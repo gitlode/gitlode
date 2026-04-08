@@ -18,14 +18,20 @@ Existing dependencies in `package.json` are provisional and can be reconsidered 
 
 ---
 
-## Phase 0: Project Tooling Setup ✅ / 🔲
+## Phase 0: Project Tooling Setup 🔲
 
 _Configure all developer tooling. No source code changes._
 
-### Steps
+### Status
 
-1. **`package.json`** — add devDependencies (`eslint`, `typescript-eslint`, `vitest`) and scripts:
-   - `lint`, `lint:fix`, `test`, `test:watch`
+- ✅ Vitest added (`devDependencies`), `test`/`test:watch` scripts added
+- ✅ `.gitignore` — all needed entries present
+- ❌ **ESLint not set up** — `eslint`, `typescript-eslint`, `eslint.config.js`, `lint`/`lint:fix` scripts all missing
+- ❌ **`vitest.config.ts` not created** (using Vitest defaults for now)
+
+### Remaining Steps
+
+1. **`package.json`** — add devDependencies: `eslint` (v9), `typescript-eslint` (v8); add scripts: `lint`, `lint:fix`
 2. **`eslint.config.js`** — ESLint flat config (ESM `.js`); `tseslint.configs.recommended`; applies to `src/**/*.ts`; ignores `dist/`
 3. **`vitest.config.ts`** — Node environment; test match: `tests/**/*.test.ts`
 4. **`npm install`** — lock new deps
@@ -33,26 +39,31 @@ _Configure all developer tooling. No source code changes._
 ### Verification
 
 - [ ] `npm run build` — no regressions
-- [ ] `npm run lint` — passes on `src/index.ts`
-- [ ] `npm test` — exits 0 ("no test files found" is acceptable)
+- [ ] `npm run lint` — passes on all files in `src/`
+- [ ] `npm test` — all existing tests still pass
 - [ ] `npm run fmt:check` — passes (oxfmt unaffected)
 
 ---
 
-## Phase 1: Scaffold & Shared Types 🔲
+## Phase 1: Scaffold & Shared Types ✅
 
 _All shared TypeScript interfaces and types. No logic._
 
-### Steps
+### Status
 
-1. `src/git/types.ts` — `GitAdapter` interface, `RawCommit`, `GitAdapterError` + `GitAdapterErrorCode`
-2. `src/core/types.ts` — `ExtractorConfig`, `RotationConfig`, `StateFile`
-3. `src/output/types.ts` — `OutputCommit`
+Done (completed in previous session, ahead of schedule).
 
-### Verification
+- ✅ `src/git/index.ts` — `GitAdapter`, `RawCommit`, `RawPerson extends PersonIdentity`
+- ✅ `src/git/errors.ts` — `GitAdapterError`, `GitAdapterErrorCode`
+- ✅ `src/core/index.ts` — `ExtractorConfig`, `ExtractionRange`, `RotationConfig`, `StateFile`, `StateBranchEntry`, `PersonIdentity`
+- ✅ `src/output/index.ts` — `OutputCommit`, `OutputPerson`, `OutputRepository`
+- ✅ `src/cli/index.ts` — empty placeholder
+- ✅ `tests/git-adapter-error.test.ts` — 3 smoke tests for `GitAdapterError`; all pass
 
-- [ ] `npm run build` — zero TypeScript errors
-- [ ] `npm run lint` — zero ESLint errors
+### Notable design decisions
+
+- `PersonIdentity` lives in `core` as the shared base for `RawPerson` (git layer) and `OutputPerson` (output layer)
+- All anonymous inline shapes were given explicit names (`ExtractionRange`, `StateBranchEntry`, `OutputRepository`, etc.)
 
 ---
 
@@ -143,19 +154,22 @@ _Wire all layers through citty, implement all validation, complete `src/index.ts
 
 _Automate quality checks on every PR; publish to npm on release tag._
 
-### Steps
+### Status
 
-1. `.github/workflows/ci.yml`:
-   - Triggers: push to `main`, `pull_request`
-   - Jobs: typecheck (`tsc --noEmit`), lint, format-check, test, build
-   - Node 22
+- ✅ `.github/workflows/ci.yml` — triggers on push/PR; jobs: build, test, fmt:check; Node 22
+- ❌ Lint step missing from CI (ESLint not yet set up — will be added after Phase 0 completes)
+- ❌ `.github/workflows/release.yml` — not yet created
+
+### Remaining Steps
+
+1. Add `lint` step to `ci.yml` after Phase 0 ESLint setup is done
 2. `.github/workflows/release.yml`:
    - Trigger: push of `v*` tag
    - Jobs: build → `npm publish` (uses `NODE_AUTH_TOKEN` secret)
 
 ### Verification
 
-- [ ] Test PR: all CI jobs pass on GitHub
+- [ ] Test PR: all CI jobs (including lint) pass on GitHub
 
 ---
 

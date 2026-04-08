@@ -1,0 +1,38 @@
+{
+  "name": "gitrail",
+  "version": "0.1.0",
+  "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
+  "keywords": [
+    "cli",
+    "data-warehouse",
+    "etl",
+    "git",
+    "jsonl"
+  ],
+  "license": "MIT",
+  "bin": {
+    "gitrail": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "dependencies": {
+    "citty": "^0.2.2",
+    "isomorphic-git": "^1.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "oxfmt": "^0.44.0",
+    "typescript": "^6.0.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

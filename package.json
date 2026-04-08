@@ -20,6 +20,8 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check"
   },
@@ -30,7 +32,8 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "oxfmt": "^0.44.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.3"
   },
   "engines": {
     "node": ">=22.0.0"

@@ -65,3 +65,7 @@ gitrail/
 - [CLI Interface Specification](instructions/cli.instructions.md)
 - [Output JSON Schema](instructions/schema.instructions.md)
 - [Git Traversal & Differential Extraction](instructions/git-traversal.instructions.md)
+
+## Coding Conventions
+
+- **Code comments must be written in English.** This applies to all source files, configuration files, and CI/CD definitions.

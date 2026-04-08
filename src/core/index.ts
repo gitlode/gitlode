@@ -1,4 +1,11 @@
-export type { ExtractorConfig, ExtractionRange, PersonIdentity, RotationConfig, StateBranchEntry, StateFile };
+export type {
+  ExtractorConfig,
+  ExtractionRange,
+  PersonIdentity,
+  RotationConfig,
+  StateBranchEntry,
+  StateFile,
+};
 
 interface PersonIdentity {
   name: string;

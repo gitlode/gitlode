@@ -21,11 +21,7 @@ interface GitAdapter {
   resolveRef(repoPath: string, ref: string): Promise<string>;
 
   /** Walk commits reachable from `head`, stopping before `excludeHash` if provided */
-  walkCommits(
-    repoPath: string,
-    head: string,
-    excludeHash?: string,
-  ): AsyncIterable<RawCommit>;
+  walkCommits(repoPath: string, head: string, excludeHash?: string): AsyncIterable<RawCommit>;
 
   /** Return the remote URL for `origin`, or null if not set */
   getRemoteUrl(repoPath: string): Promise<string | null>;

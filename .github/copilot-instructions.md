@@ -69,6 +69,7 @@ gitrail/
 ## Coding Conventions
 
 - **Code comments must be written in English.** This applies to all source files, configuration files, and CI/CD definitions.
+- **Always run `npm run fmt` before finishing any implementation session.** CI enforces `npm run fmt:check`; failing to format locally will cause CI failures on push. The verification checklist for every phase must include `npm run fmt:check` as the final step.
 
 ## Autonomy
 

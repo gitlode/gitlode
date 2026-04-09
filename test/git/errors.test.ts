@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GitAdapterError } from "../src/git/errors.js";
+import { GitAdapterError } from "../../src/git/errors.js";
 
 describe("GitAdapterError", () => {
   it("has the correct name", () => {

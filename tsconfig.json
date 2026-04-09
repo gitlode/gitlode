@@ -28,7 +28,10 @@
     "forceConsistentCasingInFileNames": true,
 
     // Completeness
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    // Type definitions
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

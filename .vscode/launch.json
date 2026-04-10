@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Gitrail: full extract",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/index.ts",
+      "args": [
+        "--repo",
+        "${workspaceFolder}",
+        "--branch",
+        "develop",
+        "--output",
+        "${workspaceFolder}/out"
+      ],
+      "preLaunchTask": "npm: build",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/node_modules/**"
+      ],
+      "env": {
+        // "NODE_ENV": "development",
+        // "DEBUG": "isomorphic-git:*" // Enable debug logging for isomorphic-git
+      }
+    }
+  ]
+}

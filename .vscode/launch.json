@@ -17,10 +17,7 @@
       "preLaunchTask": "npm: build",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
-      "skipFiles": [
-        "<node_internals>/**",
-        "${workspaceFolder}/node_modules/**"
-      ],
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
       "env": {
         // "NODE_ENV": "development",
         // "DEBUG": "isomorphic-git:*" // Enable debug logging for isomorphic-git
@@ -45,10 +42,7 @@
       "preLaunchTask": "npm: build",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
-      "skipFiles": [
-        "<node_internals>/**",
-        "${workspaceFolder}/node_modules/**"
-      ],
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
       "env": {
         // "NODE_ENV": "development",
         // "DEBUG": "isomorphic-git:*" // Enable debug logging for isomorphic-git

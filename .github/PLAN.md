@@ -164,26 +164,24 @@ _Wire all layers through citty, implement all validation, complete `src/index.ts
 
 ---
 
-## Phase 6: GitHub Actions CI/CD 🔲
+## Phase 6: GitHub Actions CI/CD ✅
 
 _Automate quality checks on every PR; publish to npm on release tag._
 
-### Status
+### Status: Complete
 
-- ✅ `.github/workflows/ci.yml` — triggers on push/PR; jobs: build, test, fmt:check; Node 22
-- ❌ Lint step missing from CI (ESLint not yet set up — will be added after Phase 0 completes)
-- ❌ `.github/workflows/release.yml` — not yet created
-
-### Remaining Steps
-
-1. Add `lint` step to `ci.yml` after Phase 0 ESLint setup is done
-2. `.github/workflows/release.yml`:
-   - Trigger: push of `v*` tag
-   - Jobs: build → `npm publish` (uses `NODE_AUTH_TOKEN` secret)
+- ✅ `ci.yml` — complete (build, test, lint, fmt:check; Node 22)
+- ✅ `release.yml` — npm Trusted Publishing (OIDC); triggers: release published + workflow_dispatch
+- ✅ `package.json` — `repository.url` added (`https://github.com/tomo-waka/gitrail.git`)
 
 ### Verification
 
-- [ ] Test PR: all CI jobs (including lint) pass on GitHub
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run fmt:check` — clean
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 49/49 pass
+- ✅ `release.yml` — valid YAML, no `NODE_AUTH_TOKEN` secret, no `--provenance` flag
+- ✅ `package.json` has `repository.url` = `https://github.com/tomo-waka/gitrail.git`
 
 ---
 

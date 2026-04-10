@@ -10,6 +10,10 @@
     "jsonl"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomo-waka/gitrail.git"
+  },
   "bin": {
     "gitrail": "./dist/index.js"
   },

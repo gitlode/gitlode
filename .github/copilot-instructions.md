@@ -65,3 +65,24 @@ gitrail/
 - [CLI Interface Specification](instructions/cli.instructions.md)
 - [Output JSON Schema](instructions/schema.instructions.md)
 - [Git Traversal & Differential Extraction](instructions/git-traversal.instructions.md)
+
+## Coding Conventions
+
+- **Code comments must be written in English.** This applies to all source files, configuration files, and CI/CD definitions.
+- **Always run `npm run format:write` before finishing any implementation session.** CI enforces `npm run format:check`; failing to format locally will cause CI failures on push. The verification checklist for every phase must include `npm run format:check` as the final step.
+
+## Autonomy
+
+This is an early-stage greenfield project with no existing users or production dependencies.
+
+**Proceed without asking for confirmation** for all local, reversible actions:
+
+- Creating, editing, or moving files
+- Installing or updating dependencies
+- Running builds, tests, linters, or formatters
+- Creating commits
+
+**Always ask before:**
+
+- Deleting any file or directory
+- Running `git push`, `git reset --hard`, or any history-altering command

@@ -1,0 +1,217 @@
+# gitrail — Project Build-out Plan
+
+## Overview
+
+8 phases total. Each phase ends with a verification checkpoint — implementation pauses for review and sign-off before moving to the next phase.
+
+Existing dependencies in `package.json` are provisional and can be reconsidered during implementation if there is good reason.
+
+## Tooling Decisions
+
+| Concern       | Choice                           |
+| ------------- | -------------------------------- |
+| CLI framework | citty (keep as-is)               |
+| Git library   | isomorphic-git (fixed by design) |
+| Testing       | Vitest (ESM-native)              |
+| Linting       | ESLint v9 + typescript-eslint    |
+| Formatting    | oxfmt (keep as-is)               |
+
+---
+
+## Phase 0: Project Tooling Setup ✅
+
+_Configure all developer tooling. No source code changes._
+
+### Status: Complete
+
+- ✅ Vitest added (`devDependencies`), `test`/`test:watch` scripts added
+- ✅ `.gitignore` — all needed entries present
+- ✅ `eslint` (v10), `typescript-eslint` (v8) added to `devDependencies`
+- ✅ `eslint.config.js` — flat config, `tseslint.configs.recommended`, applies to `src/**/*.ts`
+- ✅ `vitest.config.ts` — Node environment, `tests/**/*.test.ts`
+- ✅ `lint` / `lint:fix` scripts added to `package.json`
+
+### Verification
+
+- ✅ `npm run build` — no regressions
+- ✅ `npm run lint` — passes on all files in `src/`
+- ✅ `npm test` — 3/3 tests pass
+- ✅ `npm run format:check` — passes (required one `npm run format:write` pass to fix a pre-existing issue in `src/core/index.ts`)
+
+---
+
+## Phase 1: Scaffold & Shared Types ✅
+
+_All shared TypeScript interfaces and types. No logic._
+
+### Status
+
+Done (completed in previous session, ahead of schedule).
+
+- ✅ `src/git/index.ts` — `GitAdapter`, `RawCommit`, `RawPerson extends PersonIdentity`
+- ✅ `src/git/errors.ts` — `GitAdapterError`, `GitAdapterErrorCode`
+- ✅ `src/core/index.ts` — `ExtractorConfig`, `ExtractionRange`, `RotationConfig`, `StateFile`, `StateBranchEntry`, `PersonIdentity`
+- ✅ `src/output/index.ts` — `OutputCommit`, `OutputPerson`, `OutputRepository`
+- ✅ `src/cli/index.ts` — empty placeholder
+- ✅ `tests/git-adapter-error.test.ts` — 3 smoke tests for `GitAdapterError`; all pass
+
+### Notable design decisions
+
+- `PersonIdentity` lives in `core` as the shared base for `RawPerson` (git layer) and `OutputPerson` (output layer)
+- All anonymous inline shapes were given explicit names (`ExtractionRange`, `StateBranchEntry`, `OutputRepository`, etc.)
+
+---
+
+## Phase 2: Git Adapter Layer (`src/git/`) ✅
+
+_Concrete isomorphic-git adapter: ref resolution, remote URL, BFS commit walk with exclusion._
+
+### Status: Complete
+
+- ✅ `src/git/isomorphic-git-adapter.ts` — `resolveRef`, `getRemoteUrl`, `walkCommits` (BFS + `_collectReachable` exclusion); constructor accepts optional `FsClient` for DI (defaults to `node:fs`)
+- ✅ `src/git/index.ts` — re-exports `IsomorphicGitAdapter`
+- ✅ `test/git/isomorphic-git-adapter.test.ts` — 6 tests using fully in-memory repos via `memfs`; full traversal, exclusion boundary, merge DAG, remote URL cases
+- ✅ `memfs` added as devDependency
+
+### Refactoring performed (not originally in plan)
+
+- **Type definitions separated**: all interfaces/types moved from `index.ts` to `types.ts` in each layer (`src/git/types.ts`, `src/core/types.ts`, `src/output/types.ts`); `index.ts` files are re-export-only
+- **`FsClient` typed properly**: replaced `any` with `import type { FsClient } from "isomorphic-git"`; `node:fs` cast via `as FsClient`
+- **Test directory restructured**: `tests/` renamed to `test/`; src-mirror layout (`test/git/`); `vitest.config.ts` `include` updated to `test/**/*.test.ts`
+- **`tsconfig.json`**: added `"types": ["node"]` for `node:` protocol imports under TypeScript 6
+
+### Verification
+
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 9/9 pass (3 errors + 6 adapter tests)
+- ✅ `npm run format:check` — clean
+
+---
+
+## Phase 3: Output Layer (`src/output/`) ✅
+
+_JSONL serialization, ISO 8601 timestamp conversion, file rotation._
+
+### Status: Complete
+
+- ✅ `src/output/utils.ts` — `toISO8601()` (negated-offset algorithm), `splitMessage()`
+- ✅ `src/output/writer.ts` — `OutputWriter` class; `{prefix}-000001.jsonl`; post-write rotation on `maxLines`/`maxBytes`; LF-only; byte counting via `Buffer.byteLength`
+- ✅ `src/output/index.ts` — re-exports from `utils.ts` and `writer.ts`
+- ✅ `test/output/utils.test.ts` — 8 tests (JST, UTC, negative offset, `splitMessage` cases)
+- ✅ `test/output/writer.test.ts` — 6 tests (no rotation, line rotation, byte rotation, both thresholds, valid JSONL, LF-only)
+
+### Verification
+
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 23/23 pass (3 + 6 git + 8 utils + 6 writer)
+- ✅ `npm run format:check` — clean
+
+---
+
+## Phase 4: Core Logic Layer (`src/core/`) ✅
+
+_Orchestration, differential filtering, output mapping, atomic state file management._
+
+### Status: Complete
+
+- ✅ `src/core/extractor.ts` — `Extractor` class with full implementation
+- ✅ `src/core/index.ts` — re-exports `Extractor`
+- ✅ `test/core/extractor.test.ts` — 7 tests covering all required scenarios
+
+### Implementation notes
+
+- State file `ENOENT` → silent full extraction; any other read/parse error → rethrow
+- `excludeHash` logic: `range.type === "commit"` → use hash; `range.type === "date"` → no excludeHash (filter per-commit); state map → use `lastCommitHash`; none → full extraction
+- `--since-date` uses `continue` (not `break`) — correct for BFS across non-chronological merge branches
+- `COMMIT_NOT_FOUND` on stale `lastCommitHash` → `stderr` warning + fallback to full extraction, preserving `visited` set
+- `writer.close()` in `finally` — always runs; state file written only in success path
+- Atomic state write: `.tmp` → `rename`; `path.resolve()` applied to both paths before comparison
+
+### Verification
+
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 30/30 pass (23 prior + 7 extractor)
+- ✅ `npm run format:check` — clean
+
+---
+
+## Phase 5: CLI Layer + End-to-End Wiring (`src/cli/`) ✅
+
+_Wire all layers through citty, implement all validation, complete `src/index.ts`._
+
+### Status: Complete
+
+- ✅ `src/cli/args.ts` — `parseArgs(adapter)` function; all 9 params; 3 mutual-exclusion rules; all validation; `--output-prefix` derivation; `--branch` collected manually from `process.argv` (citty only keeps last occurrence)
+- ✅ `src/cli/index.ts` — re-exports `parseArgs`
+- ✅ `src/index.ts` — full wiring: `IsomorphicGitAdapter` → `parseArgs` → `Extractor`; exit codes 0/1/2; stray `export { Extractor }` removed
+- ✅ `test/cli/args.test.ts` — 19 tests (mutual exclusion, missing branch, invalid rotation args, invalid date, prefix derivation, valid round-trip)
+- ✅ `format:check` failure on `.vscode/launch.json` (not from phase work) fixed with `npm run format:write`
+
+### Notable design decision
+
+`--branch` is collected by manually scanning `process.argv` before citty parsing, because citty only retains the last occurrence of a repeated string flag. The rest of parsing delegates to citty's `parseCittyArgs`.
+
+### Verification
+
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 49/49 pass (30 prior + 19 CLI)
+- ✅ `npm run format:check` — clean
+- ✅ End-to-end smoke test: `node dist/index.js --branch develop ./` → valid JSONL output with correct `oid`, `subject`, ISO 8601 timestamps, `repository.name: "gitrail"`, `repository.url: "https://github.com/tomo-waka/gitrail.git"`
+
+---
+
+## Phase 6: GitHub Actions CI/CD ✅
+
+_Automate quality checks on every PR; publish to npm on release tag._
+
+### Status: Complete
+
+- ✅ `ci.yml` — complete (build, test, lint, format:check; Node 22)
+- ✅ `release.yml` — npm Trusted Publishing (OIDC); triggers: release published + workflow_dispatch
+- ✅ `package.json` — `repository.url` added (`https://github.com/tomo-waka/gitrail.git`)
+
+### Verification
+
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run format:check` — clean
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 49/49 pass
+- ✅ `release.yml` — valid YAML, no `NODE_AUTH_TOKEN` secret, no `--provenance` flag
+- ✅ `package.json` has `repository.url` = `https://github.com/tomo-waka/gitrail.git`
+
+---
+
+## Phase 7: OSS Documentation ✅
+
+_Minimum viable documentation for a public CLI project._
+
+### Status: Complete
+
+- ✅ `README.md` — expanded (requirements, CLI reference, incremental extraction, output file naming)
+- ✅ `CONTRIBUTING.md` — created (prerequisites, setup, build, test, lint/format, PR workflow, code style)
+- ✅ `CHANGELOG.md` — created (v0.1.0 entry following Keep a Changelog format)
+- ✅ `LICENSE` — MIT, verified correct, no changes needed
+
+### Verification
+
+- ✅ `npm run format:check` — clean across all new/modified files
+- ✅ All Markdown links in `README.md` reference accurate CLI behavior
+- ✅ No placeholder text (`TODO`, `...`) left in any file
+- ✅ Phase 7 marked ✅
+
+---
+
+## Final End-to-End Checklist
+
+- ✅ `npm run build` — zero TypeScript errors
+- ✅ `npm run lint` — zero ESLint warnings/errors
+- ✅ `npm test` — all unit tests pass
+- ✅ CI workflow passes (ci.yml present and passing)
+- [ ] `node dist/index.js --branch main ./` — full extraction; produces `gitrail-000001.jsonl`
+- [ ] Re-run with `--state state.json` — no new output; state file updated
+- [ ] New commit → re-run with `--state` — only new commit in output
+- [ ] `--rotate-lines 2` — produces `gitrail-000001.jsonl`, `gitrail-000002.jsonl`, …

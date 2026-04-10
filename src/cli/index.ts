@@ -1,1 +1,1 @@
-export {};
+export { parseArgs } from "./args.js";

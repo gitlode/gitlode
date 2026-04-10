@@ -112,12 +112,25 @@ export class IsomorphicGitAdapter implements GitAdapter {
       const hash = queue.shift()!;
       if (reachable.has(hash)) continue;
       reachable.add(hash);
-      const { commit } = await git.readCommit({
-        fs: this._fs,
-        dir: repoPath,
-        oid: hash,
-      });
-      for (const parent of commit.parent) {
+      let commitParents: string[];
+      try {
+        const { commit } = await git.readCommit({
+          fs: this._fs,
+          dir: repoPath,
+          oid: hash,
+        });
+        commitParents = commit.parent;
+      } catch (err) {
+        if (err instanceof Error && err.name === "NotFoundError") {
+          throw new GitAdapterError(`Commit not found: ${hash}`, "COMMIT_NOT_FOUND", err);
+        }
+        throw new GitAdapterError(
+          `Unexpected error reading commit ${hash}: ${String(err)}`,
+          "UNKNOWN",
+          err,
+        );
+      }
+      for (const parent of commitParents) {
         queue.push(parent);
       }
     }

@@ -138,26 +138,29 @@ _Orchestration, differential filtering, output mapping, atomic state file manage
 
 ---
 
-## Phase 5: CLI Layer + End-to-End Wiring (`src/cli/`) 🔲
+## Phase 5: CLI Layer + End-to-End Wiring (`src/cli/`) ✅
 
 _Wire all layers through citty, implement all validation, complete `src/index.ts`._
 
-### Steps
+### Status: Complete
 
-1. `src/cli/args.ts`:
-   - Parse all 9 parameters
-   - Enforce 3 mutual-exclusion rules
-   - All validation rules from `cli.instructions.md`
-   - `--output-prefix` derivation via `getRemoteUrl()` fallback chain
-   - Build and return `ExtractorConfig`
-2. `src/cli/index.ts` — barrel export
-3. Update `src/index.ts` — replace citty stub with full CLI → `Extractor` delegation; exit codes 0/1/2
-4. Integration test: full run + incremental run against a real repo
+- ✅ `src/cli/args.ts` — `parseArgs(adapter)` function; all 9 params; 3 mutual-exclusion rules; all validation; `--output-prefix` derivation; `--branch` collected manually from `process.argv` (citty only keeps last occurrence)
+- ✅ `src/cli/index.ts` — re-exports `parseArgs`
+- ✅ `src/index.ts` — full wiring: `IsomorphicGitAdapter` → `parseArgs` → `Extractor`; exit codes 0/1/2; stray `export { Extractor }` removed
+- ✅ `test/cli/args.test.ts` — 19 tests (mutual exclusion, missing branch, invalid rotation args, invalid date, prefix derivation, valid round-trip)
+- ✅ `fmt:check` failure on `.vscode/launch.json` (not from phase work) fixed with `npm run fmt`
+
+### Notable design decision
+
+`--branch` is collected by manually scanning `process.argv` before citty parsing, because citty only retains the last occurrence of a repeated string flag. The rest of parsing delegates to citty's `parseCittyArgs`.
 
 ### Verification
 
-- [ ] `node dist/index.js --help` — usage displayed correctly
-- [ ] Smoke tests: full, incremental, rotation
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 49/49 pass (30 prior + 19 CLI)
+- ✅ `npm run fmt:check` — clean
+- ✅ End-to-end smoke test: `node dist/index.js --branch develop ./` → valid JSONL output with correct `oid`, `subject`, ISO 8601 timestamps, `repository.name: "gitrail"`, `repository.url: "https://github.com/tomo-waka/gitrail.git"`
 
 ---
 

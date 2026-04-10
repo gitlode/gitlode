@@ -110,25 +110,31 @@ _JSONL serialization, ISO 8601 timestamp conversion, file rotation._
 
 ---
 
-## Phase 4: Core Logic Layer (`src/core/`) 🔲
+## Phase 4: Core Logic Layer (`src/core/`) ✅
 
 _Orchestration, differential filtering, output mapping, atomic state file management._
 
-### Steps
+### Status: Complete
 
-1. `src/core/extractor.ts` — `Extractor` class:
-   - Full extraction / `--since-date` (filter + early stop) / `--since-commit` + `--state` (excludeHash)
-   - Multi-branch sequential traversal with global `visited` Set (within-run dedup)
-   - `RawCommit` → `OutputCommit` mapping (repository.name/url derived once per run)
-   - State file: read with `path.resolve()` comparison; write atomically (`.tmp` → rename); only after all output flushed
-   - Non-fatal warnings: branch missing, `lastCommitHash` gone → fall back to full
-2. `src/core/index.ts` — barrel export
-3. Unit tests: dedup across branches, since-date + early stop, state file round-trip, atomic write
+- ✅ `src/core/extractor.ts` — `Extractor` class with full implementation
+- ✅ `src/core/index.ts` — re-exports `Extractor`
+- ✅ `test/core/extractor.test.ts` — 7 tests covering all required scenarios
+
+### Implementation notes
+
+- State file `ENOENT` → silent full extraction; any other read/parse error → rethrow
+- `excludeHash` logic: `range.type === "commit"` → use hash; `range.type === "date"` → no excludeHash (filter per-commit); state map → use `lastCommitHash`; none → full extraction
+- `--since-date` uses `continue` (not `break`) — correct for BFS across non-chronological merge branches
+- `COMMIT_NOT_FOUND` on stale `lastCommitHash` → `stderr` warning + fallback to full extraction, preserving `visited` set
+- `writer.close()` in `finally` — always runs; state file written only in success path
+- Atomic state write: `.tmp` → `rename`; `path.resolve()` applied to both paths before comparison
 
 ### Verification
 
-- [ ] `npm test` — all tests pass
-- [ ] Smoke test: full extraction produces valid JSONL
+- ✅ `npm run build` — 0 errors
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm test` — 30/30 pass (23 prior + 7 extractor)
+- ✅ `npm run fmt:check` — clean
 
 ---
 

@@ -6,3 +6,4 @@ export type {
   StateBranchEntry,
   StateFile,
 } from "./types.js";
+export { Extractor } from "./extractor.js";

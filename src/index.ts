@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { defineCommand, runMain } from "citty";
 
+export { Extractor } from "./core/index.js";
+
 const main = defineCommand({
   meta: {
     name: "gitrail",

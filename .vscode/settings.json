@@ -12,11 +12,5 @@
   "cSpell.words": ["gitrail"],
 
   // Formatter
-  "[json]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode"
-  },
-  "[jsonc]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode"
-  },
-  "json.format.enable": false
+  "editor.defaultFormatter": "oxc.oxc-vscode"
 }

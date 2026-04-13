@@ -158,6 +158,19 @@ gitrail --branch main --since-commit abc123def456 ./my-repo
 gitrail --branch main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
 ```
 
+## Project Information
+
+- [Changelog](CHANGELOG.md) — release history and notable changes by version
+
+## Developer Guide
+
+Developer-oriented references:
+
+- [Contributing Guide](CONTRIBUTING.md) — local setup, quality checks, and pull request workflow
+- [Architecture](docs/design/architecture.md) — layer responsibilities, end-to-end flow, and key design decisions
+- [Git Traversal](docs/design/git-traversal.md) — DAG traversal, differential extraction modes, and deduplication strategy
+- [Output Schema](docs/design/schema.md) — JSONL format, field definitions, timestamp conversion, and file rotation
+
 ## License
 
 MIT

@@ -84,7 +84,11 @@ The following combinations are invalid and must produce a clear error message be
 
 ## Validation Rules
 
-All validation must occur before any Git access or file I/O.
+All validation must complete before extraction and file output begin. Validation proceeds in three phases:
+
+1. **Format / mutual exclusion** — no I/O (mutual exclusion rules, branch count, numeric arg formats, ISO 8601 format for `--since-date`)
+2. **File system** — `<repository-path>` existence, `--output-dir` existence
+3. **Git** — repository identity (`resolveRef` on first branch), `--since-commit` reachability (`walkCommits` with the hash as `excludeHash`)
 
 | Condition                                                     | Error                                                                                 |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -129,10 +133,46 @@ gitrail --branch main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
 
 ---
 
-## Recommended CLI Framework
+## CLI Framework
 
-Use **[citty](https://github.com/unjs/citty)** or **[clerc](https://github.com/clerkdev/clerc)**. Both are modern TypeScript-native frameworks with zero legacy overhead.
+**[citty](https://github.com/unjs/citty)** — decided and in use. TypeScript-native, zero legacy overhead.
 
-Alternative: **[commander.js](https://github.com/tj/commander.js)** — mature and widely used, acceptable if the above are unsuitable.
+---
 
-Avoid: yargs, meow (heavier than necessary for this scope).
+## Implementation Notes
+
+### `--branch` multi-occurrence workaround
+
+citty only retains the **last** occurrence when a string flag appears multiple times. Because `--branch` must be repeatable, all `--branch` values are collected by manually scanning `process.argv` **before** delegating to `parseCittyArgs`. citty then parses everything else.
+
+```typescript
+const branches: string[] = [];
+for (let i = 0; i < rawArgv.length; i++) {
+  if (rawArgv[i] === "--branch") {
+    const val = rawArgv[i + 1];
+    if (val !== undefined && !val.startsWith("-")) {
+      branches.push(val);
+      i++;
+    }
+  } else if (rawArgv[i]?.startsWith("--branch=")) {
+    const val = rawArgv[i]!.slice("--branch=".length);
+    if (val) branches.push(val);
+  }
+}
+```
+
+### `cmdDefinition` export
+
+`src/cli/args.ts` exports `cmdDefinition` — a `defineCommand` descriptor with `meta` and `args` but no `run()`. This object is spread into the `defineCommand` call in `src/index.ts` so that citty can populate `--help` output with all argument descriptions:
+
+```typescript
+// src/index.ts
+import { cmdDefinition } from "./cli/index.js";
+
+const main = defineCommand({
+  ...cmdDefinition, // brings in meta + args
+  async run() { ... },
+});
+```
+
+This separation keeps argument definitions co-located with `parseArgs` while allowing the entry point to own the `run()` implementation.

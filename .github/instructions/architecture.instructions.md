@@ -11,7 +11,7 @@ applyTo: "src/**"
 ┌─────────────────────────────────┐
 │           CLI Layer             │  Argument parsing, validation, error display
 ├─────────────────────────────────┤
-│         Core Logic Layer        │  Commit traversal orchestration, JSON mapping, file rotation
+│         Core Logic Layer        │  Commit traversal orchestration, JSON mapping, state file management
 ├─────────────────────────────────┤
 │      Git Adapter Interface      │  Abstract interface — isolates isomorphic-git dependency
 ├─────────────────────────────────┤
@@ -29,8 +29,7 @@ Each layer must only depend on the layer directly below it. The Core Logic layer
 
 - Parse and validate CLI arguments (see `cli.instructions.md` for full parameter spec)
 - Enforce mutual-exclusion rules between parameters
-- Load and validate the state file if `--state` is provided
-- Instantiate Core and pass resolved config
+- Instantiate Core and pass resolved config (including `stateFilePath` as a string — state file I/O is performed by Core, not CLI)
 - Handle top-level errors and format user-facing error messages
 - Exit with appropriate codes: `0` = success, `1` = user error, `2` = runtime error
 
@@ -40,20 +39,22 @@ Responsibilities:
 
 - Orchestrate commit traversal by calling `GitAdapter`
 - Map raw commit data to the output JSON schema
-- Apply differential filtering (since-commit / since-date)
-- Manage file rotation logic (line count / byte size thresholds)
-- Update the state file atomically after successful output
+- Apply differential filtering (since-commit / since-date); uses `continue` (not `break`) for `--since-date` because BFS order is not chronological
+- Read the state file at startup; write it atomically (`.tmp` → rename) only after all output files are fully flushed and closed
+- Instantiate `OutputWriter` with the rotation config — rotation thresholds are enforced inside `OutputWriter`, not in Core
 
 Key types:
 
 ```typescript
+type ExtractionRange = { type: "commit"; hash: string } | { type: "date"; since: Date };
+
 interface ExtractorConfig {
   repositoryPath: string;
   branches: string[]; // At least one required
   outputDir: string;
   outputPrefix: string;
   rotation: RotationConfig;
-  range?: { type: "commit"; hash: string } | { type: "date"; since: Date };
+  range?: ExtractionRange;
   stateFilePath?: string;
 }
 
@@ -104,9 +105,11 @@ interface RawCommit {
 
 The concrete implementation of `GitAdapter` using isomorphic-git.
 
-- Uses `isomorphic-git`'s `log()` and `walk()` APIs
-- Implements commit exclusion via reachability check (see `git-traversal.instructions.md`)
+- Uses `isomorphic-git`'s `readCommit()` (BFS traversal), `resolveRef()`, and `getConfig()` APIs
+- Does **not** use isomorphic-git's `log()` or `walk()` APIs; BFS is implemented manually using `readCommit()` in a queue loop
+- Implements commit exclusion via reachability pre-computation (see `git-traversal.instructions.md`)
 - Must not leak isomorphic-git types outside this file
+- Accepts an optional `FsClient` in its constructor for dependency injection (defaults to `node:fs`)
 
 ### Output Layer (`src/output/`)
 
@@ -115,6 +118,17 @@ The concrete implementation of `GitAdapter` using isomorphic-git.
 - Rotate to a new file when thresholds are exceeded
 - Generate output filenames: `{prefix}-{sequenceNumber padded to 6 digits}.jsonl`
 - Use `\n` (LF) as line endings — never `\r\n`
+
+---
+
+## File Layout Convention
+
+Every layer follows a consistent two-file pattern:
+
+- **`types.ts`** — all TypeScript interfaces and type aliases for that layer. No runtime code.
+- **`index.ts`** — re-export barrel only. No type definitions or logic.
+
+This separation was introduced in Phase 2 to keep type definitions discoverable and to prevent circular imports between layers.
 
 ---
 

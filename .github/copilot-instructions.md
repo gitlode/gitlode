@@ -13,32 +13,54 @@ Key characteristics:
 
 ## Tech Stack
 
-| Layer         | Choice                          | Rationale                                     |
-| ------------- | ------------------------------- | --------------------------------------------- |
-| Language      | TypeScript (strict mode)        | Type safety, npm ecosystem                    |
-| Runtime       | Node.js                         | CLI target environment                        |
-| Git access    | isomorphic-git                  | Pure JS, no native build, actively maintained |
-| CLI framework | TBD (see `cli.instructions.md`) |                                               |
-| Output format | JSON Lines (JSONL)              | Streaming-friendly, DWH-compatible            |
+| Layer         | Choice                   | Rationale                                     |
+| ------------- | ------------------------ | --------------------------------------------- |
+| Language      | TypeScript (strict mode) | Type safety, npm ecosystem                    |
+| Runtime       | Node.js                  | CLI target environment                        |
+| Git access    | isomorphic-git           | Pure JS, no native build, actively maintained |
+| CLI framework | citty                    | TypeScript-native, zero legacy overhead       |
+| Output format | JSON Lines (JSONL)       | Streaming-friendly, DWH-compatible            |
 
-## Repository Structure (target)
+## Repository Structure
 
 ```
 gitrail/
 ├── .github/
 │   ├── copilot-instructions.md       # This file
-│   └── instructions/
-│       ├── architecture.instructions.md
-│       ├── cli.instructions.md
-│       ├── schema.instructions.md
-│       └── git-traversal.instructions.md
+│   ├── instructions/
+│   │   ├── architecture.instructions.md
+│   │   ├── cli.instructions.md
+│   │   ├── schema.instructions.md
+│   │   ├── git-traversal.instructions.md
+│   │   └── roadmap.md
+│   ├── workflows/
+│   │   ├── ci.yml
+│   │   └── release.yml
+│   └── PLAN.md
 ├── src/
 │   ├── index.ts                      # CLI entry point
 │   ├── cli/                          # CLI argument parsing
+│   │   ├── args.ts
+│   │   └── index.ts
 │   ├── core/                         # Core extraction logic
+│   │   ├── extractor.ts
+│   │   ├── index.ts
+│   │   └── types.ts
 │   ├── git/                          # Git Adapter layer
+│   │   ├── errors.ts
+│   │   ├── index.ts
+│   │   ├── isomorphic-git-adapter.ts
+│   │   └── types.ts
 │   └── output/                       # JSON serialization and file rotation
-├── tests/
+│       ├── index.ts
+│       ├── types.ts
+│       ├── utils.ts
+│       └── writer.ts
+├── test/                             # Mirrors src/ layout
+│   ├── cli/
+│   ├── core/
+│   ├── git/
+│   └── output/
 ├── package.json
 └── tsconfig.json
 ```

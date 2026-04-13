@@ -6,20 +6,6 @@ Items are grouped by expected priority order within each section. Final ordering
 
 ---
 
-## Completed: v0.1.0 — Initial Release
-
-- Commit-level extraction with fixed schema
-- JSON Lines output with `\n` line endings
-- Branch-based traversal (one or more refs as starting points)
-- Full and differential extraction (`--state`, `--since-commit`, `--since-date`)
-- File rotation by line count and byte size
-- Output filename prefix derived from remote origin
-- State file for incremental run management
-- CI (GitHub Actions): build, lint, format check, tests
-- Release workflow: npm Trusted Publishing (OIDC)
-
----
-
 ## Product Improvements
 
 ### Near-term

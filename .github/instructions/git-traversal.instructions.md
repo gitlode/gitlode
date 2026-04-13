@@ -63,7 +63,7 @@ This is equivalent to `git log <excludeHash>..<currentHead>` and correctly handl
 1. Walk all commits reachable from HEAD (no `excludeHash`)
 2. Filter: include only commits where `committer.timestamp` (as Unix seconds) is **after** the specified date
 3. Use `committer.timestamp` (not `author.timestamp`) as the filter criterion
-4. Stop walking when a commit's `committer.timestamp` is older than the specified date — do not continue walking older history
+4. Use `continue` (not `break`) to skip old commits — do not abort the traversal when an old commit is encountered. BFS order across merge branches is not chronological: a newer commit from a merged branch may appear after an older one in BFS order, so early termination would silently drop commits.
 
 ---
 
@@ -89,7 +89,7 @@ With proper exclusion (reachability difference): yields only `5`, `4`, `A`, `B`,
 
 ### Implementation in isomorphic-git
 
-isomorphic-git's `log()` API does not natively support exclusion. Use `walk()` with a custom visitor that tracks visited commits and stops when the `excludeHash` commit (or any of its ancestors) is reached.
+isomorphic-git's `log()` and `walk()` APIs do not natively support exclusion-based traversal. The implementation uses `readCommit()` in a manual BFS queue loop. `_collectReachable()` pre-computes the full set of commit hashes reachable from `excludeHash`; the main loop skips any hash found in that set.
 
 Algorithm for `walkCommits(repoPath, head, excludeHash)`:
 

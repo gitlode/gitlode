@@ -211,7 +211,7 @@ _Minimum viable documentation for a public CLI project._
 - ✅ `npm run lint` — zero ESLint warnings/errors
 - ✅ `npm test` — all unit tests pass
 - ✅ CI workflow passes (ci.yml present and passing)
-- [ ] `node dist/index.js --branch main ./` — full extraction; produces `gitrail-000001.jsonl`
-- [ ] Re-run with `--state state.json` — no new output; state file updated
-- [ ] New commit → re-run with `--state` — only new commit in output
-- [ ] `--rotate-lines 2` — produces `gitrail-000001.jsonl`, `gitrail-000002.jsonl`, …
+- ✅ `node dist/index.js --branch main ./` — full extraction; produces `gitrail-000001.jsonl`
+- ✅ Re-run with `--state state.json` — no new output; state file updated
+- ✅ New commit → re-run with `--state` — only new commit in output
+- ✅ `--rotate-lines 2` — produces `gitrail-000001.jsonl`, `gitrail-000002.jsonl`, …

@@ -109,14 +109,14 @@ _Add a small usability feature for non-interactive environments._
 
 ### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 ### Tasks
 
-- [ ] Add a `--quiet` flag to suppress progress and summary output
-- [ ] Ensure this affects only stderr chatter, not normal extraction output or exit codes
+- [x] Add a `--quiet` flag to suppress progress and summary output
+- [x] Ensure this affects only stderr chatter, not normal extraction output or exit codes
 - [ ] Document the intended use for CI and scheduled jobs
 
 ### Target files
@@ -127,8 +127,8 @@ _Add a small usability feature for non-interactive environments._
 
 ### Verification
 
-- [ ] Running with `--quiet` suppresses progress and summary output
-- [ ] Extraction results and exit status remain unchanged
+- [x] Running with `--quiet` suppresses progress and summary output
+- [x] Extraction results and exit status remain unchanged
 
 ---
 

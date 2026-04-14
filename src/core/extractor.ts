@@ -137,7 +137,7 @@ export class Extractor {
           }
           await writer.write(mapToOutputCommit(commit, repoName, remoteUrl));
           commitsWritten++;
-          if (commitsWritten % 100 === 0) {
+          if (!this.config.quiet && commitsWritten % 100 === 0) {
             process.stderr.write(`\rProcessed ${commitsWritten} commits...`);
           }
         };
@@ -160,11 +160,12 @@ export class Extractor {
         }
       }
     } finally {
-      if (commitsWritten > 0 && commitsWritten % 100 !== 0) {
-        // Flush the in-place progress line if it was started but not yet terminated
-        process.stderr.write(`\rProcessed ${commitsWritten} commits...\n`);
-      } else if (commitsWritten >= 100) {
-        process.stderr.write("\n");
+      if (!this.config.quiet) {
+        if (commitsWritten > 0 && commitsWritten % 100 !== 0) {
+          process.stderr.write(`\rProcessed ${commitsWritten} commits...\n`);
+        } else if (commitsWritten >= 100) {
+          process.stderr.write("\n");
+        }
       }
       await writer.close();
     }

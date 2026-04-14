@@ -51,6 +51,11 @@ const argsDef = {
     type: "string" as const,
     description: "Start a new output file after N bytes",
   },
+  quiet: {
+    type: "boolean" as const,
+    default: false,
+    description: "Suppress progress and summary output (for CI, cron, and scripted usage)",
+  },
 } satisfies ArgsDef;
 
 // defineCommand descriptor (provides structured metadata and enables --help generation
@@ -101,6 +106,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ExtractorConfig> {
   const rotateLinesRaw = parsed["rotate-lines"] as string | undefined;
   const rotateSizeRaw = parsed["rotate-size"] as string | undefined;
   const repoPath = parsed["repository-path"] as string | undefined;
+  const quiet = Boolean(parsed["quiet"]);
 
   // --- Mutual exclusion checks (before any I/O) ---
   if (sinceCommit && sinceDate) {
@@ -231,5 +237,6 @@ export async function parseArgs(adapter: GitAdapter): Promise<ExtractorConfig> {
         ? { type: "date", since: sinceDateObj }
         : undefined,
     stateFilePath: state,
+    quiet,
   };
 }

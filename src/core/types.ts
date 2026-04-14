@@ -18,6 +18,7 @@ export interface ExtractorConfig {
   rotation: RotationConfig;
   range?: ExtractionRange;
   stateFilePath?: string;
+  quiet?: boolean;
 }
 
 export interface StateBranchEntry {

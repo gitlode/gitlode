@@ -326,4 +326,20 @@ describe("parseArgs – valid args round-trip", () => {
     const config = await parseArgs(adapter);
     expect(config.stateFilePath).toBe("/tmp/state.json");
   });
+
+  it("sets quiet=true when --quiet is provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "--quiet", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.quiet).toBe(true);
+  });
+
+  it("sets quiet=false when --quiet is not provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.quiet).toBe(false);
+  });
 });

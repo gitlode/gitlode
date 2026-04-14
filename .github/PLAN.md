@@ -117,7 +117,7 @@ _Add a small usability feature for non-interactive environments._
 
 - [x] Add a `--quiet` flag to suppress progress and summary output
 - [x] Ensure this affects only stderr chatter, not normal extraction output or exit codes
-- [ ] Document the intended use for CI and scheduled jobs
+- [x] Document the intended use for CI and scheduled jobs
 
 ### Target files
 
@@ -196,9 +196,9 @@ Before considering v0.1.4 ready:
 - [x] `npm run lint` passes
 - [x] `npm run format:check` passes as the final formatting gate
 - [x] `node dist/index.js --help` shows the supported arguments correctly
-- [ ] One end-to-end extraction smoke test confirms valid JSONL output
-- [ ] One end-to-end extraction smoke test confirms stderr-only progress/summary output
-- [ ] One end-to-end extraction smoke test confirms correct behavior with `--quiet`
+- [x] One end-to-end extraction smoke test confirms valid JSONL output
+- [x] One end-to-end extraction smoke test confirms stderr-only progress/summary output
+- [x] One end-to-end extraction smoke test confirms correct behavior with `--quiet`
 
 ---
 

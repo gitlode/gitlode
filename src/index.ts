@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { defineCommand, runMain } from "citty";
-import { IsomorphicGitAdapter } from "./git/index.js";
-import { Extractor } from "./core/index.js";
+
 import { parseArgs } from "./cli/index.js";
+import { Extractor } from "./core/index.js";
+import { IsomorphicGitAdapter } from "./git/index.js";
 import { GitAdapterError } from "./git/index.js";
 
 const main = defineCommand({

@@ -24,6 +24,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",
     "format:check": "oxfmt --check",
     "format:write": "oxfmt",
     "lint": "eslint src",

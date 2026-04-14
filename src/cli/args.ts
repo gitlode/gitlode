@@ -1,10 +1,12 @@
 import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
+
 import { defineCommand, parseArgs as parseCittyArgs } from "citty";
 import type { ArgsDef } from "citty";
+
+import type { ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { GitAdapter } from "../git/index.js";
-import type { ExtractorConfig } from "../core/index.js";
 
 // Define all citty args on a defineCommand descriptor.
 // The schema is defined separately so it can be passed directly to parseCittyArgs.

@@ -1,13 +1,15 @@
-import { join } from "node:path";
+import nodeFs from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import nodeFs from "node:fs";
+import { join } from "node:path";
+
 import * as git from "isomorphic-git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
-import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
-import type { GitAdapter } from "../../src/git/index.js";
+
 import { parseArgs } from "../../src/cli/args.js";
+import type { GitAdapter } from "../../src/git/index.js";
+import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
 
 const AUTHOR = {
   name: "Tester",

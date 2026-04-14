@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { Volume, createFsFromVolume } from "memfs";
+import { join, resolve } from "node:path";
+
 import * as git from "isomorphic-git";
+import { Volume, createFsFromVolume } from "memfs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { Extractor } from "../../src/core/extractor.js";
 import type { ExtractorConfig, StateFile } from "../../src/core/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";

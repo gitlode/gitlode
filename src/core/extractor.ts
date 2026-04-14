@@ -1,5 +1,6 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import { OutputWriter, splitMessage, toISO8601 } from "../output/index.js";

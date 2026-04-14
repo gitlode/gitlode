@@ -1,4 +1,5 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["dist/**", "out/**"]
+  "ignorePatterns": ["dist/**", "out/**"],
+  "sortImports": true
 }

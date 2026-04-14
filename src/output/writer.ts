@@ -1,6 +1,7 @@
 import { open } from "node:fs/promises";
-import { join } from "node:path";
 import type { FileHandle } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { RotationConfig } from "../core/index.js";
 import type { OutputCommit } from "./types.js";
 

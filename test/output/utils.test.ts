@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { splitMessage, toISO8601 } from "../../src/output/utils.js";
 
 describe("toISO8601", () => {

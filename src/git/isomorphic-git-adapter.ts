@@ -1,6 +1,8 @@
 import nodeFs from "node:fs";
+
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
+
 import { GitAdapterError } from "./errors.js";
 import type { GitAdapter, RawCommit } from "./index.js";
 

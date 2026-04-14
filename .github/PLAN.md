@@ -43,15 +43,15 @@ _Fix a clear correctness issue in the command-line UX._
 
 ### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 ### Tasks
 
-- [ ] Reuse the existing command definition already declared in the CLI layer
-- [ ] Wire that definition into the main entrypoint so `--help` displays the full supported option set
-- [ ] Keep the fix minimal and avoid redesigning the help renderer in this release
+- [x] Reuse the existing command definition already declared in the CLI layer
+- [x] Wire that definition into the main entrypoint so `--help` displays the full supported option set
+- [x] Keep the fix minimal and avoid redesigning the help renderer in this release
 
 ### Target files
 
@@ -61,8 +61,8 @@ _Fix a clear correctness issue in the command-line UX._
 
 ### Verification
 
-- [ ] `node dist/index.js --help` lists the supported parameters and descriptions
-- [ ] No existing CLI argument parsing behavior regresses
+- [x] `node dist/index.js --help` lists the supported parameters and descriptions
+- [x] No existing CLI argument parsing behavior regresses
 
 ---
 

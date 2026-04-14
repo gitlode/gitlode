@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 import { defineCommand, runMain } from "citty";
 
-import { parseArgs } from "./cli/index.js";
+import { cmdDefinition, parseArgs } from "./cli/index.js";
 import { Extractor } from "./core/index.js";
 import { IsomorphicGitAdapter } from "./git/index.js";
 import { GitAdapterError } from "./git/index.js";
 
 const main = defineCommand({
-  meta: {
-    name: "gitrail",
-    description: "Extract Git commit history to JSON Lines",
-  },
+  ...cmdDefinition,
   async run() {
     const adapter = new IsomorphicGitAdapter();
     let config;

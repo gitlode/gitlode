@@ -50,6 +50,14 @@ gitrail [options] <repository-path>
 | `--since-date <ISO8601>`   | string     |          | —                          | Extract commits after this datetime                            |
 | `--rotate-lines <n>`       | number     |          | —                          | Start new file after `n` lines                                 |
 | `--rotate-size <bytes>`    | number     |          | —                          | Start new file after `n` bytes                                 |
+| `--quiet`                  | boolean    |          | `false`                    | Suppress progress and summary output for automation            |
+
+### Help and runtime output
+
+- Run `gitrail --help` to display the full supported option list and descriptions.
+- During extraction, progress updates and the final completion summary are written to **stderr**.
+- Use `--quiet` for CI, cron, and scripted runs when you want to suppress non-error status output.
+- Validation and runtime errors are also written to **stderr** and use the exit codes listed below.
 
 ### Mutual exclusion rules
 
@@ -156,6 +164,9 @@ gitrail --branch main --since-commit abc123def456 ./my-repo
 
 # With file rotation (new file every 10,000 lines or 100 MB)
 gitrail --branch main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
+
+# Quiet mode for automation
+gitrail --branch main --state ./gitrail-state.json --quiet ./my-repo
 ```
 
 ## Project Information

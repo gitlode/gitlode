@@ -165,15 +165,15 @@ _Record the small user-facing improvements and release intent clearly._
 
 ### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 ### Tasks
 
-- [ ] Update the CLI documentation in `README.md`
-- [ ] Add a v0.1.4 entry to `CHANGELOG.md`
-- [ ] Ensure the release notes reflect the purpose of this version: modest enhancements plus CI/CD flow validation
+- [x] Update the CLI documentation in `README.md`
+- [x] Add a v0.1.4 entry to `CHANGELOG.md`
+- [x] Ensure the release notes reflect the purpose of this version: modest enhancements plus CI/CD flow validation
 
 ### Target files
 
@@ -182,8 +182,8 @@ _Record the small user-facing improvements and release intent clearly._
 
 ### Verification
 
-- [ ] Documentation matches the implemented CLI behavior
-- [ ] No placeholder text remains in the release notes
+- [x] Documentation matches the implemented CLI behavior
+- [x] No placeholder text remains in the release notes
 
 ---
 
@@ -191,11 +191,11 @@ _Record the small user-facing improvements and release intent clearly._
 
 Before considering v0.1.4 ready:
 
-- [ ] `npm run build` completes successfully
-- [ ] `npm test` passes for the full suite
-- [ ] `npm run lint` passes
-- [ ] `npm run format:check` passes as the final formatting gate
-- [ ] `node dist/index.js --help` shows the supported arguments correctly
+- [x] `npm run build` completes successfully
+- [x] `npm test` passes for the full suite
+- [x] `npm run lint` passes
+- [x] `npm run format:check` passes as the final formatting gate
+- [x] `node dist/index.js --help` shows the supported arguments correctly
 - [ ] One end-to-end extraction smoke test confirms valid JSONL output
 - [ ] One end-to-end extraction smoke test confirms stderr-only progress/summary output
 - [ ] One end-to-end extraction smoke test confirms correct behavior with `--quiet`

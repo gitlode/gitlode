@@ -91,6 +91,23 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 ---
 
+#### Output: Prevent overwrite across extraction sessions
+
+Current rotated output filenames such as `gitrail-000001.jsonl` restart from the same sequence on every invocation. If the tool writes to the same output directory repeatedly, previous results can be overwritten.
+
+**Preferred direction for the first fix**: include the execution time or another session-specific identifier in the rotated filename so each run generates a unique series without requiring manual cleanup.
+
+**Candidate approaches to evaluate during implementation**:
+
+- **A)** Include the execution timestamp in the filename
+- **B)** Continue the numeric sequence across sessions
+- **C)** Refuse to overwrite an existing file unless an explicit overwrite flag is provided
+- **D)** Consider other approaches if they provide a better balance of simplicity and safety
+
+The current assumption is to start with **A** because it is the simplest way to prevent accidental overwrite. The exact naming scheme should still be reviewed at implementation time to balance readability, sort order, and operational safety.
+
+---
+
 ### Medium-term
 
 #### CLI spec: Explicit extraction mode and state ergonomics

@@ -4,6 +4,25 @@ This file records all planned improvements beyond the initial release: product f
 
 Items are grouped by expected priority order within each section. Final ordering is subject to review.
 
+This roadmap is intentionally organized by product priority and time horizon, not by release version. When an item is selected for a specific release, annotate it with lightweight metadata instead of moving it to a different section.
+
+### Metadata Convention
+
+Use the following fields on selected items when needed:
+
+- **Release target**: the intended version, such as `v0.1.4`
+- **Status**: one of `planned`, `in progress`, or `deferred`
+
+The intended document flow is:
+
+- roadmap → future-facing backlog and release targeting
+- plan → active implementation tracking
+- changelog → released history
+
+Because completed work should move into the changelog after release, the roadmap does not need a persistent `done` status.
+
+This keeps the roadmap stable for both humans and LLMs while still making release planning explicit.
+
 ---
 
 ## Product Improvements
@@ -11,6 +30,9 @@ Items are grouped by expected priority order within each section. Final ordering
 ### Near-term
 
 #### Bug: `--help` argument list not displaying
+
+**Release target**: `v0.1.4`  
+**Status**: `planned`
 
 `node dist/index.js --help` shows only the command name and description — argument definitions are not displayed.
 
@@ -32,6 +54,9 @@ const main = defineCommand({
 ---
 
 #### CLI UX: Progress reporting and post-run summary
+
+**Release target**: `v0.1.4`  
+**Status**: `planned`
 
 **Progress reporting during extraction**
 
@@ -157,6 +182,9 @@ When a branch is added to `--branch` in a subsequent run, its full traversal may
 ### Near-term
 
 #### Fix: `eslint.config.js` deprecated config syntax
+
+**Release target**: `v0.1.4`  
+**Status**: `planned`
 
 Current `eslint.config.js` uses a spread of `tseslint.configs.recommended` into `tseslint.config()`, which is marked as deprecated. Update to the current recommended flat config pattern when revisiting.
 

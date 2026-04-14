@@ -1,6 +1,7 @@
 export type {
   ExtractorConfig,
   ExtractionRange,
+  ExtractionResult,
   PersonIdentity,
   RotationConfig,
   StateBranchEntry,

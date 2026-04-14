@@ -31,3 +31,11 @@ export interface StateFile {
   repositoryPath: string;
   branches: StateBranchEntry[];
 }
+
+export interface ExtractionResult {
+  commitsWritten: number;
+  filesCreated: number;
+  bytesWritten: number;
+  elapsedMs: number;
+  branches: string[];
+}

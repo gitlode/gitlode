@@ -288,6 +288,68 @@ describe("Extractor", () => {
     );
   });
 
+  it("returns ExtractionResult with correct metrics after a successful run", async () => {
+    const { fs, init, addCommit } = makeRepo("https://github.com/org/my-repo.git");
+    await init();
+    await addCommit("a.txt", "v1", "commit 1", 1000);
+    await addCommit("a.txt", "v2", "commit 2", 2000);
+    await addCommit("a.txt", "v3", "commit 3", 3000);
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const config = makeConfig({ outputDir: tmpDir });
+    const extractor = new Extractor(config, adapter);
+    const result = await extractor.run();
+
+    expect(result.commitsWritten).toBe(3);
+    expect(result.filesCreated).toBe(1);
+    expect(result.bytesWritten).toBeGreaterThan(0);
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
+    expect(result.branches).toEqual(["main"]);
+  });
+
+  it("returns ExtractionResult with filesCreated=2 when rotation splits output", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    await addCommit("a.txt", "v1", "commit 1", 1000);
+    await addCommit("a.txt", "v2", "commit 2", 2000);
+    await addCommit("a.txt", "v3", "commit 3", 3000);
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const config = makeConfig({ outputDir: tmpDir, rotation: { maxLines: 2 } });
+    const extractor = new Extractor(config, adapter);
+    const result = await extractor.run();
+
+    expect(result.commitsWritten).toBe(3);
+    expect(result.filesCreated).toBe(2);
+    expect(result.bytesWritten).toBeGreaterThan(0);
+    expect(result.branches).toEqual(["main"]);
+  });
+
+  it("returns ExtractionResult with commitsWritten=0 when no new commits exist", async () => {
+    const { fs, init, addCommit } = makeRepo("https://github.com/org/my-repo.git");
+    await init();
+    await addCommit("a.txt", "v1", "commit 1", 1000);
+
+    const stateFilePath = join(tmpDir, "gitrail-state.json");
+    const adapter = new IsomorphicGitAdapter(fs);
+
+    await new Extractor(makeConfig({ outputDir: tmpDir, stateFilePath }), adapter).run();
+
+    const tmpDir2 = join(tmpdir(), `gitrail-extractor-test-${randomUUID()}`);
+    await mkdir(tmpDir2, { recursive: true });
+    try {
+      const result = await new Extractor(
+        makeConfig({ outputDir: tmpDir2, stateFilePath }),
+        adapter,
+      ).run();
+      expect(result.commitsWritten).toBe(0);
+      expect(result.filesCreated).toBe(0);
+      expect(result.bytesWritten).toBe(0);
+    } finally {
+      await rm(tmpDir2, { recursive: true, force: true });
+    }
+  });
+
   it("file rotation integration: maxLines: 2 creates multiple output files", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();

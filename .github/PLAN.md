@@ -72,21 +72,21 @@ _Add lightweight runtime visibility without changing extraction results._
 
 ### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 ### Tasks
 
-- [ ] Add periodic progress updates during extraction
-- [ ] Write progress updates to **stderr only** so JSONL output remains safe for piping
-- [ ] Add a completion summary including:
-  - [ ] commits written
-  - [ ] output files created
-  - [ ] total bytes written
-  - [ ] elapsed time
-  - [ ] processed branches
-- [ ] Prefer a simple implementation without new runtime dependencies unless a strong need emerges
+- [x] Add periodic progress updates during extraction
+- [x] Write progress updates to **stderr only** so JSONL output remains safe for piping
+- [x] Add a completion summary including:
+  - [x] commits written
+  - [x] output files created
+  - [x] total bytes written
+  - [x] elapsed time
+  - [x] processed branches
+- [x] Prefer a simple implementation without new runtime dependencies unless a strong need emerges
 
 ### Target files
 
@@ -97,9 +97,9 @@ _Add lightweight runtime visibility without changing extraction results._
 
 ### Verification
 
-- [ ] Progress output appears during larger extraction runs
-- [ ] Summary output appears at the end of a successful run
-- [ ] stdout remains valid JSONL when redirected or piped
+- [x] Progress output appears during larger extraction runs
+- [x] Summary output appears at the end of a successful run
+- [x] stdout remains valid JSONL when redirected or piped
 
 ---
 

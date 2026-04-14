@@ -1,11 +1,12 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+import { performance } from "node:perf_hooks";
 
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import { OutputWriter, splitMessage, toISO8601 } from "../output/index.js";
 import type { OutputCommit } from "../output/index.js";
-import type { ExtractorConfig, StateFile } from "./types.js";
+import type { ExtractorConfig, ExtractionResult, StateFile } from "./types.js";
 
 function deriveRepoName(remoteUrl: string | null, repoPath: string): string {
   if (remoteUrl) {
@@ -50,7 +51,8 @@ export class Extractor {
     private readonly adapter: GitAdapter,
   ) {}
 
-  async run(): Promise<void> {
+  async run(): Promise<ExtractionResult> {
+    const startTime = performance.now();
     const repoPath = resolve(this.config.repositoryPath);
 
     const remoteUrl = await this.adapter.getRemoteUrl(repoPath);
@@ -95,6 +97,7 @@ export class Extractor {
 
     const branchHeads = new Map<string, string>();
     const visited = new Set<string>();
+    let commitsWritten = 0;
 
     try {
       for (const branch of this.config.branches) {
@@ -124,36 +127,32 @@ export class Extractor {
         }
         // For range.type === "date": no excludeHash; filtering handled per-commit below
 
+        const writeCommit = async (commit: RawCommit) => {
+          if (visited.has(commit.oid)) return;
+          visited.add(commit.oid);
+          if (this.config.range?.type === "date") {
+            if (commit.committer.timestamp * 1000 <= this.config.range.since.getTime()) {
+              return;
+            }
+          }
+          await writer.write(mapToOutputCommit(commit, repoName, remoteUrl));
+          commitsWritten++;
+          if (commitsWritten % 100 === 0) {
+            process.stderr.write(`\rProcessed ${commitsWritten} commits...`);
+          }
+        };
+
         try {
           for await (const commit of this.adapter.walkCommits(repoPath, head, excludeHash)) {
-            if (visited.has(commit.oid)) continue;
-            visited.add(commit.oid);
-
-            // Filter by --since-date
-            if (this.config.range?.type === "date") {
-              if (commit.committer.timestamp * 1000 <= this.config.range.since.getTime()) {
-                continue;
-              }
-            }
-
-            const outputCommit = mapToOutputCommit(commit, repoName, remoteUrl);
-            await writer.write(outputCommit);
+            await writeCommit(commit);
           }
         } catch (err) {
           if (err instanceof GitAdapterError && err.code === "COMMIT_NOT_FOUND") {
             process.stderr.write(
               `Warning: Last commit hash for branch "${branch}" no longer exists. Falling back to full extraction.\n`,
             );
-            // Retry without excludeHash
             for await (const commit of this.adapter.walkCommits(repoPath, head)) {
-              if (visited.has(commit.oid)) continue;
-              visited.add(commit.oid);
-              if (this.config.range?.type === "date") {
-                if (commit.committer.timestamp * 1000 <= this.config.range.since.getTime()) {
-                  continue;
-                }
-              }
-              await writer.write(mapToOutputCommit(commit, repoName, remoteUrl));
+              await writeCommit(commit);
             }
           } else {
             throw err;
@@ -161,6 +160,12 @@ export class Extractor {
         }
       }
     } finally {
+      if (commitsWritten > 0 && commitsWritten % 100 !== 0) {
+        // Flush the in-place progress line if it was started but not yet terminated
+        process.stderr.write(`\rProcessed ${commitsWritten} commits...\n`);
+      } else if (commitsWritten >= 100) {
+        process.stderr.write("\n");
+      }
       await writer.close();
     }
 
@@ -179,5 +184,13 @@ export class Extractor {
       await writeFile(tmpPath, JSON.stringify(newState, null, 2), "utf8");
       await rename(tmpPath, this.config.stateFilePath);
     }
+
+    return {
+      commitsWritten,
+      filesCreated: writer.filesCreated,
+      bytesWritten: writer.bytesWritten,
+      elapsedMs: performance.now() - startTime,
+      branches: Array.from(branchHeads.keys()),
+    };
   }
 }

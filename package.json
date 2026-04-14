@@ -30,7 +30,8 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "citty": "^0.2.2",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.1.4",
     "memfs": "^4.57.1",
     "oxfmt": "^0.44.0",
     "oxlint": "^1.60.0",

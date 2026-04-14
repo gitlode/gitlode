@@ -1,8 +1,9 @@
-import { Volume, createFsFromVolume } from "memfs";
 import * as git from "isomorphic-git";
+import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it } from "vitest";
-import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
+
 import type { RawCommit } from "../../src/git/index.js";
+import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
 
 const AUTHOR = {
   name: "Tester",

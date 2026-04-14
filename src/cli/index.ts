@@ -1,1 +1,1 @@
-export { parseArgs } from "./args.js";
+export { cmdDefinition, parseArgs } from "./args.js";

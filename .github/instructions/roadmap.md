@@ -4,6 +4,25 @@ This file records all planned improvements beyond the initial release: product f
 
 Items are grouped by expected priority order within each section. Final ordering is subject to review.
 
+This roadmap is intentionally organized by product priority and time horizon, not by release version. When an item is selected for a specific release, annotate it with lightweight metadata instead of moving it to a different section.
+
+### Metadata Convention
+
+Use the following fields on selected items when needed:
+
+- **Release target**: the intended version, such as `v0.1.4`
+- **Status**: one of `planned`, `in progress`, or `deferred`
+
+The intended document flow is:
+
+- roadmap → future-facing backlog and release targeting
+- plan → active implementation tracking
+- changelog → released history
+
+Because completed work should move into the changelog after release, the roadmap does not need a persistent `done` status.
+
+This keeps the roadmap stable for both humans and LLMs while still making release planning explicit.
+
 ---
 
 ## Product Improvements
@@ -11,6 +30,9 @@ Items are grouped by expected priority order within each section. Final ordering
 ### Near-term
 
 #### Bug: `--help` argument list not displaying
+
+**Release target**: `v0.1.4`  
+**Status**: `planned`
 
 `node dist/index.js --help` shows only the command name and description — argument definitions are not displayed.
 
@@ -32,6 +54,9 @@ const main = defineCommand({
 ---
 
 #### CLI UX: Progress reporting and post-run summary
+
+**Release target**: `v0.1.4`  
+**Status**: `planned`
 
 **Progress reporting during extraction**
 
@@ -56,6 +81,19 @@ After extraction completes, print to stderr:
 
 ---
 
+#### CLI UX: Progress metrics quality and progress-display redesign
+
+The current Phase 2 implementation reports progress using the number of written commits (`Processed N commits...`). This is better than having no runtime visibility, and it remains acceptable for v0.1.4, but it is not always a good proxy for actual elapsed work.
+
+For example, runs that use a state file and ultimately write zero new commits can still spend substantial time traversing history or resolving repository state. In those situations, commit-count progress has only a weak relationship to elapsed time and user-perceived progress.
+
+**Future improvement goals**:
+
+- break the end-to-end extraction work into more meaningful phases and measure their durations separately
+- analyze where time is actually spent during traversal, filtering, state handling, and output writing
+- redesign progress reporting based on that evidence rather than using commit count alone
+- keep the current Phase 2 behavior in v0.1.4 as a pragmatic baseline, but treat it as a first iteration rather than a final UX design
+
 #### CLI UX: `--help` option grouping and discoverability
 
 The `--help` output lists all options in a flat list with no grouping. The jump from "I want incremental extraction" to "I need `--state`" is non-obvious.
@@ -63,6 +101,23 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 - Group options under section headers: **Output**, **Differential Extraction**, **File Rotation**
 - Add a note to the `--state` description: "Primary mechanism for scheduled/incremental runs"
 - Evaluate whether citty supports option grouping natively; if not, consider a custom help renderer
+
+---
+
+#### Output: Prevent overwrite across extraction sessions
+
+Current rotated output filenames such as `gitrail-000001.jsonl` restart from the same sequence on every invocation. If the tool writes to the same output directory repeatedly, previous results can be overwritten.
+
+**Preferred direction for the first fix**: include the execution time or another session-specific identifier in the rotated filename so each run generates a unique series without requiring manual cleanup.
+
+**Candidate approaches to evaluate during implementation**:
+
+- **A)** Include the execution timestamp in the filename
+- **B)** Continue the numeric sequence across sessions
+- **C)** Refuse to overwrite an existing file unless an explicit overwrite flag is provided
+- **D)** Consider other approaches if they provide a better balance of simplicity and safety
+
+The current assumption is to start with **A** because it is the simplest way to prevent accidental overwrite. The exact naming scheme should still be reviewed at implementation time to balance readability, sort order, and operational safety.
 
 ---
 
@@ -158,11 +213,39 @@ When a branch is added to `--branch` in a subsequent run, its full traversal may
 
 #### Fix: `eslint.config.js` deprecated config syntax
 
+**Release target**: `v0.1.4`  
+**Status**: `planned`
+
 Current `eslint.config.js` uses a spread of `tseslint.configs.recommended` into `tseslint.config()`, which is marked as deprecated. Update to the current recommended flat config pattern when revisiting.
 
 Check the `typescript-eslint` docs for the current idiomatic approach at that time.
 
 ---
+
+#### Refactor: Extractor boundary cleanup for runtime and I/O concerns
+
+`src/core/extractor.ts` currently owns some runtime-specific mechanisms directly, including stderr progress/warning output, Node.js timing APIs, state-file I/O, and direct coupling to output metrics.
+
+This works functionally, but it weakens the architectural boundary between stable core policy and volatile runtime concerns.
+
+**Goal**:
+
+- keep orchestration and extraction policy in the core layer
+- move runtime and side-effect concerns behind explicit abstractions owned by the outer layers
+
+**Candidate refactoring directions**:
+
+- introduce a small reporting/progress interface instead of direct stderr writes
+- introduce a clock abstraction instead of calling Node timing APIs directly in the core
+- evaluate whether state persistence should move behind a dedicated state-store abstraction
+- keep CLI presentation concerns in the CLI layer rather than the extractor itself
+
+**Why this matters**:
+
+- improves testability
+- reduces infrastructure coupling in the core layer
+- makes future feature work require fewer architecture decisions
+- better aligns with the principle: **stable core, volatile edges**
 
 #### Refactor: TypeScript `readonly` audit
 

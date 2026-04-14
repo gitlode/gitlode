@@ -71,6 +71,7 @@ gitrail/
 2. **Adapter pattern for Git access**: Core logic depends on an abstract `GitAdapter` interface, not directly on isomorphic-git. This allows future library substitution without touching core logic.
 3. **Streaming-first**: Commit traversal and file output are designed as streams/async iterables to handle large repositories without loading all data into memory.
 4. **Fail-safe state management**: The state file is updated only after successful output. Partial failures must not corrupt state.
+5. **Stable core, volatile edges**: Keep policy and domain decisions in the core, and push runtime-specific mechanisms — such as file I/O, clocks, logging, console output, and framework bindings — to the system boundary through explicit abstractions.
 
 ## Key Design Decisions (do not revisit without reason)
 
@@ -92,6 +93,24 @@ gitrail/
 
 - **Code comments must be written in English.** This applies to all source files, configuration files, and CI/CD definitions.
 - **Always run `npm run format:write` before finishing any implementation session.** CI enforces `npm run format:check`; failing to format locally will cause CI failures on push. The verification checklist for every phase must include `npm run format:check` as the final step.
+
+## Planning & Phase-Execution Guidance
+
+For release work driven by `.github/PLAN.md`, `.github/instructions/roadmap.md`, and branch-session starting prompts:
+
+- Treat the roadmap item, active plan phase, and starting prompt as the **implementation contract** for that phase.
+- Prefer to remove non-essential design decisions **before coding** by recording the intended technical approach in the plan or prompt.
+- When a phase contains non-obvious implementation choices, the plan or prompt should specify as many of the following as practical:
+  - preferred API, library, or built-in Node.js feature to use
+  - expected files or architectural layers to touch
+  - output-stream requirements (for example, stdout vs stderr)
+  - measurement or timing approach when observability is involved
+  - dependency constraints (for example, prefer zero new runtime dependencies)
+  - explicit non-goals or out-of-scope work
+  - required verification commands and behavioral checks
+- During implementation, do **not** reopen a design choice that has already been specified in the plan or prompt unless verification evidence shows that it is blocked or incorrect.
+- If the current phase still leaves an important technical decision ambiguous, pause and refine the plan or starting prompt first rather than making an unnecessary architectural choice during implementation.
+- Branch-session starting prompts should be concrete enough that implementation can proceed with minimal additional design judgment.
 
 ## Autonomy
 

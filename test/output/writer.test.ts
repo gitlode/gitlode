@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { OutputWriter } from "../../src/output/writer.js";
+
 import type { OutputCommit } from "../../src/output/types.js";
+import { OutputWriter } from "../../src/output/writer.js";
 
 function makeCommit(oid: string): OutputCommit {
   return {

@@ -1,6 +1,7 @@
 import { open } from "node:fs/promises";
-import { join } from "node:path";
 import type { FileHandle } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { RotationConfig } from "../core/index.js";
 import type { OutputCommit } from "./types.js";
 
@@ -9,12 +10,21 @@ export class OutputWriter {
   private handle: FileHandle | null = null;
   private lineCount = 0;
   private byteCount = 0;
+  private totalBytesWritten = 0;
 
   constructor(
     private readonly outputDir: string,
     private readonly prefix: string,
     private readonly rotation: RotationConfig,
   ) {}
+
+  get filesCreated(): number {
+    return this.seq;
+  }
+
+  get bytesWritten(): number {
+    return this.totalBytesWritten;
+  }
 
   private async openNext(): Promise<FileHandle> {
     this.seq++;
@@ -35,6 +45,7 @@ export class OutputWriter {
     await handle.write(line, null, "utf8");
     this.lineCount++;
     this.byteCount += bytes;
+    this.totalBytesWritten += bytes;
 
     const rotateByLines =
       this.rotation.maxLines !== undefined && this.lineCount >= this.rotation.maxLines;

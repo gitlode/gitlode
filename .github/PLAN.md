@@ -1,217 +1,208 @@
-# gitrail — Project Build-out Plan
+# gitrail — v0.1.4 Release Plan
 
 ## Overview
 
-8 phases total. Each phase ends with a verification checkpoint — implementation pauses for review and sign-off before moving to the next phase.
+This plan covers the next release after the completed initial build-out.
+The target version is **v0.1.4**.
 
-Existing dependencies in `package.json` are provisional and can be reconsidered during implementation if there is good reason.
+Version numbers between v0.1.0 and v0.1.4 were used during CI/CD verification and are intentionally skipped. This project continues to follow **Semantic Versioning**, and v0.1.4 is planned as a **small, backward-compatible release** focused on modest improvements and validating the stability of the release flow.
 
-## Tooling Decisions
+The user has already completed some local lint and format maintenance work. That work is treated as baseline repository hygiene and should be preserved during implementation.
 
-| Concern       | Choice                           |
-| ------------- | -------------------------------- |
-| CLI framework | citty (keep as-is)               |
-| Git library   | isomorphic-git (fixed by design) |
-| Testing       | Vitest (ESM-native)              |
-| Linting       | ESLint v9 + typescript-eslint    |
-| Formatting    | oxfmt (keep as-is)               |
+## Release Goals
 
----
+- Ship a small, low-risk release with clear user value
+- Keep extraction semantics and JSONL output behavior backward-compatible
+- Improve CLI usability for interactive and automated runs
+- Exercise the CI/CD and release process on a stable, reviewable change set
 
-## Phase 0: Project Tooling Setup ✅
+## Scope Summary
 
-_Configure all developer tooling. No source code changes._
+### Included in v0.1.4
 
-### Status: Complete
+- Fix the CLI `--help` output so defined parameters are displayed correctly
+- Add extraction progress reporting to stderr
+- Add a post-run execution summary to stderr
+- Add a `--quiet` flag for CI, cron, and scripted usage
+- Refresh the deprecated `typescript-eslint` flat-config pattern in the ESLint setup
+- Update documentation and changelog entries for the release
 
-- ✅ Vitest added (`devDependencies`), `test`/`test:watch` scripts added
-- ✅ `.gitignore` — all needed entries present
-- ✅ `eslint` (v10), `typescript-eslint` (v8) added to `devDependencies`
-- ✅ `eslint.config.js` — flat config, `tseslint.configs.recommended`, applies to `src/**/*.ts`
-- ✅ `vitest.config.ts` — Node environment, `tests/**/*.test.ts`
-- ✅ `lint` / `lint:fix` scripts added to `package.json`
+### Explicitly excluded from v0.1.4
 
-### Verification
-
-- ✅ `npm run build` — no regressions
-- ✅ `npm run lint` — passes on all files in `src/`
-- ✅ `npm test` — 3/3 tests pass
-- ✅ `npm run format:check` — passes (required one `npm run format:write` pass to fix a pre-existing issue in `src/core/index.ts`)
+- Help option grouping or custom help renderer work
+- Explicit extraction mode / state ergonomics redesign
+- Cross-run deduplication for newly added branches
+- Full `readonly` audit across all interfaces and types
+- Long-term output/schema expansion features
 
 ---
 
-## Phase 1: Scaffold & Shared Types ✅
+## Phase 1: CLI Help Output Fix
 
-_All shared TypeScript interfaces and types. No logic._
+_Fix a clear correctness issue in the command-line UX._
 
 ### Status
 
-Done (completed in previous session, ahead of schedule).
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
-- ✅ `src/git/index.ts` — `GitAdapter`, `RawCommit`, `RawPerson extends PersonIdentity`
-- ✅ `src/git/errors.ts` — `GitAdapterError`, `GitAdapterErrorCode`
-- ✅ `src/core/index.ts` — `ExtractorConfig`, `ExtractionRange`, `RotationConfig`, `StateFile`, `StateBranchEntry`, `PersonIdentity`
-- ✅ `src/output/index.ts` — `OutputCommit`, `OutputPerson`, `OutputRepository`
-- ✅ `src/cli/index.ts` — empty placeholder
-- ✅ `tests/git-adapter-error.test.ts` — 3 smoke tests for `GitAdapterError`; all pass
+### Tasks
 
-### Notable design decisions
+- [x] Reuse the existing command definition already declared in the CLI layer
+- [x] Wire that definition into the main entrypoint so `--help` displays the full supported option set
+- [x] Keep the fix minimal and avoid redesigning the help renderer in this release
 
-- `PersonIdentity` lives in `core` as the shared base for `RawPerson` (git layer) and `OutputPerson` (output layer)
-- All anonymous inline shapes were given explicit names (`ExtractionRange`, `StateBranchEntry`, `OutputRepository`, etc.)
+### Target files
 
----
-
-## Phase 2: Git Adapter Layer (`src/git/`) ✅
-
-_Concrete isomorphic-git adapter: ref resolution, remote URL, BFS commit walk with exclusion._
-
-### Status: Complete
-
-- ✅ `src/git/isomorphic-git-adapter.ts` — `resolveRef`, `getRemoteUrl`, `walkCommits` (BFS + `_collectReachable` exclusion); constructor accepts optional `FsClient` for DI (defaults to `node:fs`)
-- ✅ `src/git/index.ts` — re-exports `IsomorphicGitAdapter`
-- ✅ `test/git/isomorphic-git-adapter.test.ts` — 6 tests using fully in-memory repos via `memfs`; full traversal, exclusion boundary, merge DAG, remote URL cases
-- ✅ `memfs` added as devDependency
-
-### Refactoring performed (not originally in plan)
-
-- **Type definitions separated**: all interfaces/types moved from `index.ts` to `types.ts` in each layer (`src/git/types.ts`, `src/core/types.ts`, `src/output/types.ts`); `index.ts` files are re-export-only
-- **`FsClient` typed properly**: replaced `any` with `import type { FsClient } from "isomorphic-git"`; `node:fs` cast via `as FsClient`
-- **Test directory restructured**: `tests/` renamed to `test/`; src-mirror layout (`test/git/`); `vitest.config.ts` `include` updated to `test/**/*.test.ts`
-- **`tsconfig.json`**: added `"types": ["node"]` for `node:` protocol imports under TypeScript 6
+- `src/index.ts`
+- `src/cli/index.ts`
+- `src/cli/args.ts`
 
 ### Verification
 
-- ✅ `npm run build` — 0 errors
-- ✅ `npm run lint` — 0 errors
-- ✅ `npm test` — 9/9 pass (3 errors + 6 adapter tests)
-- ✅ `npm run format:check` — clean
+- [x] `node dist/index.js --help` lists the supported parameters and descriptions
+- [x] No existing CLI argument parsing behavior regresses
 
 ---
 
-## Phase 3: Output Layer (`src/output/`) ✅
+## Phase 2: Runtime Progress and Summary Output
 
-_JSONL serialization, ISO 8601 timestamp conversion, file rotation._
+_Add lightweight runtime visibility without changing extraction results._
 
-### Status: Complete
+### Status
 
-- ✅ `src/output/utils.ts` — `toISO8601()` (negated-offset algorithm), `splitMessage()`
-- ✅ `src/output/writer.ts` — `OutputWriter` class; `{prefix}-000001.jsonl`; post-write rotation on `maxLines`/`maxBytes`; LF-only; byte counting via `Buffer.byteLength`
-- ✅ `src/output/index.ts` — re-exports from `utils.ts` and `writer.ts`
-- ✅ `test/output/utils.test.ts` — 8 tests (JST, UTC, negative offset, `splitMessage` cases)
-- ✅ `test/output/writer.test.ts` — 6 tests (no rotation, line rotation, byte rotation, both thresholds, valid JSONL, LF-only)
+- [x] Planned
+- [x] In progress
+- [x] Completed
+
+### Tasks
+
+- [x] Add periodic progress updates during extraction
+- [x] Write progress updates to **stderr only** so JSONL output remains safe for piping
+- [x] Add a completion summary including:
+  - [x] commits written
+  - [x] output files created
+  - [x] total bytes written
+  - [x] elapsed time
+  - [x] processed branches
+- [x] Prefer a simple implementation without new runtime dependencies unless a strong need emerges
+
+### Target files
+
+- `src/core/types.ts`
+- `src/core/extractor.ts`
+- `src/output/writer.ts`
+- `src/index.ts`
 
 ### Verification
 
-- ✅ `npm run build` — 0 errors
-- ✅ `npm run lint` — 0 errors
-- ✅ `npm test` — 23/23 pass (3 + 6 git + 8 utils + 6 writer)
-- ✅ `npm run format:check` — clean
+- [x] Progress output appears during larger extraction runs
+- [x] Summary output appears at the end of a successful run
+- [x] stdout remains valid JSONL when redirected or piped
 
 ---
 
-## Phase 4: Core Logic Layer (`src/core/`) ✅
+## Phase 3: Quiet Mode for Automation
 
-_Orchestration, differential filtering, output mapping, atomic state file management._
+_Add a small usability feature for non-interactive environments._
 
-### Status: Complete
+### Status
 
-- ✅ `src/core/extractor.ts` — `Extractor` class with full implementation
-- ✅ `src/core/index.ts` — re-exports `Extractor`
-- ✅ `test/core/extractor.test.ts` — 7 tests covering all required scenarios
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
-### Implementation notes
+### Tasks
 
-- State file `ENOENT` → silent full extraction; any other read/parse error → rethrow
-- `excludeHash` logic: `range.type === "commit"` → use hash; `range.type === "date"` → no excludeHash (filter per-commit); state map → use `lastCommitHash`; none → full extraction
-- `--since-date` uses `continue` (not `break`) — correct for BFS across non-chronological merge branches
-- `COMMIT_NOT_FOUND` on stale `lastCommitHash` → `stderr` warning + fallback to full extraction, preserving `visited` set
-- `writer.close()` in `finally` — always runs; state file written only in success path
-- Atomic state write: `.tmp` → `rename`; `path.resolve()` applied to both paths before comparison
+- [x] Add a `--quiet` flag to suppress progress and summary output
+- [x] Ensure this affects only stderr chatter, not normal extraction output or exit codes
+- [x] Document the intended use for CI and scheduled jobs
+
+### Target files
+
+- `src/cli/args.ts`
+- `src/core/types.ts`
+- `src/index.ts`
 
 ### Verification
 
-- ✅ `npm run build` — 0 errors
-- ✅ `npm run lint` — 0 errors
-- ✅ `npm test` — 30/30 pass (23 prior + 7 extractor)
-- ✅ `npm run format:check` — clean
+- [x] Running with `--quiet` suppresses progress and summary output
+- [x] Extraction results and exit status remain unchanged
 
 ---
 
-## Phase 5: CLI Layer + End-to-End Wiring (`src/cli/`) ✅
+## Phase 4: Dev-Environment Maintenance
 
-_Wire all layers through citty, implement all validation, complete `src/index.ts`._
+_Apply a narrowly scoped tooling cleanup aligned with current repository maintenance._
 
-### Status: Complete
+### Status
 
-- ✅ `src/cli/args.ts` — `parseArgs(adapter)` function; all 9 params; 3 mutual-exclusion rules; all validation; `--output-prefix` derivation; `--branch` collected manually from `process.argv` (citty only keeps last occurrence)
-- ✅ `src/cli/index.ts` — re-exports `parseArgs`
-- ✅ `src/index.ts` — full wiring: `IsomorphicGitAdapter` → `parseArgs` → `Extractor`; exit codes 0/1/2; stray `export { Extractor }` removed
-- ✅ `test/cli/args.test.ts` — 19 tests (mutual exclusion, missing branch, invalid rotation args, invalid date, prefix derivation, valid round-trip)
-- ✅ `format:check` failure on `.vscode/launch.json` (not from phase work) fixed with `npm run format:write`
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
-### Notable design decision
+### Tasks
 
-`--branch` is collected by manually scanning `process.argv` before citty parsing, because citty only retains the last occurrence of a repeated string flag. The rest of parsing delegates to citty's `parseCittyArgs`.
+- [x] Update the deprecated `typescript-eslint` configuration pattern in `eslint.config.js`
+- [x] Preserve the user’s already completed lint and format fixes
+- [x] Avoid a broader lint ruleset redesign in this release
+
+### Target files
+
+- `eslint.config.js`
 
 ### Verification
 
-- ✅ `npm run build` — 0 errors
-- ✅ `npm run lint` — 0 errors
-- ✅ `npm test` — 49/49 pass (30 prior + 19 CLI)
-- ✅ `npm run format:check` — clean
-- ✅ End-to-end smoke test: `node dist/index.js --branch develop ./` → valid JSONL output with correct `oid`, `subject`, ISO 8601 timestamps, `repository.name: "gitrail"`, `repository.url: "https://github.com/tomo-waka/gitrail.git"`
+- [x] `npm run lint` passes
+- [x] `npm run format:check` passes
 
 ---
 
-## Phase 6: GitHub Actions CI/CD ✅
+## Phase 5: Release Documentation and Notes
 
-_Automate quality checks on every PR; publish to npm on release tag._
+_Record the small user-facing improvements and release intent clearly._
 
-### Status: Complete
+### Status
 
-- ✅ `ci.yml` — complete (build, test, lint, format:check; Node 22)
-- ✅ `release.yml` — npm Trusted Publishing (OIDC); triggers: release published + workflow_dispatch
-- ✅ `package.json` — `repository.url` added (`https://github.com/tomo-waka/gitrail.git`)
+- [x] Planned
+- [x] In progress
+- [x] Completed
+
+### Tasks
+
+- [x] Update the CLI documentation in `README.md`
+- [x] Add a v0.1.4 entry to `CHANGELOG.md`
+- [x] Ensure the release notes reflect the purpose of this version: modest enhancements plus CI/CD flow validation
+
+### Target files
+
+- `README.md`
+- `CHANGELOG.md`
 
 ### Verification
 
-- ✅ `npm run build` — 0 errors
-- ✅ `npm run format:check` — clean
-- ✅ `npm run lint` — 0 errors
-- ✅ `npm test` — 49/49 pass
-- ✅ `release.yml` — valid YAML, no `NODE_AUTH_TOKEN` secret, no `--provenance` flag
-- ✅ `package.json` has `repository.url` = `https://github.com/tomo-waka/gitrail.git`
+- [x] Documentation matches the implemented CLI behavior
+- [x] No placeholder text remains in the release notes
 
 ---
 
-## Phase 7: OSS Documentation ✅
+## Final Verification Checklist
 
-_Minimum viable documentation for a public CLI project._
+Before considering v0.1.4 ready:
 
-### Status: Complete
-
-- ✅ `README.md` — expanded (requirements, CLI reference, incremental extraction, output file naming)
-- ✅ `CONTRIBUTING.md` — created (prerequisites, setup, build, test, lint/format, PR workflow, code style)
-- ✅ `CHANGELOG.md` — created (v0.1.0 entry following Keep a Changelog format)
-- ✅ `LICENSE` — MIT, verified correct, no changes needed
-
-### Verification
-
-- ✅ `npm run format:check` — clean across all new/modified files
-- ✅ All Markdown links in `README.md` reference accurate CLI behavior
-- ✅ No placeholder text (`TODO`, `...`) left in any file
-- ✅ Phase 7 marked ✅
+- [x] `npm run build` completes successfully
+- [x] `npm test` passes for the full suite
+- [x] `npm run lint` passes
+- [x] `npm run format:check` passes as the final formatting gate
+- [x] `node dist/index.js --help` shows the supported arguments correctly
+- [x] One end-to-end extraction smoke test confirms valid JSONL output
+- [x] One end-to-end extraction smoke test confirms stderr-only progress/summary output
+- [x] One end-to-end extraction smoke test confirms correct behavior with `--quiet`
 
 ---
 
-## Final End-to-End Checklist
+## Release Intent Summary
 
-- ✅ `npm run build` — zero TypeScript errors
-- ✅ `npm run lint` — zero ESLint warnings/errors
-- ✅ `npm test` — all unit tests pass
-- ✅ CI workflow passes (ci.yml present and passing)
-- ✅ `node dist/index.js --branch main ./` — full extraction; produces `gitrail-000001.jsonl`
-- ✅ Re-run with `--state state.json` — no new output; state file updated
-- ✅ New commit → re-run with `--state` — only new commit in output
-- ✅ `--rotate-lines 2` — produces `gitrail-000001.jsonl`, `gitrail-000002.jsonl`, …
+v0.1.4 is intentionally a **small stability release**.
+It improves the CLI experience, keeps the implementation risk low, and provides a practical checkpoint for validating the project’s CI/CD and packaging flow before larger roadmap work begins.

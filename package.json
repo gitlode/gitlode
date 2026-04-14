@@ -1,6 +1,6 @@
 {
   "name": "gitrail",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
   "keywords": [
     "cli",
@@ -24,12 +24,14 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",
     "format:check": "oxfmt --check",
     "format:write": "oxfmt",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "citty": "^0.2.2",
@@ -37,11 +39,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "eslint": "^10.0.0",
+    "@vitest/coverage-v8": "^4.1.4",
     "memfs": "^4.57.1",
     "oxfmt": "^0.44.0",
+    "oxlint": "^1.60.0",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.0.0",
     "vitest": "^4.1.3"
   },
   "engines": {

@@ -11,7 +11,7 @@
   },
 
   // Dictonary
-  "cSpell.words": ["citty", "gitrail", "nodegit", "oxfmt"],
+  "cSpell.words": ["citty", "gitrail", "nodegit", "oxfmt", "oxlint"],
 
   // Formatter
   "editor.defaultFormatter": "oxc.oxc-vscode"

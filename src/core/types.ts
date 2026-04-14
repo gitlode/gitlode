@@ -18,6 +18,7 @@ export interface ExtractorConfig {
   rotation: RotationConfig;
   range?: ExtractionRange;
   stateFilePath?: string;
+  quiet?: boolean;
 }
 
 export interface StateBranchEntry {
@@ -30,4 +31,12 @@ export interface StateFile {
   generatedAt: string;
   repositoryPath: string;
   branches: StateBranchEntry[];
+}
+
+export interface ExtractionResult {
+  commitsWritten: number;
+  filesCreated: number;
+  bytesWritten: number;
+  elapsedMs: number;
+  branches: string[];
 }

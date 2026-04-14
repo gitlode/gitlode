@@ -1,10 +1,12 @@
 import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
+
 import { defineCommand, parseArgs as parseCittyArgs } from "citty";
 import type { ArgsDef } from "citty";
+
+import type { ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { GitAdapter } from "../git/index.js";
-import type { ExtractorConfig } from "../core/index.js";
 
 // Define all citty args on a defineCommand descriptor.
 // The schema is defined separately so it can be passed directly to parseCittyArgs.
@@ -48,6 +50,11 @@ const argsDef = {
   "rotate-size": {
     type: "string" as const,
     description: "Start a new output file after N bytes",
+  },
+  quiet: {
+    type: "boolean" as const,
+    default: false,
+    description: "Suppress progress and summary output (for CI, cron, and scripted usage)",
   },
 } satisfies ArgsDef;
 
@@ -99,6 +106,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ExtractorConfig> {
   const rotateLinesRaw = parsed["rotate-lines"] as string | undefined;
   const rotateSizeRaw = parsed["rotate-size"] as string | undefined;
   const repoPath = parsed["repository-path"] as string | undefined;
+  const quiet = Boolean(parsed["quiet"]);
 
   // --- Mutual exclusion checks (before any I/O) ---
   if (sinceCommit && sinceDate) {
@@ -229,5 +237,6 @@ export async function parseArgs(adapter: GitAdapter): Promise<ExtractorConfig> {
         ? { type: "date", since: sinceDateObj }
         : undefined,
     stateFilePath: state,
+    quiet,
   };
 }

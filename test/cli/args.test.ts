@@ -1,13 +1,15 @@
-import { join } from "node:path";
+import nodeFs from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import nodeFs from "node:fs";
+import { join } from "node:path";
+
 import * as git from "isomorphic-git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
-import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
-import type { GitAdapter } from "../../src/git/index.js";
+
 import { parseArgs } from "../../src/cli/args.js";
+import type { GitAdapter } from "../../src/git/index.js";
+import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -323,5 +325,21 @@ describe("parseArgs – valid args round-trip", () => {
     setArgv("--branch", "main", "--state", "/tmp/state.json", "--output-dir", repoDir, repoDir);
     const config = await parseArgs(adapter);
     expect(config.stateFilePath).toBe("/tmp/state.json");
+  });
+
+  it("sets quiet=true when --quiet is provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "--quiet", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.quiet).toBe(true);
+  });
+
+  it("sets quiet=false when --quiet is not provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.quiet).toBe(false);
   });
 });

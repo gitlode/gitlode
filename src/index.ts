@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 import { defineCommand, runMain } from "citty";
-import { IsomorphicGitAdapter } from "./git/index.js";
+
+import { cmdDefinition, parseArgs } from "./cli/index.js";
 import { Extractor } from "./core/index.js";
-import { parseArgs } from "./cli/index.js";
+import { IsomorphicGitAdapter } from "./git/index.js";
 import { GitAdapterError } from "./git/index.js";
 
 const main = defineCommand({
-  meta: {
-    name: "gitrail",
-    description: "Extract Git commit history to JSON Lines",
-  },
+  ...cmdDefinition,
   async run() {
     const adapter = new IsomorphicGitAdapter();
     let config;
@@ -26,7 +24,18 @@ const main = defineCommand({
     }
     try {
       const extractor = new Extractor(config, adapter);
-      await extractor.run();
+      const result = await extractor.run();
+      if (!config.quiet) {
+        const elapsed = (result.elapsedMs / 1000).toFixed(1);
+        process.stderr.write(`\nExtraction complete\n`);
+        process.stderr.write(`  Commits written : ${result.commitsWritten}\n`);
+        process.stderr.write(`  Files created   : ${result.filesCreated}\n`);
+        process.stderr.write(`  Bytes written   : ${result.bytesWritten}\n`);
+        process.stderr.write(`  Elapsed time    : ${elapsed}s\n`);
+        process.stderr.write(
+          `  Branches        : ${result.branches.length > 0 ? result.branches.join(", ") : "(none)"}\n`,
+        );
+      }
     } catch (e) {
       if (e instanceof GitAdapterError) {
         process.stderr.write(e.message + "\n");

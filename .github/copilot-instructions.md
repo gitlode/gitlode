@@ -93,6 +93,24 @@ gitrail/
 - **Code comments must be written in English.** This applies to all source files, configuration files, and CI/CD definitions.
 - **Always run `npm run format:write` before finishing any implementation session.** CI enforces `npm run format:check`; failing to format locally will cause CI failures on push. The verification checklist for every phase must include `npm run format:check` as the final step.
 
+## Planning & Phase-Execution Guidance
+
+For release work driven by `.github/PLAN.md`, `.github/instructions/roadmap.md`, and branch-session starting prompts:
+
+- Treat the roadmap item, active plan phase, and starting prompt as the **implementation contract** for that phase.
+- Prefer to remove non-essential design decisions **before coding** by recording the intended technical approach in the plan or prompt.
+- When a phase contains non-obvious implementation choices, the plan or prompt should specify as many of the following as practical:
+  - preferred API, library, or built-in Node.js feature to use
+  - expected files or architectural layers to touch
+  - output-stream requirements (for example, stdout vs stderr)
+  - measurement or timing approach when observability is involved
+  - dependency constraints (for example, prefer zero new runtime dependencies)
+  - explicit non-goals or out-of-scope work
+  - required verification commands and behavioral checks
+- During implementation, do **not** reopen a design choice that has already been specified in the plan or prompt unless verification evidence shows that it is blocked or incorrect.
+- If the current phase still leaves an important technical decision ambiguous, pause and refine the plan or starting prompt first rather than making an unnecessary architectural choice during implementation.
+- Branch-session starting prompts should be concrete enough that implementation can proceed with minimal additional design judgment.
+
 ## Autonomy
 
 This is an early-stage greenfield project with no existing users or production dependencies.

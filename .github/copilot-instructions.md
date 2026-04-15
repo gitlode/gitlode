@@ -88,6 +88,7 @@ gitrail/
 - [CLI Interface Specification](instructions/cli.instructions.md)
 - [Output JSON Schema](instructions/schema.instructions.md)
 - [Git Traversal & Differential Extraction](instructions/git-traversal.instructions.md)
+- [Phase Section Template](instructions/phase-template.instructions.md)
 
 ## Coding Conventions
 
@@ -111,6 +112,7 @@ For release work driven by `.github/PLAN.md`, `.github/instructions/roadmap.md`,
 - During implementation, do **not** reopen a design choice that has already been specified in the plan or prompt unless verification evidence shows that it is blocked or incorrect.
 - If the current phase still leaves an important technical decision ambiguous, pause and refine the plan or starting prompt first rather than making an unnecessary architectural choice during implementation.
 - Branch-session starting prompts should be concrete enough that implementation can proceed with minimal additional design judgment.
+- Use [phase-template.instructions.md](instructions/phase-template.instructions.md) as the standard structure when authoring or filling in phase sections.
 
 ## Autonomy
 

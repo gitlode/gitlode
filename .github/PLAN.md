@@ -362,13 +362,75 @@ npm run format:check
 
 ## Phase 5: Cross-Run Deduplication for Newly Added Branches
 
-_When branches are added across sessions, compute the merge base with previously seen branches and use it as the traversal boundary, preventing duplicate commits in downstream output._
+_When a new branch is added to `--branch` in an incremental run, compute the merge base between that branch and all branches already recorded in the state file, and use the deepest common ancestor as `excludeHash` for the new branch's traversal, preventing commits already extracted in prior runs from appearing in the output again._
 
 ### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
+
+### Design References
+
+- [`instructions/git-traversal.instructions.md`](instructions/git-traversal.instructions.md) — "Deduplication: Across Runs (known limitation)" and "Future Work: Cross-Run Deduplication for New Branches"
+- Roadmap item: "Correctness: Cross-run deduplication for newly added branches"
+
+### Design Decisions
+
+- **Trigger condition**: a branch is "new" when it appears in `--branch` args but is **absent from the state file's `branches` array**. Only applies in `--mode incremental`. Snapshot mode does not read state and requires no deduplication.
+- **Merge base computation**: use `isomorphic-git`'s `findMergeBase({ fs, dir, oids })` API. `oids` is the list of HEAD hashes for all **existing** branches from the state file (not the new branch). The function returns `string[]`; use the first element as the merge base hash. If it returns an empty array (no common ancestor — detached histories), skip the deduplication and fall back to full traversal for that branch.
+- **`findMergeBase` is added to `GitAdapter`**:
+  ```typescript
+  findMergeBase(repoPath: string, oids: readonly CommitHash[]): Promise<CommitHash | null>;
+  ```
+  Returns `null` when no common ancestor exists. The concrete implementation in `IsomorphicGitAdapter` calls `git.findMergeBase()` and returns the first result, or `null` if the result array is empty.
+- **`excludeHash` selection for a new branch**: use the merge base hash as `excludeHash` in `walkCommits()`. This is the same mechanism already used for incremental extraction — no new traversal primitive is required.
+- **Only one merge base per new branch**: compute the merge base between the new branch HEAD and all existing branch HEADs together (passing all `oids` at once to `findMergeBase`). Do not compute pairwise merge bases; the single multi-ancestor call is correct and sufficient.
+- **Existing branches are unaffected**: branches already in the state file continue to use `stateMap.get(branch)` as `excludeHash`, exactly as in the current incremental logic.
+- **State file write is unchanged**: after a successful run, the state file records the current HEAD hash for each processed branch (including newly added branches). No new field is needed in the state file.
+- **`MERGE_BASE_NOT_FOUND` error code**: add to `GitAdapterErrorCode`. Used when `findMergeBase` itself throws an unexpected error (not for the empty-result case — that is the `null` return).
+- **New runtime dependencies**: none (`findMergeBase` is already in isomorphic-git).
+
+### Non-Goals
+
+- Deduplication for snapshot mode — state is not read, so there is no prior-run context
+- Deduplication when no branches exist in the state file (first run) — no existing HEADs to compute merge base against
+- Storing per-commit output history to enable arbitrary deduplication — the merge-base approach is sufficient and bounded
+- Changes to state file schema
+
+### Target Files
+
+| File                                      | Action | Notes                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/git/types.ts`                        | Modify | Add `findMergeBase(repoPath: string, oids: readonly CommitHash[]): Promise<CommitHash \| null>` to `GitAdapter`                                                                                                                                                                                                              |
+| `src/git/errors.ts`                       | Modify | Add `"MERGE_BASE_NOT_FOUND"` to `GitAdapterErrorCode`                                                                                                                                                                                                                                                                        |
+| `src/git/isomorphic-git-adapter.ts`       | Modify | Implement `findMergeBase()`: call `git.findMergeBase({ fs, dir, oids })`; return first result as `CommitHash` or `null` if empty; wrap unexpected errors in `GitAdapterError` with code `"MERGE_BASE_NOT_FOUND"`                                                                                                             |
+| `src/core/extractor.ts`                   | Modify | In incremental mode, before the per-branch loop: identify new branches (in `config.branches` but absent from `stateMap`); if any exist and `stateMap.size > 0`, call `adapter.findMergeBase()` with existing branch HEADs; use the result as `excludeHash` for new branches; fall back to full traversal if result is `null` |
+| `test/git/isomorphic-git-adapter.test.ts` | Modify | Add tests: `findMergeBase` returns the correct common ancestor for a forked history; returns `null` for detached histories; wraps unexpected errors as `MERGE_BASE_NOT_FOUND`                                                                                                                                                |
+| `test/core/extractor.test.ts`             | Modify | Add tests: new branch in incremental mode uses merge base as `excludeHash`; new branch with no common ancestor falls back to full traversal; existing branches are unaffected by merge base logic                                                                                                                            |
+
+### Implementation Notes
+
+- The merge base computation must happen **before** the per-branch traversal loop, using the HEAD hashes of the branches already in `stateMap`. These can be resolved via `adapter.resolveRef()` for each existing branch name at that point — or, if Phase 1 has already been applied, the state file's `lastCommitHash` values (already in `stateMap`) can be used directly as the `oids` list, avoiding extra `resolveRef()` calls.
+- Using `stateMap` values (prior run's HEAD hashes) rather than current HEAD hashes for `oids` is acceptable and slightly preferred: it avoids an extra async call per existing branch and is consistent with what the existing incremental logic already uses as `excludeHash`.
+- `findMergeBase` with a single existing branch (`stateMap.size === 1`) degenerates to a two-ancestor merge base call, which is the common case and is correct.
+
+### Verification
+
+**Automated:**
+
+```
+npm run build
+npm test
+npm run format:check
+```
+
+**Behavioral checks:**
+
+- Run 1: `gitrail --mode incremental -b main -s ./state.json ./repo` — extracts commits on `main`, records state
+- Run 2: `gitrail --mode incremental -b main -b feature -s ./state.json ./repo` — `feature` is new; confirm commits shared with `main` (below merge base) do not appear in output; `feature`-only commits above merge base do appear
+- Run 2 with detached history (no common ancestor): confirm `feature` is fully extracted without error
+- Confirm `main` differential output in Run 2 is identical to what it would be without the `feature` branch added
 
 ---
 

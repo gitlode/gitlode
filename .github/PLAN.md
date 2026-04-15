@@ -177,13 +177,106 @@ npm run format:check
 
 ## Phase 3: Extractor Boundary Cleanup for Runtime and I/O Concerns
 
-_Introduce explicit abstractions for stderr output, timing, and state persistence in the core layer, replacing direct runtime coupling in `extractor.ts`._
+_Introduce `Reporter`, `StateStore`, and two clock function types into the core layer, and inject them into `Extractor` via constructor arguments, removing all direct runtime coupling (`process.stderr`, `performance`, `Date`, `fs`) from `extractor.ts`._
 
 ### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
+
+### Design References
+
+- [`instructions/architecture.instructions.md`](instructions/architecture.instructions.md) — "Stable core, volatile edges" principle; component responsibilities
+- Roadmap item: "Refactor: Extractor boundary cleanup for runtime and I/O concerns"
+
+### Design Decisions
+
+- **`Reporter` interface** — split by meaning into three methods:
+  ```typescript
+  interface Reporter {
+    warn(message: string): void;           // branch-not-found, fallback warnings
+    progress(commitsWritten: number): void; // called after each commit write
+    done(commitsWritten: number): void;    // called once in the finally block
+  }
+  ```
+  The `\r`/`\n` rendering, 100-commit throttling, and final flush logic all move into the concrete implementation. `Extractor` calls `progress()` on every commit and `done()` in `finally` — it has no knowledge of display format.
+
+- **`quiet` removal from `ExtractorConfig`** — `Extractor` no longer reads `quiet`. Instead, the CLI passes a no-op `Reporter` when `--quiet` is set. `parseArgs()` return type changes from `Promise<ExtractorConfig>` to `Promise<{ config: ExtractorConfig; quiet: boolean }>`. `src/index.ts` destructures the result, selects the Reporter, and retains `quiet` locally for the post-run summary guard.
+
+- **Clock functions — injected separately by purpose**:
+  - `wallNow: () => Date` — replaces `new Date()` calls: state file `generatedAt` field and the Phase 2 session timestamp for `filenameFor`
+  - `monotonicNow: () => number` — replaces `performance.now()` calls: elapsed time measurement
+  Defined as type aliases in `src/core/types.ts`. Injected as constructor parameters. This ensures that after Phase 2, `Extractor` has zero direct timer/Date calls.
+
+- **`StateStore` interface**:
+  ```typescript
+  interface StateStore {
+    read(): Promise<StateFile | null>;  // null when file does not exist
+    write(state: StateFile): Promise<void>;
+  }
+  ```
+  The atomic write implementation (`writeFile(tmp)` → `rename`) moves into the concrete `NodeStateStore` class. Validation logic (version check, repository path check) stays in `Extractor` — it is domain policy, not I/O.
+
+- **Constructor signature**:
+  ```typescript
+  constructor(
+    config: ExtractorConfig,
+    adapter: GitAdapter,
+    reporter: Reporter,
+    wallNow: () => Date,
+    monotonicNow: () => number,
+    stateStore?: StateStore,   // provided iff config.stateFilePath is defined
+  )
+  ```
+  Separating config data from dependency objects follows the standard Dependency Inversion principle: config describes *what* to do; injected objects provide *how* to do runtime-specific work.
+
+- **Concrete implementations live in `src/index.ts`** — `stderrReporter`, `noopReporter`, and `NodeStateStore` are defined inline in the CLI entry point. No new source files are created. This mirrors how `IsomorphicGitAdapter` is the concrete Git implementation at the system boundary.
+
+- **`stateStore` is optional** — when `config.stateFilePath` is undefined, `stateStore` is not passed and `Extractor` skips state operations (same guard condition as current `if (this.config.stateFilePath)`).
+
+- **New runtime dependencies**: none.
+
+### Non-Goals
+
+- Changing state file schema, atomic write strategy, or validation rules
+- Abstracting `OutputWriter` — it is already constructed by `Extractor` and tested separately
+- Clock abstraction in layers other than Core (CLI layer uses `Date`/`performance` directly)
+- Any observable change in CLI output format or behavior
+
+### Target Files
+
+| File                          | Action | Notes                                                                                                                                                                                                                                                    |
+| ----------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/types.ts`           | Modify | Add `Reporter` and `StateStore` interfaces; add `WallClock` and `MonotonicClock` type aliases (`() => Date` and `() => number`); remove `quiet` from `ExtractorConfig`                                                                                   |
+| `src/core/index.ts`           | Modify | Re-export `Reporter`, `StateStore`, `WallClock`, `MonotonicClock`                                                                                                                                                                                        |
+| `src/core/extractor.ts`       | Modify | Add `reporter`, `wallNow`, `monotonicNow`, `stateStore?` constructor parameters; replace all `process.stderr.write` with `reporter.warn/progress/done`; replace `performance.now()` with `monotonicNow()`; replace `new Date()` with `wallNow()`; replace inline state I/O with `stateStore.read()/write()` |
+| `src/cli/args.ts`             | Modify | Remove `quiet` from `ExtractorConfig` construction; change return type to `Promise<{ config: ExtractorConfig; quiet: boolean }>` |
+| `src/index.ts`                | Modify | Destructure `{ config, quiet }` from `parseArgs()`; define `stderrReporter`, `noopReporter`, `NodeStateStore` inline; pass appropriate Reporter and optional StateStore to `new Extractor(...)`; retain `quiet` local variable for the post-run summary guard |
+| `test/core/extractor.test.ts` | Modify | Add `reporter`, `wallNow`, `monotonicNow`, and `stateStore` mocks/stubs to all `Extractor` instantiations; add tests verifying `reporter.warn` is called on branch-not-found and fallback; verify `reporter.done` is called in finally                   |
+
+### Implementation Notes
+
+- In `src/index.ts`, `stderrReporter` should maintain internal state (`lastDisplayed: number`) to throttle `progress()` display to every 100 commits, and emit the final `\n` flush in `done()`.
+- `NodeStateStore.write()` receives the complete `StateFile` object (including `generatedAt`). The `generatedAt` value is set by Extractor using `wallNow()` before calling `stateStore.write()`.
+- After Phase 2, `Extractor.run()` already calls `wallNow()` once for the session timestamp (`filenameFor`). After Phase 3, the same `wallNow()` call serves double duty — session timestamp and `generatedAt`. Capture it as a single `const sessionTs = wallNow()` at the start of `run()`.
+- `stderrReporter` and `noopReporter` can be plain object literals in `src/index.ts`; a class is not required.
+
+### Verification
+
+**Automated:**
+
+```
+npm run build
+npm test
+npm run format:check
+```
+
+**Behavioral checks:**
+
+- `gitrail -b main ./repo` — stderr shows progress and summary as before; exits 0
+- `gitrail -b main --quiet ./repo` — no stderr output except errors; exits 0
+- Confirm `src/core/extractor.ts` has zero imports from `node:fs/promises`, `node:perf_hooks`, and no direct references to `process.stderr` or `Date`
 
 ---
 

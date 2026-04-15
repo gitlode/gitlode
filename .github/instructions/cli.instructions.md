@@ -23,24 +23,42 @@ gitrail [options] <repository-path>
 | ------------------- | ------ | -------- | -------------------------------- |
 | `<repository-path>` | string | ✅       | Local path to the Git repository |
 
-### Branch Selection
+### Extraction Mode
 
-| Parameter        | Type   | Required | Description                                                                             |
-| ---------------- | ------ | -------- | --------------------------------------------------------------------------------------- |
-| `--branch <ref>` | string | ✅       | Ref (branch name) to use as traversal starting point. Repeatable for multiple branches. |
+| Parameter        | Alias | Type                      | Required | Default    | Description                                                                                                                               |
+| ---------------- | ----- | ------------------------- | -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `--mode`         | `-m`  | `snapshot \| incremental` |          | `snapshot` | Extraction mode. `snapshot` extracts independently of prior state. `incremental` extracts only commits new since the last recorded state. |
+| `--branch <ref>` | `-b`  | string (repeatable)       | ✅       |            | Ref to use as traversal starting point. May be specified multiple times.                                                                  |
 
 `--branch` must be specified at least once. There is no default. Accepting multiple values:
 
 ```bash
 gitrail --branch main --branch develop ./my-repo
+gitrail -b main -b develop ./my-repo
 ```
+
+### Range Filter (snapshot mode only)
+
+| Parameter                | Type   | Description                                                                                                          |
+| ------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------- |
+| `--since-ref <ref>`      | string | Exclude commits reachable from this ref. Accepts commit hash, tag name, or branch name. Resolved via `resolveRef()`. |
+| `--since-date <ISO8601>` | string | Include only commits with committer timestamp after this datetime.                                                   |
+
+These parameters are only valid in snapshot mode. They are mutually exclusive with `--mode incremental`.
+
+### State Management
+
+| Parameter            | Alias | Type                | Default | Description                                                                                                                                                                                                   |
+| -------------------- | ----- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--state <path>`     | `-s`  | string              |         | Path to state file. In snapshot mode, state content is ignored but file is updated on success. In incremental mode, state is read to determine differential range. Required when `--mode incremental`.        |
+| `--on-missing-state` |       | `error \| snapshot` | `error` | Behavior when `--mode incremental` and state file does not exist. `error`: exit with code 1. `snapshot`: warn and fall back to full extraction, then create state file. Only valid with `--mode incremental`. |
 
 ### Output
 
-| Parameter                  | Type   | Required | Default                    | Description                              |
-| -------------------------- | ------ | -------- | -------------------------- | ---------------------------------------- |
-| `--output-dir <path>`      | string |          | `./`                       | Directory to write output `.jsonl` files |
-| `--output-prefix <string>` | string |          | derived from remote origin | Filename prefix for output files         |
+| Parameter                  | Alias | Type   | Default                    | Description                                           |
+| -------------------------- | ----- | ------ | -------------------------- | ----------------------------------------------------- |
+| `--output-dir <path>`      | `-o`  | string | `./`                       | Directory to write output `.jsonl` files. Must exist. |
+| `--output-prefix <string>` |       | string | derived from remote origin | Filename prefix for output files                      |
 
 **`--output-prefix` derivation logic** (when not specified):
 
@@ -51,22 +69,20 @@ gitrail --branch main --branch develop ./my-repo
 3. If remote URL is unavailable → use the directory name of `<repository-path>`
 4. If `--output-prefix` is explicitly provided → use that value (highest priority)
 
-### Differential Extraction
-
-| Parameter                | Type   | Required | Description                                                                                         |
-| ------------------------ | ------ | -------- | --------------------------------------------------------------------------------------------------- |
-| `--state <path>`         | string |          | Path to state file. If file exists → differential mode. If not → full extraction, then create file. |
-| `--since-commit <hash>`  | string |          | Extract only commits newer than this hash (exclusive)                                               |
-| `--since-date <ISO8601>` | string |          | Extract only commits with committer timestamp after this datetime                                   |
-
 ### File Rotation
 
-| Parameter               | Type   | Required | Default | Description                             |
-| ----------------------- | ------ | -------- | ------- | --------------------------------------- |
-| `--rotate-lines <n>`    | number |          | none    | Start a new output file after `n` lines |
-| `--rotate-size <bytes>` | number |          | none    | Start a new output file after `n` bytes |
+| Parameter               | Type   | Default | Description                             |
+| ----------------------- | ------ | ------- | --------------------------------------- |
+| `--rotate-lines <n>`    | number | none    | Start a new output file after `n` lines |
+| `--rotate-size <bytes>` | number | none    | Start a new output file after `n` bytes |
 
 Both may be specified simultaneously — rotation triggers when **either** threshold is reached.
+
+### Control
+
+| Parameter | Alias | Type    | Default | Description                                    |
+| --------- | ----- | ------- | ------- | ---------------------------------------------- |
+| `--quiet` | `-q`  | boolean | `false` | Suppress progress and summary output on stderr |
 
 ---
 
@@ -74,11 +90,15 @@ Both may be specified simultaneously — rotation triggers when **either** thres
 
 The following combinations are invalid and must produce a clear error message before any processing begins:
 
-| Combination                       | Error Message                                                                           |
-| --------------------------------- | --------------------------------------------------------------------------------------- |
-| `--since-commit` + `--since-date` | `--since-commit and --since-date cannot be used together`                               |
-| `--state` + `--since-commit`      | `--state and --since-commit cannot be used together. Use --state for incremental runs.` |
-| `--state` + `--since-date`        | `--state and --since-date cannot be used together. Use --state for incremental runs.`   |
+| Combination                                           | Error Message                                              |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| `--since-ref` + `--since-date`                        | `--since-ref and --since-date cannot be used together`     |
+| `--mode incremental` + `--since-ref`                  | `--since-ref cannot be used with --mode incremental`       |
+| `--mode incremental` + `--since-date`                 | `--since-date cannot be used with --mode incremental`      |
+| `--on-missing-state` + `--mode snapshot` (or omitted) | `--on-missing-state is only valid with --mode incremental` |
+| `--mode incremental` + no `--state`                   | `--state is required when using --mode incremental`        |
+
+`--state` + `--since-*` is **permitted** in snapshot mode. `--state` serves only as a recording path; `--since-*` controls the extraction range independently.
 
 ---
 
@@ -86,19 +106,29 @@ The following combinations are invalid and must produce a clear error message be
 
 All validation must complete before extraction and file output begin. Validation proceeds in three phases:
 
-1. **Format / mutual exclusion** — no I/O (mutual exclusion rules, branch count, numeric arg formats, ISO 8601 format for `--since-date`)
-2. **File system** — `<repository-path>` existence, `--output-dir` existence
-3. **Git** — repository identity (`resolveRef` on first branch), `--since-commit` reachability (`walkCommits` with the hash as `excludeHash`)
+1. **Format / mutual exclusion** — no I/O (mutual exclusion rules, branch count, `--mode` value, `--on-missing-state` value, numeric arg formats, ISO 8601 format for `--since-date`)
+2. **File system** — `<repository-path>` existence, `--output-dir` existence, `--state` parent directory existence, `--state` file existence check (result passed to subsequent logic)
+3. **Git** — repository identity (`resolveRef` on first branch), each `--branch` ref resolution, `--since-ref` resolution via `resolveRef()`, state file content validation (JSON structure, `version`, `repositoryPath` match)
 
-| Condition                                                     | Error                                                                                 |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `<repository-path>` does not exist                            | `Repository not found: <path>`                                                        |
-| `<repository-path>` is not a Git repository                   | `Not a Git repository: <path>`                                                        |
-| `--branch` not specified                                      | `At least one --branch must be specified`                                             |
-| `--output-dir` does not exist                                 | `Output directory not found: <path>`                                                  |
-| `--since-date` is not valid ISO 8601                          | `Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)` |
-| `--since-commit` hash not found in specified branch           | `Commit <hash> not found in branch <name>`                                            |
-| `--rotate-lines` or `--rotate-size` is not a positive integer | `<param> must be a positive integer`                                                  |
+**Phase 2 — state file existence handling for incremental mode:**
+
+- If `--mode incremental` and state file does not exist:
+  - `--on-missing-state error` (default) → exit with code 1
+  - `--on-missing-state snapshot` → emit warning to stderr, set fallback flag (behave as snapshot with no range filter)
+
+| Condition                                                     | Phase | Error                                                                                 |
+| ------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
+| `<repository-path>` does not exist                            | 2     | `Repository not found: <path>`                                                        |
+| `<repository-path>` is not a Git repository                   | 3     | `Not a Git repository: <path>`                                                        |
+| `--branch` not specified                                      | 1     | `At least one --branch must be specified`                                             |
+| `--mode` value invalid                                        | 1     | `--mode must be "snapshot" or "incremental"`                                          |
+| `--on-missing-state` value invalid                            | 1     | `--on-missing-state must be "error" or "snapshot"`                                    |
+| `--output-dir` does not exist                                 | 2     | `Output directory not found: <path>`                                                  |
+| `--state` parent directory does not exist                     | 2     | `Parent directory for state file not found: <dir>`                                    |
+| `--since-date` is not valid ISO 8601                          | 1     | `Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)` |
+| `--since-ref` ref not found in repository                     | 3     | `Ref not found: <ref>`                                                                |
+| `--rotate-lines` or `--rotate-size` is not a positive integer | 1     | `<param> must be a positive integer`                                                  |
+| State file `repositoryPath` mismatch                          | 3     | `State file was created for a different repository: <recorded-path>`                  |
 
 ---
 
@@ -115,20 +145,34 @@ All validation must complete before extraction and file output begin. Validation
 ## Usage Examples
 
 ```bash
-# Full extraction of main branch
+# Snapshot extraction of main branch (default mode)
 gitrail --branch main ./my-repo
+gitrail -b main ./my-repo
 
 # Multiple branches, custom output dir
-gitrail --branch main --branch develop --output-dir ./output ./my-repo
+gitrail -b main -b develop -o ./output ./my-repo
+
+# Snapshot with state recording (for later incremental runs)
+gitrail --mode snapshot --branch main --state ./gitrail-state.json ./my-repo
 
 # Incremental run using state file
-gitrail --branch main --state ./gitrail-state.json ./my-repo
+gitrail --mode incremental --branch main --state ./gitrail-state.json ./my-repo
+gitrail -m incremental -b main -s ./gitrail-state.json ./my-repo
 
-# Manual differential by commit hash
-gitrail --branch main --since-commit abc123def456 ./my-repo
+# Incremental with auto-initialization on first run
+gitrail -m incremental -b main -s ./gitrail-state.json --on-missing-state snapshot ./my-repo
+
+# Snapshot from a release tag (extract only commits after v1.0)
+gitrail --branch main --since-ref v1.0 ./my-repo
+
+# Snapshot from a release tag with state recording
+gitrail -b main -b develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
+
+# Time-based snapshot
+gitrail --branch main --since-date 2024-01-01T00:00:00Z ./my-repo
 
 # With file rotation
-gitrail --branch main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
+gitrail -b main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
 ```
 
 ---
@@ -141,14 +185,14 @@ gitrail --branch main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
 
 ## Implementation Notes
 
-### `--branch` multi-occurrence workaround
+### `--branch` / `-b` multi-occurrence workaround
 
-citty only retains the **last** occurrence when a string flag appears multiple times. Because `--branch` must be repeatable, all `--branch` values are collected by manually scanning `process.argv` **before** delegating to `parseCittyArgs`. citty then parses everything else.
+citty only retains the **last** occurrence when a string flag appears multiple times. Because `--branch` must be repeatable, all `--branch` and `-b` values are collected by manually scanning `process.argv` **before** delegating to `parseCittyArgs`. citty then parses everything else.
 
 ```typescript
 const branches: string[] = [];
 for (let i = 0; i < rawArgv.length; i++) {
-  if (rawArgv[i] === "--branch") {
+  if (rawArgv[i] === "--branch" || rawArgv[i] === "-b") {
     const val = rawArgv[i + 1];
     if (val !== undefined && !val.startsWith("-")) {
       branches.push(val);

@@ -33,7 +33,11 @@ A commit X is "reachable" from commit Y if X can be found by following parent li
 
 ## Traversal Algorithm
 
-### Full Extraction (no `--since-*` / no `--state`)
+### Snapshot Mode (default)
+
+Snapshot mode extracts commits independently of any prior state. The extraction range can be further controlled by `--since-ref` or `--since-date`.
+
+#### No range filter (full snapshot)
 
 For each specified `--branch`:
 
@@ -41,29 +45,46 @@ For each specified `--branch`:
 2. Walk all commits reachable from that hash via `GitAdapter.walkCommits(head, excludeHash: undefined)`
 3. Write each commit to output
 
-### Differential Extraction via `--state`
+#### `--since-ref`
 
-For each branch recorded in the state file:
+1. Resolve `--since-ref` to a commit hash via `GitAdapter.resolveRef()` (accepts commit hash, tag name, or branch name)
+2. For each specified `--branch`:
+   - Resolve the ref to HEAD hash
+   - Use the resolved since-ref hash as `excludeHash` in `GitAdapter.walkCommits(head, excludeHash)`
+   - The traversal yields only commits reachable from HEAD but **not** reachable from `excludeHash`
 
-1. Resolve the current HEAD hash for that branch
-2. Use the recorded `lastCommitHash` as `excludeHash`
-3. Call `GitAdapter.walkCommits(currentHead, excludeHash)`
-4. The traversal yields only commits reachable from `currentHead` but **not** reachable from `excludeHash`
+This is equivalent to `git log <since-ref>..<head>` and correctly handles merged branches. See "Merge Commit Handling" below.
 
-This is equivalent to `git log <excludeHash>..<currentHead>` and correctly handles merged branches. See "Merge Commit Handling" below.
+#### `--since-date`
 
-### Differential Extraction via `--since-commit`
+1. For each specified `--branch`:
+   - Walk all commits reachable from HEAD (no `excludeHash`)
+   - Filter: include only commits where `committer.timestamp` (as Unix seconds) is **after** the specified date
+   - Use `committer.timestamp` (not `author.timestamp`) as the filter criterion
+   - Use `continue` (not `break`) to skip old commits — do not abort the traversal when an old commit is encountered. BFS order across merge branches is not chronological: a newer commit from a merged branch may appear after an older one in BFS order, so early termination would silently drop commits.
 
-1. Validate that the specified hash exists and is reachable from each specified `--branch`
-   - If not reachable: abort with error `Commit <hash> not found in branch <name>`
-2. Use the hash as `excludeHash` in `GitAdapter.walkCommits()`
+### Incremental Mode
 
-### Differential Extraction via `--since-date`
+Incremental mode extracts only commits new since the last recorded state. Requires `--state`.
 
-1. Walk all commits reachable from HEAD (no `excludeHash`)
-2. Filter: include only commits where `committer.timestamp` (as Unix seconds) is **after** the specified date
-3. Use `committer.timestamp` (not `author.timestamp`) as the filter criterion
-4. Use `continue` (not `break`) to skip old commits — do not abort the traversal when an old commit is encountered. BFS order across merge branches is not chronological: a newer commit from a merged branch may appear after an older one in BFS order, so early termination would silently drop commits.
+1. Read state file → build `stateMap: Map<branchName, lastCommitHash>`
+2. For each specified `--branch`:
+   - Resolve ref to current HEAD hash
+   - If branch exists in stateMap: use `stateMap.get(branch)` as `excludeHash`
+   - If branch not in stateMap: no `excludeHash` (full traversal for that branch)
+   - Call `GitAdapter.walkCommits(head, excludeHash)`
+3. Maintain global `visited: Set<string>` across all branches
+4. On success: write state file with each branch's current HEAD hash
+
+**Warning conditions**:
+
+- Branch in stateMap does not exist in repository → warn, skip
+- `lastCommitHash` from stateMap is unreachable (e.g. after force push) → warn, full traversal for that branch
+- Branch not in stateMap → full traversal (may produce duplicates with prior runs; see Deduplication section)
+
+### Incremental + `--on-missing-state snapshot` Fallback
+
+When `--mode incremental` is specified with `--on-missing-state snapshot` and the state file does not exist: behave as snapshot mode with no range filter (full traversal for all branches). Create state file on success.
 
 ---
 
@@ -149,6 +170,17 @@ async function collectReachable(repoPath: string, startHash: string): Promise<Se
 
 Specified by `--state <path>`. The path is fully user-controlled. No default location is assumed.
 
+### Role of `--state` in Each Mode
+
+- **Snapshot mode**: State file content is **ignored** during extraction. On successful completion, the state file is written (created or overwritten) with each branch's current HEAD hash. This allows a snapshot run to initialize or reset state for subsequent incremental runs.
+- **Incremental mode**: State file is **read** to determine the `excludeHash` per branch. On successful completion, the state file is updated with each branch's current HEAD hash.
+
+### State File Records HEAD, Not Filtered Range
+
+When `--since-ref` or `--since-date` is used in snapshot mode with `--state`, the state file records each branch's **current HEAD hash** — not the boundary of the filtered range. This means the state reflects the repository state at extraction time, independent of what was actually output.
+
+**Warning condition**: If `--state` + `--since-ref` is used and a branch's HEAD is reachable from the since-ref (resulting in 0 commits output for that branch), emit a warning to stderr: subsequent incremental runs may output commits between the branch HEAD and the since-ref that were excluded in this run.
+
 ### Read on Startup
 
 If `--state` is provided and the file exists:
@@ -156,7 +188,8 @@ If `--state` is provided and the file exists:
 1. Parse and validate the JSON structure (check `version` field)
 2. Resolve both the recorded `repositoryPath` and the provided `<repository-path>` to absolute paths using `path.resolve()` before comparing. Simple string equality on raw input will produce false mismatches when the same path is expressed differently (e.g. `./my-repo` vs `/home/user/my-repo`). If they do not match after resolution, abort with error:
    `State file was created for a different repository: <recorded-path>`
-3. For each branch in the state file, use `lastCommitHash` as the `excludeHash` for that branch's traversal
+3. In incremental mode: for each branch in the state file, use `lastCommitHash` as the `excludeHash` for that branch's traversal
+4. In snapshot mode: skip step 3 (state content is not used for extraction)
 
 Note: the `repositoryPath` value written to the state file must also be the `path.resolve()`-ed absolute path, not the raw CLI input.
 
@@ -173,13 +206,13 @@ This ensures that a crash during output writing does not corrupt the state file.
 
 ### Branch Reconciliation
 
-At the start of a run using `--state`:
+At the start of an incremental run using `--state`:
 
 - Branches in `--branch` args but **not in state file**: treated as full extraction for that branch. ⚠️ This may produce duplicate output if the new branch shares history with already-extracted branches. See "Cross-Run Deduplication for New Branches" in the Deduplication section.
 - Branches in state file but **not in `--branch` args**: ignored (not re-extracted, not removed from state)
 - Branches in both: differential extraction using recorded `lastCommitHash`
 
-After a successful run, the state file is updated to reflect the new `lastCommitHash` for each processed branch.
+After a successful run (in either mode), the state file is updated to reflect the current HEAD hash for each processed branch.
 
 ### Warning Conditions (non-fatal)
 
@@ -217,7 +250,7 @@ for (const branch of branches) {
 }
 ```
 
-Memory note: the `visited` set holds one hash per unique commit traversed. At approximately 100–150 bytes per entry (string + Set overhead), a repository with 1 million commits consumes roughly 100–150 MB. This is acceptable for the initial implementation. For repositories significantly larger than this, range-limiting options (`--since-commit`, `--since-date`) reduce the traversal scope proportionally.
+Memory note: the `visited` set holds one hash per unique commit traversed. At approximately 100–150 bytes per entry (string + Set overhead), a repository with 1 million commits consumes roughly 100–150 MB. This is acceptable for the initial implementation. For repositories significantly larger than this, range-limiting options (`--since-ref`, `--since-date`) reduce the traversal scope proportionally.
 
 ### Across Runs (known limitation)
 

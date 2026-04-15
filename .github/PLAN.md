@@ -206,7 +206,7 @@ _Introduce `Reporter`, `StateStore`, and two clock function types into the core 
 - **Clock functions — injected separately by purpose**:
   - `wallNow: () => Date` — replaces `new Date()` calls: state file `generatedAt` field and the Phase 2 session timestamp for `filenameFor`
   - `monotonicNow: () => number` — replaces `performance.now()` calls: elapsed time measurement
-    Defined as type aliases in `src/core/types.ts`. Injected as constructor parameters. This ensures that after Phase 2, `Extractor` has zero direct timer/Date calls.
+    Defined as type aliases in `src/core/types.ts`. Injected as constructor parameters. This ensures that after Phase 3, `Extractor` has zero direct timer/Date calls.
 
 - **`StateStore` interface**:
 
@@ -262,7 +262,7 @@ _Introduce `Reporter`, `StateStore`, and two clock function types into the core 
 
 - In `src/index.ts`, `stderrReporter` should maintain internal state (`lastDisplayed: number`) to throttle `progress()` display to every 100 commits, and emit the final `\n` flush in `done()`.
 - `NodeStateStore.write()` receives the complete `StateFile` object (including `generatedAt`). The `generatedAt` value is set by Extractor using `wallNow()` before calling `stateStore.write()`.
-- After Phase 2, `Extractor.run()` already calls `wallNow()` once for the session timestamp (`filenameFor`). After Phase 3, the same `wallNow()` call serves double duty — session timestamp and `generatedAt`. Capture it as a single `const sessionTs = wallNow()` at the start of `run()`.
+- After Phase 2, `Extractor.run()` already calls `new Date()` once for the session timestamp (`filenameFor`). After Phase 3, the same `wallNow()` call serves double duty — session timestamp and `generatedAt`. Capture it as a single `const sessionTs = wallNow()` at the start of `run()`.
 - `stderrReporter` and `noopReporter` can be plain object literals in `src/index.ts`; a class is not required.
 
 ### Verification

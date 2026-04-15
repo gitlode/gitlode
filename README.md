@@ -1,10 +1,10 @@
 # gitrail
 
-A CLI tool that extracts Git repository commit history and outputs it as [JSON Lines](https://jsonlines.org/) (`.jsonl`) files, suitable for ingestion into data warehouses and analytical systems.
+A CLI tool that extracts commit history from a local Git repository and outputs it as [JSON Lines](https://jsonlines.org/) (`.jsonl`) files, suitable for ingestion into data warehouses and analytical systems.
 
 ## Features
 
-- Reads Git repository data via [isomorphic-git](https://isomorphic-git.org/) — no system-installed Git required
+- Reads the local `.git` directory directly via [isomorphic-git](https://isomorphic-git.org/) — no `git` CLI required at runtime
 - Outputs one commit per line in JSON Lines format
 - Explicit extraction modes: `--mode snapshot` for independent extraction, `--mode incremental` for differential extraction using a state file
 - Handles multi-branch extraction with cross-branch deduplication
@@ -12,7 +12,7 @@ A CLI tool that extracts Git repository commit history and outputs it as [JSON L
 ## Requirements
 
 - Node.js ≥ 22.0.0
-- No system-installed Git required (uses isomorphic-git)
+- A local Git repository (cloned and fetched via your preferred method — gitrail reads `.git` data directly and does not require the `git` CLI)
 
 ## Installation
 
@@ -23,11 +23,12 @@ npm install -g gitrail
 ## Quick Start
 
 ```bash
-# One-time extraction
+# One-time extraction from a local clone
 gitrail -b main ./my-repo
 
-# Continuous extraction — same command handles first run and all subsequent runs
-gitrail -m incremental -b main -s ./gitrail-state.json --on-missing-state snapshot ./my-repo
+# Continuous extraction — fetch remote changes, then extract new commits
+git -C ./my-repo fetch origin
+gitrail -m incremental -b origin/main -s ./gitrail-state.json --on-missing-state snapshot ./my-repo
 ```
 
 See the [User Guide](docs/usage.md) for detailed workflow patterns including incremental setup,

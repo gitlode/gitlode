@@ -58,6 +58,13 @@ directory name if no remote is configured).
 
 For pipelines that regularly load new commits into a data warehouse.
 
+> gitrail reads only the local `.git` directory. To pick up newly pushed commits, run
+> `git fetch` before each gitrail invocation. Note that `git fetch` updates **remote-tracking
+> refs** (e.g. `origin/main`), not local branch refs (`main`). Use the remote-tracking ref
+> name with `--branch` (e.g. `-b origin/main`) so that a plain `git fetch` is sufficient.
+> Alternatively, use `git pull` to advance the local branch, or work with a **bare clone**
+> where `git fetch` updates refs directly.
+
 **Step 1 — initialize state (once):**
 
 ```bash
@@ -69,7 +76,8 @@ This extracts all commits and writes a state file recording the current HEAD of 
 **Step 2 — all subsequent runs:**
 
 ```bash
-gitrail -m incremental -b main -s ./gitrail-state.json ./my-repo
+git -C ./my-repo fetch origin
+gitrail -m incremental -b origin/main -s ./gitrail-state.json ./my-repo
 ```
 
 Only commits added since the last run are extracted. The state file is updated on success.

@@ -15,7 +15,6 @@ The primary focus is on stabilizing the CLI contract early — particularly arou
 - Prevent accidental data overwrites caused by repeated runs in the same output directory
 - Improve cross-session correctness when users add new branches over time
 - Reduce architecture coupling in the core layer to improve testability and future feature velocity
-- Improve help discoverability for new users
 
 ## Scope Summary
 
@@ -26,7 +25,6 @@ The primary focus is on stabilizing the CLI contract early — particularly arou
 - Add execution-time uniqueness to rotated output filenames to prevent overwrite across sessions
 - Introduce explicit extraction mode (`--mode snapshot|incremental`), rename `--since-commit` to `--since-ref`, add `--on-missing-state`, and add shorthand aliases for all major flags
 - Add merge-base-based cross-run deduplication when new branches are added across sessions
-- Group `--help` output by category for better discoverability
 - Update all human-oriented documentation (`docs/`, README, changelog, and migration notes) to reflect the complete v0.2.0 changes
 
 ### Explicitly excluded from v0.2.0
@@ -67,7 +65,6 @@ _Replace implicit extraction mode detection with an explicit `--mode snapshot|in
 ### Non-Goals
 
 - `--state-dir` (automatic state file path derivation) — deferred to a future release
-- Help output grouping — Phase 6
 - Cross-run deduplication for newly added branches — Phase 5
 - Changes to output format, JSON schema, or `OutputWriter`
 
@@ -434,19 +431,7 @@ npm run format:check
 
 ---
 
-## Phase 6: Help Option Grouping and Discoverability
-
-_Group CLI options under labelled sections in the `--help` output and add descriptive notes to guide users toward the incremental extraction workflow._
-
-### Status
-
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
-
----
-
-## Phase 7: Documentation Update
+## Phase 6: Documentation Update
 
 _Update all human-oriented documentation — `docs/`, README, changelog, and migration notes — to reflect the complete set of changes introduced in this release._
 

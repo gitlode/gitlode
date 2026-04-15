@@ -49,6 +49,12 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 - Add a note to the `--state` description: "Primary mechanism for scheduled/incremental runs"
 - Evaluate whether citty supports option grouping natively; if not, consider a custom help renderer
 
+**Design resolution notes (v0.2.0 — deferred)**:
+
+- citty does not support option grouping natively (confirmed at v0.2.0 design time). A custom help renderer would be required.
+- Deferred on cost/value grounds: the option set (~10 options) is small enough to be readable without grouping, and gitrail usage patterns tend toward fixed, recurring invocations rather than exploratory CLI trial-and-error. The implementation cost of a custom renderer outweighs the discoverability benefit at this scale.
+- `docs/usage.md` and README serve as the primary reference for workflow guidance in the interim.
+
 ---
 
 #### Output: Prevent overwrite across extraction sessions

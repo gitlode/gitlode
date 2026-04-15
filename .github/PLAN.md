@@ -27,7 +27,7 @@ The primary focus is on stabilizing the CLI contract early — particularly arou
 - Introduce explicit extraction mode (`--mode snapshot|incremental`), rename `--since-commit` to `--since-ref`, add `--on-missing-state`, and add shorthand aliases for all major flags
 - Add merge-base-based cross-run deduplication when new branches are added across sessions
 - Group `--help` output by category for better discoverability
-- Update documentation and changelog entries for the release
+- Update all human-oriented documentation (`docs/`, README, changelog, and migration notes) to reflect the complete v0.2.0 changes
 
 ### Explicitly excluded from v0.2.0
 
@@ -37,43 +37,7 @@ The primary focus is on stabilizing the CLI contract early — particularly arou
 
 ---
 
-## Phase 1: Extractor Boundary Cleanup for Runtime and I/O Concerns
-
-_Introduce explicit abstractions for stderr output, timing, and state persistence in the core layer, replacing direct runtime coupling in `extractor.ts`._
-
-### Status
-
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
-
----
-
-## Phase 2: TypeScript `readonly` Audit
-
-_Apply `readonly` modifiers to all interface fields and collection types used as pure data or configuration, starting from value types and working inward._
-
-### Status
-
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
-
----
-
-## Phase 3: Output Filename Uniqueness Across Sessions
-
-_Include a session-unique identifier (execution timestamp) in rotated output filenames so repeated runs in the same directory do not overwrite prior results._
-
-### Status
-
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
-
----
-
-## Phase 4: Explicit Extraction Mode and State Ergonomics
+## Phase 1: Explicit Extraction Mode and State Ergonomics
 
 _Replace implicit extraction mode detection with an explicit `--mode snapshot|incremental` flag, rename `--since-commit` to `--since-ref` to accept any Git ref (commit hash, tag, or branch name), introduce `--on-missing-state` to control behavior when the expected state file is absent, and add shorthand aliases (`-m`, `-b`, `-o`, `-s`, `-q`) for all major flags._
 
@@ -109,14 +73,14 @@ _Replace implicit extraction mode detection with an explicit `--mode snapshot|in
 
 ### Target Files
 
-| File                              | Action | Notes                                                                                                                                                                                                                                                                                                                                                                               |
-| --------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/cli/args.ts`                 | Modify | Rename `since-commit` → `since-ref` in `argsDef`; add `mode` arg with alias `-m`; add `on-missing-state` arg; add aliases `-o`, `-s`, `-q`; extend `-b` manual scan; rewrite mutual exclusion (5 rules replacing 2); add Phase 2 state parent dir check; replace `--since-commit` walkCommits validation with `resolveRef()` for `--since-ref`; update `ExtractorConfig` population |
-| `src/core/types.ts`               | Modify | `ExtractionRange`: rename `type: "commit"` → `type: "ref"`; add `mode: "snapshot" \| "incremental"` to `ExtractorConfig`; add `onMissingState?: "error" \| "snapshot"` to `ExtractorConfig`                                                                                                                                                                                         |
-| `src/core/extractor.ts`           | Modify | Guard state-reading block with `this.config.mode === "incremental"`; implement `--on-missing-state snapshot` fallback (warn + full traversal) and `error` (exit 1) when state file is absent in incremental mode; update `ExtractionRange` type check from `"commit"` → `"ref"`                                                                                                     |
-| `test/cli/args.test.ts`           | Modify | Add tests for `--mode`, `--since-ref`, `--on-missing-state`, aliases `-m`/`-b`/`-o`/`-s`/`-q`; update mutual exclusion tests (5 new, remove 2 old); add Phase 2 state parent dir test; update `--since-commit` test to expect unknown-flag error                                                                                                                                    |
-| `test/cli/cmd-definition.test.ts` | Modify | Reflect renamed arg `since-ref` and new args `mode`, `on-missing-state` in command definition assertions                                                                                                                                                                                                                                                                            |
-| `test/core/extractor.test.ts`     | Modify | Add tests: snapshot mode ignores state content; incremental mode reads state; `--on-missing-state snapshot` fallback emits warning and performs full traversal; `--on-missing-state error` (enforced in `args.ts`, not `Extractor`) — confirm `Extractor` does not need to re-validate                                                                                              |
+| File                              | Action | Notes                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/cli/args.ts`                 | Modify | Rename `since-commit` → `since-ref` in `argsDef`; add `mode` arg with alias `-m`; add `on-missing-state` arg; add aliases `-o`, `-s`, `-q`; extend `-b` manual scan; rewrite mutual exclusion (5 rules replacing 2); add state parent directory existence check (filesystem validation step); replace `--since-commit` walkCommits validation with `resolveRef()` for `--since-ref`; update `ExtractorConfig` population |
+| `src/core/types.ts`               | Modify | `ExtractionRange`: rename `type: "commit"` → `type: "ref"`; add `mode: "snapshot" \| "incremental"` to `ExtractorConfig`; add `onMissingState?: "error" \| "snapshot"` to `ExtractorConfig`                                                                                                                                                                                                                              |
+| `src/core/extractor.ts`           | Modify | Guard state-reading block with `this.config.mode === "incremental"`; implement `--on-missing-state snapshot` fallback (warn + full traversal) and `error` (exit 1) when state file is absent in incremental mode; update `ExtractionRange` type check from `"commit"` → `"ref"`                                                                                                                                          |
+| `test/cli/args.test.ts`           | Modify | Add tests for `--mode`, `--since-ref`, `--on-missing-state`, aliases `-m`/`-b`/`-o`/`-s`/`-q`; update mutual exclusion tests (5 new, remove 2 old); add state parent dir filesystem validation test; update `--since-commit` test to expect unknown-flag error                                                                                                                                                           |
+| `test/cli/cmd-definition.test.ts` | Modify | Reflect renamed arg `since-ref` and new args `mode`, `on-missing-state` in command definition assertions                                                                                                                                                                                                                                                                                                                 |
+| `test/core/extractor.test.ts`     | Modify | Add tests: snapshot mode ignores state content; incremental mode reads state; `--on-missing-state snapshot` fallback emits warning and performs full traversal; `--on-missing-state error` (enforced in `args.ts`, not `Extractor`) — confirm `Extractor` does not need to re-validate                                                                                                                                   |
 
 ### Implementation Notes
 
@@ -140,14 +104,98 @@ npm run format:check
 - `gitrail -b main ./repo` — snapshot mode (default), no state, exits 0
 - `gitrail --mode snapshot -b main -s ./state.json ./repo` — snapshot; creates/overwrites state file; prior state content is not used
 - `gitrail --mode incremental -b main -s ./state.json ./repo` (state exists) — reads state, differential extraction, exits 0
-- `gitrail --mode incremental -b main -s ./state.json ./repo` (state missing, default `--on-missing-state error`) — exits 1 with message `--state is required when using --mode incremental` ... actually state file is missing, not `--state` omitted. Confirm message is `State file not found: <path>`  
-  → Update: exits 1 with the configured error message for missing state file
+- `gitrail --mode incremental -b main -s ./state.json ./repo` (state missing, default `--on-missing-state error`) — exits 1 with message `State file not found: <path>`
 - `gitrail -m incremental -b main -s ./state.json --on-missing-state snapshot ./repo` (state missing) — emits warning to stderr, performs full extraction, creates state file, exits 0
 - `gitrail -b main --since-ref v1.0 ./repo` — snapshot from tag boundary, exits 0
 - `gitrail -b main --since-ref v1.0 -s ./state.json ./repo` — snapshot from tag, records HEAD in state file (not tag hash)
 - `gitrail -m incremental -b main -s ./state.json --since-ref v1.0 ./repo` — exits 1: `--since-ref cannot be used with --mode incremental`
 - `gitrail --mode incremental -b main ./repo` (no `--state`) — exits 1: `--state is required when using --mode incremental`
 - `gitrail --since-commit abc123 ./repo` — citty unknown-arg error (confirm `--since-commit` is no longer recognized)
+
+---
+
+## Phase 2: Output Filename Uniqueness Across Sessions
+
+_Replace the `prefix` parameter in `OutputWriter` with a `filenameFor: (seq: number) => string` callback, and generate that callback in `Extractor.run()` using an execution timestamp, so each session writes to a unique filename series and cannot overwrite prior results._
+
+### Status
+
+- [ ] Planned
+- [ ] In progress
+- [ ] Completed
+
+### Design References
+
+- Roadmap item: "Output: Prevent overwrite across extraction sessions"
+
+### Design Decisions
+
+- **Filename format**: `{prefix}-{timestamp}-{seq}.jsonl` — session groups are contiguous in lexicographic sort order, and the timestamp serves as a secondary operational record of when the output was produced.
+- **Timestamp format**: `YYYYMMDDTHHmmssZ` (UTC, second precision, filesystem-safe). Millisecond precision provides no meaningful benefit for the operational accident-prevention goal, and is intentionally excluded.
+- **Collision tolerance**: Same-second double-execution collisions are accepted. The goal is to prevent operational accidents across separate invocations, not cryptographic uniqueness.
+- **`filenameFor` callback replaces the `prefix` constructor parameter**: `OutputWriter` receives `filenameFor: (seq: number) => string` instead of `prefix: string`. It returns a filename only (not a path). Path construction remains `join(outputDir, filenameFor(seq))` inside `OutputWriter`, keeping `outputDir` as the sole authority over the output directory. This prevents path traversal vulnerabilities that would arise if the callback could return an absolute or relative path.
+- **Timestamp is captured once in `Extractor.run()`** before the write loop starts, then closed over in the `filenameFor` lambda. `OutputWriter` itself has no knowledge of timestamps.
+- **`formatSessionTimestamp(date: Date): string`** is a pure helper function added to `src/output/utils.ts`. It produces the `YYYYMMDDTHHmmssZ` string and is independently testable.
+- **Phase 3 compatibility**: because `OutputWriter` is unaware of how the timestamp is obtained, Phase 3's Clock abstraction only needs to change where `new Date()` is called in `Extractor.run()` — `OutputWriter` requires no further changes.
+- **New runtime dependencies**: none.
+
+### Non-Goals
+
+- Millisecond or UUID-based uniqueness — second precision is sufficient for the operational goal
+- Allowing `filenameFor` to return a full path — filename only, path joining stays in `OutputWriter`
+- Changing the `.jsonl` extension or the zero-padded sequence format
+- Any changes to the output JSON schema or rotation logic
+
+### Target Files
+
+| File                      | Action | Notes                                                                                                                                                                      |
+| ------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/output/writer.ts`    | Modify | Replace `prefix: string` constructor parameter with `filenameFor: (seq: number) => string`; update `openNext()` to call `filenameFor(this.seq)` instead of constructing the filename internally |
+| `src/output/utils.ts`     | Modify | Add `formatSessionTimestamp(date: Date): string` — formats a `Date` as `YYYYMMDDTHHmmssZ` (UTC, second precision)                                                         |
+| `src/output/index.ts`     | Modify | Re-export `formatSessionTimestamp`                                                                                                                                         |
+| `src/core/extractor.ts`   | Modify | Replace `new OutputWriter(outputDir, prefix, rotation)` with `new OutputWriter(outputDir, (seq) => \`${prefix}-${tsStr}-${String(seq).padStart(6, "0")}.jsonl\`, rotation)`; capture `new Date()` as `sessionTs` before the write loop; derive `tsStr` via `formatSessionTimestamp(sessionTs)` |
+| `test/output/writer.test.ts` | Modify | Replace `prefix`-based constructor calls with explicit `filenameFor` callbacks; update all `readFile` calls that reference hardcoded filenames (e.g. `repo-000001.jsonl`) to use the filename produced by the test's own callback |
+| `test/output/utils.test.ts`  | Modify | Add tests for `formatSessionTimestamp`: UTC output, second truncation, known input/output pair                                                                             |
+
+### Verification
+
+**Automated:**
+
+```
+npm run build
+npm test
+npm run format:check
+```
+
+**Behavioral checks:**
+
+- Run `gitrail -b main ./repo -o ./out` twice in quick succession; confirm two distinct timestamp segments appear in `./out/` filenames and no file from the first run is overwritten
+- Run with `--max-lines 1` across multiple commits; confirm all files in the session share the same timestamp segment and sequence numbers are `000001`, `000002`, etc.
+- Confirm filename format matches `{prefix}-YYYYMMDDTHHmmssZ-{6-digit-seq}.jsonl` exactly
+
+---
+
+## Phase 3: Extractor Boundary Cleanup for Runtime and I/O Concerns
+
+_Introduce explicit abstractions for stderr output, timing, and state persistence in the core layer, replacing direct runtime coupling in `extractor.ts`._
+
+### Status
+
+- [ ] Planned
+- [ ] In progress
+- [ ] Completed
+
+---
+
+## Phase 4: TypeScript `readonly` Audit
+
+_Apply `readonly` modifiers to all interface fields and collection types used as pure data or configuration, starting from value types and working inward._
+
+### Status
+
+- [ ] Planned
+- [ ] In progress
+- [ ] Completed
 
 ---
 
@@ -175,9 +223,9 @@ _Group CLI options under labelled sections in the `--help` output and add descri
 
 ---
 
-## Phase 7: Release Documentation and Notes
+## Phase 7: Documentation Update
 
-_Update the README, changelog, and any migration notes to reflect breaking CLI changes and new behavior introduced in this release._
+_Update all human-oriented documentation — `docs/`, README, changelog, and migration notes — to reflect the complete set of changes introduced in this release._
 
 ### Status
 

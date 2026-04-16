@@ -33,25 +33,25 @@ The primary focus is on stabilizing the CLI contract early — particularly arou
 - Configurable field inclusion or exclusion
 - All long-term output, schema, and streaming features
 
----
+## Development Phases
 
-## Phase 1: Explicit Extraction Mode and State Ergonomics
+### Phase 1: Explicit Extraction Mode and State Ergonomics
 
 _Replace implicit extraction mode detection with an explicit `--mode snapshot|incremental` flag, rename `--since-commit` to `--since-ref` to accept any Git ref (commit hash, tag, or branch name), introduce `--on-missing-state` to control behavior when the expected state file is absent, and add shorthand aliases (`-m`, `-b`, `-o`, `-s`, `-q`) for all major flags._
 
-### Status
+#### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
 
-### Design References
+#### Design References
 
 - [`instructions/cli.instructions.md`](instructions/cli.instructions.md) — full parameter reference, mutual exclusion rules, validation phases, usage examples
 - [`instructions/git-traversal.instructions.md`](instructions/git-traversal.instructions.md) — Traversal Algorithm (Snapshot Mode / Incremental Mode), State File Management (role per mode, HEAD recording semantics)
 - Roadmap item: "CLI spec: Explicit extraction mode and state ergonomics"
 
-### Design Decisions
+#### Design Decisions
 
 - **`--mode snapshot|incremental`**: default is `snapshot`. `snapshot` extracts independently of prior state; `incremental` reads state to determine the commit boundary. The presence of `--state` alone no longer implies incremental mode — this is a breaking change from v0.1.x behavior.
 - **`--since-commit` renamed to `--since-ref`**: accepts commit hash, tag name, or branch name. Resolved via `resolveRef()`. The internal `ExtractionRange` type field changes from `type: "commit"` to `type: "ref"`. This is a breaking CLI change.
@@ -62,13 +62,13 @@ _Replace implicit extraction mode detection with an explicit `--mode snapshot|in
 - **`ExtractorConfig` gains `mode` and `onMissingState` fields**: `mode: "snapshot" | "incremental"`. `onMissingState?: "error" | "snapshot"` (relevant only in incremental mode). `Extractor.run()` uses `mode` to decide whether to read state content.
 - **New runtime dependencies**: none.
 
-### Non-Goals
+#### Non-Goals
 
 - `--state-dir` (automatic state file path derivation) — deferred to a future release
 - Cross-run deduplication for newly added branches — Phase 5
 - Changes to output format, JSON schema, or `OutputWriter`
 
-### Target Files
+#### Target Files
 
 | File                              | Action | Notes                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -79,14 +79,14 @@ _Replace implicit extraction mode detection with an explicit `--mode snapshot|in
 | `test/cli/cmd-definition.test.ts` | Modify | Reflect renamed arg `since-ref` and new args `mode`, `on-missing-state` in command definition assertions                                                                                                                                                                                                                                                                                                                 |
 | `test/core/extractor.test.ts`     | Modify | Add tests: snapshot mode ignores state content; incremental mode reads state; `--on-missing-state snapshot` fallback emits warning and performs full traversal; `--on-missing-state error` (enforced in `args.ts`, not `Extractor`) — confirm `Extractor` does not need to re-validate                                                                                                                                   |
 
-### Implementation Notes
+#### Implementation Notes
 
 - The existing `process.argv` manual scan loop collects `--branch` and `--branch=`; it must also collect `-b` followed by a non-flag value. Add that case alongside the existing `--branch` cases.
 - The prior state-reading block in `Extractor.run()` silently skips to full extraction on `ENOENT`. With the new design, this behavior moves to `args.ts` (for the `--on-missing-state` decision) and the `ENOENT` path in `Extractor` should become unreachable in incremental mode. The snapshot-mode path should skip state-reading entirely.
 - The old `--since-commit` validation called `walkCommits()` to verify the hash existed. Replace this with a single `resolveRef()` call for `--since-ref` — if it throws `REF_NOT_FOUND`, emit `Ref not found: <ref>` and exit 1.
 - The old mutual exclusion `--state && (sinceCommit || sinceDate)` → error must be removed. Review `args.test.ts` for tests that assert this behavior and update them to assert the opposite (permitted in snapshot mode).
 
-### Verification
+#### Verification
 
 **Automated:**
 
@@ -111,21 +111,21 @@ npm run format:check
 
 ---
 
-## Phase 2: Output Filename Uniqueness Across Sessions
+### Phase 2: Output Filename Uniqueness Across Sessions
 
 _Replace the `prefix` parameter in `OutputWriter` with a `filenameFor: (seq: number) => string` callback, and generate that callback in `Extractor.run()` using an execution timestamp, so each session writes to a unique filename series and cannot overwrite prior results._
 
-### Status
+#### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
 
-### Design References
+#### Design References
 
 - Roadmap item: "Output: Prevent overwrite across extraction sessions"
 
-### Design Decisions
+#### Design Decisions
 
 - **Filename format**: `{prefix}-{timestamp}-{seq}.jsonl` — session groups are contiguous in lexicographic sort order, and the timestamp serves as a secondary operational record of when the output was produced.
 - **Timestamp format**: `YYYYMMDDTHHmmssZ` (UTC, second precision, filesystem-safe). Millisecond precision provides no meaningful benefit for the operational accident-prevention goal, and is intentionally excluded.
@@ -136,14 +136,14 @@ _Replace the `prefix` parameter in `OutputWriter` with a `filenameFor: (seq: num
 - **Phase 3 compatibility**: because `OutputWriter` is unaware of how the timestamp is obtained, Phase 3's Clock abstraction only needs to change where `new Date()` is called in `Extractor.run()` — `OutputWriter` requires no further changes.
 - **New runtime dependencies**: none.
 
-### Non-Goals
+#### Non-Goals
 
 - Millisecond or UUID-based uniqueness — second precision is sufficient for the operational goal
 - Allowing `filenameFor` to return a full path — filename only, path joining stays in `OutputWriter`
 - Changing the `.jsonl` extension or the zero-padded sequence format
 - Any changes to the output JSON schema or rotation logic
 
-### Target Files
+#### Target Files
 
 | File                         | Action | Notes                                                                                                                                                                                                                                                                                    |
 | ---------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -154,7 +154,7 @@ _Replace the `prefix` parameter in `OutputWriter` with a `filenameFor: (seq: num
 | `test/output/writer.test.ts` | Modify | Replace `prefix`-based constructor calls with explicit `filenameFor` callbacks; update all `readFile` calls that reference hardcoded filenames (e.g. `repo-000001.jsonl`) to use the filename produced by the test's own callback                                                        |
 | `test/output/utils.test.ts`  | Modify | Add tests for `formatSessionTimestamp`: UTC output, second truncation, known input/output pair                                                                                                                                                                                           |
 
-### Verification
+#### Verification
 
 **Automated:**
 
@@ -172,22 +172,22 @@ npm run format:check
 
 ---
 
-## Phase 3: Extractor Boundary Cleanup for Runtime and I/O Concerns
+### Phase 3: Extractor Boundary Cleanup for Runtime and I/O Concerns
 
 _Introduce `Reporter`, `StateStore`, and two clock function types into the core layer, and inject them into `Extractor` via constructor arguments, removing all direct runtime coupling (`process.stderr`, `performance`, `Date`, `fs`) from `extractor.ts`._
 
-### Status
+#### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
 
-### Design References
+#### Design References
 
 - [`instructions/architecture.instructions.md`](instructions/architecture.instructions.md) — "Stable core, volatile edges" principle; component responsibilities
 - Roadmap item: "Refactor: Extractor boundary cleanup for runtime and I/O concerns"
 
-### Design Decisions
+#### Design Decisions
 
 - **`Reporter` interface** — split by meaning into three methods:
 
@@ -240,14 +240,14 @@ _Introduce `Reporter`, `StateStore`, and two clock function types into the core 
 
 - **New runtime dependencies**: none.
 
-### Non-Goals
+#### Non-Goals
 
 - Changing state file schema, atomic write strategy, or validation rules
 - Abstracting `OutputWriter` — it is already constructed by `Extractor` and tested separately
 - Clock abstraction in layers other than Core (CLI layer uses `Date`/`performance` directly)
 - Any observable change in CLI output format or behavior
 
-### Target Files
+#### Target Files
 
 | File                          | Action | Notes                                                                                                                                                                                                                                                                                                       |
 | ----------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -258,14 +258,14 @@ _Introduce `Reporter`, `StateStore`, and two clock function types into the core 
 | `src/index.ts`                | Modify | Destructure `{ config, quiet }` from `parseArgs()`; define `stderrReporter`, `noopReporter`, `NodeStateStore` inline; pass appropriate Reporter and optional StateStore to `new Extractor(...)`; retain `quiet` local variable for the post-run summary guard                                               |
 | `test/core/extractor.test.ts` | Modify | Add `reporter`, `wallNow`, `monotonicNow`, and `stateStore` mocks/stubs to all `Extractor` instantiations; add tests verifying `reporter.warn` is called on branch-not-found and fallback; verify `reporter.done` is called in finally                                                                      |
 
-### Implementation Notes
+#### Implementation Notes
 
 - In `src/index.ts`, `stderrReporter` should maintain internal state (`lastDisplayed: number`) to throttle `progress()` display to every 100 commits, and emit the final `\n` flush in `done()`.
 - `NodeStateStore.write()` receives the complete `StateFile` object (including `generatedAt`). The `generatedAt` value is set by Extractor using `wallNow()` before calling `stateStore.write()`.
 - After Phase 2, `Extractor.run()` already calls `new Date()` once for the session timestamp (`filenameFor`). After Phase 3, the same `wallNow()` call serves double duty — session timestamp and `generatedAt`. Capture it as a single `const sessionTs = wallNow()` at the start of `run()`.
 - `stderrReporter` and `noopReporter` can be plain object literals in `src/index.ts`; a class is not required.
 
-### Verification
+#### Verification
 
 **Automated:**
 
@@ -283,17 +283,17 @@ npm run format:check
 
 ---
 
-## Phase 4: TypeScript Type Strengthening
+### Phase 4: TypeScript Type Strengthening
 
 _Strengthen the type system across all layers by applying `readonly` modifiers, `readonly` array types, `never`-based exhaustiveness checks, and a branded `CommitHash` type — keeping changes to the type layer only, with one deliberate exception: a runtime `isCommitHash()` guard at the user-controlled state file boundary._
 
-### Status
+#### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
 
-### Design Decisions
+#### Design Decisions
 
 - **`readonly` on all pure data fields**: apply to every field in `RawPerson`, `RawCommit`, `PersonIdentity`, `OutputPerson`, `OutputRepository`, `OutputCommit`, `RotationConfig`, `ExtractorConfig`, `StateBranchEntry`, `StateFile`, `ExtractionResult`, `GitAdapter` method signatures. Fields are mutable only where there is an explicit documented reason.
 - **`readonly` array types**: `branches: string[]` → `readonly string[]` in `ExtractorConfig`; `parents: string[]` → `readonly string[]` in `RawCommit` and `OutputCommit`; `branches: StateBranchEntry[]` → `readonly StateBranchEntry[]` in `StateFile`. The distinction matters: a `readonly` field holding a mutable array still allows `.push()`; `readonly T[]` prohibits mutation of the array itself.
@@ -314,14 +314,14 @@ _Strengthen the type system across all layers by applying `readonly` modifiers, 
 - **Execution code impact**: limited to `isCommitHash()` function definition and its call site in state file parsing. All other changes are type-only.
 - **New runtime dependencies**: none.
 
-### Non-Goals
+#### Non-Goals
 
 - SHA-256 (64-char) support — isomorphic-git does not produce it; defer if ever needed
 - Branded types for repo paths, branch names, or remote URLs — the safety gain does not justify the annotation noise at this stage
 - Changing `interface` to `type` or vice versa — current usage is already idiomatic
 - Any changes to runtime logic, output format, or CLI behavior
 
-### Target Files
+#### Target Files
 
 | File                                      | Action | Notes                                                                                                                                                                                                   |
 | ----------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -334,12 +334,12 @@ _Strengthen the type system across all layers by applying `readonly` modifiers, 
 | `test/core/extractor.test.ts`             | Modify | Update state file fixtures to use valid 40-char hex hashes (any that are already valid remain unchanged); add test asserting `isCommitHash` rejects an invalid hash in state file                       |
 | `test/git/isomorphic-git-adapter.test.ts` | Modify | No logic changes expected; confirm type-level changes compile cleanly                                                                                                                                   |
 
-### Implementation Notes
+#### Implementation Notes
 
 - Apply changes layer by layer outward: `src/core/types.ts` first, then `src/git/types.ts`, then `src/output/types.ts`, then the concrete files (`extractor.ts`, `isomorphic-git-adapter.ts`). This order ensures TypeScript surfaces all cascade errors in one pass rather than iteratively.
 - `assertNever` is intentionally defined in `src/core/types.ts` rather than a utility file — it is tightly coupled to the discriminated union definitions in that file, and placing it there makes the exhaustiveness contract visible at its point of definition.
 
-### Verification
+#### Verification
 
 **Automated:**
 
@@ -357,22 +357,22 @@ npm run format:check
 
 ---
 
-## Phase 5: Cross-Run Deduplication for Newly Added Branches
+### Phase 5: Cross-Run Deduplication for Newly Added Branches
 
 _When a new branch is added to `--branch` in an incremental run, compute the merge base between that branch and all branches already recorded in the state file, and use the deepest common ancestor as `excludeHash` for the new branch's traversal, preventing commits already extracted in prior runs from appearing in the output again._
 
-### Status
+#### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
 
-### Design References
+#### Design References
 
 - [`instructions/git-traversal.instructions.md`](instructions/git-traversal.instructions.md) — "Deduplication: Across Runs (known limitation)" and "Future Work: Cross-Run Deduplication for New Branches"
 - Roadmap item: "Correctness: Cross-run deduplication for newly added branches"
 
-### Design Decisions
+#### Design Decisions
 
 - **Trigger condition**: a branch is "new" when it appears in `--branch` args but is **absent from the state file's `branches` array**. Only applies in `--mode incremental`. Snapshot mode does not read state and requires no deduplication.
 - **Merge base computation**: use `isomorphic-git`'s `findMergeBase({ fs, dir, oids })` API. `oids` is the list of HEAD hashes for all **existing** branches from the state file (not the new branch). The function returns `string[]`; use the first element as the merge base hash. If it returns an empty array (no common ancestor — detached histories), skip the deduplication and fall back to full traversal for that branch.
@@ -388,14 +388,14 @@ _When a new branch is added to `--branch` in an incremental run, compute the mer
 - **`MERGE_BASE_NOT_FOUND` error code**: add to `GitAdapterErrorCode`. Used when `findMergeBase` itself throws an unexpected error (not for the empty-result case — that is the `null` return).
 - **New runtime dependencies**: none (`findMergeBase` is already in isomorphic-git).
 
-### Non-Goals
+#### Non-Goals
 
 - Deduplication for snapshot mode — state is not read, so there is no prior-run context
 - Deduplication when no branches exist in the state file (first run) — no existing HEADs to compute merge base against
 - Storing per-commit output history to enable arbitrary deduplication — the merge-base approach is sufficient and bounded
 - Changes to state file schema
 
-### Target Files
+#### Target Files
 
 | File                                      | Action | Notes                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -406,13 +406,13 @@ _When a new branch is added to `--branch` in an incremental run, compute the mer
 | `test/git/isomorphic-git-adapter.test.ts` | Modify | Add tests: `findMergeBase` returns the correct common ancestor for a forked history; returns `null` for detached histories; wraps unexpected errors as `MERGE_BASE_NOT_FOUND`                                                                                                                                                |
 | `test/core/extractor.test.ts`             | Modify | Add tests: new branch in incremental mode uses merge base as `excludeHash`; new branch with no common ancestor falls back to full traversal; existing branches are unaffected by merge base logic                                                                                                                            |
 
-### Implementation Notes
+#### Implementation Notes
 
 - The merge base computation must happen **before** the per-branch traversal loop, using the HEAD hashes of the branches already in `stateMap`. These can be resolved via `adapter.resolveRef()` for each existing branch name at that point — or, if Phase 1 has already been applied, the state file's `lastCommitHash` values (already in `stateMap`) can be used directly as the `oids` list, avoiding extra `resolveRef()` calls.
 - Using `stateMap` values (prior run's HEAD hashes) rather than current HEAD hashes for `oids` is acceptable and slightly preferred: it avoids an extra async call per existing branch and is consistent with what the existing incremental logic already uses as `excludeHash`.
 - `findMergeBase` with a single existing branch (`stateMap.size === 1`) degenerates to a two-ancestor merge base call, which is the common case and is correct.
 
-### Verification
+#### Verification
 
 **Automated:**
 
@@ -429,137 +429,48 @@ npm run format:check
 - Run 2 with detached history (no common ancestor): confirm `feature` is fully extracted without error
 - Confirm `main` differential output in Run 2 is identical to what it would be without the `feature` branch added
 
----
+## Release Tasks
 
-## Phase 6: Documentation Update
+### Documentation Update
 
-_Update all human-oriented documentation — `CHANGELOG.md`, `README.md`, `docs/usage.md`, and `docs/design/` — to reflect the complete set of changes introduced in this release._
+_Update all human-oriented documentation to reflect the complete set of changes introduced in this release. Run after all Development Phases are complete._
 
-### Status
+#### Status
 
 - [ ] Planned
 - [ ] In progress
 - [ ] Completed
 
-### Design Decisions
+#### Mandatory Files
 
-- **CHANGELOG format**: follows Keep a Changelog (Added / Changed / Migration subsections). Breaking changes carry a **Breaking** prefix within Changed. Internal-only phases (Phase 3: Extractor Boundary Cleanup; Phase 4: TypeScript Type Strengthening) are omitted — they have no user-visible impact.
-- **Migration subsection in CHANGELOG**: placed as `### Migration` within the `[0.2.0]` section. Two items: (1) `--since-commit` → `--since-ref` rename; (2) `--mode incremental` now required to trigger differential extraction — `--state` alone no longer implies incremental mode.
-- **Filename format update**: the new format is `{prefix}-{YYYYMMDDTHHmmssZ}-{nnnnnn}.jsonl` (e.g. `my-repo-20240115T090000Z-000001.jsonl`). All occurrences in README.md and docs/usage.md referencing the old `<prefix>-000001.jsonl` pattern must be replaced.
-- **docs/usage.md Multi-Branch "Adding a new branch" section**: replace the "duplicate commits may appear" warning and the Recovery block with a description of the v0.2.0 automatic deduplication behavior (Phase 5). If no common ancestor exists, a full traversal is performed for the new branch.
-- **docs/usage.md is otherwise already up to date**: it already reflects the v0.2.0 CLI surface (`--mode`, `--since-ref`, `--on-missing-state`, grouped CLI reference tables, CI workflow). Only the two targeted changes are required.
+The following files are required for every release and must be updated regardless of scope:
 
-### Non-Goals
+| File           | Notes                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CHANGELOG.md` | Prepend `[0.2.0]` section following Keep a Changelog format (Added / Changed / Migration subsections). Breaking changes carry a **Breaking** prefix within Changed. Internal-only phases (Phase 3, Phase 4) are omitted — no user-visible impact. Include a `### Migration` subsection covering the two breaking CLI changes. |
+| `README.md`    | Review for impact; update if CLI behavior or output format is described.                                                                                                                                                                                                                                                      |
+
+#### Pre-Execution Step
+
+Before starting this task, review all human-oriented documentation for content that has become stale due to changes introduced in Phases 1–5. This review is mandatory regardless of what was anticipated at planning time.
+
+Documentation to review:
+
+- `README.md`
+- `docs/usage.md`
+- `docs/design/` (all files)
+
+For each file, check against the actual implementation for: renamed CLI options, changed output formats, removed limitations, and new behaviors. Update any stale content found during the review.
+
+#### Explicitly Out of Scope
 
 - `CONTRIBUTING.md` — no process changes in this release
 
-### Target Files
+#### Verification
 
-| File | Action | Notes |
-| --- | --- | --- |
-| `CHANGELOG.md` | Modify | Prepend `[0.2.0]` section; see Implementation Notes for exact structure |
-| `README.md` | Modify | Update Output section: replace `<prefix>-000001.jsonl` example with new timestamp-based format and add a brief naming note |
-| `docs/usage.md` | Modify | Two changes: (1) File Rotation section — update filename format examples; (2) Multi-Branch "Adding a new branch" subsection — replace duplicate-commit warning and Recovery block with automatic deduplication description |
-| `docs/design/schema.md` | Modify | "Output file naming" section: replace `{prefix}-{seq}.jsonl` format with `{prefix}-{YYYYMMDDTHHmmssZ}-{seq}.jsonl`; update example filenames accordingly |
-| `docs/design/git-traversal.md` | Modify | Three changes: (1) Rename "Differential by commit hash" section — `--since-commit` → `--since-ref`, note it accepts any Git ref; (2) "Across runs" subsection — replace "Known limitation" + duplicates-explanation + "Current recommendation" with the merge-base deduplication behavior implemented in Phase 5; (3) "Future enhancement candidates" — remove the first bullet point (merge-base deduplication is now implemented) |
-| `docs/design/architecture.md` | Modify | Two changes: (1) Core layer responsibilities — replace `--since-commit` with `--since-ref`; (2) Core layer responsibilities — add Reporter, StateStore, and clock abstractions injected via constructor (Phase 3 outcome); End-to-End Runtime Flow step 3 — clarify that state is read only in `--mode incremental` |
-
-### Implementation Notes
-
-**CHANGELOG.md — `[0.2.0]` section structure** (prepend above `[0.1.4]`; set date to the actual release date):
-
-```markdown
-## [0.2.0] - YYYY-MM-DD
-
-### Added
-
-- `--mode snapshot|incremental` flag to declare extraction intent explicitly (`-m` alias).
-  Default is `snapshot`. `snapshot` runs independently of any prior state; `incremental`
-  reads the state file to extract only new commits and requires `--state`.
-- `--on-missing-state error|snapshot` flag to control behavior when `--mode incremental` is
-  used and the state file is absent. Default is `error`. `snapshot` emits a warning to stderr,
-  performs full extraction, and creates the state file.
-- Shorthand aliases: `-m` (`--mode`), `-o` (`--output-dir`), `-s` (`--state`), `-q` (`--quiet`).
-  The `-b` alias for `--branch` was already present.
-- Cross-run deduplication for newly added branches: when a branch is added to `--branch` in a
-  subsequent incremental run, gitrail automatically computes the merge base between the new
-  branch and branches already recorded in the state file, and uses it as the exclusion boundary.
-  Commits already extracted via other branches are not duplicated.
-
-### Changed
-
-- **Breaking**: `--since-commit` renamed to `--since-ref`. The new option accepts a commit hash,
-  tag name, or branch name (resolved via `resolveRef()`).
-- **Breaking**: Differential extraction now requires `--mode incremental` to be specified
-  explicitly. Previously, the presence of an existing state file implicitly triggered differential
-  extraction. In v0.2.0, `--mode` must be set; `--state` alone records state without reading it
-  (snapshot mode).
-- Output filenames now include a session timestamp:
-  `{prefix}-{YYYYMMDDTHHmmssZ}-{nnnnnn}.jsonl` (e.g. `my-repo-20240115T090000Z-000001.jsonl`).
-  Files from different sessions no longer share a filename series, preventing accidental overwrites
-  in shared output directories.
-- `--state` and `--since-ref` / `--since-date` are now permitted together in snapshot mode.
-  `--state` serves as a recording path only; `--since-ref` / `--since-date` control the extraction
-  range independently.
-
-### Migration
-
-_Upgrading from v0.1.x to v0.2.0_
-
-**1. Rename `--since-commit` to `--since-ref`**
-
-​```diff
-- gitrail -b main --since-commit abc123 ./my-repo
-+ gitrail -b main --since-ref abc123 ./my-repo
-​```
-
-**2. Add `--mode incremental` to incremental runs**
-
-In v0.1.x, passing `--state` pointing to an existing state file implicitly triggered differential
-extraction. In v0.2.0, `--mode incremental` is required:
-
-​```diff
-- gitrail -b main --state ./state.json ./my-repo
-+ gitrail -m incremental -b main -s ./state.json ./my-repo
-​```
-
-Without `--mode incremental`, `--state` only records the current HEAD after a snapshot
-extraction — it does not read from the file.
-
-[0.2.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.2.0
-```
-
-**README.md — Output section filename format:**
-
-Replace: `` Output files are named `<prefix>-000001.jsonl`, `<prefix>-000002.jsonl`, and so on. ``
-
-With: `` Output files are named `<prefix>-20240115T090000Z-000001.jsonl`. The timestamp segment (UTC, second precision) is fixed for each session, so all files from a single run share it. Use `--rotate-lines` or `--rotate-size` to split output across multiple files. ``
-
-**docs/usage.md — File Rotation section filename format:**
-
-Replace both occurrences of `<prefix>-000001.jsonl` / `<prefix>-000002.jsonl` (in the prose paragraph and in the CLI reference note at the bottom) with `<prefix>-20240115T090000Z-000001.jsonl` / `<prefix>-20240115T090000Z-000002.jsonl`. Add the note: "The timestamp segment is fixed for the session (captured at run start); all files from one run share it."
-
-**docs/usage.md — Multi-Branch "Adding a new branch to an existing incremental workflow" subsection:**
-
-Replace the current text (from "If a branch is listed in `--branch` but has no entry in the state file" through the end of the Recovery block) with:
-
-> If a branch is listed in `--branch` but has no entry in the state file, gitrail automatically
-> computes the merge base between the new branch and the branches already recorded in the state
-> file, then uses it as the exclusion boundary. Only commits specific to the new branch above the
-> merge base are written — commits already extracted via other branches are not duplicated.
->
-> If the new branch shares no common ancestor with any already-extracted branch (detached
-> history), gitrail falls back to a full traversal for that branch.
-
-### Verification
-
-- `CHANGELOG.md` has a `[0.2.0]` entry with Added, Changed, and Migration subsections; Migration covers both breaking changes with diff examples
-- No occurrence of `--since-commit` in any documentation file (CHANGELOG.md, README.md, docs/)
-- No occurrence of the old filename pattern `{prefix}-000001.jsonl` (without timestamp) in README.md, docs/usage.md, or docs/design/schema.md
-- No occurrence of "duplicate commits may appear" or "Recovery:" in `docs/usage.md`
-- `docs/design/git-traversal.md` has no "Known limitation" block in the "Across runs" section; describes merge-base deduplication instead
-- `docs/design/git-traversal.md` "Future enhancement candidates" does not mention merge-base deduplication
-- `docs/design/architecture.md` Core layer responsibilities mention Reporter, StateStore, and clock abstractions
+- `CHANGELOG.md` has a `[0.2.0]` entry with Added, Changed, and Migration subsections
+- No occurrence of `--since-commit` in any documentation file (`CHANGELOG.md`, `README.md`, `docs/`)
+- No occurrence of the old filename pattern without a timestamp segment in `README.md`, `docs/`
 - `npm run format:check` passes
 
 ---

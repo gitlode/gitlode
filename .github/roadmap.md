@@ -59,6 +59,8 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 #### Output: Prevent overwrite across extraction sessions
 
+**Release target**: v0.2.0
+
 Current rotated output filenames such as `gitrail-000001.jsonl` restart from the same sequence on every invocation. If the tool writes to the same output directory repeatedly, previous results can be overwritten.
 
 **Preferred direction for the first fix**: include the execution time or another session-specific identifier in the rotated filename so each run generates a unique series without requiring manual cleanup.
@@ -107,6 +109,8 @@ The current assumption is to start with **A** because it is the simplest way to 
 ---
 
 #### Correctness: Cross-run deduplication for newly added branches
+
+**Release target**: v0.2.0
 
 When a branch is added to `--branch` in a subsequent run, its full traversal may output commits already extracted by a prior run via a different branch sharing history.
 
@@ -210,6 +214,8 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 
 #### Refactor: Extractor boundary cleanup for runtime and I/O concerns
 
+**Release target**: v0.2.0
+
 `src/core/extractor.ts` currently owns some runtime-specific mechanisms directly, including stderr progress/warning output, Node.js timing APIs, state-file I/O, and direct coupling to output metrics.
 
 This works functionally, but it weakens the architectural boundary between stable core policy and volatile runtime concerns.
@@ -234,6 +240,8 @@ This works functionally, but it weakens the architectural boundary between stabl
 - better aligns with the principle: **stable core, volatile edges**
 
 #### Refactor: TypeScript `readonly` audit
+
+**Release target**: v0.2.0
 
 All current interfaces and types (`RawCommit`, `GitAdapter`, `ExtractorConfig`, `RotationConfig`, `StateFile`, `OutputCommit`, etc.) are defined without `readonly` modifiers.
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -93,6 +93,22 @@ async function readJsonlFile(filePath: string): Promise<OutputCommit[]> {
     .map((line) => JSON.parse(line) as OutputCommit);
 }
 
+/** Returns sorted absolute paths of all .jsonl files in a directory. */
+async function findJsonlFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir);
+  return entries
+    .filter((e) => e.endsWith(".jsonl"))
+    .sort()
+    .map((e) => join(dir, e));
+}
+
+/** Reads all commits from the first .jsonl file found in a directory. */
+async function readFirstJsonlFile(dir: string): Promise<OutputCommit[]> {
+  const files = await findJsonlFiles(dir);
+  if (files.length === 0) throw new Error(`No .jsonl files found in ${dir}`);
+  return readJsonlFile(files[0]!);
+}
+
 describe("Extractor", () => {
   let tmpDir: string;
 
@@ -117,7 +133,7 @@ describe("Extractor", () => {
     const extractor = new Extractor(config, adapter);
     await extractor.run();
 
-    const commits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
+    const commits = await readFirstJsonlFile(tmpDir);
     expect(commits).toHaveLength(3);
 
     const oids = commits.map((c) => c.oid);
@@ -132,7 +148,8 @@ describe("Extractor", () => {
     }
 
     // Verify each line is valid JSON (readJsonlFile already does this via JSON.parse)
-    const raw = await readFile(join(tmpDir, "repo-000001.jsonl"), "utf8");
+    const [firstFile] = await findJsonlFiles(tmpDir);
+    const raw = await readFile(firstFile!, "utf8");
     expect(raw).not.toContain("\r\n");
     const lines = raw.split("\n").filter(Boolean);
     expect(lines).toHaveLength(3);
@@ -158,7 +175,7 @@ describe("Extractor", () => {
     const extractor = new Extractor(config, adapter);
     await extractor.run();
 
-    const commits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
+    const commits = await readFirstJsonlFile(tmpDir);
 
     // sha1 and sha2 are shared; sha3 is main-only
     const oids = commits.map((c) => c.oid);
@@ -187,7 +204,7 @@ describe("Extractor", () => {
     const extractor = new Extractor(config, adapter);
     await extractor.run();
 
-    const commits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
+    const commits = await readFirstJsonlFile(tmpDir);
     const oids = commits.map((c) => c.oid);
     expect(oids).toContain(sha3); // strictly after cutoff
     expect(oids).toHaveLength(1); // only sha3 passes the filter
@@ -209,7 +226,7 @@ describe("Extractor", () => {
     const extractor = new Extractor(config, adapter);
     await extractor.run();
 
-    const commits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
+    const commits = await readFirstJsonlFile(tmpDir);
     const oids = commits.map((c) => c.oid);
     expect(oids).not.toContain(sha1); // excluded
     expect(oids).toContain(sha2);
@@ -231,7 +248,7 @@ describe("Extractor", () => {
     const config1 = makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" });
     await new Extractor(config1, adapter).run();
 
-    const firstCommits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
+    const firstCommits = await readFirstJsonlFile(tmpDir);
     expect(firstCommits).toHaveLength(2);
 
     // Verify state file was written with absolute repositoryPath
@@ -250,15 +267,8 @@ describe("Extractor", () => {
       await new Extractor(config2, adapter).run();
 
       // No commits to write — no output file created (writer.seq stays 0)
-      try {
-        await readFile(join(tmpDir2, "repo-000001.jsonl"), "utf8");
-        // If file exists, it should be empty
-        const commits = await readJsonlFile(join(tmpDir2, "repo-000001.jsonl"));
-        expect(commits).toHaveLength(0);
-      } catch (err) {
-        // File not created is also acceptable (writer never opened a file)
-        expect((err as NodeJS.ErrnoException).code).toBe("ENOENT");
-      }
+      const jsonlFiles = await findJsonlFiles(tmpDir2);
+      expect(jsonlFiles).toHaveLength(0);
     } finally {
       await rm(tmpDir2, { recursive: true, force: true });
     }
@@ -370,8 +380,9 @@ describe("Extractor", () => {
     const extractor = new Extractor(config, adapter);
     await extractor.run();
 
-    const file1 = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
-    const file2 = await readJsonlFile(join(tmpDir, "repo-000002.jsonl"));
+    const [file1path, file2path] = await findJsonlFiles(tmpDir);
+    const file1 = await readJsonlFile(file1path!);
+    const file2 = await readJsonlFile(file2path!);
 
     expect(file1).toHaveLength(2);
     expect(file2).toHaveLength(1);
@@ -407,7 +418,7 @@ describe("Extractor", () => {
         adapter,
       ).run();
 
-      const commits = await readJsonlFile(join(tmpDir2, "repo-000001.jsonl"));
+      const commits = await readFirstJsonlFile(tmpDir2);
       const oids = commits.map((c) => c.oid);
       // Snapshot mode should return all commits regardless of state
       expect(oids).toContain(sha1);
@@ -446,7 +457,7 @@ describe("Extractor", () => {
         adapter,
       ).run();
 
-      const commits = await readJsonlFile(join(tmpDir2, "repo-000001.jsonl"));
+      const commits = await readFirstJsonlFile(tmpDir2);
       const oids = commits.map((c) => c.oid);
       expect(oids).toContain(sha3);
       expect(commits).toHaveLength(1);
@@ -479,7 +490,7 @@ describe("Extractor", () => {
 
       // All commits extracted (full traversal)
       expect(result.commitsWritten).toBe(2);
-      const commits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
+      const commits = await readFirstJsonlFile(tmpDir);
       const oids = commits.map((c) => c.oid);
       expect(oids).toContain(sha1);
       expect(oids).toContain(sha2);

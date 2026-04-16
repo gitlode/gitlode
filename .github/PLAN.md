@@ -117,9 +117,9 @@ _Replace the `prefix` parameter in `OutputWriter` with a `filenameFor: (seq: num
 
 #### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 #### Design References
 

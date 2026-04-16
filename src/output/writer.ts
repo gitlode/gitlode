@@ -14,7 +14,7 @@ export class OutputWriter {
 
   constructor(
     private readonly outputDir: string,
-    private readonly prefix: string,
+    private readonly filenameFor: (seq: number) => string,
     private readonly rotation: RotationConfig,
   ) {}
 
@@ -28,8 +28,7 @@ export class OutputWriter {
 
   private async openNext(): Promise<FileHandle> {
     this.seq++;
-    const seqStr = String(this.seq).padStart(6, "0");
-    const filename = `${this.prefix}-${seqStr}.jsonl`;
+    const filename = this.filenameFor(this.seq);
     const filepath = join(this.outputDir, filename);
     const handle = await open(filepath, "w");
     this.handle = handle;

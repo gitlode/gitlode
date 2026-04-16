@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { OutputWriter, splitMessage, toISO8601 } from "../output/index.js";
+import { OutputWriter, formatSessionTimestamp, splitMessage, toISO8601 } from "../output/index.js";
 import type { OutputCommit } from "../output/index.js";
 import type { ExtractorConfig, ExtractionResult, StateFile } from "./types.js";
 
@@ -93,9 +93,11 @@ export class Extractor {
       }
     }
 
+    const sessionTs = new Date();
+    const tsStr = formatSessionTimestamp(sessionTs);
     const writer = new OutputWriter(
       this.config.outputDir,
-      this.config.outputPrefix,
+      (seq) => `${this.config.outputPrefix}-${tsStr}-${String(seq).padStart(6, "0")}.jsonl`,
       this.config.rotation,
     );
 

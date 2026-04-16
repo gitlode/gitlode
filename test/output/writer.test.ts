@@ -45,7 +45,8 @@ describe("OutputWriter", () => {
   });
 
   it("writes all commits to a single file when no rotation is configured", async () => {
-    const writer = new OutputWriter(tmpDir, "repo", {});
+    const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
+    const writer = new OutputWriter(tmpDir, filenameFor, {});
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2)));
     await writer.write(makeCommit(oid(3)));
@@ -57,7 +58,8 @@ describe("OutputWriter", () => {
   });
 
   it("rotates to a new file after maxLines — triggering line stays in file 1", async () => {
-    const writer = new OutputWriter(tmpDir, "repo", { maxLines: 2 });
+    const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
+    const writer = new OutputWriter(tmpDir, filenameFor, { maxLines: 2 });
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2))); // triggers rotation; this line is in file 1
     await writer.write(makeCommit(oid(3))); // goes to file 2
@@ -78,7 +80,8 @@ describe("OutputWriter", () => {
     const lineSize = Buffer.byteLength(JSON.stringify(sampleCommit) + "\n", "utf8");
 
     // maxBytes = exactly one line: after first write byte count equals maxBytes → rotate
-    const writer = new OutputWriter(tmpDir, "repo", { maxBytes: lineSize });
+    const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
+    const writer = new OutputWriter(tmpDir, filenameFor, { maxBytes: lineSize });
     await writer.write(makeCommit(oid(1))); // triggers rotation; stays in file 1
     await writer.write(makeCommit(oid(2))); // goes to file 2
     await writer.close();
@@ -94,7 +97,8 @@ describe("OutputWriter", () => {
   });
 
   it("rotates when either threshold is reached first (lines wins)", async () => {
-    const writer = new OutputWriter(tmpDir, "repo", { maxLines: 2, maxBytes: 999_999 });
+    const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
+    const writer = new OutputWriter(tmpDir, filenameFor, { maxLines: 2, maxBytes: 999_999 });
     for (let i = 1; i <= 3; i++) {
       await writer.write(makeCommit(oid(i)));
     }
@@ -112,7 +116,8 @@ describe("OutputWriter", () => {
 
   it("output is valid JSONL: each line parses as JSON and matches the written commit", async () => {
     const commit = makeCommit("a".repeat(40));
-    const writer = new OutputWriter(tmpDir, "repo", {});
+    const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
+    const writer = new OutputWriter(tmpDir, filenameFor, {});
     await writer.write(commit);
     await writer.close();
 
@@ -126,7 +131,8 @@ describe("OutputWriter", () => {
   });
 
   it("uses LF line endings only (no CRLF)", async () => {
-    const writer = new OutputWriter(tmpDir, "repo", {});
+    const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
+    const writer = new OutputWriter(tmpDir, filenameFor, {});
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2)));
     await writer.close();

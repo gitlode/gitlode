@@ -180,11 +180,26 @@ Record which branch(es) each commit was reachable from at extraction time (e.g. 
 
 ---
 
+#### Output: stdout support and stream-based OutputWriter
+
+Add `--output -` to write to stdout, enabling output to be piped into other tools directly.
+
+At this point, `OutputWriter` should be redesigned around Node.js `Writable` streams rather than the current `FileHandle`-based implementation. Rewriting to a stream-based model is not warranted today — the CLI-only, batch-run use case does not benefit from it — but stdout output introduces the need to write to heterogeneous sinks (file vs. stdout), which is where the `Writable` abstraction pays off.
+
+**Key design notes**:
+
+- When writing to stdout, file rotation has no meaning and must be disabled or ignored gracefully.
+- The `OutputWriter` abstraction could accept a `Writable` (or `AsyncIterable` sink) rather than owning file I/O directly. This removes the need for `OutputWriter` to implement rotation internally for the stdout path.
+- Consider whether third-party rotation libraries (e.g. `rotating-file-stream`) become worthwhile once the file-writing path is expressed as a `Writable` pipeline. Currently the rotation logic is ~5 lines and an external dependency is not justified; evaluate at implementation time.
+
+**Why deferred**: No current user need for stdout output. Refactoring `OutputWriter` solely for stream architecture hygiene would be over-engineering without a concrete requirement.
+
+---
+
 #### Other future considerations
 
 - **Additional rotation strategies**: by commit date (one file per month/year), by branch (one file per branch)
 - **Ref pattern matching**: `--branch 'feature/*'` glob support (note: temporary branches introduce risk of capturing transient data — document trade-offs)
-- **Streaming to stdout**: `--output -` to write to stdout for piping into other tools
 - **Windows line endings**: `--line-ending crlf` flag (LF-only today; architecturally trivial to add)
 
 ---

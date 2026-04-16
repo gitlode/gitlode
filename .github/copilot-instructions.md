@@ -32,11 +32,12 @@ gitrail/
 │   │   ├── cli.instructions.md
 │   │   ├── schema.instructions.md
 │   │   ├── git-traversal.instructions.md
-│   │   └── roadmap.md
+│   │   └── development-workflow.instructions.md
 │   ├── workflows/
 │   │   ├── ci.yml
 │   │   └── release.yml
-│   └── PLAN.md
+│   ├── PLAN.md
+│   └── roadmap.md
 ├── src/
 │   ├── index.ts                      # CLI entry point
 │   ├── cli/                          # CLI argument parsing
@@ -89,6 +90,7 @@ gitrail/
 - [Output JSON Schema](instructions/schema.instructions.md)
 - [Git Traversal & Differential Extraction](instructions/git-traversal.instructions.md)
 - [Phase Section Template](instructions/phase-template.instructions.md)
+- [Development Workflow](instructions/development-workflow.instructions.md)
 
 ## Coding Conventions
 
@@ -97,22 +99,14 @@ gitrail/
 
 ## Planning & Phase-Execution Guidance
 
-For release work driven by `.github/PLAN.md`, `.github/instructions/roadmap.md`, and branch-session starting prompts:
+The full development lifecycle — session types, planning stages, implementation cycle, summary formats, and role expectations — is defined in [development-workflow.instructions.md](instructions/development-workflow.instructions.md). Refer to that document for all workflow-related guidance.
 
-- Treat the roadmap item, active plan phase, and starting prompt as the **implementation contract** for that phase.
-- Prefer to remove non-essential design decisions **before coding** by recording the intended technical approach in the plan or prompt.
-- When a phase contains non-obvious implementation choices, the plan or prompt should specify as many of the following as practical:
-  - preferred API, library, or built-in Node.js feature to use
-  - expected files or architectural layers to touch
-  - output-stream requirements (for example, stdout vs stderr)
-  - measurement or timing approach when observability is involved
-  - dependency constraints (for example, prefer zero new runtime dependencies)
-  - explicit non-goals or out-of-scope work
-  - required verification commands and behavioral checks
-- During implementation, do **not** reopen a design choice that has already been specified in the plan or prompt unless verification evidence shows that it is blocked or incorrect.
-- If the current phase still leaves an important technical decision ambiguous, pause and refine the plan or starting prompt first rather than making an unnecessary architectural choice during implementation.
-- Branch-session starting prompts should be concrete enough that implementation can proceed with minimal additional design judgment.
-- Use [phase-template.instructions.md](instructions/phase-template.instructions.md) as the standard structure when authoring or filling in phase sections.
+Key principles for implementation sessions:
+
+- Treat the phase file and starting prompt as the **implementation contract**.
+- Do **not** reopen a design choice specified in the phase file unless verification evidence shows it is blocked or incorrect.
+- If an important technical decision is ambiguous, pause and escalate rather than making an architectural choice during implementation.
+- Use [phase-template.instructions.md](instructions/phase-template.instructions.md) as the standard structure when authoring phase files.
 
 ## Autonomy
 

@@ -12,12 +12,14 @@ The goal is to ensure that every phase is specified thoroughly enough to execute
 
 ## Relationship to Other Files
 
-| File                                     | Role                                                          |
-| ---------------------------------------- | ------------------------------------------------------------- |
-| `.github/PLAN.md`                        | Active release plan; contains one phase section per work unit |
-| `.github/instructions/roadmap.md`        | Long-horizon backlog; feeds into PLAN.md releases             |
-| `.github/instructions/*.instructions.md` | Technical specifications; linked from phase Design References |
-| `.github/copilot-instructions.md`        | Global conventions; see "Planning & Phase-Execution Guidance" |
+| File                                                        | Role                                                                        |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `.github/PLAN.md`                                           | Active release plan; phase list with status (design detail in phase files)  |
+| `.github/plans/{version}/phase-N.md`                        | Individual phase files using this template                                  |
+| `.github/instructions/development-workflow.instructions.md` | End-to-end development lifecycle; defines when and how phase files are used |
+| `.github/roadmap.md`                                        | Long-horizon backlog; feeds into PLAN.md releases                           |
+| `.github/instructions/*.instructions.md`                    | Technical specifications; linked from phase Design References               |
+| `.github/copilot-instructions.md`                           | Project-level conventions                                                   |
 
 ## When to Fill Each Section
 

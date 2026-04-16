@@ -1,25 +1,38 @@
+declare const _commitHashBrand: unique symbol;
+export type CommitHash = string & { readonly [_commitHashBrand]: "CommitHash" };
+
+export function isCommitHash(v: unknown): v is CommitHash {
+  return typeof v === "string" && /^[0-9a-f]{40}$/.test(v);
+}
+
+export function assertNever(x: never): never {
+  throw new Error(`Unexpected value: ${String(x)}`);
+}
+
 export interface PersonIdentity {
-  name: string;
-  email: string;
+  readonly name: string;
+  readonly email: string;
 }
 
 export interface RotationConfig {
-  maxLines?: number;
-  maxBytes?: number;
+  readonly maxLines?: number;
+  readonly maxBytes?: number;
 }
 
-export type ExtractionRange = { type: "ref"; ref: string } | { type: "date"; since: Date };
+export type ExtractionRange =
+  | { readonly type: "ref"; readonly ref: CommitHash }
+  | { readonly type: "date"; readonly since: Date };
 
 export interface ExtractorConfig {
-  repositoryPath: string;
-  branches: string[];
-  outputDir: string;
-  outputPrefix: string;
-  rotation: RotationConfig;
-  mode: "snapshot" | "incremental";
-  onMissingState?: "error" | "snapshot";
-  range?: ExtractionRange;
-  stateFilePath?: string;
+  readonly repositoryPath: string;
+  readonly branches: readonly string[];
+  readonly outputDir: string;
+  readonly outputPrefix: string;
+  readonly rotation: RotationConfig;
+  readonly mode: "snapshot" | "incremental";
+  readonly onMissingState?: "error" | "snapshot";
+  readonly range?: ExtractionRange;
+  readonly stateFilePath?: string;
 }
 
 export interface Reporter {
@@ -37,21 +50,21 @@ export type WallClock = () => Date;
 export type MonotonicClock = () => number;
 
 export interface StateBranchEntry {
-  name: string;
-  lastCommitHash: string;
+  readonly name: string;
+  readonly lastCommitHash: CommitHash;
 }
 
 export interface StateFile {
-  version: 1;
-  generatedAt: string;
-  repositoryPath: string;
-  branches: StateBranchEntry[];
+  readonly version: 1;
+  readonly generatedAt: string;
+  readonly repositoryPath: string;
+  readonly branches: readonly StateBranchEntry[];
 }
 
 export interface ExtractionResult {
-  commitsWritten: number;
-  filesCreated: number;
-  bytesWritten: number;
-  elapsedMs: number;
-  branches: string[];
+  readonly commitsWritten: number;
+  readonly filesCreated: number;
+  readonly bytesWritten: number;
+  readonly elapsedMs: number;
+  readonly branches: readonly string[];
 }

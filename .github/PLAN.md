@@ -289,9 +289,9 @@ _Strengthen the type system across all layers by applying `readonly` modifiers, 
 
 #### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 #### Design Decisions
 

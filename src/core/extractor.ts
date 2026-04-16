@@ -5,6 +5,7 @@ import { GitAdapterError } from "../git/index.js";
 import { OutputWriter, formatSessionTimestamp, splitMessage, toISO8601 } from "../output/index.js";
 import type { OutputCommit } from "../output/index.js";
 import type {
+  CommitHash,
   ExtractorConfig,
   ExtractionResult,
   MonotonicClock,
@@ -13,6 +14,7 @@ import type {
   StateStore,
   WallClock,
 } from "./types.js";
+import { assertNever, isCommitHash } from "./types.js";
 
 function deriveRepoName(remoteUrl: string | null, repoPath: string): string {
   if (remoteUrl) {
@@ -69,7 +71,7 @@ export class Extractor {
     const repoName = deriveRepoName(remoteUrl, repoPath);
 
     // Read and validate state file — only in incremental mode
-    const stateMap = new Map<string, string>();
+    const stateMap = new Map<string, CommitHash>();
     if (this.stateStore && this.config.mode === "incremental") {
       const stateData = await this.stateStore.read();
       if (stateData === null) {
@@ -90,6 +92,11 @@ export class Extractor {
           );
         }
         for (const entry of stateData.branches) {
+          if (!isCommitHash(entry.lastCommitHash)) {
+            throw new Error(
+              `Invalid commit hash in state file for branch "${entry.name}": ${entry.lastCommitHash}`,
+            );
+          }
           stateMap.set(entry.name, entry.lastCommitHash);
         }
       }
@@ -103,13 +110,13 @@ export class Extractor {
       this.config.rotation,
     );
 
-    const branchHeads = new Map<string, string>();
+    const branchHeads = new Map<string, CommitHash>();
     const visited = new Set<string>();
     let commitsWritten = 0;
 
     try {
       for (const branch of this.config.branches) {
-        let head: string;
+        let head: CommitHash;
         try {
           head = await this.adapter.resolveRef(repoPath, branch);
         } catch (err) {
@@ -124,16 +131,22 @@ export class Extractor {
         branchHeads.set(branch, head);
 
         // Determine excludeHash for this branch
-        let excludeHash: string | undefined;
-        if (this.config.range?.type === "ref") {
-          excludeHash = this.config.range.ref;
-        } else if (this.config.range === undefined || this.config.range === null) {
+        let excludeHash: CommitHash | undefined;
+        if (this.config.range === undefined) {
           const lastHash = stateMap.get(branch);
           if (lastHash !== undefined) {
             excludeHash = lastHash;
           }
+        } else {
+          const range = this.config.range;
+          if (range.type === "ref") {
+            excludeHash = range.ref;
+          } else if (range.type === "date") {
+            // no excludeHash; filtering handled per-commit below
+          } else {
+            assertNever(range);
+          }
         }
-        // For range.type === "date": no excludeHash; filtering handled per-commit below
 
         const writeCommit = async (commit: RawCommit) => {
           if (visited.has(commit.oid)) return;

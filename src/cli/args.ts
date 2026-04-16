@@ -4,7 +4,7 @@ import { basename, dirname, resolve } from "node:path";
 import { defineCommand, parseArgs as parseCittyArgs } from "citty";
 import type { ArgsDef } from "citty";
 
-import type { ExtractorConfig } from "../core/index.js";
+import type { CommitHash, ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { GitAdapter } from "../git/index.js";
 
@@ -234,7 +234,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     }
   }
 
-  let resolvedSinceRef: string | undefined;
+  let resolvedSinceRef: CommitHash | undefined;
   if (sinceRef) {
     try {
       resolvedSinceRef = await adapter.resolveRef(resolvedRepoPath, sinceRef);

@@ -1,4 +1,5 @@
 export type {
+  CommitHash,
   ExtractorConfig,
   ExtractionRange,
   ExtractionResult,
@@ -11,4 +12,5 @@ export type {
   StateStore,
   WallClock,
 } from "./types.js";
+export { assertNever, isCommitHash } from "./types.js";
 export { Extractor } from "./extractor.js";

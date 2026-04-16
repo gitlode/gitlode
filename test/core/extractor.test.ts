@@ -650,4 +650,31 @@ describe("Extractor", () => {
     expect(reporter.doneCalls).toHaveLength(1);
     expect(reporter.doneCalls[0]).toBe(2);
   });
+
+  it("isCommitHash guard: rejects invalid lastCommitHash in state file with a clear error", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    await addCommit("a.txt", "v1", "commit 1", 1000);
+
+    const stateFilePath = join(tmpDir, "gitrail-state.json");
+    // Write a state file with a deliberately invalid hash to exercise the runtime guard
+    await writeFile(
+      stateFilePath,
+      JSON.stringify({
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        repositoryPath: resolve("/"),
+        branches: [{ name: "main", lastCommitHash: "not-a-hash" }],
+      }),
+      "utf8",
+    );
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const config = makeConfig({ outputDir: tmpDir, stateFilePath, mode: "incremental" });
+    const extractor = makeExtractor(config, adapter);
+
+    await expect(extractor.run()).rejects.toThrow(
+      'Invalid commit hash in state file for branch "main"',
+    );
+  });
 });

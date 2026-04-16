@@ -80,34 +80,36 @@ async function makeRealRepo(options?: { remoteUrl?: string; branch?: string }): 
 // ---------------------------------------------------------------------------
 
 describe("parseArgs – mutual exclusion", () => {
-  it("--since-commit + --since-date → exits with code 1", async () => {
+  it("--since-ref + --since-date → exits with code 1", async () => {
+    setArgv("--branch", "main", "--since-ref", "v1.0", "--since-date", "2024-01-01T00:00:00Z", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith(
+      "--since-ref and --since-date cannot be used together\n",
+    );
+  });
+
+  it("--mode incremental + --since-ref → exits with code 1", async () => {
     setArgv(
+      "--mode",
+      "incremental",
       "--branch",
       "main",
-      "--since-commit",
-      "abc123",
-      "--since-date",
-      "2024-01-01T00:00:00Z",
+      "--state",
+      "state.json",
+      "--since-ref",
+      "v1.0",
       ".",
     );
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith(
-      "--since-commit and --since-date cannot be used together\n",
-    );
+    expect(stderrSpy).toHaveBeenCalledWith("--since-ref cannot be used with --mode incremental\n");
   });
 
-  it("--state + --since-commit → exits with code 1", async () => {
-    setArgv("--branch", "main", "--state", "state.json", "--since-commit", "abc123", ".");
-    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith(
-      "--state and --since-commit cannot be used together. Use --state for incremental runs.\n",
-    );
-  });
-
-  it("--state + --since-date → exits with code 1", async () => {
+  it("--mode incremental + --since-date → exits with code 1", async () => {
     setArgv(
+      "--mode",
+      "incremental",
       "--branch",
       "main",
       "--state",
@@ -118,9 +120,55 @@ describe("parseArgs – mutual exclusion", () => {
     );
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith("--since-date cannot be used with --mode incremental\n");
+  });
+
+  it("--on-missing-state without --mode incremental → exits with code 1", async () => {
+    setArgv("--branch", "main", "--on-missing-state", "snapshot", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith(
-      "--state and --since-date cannot be used together. Use --state for incremental runs.\n",
+      "--on-missing-state is only valid with --mode incremental\n",
     );
+  });
+
+  it("--mode incremental without --state → exits with code 1", async () => {
+    setArgv("--mode", "incremental", "--branch", "main", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith("--state is required when using --mode incremental\n");
+  });
+
+  it("--state + --since-ref is permitted in snapshot mode (no error)", async () => {
+    // In snapshot mode, --state and --since-ref are allowed together.
+    // The test verifies no mutual exclusion error — further processing may still fail.
+    setArgv("--branch", "main", "--state", "/tmp/state.json", "--since-ref", "v1.0", ".");
+    const result = await parseArgs(noopAdapter).catch((e: unknown) => e);
+    if (result instanceof Error && result.message.includes("process.exit")) {
+      expect(stderrSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("cannot be used together"),
+      );
+      expect(stderrSpy).not.toHaveBeenCalledWith(expect.stringContaining("cannot be used with"));
+    }
+  });
+
+  it("--state + --since-date is permitted in snapshot mode (no error)", async () => {
+    setArgv(
+      "--branch",
+      "main",
+      "--state",
+      "/tmp/state.json",
+      "--since-date",
+      "2024-01-01T00:00:00Z",
+      ".",
+    );
+    const result = await parseArgs(noopAdapter).catch((e: unknown) => e);
+    if (result instanceof Error && result.message.includes("process.exit")) {
+      expect(stderrSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("cannot be used together"),
+      );
+      expect(stderrSpy).not.toHaveBeenCalledWith(expect.stringContaining("cannot be used with"));
+    }
   });
 });
 
@@ -283,6 +331,7 @@ describe("parseArgs – valid args round-trip", () => {
     expect(config.rotation).toEqual({ maxLines: undefined, maxBytes: undefined });
     expect(config.range).toBeUndefined();
     expect(config.stateFilePath).toBeUndefined();
+    expect(config.mode).toBe("snapshot");
   });
 
   it("returns correct rotation config", async () => {
@@ -322,9 +371,10 @@ describe("parseArgs – valid args round-trip", () => {
   it("sets stateFilePath when --state is provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--state", "/tmp/state.json", "--output-dir", repoDir, repoDir);
+    const stateFilePath = join(repoDir, "state.json");
+    setArgv("--branch", "main", "--state", stateFilePath, "--output-dir", repoDir, repoDir);
     const config = await parseArgs(adapter);
-    expect(config.stateFilePath).toBe("/tmp/state.json");
+    expect(config.stateFilePath).toBe(stateFilePath);
   });
 
   it("sets quiet=true when --quiet is provided", async () => {
@@ -341,5 +391,248 @@ describe("parseArgs – valid args round-trip", () => {
     setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
     const config = await parseArgs(adapter);
     expect(config.quiet).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --mode flag and -m alias
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --mode", () => {
+  let repoDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("defaults mode to snapshot when --mode is not provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.mode).toBe("snapshot");
+  });
+
+  it("accepts --mode snapshot explicitly", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--mode", "snapshot", "--branch", "main", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.mode).toBe("snapshot");
+  });
+
+  it("accepts -m as alias for --mode", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("-m", "snapshot", "--branch", "main", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.mode).toBe("snapshot");
+  });
+
+  it("rejects invalid --mode value", async () => {
+    setArgv("--mode", "auto", "--branch", "main", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith('--mode must be "snapshot" or "incremental"\n');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --mode incremental + state
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – incremental mode", () => {
+  let repoDir: string;
+  let stateDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+    if (stateDir) await rm(stateDir, { recursive: true, force: true });
+  });
+
+  it("accepts --mode incremental with --state pointing to an existing file", async () => {
+    stateDir = await mkdtemp(join(tmpdir(), "gitrail-args-state-"));
+    const stateFile = join(stateDir, "state.json");
+    await writeFile(
+      stateFile,
+      JSON.stringify({ version: 1, generatedAt: "", repositoryPath: "/", branches: [] }),
+    );
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv(
+      "--mode",
+      "incremental",
+      "--branch",
+      "main",
+      "--state",
+      stateFile,
+      "--output-dir",
+      repoDir,
+      repoDir,
+    );
+    const config = await parseArgs(adapter);
+    expect(config.mode).toBe("incremental");
+    expect(config.stateFilePath).toBe(stateFile);
+    expect(config.onMissingState).toBe("error");
+  });
+
+  it("exits 1 when --mode incremental and state file missing (default --on-missing-state error)", async () => {
+    stateDir = await mkdtemp(join(tmpdir(), "gitrail-args-state-"));
+    const missingStatePath = join(stateDir, "nonexistent.json");
+    setArgv("--mode", "incremental", "--branch", "main", "--state", missingStatePath, ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("State file not found:"));
+  });
+
+  it("accepts --on-missing-state snapshot when mode is incremental", async () => {
+    stateDir = await mkdtemp(join(tmpdir(), "gitrail-args-state-"));
+    const missingStatePath = join(stateDir, "nonexistent.json");
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv(
+      "--mode",
+      "incremental",
+      "--branch",
+      "main",
+      "--state",
+      missingStatePath,
+      "--on-missing-state",
+      "snapshot",
+      "--output-dir",
+      repoDir,
+      repoDir,
+    );
+    const config = await parseArgs(adapter);
+    expect(config.mode).toBe("incremental");
+    expect(config.onMissingState).toBe("snapshot");
+  });
+
+  it("rejects --on-missing-state with invalid value", async () => {
+    setArgv(
+      "--mode",
+      "incremental",
+      "--branch",
+      "main",
+      "--state",
+      "state.json",
+      "--on-missing-state",
+      "ignore",
+      ".",
+    );
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith('--on-missing-state must be "error" or "snapshot"\n');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// State parent directory existence check
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – state parent directory validation", () => {
+  it("exits 1 when state parent directory does not exist", async () => {
+    setArgv("--branch", "main", "--state", "/nonexistent-dir-abc/state.json", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Parent directory for state file not found:"),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --since-ref
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --since-ref", () => {
+  let repoDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("returns range with type 'ref' when --since-ref is provided", async () => {
+    repoDir = await makeRealRepo();
+    // The noopAdapter resolveRef always returns a hash, so since-ref validation passes
+    setArgv("--branch", "main", "--since-ref", "v1.0", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(noopAdapter);
+    expect(config.range).toEqual({
+      type: "ref",
+      ref: "abc123def456abc123def456abc123def456abc123",
+    });
+  });
+
+  it("exits 1 when --since-ref is not found in repository", async () => {
+    repoDir = await makeRealRepo();
+    const { GitAdapterError } = await import("../../src/git/index.js");
+    const failAdapter: GitAdapter = {
+      resolveRef: async (_repoPath, ref) => {
+        if (ref === "nonexistent-tag") {
+          throw new GitAdapterError("Ref not found", "REF_NOT_FOUND");
+        }
+        return "abc123def456abc123def456abc123def456abc123";
+      },
+      walkCommits: async function* () {},
+      getRemoteUrl: async () => null,
+    };
+    setArgv("--branch", "main", "--since-ref", "nonexistent-tag", "--output-dir", repoDir, repoDir);
+    await expect(parseArgs(failAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith("Ref not found: nonexistent-tag\n");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shorthand aliases
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – shorthand aliases", () => {
+  let repoDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("-b collects branch values", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("-b", "main", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.branches).toContain("main");
+  });
+
+  it("-b can be used multiple times (repeatable)", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("-b", "main", "-b", "develop", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.branches).toContain("main");
+    expect(config.branches).toContain("develop");
+  });
+
+  it("-o is accepted as alias for --output-dir", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "-o", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.outputDir).toBe(repoDir);
+  });
+
+  it("-s is accepted as alias for --state", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    const stateFilePath = join(repoDir, "state.json");
+    setArgv("--branch", "main", "-s", stateFilePath, "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.stateFilePath).toBe(stateFilePath);
+  });
+
+  it("-q is accepted as alias for --quiet", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "-q", "--output-dir", repoDir, repoDir);
+    const config = await parseArgs(adapter);
+    expect(config.quiet).toBe(true);
   });
 });

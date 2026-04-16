@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Extractor } from "../../src/core/extractor.js";
 import type { ExtractorConfig, StateFile } from "../../src/core/index.js";
@@ -80,6 +80,7 @@ function makeConfig(
     branches: ["main"],
     outputPrefix: "repo",
     rotation: {},
+    mode: "snapshot",
     ...overrides,
   };
 }
@@ -192,7 +193,7 @@ describe("Extractor", () => {
     expect(oids).toHaveLength(1); // only sha3 passes the filter
   });
 
-  it("--since-commit: only commits newer than the given hash are written", async () => {
+  it("--since-ref: only commits newer than the given ref hash are written", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
 
@@ -203,7 +204,7 @@ describe("Extractor", () => {
     const adapter = new IsomorphicGitAdapter(fs);
     const config = makeConfig({
       outputDir: tmpDir,
-      range: { type: "commit", hash: sha1 },
+      range: { type: "ref", ref: sha1 },
     });
     const extractor = new Extractor(config, adapter);
     await extractor.run();
@@ -226,8 +227,8 @@ describe("Extractor", () => {
     const stateFilePath = join(tmpDir, "gitrail-state.json");
     const adapter = new IsomorphicGitAdapter(fs);
 
-    // First run
-    const config1 = makeConfig({ outputDir: tmpDir, stateFilePath });
+    // First run — snapshot mode writes state file
+    const config1 = makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" });
     await new Extractor(config1, adapter).run();
 
     const firstCommits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
@@ -241,11 +242,11 @@ describe("Extractor", () => {
     expect(stateFile.branches).toHaveLength(1);
     expect(stateFile.branches[0]!.name).toBe("main");
 
-    // Second run with same state — no new commits → output file should have 0 commits
+    // Second run in incremental mode with same state — no new commits → output file should have 0 commits
     const tmpDir2 = join(tmpdir(), `gitrail-extractor-test-${randomUUID()}`);
     await mkdir(tmpDir2, { recursive: true });
     try {
-      const config2 = makeConfig({ outputDir: tmpDir2, stateFilePath });
+      const config2 = makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" });
       await new Extractor(config2, adapter).run();
 
       // No commits to write — no output file created (writer.seq stays 0)
@@ -280,7 +281,7 @@ describe("Extractor", () => {
 
     const adapter = new IsomorphicGitAdapter(fs);
     // Config uses repositoryPath "/" (resolves to root), state says "/some/other/repo"
-    const config = makeConfig({ outputDir: tmpDir, stateFilePath });
+    const config = makeConfig({ outputDir: tmpDir, stateFilePath, mode: "incremental" });
     const extractor = new Extractor(config, adapter);
 
     await expect(extractor.run()).rejects.toThrow(
@@ -333,13 +334,16 @@ describe("Extractor", () => {
     const stateFilePath = join(tmpDir, "gitrail-state.json");
     const adapter = new IsomorphicGitAdapter(fs);
 
-    await new Extractor(makeConfig({ outputDir: tmpDir, stateFilePath }), adapter).run();
+    await new Extractor(
+      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      adapter,
+    ).run();
 
     const tmpDir2 = join(tmpdir(), `gitrail-extractor-test-${randomUUID()}`);
     await mkdir(tmpDir2, { recursive: true });
     try {
       const result = await new Extractor(
-        makeConfig({ outputDir: tmpDir2, stateFilePath }),
+        makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" }),
         adapter,
       ).run();
       expect(result.commitsWritten).toBe(0);
@@ -376,5 +380,117 @@ describe("Extractor", () => {
     const allOids = [...file1, ...file2].map((c) => c.oid);
     expect(allOids).toHaveLength(3);
     expect(new Set(allOids).size).toBe(3); // no duplicates
+  });
+
+  it("snapshot mode ignores state file content and performs full extraction", async () => {
+    const { fs, init, addCommit } = makeRepo("https://github.com/org/my-repo.git");
+    await init();
+
+    const sha1 = await addCommit("a.txt", "v1", "commit 1", 1000);
+    const sha2 = await addCommit("a.txt", "v2", "commit 2", 2000);
+
+    const stateFilePath = join(tmpDir, "gitrail-state.json");
+    const adapter = new IsomorphicGitAdapter(fs);
+
+    // First run (snapshot) — records state
+    await new Extractor(
+      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      adapter,
+    ).run();
+
+    // Second run in snapshot mode — state content is ignored, all commits extracted again
+    const tmpDir2 = join(tmpdir(), `gitrail-extractor-test-${randomUUID()}`);
+    await mkdir(tmpDir2, { recursive: true });
+    try {
+      await new Extractor(
+        makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "snapshot" }),
+        adapter,
+      ).run();
+
+      const commits = await readJsonlFile(join(tmpDir2, "repo-000001.jsonl"));
+      const oids = commits.map((c) => c.oid);
+      // Snapshot mode should return all commits regardless of state
+      expect(oids).toContain(sha1);
+      expect(oids).toContain(sha2);
+      expect(commits).toHaveLength(2);
+    } finally {
+      await rm(tmpDir2, { recursive: true, force: true });
+    }
+  });
+
+  it("incremental mode reads state and performs differential extraction", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+
+    await addCommit("a.txt", "v1", "commit 1", 1000);
+    await addCommit("a.txt", "v2", "commit 2", 2000);
+
+    const stateFilePath = join(tmpDir, "gitrail-state.json");
+    const adapter = new IsomorphicGitAdapter(fs);
+
+    // First run (snapshot) — records state
+    await new Extractor(
+      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      adapter,
+    ).run();
+
+    // Add a new commit after the state was recorded
+    const sha3 = await addCommit("a.txt", "v3", "commit 3", 3000);
+
+    // Second run in incremental mode — should only get the new commit
+    const tmpDir2 = join(tmpdir(), `gitrail-extractor-test-${randomUUID()}`);
+    await mkdir(tmpDir2, { recursive: true });
+    try {
+      await new Extractor(
+        makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" }),
+        adapter,
+      ).run();
+
+      const commits = await readJsonlFile(join(tmpDir2, "repo-000001.jsonl"));
+      const oids = commits.map((c) => c.oid);
+      expect(oids).toContain(sha3);
+      expect(commits).toHaveLength(1);
+    } finally {
+      await rm(tmpDir2, { recursive: true, force: true });
+    }
+  });
+
+  it("--on-missing-state snapshot: emits warning and performs full traversal when state file absent", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+
+    const sha1 = await addCommit("a.txt", "v1", "commit 1", 1000);
+    const sha2 = await addCommit("a.txt", "v2", "commit 2", 2000);
+
+    const missingStatePath = join(tmpDir, "nonexistent-state.json");
+    const adapter = new IsomorphicGitAdapter(fs);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    try {
+      const result = await new Extractor(
+        makeConfig({
+          outputDir: tmpDir,
+          stateFilePath: missingStatePath,
+          mode: "incremental",
+          onMissingState: "snapshot",
+        }),
+        adapter,
+      ).run();
+
+      // All commits extracted (full traversal)
+      expect(result.commitsWritten).toBe(2);
+      const commits = await readJsonlFile(join(tmpDir, "repo-000001.jsonl"));
+      const oids = commits.map((c) => c.oid);
+      expect(oids).toContain(sha1);
+      expect(oids).toContain(sha2);
+
+      // Warning was emitted
+      const warningCall = stderrSpy.mock.calls.find(
+        (args) => typeof args[0] === "string" && args[0].includes("State file not found"),
+      );
+      expect(warningCall).toBeDefined();
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 });

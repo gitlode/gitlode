@@ -41,9 +41,9 @@ _Replace implicit extraction mode detection with an explicit `--mode snapshot|in
 
 #### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 #### Design References
 

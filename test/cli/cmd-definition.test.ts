@@ -15,10 +15,12 @@ describe("cmdDefinition – help output wiring", () => {
     const expectedKeys = [
       "repository-path",
       "branch",
+      "mode",
       "output-dir",
       "output-prefix",
       "state",
-      "since-commit",
+      "on-missing-state",
+      "since-ref",
       "since-date",
       "rotate-lines",
       "rotate-size",

@@ -8,7 +8,7 @@ export interface RotationConfig {
   maxBytes?: number;
 }
 
-export type ExtractionRange = { type: "commit"; hash: string } | { type: "date"; since: Date };
+export type ExtractionRange = { type: "ref"; ref: string } | { type: "date"; since: Date };
 
 export interface ExtractorConfig {
   repositoryPath: string;
@@ -16,6 +16,8 @@ export interface ExtractorConfig {
   outputDir: string;
   outputPrefix: string;
   rotation: RotationConfig;
+  mode: "snapshot" | "incremental";
+  onMissingState?: "error" | "snapshot";
   range?: ExtractionRange;
   stateFilePath?: string;
   quiet?: boolean;

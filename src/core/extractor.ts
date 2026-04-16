@@ -58,9 +58,9 @@ export class Extractor {
     const remoteUrl = await this.adapter.getRemoteUrl(repoPath);
     const repoName = deriveRepoName(remoteUrl, repoPath);
 
-    // Read and validate state file if configured
+    // Read and validate state file — only in incremental mode
     const stateMap = new Map<string, string>();
-    if (this.config.stateFilePath) {
+    if (this.config.stateFilePath && this.config.mode === "incremental") {
       try {
         const raw = await readFile(this.config.stateFilePath, "utf8");
         const stateFile = JSON.parse(raw) as StateFile;
@@ -80,9 +80,13 @@ export class Extractor {
         if (
           err instanceof Error &&
           "code" in err &&
-          (err as NodeJS.ErrnoException).code === "ENOENT"
+          (err as NodeJS.ErrnoException).code === "ENOENT" &&
+          this.config.onMissingState === "snapshot"
         ) {
-          // State file does not yet exist — full extraction
+          process.stderr.write(
+            `Warning: State file not found: ${this.config.stateFilePath}. Falling back to full snapshot extraction.\n`,
+          );
+          // stateMap stays empty → full traversal
         } else {
           throw err;
         }
@@ -117,8 +121,8 @@ export class Extractor {
 
         // Determine excludeHash for this branch
         let excludeHash: string | undefined;
-        if (this.config.range?.type === "commit") {
-          excludeHash = this.config.range.hash;
+        if (this.config.range?.type === "ref") {
+          excludeHash = this.config.range.ref;
         } else if (this.config.range === undefined || this.config.range === null) {
           const lastHash = stateMap.get(branch);
           if (lastHash !== undefined) {

@@ -256,6 +256,26 @@ Particularly: `RawCommit`, `OutputCommit`, `StateFile`, `ExtractorConfig` should
 
 ---
 
+#### Preparation: Introduce `erasableSyntaxOnly` and refactor non-erasable syntax
+
+**Background and purpose**:
+
+The roadmap item "Migrate to Node.js built-in TypeScript support" (see Long-term section) requires that source code avoid TypeScript syntax that cannot be stripped at runtime — specifically syntax that has runtime semantics and cannot be removed by a simple type-erasing transform. The `erasableSyntaxOnly` compiler flag enforces this constraint statically.
+
+Introducing this flag well before the actual migration serves two purposes:
+
+1. **Prevent regression**: any future code addition that introduces non-erasable syntax (e.g. parameter properties, `const enum`, legacy decorators, `namespace`) will be caught by `tsc` and CI immediately, rather than discovered at migration time.
+2. **Prove readiness**: once the flag compiles cleanly, the codebase is structurally ready for `--strip-types`-based execution, independent of when the migration actually happens.
+
+**Work items**:
+
+- Add `"erasableSyntaxOnly": true` to `tsconfig.json`
+- Refactor all non-erasable syntax to comply. Based on the current codebase, the only known instance is the parameter property in `NodeStateStore` (`src/index.ts`); expand the field declaration explicitly
+
+**Why now**: The required refactoring is minimal (one site) and mechanically straightforward. The cost of introducing the flag early is low; the cost of discovering violations late — after more code has been written — grows over time.
+
+---
+
 ### Long-term
 
 #### Migrate to Node.js built-in TypeScript support

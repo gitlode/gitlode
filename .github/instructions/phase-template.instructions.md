@@ -23,16 +23,16 @@ The goal is to ensure that every phase is specified thoroughly enough to execute
 
 ## When to Fill Each Section
 
-| Section                | When                                                                  | Owner                                      |
-| ---------------------- | --------------------------------------------------------------------- | ------------------------------------------ |
-| Title, summary, Status | When the phase is first added to PLAN.md                              | Planning session                           |
-| Design References      | Planning session                                                      | Planning session                           |
-| Design Decisions       | **Before the implementation session starts**                          | Planning/pre-implementation session        |
-| Non-Goals              | Before implementation                                                 | Planning session                           |
-| Target Files                | Before implementation                                                 | Planning/pre-implementation session        |
-| Documentation Touchpoints   | Before implementation                                                 | Planning session                           |
-| Implementation Notes        | When non-obvious details are known                                    | Pre-implementation or early implementation |
-| Verification           | Before implementation (commands); after first run (behavioral checks) | Pre-implementation session                 |
+| Section                   | When                                                                  | Owner                                      |
+| ------------------------- | --------------------------------------------------------------------- | ------------------------------------------ |
+| Title, summary, Status    | When the phase is first added to PLAN.md                              | Planning session                           |
+| Design References         | Planning session                                                      | Planning session                           |
+| Design Decisions          | **Before the implementation session starts**                          | Planning/pre-implementation session        |
+| Non-Goals                 | Before implementation                                                 | Planning session                           |
+| Target Files              | Before implementation                                                 | Planning/pre-implementation session        |
+| Documentation Touchpoints | Before implementation                                                 | Planning session                           |
+| Implementation Notes      | When non-obvious details are known                                    | Pre-implementation or early implementation |
+| Verification              | Before implementation (commands); after first run (behavioral checks) | Pre-implementation session                 |
 
 Sections marked "Before the implementation session starts" are the ones most likely to cause mid-session pauses if left blank.
 
@@ -98,9 +98,9 @@ _Sections in `docs/`, `instructions/`, or other markdown files that describe beh
 
 _Omit this section entirely if the phase makes no change to documented behavior._
 
-| File | Section | Action |
-| ---- | ------- | ------ |
-| `docs/design/foo.md` | "\<Section title\>" | \<Replace \| Update \| Remove\> |
+| File                                       | Section             | Action                          |
+| ------------------------------------------ | ------------------- | ------------------------------- |
+| `docs/design/foo.md`                       | "\<Section title\>" | \<Replace \| Update \| Remove\> |
 | `.github/instructions/bar.instructions.md` | "\<Section title\>" | \<Replace \| Update \| Remove\> |
 
 #### Implementation Notes

@@ -185,7 +185,21 @@ Four session types are used throughout a release cycle. Each has a defined lifes
 
 **Session**: Planning session.
 
-#### 1a. Release intent
+#### 1a. PLAN.md preparation
+
+Before starting any planning activities, bring PLAN.md to a clean state for the new release. PLAN.md is a single file that is overwritten at the start of each planning session. Determine its current state and act accordingly:
+
+1. **No PLAN.md exists** (first planning session ever): Create PLAN.md from scratch using the template in the "PLAN.md structure" section above. Fill in the new version number; leave all content sections as empty stubs to be filled during 1c–1e.
+2. **PLAN.md contains a completed prior release** (all phases marked Completed and the Final Verification Checklist cleared): Overwrite PLAN.md with a fresh skeleton for the new version. The prior release's record is already captured in CHANGELOG.md; retaining stale content adds noise without value.
+3. **PLAN.md contains an incomplete or in-progress prior release**: Escalate to human before proceeding. Do not overwrite PLAN.md.
+
+The resulting skeleton must contain: the new version title, empty stubs for Overview, Release Goals, Scope Summary, and Development Phases, and the **canonical Release Tasks template** (see note below). The Final Verification Checklist is an empty stub.
+
+> **Release Tasks template note**: The "what to do" in Release Tasks (update CHANGELOG, review README, clean up roadmap, run format check) is the same for every release. Only the release-specific notes (extra docs, migration guidance) differ. When creating the skeleton, restore the Release Tasks section to its canonical template form — do not reduce it to an empty stub. The canonical form is maintained in PLAN.md itself and should be copied forward when overwriting.
+
+---
+
+#### 1b. Release intent
 
 Human provides the release intent — a brief statement of the release's character and ambition level, along with the target version number (vX.Y.Z). Examples:
 
@@ -194,7 +208,7 @@ Human provides the release intent — a brief statement of the release's charact
 
 The version number and intent together set the constraint frame for all subsequent scoping decisions.
 
-#### 1b. Scope and item selection
+#### 1c. Scope and item selection
 
 Pick items from `roadmap.md` for the release. Sources of items:
 
@@ -204,7 +218,7 @@ Pick items from `roadmap.md` for the release. Sources of items:
 
 Record selections in PLAN.md (Scope Summary: included / excluded).
 
-#### 1c. Phase decomposition and provisional ordering
+#### 1d. Phase decomposition and provisional ordering
 
 Break the selected scope into phases. Each phase should be implementable in a single branch session.
 
@@ -214,13 +228,27 @@ Determine a provisional execution order considering:
 - Diff overlap minimization (phases touching the same files benefit from adjacency or sequencing).
 - Risk front-loading (uncertain or foundational changes earlier).
 
-This order is provisional — it may be adjusted during detailed design (1d).
+This order is provisional — it may be adjusted during detailed design (1e).
 
-#### 1d. Detailed design per phase
+#### 1e. Detailed design per phase
 
-For each phase, fill in the phase file according to [phase-template.instructions.md](phase-template.instructions.md).
+Phases are designed one at a time, in order. For each phase, the planning session LLM asks the human whether to proceed **in the current planning session** or in a **planning branch session**. The human chooses based on expected complexity.
 
-Key activities:
+**If the planning session is chosen**: the LLM fills in the phase file directly and continues to the next phase when done.
+
+**If a planning branch session is chosen**: the planning session LLM creates a starting prompt for the branch session (analogous to Stage 2b, but for design work rather than implementation), then waits for the branch session to complete. The human provides the branch session output to the planning session before the next phase begins.
+
+Repeat this per-phase cycle until all phases have detailed designs.
+
+> This loop mirrors the Stage 2 implementation cycle (2a–2e), with one key difference: the branch session is optional and created only when the design work is expected to be complex enough to benefit from isolation. Simple phases are designed inline in the planning session.
+
+**Human escalation during design** (applies in both planning session and planning branch session):
+
+- If a design decision has unresolved ambiguity — including cases where two or more meaningfully different approaches are viable — pause and ask the human before writing the Design Decision as a finished choice.
+- When asking, provide enough context for a clear decision: state the options, the non-obvious trade-offs, and your recommended default with a brief rationale. Do not ask open-ended questions without framing the decision space.
+- Do not silently pick one option and record it as decided. An undisclosed choice made during planning carries the same risk as one made during implementation.
+
+For each phase, the key design activities are:
 
 - **Re-evaluate the item**: Before detailed design, confirm the item is still worth implementing and the approach is sound. Roadmap entries may be rough ideas — some may not survive scrutiny.
 - **Resolve all design decisions**: Write them as finished choices, not open questions. Every missing decision is a potential mid-implementation pause.
@@ -228,9 +256,7 @@ Key activities:
 - **Update instructions files**: If the phase changes behavior covered by an instructions file, update the spec during planning — not during implementation.
 - **Adjust phase ordering**: If design work reveals a better sequence, update the order now.
 
-Complex phases may use a **planning branch session** to isolate the design work.
-
-#### 1e. Planning completion
+#### 1f. Planning completion
 
 Planning is complete when all of the following are true:
 
@@ -353,7 +379,7 @@ Every development branch session must produce a summary in this format:
 - Flag design decisions that are still in question form or contain ambiguity.
 - Verify cross-phase consistency: if phase N modifies an interface, check that phase N+1's Target Files account for it.
 - Confirm instructions files are updated when behavior specs change.
-- At planning completion, verify all completion criteria (Stage 1e) are met.
+- At planning completion, verify all completion criteria (Stage 1f) are met.
 
 #### In trunk sessions
 

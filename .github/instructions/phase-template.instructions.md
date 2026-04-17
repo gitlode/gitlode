@@ -29,8 +29,9 @@ The goal is to ensure that every phase is specified thoroughly enough to execute
 | Design References      | Planning session                                                      | Planning session                           |
 | Design Decisions       | **Before the implementation session starts**                          | Planning/pre-implementation session        |
 | Non-Goals              | Before implementation                                                 | Planning session                           |
-| Target Files           | Before implementation                                                 | Planning/pre-implementation session        |
-| Implementation Notes   | When non-obvious details are known                                    | Pre-implementation or early implementation |
+| Target Files                | Before implementation                                                 | Planning/pre-implementation session        |
+| Documentation Touchpoints   | Before implementation                                                 | Planning session                           |
+| Implementation Notes        | When non-obvious details are known                                    | Pre-implementation or early implementation |
 | Verification           | Before implementation (commands); after first run (behavioral checks) | Pre-implementation session                 |
 
 Sections marked "Before the implementation session starts" are the ones most likely to cause mid-session pauses if left blank.
@@ -91,6 +92,17 @@ _Files to create or modify. Enough detail to start without a workspace explorati
 | `src/foo/types.ts`     | Modify | \<what changes\>                         |
 | `test/foo/bar.test.ts` | Modify | \<what test cases are added or changed\> |
 
+#### Documentation Touchpoints
+
+_Sections in `docs/`, `instructions/`, or other markdown files that describe behavior this phase changes or resolves. Enumerate every section that will become stale or incorrect after implementation — including "known limitation", "future work", and "future enhancement" entries that the phase implements._
+
+_Omit this section entirely if the phase makes no change to documented behavior._
+
+| File | Section | Action |
+| ---- | ------- | ------ |
+| `docs/design/foo.md` | "\<Section title\>" | \<Replace \| Update \| Remove\> |
+| `.github/instructions/bar.instructions.md` | "\<Section title\>" | \<Replace \| Update \| Remove\> |
+
 #### Implementation Notes
 
 _Non-obvious implementation details not already covered by Design Decisions. Omit the section entirely if everything is clear from the above._
@@ -122,3 +134,4 @@ npm run format:check
 - Write Design Decisions as finished choices, not as open questions. If a choice is still open, resolve it in a planning conversation before adding the phase to PLAN.md.
 - Behavioral verification items should cover user-visible changes. "Build and tests pass" alone is not sufficient when the phase changes CLI behavior or output format.
 - Keep Implementation Notes minimal. If an implementation detail is important enough to note, consider whether it belongs in Design Decisions instead.
+- **Documentation Touchpoints are a planning obligation, not a post-implementation cleanup.** Identify them by reading every file listed under Design References and asking: "Does this file contain text that describes the world before this phase?" Phases that resolve a roadmap item, implement a "future work" entry, or remove a "known limitation" will almost always have at least one touchpoint. These sections must be listed explicitly — a vague "update docs/" in the Documentation Update release task is not a substitute.

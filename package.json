@@ -1,6 +1,6 @@
 {
   "name": "gitrail",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
   "keywords": [
     "cli",

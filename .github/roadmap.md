@@ -57,70 +57,7 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 ---
 
-#### Output: Prevent overwrite across extraction sessions
-
-**Release target**: v0.2.0
-
-Current rotated output filenames such as `gitrail-000001.jsonl` restart from the same sequence on every invocation. If the tool writes to the same output directory repeatedly, previous results can be overwritten.
-
-**Preferred direction for the first fix**: include the execution time or another session-specific identifier in the rotated filename so each run generates a unique series without requiring manual cleanup.
-
-**Candidate approaches to evaluate during implementation**:
-
-- **A)** Include the execution timestamp in the filename
-- **B)** Continue the numeric sequence across sessions
-- **C)** Refuse to overwrite an existing file unless an explicit overwrite flag is provided
-- **D)** Consider other approaches if they provide a better balance of simplicity and safety
-
-The current assumption is to start with **A** because it is the simplest way to prevent accidental overwrite. The exact naming scheme should still be reviewed at implementation time to balance readability, sort order, and operational safety.
-
----
-
 ### Medium-term
-
-#### CLI spec: Explicit extraction mode and state ergonomics
-
-**Release target**: v0.2.0
-
-**Problem A — implicit intent**: A user who always intends full extraction but accidentally passes `--state` pointing to an existing file will silently get differential output. There is no explicit intent signal.
-
-**Problem B — no force-full flag**: If a user has been using `--state` for incremental runs but wants a one-time full re-extraction (e.g. schema change upstream), they must manually delete the state file.
-
-**Problem C — state file path always manual**: The user must pass `--state ./somewhere/state.json` on every invocation. A natural default would be co-locating it with the output files.
-
-**Problem D — missing-state behavior not configurable**: If the state file is deleted or corrupted mid-series, the next run silently falls back to full extraction. Downstream DWH consumers may receive duplicate records.
-
-**Candidate improvements**:
-
-- `--mode full|incremental` flag to make intent explicit; `full` ignores state file content but still updates it after the run
-- `--state-dir <dir>` option that auto-derives the state filename from `<output-prefix>` (e.g. `<dir>/<prefix>.state.json`), reducing per-invocation configuration
-- `--on-missing-state error|warn|full` flag to control behavior when state file is expected but absent
-- Document explicitly in README: state file does not survive ephemeral CI workspaces; recommend artifact caching strategies
-
-**Design resolution notes (v0.2.0)**:
-
-- Problems A, B, D addressed. Problem C (`--state-dir`) explicitly deferred beyond v0.2.0.
-- `--mode` adopted values `snapshot|incremental` (not `full|incremental`). `snapshot` was chosen because it accurately describes "extract a cross-section of the DAG" regardless of whether a range filter is applied. `full` would be misleading when combined with `--since-ref` or `--since-date`.
-- `--on-missing-state` adopted values `error|snapshot` (not `error|warn|full`). `warn` was not useful as a distinct value from `snapshot`. The fallback mode name `snapshot` was chosen for consistency with `--mode snapshot`.
-- `--state` + `--since-ref` / `--since-date` is **permitted** in snapshot mode (state is a recording path only; range filter is independent). This reverses the prior mutual exclusion between `--state` and `--since-*`.
-- `--since-commit` renamed to `--since-ref` to accept any Git ref (tag name, branch name, or commit hash). Resolved via `resolveRef()`.
-- CI guidance documented in `docs/usage.md` (Typical Workflows § CI and ephemeral environments).
-
----
-
-#### Correctness: Cross-run deduplication for newly added branches
-
-**Release target**: v0.2.0
-
-When a branch is added to `--branch` in a subsequent run, its full traversal may output commits already extracted by a prior run via a different branch sharing history.
-
-**Fix**: At run start, compute the merge base between the new branch and all branches already recorded in the state file. Use the merge base as `excludeHash` for the new branch's traversal.
-
-- Requires `findMergeBase()` support in the Git Adapter
-- Does not require storing all previously output hashes
-- See `git-traversal.instructions.md` — "Future Work: Cross-Run Deduplication for New Branches"
-
----
 
 #### Refactor: `Extractor.run()` decomposition and structural clarity
 
@@ -234,50 +171,6 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ## Development Environment Improvements
 
 ### Near-term
-
-#### Refactor: Extractor boundary cleanup for runtime and I/O concerns
-
-**Release target**: v0.2.0
-
-`src/core/extractor.ts` currently owns some runtime-specific mechanisms directly, including stderr progress/warning output, Node.js timing APIs, state-file I/O, and direct coupling to output metrics.
-
-This works functionally, but it weakens the architectural boundary between stable core policy and volatile runtime concerns.
-
-**Goal**:
-
-- keep orchestration and extraction policy in the core layer
-- move runtime and side-effect concerns behind explicit abstractions owned by the outer layers
-
-**Candidate refactoring directions**:
-
-- introduce a small reporting/progress interface instead of direct stderr writes
-- introduce a clock abstraction instead of calling Node timing APIs directly in the core
-- evaluate whether state persistence should move behind a dedicated state-store abstraction
-- keep CLI presentation concerns in the CLI layer rather than the extractor itself
-
-**Why this matters**:
-
-- improves testability
-- reduces infrastructure coupling in the core layer
-- makes future feature work require fewer architecture decisions
-- better aligns with the principle: **stable core, volatile edges**
-
-#### Refactor: TypeScript `readonly` audit
-
-**Release target**: v0.2.0
-
-All current interfaces and types (`RawCommit`, `GitAdapter`, `ExtractorConfig`, `RotationConfig`, `StateFile`, `OutputCommit`, etc.) are defined without `readonly` modifiers.
-
-**Approach**:
-
-1. Start with pure data/value types (interfaces used only as data carriers)
-2. Mark all fields `readonly`
-3. Work inward to classes/logic that construct or mutate them
-4. Leave fields mutable only where there is a deliberate reason
-
-Particularly: `RawCommit`, `OutputCommit`, `StateFile`, `ExtractorConfig` should be fully readonly. Collections used as read-only input (e.g. `branches: string[]`) should be `readonly string[]`.
-
----
 
 #### Preparation: Introduce `erasableSyntaxOnly` and refactor non-erasable syntax
 

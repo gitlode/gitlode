@@ -437,18 +437,19 @@ _Update all human-oriented documentation to reflect the complete set of changes 
 
 #### Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 #### Mandatory Files
 
 The following files are required for every release and must be updated regardless of scope:
 
-| File           | Notes                                                                                                                                                                                                                                                                                                                         |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CHANGELOG.md` | Prepend `[0.2.0]` section following Keep a Changelog format (Added / Changed / Migration subsections). Breaking changes carry a **Breaking** prefix within Changed. Internal-only phases (Phase 3, Phase 4) are omitted — no user-visible impact. Include a `### Migration` subsection covering the two breaking CLI changes. |
-| `README.md`    | Review for impact; update if CLI behavior or output format is described.                                                                                                                                                                                                                                                      |
+| File                 | Notes                                                                                                                                                                                                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CHANGELOG.md`       | Prepend `[0.2.0]` section following Keep a Changelog format (Added / Changed / Migration subsections). Breaking changes carry a **Breaking** prefix within Changed. Internal-only phases (Phase 3, Phase 4) are omitted — no user-visible impact. Include a `### Migration` subsection covering the two breaking CLI changes.         |
+| `README.md`          | Review for impact; update if CLI behavior or output format is described.                                                                                                                                                                                                                                                              |
+| `.github/roadmap.md` | Remove all roadmap entries that were implemented in this release — i.e., entries that appear in this PLAN.md and are reflected in CHANGELOG.md. Entries that were evaluated but explicitly deferred (e.g. design resolution notes) should remain. This cleanup step is required on every release to keep the roadmap forward-looking. |
 
 #### Pre-Execution Step
 
@@ -471,13 +472,20 @@ For each file, check against the actual implementation for: renamed CLI options,
 - `CHANGELOG.md` has a `[0.2.0]` entry with Added, Changed, and Migration subsections
 - No occurrence of `--since-commit` in any documentation file (`CHANGELOG.md`, `README.md`, `docs/`)
 - No occurrence of the old filename pattern without a timestamp segment in `README.md`, `docs/`
+- All roadmap entries with **Release target** equal to this version have been removed from `roadmap.md`
 - `npm run format:check` passes
 
 ---
 
 ## Final Verification Checklist
 
-_To be filled in when phase implementation detail is finalized._
+- [x] `npm run build` passes
+- [x] `npm test` passes (94/94 tests)
+- [x] `npm run format:check` passes
+- [x] `CHANGELOG.md` has a `[0.2.0]` entry with Added, Changed, and Migration subsections
+- [x] No occurrence of `--since-commit` in any documentation file
+- [x] Output filename format updated to `{prefix}-{timestamp}-{seq}.jsonl` in `README.md` and `docs/`
+- [x] All phase files marked Completed
 
 ---
 

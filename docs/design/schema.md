@@ -15,14 +15,20 @@ Normative rules remain in `.github/instructions/schema.instructions.md`.
 
 ## Output file naming
 
-Files are named `{prefix}-{seq}.jsonl` where `seq` is a zero-padded 6-digit sequence number starting at `000001`.
+Files are named `{prefix}-{timestamp}-{seq}.jsonl` where:
 
-Example sequence for prefix `my-repo`:
+- `prefix` is derived from the repository (see below)
+- `timestamp` is a session timestamp in `YYYYMMDDTHHmmssZ` format (UTC, second precision), captured once at the start of each run
+- `seq` is a zero-padded 6-digit sequence number starting at `000001`
+
+All files produced in a single session share the same timestamp segment, making it possible to identify which files belong to the same run. Files from different sessions have distinct timestamps and will not overwrite each other.
+
+Example sequence for prefix `my-repo` and session timestamp `20260417T120000Z`:
 
 ```
-my-repo-000001.jsonl
-my-repo-000002.jsonl
-my-repo-000003.jsonl
+my-repo-20260417T120000Z-000001.jsonl
+my-repo-20260417T120000Z-000002.jsonl
+my-repo-20260417T120000Z-000003.jsonl
 ```
 
 Prefix derivation (in priority order):

@@ -95,8 +95,10 @@ Each line in the output `.jsonl` file is a JSON object representing one commit:
 | `repository.name`                          | Repository name derived from remote origin URL (falls back to directory name)               |
 | `repository.url`                           | Remote origin URL, or `null` if no remote is configured                                     |
 
-Output files are named `<prefix>-000001.jsonl`, `<prefix>-000002.jsonl`, and so on. The prefix is
-derived from the repository's remote origin URL; use `--output-prefix` to override. Use
+Output files are named `<prefix>-<timestamp>-000001.jsonl`, `<prefix>-<timestamp>-000002.jsonl`, and so on. The prefix is
+derived from the repository's remote origin URL; use `--output-prefix` to override. The timestamp
+segment (`YYYYMMDDTHHmmssZ`) is captured once per session, so all files from a single run share
+the same timestamp and will not overwrite files produced by earlier runs. Use
 `--rotate-lines` or `--rotate-size` to split output across multiple files.
 
 > **Note:** Output line order is not guaranteed to be chronological. Sort by `committer.timestamp`

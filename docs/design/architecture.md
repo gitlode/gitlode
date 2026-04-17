@@ -109,7 +109,7 @@ Files:
 Responsibilities:
 
 - Coordinate branch traversal through the adapter.
-- Apply differential behavior for `--state`, `--since-commit`, and `--since-date`.
+- Apply differential behavior for `--state`, `--since-ref`, and `--since-date`.
 - Deduplicate commits across branches in one run.
 - Map raw commit data to output schema objects.
 - Coordinate output writer lifecycle.

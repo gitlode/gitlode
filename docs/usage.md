@@ -265,9 +265,11 @@ gitrail -b main --rotate-size 104857600 ./my-repo
 gitrail -b main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
 ```
 
-Output files are named `<prefix>-000001.jsonl`, `<prefix>-000002.jsonl`, etc. The prefix is
+Output files are named `<prefix>-<timestamp>-000001.jsonl`, `<prefix>-<timestamp>-000002.jsonl`, etc. The prefix is
 derived from the repository's remote origin URL (last path segment, `.git` stripped). Use
-`--output-prefix` to override.
+`--output-prefix` to override. The timestamp segment (`YYYYMMDDTHHmmssZ`) is captured once per
+session; all files from a single run share the same timestamp and will not overwrite files from
+earlier runs.
 
 ---
 

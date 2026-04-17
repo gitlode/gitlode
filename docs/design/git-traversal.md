@@ -87,17 +87,17 @@ Interpretation for state-based differential:
 - Already processed set is `{3, 2, 1}`.
 - Example BFS traversal result list for this differential run: `[5, M, C, B, A]`
 
-### Differential by commit hash
+### Differential by commit hash or ref
 
-With `--since-commit`:
+With `--since-ref`:
 
-- CLI validates the commit boundary against each requested branch.
-- Core passes the boundary as `excludeHash`.
+- CLI resolves the ref (tag, branch name, or full commit hash) to a commit hash via `resolveRef()`.
+- Core passes the resolved hash as `excludeHash`.
 
 Example traversal result list:
 
 - Uses the same traversal behavior as state-based differential.
-- For the visual above with `--since-commit 3`, one BFS result is `[5, M, C, B, A]`.
+- For the visual above with `--since-ref 3` (or a tag pointing to commit 3), one BFS result is `[5, M, C, B, A]`.
 
 ### Differential by date
 

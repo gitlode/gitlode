@@ -134,7 +134,7 @@ export class Extractor {
     return mergeBase ?? undefined;
   }
 
-  private buildExcludeHash(
+  private resolveExcludeHash(
     branch: string,
     stateMap: ReadonlyMap<string, CommitHash>,
     newBranchExclude: CommitHash | undefined,
@@ -167,7 +167,7 @@ export class Extractor {
     }
     ctx.branchHeads.set(branch, head);
 
-    const excludeHash = this.buildExcludeHash(branch, ctx.stateMap, ctx.newBranchExclude);
+    const excludeHash = this.resolveExcludeHash(branch, ctx.stateMap, ctx.newBranchExclude);
 
     const writeCommit = async (commit: RawCommit) => {
       if (ctx.visited.has(commit.oid)) return;
@@ -229,6 +229,8 @@ export class Extractor {
     const commitsRef = { count: 0 };
 
     try {
+      // In incremental mode, compute merge base of existing branches to use as
+      // excludeHash for newly added branches, preventing cross-run duplicates
       const newBranchExcludeHash = await this.computeNewBranchExclude(
         newBranches,
         stateMap,

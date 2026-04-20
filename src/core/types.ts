@@ -33,12 +33,13 @@ export interface ExtractorConfig {
   readonly onMissingState?: "error" | "snapshot";
   readonly range?: ExtractionRange;
   readonly stateFilePath?: string;
+  readonly outputMode: "commit" | "file";
 }
 
 export interface Reporter {
   warn(message: string): void;
-  progress(commitsWritten: number): void;
-  done(commitsWritten: number): void;
+  progress(recordsWritten: number): void;
+  done(recordsWritten: number): void;
 }
 
 export interface StateStore {
@@ -62,7 +63,7 @@ export interface StateFile {
 }
 
 export interface ExtractionResult {
-  readonly commitsWritten: number;
+  readonly recordsWritten: number;
   readonly filesCreated: number;
   readonly bytesWritten: number;
   readonly elapsedMs: number;

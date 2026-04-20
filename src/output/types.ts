@@ -18,3 +18,14 @@ export interface OutputCommit {
   readonly parents: readonly string[];
   readonly repository: OutputRepository;
 }
+
+export interface OutputFileRecord extends OutputCommit {
+  readonly file: {
+    readonly path: string;
+    readonly status: "added" | "modified" | "deleted";
+    readonly additions: number | null;
+    readonly deletions: number | null;
+  };
+}
+
+export type OutputRecord = OutputCommit | OutputFileRecord;

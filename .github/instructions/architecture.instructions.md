@@ -108,7 +108,11 @@ interface GitAdapter {
   /** Return per-file change info between `commitOid` and `parentOid`.
    *  If `parentOid` is omitted (root commit), all files in the commit tree are "added".
    *  Binary files have `additions: null` and `deletions: null`. */
-  getFileChanges(repoPath: string, commitOid: string, parentOid?: string): Promise<readonly FileChange[]>;
+  getFileChanges(
+    repoPath: string,
+    commitOid: string,
+    parentOid?: string,
+  ): Promise<readonly FileChange[]>;
 
   /** Find the common ancestor (merge base) commit hash among all provided commit hashes.
    *  Returns null if no common ancestor exists (e.g. orphan branches). */

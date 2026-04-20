@@ -8,8 +8,15 @@ import { Volume, createFsFromVolume } from "memfs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Extractor } from "../../src/core/extractor.js";
-import type { ExtractorConfig, Reporter, StateFile, StateStore } from "../../src/core/index.js";
+import type {
+  CommitHash,
+  ExtractorConfig,
+  Reporter,
+  StateFile,
+  StateStore,
+} from "../../src/core/index.js";
 import { GitAdapterError } from "../../src/git/index.js";
+import type { FileChange, GitAdapter, RawCommit } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
 import type { OutputCommit } from "../../src/output/index.js";
 
@@ -82,6 +89,7 @@ function makeConfig(
     outputPrefix: "repo",
     rotation: {},
     mode: "snapshot",
+    outputMode: "commit",
     ...overrides,
   };
 }
@@ -379,7 +387,7 @@ describe("Extractor", () => {
     const extractor = makeExtractor(config, adapter);
     const result = await extractor.run();
 
-    expect(result.commitsWritten).toBe(3);
+    expect(result.recordsWritten).toBe(3);
     expect(result.filesCreated).toBe(1);
     expect(result.bytesWritten).toBeGreaterThan(0);
     expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
@@ -398,13 +406,13 @@ describe("Extractor", () => {
     const extractor = makeExtractor(config, adapter);
     const result = await extractor.run();
 
-    expect(result.commitsWritten).toBe(3);
+    expect(result.recordsWritten).toBe(3);
     expect(result.filesCreated).toBe(2);
     expect(result.bytesWritten).toBeGreaterThan(0);
     expect(result.branches).toEqual(["main"]);
   });
 
-  it("returns ExtractionResult with commitsWritten=0 when no new commits exist", async () => {
+  it("returns ExtractionResult with recordsWritten=0 when no new commits exist", async () => {
     const { fs, init, addCommit } = makeRepo("https://github.com/org/my-repo.git");
     await init();
     await addCommit("a.txt", "v1", "commit 1", 1000);
@@ -424,7 +432,7 @@ describe("Extractor", () => {
         makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" }),
         adapter,
       ).run();
-      expect(result.commitsWritten).toBe(0);
+      expect(result.recordsWritten).toBe(0);
       expect(result.filesCreated).toBe(0);
       expect(result.bytesWritten).toBe(0);
     } finally {
@@ -557,7 +565,7 @@ describe("Extractor", () => {
     ).run();
 
     // All commits extracted (full traversal)
-    expect(result.commitsWritten).toBe(2);
+    expect(result.recordsWritten).toBe(2);
     const commits = await readFirstJsonlFile(tmpDir);
     const oids = commits.map((c) => c.oid);
     expect(oids).toContain(sha1);
@@ -583,7 +591,7 @@ describe("Extractor", () => {
     ).run();
 
     // Only commits from main are extracted; the missing branch is skipped
-    expect(result.commitsWritten).toBe(1);
+    expect(result.recordsWritten).toBe(1);
     const warning = reporter.warnings.find((w) => w.includes("nonexistent-branch"));
     expect(warning).toBeDefined();
     expect(warning).toContain("no longer exists in the repository");
@@ -630,7 +638,7 @@ describe("Extractor", () => {
     ).run();
 
     // Full fallback extraction ran — all commits written
-    expect(result.commitsWritten).toBe(2);
+    expect(result.recordsWritten).toBe(2);
     const warning = reporter.warnings.find((w) => w.includes("no longer exists"));
     expect(warning).toBeDefined();
     expect(warning).toContain("Falling back to full extraction");
@@ -845,5 +853,283 @@ describe("Extractor", () => {
     } finally {
       await rm(tmpDir2, { recursive: true, force: true });
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // --output-mode file
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Creates a minimal fake GitAdapter for file mode tests.
+   * `fileChangeMap` maps commitOid → FileChange[]; commits are traversed in reverse order.
+   */
+  function makeFakeGitAdapter(
+    commits: RawCommit[],
+    fileChangeMap: Map<string, readonly FileChange[]>,
+    remoteUrl: string | null = null,
+  ): GitAdapter {
+    const headOid = commits[commits.length - 1]!.oid;
+    return {
+      async resolveRef() {
+        return headOid;
+      },
+      async *walkCommits(_repoPath, _head, excludeHash) {
+        for (const commit of [...commits].reverse()) {
+          if (commit.oid === excludeHash) break;
+          yield commit;
+        }
+      },
+      async getRemoteUrl() {
+        return remoteUrl;
+      },
+      async findMergeBase() {
+        return null;
+      },
+      async getFileChanges(_repoPath, commitOid) {
+        return fileChangeMap.get(commitOid) ?? [];
+      },
+    };
+  }
+
+  function makeRawCommit(
+    oid: string,
+    message: string,
+    parents: string[] = [],
+    timestamp = 1000,
+  ): RawCommit {
+    return {
+      oid: oid as CommitHash,
+      message: `${message}\n`,
+      author: { name: "Tester", email: "test@example.com", timestamp, timezoneOffset: 0 },
+      committer: { name: "Tester", email: "test@example.com", timestamp, timezoneOffset: 0 },
+      parents,
+    };
+  }
+
+  describe("--output-mode file", () => {
+    it("produces one record per changed file per commit", async () => {
+      const sha1 = "a".repeat(40);
+      const sha2 = "b".repeat(40);
+      const commits = [
+        makeRawCommit(sha1, "first commit", [], 1000),
+        makeRawCommit(sha2, "second commit", [sha1], 2000),
+      ];
+      const fileChanges = new Map<string, readonly FileChange[]>([
+        [sha1, [{ path: "a.txt", status: "added", additions: 5, deletions: 0 }]],
+        [
+          sha2,
+          [
+            { path: "a.txt", status: "modified", additions: 2, deletions: 1 },
+            { path: "b.txt", status: "added", additions: 3, deletions: 0 },
+          ],
+        ],
+      ]);
+      const adapter = makeFakeGitAdapter(commits, fileChanges);
+      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const result = await new Extractor(
+        config,
+        adapter,
+        makeReporter(),
+        () => new Date(),
+        () => 0,
+      ).run();
+
+      // sha1 has 1 file change, sha2 has 2 → 3 total
+      expect(result.recordsWritten).toBe(3);
+
+      const rawContent = await readFile((await findJsonlFiles(tmpDir))[0]!, "utf8");
+      const records = rawContent
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as OutputCommit & { file?: unknown });
+      expect(records).toHaveLength(3);
+      // Every record has a 'file' property
+      for (const record of records) {
+        expect(record.file).toBeDefined();
+      }
+      // Records from sha2 include both changed files
+      const sha2Records = records.filter((r) => r.oid === sha2);
+      expect(sha2Records).toHaveLength(2);
+      const paths = sha2Records.map((r) => (r.file as { path: string }).path);
+      expect(paths).toContain("a.txt");
+      expect(paths).toContain("b.txt");
+    });
+
+    it("file record carries denormalized commit metadata", async () => {
+      const sha1 = "a".repeat(40);
+      const commits = [makeRawCommit(sha1, "first commit", [], 1000)];
+      const fileChanges = new Map<string, readonly FileChange[]>([
+        [sha1, [{ path: "readme.md", status: "added", additions: 10, deletions: 0 }]],
+      ]);
+      const adapter = makeFakeGitAdapter(commits, fileChanges, "https://github.com/org/repo.git");
+      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      await new Extractor(
+        config,
+        adapter,
+        makeReporter(),
+        () => new Date(),
+        () => 0,
+      ).run();
+
+      const rawContent = await readFile((await findJsonlFiles(tmpDir))[0]!, "utf8");
+      const record = JSON.parse(rawContent.trim()) as OutputCommit & {
+        file: { path: string; status: string; additions: number; deletions: number };
+      };
+      // Commit fields are present
+      expect(record.oid).toBe(sha1);
+      expect(record.subject).toBe("first commit");
+      expect(record.parents).toEqual([]);
+      expect(record.repository.name).toBe("repo");
+      expect(record.repository.url).toBe("https://github.com/org/repo.git");
+      // File fields are present
+      expect(record.file.path).toBe("readme.md");
+      expect(record.file.status).toBe("added");
+      expect(record.file.additions).toBe(10);
+      expect(record.file.deletions).toBe(0);
+    });
+
+    it("empty commit (no file changes) produces no output records", async () => {
+      const sha1 = "a".repeat(40);
+      const sha2 = "b".repeat(40);
+      const commits = [
+        makeRawCommit(sha1, "first commit", [], 1000),
+        makeRawCommit(sha2, "empty commit", [sha1], 2000),
+      ];
+      // sha2 has no file changes
+      const fileChanges = new Map<string, readonly FileChange[]>([
+        [sha1, [{ path: "a.txt", status: "added", additions: 1, deletions: 0 }]],
+        [sha2, []],
+      ]);
+      const adapter = makeFakeGitAdapter(commits, fileChanges);
+      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const result = await new Extractor(
+        config,
+        adapter,
+        makeReporter(),
+        () => new Date(),
+        () => 0,
+      ).run();
+
+      // sha1 has 1 record, sha2 has 0 records
+      expect(result.recordsWritten).toBe(1);
+      const rawContent = await readFile((await findJsonlFiles(tmpDir))[0]!, "utf8");
+      const records = rawContent.split("\n").filter(Boolean);
+      expect(records).toHaveLength(1);
+    });
+
+    it("merge commit uses parents[0] as parentOid for getFileChanges", async () => {
+      const sha1 = "a".repeat(40);
+      const sha2 = "b".repeat(40);
+      const sha3 = "c".repeat(40); // merge commit with parents [sha1, sha2]
+      const capturedParentOids: (string | undefined)[] = [];
+
+      const commits = [
+        makeRawCommit(sha1, "base", [], 1000),
+        makeRawCommit(sha2, "branch", [sha1], 2000),
+        makeRawCommit(sha3, "merge", [sha1, sha2], 3000),
+      ];
+      const adapter: GitAdapter = {
+        async resolveRef() {
+          return sha3 as CommitHash;
+        },
+        async *walkCommits() {
+          for (const c of [...commits].reverse()) yield c;
+        },
+        async getRemoteUrl() {
+          return null;
+        },
+        async findMergeBase() {
+          return null;
+        },
+        async getFileChanges(_repoPath, _commitOid, parentOid) {
+          capturedParentOids.push(parentOid);
+          return [];
+        },
+      };
+      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      await new Extractor(
+        config,
+        adapter,
+        makeReporter(),
+        () => new Date(),
+        () => 0,
+      ).run();
+
+      // For sha3 (merge commit with parents [sha1, sha2]), parentOid must be sha1 (parents[0])
+      const mergeCallIdx = 2; // third commit traversed (reverse order: sha3, sha2, sha1)
+      expect(capturedParentOids[0]).toBe(sha1); // sha3's parents[0]
+      // For sha1 (root), parentOid must be undefined
+      expect(capturedParentOids[2]).toBeUndefined();
+    });
+
+    it("recordsWritten counts file records, not commits", async () => {
+      const sha1 = "a".repeat(40);
+      const commits = [makeRawCommit(sha1, "big commit", [], 1000)];
+      // One commit that changes 4 files
+      const fileChanges = new Map<string, readonly FileChange[]>([
+        [
+          sha1,
+          [
+            { path: "a.txt", status: "added", additions: 1, deletions: 0 },
+            { path: "b.txt", status: "added", additions: 2, deletions: 0 },
+            { path: "c.txt", status: "added", additions: 3, deletions: 0 },
+            { path: "d.txt", status: "added", additions: 4, deletions: 0 },
+          ],
+        ],
+      ]);
+      const reporter = makeReporter();
+      const adapter = makeFakeGitAdapter(commits, fileChanges);
+      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const result = await new Extractor(
+        config,
+        adapter,
+        reporter,
+        () => new Date(),
+        () => 0,
+      ).run();
+
+      // 1 commit × 4 file changes = 4 records
+      expect(result.recordsWritten).toBe(4);
+      // reporter.progress was called 4 times (once per file record)
+      expect(reporter.progressCalls).toHaveLength(4);
+      expect(reporter.progressCalls).toEqual([1, 2, 3, 4]);
+      // reporter.done called with final count
+      expect(reporter.doneCalls[0]).toBe(4);
+    });
+
+    it("file rotation in file mode: single commit's records can span rotation boundaries", async () => {
+      const sha1 = "a".repeat(40);
+      const commits = [makeRawCommit(sha1, "big commit", [], 1000)];
+      const fileChanges = new Map<string, readonly FileChange[]>([
+        [
+          sha1,
+          [
+            { path: "a.txt", status: "added", additions: 1, deletions: 0 },
+            { path: "b.txt", status: "added", additions: 1, deletions: 0 },
+            { path: "c.txt", status: "added", additions: 1, deletions: 0 },
+          ],
+        ],
+      ]);
+      const adapter = makeFakeGitAdapter(commits, fileChanges);
+      const config = makeConfig({
+        outputDir: tmpDir,
+        outputMode: "file",
+        rotation: { maxLines: 2 },
+      });
+      await new Extractor(
+        config,
+        adapter,
+        makeReporter(),
+        () => new Date(),
+        () => 0,
+      ).run();
+
+      const files = await findJsonlFiles(tmpDir);
+      expect(files).toHaveLength(2); // 3 records, maxLines=2 → 2 files
+      const file1Lines = (await readFile(files[0]!, "utf8")).split("\n").filter(Boolean);
+      const file2Lines = (await readFile(files[1]!, "utf8")).split("\n").filter(Boolean);
+      expect(file1Lines).toHaveLength(2);
+      expect(file2Lines).toHaveLength(1);
+    });
   });
 });

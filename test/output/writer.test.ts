@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { OutputCommit } from "../../src/output/types.js";
+import type { OutputCommit, OutputFileRecord } from "../../src/output/types.js";
 import { OutputWriter } from "../../src/output/writer.js";
 
 function makeCommit(oid: string): OutputCommit {
@@ -147,5 +147,30 @@ describe("OutputWriter", () => {
     for (const line of lines.slice(0, -1)) {
       expect(line).not.toHaveLength(0);
     }
+  });
+
+  it("accepts OutputFileRecord (with file field) without error", async () => {
+    const base = makeCommit(oid(1));
+    const fileRecord: OutputFileRecord = {
+      ...base,
+      file: {
+        path: "src/index.ts",
+        status: "modified",
+        additions: 5,
+        deletions: 2,
+      },
+    };
+    const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
+    const writer = new OutputWriter(tmpDir, filenameFor, {});
+    await writer.write(fileRecord);
+    await writer.close();
+
+    const content = await readFile(join(tmpDir, "repo-000001.jsonl"), "utf8");
+    const parsed = JSON.parse(content.trim()) as OutputFileRecord;
+    expect(parsed.oid).toBe(base.oid);
+    expect(parsed.file.path).toBe("src/index.ts");
+    expect(parsed.file.status).toBe("modified");
+    expect(parsed.file.additions).toBe(5);
+    expect(parsed.file.deletions).toBe(2);
   });
 });

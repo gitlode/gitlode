@@ -23,6 +23,8 @@ const noopAdapter: GitAdapter = {
   resolveRef: async () => "abc123def456abc123def456abc123def456abc123",
   walkCommits: async function* () {},
   getRemoteUrl: async () => null,
+  findMergeBase: async () => null,
+  getFileChanges: async () => [],
 };
 
 let exitSpy: MockInstance;
@@ -575,6 +577,8 @@ describe("parseArgs – --since-ref", () => {
       },
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
+      findMergeBase: async () => null,
+      getFileChanges: async () => [],
     };
     setArgv("--branch", "main", "--since-ref", "nonexistent-tag", "--output-dir", repoDir, repoDir);
     await expect(parseArgs(failAdapter)).rejects.toThrow("process.exit(1)");
@@ -634,5 +638,48 @@ describe("parseArgs – shorthand aliases", () => {
     setArgv("--branch", "main", "-q", "--output-dir", repoDir, repoDir);
     const { quiet } = await parseArgs(adapter);
     expect(quiet).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --output-mode
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --output-mode", () => {
+  let repoDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("defaults outputMode to 'commit' when --output-mode is not provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.outputMode).toBe("commit");
+  });
+
+  it("accepts --output-mode commit explicitly", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--output-mode", "commit", "--branch", "main", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.outputMode).toBe("commit");
+  });
+
+  it("accepts --output-mode file", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--output-mode", "file", "--branch", "main", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.outputMode).toBe("file");
+  });
+
+  it("rejects invalid --output-mode value", async () => {
+    setArgv("--output-mode", "json", "--branch", "main", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith('--output-mode must be "commit" or "file"\n');
   });
 });

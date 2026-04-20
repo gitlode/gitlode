@@ -78,6 +78,12 @@ const argsDef = {
     alias: "q",
     description: "Suppress progress and summary output (for CI, cron, and scripted usage)",
   },
+  "output-mode": {
+    type: "string" as const,
+    default: "commit",
+    description:
+      'Output record granularity: "commit" (default) emits one record per commit; "file" emits one record per changed file within each commit',
+  },
 } satisfies ArgsDef;
 
 // defineCommand descriptor (provides structured metadata and enables --help generation
@@ -133,6 +139,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
   const rotateSizeRaw = parsed["rotate-size"] as string | undefined;
   const repoPath = parsed["repository-path"] as string | undefined;
   const quiet = Boolean(parsed["quiet"]);
+  const outputMode = (parsed["output-mode"] ?? "commit") as string;
 
   // --- Phase 1: Format and mutual exclusion checks (no I/O) ---
   if (mode !== "snapshot" && mode !== "incremental") {
@@ -140,6 +147,9 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
   }
   if (onMissingState !== "error" && onMissingState !== "snapshot") {
     userError('--on-missing-state must be "error" or "snapshot"');
+  }
+  if (outputMode !== "commit" && outputMode !== "file") {
+    userError('--output-mode must be "commit" or "file"');
   }
 
   if (sinceRef && sinceDate) {
@@ -275,6 +285,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
         ? { type: "date", since: sinceDateObj }
         : undefined,
     stateFilePath: state,
+    outputMode: outputMode as "commit" | "file",
     quiet,
   };
 }

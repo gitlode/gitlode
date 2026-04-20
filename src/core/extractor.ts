@@ -1,9 +1,9 @@
 import { basename, resolve } from "node:path";
 
-import type { GitAdapter, RawCommit } from "../git/index.js";
+import type { FileChange, GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import { OutputWriter, formatSessionTimestamp, splitMessage, toISO8601 } from "../output/index.js";
-import type { OutputCommit } from "../output/index.js";
+import type { OutputCommit, OutputFileRecord } from "../output/index.js";
 import type {
   CommitHash,
   ExtractorConfig,
@@ -53,6 +53,23 @@ function mapToOutputCommit(
   };
 }
 
+function mapToOutputFileRecord(
+  commit: RawCommit,
+  fileChange: FileChange,
+  repoName: string,
+  remoteUrl: string | null,
+): OutputFileRecord {
+  return {
+    ...mapToOutputCommit(commit, repoName, remoteUrl),
+    file: {
+      path: fileChange.path,
+      status: fileChange.status,
+      additions: fileChange.additions,
+      deletions: fileChange.deletions,
+    },
+  };
+}
+
 interface BranchRunContext {
   readonly repoPath: string;
   readonly repoName: string;
@@ -61,7 +78,7 @@ interface BranchRunContext {
   readonly newBranchExclude: CommitHash | undefined;
   readonly writer: OutputWriter;
   readonly visited: Set<string>;
-  readonly commitsRef: { count: number };
+  readonly recordsRef: { count: number };
   readonly branchHeads: Map<string, CommitHash>;
 }
 
@@ -177,9 +194,21 @@ export class Extractor {
           return;
         }
       }
-      await ctx.writer.write(mapToOutputCommit(commit, ctx.repoName, ctx.remoteUrl));
-      ctx.commitsRef.count++;
-      this.reporter.progress(ctx.commitsRef.count);
+      if (this.config.outputMode === "commit") {
+        await ctx.writer.write(mapToOutputCommit(commit, ctx.repoName, ctx.remoteUrl));
+        ctx.recordsRef.count++;
+        this.reporter.progress(ctx.recordsRef.count);
+      } else {
+        const parentOid = commit.parents[0] as CommitHash | undefined;
+        const fileChanges = await this.adapter.getFileChanges(ctx.repoPath, commit.oid, parentOid);
+        for (const fileChange of fileChanges) {
+          await ctx.writer.write(
+            mapToOutputFileRecord(commit, fileChange, ctx.repoName, ctx.remoteUrl),
+          );
+          ctx.recordsRef.count++;
+          this.reporter.progress(ctx.recordsRef.count);
+        }
+      }
     };
 
     try {
@@ -226,7 +255,7 @@ export class Extractor {
 
     const branchHeads = new Map<string, CommitHash>();
     const visited = new Set<string>();
-    const commitsRef = { count: 0 };
+    const recordsRef = { count: 0 };
 
     try {
       // In incremental mode, compute merge base of existing branches to use as
@@ -245,7 +274,7 @@ export class Extractor {
         newBranchExclude: newBranchExcludeHash,
         writer,
         visited,
-        commitsRef,
+        recordsRef,
         branchHeads,
       };
 
@@ -253,7 +282,7 @@ export class Extractor {
         await this.processBranch(branch, ctx);
       }
     } finally {
-      this.reporter.done(commitsRef.count);
+      this.reporter.done(recordsRef.count);
       await writer.close();
     }
 
@@ -272,7 +301,7 @@ export class Extractor {
     }
 
     return {
-      commitsWritten: commitsRef.count,
+      recordsWritten: recordsRef.count,
       filesCreated: writer.filesCreated,
       bytesWritten: writer.bytesWritten,
       elapsedMs: this.monotonicNow() - startTime,

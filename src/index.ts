@@ -15,15 +15,15 @@ const stderrReporter: Reporter & { lastDisplayed: number } = {
   warn(message: string): void {
     process.stderr.write(message + "\n");
   },
-  progress(commitsWritten: number): void {
-    if (commitsWritten - this.lastDisplayed >= 100) {
-      this.lastDisplayed = commitsWritten;
-      process.stderr.write(`\rProcessed ${commitsWritten} commits...`);
+  progress(recordsWritten: number): void {
+    if (recordsWritten - this.lastDisplayed >= 100) {
+      this.lastDisplayed = recordsWritten;
+      process.stderr.write(`\rProcessed ${recordsWritten} records...`);
     }
   },
-  done(commitsWritten: number): void {
-    if (commitsWritten > 0 && commitsWritten !== this.lastDisplayed) {
-      process.stderr.write(`\rProcessed ${commitsWritten} commits...\n`);
+  done(recordsWritten: number): void {
+    if (recordsWritten > 0 && recordsWritten !== this.lastDisplayed) {
+      process.stderr.write(`\rProcessed ${recordsWritten} records...\n`);
     } else if (this.lastDisplayed >= 100) {
       process.stderr.write("\n");
     }
@@ -32,8 +32,8 @@ const stderrReporter: Reporter & { lastDisplayed: number } = {
 
 const noopReporter: Reporter = {
   warn(_message: string): void {},
-  progress(_commitsWritten: number): void {},
-  done(_commitsWritten: number): void {},
+  progress(_recordsWritten: number): void {},
+  done(_recordsWritten: number): void {},
 };
 
 class NodeStateStore implements StateStore {
@@ -100,7 +100,7 @@ const main = defineCommand({
       if (!quiet) {
         const elapsed = (result.elapsedMs / 1000).toFixed(1);
         process.stderr.write(`\nExtraction complete\n`);
-        process.stderr.write(`  Commits written : ${result.commitsWritten}\n`);
+        process.stderr.write(`  Records written : ${result.recordsWritten}\n`);
         process.stderr.write(`  Files created   : ${result.filesCreated}\n`);
         process.stderr.write(`  Bytes written   : ${result.bytesWritten}\n`);
         process.stderr.write(`  Elapsed time    : ${elapsed}s\n`);

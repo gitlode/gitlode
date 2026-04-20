@@ -74,6 +74,41 @@ Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would ali
 
 ---
 
+#### CLI UX: Warn on unknown CLI arguments
+
+Currently, citty parses arguments with `strict: false` (inherited from `node:util.parseArgs`), which means unrecognized options are silently ignored. A typo such as `--rotate-line` (instead of `--rotate-lines`) passes through without any diagnostic, and the option simply has no effect. This is indistinguishable from a bug in the program itself.
+
+Most mainstream CLI frameworks treat unknown arguments as an error or at minimum a warning (e.g. `argparse` exits with code 2, `commander` errors by default, `yargs` with `strict()` mode). The current behavior is inconsistent with user expectations and can be considered a usability defect.
+
+**Reference behavior: git**:
+
+git is the primary CLI reference for gitrail's UX standards. Although many users interact with git through IDEs or GUI clients rather than the terminal directly, gitrail operates on local git repositories — making git's own CLI conventions the most relevant baseline. When users do invoke gitrail manually, the mental model they bring is shaped by git's behavior.
+
+git treats unknown options as fatal errors and exits immediately without performing any work:
+
+```
+$ git log --unknown-option
+fatal: unrecognized argument: --unknown-option
+# exit code: 128
+```
+
+This means the expected behavior for gitrail is also **error on unknown arguments, exit non-zero, perform no extraction**. A `console.warn`-and-continue approach (warn but proceed) is inconsistent with this baseline and should be considered a fallback only if implementation constraints prevent a clean error path.
+
+**Fix directions to evaluate at design time**:
+
+- **`setup()` hook approach**: In the `defineCommand` `setup()` hook, compare `rawArgs` against the set of known option names (including aliases and kebab/camelCase variants) and emit a `console.warn` to stderr for each unrecognized option. Low implementation cost; no dependency changes.
+- **citty issue / upstream fix**: File a feature request upstream to expose a `strict` mode option. Monitor for resolution before implementing locally.
+- **Library migration**: `commander` and `yargs` have built-in strict modes, but migrating away from citty is a larger architectural change and is not warranted for this issue alone.
+
+**Design considerations**:
+
+- Warnings should go to stderr so they are not captured by output redirection.
+- `--quiet` suppresses progress and summary output but should **not** suppress unknown-argument warnings — a silent typo with `--quiet` would be the hardest failure mode to diagnose.
+- Positional arguments and `--` passthrough must be excluded from the unknown-option check.
+- The warning message should suggest the closest known option name (edit-distance heuristic) if feasible.
+
+---
+
 ### Medium-term
 
 #### Development: Granular performance profiling

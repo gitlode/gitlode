@@ -4,9 +4,9 @@ _Decompose the monolithic `Extractor.run()` method into focused private helpers 
 
 ## Status
 
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] Planned
+- [x] In progress
+- [x] Completed
 
 ## Design References
 

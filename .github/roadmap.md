@@ -41,6 +41,8 @@ For example, runs that use a state file and ultimately write zero new commits ca
 - redesign progress reporting based on that evidence rather than using commit count alone
 - keep the current Phase 2 behavior in v0.1.4 as a pragmatic baseline, but treat it as a first iteration rather than a final UX design
 
+**Design dependency**: This redesign should be approached together with the "Granular performance profiling" item (see Medium-term section). Progress display redesign requires knowing what is measurable; performance profiling provides that evidence. Design both together in the same release.
+
 #### CLI UX: `--help` option grouping and discoverability
 
 The `--help` output lists all options in a flat list with no grouping. The jump from "I want incremental extraction" to "I need `--state`" is non-obvious.
@@ -73,6 +75,23 @@ Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would ali
 ---
 
 ### Medium-term
+
+#### Development: Granular performance profiling
+
+Add per-phase timing instrumentation to measure where time is actually spent during extraction. The target granularity is: DAG traversal, blob reads, diff computation (per-file), and output writing.
+
+**Motivation**: File-level output mode (`--output-mode file`, introduced in v0.3.0) computes a tree diff for every commit, which increases processing time proportionally to the number of changed files. If performance is unacceptable on large repositories, the root cause needs to be identified precisely before any mitigation is considered — including the possibility of replacing isomorphic-git with a different Git backend.
+
+**Design considerations**:
+
+- Expose timing data in `ExtractionResult` (e.g. `timings: { traversalMs, blobReadMs, diffMs, writeMs }`) for programmatic access and test coverage
+- Consider a `--profile` flag to print per-phase timing to stderr (off by default to avoid changing default output)
+- Instrument `GitAdapter.getFileChanges()` separately from commit traversal, since diff cost scales with file count per commit
+- Measure first on real repositories of varying sizes; optimize only where evidence shows a bottleneck
+
+**Why deferred to v0.3.1**: The target of this measurement is v0.3.0's file-level output performance. v0.3.0 must be complete before meaningful baseline data exists. Implementing instrumentation before the feature exists would mean measuring against an incomplete workload.
+
+---
 
 #### Output: Configurable field inclusion/exclusion
 
@@ -122,13 +141,19 @@ Record which branch(es) each commit was reachable from at extraction time (e.g. 
 
 #### Output: Commit file diff stats
 
+**Release target**: v0.3.0 (partial — `GitAdapter.getFileChanges()` adapter infrastructure only; `--include-files` CLI flag deferred beyond v0.3.0)
+
 - For each commit, include an array of changed files with `path`, `status`, `additions`, `deletions`
 - Made opt-in via `--include-files` flag (more expensive — requires tree comparison per commit)
 - Implementation: requires `isomorphic-git`'s `walk()` API with tree diff
 
+**Why `--include-files` is deferred**: Everything `--include-files` enables can already be achieved by running gitrail twice — once in `--output-mode commit` and once in `--output-mode file` — and joining the two outputs in the downstream analytical system. `--include-files` adds convenience (a single pass, a single denormalized record), but it does not add any new analytical capability beyond what the two-mode combination already provides. Given this, it is classified as a convenience feature and deferred to a release after `--output-mode file` is proven in practice.
+
 ---
 
 #### Output: File-level output mode
+
+**Release target**: v0.3.0
 
 - New mode where each output record represents a single changed **file** within a commit (rather than the commit itself)
 - Controlled by `--output-mode file` (default: `commit`)
@@ -166,6 +191,8 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 
 #### Preparation: Introduce `erasableSyntaxOnly` and refactor non-erasable syntax
 
+**Release target**: v0.3.0
+
 **Background and purpose**:
 
 The roadmap item "Migrate to Node.js built-in TypeScript support" (see Long-term section) requires that source code avoid TypeScript syntax that cannot be stripped at runtime — specifically syntax that has runtime semantics and cannot be removed by a simple type-erasing transform. The `erasableSyntaxOnly` compiler flag enforces this constraint statically.
@@ -187,6 +214,8 @@ Introducing this flag well before the actual migration serves two purposes:
 ### Medium-term
 
 #### Refactor: `Extractor.run()` decomposition and structural clarity
+
+**Release target**: v0.3.0
 
 `Extractor.run()` has grown incrementally as features were added across releases. The method currently handles five distinct concerns in sequence: session initialization, state file reading and validation, merge-base computation for new branches, per-branch traversal with fallback, and state file writing. Each concern is currently expressed as a flat block of imperative code within a single method body.
 

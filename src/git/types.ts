@@ -13,6 +13,15 @@ export interface RawCommit {
   readonly parents: readonly string[];
 }
 
+export interface FileChange {
+  readonly path: string;
+  readonly status: "added" | "modified" | "deleted";
+  /** null for binary files */
+  readonly additions: number | null;
+  /** null for binary files */
+  readonly deletions: number | null;
+}
+
 export interface GitAdapter {
   /** Resolve a ref (branch name) to a commit hash */
   resolveRef(repoPath: string, ref: string): Promise<CommitHash>;
@@ -30,4 +39,12 @@ export interface GitAdapter {
   /** Find the lowest common ancestor of all given commit hashes.
    *  Returns null if no common ancestor exists (detached histories). */
   findMergeBase(repoPath: string, oids: readonly CommitHash[]): Promise<CommitHash | null>;
+
+  /** Return per-file change information between a commit and its parent.
+   *  Pass parentOid for normal commits; omit for root commits (all files are "added"). */
+  getFileChanges(
+    repoPath: string,
+    commitOid: CommitHash,
+    parentOid?: CommitHash,
+  ): Promise<readonly FileChange[]>;
 }

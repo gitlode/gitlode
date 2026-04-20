@@ -267,6 +267,158 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
   });
 });
 
+/** Extend makeRepo with helpers for deletion and binary content. */
+function makeRepoExt() {
+  const base = makeRepo();
+  const { fs } = base;
+
+  async function removeCommit(filename: string, message: string): Promise<string> {
+    await git.remove({ fs, dir: "/", filepath: filename });
+    return git.commit({
+      fs,
+      dir: "/",
+      message,
+      author: { ...AUTHOR, timestamp: AUTHOR.timestamp },
+    });
+  }
+
+  async function addBinaryCommit(filename: string, message: string): Promise<string> {
+    const binaryContent = Buffer.from([
+      0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x00, 0x57, 0x6f, 0x72, 0x6c, 0x64,
+    ]);
+    (fs as { writeFileSync: (p: string, d: Buffer) => void }).writeFileSync(
+      `/${filename}`,
+      binaryContent,
+    );
+    await git.add({ fs, dir: "/", filepath: filename });
+    return git.commit({
+      fs,
+      dir: "/",
+      message,
+      author: { ...AUTHOR, timestamp: AUTHOR.timestamp },
+    });
+  }
+
+  return { ...base, removeCommit, addBinaryCommit };
+}
+
+describe("IsomorphicGitAdapter.getFileChanges", () => {
+  it("root commit: all files are 'added'", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const changes = await adapter.getFileChanges("/", sha1 as never);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "a.txt",
+      status: "added",
+      additions: 2,
+      deletions: 0,
+    });
+  });
+
+  it("file added: correct addition count, deletions = 0", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+    const sha2 = await addCommit("b.txt", "new1\n", "add b.txt");
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "b.txt",
+      status: "added",
+      additions: 1,
+      deletions: 0,
+    });
+  });
+
+  it("file modified: correct addition and deletion counts", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+    // Modify: remove line2, add line3 and line4
+    const sha2 = await addCommit("a.txt", "line1\nline3\nline4\n", "modify a.txt");
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "a.txt",
+      status: "modified",
+      additions: 2,
+      deletions: 1,
+    });
+  });
+
+  it("file deleted: additions = 0, correct deletion count", async () => {
+    const { fs, init, addCommit, removeCommit } = makeRepoExt();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+    const sha2 = await addCommit("b.txt", "x\n", "add b.txt");
+    const sha3 = await removeCommit("b.txt", "delete b.txt");
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const changes = await adapter.getFileChanges("/", sha3 as never, sha2 as never);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "b.txt",
+      status: "deleted",
+      additions: 0,
+      deletions: 1,
+    });
+  });
+
+  it("binary file: additions and deletions are null", async () => {
+    const { fs, init, addBinaryCommit } = makeRepoExt();
+    await init();
+    const sha1 = await addBinaryCommit("binary.bin", "add binary file");
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const changes = await adapter.getFileChanges("/", sha1 as never);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "binary.bin",
+      status: "added",
+      additions: null,
+      deletions: null,
+    });
+  });
+
+  it("empty commit: returns empty array", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\n", "root commit");
+
+    // Create a commit with same tree as sha1 (no file changes)
+    const { commit: parentCommit } = await git.readCommit({ fs, dir: "/", oid: sha1 });
+    const emptyCommit = await git.writeCommit({
+      fs,
+      dir: "/",
+      commit: {
+        tree: parentCommit.tree,
+        parent: [sha1],
+        message: "empty commit\n",
+        author: { ...AUTHOR, timestamp: AUTHOR.timestamp + 1000 },
+        committer: { ...AUTHOR, timestamp: AUTHOR.timestamp + 1000 },
+      },
+    });
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    const changes = await adapter.getFileChanges("/", emptyCommit as never, sha1 as never);
+
+    expect(changes).toHaveLength(0);
+  });
+});
+
 describe("IsomorphicGitAdapter.findMergeBase", () => {
   it("returns the common ancestor for a forked history", async () => {
     // Build:  sha1 → sha2 (main)

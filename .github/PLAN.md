@@ -41,7 +41,7 @@ This release also includes two preparatory changes that improve internal quality
 | --- | ---------------------------------------------------------------- | ------------------------------------- | --------- |
 | 1   | TypeScript: `erasableSyntaxOnly` and Parameter Property Refactor | [phase-1.md](plans/v0.3.0/phase-1.md) | Completed |
 | 2   | `Extractor.run()` Decomposition                                  | [phase-2.md](plans/v0.3.0/phase-2.md) | Completed |
-| 3   | File Diff Computation in Git Adapter                             | [phase-3.md](plans/v0.3.0/phase-3.md) | Planned   |
+| 3   | File Diff Computation in Git Adapter                             | [phase-3.md](plans/v0.3.0/phase-3.md) | Completed |
 | 4   | File-Level Output Mode (`--output-mode file`)                    | [phase-4.md](plans/v0.3.0/phase-4.md) | Planned   |
 
 **Phase dependency**: Phase 3 must complete before Phase 4. Phases 1 and 2 are independent and can be executed in any order.

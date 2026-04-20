@@ -110,6 +110,18 @@ export class Extractor {
     return stateMap;
   }
 
+  private async computeNewBranchExclude(
+    newBranches: ReadonlySet<string>,
+    stateMap: ReadonlyMap<string, CommitHash>,
+    repoPath: string,
+  ): Promise<CommitHash | undefined> {
+    if (newBranches.size === 0 || stateMap.size === 0) {
+      return undefined;
+    }
+    const mergeBase = await this.adapter.findMergeBase(repoPath, Array.from(stateMap.values()));
+    return mergeBase ?? undefined;
+  }
+
   async run(): Promise<ExtractionResult> {
     const startTime = this.monotonicNow();
     const repoPath = resolve(this.config.repositoryPath);
@@ -139,15 +151,11 @@ export class Extractor {
     let commitsWritten = 0;
 
     try {
-      // In incremental mode, compute merge base of existing branches to use as
-      // excludeHash for newly added branches, preventing cross-run duplicates
-      let newBranchExcludeHash: CommitHash | undefined;
-      if (newBranches.size > 0 && stateMap.size > 0) {
-        const mergeBase = await this.adapter.findMergeBase(repoPath, Array.from(stateMap.values()));
-        if (mergeBase !== null) {
-          newBranchExcludeHash = mergeBase;
-        }
-      }
+      const newBranchExcludeHash = await this.computeNewBranchExclude(
+        newBranches,
+        stateMap,
+        repoPath,
+      );
 
       for (const branch of this.config.branches) {
         let head: CommitHash;

@@ -170,18 +170,92 @@ A new file is opened when **either** condition is met after writing a line:
 
 The check occurs **after** writing each line. The line that triggered the threshold is included in the current file; the next line opens a new file.
 
-### Rotation Behaviour When Neither Flag Is Set
+### Rotation Behavior When Neither Flag Is Set
 
 All output is written to a single file: `{prefix}-000001.jsonl`.
 
 ---
 
-## Future Schema Extensions (Phase 2+)
+## File-Level Output Schema
 
-These fields are **not implemented in the initial version** but are reserved and must not be used for other purposes:
+When `--output-mode file` is specified, each output line represents a single changed file within a commit. Commits with multiple changed files produce multiple output lines. Commits with no changed files (empty commits) produce no output lines.
+
+Each line carries the full commit metadata (denormalized) plus file-specific fields:
 
 ```typescript
-// Phase 2 — file-level diff stats per commit
+interface OutputFileRecord extends OutputCommit {
+  file: {
+    path: string;
+    status: "added" | "modified" | "deleted";
+    additions: number | null; // null for binary files
+    deletions: number | null; // null for binary files
+  };
+}
+```
+
+### File-Specific Field Definitions
+
+#### `file.path`
+
+Relative path from the repository root. Uses `/` as the separator regardless of OS.
+
+#### `file.status`
+
+- `"added"`: file exists in this commit but not in the parent
+- `"modified"`: file exists in both commits with different content
+- `"deleted"`: file exists in the parent but not in this commit
+
+Rename detection is not performed. A renamed file appears as a `"deleted"` entry for the old path and an `"added"` entry for the new path.
+
+#### `file.additions` / `file.deletions`
+
+Line-level diff statistics:
+
+- `additions`: number of lines present in the new version but not in the old version
+- `deletions`: number of lines present in the old version but not in the new version
+- `null`: file is binary (contains NUL bytes in the first 8000 bytes); line-level statistics are not meaningful
+
+For `"added"` files: `deletions` is `0`, `additions` is the total line count.
+For `"deleted"` files: `additions` is `0`, `deletions` is the total line count.
+
+### Merge Commit Handling
+
+For merge commits (commits with multiple parents), file changes are computed against the **first parent only**. This represents "what the merge introduced relative to the mainline."
+
+### Example Output Line (file mode)
+
+```json
+{
+  "oid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "subject": "Fix null pointer in auth module",
+  "body": "",
+  "author": {
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "timestamp": "2024-01-15T09:00:00+09:00"
+  },
+  "committer": {
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "timestamp": "2024-01-15T09:05:00+09:00"
+  },
+  "parents": ["parenthash1"],
+  "repository": { "name": "my-repo", "url": "https://github.com/org/my-repo" },
+  "file": { "path": "src/auth/handler.ts", "status": "modified", "additions": 5, "deletions": 2 }
+}
+```
+
+---
+
+## Future Schema Extensions
+
+These fields are **not yet implemented** but are reserved and must not be used for other purposes:
+
+```typescript
+// Commit-level embedded file array (--include-files flag)
+// Deferred beyond v0.3.0 — file-level output mode (--output-mode file) provides
+// equivalent analytical capability. This remains a convenience feature for users
+// who prefer a single denormalized commit record with an embedded files array.
 interface OutputCommitWithFiles extends OutputCommit {
   files?: Array<{
     path: string;
@@ -191,7 +265,7 @@ interface OutputCommitWithFiles extends OutputCommit {
   }>;
 }
 
-// Phase 2 — per-run execution metadata (first line only)
+// Per-run execution metadata (first line only)
 interface MetaLine {
   _meta: {
     extractedAt: string; // ISO 8601
@@ -199,7 +273,7 @@ interface MetaLine {
   };
 }
 
-// Phase 2 — configurable field inclusion/exclusion
+// Configurable field inclusion/exclusion
 // Fields such as author.email are PII and may need to be excluded
 // This will be controlled via a --fields or --exclude-fields CLI option
 ```

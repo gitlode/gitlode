@@ -138,6 +138,28 @@ Add per-phase timing instrumentation to measure where time is actually spent dur
 
 ### Long-term
 
+#### Pipeline: Pluggable enrichment stage for organization-specific metadata
+
+Allow users to attach custom processing stages to gitrail's extraction pipeline so that
+organization-specific semantics can be derived without expanding the core schema for every use
+case.
+
+Example targets include parsing commit subjects that follow conventions such as Conventional
+Commits, deriving custom classification fields from file paths, or attaching additional metadata
+computed from diff content.
+
+**Design intent**:
+
+- keep gitrail core focused on canonical Git facts and broadly reusable output grains
+- move organization-specific interpretation to a user-controlled extension boundary
+- allow enrichment without forcing the project to standardize every downstream analytical need
+
+**Open design questions**:
+
+- whether the extension point should run in-process, as an external command, or via a streaming IPC boundary
+- what record shape and lifecycle guarantees plugins can rely on
+- how plugin failures should affect extraction success, state writing, and reproducibility
+
 #### Output: Branch reachability annotation per commit
 
 Record which branch(es) each commit was reachable from at extraction time (e.g. `"branches": ["main", "develop"]` in the output JSON). This mirrors the view provided by IDEs such as IntelliJ IDEA's Git log, where each commit row shows the set of branches it belongs to.

@@ -41,6 +41,16 @@ A useful design lens for output schema decisions: fields act as either **aggrega
 A finer-grained axis is analytically useful only when the data also carries a measure that varies
 meaningfully at that granularity.
 
+Core output grains should therefore prefer entities that are both Git-native and analytically
+stable across repositories and tooling choices. Finer-grained structures derived from diff
+presentation may still be useful, but they are usually better treated as derived signals or
+pipeline enrichments than as default first-class output records unless they establish a reusable
+axis/measure pair with broad value.
+
+This separation is also an extensibility principle: gitrail's core should expose canonical Git
+facts, while organization-specific interpretation or enrichment should be attachable at the
+pipeline boundary rather than embedded into the core extraction model.
+
 ### What gitrail is not for
 
 Individual history inspection — "what commits touched this file?", "who last changed this

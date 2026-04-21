@@ -179,6 +179,60 @@ Add per-phase timing instrumentation to measure where time is actually spent dur
 
 ---
 
+#### Architecture: Diff algorithm abstraction within `IsomorphicGitAdapter`
+
+Introduce a `DiffAdapter` interface as an internal strategy within `IsomorphicGitAdapter`,
+injectable via its constructor. This makes the line diff algorithm swappable without changing the
+`GitAdapter` interface that core depends on.
+
+**Motivation**:
+
+- **Performance**: The `diff` package used today is a pure-JS implementation. A native (e.g.
+  WebAssembly-backed) diff algorithm could significantly reduce per-commit processing time in
+  `--per-file` mode, where a tree diff and line diff are computed for every changed file. The
+  diff abstraction makes it possible to benchmark and swap implementations without touching
+  anything outside `IsomorphicGitAdapter`.
+- **Algorithm interchangeability**: Different diff algorithms (Myers, patience, histogram) produce
+  different `additions`/`deletions` counts for the same file pair. Making the algorithm explicit
+  and swappable ensures that the implementation choice is a deliberate, testable decision rather
+  than an implicit consequence of whichever library was installed.
+
+**Key design constraint — `DiffAdapter` must not surface to core**:
+
+If a future Git backend (e.g. a libgit2-based adapter) computes tree diff and line diff as a
+single native operation, splitting them at the `GitAdapter` boundary would be counterproductive.
+To avoid this, `DiffAdapter` is scoped strictly as an implementation detail of
+`IsomorphicGitAdapter`:
+
+- `GitAdapter` interface remains unchanged
+- `IsomorphicGitAdapter` accepts a `DiffAdapter` via constructor injection
+- A future `Libgit2Adapter` would implement `GitAdapter` independently and would not use
+  `DiffAdapter` at all
+
+**Sketch**:
+
+```ts
+interface DiffAdapter {
+  computeLineDiff(
+    before: Uint8Array,
+    after: Uint8Array,
+  ): { additions: number; deletions: number } | null; // null = binary
+}
+
+class IsomorphicGitAdapter implements GitAdapter {
+  constructor(
+    fsImpl?: FsClient,
+    diff: DiffAdapter = new JsDiffAdapter(),
+  ) { ... }
+}
+```
+
+**Design dependency**: Implementing this before "Granular performance profiling" is low-risk
+because the change is entirely internal to `IsomorphicGitAdapter`. However, profiling data would
+help prioritize which alternative `DiffAdapter` implementations to pursue first.
+
+---
+
 #### Output: Configurable field inclusion/exclusion
 
 - Add `--fields` or `--exclude-fields` CLI option
@@ -272,6 +326,43 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ---
 
 ## Development Environment Improvements
+
+### Near-term
+
+#### Code hygiene: Identifier naming audit for semantic accuracy
+
+Several identifiers in the codebase carry names that imply a storage medium, lifecycle, or
+structural pattern that the definition itself does not reflect. These are not bugs and do not
+affect behavior, but they reduce the signal-to-noise ratio when reading the code and make type
+names harder to reason about in isolation.
+
+**Representative example**: `StateFile` is an interface describing a plain data structure
+`{ version, generatedAt, repositoryPath, branches }`. The suffix `File` implies a storage medium,
+but the interface carries no I/O semantics — that responsibility belongs to `StateStore`. A name
+such as `State` or `ExtractionState` would be more accurate.
+
+Other potential candidates (to be verified and decided at design time, not predetermined here):
+
+- `StateBranchEntry` — "Entry" adds no meaning; `StateBranch` may be sufficient
+- `PersonIdentity` — "Identity" is overloaded; `Person` or `PersonInfo` may be clearer
+
+**Acceptable impact boundary**:
+
+This item is scoped to changes that meet **all** of the following conditions simultaneously:
+
+- No change to the CLI interface (flag names, behavior, exit codes)
+- No change to the output JSON schema (field names, structure, `.jsonl` format)
+- No change to the state file JSON format on disk (field names, `version` value)
+- No behavioral change of any kind
+
+Renames that touch only internal TypeScript identifiers — types, interfaces, type aliases, and
+their import references — are within scope. Changes that require altering any of the above
+boundaries must not be bundled into this item and should be tracked separately.
+
+**At design time**: Re-examine all type and interface identifiers in `src/` for similar naming
+issues before finalizing the change list. The examples above are illustrative, not exhaustive.
+
+---
 
 ### Medium-term
 

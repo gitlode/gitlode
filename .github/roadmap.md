@@ -28,6 +28,79 @@ This keeps the roadmap stable for both humans and LLMs while still making releas
 
 ### Near-term
 
+#### Architecture: Fact-based extraction pipeline and orchestration split
+
+The current extraction flow centralizes too many responsibilities inside `Extractor`: commit
+traversal, file-level expansion, output projection, sink lifecycle, and state checkpoint update.
+This is acceptable as a PoC baseline, but it is not the desired pre-release architecture for a
+tool that is expected to grow additional pipeline stages and heterogeneous output sinks.
+
+This should be treated as an **architecture-level redesign item**, not as a local dependency
+inversion cleanup. The goal is to separate domain-stage responsibilities and make the execution
+workflow explicit, while preserving current CLI-visible behavior and output semantics during the
+migration.
+
+**Final target architecture decided from design discussion**:
+
+- introduce an orchestration layer between CLI/runtime and the core extraction stages
+- treat the internal checkpoint workflow as orchestration responsibility rather than extractor responsibility
+- split the current extraction flow into the following named stages:
+  - `ExtractionCoordinator`
+  - `CommitTraversalExtractor`
+  - `FileChangeExpander`
+  - `CommitRecordProjector`
+  - `FileChangeRecordProjector`
+  - `OutputSink`
+- use domain-oriented stage boundaries rather than `OutputRecord` as the final core boundary
+- use `CommitFact` and `FileChangeFact` as the stable internal terms for stage-to-stage data
+- use `CheckpointStore`, `ExtractionCheckpoint`, and `BranchCheckpoint` as the preferred internal terminology for checkpoint persistence
+
+**Resulting pipeline shape**:
+
+- commit-granularity pipeline: `ExtractionCoordinator -> CommitTraversalExtractor -> CommitRecordProjector -> OutputSink`
+- file-granularity pipeline: `ExtractionCoordinator -> CommitTraversalExtractor -> FileChangeExpander -> FileChangeRecordProjector -> OutputSink`
+- `RecordGranularity` is interpreted only by `ExtractionCoordinator`; other stages do not branch on output mode
+
+**Stage responsibility contract**:
+
+- `ExtractionCoordinator`: builds the pipeline, owns progress/reporting integration, closes the sink, and commits checkpoints only after successful sink completion
+- `CommitTraversalExtractor`: performs branch traversal, differential range application, cross-branch deduplication, and branch-head collection, and emits `CommitFact`
+- `FileChangeExpander`: derives `FileChangeFact` from `CommitFact` using Git-derived file change expansion policy
+- `...RecordProjector`: converts facts into the current output schema; projection is separate from traversal and from persistence
+- `OutputSink`: persists `OutputRecord` values and owns serialization, rotation, and sink metrics
+- `CheckpointStore`: reads and writes checkpoints, but does not decide checkpoint timing
+
+**Important invariants to preserve during redesign**:
+
+- keep user-visible CLI input/output behavior unchanged during the migration
+- preserve sequential branch traversal and non-interleaved branch output
+- preserve cross-branch deduplication and current differential extraction semantics
+- preserve `since-date` skip-and-continue behavior
+- preserve `COMMIT_NOT_FOUND` fallback behavior
+- keep zero-record runs from creating empty output files
+- advance progress only after successful `OutputSink.write()`
+- commit checkpoints only after successful `OutputSink.close()`
+- preserve the current `ExtractionResult` shape until a separate design decision says otherwise
+
+**Phased migration plan**:
+
+- Phase 1: introduce the new vocabulary and abstractions while keeping `Extractor` as a compatibility facade
+- Phase 2: extract `CommitTraversalExtractor` so commit traversal and checkpoint boundary calculation no longer depend on output persistence
+- Phase 3: introduce `FileChangeExpander` and split projection into commit/file projectors so granularity branching moves out of traversal
+- Phase 4: move sink lifecycle and checkpoint commit ordering into `ExtractionCoordinator`, with concrete Node.js wiring created at the runtime edge
+- Phase 5: remove obsolete direct imports and remaining mixed-responsibility code paths once behavior is locked by tests
+
+**Migration boundary guidance**:
+
+- `AsyncIterable<OutputRecord>` remains the preferred first migration checkpoint because it enables safe producer/consumer separation without forcing the full final architecture in one step
+- this intermediate boundary is not the final architectural target; the end-state should keep output-schema projection separate from fact production
+- treat this work as a phased redesign to be completed across multiple implementation phases, not as a single big-bang rewrite
+
+**Why this should happen before v1.0.0**:
+
+- gitrail is still effectively a pre-release PoC, so this is the right stage to make structural corrections that would be much more expensive after the public interface and internal layering harden
+- the resulting pipeline boundary is expected to make future items such as enrichment stages, stdout output, field filtering, and improved profiling easier to design without re-growing a monolithic extractor
+
 #### CLI UX: Parameter model redesign for extraction and output grain
 
 The current CLI parameter system mixes multiple conceptual axes in a way that is technically

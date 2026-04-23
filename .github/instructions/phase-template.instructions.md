@@ -46,6 +46,8 @@ This template is designed to reduce **undesirable pauses**. It does **not** atte
 | Implementation Notes      | When non-obvious details are known                                    | Pre-implementation or early implementation |
 | Verification              | Before implementation (commands); after first run (behavioral checks) | Pre-implementation session                 |
 
+The `Owner` column indicates planning-stage responsibility, not necessarily which session performs the edit. When Stage 1e-1 selects `planning branch session`, that branch session may fill or update the phase file directly during detailed design, while the planning session still owns initial creation, cross-phase review, and finalization.
+
 Sections marked "Before the implementation session starts" are the ones most likely to cause mid-session pauses if left blank.
 
 ---

@@ -189,7 +189,7 @@ Four session types are used throughout a release cycle. Each has a defined lifes
 
 - **Planning → Development trunk**: PLAN.md and phase files are the handoff artifacts. No copy-paste or verbal summary is needed — the documents are the contract.
 - **Planning session → Planning branch session**: Planning session produces a starting prompt for the target phase design task.
-- **Planning branch session → Planning session**: Branch session produces a structured Planning Branch Session Summary (see format below). The summary is a handoff artifact for unresolved questions, dependency notes, non-obvious rationale, and other planning observations that are not fully captured by the phase file itself. Human copies the summary into the planning session. The planning session then finalizes the phase file and any affected instructions files as needed.
+- **Planning branch session → Planning session**: Branch session performs the detailed design work, writes the resulting design directly into the target phase file, and produces a structured Planning Branch Session Summary (see format below). The summary is a handoff artifact for unresolved questions, dependency notes, non-obvious rationale, completion signaling, and other planning observations that should be shared with the planning session but do not belong in the phase file itself. Human copies the summary into the planning session. The planning session then reviews the updated phase file and summary together, checks for cross-phase and plan-level consistency, and finalizes the phase design and any affected instructions files as needed.
 - **Development branch → Development trunk**: Branch session produces a structured summary (see Branch Session Summary below). Human copies the summary into the trunk session.
 - **Development trunk → Development branch**: Trunk session produces a starting prompt (see Starting Prompt below).
 
@@ -367,10 +367,11 @@ Phases are designed one at a time, in order, using the session mode selected in 
 
 - The planning session LLM creates a starting prompt for the branch session, analogous to Stage 2b but for design work rather than implementation.
 - The starting prompt includes the target phase identity, relevant design references, and the specific design questions or ambiguity to resolve.
+- The planning branch session performs the detailed design work and writes the resulting design directly into the target phase file.
 - The planning branch session must return a **Planning Branch Session Summary** in the standard format defined below.
-- That summary is not a replacement for the phase file; it is a supplemental handoff for unresolved questions, dependency notes, non-obvious rationale, and other planning observations that should be carried back to the planning session.
+- That summary is not a replacement for the phase file and must not be used to carry the detailed design itself; it is a supplemental handoff for unresolved questions, dependency notes, non-obvious rationale, completion signaling, and other planning observations that should be carried back to the planning session because they do not fit the phase file format.
 - The human provides that summary to the planning session before 1e-2 is treated as complete.
-- The planning session then finalizes the phase file and any affected instructions files before moving to 1e-3.
+- The planning session then reviews the updated phase file and summary together, checks for plan-level consistency and cross-phase impact, and finalizes the phase design and any affected instructions files before moving to 1e-3.
 
 **Human escalation during design** (applies in both planning session and planning branch session):
 
@@ -620,8 +621,8 @@ Every planning branch session must produce a summary in this format:
 ## Planning Branch Session Summary
 ### Phase: {N} — {title}
 ### Status: completed | partially-completed | blocked
-### Recommended Updates to the Phase File
-- (what should be added, changed, clarified, or removed in the phase file; "None" if the current draft already stands as-is)
+### Notes for Planning Session
+- (planning notes that should be shared back with the planning session but do not belong in the phase file itself; use "None" if there is nothing additional to report)
 ### Open Questions for Human
 - (only genuinely unresolved decisions that require human judgment; "None" if everything was resolved)
 ### Ordering / Dependency Notes
@@ -672,7 +673,8 @@ Every development branch session must produce a summary in this format:
 - At planning completion, verify all completion criteria (Stage 1f) are met.
 - Treat workflow gates as step-completion conditions, not as optional reminders.
 - Enforce the valid-response lists for 1c, 1d, 1e-1, 1e-3, and 1f exactly as written; never infer authorization from generic proceed/continue language.
-- When using a planning branch session, treat the phase file as the canonical design artifact. The Planning Branch Session Summary should capture only the updates, unresolved questions, dependency notes, and rationale that need to be carried back to the planning session.
+- When using a planning branch session, treat the phase file as the canonical design artifact and write the detailed design directly into that file during the branch session.
+- The Planning Branch Session Summary should not duplicate the detailed design. It should capture only the unresolved questions, dependency notes, rationale, completion signaling, and other planning observations that need to be carried back to the planning session because they do not belong in the phase file.
 - After completing each gated planning step, stop at the gate and wait for the human's explicit response before moving on.
 - When all planning-completion criteria are satisfied, ask the human to confirm that planning is complete before handing off to implementation.
 

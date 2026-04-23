@@ -152,6 +152,48 @@ grain, and missing-state fallback should be redesigned together.
 - design migration messaging appropriate for a pre-v1 CLI, where breaking changes are acceptable
   but should still be explicit
 
+#### CLI UX: Release-boundary extraction workflow
+
+The current gitrail CLI can express "extract commits after a given ref" via `--since-ref`, but it
+does not provide an explicit, user-facing way to express the complementary release-oriented
+workflow that naturally appears in repositories using release tags: snapshot the history included
+in a release once, then continuously ingest only the post-release range as new commits accumulate.
+
+This should not be treated as a simple request for the inverse of `--since-ref`. The user intent is
+not "the complement of commits after X" but "the commit set included in release ref X" as a stable
+extraction boundary. Conceptually, this is closer to treating a release ref as a traversal
+starting point or boundary than to subtracting one reachability set from another.
+
+**Target workflow**:
+
+- history at or before the latest stable release is assumed to be stable and can be extracted once as a snapshot
+- commits after that release continue to grow toward the next release
+- therefore, the post-release range should be bootstrapped once via `--since-ref` and then maintained through daily incremental extraction with a state file
+
+**Current workaround and its limitations**:
+
+- in Git terms, users may be able to approximate "extract up to release X" by creating a temporary ref fixed at that release and passing it to `--branch`
+- if `--branch <ref>` is treated as a true general ref traversal entry point, users may also be able to use the release tag itself directly rather than creating a temporary branch
+- however, neither approach is an intuitive CLI expression of the user's intent, and both require the user to translate a release-boundary question into lower-level ref manipulation
+- in addition, the ref-resolution behavior for lightweight tags, annotated tags, branch names, and raw commit hashes should be made explicit if release refs are to become part of the supported workflow model
+
+This item should therefore be treated as a **UX and extraction-model design problem**, not merely
+as a request for one additional flag.
+
+**Questions to resolve at design time**:
+
+- whether to add an explicit `--until-ref` style parameter, or instead make release-ref traversal a first-class documented workflow without introducing a new range flag
+- whether this capability should be defined as "snapshot the history included in the specified ref" rather than as the complement of `--since-ref`
+- how `--branch`, `--since-ref`, `--state`, and incremental bootstrap should fit together as one coherent release-boundary workflow
+- how ref resolution should be specified for tag names, branch names, commit hashes, and annotated-tag peeling behavior
+- whether this model should be limited to single-boundary release workflows, or whether a multi-branch interpretation is desirable and sufficiently clear
+
+**Design priority**:
+
+- users should be able to understand "extract up to the latest release once" and "bootstrap from the latest release, then switch to incremental" without having to reason in terms of temporary refs or Git-internal setup steps
+- the resulting UX should form a conceptually paired explanation with the existing `--since-ref` + state-file workflow for post-release ingestion
+- even if an internal workaround uses an auxiliary ref, that workaround should not become the primary user-facing workflow
+
 #### CLI UX: Progress metrics quality and progress-display redesign
 
 The current Phase 2 implementation reports progress using the number of written commits (`Processed N commits...`). This is better than having no runtime visibility, and it remains acceptable for v0.1.4, but it is not always a good proxy for actual elapsed work.

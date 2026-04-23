@@ -37,37 +37,37 @@ The primary focus is the roadmap item `Architecture: Fact-based extraction pipel
 
 ### Phase 1: Fact Vocabulary and Compatibility Facade
 
-- **File**: [`plans/v0.4.0/phase-1.md`](plans/v0.4.0/phase-1.md)
+- **File**: [`plans/phase-1.md`](plans/phase-1.md)
 - **Status**: Planned
 
 ### Phase 2: Commit Traversal Stage Extraction
 
-- **File**: [`plans/v0.4.0/phase-2.md`](plans/v0.4.0/phase-2.md)
+- **File**: [`plans/phase-2.md`](plans/phase-2.md)
 - **Status**: Planned
 
 ### Phase 3: File-Change Expansion and Projector Split
 
-- **File**: [`plans/v0.4.0/phase-3.md`](plans/v0.4.0/phase-3.md)
+- **File**: [`plans/phase-3.md`](plans/phase-3.md)
 - **Status**: Planned
 
 ### Phase 4: Coordinator, Output Sink, and Checkpoint Orchestration
 
-- **File**: [`plans/v0.4.0/phase-4.md`](plans/v0.4.0/phase-4.md)
+- **File**: [`plans/phase-4.md`](plans/phase-4.md)
 - **Status**: Planned
 
 ### Phase 5: CLI Parameter Model Redesign
 
-- **File**: [`plans/v0.4.0/phase-5.md`](plans/v0.4.0/phase-5.md)
+- **File**: [`plans/phase-5.md`](plans/phase-5.md)
 - **Status**: Planned
 
 ### Phase 6: Stage-Aligned Profiling Instrumentation
 
-- **File**: [`plans/v0.4.0/phase-6.md`](plans/v0.4.0/phase-6.md)
+- **File**: [`plans/phase-6.md`](plans/phase-6.md)
 - **Status**: Planned
 
 ### Phase 7: Progress Reporting Redesign and Obsolete-Path Cleanup
 
-- **File**: [`plans/v0.4.0/phase-7.md`](plans/v0.4.0/phase-7.md)
+- **File**: [`plans/phase-7.md`](plans/phase-7.md)
 - **Status**: Planned
 
 Provisional dependency notes:

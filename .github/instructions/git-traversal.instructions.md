@@ -34,12 +34,13 @@ A commit X is "reachable" from commit Y if X can be found by following parent li
 - `CommitTraversalExtractor` is the Core stage that owns branch-head resolution, exclusion-boundary
   calculation, merge-base calculation for newly added branches, sequential branch traversal,
   cross-branch deduplication, `since-date` filtering, and `COMMIT_NOT_FOUND` fallback behavior.
-- `Extractor` (and later `ExtractionCoordinator`) remains responsible for `CheckpointStore` I/O and
-  for deciding when the traversal stage's returned `ExtractionCheckpoint` is committed. That timing
-  remains after successful output completion.
-- The traversal stage consumes previously loaded checkpoint data and returns commit facts together
-  with the candidate next checkpoint. This ownership split must not change any traversal semantics
-  defined below.
+- After Phase 4, `ExtractionCoordinator` owns `CheckpointStore` write timing and `OutputSink`
+  lifecycle. The coordinator writes the checkpoint only after the pipeline completes without
+  exception and `sink.close()` succeeds. `Extractor` (now a compatibility wrapper) owns checkpoint
+  reading, missing-state fallback validation, and `CheckpointStore` injection into the coordinator.
+- The traversal stage consumes previously loaded checkpoint data (passed via `CoordinatorRequest`
+  from `Extractor`) and returns commit facts together with the candidate next checkpoint. This
+  ownership split must not change any traversal semantics defined below.
 
 ---
 

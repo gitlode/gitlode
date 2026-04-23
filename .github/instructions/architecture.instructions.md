@@ -121,6 +121,34 @@ expander → file projector, else commit projector`) before consuming the projec
 - `Extractor` remains responsible for: checkpoint store I/O, writer lifecycle, progress ownership, metrics
   aggregation, and persisting the traversal stage's candidate checkpoint only after successful writer close.
 
+### Phase 4 coordinator and sink contracts
+
+- `ExtractionCoordinator` is introduced as the orchestration stage that replaces `Extractor`'s execution
+  engine role. It is defined as a Core-owned interface plus one concrete implementation
+  `DefaultExtractionCoordinator`.
+- `ExtractionCoordinator` owns: pipeline construction (selecting traversal → commit projector or
+  traversal → expander → file projector based on `CoordinatorRequest.granularity`), the write loop
+  (iterating the projected `OutputRecord` stream and calling `OutputSink.write()`), progress
+  integration (`reporter.progress()` immediately after each successful write), `reporter.done()`
+  and `sink.close()` in a `finally` block, and writing the final `ExtractionCheckpoint` only after
+  successful pipeline completion and sink close.
+- `ExtractionCoordinator` receives a `CoordinatorRequest` (Core-owned narrower request type, not
+  `ExtractorConfig`) and returns a `CoordinatorResult`. `CoordinatorRequest` uses Core-preferred
+  field names: `granularity` (not `outputMode`), `priorCheckpoint` (not the stateMap), etc.
+- `OutputSink` is introduced as a Core-owned interface (`write`, `close`, `filesCreated`,
+  `bytesWritten`). The concrete implementation `OutputWriterSink` in `src/output/` wraps the
+  existing `OutputWriter` without modifying it.
+- `Extractor` becomes a compatibility wrapper: it loads the prior checkpoint (including
+  missing-state fallback logic and validation), derives repository metadata, constructs all stage
+  instances and the coordinator, calls `coordinator.run()`, and builds `ExtractionResult` from the
+  result and sink metrics. `src/index.ts` is unchanged.
+- Checkpoint write ordering: `sink.close()` always executes in the coordinator's `finally` block.
+  The checkpoint write is placed after the `try/finally` and executes only when the pipeline
+  completes without exception and `close()` succeeds. This preserves the current invariant exactly.
+- The `CheckpointStore` dependency in the coordinator is optional (`CheckpointStore | undefined`);
+  when absent (snapshot mode without `--state`), the coordinator skips the checkpoint write.
+- `ExtractionResult` shape and `src/index.ts` runtime wiring remain unchanged in Phase 4.
+
 ---
 
 ## Component Responsibilities
@@ -143,11 +171,15 @@ Responsibilities:
 - Read the state file at startup; write it atomically (`.tmp` → rename) only after all output files are fully flushed and closed
 - Instantiate `OutputWriter` with the rotation config — rotation thresholds are enforced inside `OutputWriter`, not in Core
 
-During the Phase 3 migration split, Core keeps checkpoint-store I/O, the granularity-selection
-decision, writer lifecycle, and progress timing in `Extractor`, while `CommitTraversalExtractor`,
+After the Phase 4 migration, `ExtractionCoordinator` owns pipeline construction, granularity
+branching, the write loop, progress integration, sink lifecycle (`OutputSink.close()`), and
+checkpoint commit timing. `Extractor` is retained as a compatibility wrapper that translates
+`ExtractorConfig` to `CoordinatorRequest`, loads the prior checkpoint, constructs stage instances
+and the coordinator, and assembles `ExtractionResult`. `CommitTraversalExtractor`,
 `FileChangeExpander`, `CommitRecordProjector`, and `FileChangeRecordProjector` own traversal,
-expansion, and projection as separate stage boundaries. Checkpoint commit timing and sink
-ownership remain in `Extractor` until Phase 4 introduces the coordinator/orchestration boundary.
+expansion, and projection respectively. `OutputSink` (backed by `OutputWriterSink`) owns record
+serialization and file rotation. `CheckpointStore` reads and writes checkpoints but does not
+decide timing.
 
 Key types:
 

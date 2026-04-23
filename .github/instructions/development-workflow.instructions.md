@@ -244,6 +244,36 @@ Pick items from `roadmap.md` for the release. Sources of items:
 
 Record selections in PLAN.md (Scope Summary: included / excluded).
 
+Before treating this step as complete, the planning session must present the full proposed scope to the human, including both included and explicitly excluded items. This presentation is the point where the human makes the final balancing judgment across human-specified items, LLM-proposed items, and release capacity. The planning session must not automatically continue to 1d once a candidate item set exists.
+
+**Required prompt:**
+
+- "Scope selection is complete. Choose next action: (1) confirm scope and proceed to phase decomposition, (2) revise scope selection, (3) stop."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `3`
+- `confirm scope and proceed to phase decomposition`
+- `revise scope selection`
+- `stop`
+
+**Invalid responses:**
+
+- Generic confirmations such as "continue", "proceed", "looks good", or "yes"
+- Any response that does not explicitly select one of the three next-action labels above
+
+**Completion condition:**
+
+- Step 1c is not complete until one valid next-action response is received.
+
+**If the response is invalid or ambiguous:**
+
+- Ask the human again.
+- Do not begin 1d.
+- Do not revise the scope unless that option is explicitly selected.
+
 #### 1d. Phase decomposition and provisional ordering
 
 Break the selected scope into phases. Each phase should be designed to be implementable in a single branch session when reasonably possible, while still preserving a clear and coherent phase boundary.
@@ -253,6 +283,36 @@ Determine a provisional execution order considering:
 - Technical dependencies (phase B requires phase A's output).
 - Diff overlap minimization (phases touching the same files benefit from adjacency or sequencing).
 - Risk front-loading (uncertain or foundational changes earlier).
+
+Before treating this step as complete, the planning session must present the proposed phase decomposition and provisional ordering to the human for final confirmation. The purpose of this gate is consistency with the rest of the workflow: the LLM may propose the phase plan, but the human confirms it before detailed phase design begins.
+
+**Required prompt:**
+
+- "Phase decomposition and provisional ordering are complete. Choose next action: (1) confirm phase plan and proceed to Phase 1 design, (2) revise phase decomposition or ordering, (3) stop."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `3`
+- `confirm phase plan and proceed to Phase 1 design`
+- `revise phase decomposition or ordering`
+- `stop`
+
+**Invalid responses:**
+
+- Generic confirmations such as "continue", "proceed", "looks good", or "yes"
+- Any response that does not explicitly select one of the three next-action labels above
+
+**Completion condition:**
+
+- Step 1d is not complete until one valid next-action response is received.
+
+**If the response is invalid or ambiguous:**
+
+- Ask the human again.
+- Do not begin 1e-1 for Phase 1.
+- Do not revise the phase plan unless that option is explicitly selected.
 
 #### 1e. Detailed design per phase loop
 
@@ -611,7 +671,7 @@ Every development branch session must produce a summary in this format:
 - Confirm instructions files are updated when behavior specs change.
 - At planning completion, verify all completion criteria (Stage 1f) are met.
 - Treat workflow gates as step-completion conditions, not as optional reminders.
-- Enforce the valid-response list for 1e-1, 1e-3, and 1f exactly as written; never infer authorization from generic proceed/continue language.
+- Enforce the valid-response lists for 1c, 1d, 1e-1, 1e-3, and 1f exactly as written; never infer authorization from generic proceed/continue language.
 - When using a planning branch session, treat the phase file as the canonical design artifact. The Planning Branch Session Summary should capture only the updates, unresolved questions, dependency notes, and rationale that need to be carried back to the planning session.
 - After completing each gated planning step, stop at the gate and wait for the human's explicit response before moving on.
 - When all planning-completion criteria are satisfied, ask the human to confirm that planning is complete before handing off to implementation.

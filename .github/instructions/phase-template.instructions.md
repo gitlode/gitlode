@@ -12,6 +12,16 @@ The goal is to ensure that every phase is specified thoroughly enough to execute
 
 Phase files are working documents for the current release only. They are not intended to serve as permanent archival records in the repository.
 
+## Pause Types in This Workflow
+
+This workflow distinguishes three different kinds of pauses:
+
+1. **Undesirable pause**: implementation stops because planning left a design decision unresolved.
+2. **Required escalation**: implementation stops because new evidence shows that a human decision is needed.
+3. **Authorization gate**: implementation or planning stops because the current step is complete and the workflow requires explicit human authorization before the next step begins.
+
+This template is designed to reduce **undesirable pauses**. It does **not** attempt to eliminate required escalations or authorization gates.
+
 ## Relationship to Other Files
 
 | File                                                        | Role                                                                        |
@@ -65,7 +75,7 @@ _Links to instruction files or roadmap items that specify the target behavior. O
 
 #### Design Decisions
 
-_Pre-resolved choices that the implementation session must not re-open. This is the most important section. Every missing entry here is a potential pause point during implementation._
+_Pre-resolved choices that the implementation session must not re-open. This is the most important section. Every missing entry here is a potential undesirable pause during implementation._
 
 Fill in all that apply:
 
@@ -134,6 +144,7 @@ npm run format:check
 
 - **Design Decisions before Non-Goals before Target Files.** This order matters: decisions constrain which files need to change, and non-goals constrain which files should not be touched.
 - Write Design Decisions as finished choices, not as open questions. If a choice is still open, resolve it in a planning conversation before marking the phase file ready for implementation.
+- A complete phase file should reduce undesirable pauses during implementation. It should not attempt to suppress required escalations or authorization gates defined by the workflow.
 - Design each phase to fit within a single implementation session when reasonably possible. If that would require forcing unrelated work together or making the phase too ambiguous, prefer a clearer phase boundary over strict single-session sizing.
 - Behavioral verification items should cover user-visible changes. "Build and tests pass" alone is not sufficient when the phase changes CLI behavior or output format.
 - Keep Implementation Notes minimal. If an implementation detail is important enough to note, consider whether it belongs in Design Decisions instead.

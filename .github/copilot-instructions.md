@@ -112,6 +112,11 @@ Key principles for implementation sessions:
 
 This is an early-stage greenfield project with no existing users or production dependencies.
 
+Favor autonomous execution for local work inside an already authorized step.
+
+Always follow workflow-specific gate rules when a referenced workflow document
+requires explicit human authorization before the next step.
+
 **Proceed without asking for confirmation** for all local, reversible actions:
 
 - Creating, editing, or moving files

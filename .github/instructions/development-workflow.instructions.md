@@ -12,12 +12,36 @@ It is **product-agnostic**: the workflow, session types, artifacts, and role exp
 
 The primary audience is LLMs operating within the workflow. The document is also intended to be readable by humans onboarding to the same process.
 
+## Operating Model
+
+This workflow is designed for **human-authorized, LLM-executed collaboration**.
+
+The core operating rule is:
+
+> The human authorizes transitions between workflow steps. The LLM may act autonomously only within a step that has already been authorized.
+
+This workflow is therefore **not** a specification for fully autonomous development. It is designed to preserve human judgment at step boundaries while still allowing the LLM to execute substantial work within an active step.
+
 ### Goals of this workflow
 
 - Eliminate ambiguity about what to do at each stage — for both human and LLM.
 - Ensure LLMs can autonomously execute implementation sessions with minimal mid-session design judgment.
 - Enable LLMs to detect and flag omissions or inconsistencies that a human might overlook.
 - Produce a repeatable process that can be adopted across different projects.
+
+## Global Gate Rules
+
+Human-authorization points in this workflow are represented as **completion conditions of named steps**, not as optional reminders embedded inside a step description.
+
+These rules apply to every gate in this workflow unless a narrower local rule explicitly adds more constraints.
+
+1. **A gated step is not complete until the required human response is received.** Producing a summary, recommendation, or draft does not by itself authorize the next step.
+2. **Only explicit responses matching the gate's listed valid responses count as authorization.** By default, this workflow expects the human to reply using the stated number or option label.
+3. **Ambiguous confirmations are invalid.** Replies such as "continue", "proceed", "next", "looks good", or "yes" do not satisfy a gate unless the gate explicitly lists them as valid responses.
+4. **If the human response is ambiguous, omitted, or out of scope, the LLM must ask again and must not perform work from the next gated step.**
+5. **A message that presents a gate must stop at that gate.** The LLM must not ask the question and then continue into the next gated step in the same response.
+6. **General project-level autonomy guidance does not override workflow gates.** If `copilot-instructions.md` or another higher-level instruction favors autonomous execution, the gate rules in this workflow still control transitions between workflow steps.
+7. **Stopping at a gate is a correct completion state.** In this workflow, completing the current authorized step and waiting for the human is successful behavior, not hesitation or failure.
 
 ---
 
@@ -111,7 +135,7 @@ breaking-change policy, and primary focus areas.
 **Authoring notes**:
 
 - The Phase List entries contain only the phase title, a link to the phase file, and the current status. No design detail.
-- The Release Tasks section contains release-specific deliverables. This is where project-specific tasks (which docs to update, changelog format, roadmap cleanup) are defined.
+- The Release Tasks section contains release-specific deliverables and verification work.
 - The Final Verification Checklist is filled after all phases and release tasks are complete, as a last gate before handoff to the human for the release operation.
 
 ### roadmap.md structure
@@ -141,7 +165,7 @@ Unlike PLAN.md and phase files, roadmap.md does **not** have a rigid section tem
 
 ### Phase file structure
 
-Each phase file follows the format defined in [phase-template.instructions.md](phase-template.instructions.md). Phase files are working documents for the current release only and live under `plans/` as `phase-N.md`. They are not intended to serve as permanent release-history records in the repository; historical traceability is provided by git history and CHANGELOG.md. That document is the authoritative reference for section structure, fill-in timing, and authoring guidance.
+Each phase file uses the format defined in [phase-template.instructions.md](phase-template.instructions.md), lives under `plans/` as `phase-N.md`, and follows that document as the authoritative reference for section structure and fill-in timing.
 
 ---
 
@@ -197,7 +221,7 @@ Before starting any planning activities, bring PLAN.md to a clean state for the 
 
 The resulting skeleton must contain: the new version title, empty stubs for Overview, Release Goals, Scope Summary, and Development Phases, and the **canonical Release Tasks template** (see note below). The Final Verification Checklist is an empty stub.
 
-> **Release Tasks template note**: The "what to do" in Release Tasks (update CHANGELOG, review README, clean up roadmap, run format check) is the same for every release. Only the release-specific notes (extra docs, migration guidance) differ. When creating the skeleton, restore the Release Tasks section to its canonical template form — do not reduce it to an empty stub. The canonical form is maintained in PLAN.md itself and should be copied forward when overwriting.
+> **Release Tasks template note**: When creating the skeleton, keep the canonical Release Tasks template intact and copy it forward instead of replacing it with an empty stub.
 
 ---
 
@@ -230,21 +254,63 @@ Determine a provisional execution order considering:
 - Diff overlap minimization (phases touching the same files benefit from adjacency or sequencing).
 - Risk front-loading (uncertain or foundational changes earlier).
 
-This order is provisional — it may be adjusted during detailed design (1e).
+#### 1e. Detailed design per phase loop
 
-#### 1e. Detailed design per phase
+For each phase, the planning session runs the following three-step loop:
 
-Phases are designed one at a time, in order. For each phase, the planning session LLM asks the human whether to proceed **in the current planning session** or in a **planning branch session**. The human chooses based on expected complexity.
+- **1e-1. Select session mode for Phase N**
+- **1e-2. Perform detailed design for Phase N**
+- **1e-3. Decide the next action after Phase N design**
 
-**If the planning session is chosen**: the LLM fills in the phase file directly, summarizes the completed design, and pauses for explicit human confirmation before moving to the next phase.
+The phase loop must not skip any of these steps.
 
-**If a planning branch session is chosen**: the planning session LLM creates a starting prompt for the branch session (analogous to Stage 2b, but for design work rather than implementation), including the target phase identity, relevant design references, and the specific design questions or ambiguity to resolve. The planning branch session must return a **Planning Branch Session Summary** in the standard format defined below. That summary is not a replacement for the phase file; it is a supplemental handoff for unresolved questions, dependency notes, non-obvious rationale, and other planning observations that should be carried back to the planning session. The human provides that summary to the planning session before the next phase begins. The planning session then finalizes the phase file and any affected instructions files, summarizes the completed design, and pauses for explicit human confirmation before moving to the next phase.
+##### 1e-1. Select session mode for Phase N
 
-Repeat this per-phase cycle until all phases have detailed designs.
+Before any design work for the phase begins, the planning session must obtain explicit authorization for how the phase will be designed.
 
-> This loop mirrors the Stage 2 implementation cycle (2a–2e), with one key difference: the branch session is optional and created only when the design work is expected to be complex enough to benefit from isolation. Simple phases are designed inline in the planning session.
+**Required prompt:**
 
-At the end of each phase design step, the planning session must not advance automatically. It should explicitly ask the human whether to proceed to the next phase, revise the current phase, or stop.
+- "Choose mode for Phase N design: (1) current planning session, (2) planning branch session."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `current planning session`
+- `planning branch session`
+
+**Invalid responses:**
+
+- Generic confirmations such as "proceed", "next", "continue", or "yes"
+- Any response that does not explicitly select one of the two mode labels above
+
+**Completion condition:**
+
+- Step 1e-1 is complete only when one valid mode-selection response is received.
+
+**If the response is invalid or ambiguous:**
+
+- Ask the human again.
+- Do not start phase design.
+- Do not edit the phase file.
+
+##### 1e-2. Perform detailed design for Phase N
+
+Phases are designed one at a time, in order, using the session mode selected in 1e-1.
+
+**If `current planning session` was selected:**
+
+- The planning session LLM fills in the phase file directly.
+- It summarizes the completed design before moving to 1e-3.
+
+**If `planning branch session` was selected:**
+
+- The planning session LLM creates a starting prompt for the branch session, analogous to Stage 2b but for design work rather than implementation.
+- The starting prompt includes the target phase identity, relevant design references, and the specific design questions or ambiguity to resolve.
+- The planning branch session must return a **Planning Branch Session Summary** in the standard format defined below.
+- That summary is not a replacement for the phase file; it is a supplemental handoff for unresolved questions, dependency notes, non-obvious rationale, and other planning observations that should be carried back to the planning session.
+- The human provides that summary to the planning session before 1e-2 is treated as complete.
+- The planning session then finalizes the phase file and any affected instructions files before moving to 1e-3.
 
 **Human escalation during design** (applies in both planning session and planning branch session):
 
@@ -260,6 +326,46 @@ For each phase, the key design activities are:
 - **Update instructions files**: If the phase changes behavior covered by an instructions file, update the spec during planning — not during implementation.
 - **Adjust phase ordering**: If design work reveals a better sequence, update the order now.
 
+**Completion condition:**
+
+- Step 1e-2 is complete only when the phase design has been carried out in the selected mode and the resulting phase file and affected instructions files are updated as needed.
+
+##### 1e-3. Decide the next action after Phase N design
+
+After Phase N design has been summarized, the planning session must obtain explicit authorization for what happens next.
+
+**Required prompt:**
+
+- "Phase N design is complete. Choose next action: (1) proceed to Phase N+1, (2) revise Phase N, (3) stop."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `3`
+- `proceed to Phase N+1`
+- `revise Phase N`
+- `stop`
+
+**Invalid responses:**
+
+- Generic confirmations such as "continue", "looks good", or "yes"
+- Any response that does not explicitly select one of the three next-action labels above
+
+**Completion condition:**
+
+- Step 1e-3 is complete only when one valid next-action response is received.
+
+**If the response is invalid or ambiguous:**
+
+- Ask the human again.
+- Do not begin the next phase.
+- Do not revise the current phase unless that option is explicitly selected.
+
+Repeat this per-phase loop until all phases have detailed designs.
+
+The planning session must not merge 1e-1, 1e-2, and 1e-3 into a single combined confirmation flow.
+
 #### 1f. Planning completion
 
 Planning is complete when all of the following are true:
@@ -273,6 +379,23 @@ Planning is complete when all of the following are true:
 Phase files created during planning are working artifacts for the current release only. They should remain stable during implementation, but they are not intended to be retained indefinitely after the release is completed.
 
 After these criteria are satisfied, the planning session must summarize the completed planning state and ask the human for explicit confirmation before treating planning as complete or handing off to the development trunk session. It must not automatically transition to implementation.
+
+**Required prompt:**
+
+- "Planning is complete. Choose next action: (1) hand off to development trunk session, (2) revise planning artifacts, (3) stop."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `3`
+- `hand off to development trunk session`
+- `revise planning artifacts`
+- `stop`
+
+**Completion condition:**
+
+- Stage 1 is not complete until one valid next-action response is received.
 
 ---
 
@@ -291,6 +414,23 @@ Before starting a branch session, the trunk session performs the following check
 3. **Phase file completeness**: All sections of the current phase file are filled. If Design Decisions contain gaps, escalate to human — do not proceed to implementation.
 4. **Phase sizing sanity check**: Confirm that the current phase still appears executable within one branch session at a reasonable level of scope and reviewability. If not, revise the phase plan before starting implementation.
 5. **If all checks pass**: Create the starting prompt for the branch session.
+
+**Required prompt before launching the branch session:**
+
+- "Pre-execution check for Phase N is complete. Choose next action: (1) start branch session for Phase N, (2) revise Phase N plan, (3) stop."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `3`
+- `start branch session for Phase N`
+- `revise Phase N plan`
+- `stop`
+
+**Completion condition:**
+
+- Stage 2a for the phase is not complete until one valid next-action response is received.
 
 ##### When a phase does not fit in one branch session
 
@@ -361,6 +501,25 @@ The trunk session:
 
 The trunk session must not automatically continue past a phase boundary. At each phase transition, the human decides whether to proceed, request revision, or stop.
 
+**Required prompt:**
+
+- "Phase N review is complete. Choose next action: (1) proceed to the next phase, (2) run a follow-up branch session for Phase N, (3) revise planning/trunk artifacts, (4) stop."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `3`
+- `4`
+- `proceed to the next phase`
+- `run a follow-up branch session for Phase N`
+- `revise planning/trunk artifacts`
+- `stop`
+
+**Completion condition:**
+
+- Stage 2e for the phase is not complete until one valid next-action response is received.
+
 ---
 
 ### Stage 3: Release Completion
@@ -369,12 +528,27 @@ The trunk session must not automatically continue past a phase boundary. At each
 
 Before entering Stage 3, the development trunk session must summarize the overall implementation state and ask the human for explicit confirmation that phase execution is complete and release-completion work should begin.
 
+**Required prompt:**
+
+- "All implementation phases are complete. Choose next action: (1) begin Stage 3 release completion, (2) return to phase work, (3) stop."
+
+**Valid responses:**
+
+- `1`
+- `2`
+- `3`
+- `begin Stage 3 release completion`
+- `return to phase work`
+- `stop`
+
+**Completion condition:**
+
+- Stage 2 is not complete until one valid next-action response is received.
+
 1. Execute release tasks defined in PLAN.md (documentation updates, changelog, migration notes, roadmap cleanup).
 2. Run final verification checklist.
 3. Remove the current release's phase files from `plans/` after their contents are no longer needed for active execution or review. Do not retain them as permanent repository records; rely on git history and CHANGELOG.md for release-history traceability.
 4. Hand off to human for the actual release operation (e.g. GitHub release, npm publish).
-
-Note: The specific content of release tasks (which documentation to update, what to include in the changelog, how to clean up roadmap entries) is defined in PLAN.md's Release Tasks section, not in this workflow document. This keeps the workflow generic and the release-specific details in the plan.
 
 ---
 
@@ -423,13 +597,6 @@ Every development branch session must produce a summary in this format:
 - behavioral checks: (brief result for each check in the phase Verification section)
 ```
 
-**Why each section matters**:
-
-- **Status**: Trunk session uses this to decide whether to proceed or intervene.
-- **Deviations from Plan**: Trunk session evaluates whether downstream phases need adjustment.
-- **Observations for Subsequent Phases**: Directly feeds into the next phase's pre-execution check (2a).
-- **Verification Results**: Confirms the phase exit criteria were met.
-
 ---
 
 ## Role Expectations
@@ -443,8 +610,10 @@ Every development branch session must produce a summary in this format:
 - Verify cross-phase consistency: if phase N modifies an interface, check that phase N+1's Target Files account for it.
 - Confirm instructions files are updated when behavior specs change.
 - At planning completion, verify all completion criteria (Stage 1f) are met.
+- Treat workflow gates as step-completion conditions, not as optional reminders.
+- Enforce the valid-response list for 1e-1, 1e-3, and 1f exactly as written; never infer authorization from generic proceed/continue language.
 - When using a planning branch session, treat the phase file as the canonical design artifact. The Planning Branch Session Summary should capture only the updates, unresolved questions, dependency notes, and rationale that need to be carried back to the planning session.
-- After completing each phase design step, summarize the result and pause for explicit human confirmation before moving to the next phase.
+- After completing each gated planning step, stop at the gate and wait for the human's explicit response before moving on.
 - When all planning-completion criteria are satisfied, ask the human to confirm that planning is complete before handing off to implementation.
 
 #### In trunk sessions
@@ -453,7 +622,7 @@ Every development branch session must produce a summary in this format:
 - Create starting prompts that are self-contained (Stage 2b).
 - When reviewing branch summaries, explicitly check "Deviations" and "Observations" sections for downstream impact.
 - If the human does not request a pre-execution check before starting a branch session, remind them.
-- After reviewing each branch-session result, summarize the current state and pause for explicit human confirmation before advancing across a phase boundary.
+- After reviewing each branch-session result, summarize the current state and stop at the gate before advancing across a phase boundary.
 - Before moving from phase execution to Stage 3 release-completion work, ask the human to confirm that implementation-stage work is complete.
 
 #### In branch sessions
@@ -462,6 +631,7 @@ Every development branch session must produce a summary in this format:
 - Do not add features, refactoring, or improvements beyond what the phase file specifies.
 - Produce the Branch Session Summary in the exact format specified — do not omit sections.
 - If a Design Decision appears to be incorrect based on implementation evidence, report it as a deviation rather than silently changing approach.
+- Treat waiting at a gate as a successful completion state when the current authorized work is finished.
 
 ### Human Responsibilities
 

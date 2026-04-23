@@ -192,7 +192,9 @@ interface ExtractorConfig {
   outputDir: string;
   outputPrefix: string;
   rotation: RotationConfig;
-  outputMode: "commit" | "file";
+  incremental: boolean;
+  missingState?: "error" | "snapshot";
+  perFile: boolean;
   range?: ExtractionRange;
   stateFilePath?: string;
 }

@@ -3,6 +3,9 @@ export type {
   CheckpointStore,
   CommitFact,
   CommitHash,
+  CommitTraversalExtractor,
+  CommitTraversalRequest,
+  CommitTraversalResult,
   ExtractionCheckpoint,
   ExtractionRange,
   ExtractionResult,
@@ -20,3 +23,4 @@ export type {
 } from "./types.js";
 export { assertNever, isCommitHash } from "./types.js";
 export { Extractor } from "./extractor.js";
+export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";

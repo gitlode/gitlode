@@ -88,19 +88,22 @@ implementation sessions must treat the following contract as binding.
 - Domain-oriented stage boundaries are preferred over using `OutputRecord` as the final Core
   boundary. Projection remains distinct from traversal and from persistence in the target design.
 
-### Phase 2 traversal-stage contract
+### Phase 2 traversal-stage contract (implemented)
 
 - `CommitTraversalExtractor` is the first extracted stage boundary in the v0.4.0 migration.
+  It is live as of Phase 2 in `src/core/commit-traversal-extractor.ts`.
 - It owns branch-head resolution and collection, per-branch exclusion-boundary calculation,
   merge-base calculation for newly added branches, sequential branch traversal, cross-branch
   deduplication, `since-date` filtering, and `COMMIT_NOT_FOUND` fallback behavior.
-- It consumes already-loaded checkpoint data from Core; it does not read or write
-  `CheckpointStore` and it does not decide checkpoint commit timing.
-- Its output contract is a traversal result containing `AsyncIterable<CommitFact>` plus a
+- It consumes already-loaded checkpoint data from `Extractor` via `CommitTraversalRequest`; it
+  does not read or write `CheckpointStore` and it does not decide checkpoint commit timing.
+- Its output contract is a `CommitTraversalResult` containing `AsyncIterable<CommitFact>` plus a
   candidate `ExtractionCheckpoint` derived from the successfully resolved branch heads.
 - `Extractor` remains responsible for repository/checkpoint loading, output projection,
   file-change expansion, output-writer lifecycle, progress ownership, and persisting the returned
   checkpoint only after successful output completion.
+- `Extractor` constructs `DefaultCommitTraversalExtractor` internally — no new runtime wiring
+  surface is exposed through `src/index.ts`.
 
 ### Phase 3 expansion and projection stage contracts
 

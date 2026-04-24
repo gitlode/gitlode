@@ -5,7 +5,7 @@ _Extract a dedicated `CommitTraversalExtractor` boundary so sequential branch tr
 #### Status
 
 - [x] Planned
-- [ ] In progress
+- [x] In progress
 - [ ] Completed
 
 #### Design Maturity

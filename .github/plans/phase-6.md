@@ -11,6 +11,11 @@ default stderr contract when profiling is not requested._
 - [ ] In progress
 - [ ] Completed
 
+#### Design Maturity
+
+- [x] Implementation-ready
+- [ ] Deferred design
+
 #### Design References
 
 - [`../instructions/architecture.instructions.md`](../instructions/architecture.instructions.md) —

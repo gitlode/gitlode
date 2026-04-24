@@ -8,6 +8,11 @@ _Introduce `FileChangeExpander` and split output projection into `CommitRecordPr
 - [ ] In progress
 - [ ] Completed
 
+#### Design Maturity
+
+- [x] Implementation-ready
+- [ ] Deferred design
+
 #### Design References
 
 - [`../instructions/architecture.instructions.md`](../instructions/architecture.instructions.md) — v0.4.0 Migration Contract, Core layer responsibilities, migration ownership rules

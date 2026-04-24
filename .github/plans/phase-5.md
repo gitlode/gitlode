@@ -13,6 +13,11 @@ documentation._
 - [ ] In progress
 - [ ] Completed
 
+#### Design Maturity
+
+- [x] Implementation-ready
+- [ ] Deferred design
+
 #### Design References
 
 - [`../instructions/cli.instructions.md`](../instructions/cli.instructions.md) — updated during

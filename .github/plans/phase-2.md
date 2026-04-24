@@ -8,6 +8,11 @@ _Extract a dedicated `CommitTraversalExtractor` boundary so sequential branch tr
 - [ ] In progress
 - [ ] Completed
 
+#### Design Maturity
+
+- [x] Implementation-ready
+- [ ] Deferred design
+
 #### Design References
 
 - [`../instructions/architecture.instructions.md`](../instructions/architecture.instructions.md) — Core layer responsibilities, v0.4.0 migration contract, migration ownership rules

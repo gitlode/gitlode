@@ -8,6 +8,11 @@ _Introduce the new internal fact/checkpoint vocabulary inside Core and keep `Ext
 - [ ] In progress
 - [ ] Completed
 
+#### Design Maturity
+
+- [x] Implementation-ready
+- [ ] Deferred design
+
 #### Design References
 
 - [`../instructions/architecture.instructions.md`](../instructions/architecture.instructions.md) — Layer Overview, v0.4.0 migration contract, Core Logic layer

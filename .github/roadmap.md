@@ -30,6 +30,8 @@ This keeps the roadmap stable for both humans and LLMs while still making releas
 
 #### Architecture: Fact-based extraction pipeline and orchestration split
 
+**Release target**: `v0.4.0`
+
 The current extraction flow centralizes too many responsibilities inside `Extractor`: commit
 traversal, file-level expansion, output projection, sink lifecycle, and state checkpoint update.
 This is acceptable as a PoC baseline, but it is not the desired pre-release architecture for a
@@ -102,6 +104,8 @@ migration.
 - the resulting pipeline boundary is expected to make future items such as enrichment stages, stdout output, field filtering, and improved profiling easier to design without re-growing a monolithic extractor
 
 #### CLI UX: Parameter model redesign for extraction and output grain
+
+**Release target**: `v0.4.0`
 
 The current CLI parameter system mixes multiple conceptual axes in a way that is technically
 usable but not clean from a user-experience perspective. In particular, the combination of
@@ -196,6 +200,8 @@ as a request for one additional flag.
 
 #### CLI UX: Progress metrics quality and progress-display redesign
 
+**Release target**: `v0.4.0`
+
 The current Phase 2 implementation reports progress using the number of written commits (`Processed N commits...`). This is better than having no runtime visibility, and it remains acceptable for v0.1.4, but it is not always a good proxy for actual elapsed work.
 
 For example, runs that use a state file and ultimately write zero new commits can still spend substantial time traversing history or resolving repository state. In those situations, commit-count progress has only a weak relationship to elapsed time and user-perceived progress.
@@ -278,6 +284,8 @@ This means the expected behavior for gitrail is also **error on unknown argument
 ### Medium-term
 
 #### Development: Granular performance profiling
+
+**Release target**: `v0.4.0`
 
 Add per-phase timing instrumentation to measure where time is actually spent during extraction. The target granularity is: DAG traversal, blob reads, diff computation (per-file), and output writing.
 

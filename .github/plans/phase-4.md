@@ -11,6 +11,11 @@ current CLI-visible behavior and output semantics without any change to `src/ind
 - [ ] In progress
 - [ ] Completed
 
+#### Design Maturity
+
+- [x] Implementation-ready
+- [ ] Deferred design
+
 #### Design References
 
 - [`../instructions/architecture.instructions.md`](../instructions/architecture.instructions.md) — v0.4.0 Migration Contract, Phase 4 coordinator/sink contracts (added during this planning session)

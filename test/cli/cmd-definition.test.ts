@@ -15,15 +15,16 @@ describe("cmdDefinition – help output wiring", () => {
     const expectedKeys = [
       "repository-path",
       "branch",
-      "mode",
+      "incremental",
       "output-dir",
       "output-prefix",
       "state",
-      "on-missing-state",
+      "missing-state",
       "since-ref",
       "since-date",
       "rotate-lines",
       "rotate-size",
+      "per-file",
     ];
     for (const key of expectedKeys) {
       expect(args, `expected arg "${key}" to be defined`).toHaveProperty(key);

@@ -63,11 +63,11 @@ export interface ExtractorConfig {
   readonly outputDir: string;
   readonly outputPrefix: string;
   readonly rotation: RotationConfig;
-  readonly mode: "snapshot" | "incremental";
-  readonly onMissingState?: "error" | "snapshot";
+  readonly incremental: boolean;
+  readonly missingState?: "error" | "snapshot";
   readonly range?: ExtractionRange;
   readonly stateFilePath?: string;
-  readonly outputMode: "commit" | "file";
+  readonly perFile: boolean;
 }
 
 export interface Reporter {

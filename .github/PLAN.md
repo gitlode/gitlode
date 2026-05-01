@@ -58,7 +58,7 @@ The primary focus is the roadmap item `Architecture: Fact-based extraction pipel
 ### Phase 5: CLI Parameter Model Redesign
 
 - **File**: [`plans/phase-5.md`](plans/phase-5.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 6: Stage-Aligned Profiling Instrumentation
 

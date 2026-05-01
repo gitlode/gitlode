@@ -94,8 +94,8 @@ function makeConfig(
     branches: ["main"],
     outputPrefix: "repo",
     rotation: {},
-    mode: "snapshot",
-    outputMode: "commit",
+    incremental: false,
+    perFile: false,
     ...overrides,
   };
 }
@@ -327,7 +327,7 @@ describe("Extractor", () => {
     const adapter = new IsomorphicGitAdapter(fs);
 
     // First run — snapshot mode writes state file
-    const config1 = makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" });
+    const config1 = makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false });
     await makeExtractor(config1, adapter).run();
 
     const firstCommits = await readFirstJsonlFile(tmpDir);
@@ -345,7 +345,7 @@ describe("Extractor", () => {
     const tmpDir2 = join(tmpdir(), `gitrail-extractor-test-${randomUUID()}`);
     await mkdir(tmpDir2, { recursive: true });
     try {
-      const config2 = makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" });
+      const config2 = makeConfig({ outputDir: tmpDir2, stateFilePath, incremental: true });
       await makeExtractor(config2, adapter).run();
 
       // No commits to write — no output file created (writer.seq stays 0)
@@ -373,7 +373,7 @@ describe("Extractor", () => {
 
     const adapter = new IsomorphicGitAdapter(fs);
     // Config uses repositoryPath "/" (resolves to root), state says "/some/other/repo"
-    const config = makeConfig({ outputDir: tmpDir, stateFilePath, mode: "incremental" });
+    const config = makeConfig({ outputDir: tmpDir, stateFilePath, incremental: true });
     const extractor = makeExtractor(config, adapter);
 
     await expect(extractor.run()).rejects.toThrow(
@@ -427,7 +427,7 @@ describe("Extractor", () => {
     const adapter = new IsomorphicGitAdapter(fs);
 
     await makeExtractor(
-      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false }),
       adapter,
     ).run();
 
@@ -435,7 +435,7 @@ describe("Extractor", () => {
     await mkdir(tmpDir2, { recursive: true });
     try {
       const result = await makeExtractor(
-        makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" }),
+        makeConfig({ outputDir: tmpDir2, stateFilePath, incremental: true }),
         adapter,
       ).run();
       expect(result.recordsWritten).toBe(0);
@@ -487,7 +487,7 @@ describe("Extractor", () => {
 
     // First run (snapshot) — records state
     await makeExtractor(
-      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false }),
       adapter,
     ).run();
 
@@ -496,7 +496,7 @@ describe("Extractor", () => {
     await mkdir(tmpDir2, { recursive: true });
     try {
       await makeExtractor(
-        makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "snapshot" }),
+        makeConfig({ outputDir: tmpDir2, stateFilePath, incremental: false }),
         adapter,
       ).run();
 
@@ -523,7 +523,7 @@ describe("Extractor", () => {
 
     // First run (snapshot) — records state
     await makeExtractor(
-      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false }),
       adapter,
     ).run();
 
@@ -535,7 +535,7 @@ describe("Extractor", () => {
     await mkdir(tmpDir2, { recursive: true });
     try {
       await makeExtractor(
-        makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" }),
+        makeConfig({ outputDir: tmpDir2, stateFilePath, incremental: true }),
         adapter,
       ).run();
 
@@ -563,8 +563,8 @@ describe("Extractor", () => {
       makeConfig({
         outputDir: tmpDir,
         stateFilePath: missingStatePath,
-        mode: "incremental",
-        onMissingState: "snapshot",
+        incremental: true,
+        missingState: "snapshot",
       }),
       adapter,
       { reporter },
@@ -635,7 +635,7 @@ describe("Extractor", () => {
     await writeFile(stateFilePath, JSON.stringify(fakeState), "utf8");
 
     const result = await new Extractor(
-      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "incremental" }),
+      makeConfig({ outputDir: tmpDir, stateFilePath, incremental: true }),
       mockAdapter as unknown as IsomorphicGitAdapter,
       reporter,
       () => new Date(),
@@ -684,7 +684,7 @@ describe("Extractor", () => {
     );
 
     const adapter = new IsomorphicGitAdapter(fs);
-    const config = makeConfig({ outputDir: tmpDir, stateFilePath, mode: "incremental" });
+    const config = makeConfig({ outputDir: tmpDir, stateFilePath, incremental: true });
     const extractor = makeExtractor(config, adapter);
 
     await expect(extractor.run()).rejects.toThrow(
@@ -733,7 +733,7 @@ describe("Extractor", () => {
 
     // Run 1: snapshot — records state with main only
     await makeExtractor(
-      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false }),
       adapter,
     ).run();
 
@@ -745,7 +745,7 @@ describe("Extractor", () => {
         makeConfig({
           outputDir: tmpDir2,
           stateFilePath,
-          mode: "incremental",
+          incremental: true,
           branches: ["main", "feature"],
         }),
         adapter,
@@ -777,7 +777,7 @@ describe("Extractor", () => {
 
     // Run 1: snapshot — records state for main
     await makeExtractor(
-      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false }),
       adapter,
     ).run();
 
@@ -805,7 +805,7 @@ describe("Extractor", () => {
         makeConfig({
           outputDir: tmpDir2,
           stateFilePath,
-          mode: "incremental",
+          incremental: true,
           branches: ["main", "orphan"],
         }),
         adapter,
@@ -834,7 +834,7 @@ describe("Extractor", () => {
 
     // Run 1: snapshot — records state
     await makeExtractor(
-      makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+      makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false }),
       adapter,
     ).run();
 
@@ -846,7 +846,7 @@ describe("Extractor", () => {
     await mkdir(tmpDir2, { recursive: true });
     try {
       await makeExtractor(
-        makeConfig({ outputDir: tmpDir2, stateFilePath, mode: "incremental" }),
+        makeConfig({ outputDir: tmpDir2, stateFilePath, incremental: true }),
         adapter,
       ).run();
 
@@ -931,7 +931,7 @@ describe("Extractor", () => {
         ],
       ]);
       const adapter = makeFakeGitAdapter(commits, fileChanges);
-      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const config = makeConfig({ outputDir: tmpDir, perFile: true });
       const result = await new Extractor(
         config,
         adapter,
@@ -968,7 +968,7 @@ describe("Extractor", () => {
         [sha1, [{ path: "readme.md", status: "added", additions: 10, deletions: 0 }]],
       ]);
       const adapter = makeFakeGitAdapter(commits, fileChanges, "https://github.com/org/repo.git");
-      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const config = makeConfig({ outputDir: tmpDir, perFile: true });
       await new Extractor(
         config,
         adapter,
@@ -1007,7 +1007,7 @@ describe("Extractor", () => {
         [sha2, []],
       ]);
       const adapter = makeFakeGitAdapter(commits, fileChanges);
-      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const config = makeConfig({ outputDir: tmpDir, perFile: true });
       const result = await new Extractor(
         config,
         adapter,
@@ -1052,7 +1052,7 @@ describe("Extractor", () => {
           return [];
         },
       };
-      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const config = makeConfig({ outputDir: tmpDir, perFile: true });
       await new Extractor(
         config,
         adapter,
@@ -1085,7 +1085,7 @@ describe("Extractor", () => {
       ]);
       const reporter = makeReporter();
       const adapter = makeFakeGitAdapter(commits, fileChanges);
-      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const config = makeConfig({ outputDir: tmpDir, perFile: true });
       const result = await new Extractor(
         config,
         adapter,
@@ -1119,7 +1119,7 @@ describe("Extractor", () => {
       const adapter = makeFakeGitAdapter(commits, fileChanges);
       const config = makeConfig({
         outputDir: tmpDir,
-        outputMode: "file",
+        perFile: true,
         rotation: { maxLines: 2 },
       });
       await new Extractor(
@@ -1175,7 +1175,7 @@ describe("Extractor", () => {
         [sha1, [{ path: "src/index.ts", status: "added", additions: 42, deletions: 0 }]],
       ]);
       const adapter = makeFakeGitAdapter(commits, fileChanges, "https://github.com/org/repo.git");
-      const config = makeConfig({ outputDir: tmpDir, outputMode: "file" });
+      const config = makeConfig({ outputDir: tmpDir, perFile: true });
       await new Extractor(
         config,
         adapter,
@@ -1210,7 +1210,7 @@ describe("Extractor", () => {
       const adapter = new IsomorphicGitAdapter(fs);
 
       await makeExtractor(
-        makeConfig({ outputDir: tmpDir, stateFilePath, mode: "snapshot" }),
+        makeConfig({ outputDir: tmpDir, stateFilePath, incremental: false }),
         adapter,
       ).run();
 

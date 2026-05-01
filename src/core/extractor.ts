@@ -61,12 +61,12 @@ export class Extractor {
   // --- Checkpoint loading (formerly initializeStateMap) ---
 
   private async loadPriorCheckpoint(repoPath: string): Promise<ExtractionCheckpoint> {
-    if (!this.stateStore || this.config.mode !== "incremental") {
+    if (!this.stateStore || !this.config.incremental) {
       return emptyCheckpoint(repoPath);
     }
     const checkpoint = await this.stateStore.read();
     if (checkpoint === null) {
-      if (this.config.onMissingState === "snapshot") {
+      if (this.config.missingState === "snapshot") {
         this.reporter.warn(
           `Warning: State file not found: ${this.config.stateFilePath}. Falling back to full snapshot extraction.`,
         );
@@ -137,7 +137,7 @@ export class Extractor {
       repoName,
       remoteUrl,
       branches: [...this.config.branches],
-      granularity: this.config.outputMode,
+      granularity: this.config.perFile ? "file" : "commit",
       range: this.config.range,
       priorCheckpoint,
       sessionTimestamp,

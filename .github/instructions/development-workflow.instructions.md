@@ -195,13 +195,13 @@ When a phase is marked as deferred design:
 
 Five session types are used throughout a release cycle. Each has a defined lifespan, responsibility scope, and context boundary.
 
-| Session type                   | Lifespan                                                 | Responsibility                                                                            | Context sources                                                                                                                |
-| ------------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Planning session**           | From release intent to planning completion               | Scope decision, phase decomposition, detailed design per phase, instructions file updates | roadmap.md, PLAN.md, phase files, instructions files                                                                           |
-| **Planning branch session**    | Single-phase design task                                 | Focused design work for a complex phase, isolated from the full planning scope            | PLAN.md (overview only), target phase file, relevant instructions files                                                        |
-| **Design refinement session**  | Single deferred-design phase before implementation       | Finalize deferred design from predecessor implementation evidence; update the phase file  | PLAN.md (overview only), target phase file, predecessor phase artifacts, relevant instructions files, current repository state |
-| **Development trunk session**  | Entire implementation cycle (all phases + release tasks) | Pre-execution checks, starting prompt creation, result review, release tasks              | PLAN.md, all phase files, design refinement summaries, branch session summaries                                                |
-| **Development branch session** | Single phase implementation                              | Implementation, testing, verification                                                     | PLAN.md (overview only), target phase file, relevant instructions files, starting prompt                                       |
+| Session type                   | Lifespan                                                 | Responsibility                                                                              | Context sources                                                                                                                |
+| ------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Planning session**           | From release intent to planning completion               | Scope decision, phase decomposition, detailed design per phase, instructions file updates   | roadmap.md, PLAN.md, phase files, instructions files                                                                           |
+| **Planning branch session**    | Single-phase design task                                 | Focused design work for a complex phase, isolated from the full planning scope              | PLAN.md (overview only), target phase file, relevant instructions files                                                        |
+| **Design refinement session**  | Single deferred-design phase before implementation       | Finalize deferred design from predecessor implementation evidence; update the phase file    | PLAN.md (overview only), target phase file, predecessor phase artifacts, relevant instructions files, current repository state |
+| **Development trunk session**  | Entire implementation cycle (all phases + release tasks) | Pre-execution checks, starting prompt preparation and handoff, result review, release tasks | PLAN.md, all phase files, design refinement summaries, branch session summaries                                                |
+| **Development branch session** | Single phase implementation                              | Implementation, testing, verification                                                       | PLAN.md (overview only), target phase file, relevant instructions files, starting prompt                                       |
 
 ### Context boundaries
 
@@ -224,7 +224,7 @@ This rule applies to starting prompts produced for planning branch sessions, des
 - **Development trunk → Design refinement session**: When a phase is marked as deferred design and its refinement trigger is satisfied, the trunk session produces a starting prompt for the refinement session.
 - **Design refinement session → Development trunk**: Refinement session resolves the deferred design directly in the phase file, updates any affected instructions files, and returns a structured Design Refinement Session Summary.
 - **Development branch → Development trunk**: Branch session produces a structured summary (see Branch Session Summary below). Human copies the summary into the trunk session.
-- **Development trunk → Development branch**: Trunk session produces a starting prompt (see Starting Prompt below).
+- **Development trunk → Development branch**: Trunk session prepares a starting prompt during Stage 2b and hands off that prepared prompt in Stage 2c (see Starting Prompt below).
 
 ---
 
@@ -398,7 +398,7 @@ Phases are designed one at a time, in order, using the session mode selected in 
 
 **If `planning branch session` was selected:**
 
-- The planning session LLM creates a starting prompt for the branch session, analogous to Stage 2c but for design work rather than implementation.
+- The planning session LLM creates a starting prompt for the branch session.
 - The starting prompt includes the target phase identity, relevant design references, and the specific design questions or ambiguity to resolve.
 - The planning branch session performs the detailed design work and writes the resulting design directly into the target phase file.
 - The planning branch session must return a **Planning Branch Session Summary** in the standard format defined below.
@@ -547,7 +547,7 @@ Before starting a branch session, the trunk session performs the following check
 2. **Prior-phase impact**: If the previous branch session summary contains "Deviations from Plan" or "Observations for Subsequent Phases", evaluate whether the current phase's Design Decisions or Target Files need adjustment.
 3. **Phase file completeness**: The current phase must be marked as `Implementation-ready`, and all sections required by that state must be filled. If Design Decisions contain gaps, or if the phase is still marked as `Deferred design`, do not proceed to implementation.
 4. **Phase sizing sanity check**: Confirm that the current phase still appears executable within one branch session at a reasonable level of scope and reviewability. If not, revise the phase plan before starting implementation.
-5. **If all checks pass**: Create the starting prompt for the branch session.
+5. **If all checks pass**: Prepare the starting prompt for the branch session and present it in the same message as the Stage 2b gate so the human can review the exact prompt before choosing the next action.
 
 **Required prompt before launching the branch session:**
 
@@ -565,6 +565,11 @@ Before starting a branch session, the trunk session performs the following check
 **Completion condition:**
 
 - Stage 2b for the phase is not complete until one valid next-action response is received.
+
+The prompt prepared in Stage 2b is the current handoff artifact for the phase.
+
+- If the human selects `revise Phase N plan`, or if any referenced input changes before launch (phase file, PLAN.md context, carry-forward items, or affected instructions files), discard that prepared prompt, rerun Stage 2b, and prepare a replacement prompt.
+- If the human selects `start branch session for Phase N` and those inputs have not changed since the Stage 2b message, reuse the prepared prompt as-is. Do not regenerate or reprint an identical second copy.
 
 ##### When a phase does not fit in one branch session
 
@@ -584,9 +589,15 @@ When such a summary is returned, the trunk session decides which of the followin
 
 A branch session may detect that one-session completion is no longer appropriate, but it must not unilaterally redefine phase boundaries. If the correct response is unclear, escalate to the human.
 
-#### 2c. Starting prompt creation (trunk session)
+#### 2c. Prepared starting prompt handoff (trunk session)
 
-The starting prompt must include:
+If the human selected option `1` in Stage 2b, the trunk session hands off the most recently prepared starting prompt to the development branch session.
+
+- Reuse the prepared prompt verbatim when its inputs are unchanged.
+- If the inputs changed after the Stage 2b message, return to Stage 2b and prepare a new prompt instead of editing or re-emitting the old one informally.
+- When Stage 2b already displayed the prompt and the inputs are unchanged, Stage 2c must not emit a second identical copy. The previously prepared prompt is already the handoff artifact.
+
+The prepared starting prompt must include:
 
 - **File references**: PLAN.md (for release-level context) and the target phase file.
 - **Phase identity**: Phase number, title, and summary line — so the branch session establishes context immediately.
@@ -594,7 +605,7 @@ The starting prompt must include:
 - **Completion instruction**: "When implementation is complete, output a Branch Session Summary in the standard format."
 - **Verification reminder**: "Run all automated verification commands and include results in the summary."
 
-The starting prompt should be self-contained: a branch session that reads only the starting prompt and the referenced files should be able to execute the phase without additional guidance.
+The prepared starting prompt should be self-contained: a branch session that reads only the starting prompt and the referenced files should be able to execute the phase without additional guidance.
 
 #### 2d. Implementation (branch session)
 
@@ -777,7 +788,7 @@ Every development branch session must produce a summary in this format:
 
 - If the current phase is marked as deferred design, run the refinement flow (Stage 2a) before any implementation work begins.
 - Execute the pre-execution checklist (Stage 2b) completely — do not skip items.
-- Create starting prompts that are self-contained (Stage 2c).
+- Prepare starting prompts that are self-contained during Stage 2b, and reuse that prepared prompt at Stage 2c unless the prompt inputs changed.
 - Review refinement and branch summaries for remaining risks, deviations, and downstream impact before authorizing the next step.
 - If the human does not request a pre-execution check before starting a branch session, remind them.
 - After reviewing each branch-session result, summarize the current state and stop at the gate before advancing across a phase boundary.

@@ -37,19 +37,14 @@ A commit X is "reachable" from commit Y if X can be found by following parent li
 - `CommitTraversalExtractor` is the Core stage that consumes those plans and owns sequential
   branch traversal, cross-branch deduplication, `since-date` filtering, and `COMMIT_NOT_FOUND`
   fallback behavior.
-- `Extractor` owns checkpoint-store loading and validation, `--on-missing-state snapshot` handling,
-  repo-name/remote-URL resolution, candidate checkpoint composition from the planner output,
-  output projection, file-change expansion, writer lifecycle, progress updates after writes, and
-  persisting that candidate checkpoint only after successful output completion. `Extractor`
-  constructs both stages and passes already-loaded checkpoint data to the planner.
 - After Phase 4, `ExtractionCoordinator` owns `CheckpointStore` write timing and `OutputSink`
   lifecycle. The coordinator writes the checkpoint only after the pipeline completes without
   exception and `sink.close()` succeeds. `Extractor` (now a compatibility wrapper) owns checkpoint
   reading, missing-state fallback validation, and `CheckpointStore` injection into the coordinator.
-- The candidate `ExtractionCheckpoint` is built by `Extractor` from the successfully resolved
-  branch heads returned by the planner. This candidate checkpoint must not be persisted until
-  output writing and writer close both succeed. This ownership split must not change any
-  traversal semantics defined below.
+- The candidate `ExtractionCheckpoint` is built inside `DefaultExtractionCoordinator` from the
+  successfully resolved branch heads returned by the planner. This candidate checkpoint must not
+  be persisted until output writing and writer close both succeed. This ownership split must not
+  change any traversal semantics defined below.
 
 ---
 

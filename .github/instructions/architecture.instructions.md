@@ -70,10 +70,9 @@ implementation sessions must treat the following contract as binding.
   explicitly replaces its mixed responsibilities.
 - The compatibility facade and remaining checkpoint-vocabulary aliases are removed in the final
   Phase 7 cleanup once progress redesign decisions are fixed.
-- No phase may move checkpoint commit timing, sink lifecycle ownership, or progress ownership into a
-  coordinator abstraction before that orchestration phase is reached.
-- No phase may move file-granularity branching into dedicated expander/projector modules before the
-  dedicated projector-split phase is reached.
+- Phases 3 and 4 have completed their designated splits: file-granularity branching now lives in
+  dedicated expander/projector modules, and checkpoint commit timing, sink lifecycle ownership, and
+  progress ownership now live in `ExtractionCoordinator`.
 - CLI-visible behavior, output schema semantics, and the current `ExtractionResult` shape must
   remain unchanged unless a later release phase explicitly redesigns those user-facing contracts.
 
@@ -131,7 +130,7 @@ expander → file projector, else commit projector`) before consuming the projec
 - `Extractor` remains responsible for: checkpoint store I/O, writer lifecycle, progress ownership, metrics
   aggregation, and persisting the traversal stage's candidate checkpoint only after successful writer close.
 
-### Phase 4 coordinator and sink contracts
+### Phase 4 coordinator and sink contracts (implemented)
 
 - `ExtractionCoordinator` is introduced as the orchestration stage that replaces `Extractor`'s execution
   engine role. It is defined as a Core-owned interface plus one concrete implementation

@@ -8,8 +8,8 @@ current CLI-visible behavior and output semantics without any change to `src/ind
 #### Status
 
 - [x] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] In progress
+- [x] Completed
 
 #### Design Maturity
 

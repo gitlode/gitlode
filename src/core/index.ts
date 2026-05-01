@@ -8,6 +8,9 @@ export type {
   CommitHash,
   CommitTraversalExtractor,
   CommitTraversalRequest,
+  CoordinatorDependencies,
+  CoordinatorRequest,
+  CoordinatorResult,
   ExtractionCheckpoint,
   ExtractionRange,
   ExtractionResult,
@@ -15,6 +18,7 @@ export type {
   FileChangeExpander,
   FileChangeFact,
   MonotonicClock,
+  OutputSink,
   PersonIdentity,
   Reporter,
   RotationConfig,
@@ -28,6 +32,7 @@ export { assertNever, isCommitHash } from "./types.js";
 export { DefaultBranchTraversalPlanner } from "./branch-traversal-planner.js";
 export { CommitRecordProjector, DefaultCommitRecordProjector } from "./commit-record-projector.js";
 export { Extractor } from "./extractor.js";
+export { ExtractionCoordinator, DefaultExtractionCoordinator } from "./extraction-coordinator.js";
 export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";
 export { DefaultFileChangeExpander } from "./file-change-expander.js";
 export {

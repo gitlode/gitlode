@@ -53,7 +53,7 @@ The primary focus is the roadmap item `Architecture: Fact-based extraction pipel
 ### Phase 4: Coordinator, Output Sink, and Checkpoint Orchestration
 
 - **File**: [`plans/phase-4.md`](plans/phase-4.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 5: CLI Parameter Model Redesign
 

@@ -170,3 +170,64 @@ export interface CommitTraversalExtractor {
 export interface FileChangeExpander {
   expand(commits: AsyncIterable<CommitFact>, repositoryPath: string): AsyncIterable<FileChangeFact>;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4 coordinator / sink contract
+// ---------------------------------------------------------------------------
+
+// OutputRecord is imported here (type-only) to define OutputSink and CoordinatorDeps.
+// The circular path core/types.ts → output/types.ts → core/index.ts → core/types.ts
+// is type-only in both directions; TypeScript resolves it without issues.
+import type { OutputRecord } from "../output/types.js";
+
+/** Core-owned interface for output sink. Wraps the output layer's write/close contract. */
+export interface OutputSink {
+  write(record: OutputRecord): Promise<void>;
+  close(): Promise<void>;
+  readonly filesCreated: number;
+  readonly bytesWritten: number;
+}
+
+/** Core-preferred request type passed to the coordinator. Field names are
+ *  Core-vocabulary terms, not CLI-facing names. `Extractor` translates
+ *  `ExtractorConfig` into `CoordinatorRequest` before calling the coordinator. */
+export interface CoordinatorRequest {
+  readonly repositoryPath: string;
+  readonly repoName: string;
+  readonly remoteUrl: string | null;
+  readonly branches: readonly string[];
+  /** Renamed from `outputMode`. */
+  readonly granularity: "commit" | "file";
+  readonly range?: ExtractionRange;
+  /** Loaded and validated by `Extractor.loadPriorCheckpoint()`. */
+  readonly priorCheckpoint: ExtractionCheckpoint;
+  /** Wall-clock time at which the extraction session started. Used for checkpoint `generatedAt`. */
+  readonly sessionTimestamp: Date;
+}
+
+export interface CoordinatorResult {
+  readonly recordsWritten: number;
+  /** Branches for which a head was successfully resolved (skipped branches are omitted). */
+  readonly branches: readonly string[];
+}
+
+/** Constructor dependencies injected into `DefaultExtractionCoordinator`.
+ *  Projector slots use inline structural types to avoid importing from projector
+ *  files (those files import from the output layer, which would create a circular
+ *  import through core/index.ts). */
+export interface CoordinatorDependencies {
+  readonly traversalPlanner: BranchTraversalPlanner;
+  readonly traversalExtractor: CommitTraversalExtractor;
+  readonly fileChangeExpander: FileChangeExpander;
+  /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */
+  readonly commitProjector: {
+    project(commits: AsyncIterable<CommitFact>): AsyncIterable<OutputRecord>;
+  };
+  /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */
+  readonly fileProjector: {
+    project(fileChanges: AsyncIterable<FileChangeFact>): AsyncIterable<OutputRecord>;
+  };
+  readonly sink: OutputSink;
+  readonly checkpointStore: CheckpointStore | undefined;
+  readonly reporter: Reporter;
+}

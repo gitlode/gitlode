@@ -2,16 +2,16 @@ import { basename, resolve } from "node:path";
 
 import type { GitAdapter } from "../git/index.js";
 import { OutputWriter, formatSessionTimestamp } from "../output/index.js";
+import { OutputWriterSink } from "../output/output-writer-sink.js";
 import { DefaultBranchTraversalPlanner } from "./branch-traversal-planner.js";
 import { DefaultCommitRecordProjector } from "./commit-record-projector.js";
 import { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";
+import { DefaultExtractionCoordinator } from "./extraction-coordinator.js";
 import { DefaultFileChangeExpander } from "./file-change-expander.js";
 import { DefaultFileChangeRecordProjector } from "./file-change-record-projector.js";
 import type {
-  BranchCheckpoint,
-  BranchTraversalPlan,
   CheckpointStore,
-  CommitHash,
+  CoordinatorDependencies,
   ExtractionCheckpoint,
   ExtractionResult,
   ExtractorConfig,
@@ -28,6 +28,11 @@ function deriveRepoName(remoteUrl: string | null, repoPath: string): string {
     return stripped || basename(repoPath);
   }
   return basename(repoPath);
+}
+
+/** Empty checkpoint sentinel used when no prior state is available. */
+function emptyCheckpoint(repositoryPath: string): ExtractionCheckpoint {
+  return { version: 1, generatedAt: "", repositoryPath, branches: [] };
 }
 
 export class Extractor {
@@ -53,55 +58,40 @@ export class Extractor {
     this.stateStore = stateStore;
   }
 
-  // --- Checkpoint helpers ---
+  // --- Checkpoint loading (formerly initializeStateMap) ---
 
-  private async initializeStateMap(repoPath: string): Promise<Map<string, CommitHash>> {
-    const stateMap = new Map<string, CommitHash>();
-    if (this.stateStore && this.config.mode === "incremental") {
-      const checkpoint = await this.stateStore.read();
-      if (checkpoint === null) {
-        if (this.config.onMissingState === "snapshot") {
-          this.reporter.warn(
-            `Warning: State file not found: ${this.config.stateFilePath}. Falling back to full snapshot extraction.`,
-          );
-          // stateMap stays empty → full traversal
-        }
-      } else {
-        if (checkpoint.version !== 1) {
-          throw new Error(`Unsupported state file version: ${checkpoint.version}`);
-        }
-        const recordedPath = resolve(checkpoint.repositoryPath);
-        if (recordedPath !== repoPath) {
-          throw new Error(
-            `State file was created for a different repository: ${checkpoint.repositoryPath}`,
-          );
-        }
-        for (const entry of checkpoint.branches) {
-          if (!isCommitHash(entry.lastCommitHash)) {
-            throw new Error(
-              `Invalid commit hash in state file for branch "${entry.name}": ${entry.lastCommitHash}`,
-            );
-          }
-          stateMap.set(entry.name, entry.lastCommitHash);
-        }
+  private async loadPriorCheckpoint(repoPath: string): Promise<ExtractionCheckpoint> {
+    if (!this.stateStore || this.config.mode !== "incremental") {
+      return emptyCheckpoint(repoPath);
+    }
+    const checkpoint = await this.stateStore.read();
+    if (checkpoint === null) {
+      if (this.config.onMissingState === "snapshot") {
+        this.reporter.warn(
+          `Warning: State file not found: ${this.config.stateFilePath}. Falling back to full snapshot extraction.`,
+        );
+        return emptyCheckpoint(repoPath);
+      }
+      // Default behavior: caller (CLI) should have already gated this; treat as empty.
+      return emptyCheckpoint(repoPath);
+    }
+    if (checkpoint.version !== 1) {
+      throw new Error(`Unsupported state file version: ${checkpoint.version}`);
+    }
+    const recordedPath = resolve(checkpoint.repositoryPath);
+    if (recordedPath !== repoPath) {
+      throw new Error(
+        `State file was created for a different repository: ${checkpoint.repositoryPath}`,
+      );
+    }
+    for (const entry of checkpoint.branches) {
+      if (!isCommitHash(entry.lastCommitHash)) {
+        throw new Error(
+          `Invalid commit hash in state file for branch "${entry.name}": ${entry.lastCommitHash}`,
+        );
       }
     }
-    return stateMap;
-  }
-
-  private buildCandidateCheckpoint(
-    repositoryPath: string,
-    generatedAt: string,
-    plans: readonly BranchTraversalPlan[],
-  ): ExtractionCheckpoint {
-    return {
-      version: 1,
-      generatedAt,
-      repositoryPath,
-      branches: plans.map(
-        (plan): BranchCheckpoint => ({ name: plan.name, lastCommitHash: plan.head }),
-      ),
-    };
+    return checkpoint;
   }
 
   async run(): Promise<ExtractionResult> {
@@ -111,75 +101,54 @@ export class Extractor {
     const remoteUrl = await this.adapter.getRemoteUrl(repoPath);
     const repoName = deriveRepoName(remoteUrl, repoPath);
 
-    const stateMap = await this.initializeStateMap(repoPath);
+    // Load and validate prior checkpoint (includes missing-state warning emission).
+    const priorCheckpoint = await this.loadPriorCheckpoint(repoPath);
 
-    const sessionTs = this.wallNow();
-    const tsStr = formatSessionTimestamp(sessionTs);
+    const sessionTimestamp = this.wallNow();
+    const tsStr = formatSessionTimestamp(sessionTimestamp);
     const writer = new OutputWriter(
       this.config.outputDir,
       (seq) => `${this.config.outputPrefix}-${tsStr}-${String(seq).padStart(6, "0")}.jsonl`,
       this.config.rotation,
     );
+    const sink = new OutputWriterSink(writer);
 
-    const planner = new DefaultBranchTraversalPlanner(this.adapter);
-    const traverser = new DefaultCommitTraversalExtractor(this.adapter);
-    const expander = new DefaultFileChangeExpander(this.adapter);
+    // Construct stage instances.
+    const traversalPlanner = new DefaultBranchTraversalPlanner(this.adapter);
+    const traversalExtractor = new DefaultCommitTraversalExtractor(this.adapter);
+    const fileChangeExpander = new DefaultFileChangeExpander(this.adapter);
     const commitProjector = new DefaultCommitRecordProjector(repoName, remoteUrl);
     const fileProjector = new DefaultFileChangeRecordProjector(repoName, remoteUrl);
-    const recordsRef = { count: 0 };
-    const generatedAt = sessionTs.toISOString();
-    let candidateCheckpoint = this.buildCandidateCheckpoint(repoPath, generatedAt, []);
 
-    try {
-      const plans = await planner.plan(
-        {
-          repositoryPath: repoPath,
-          branches: [...this.config.branches],
-          mode: this.config.mode,
-          priorBranchMap: stateMap,
-          range: this.config.range,
-        },
-        this.reporter,
-      );
-      candidateCheckpoint = this.buildCandidateCheckpoint(repoPath, generatedAt, plans);
+    const deps: CoordinatorDependencies = {
+      traversalPlanner,
+      traversalExtractor,
+      fileChangeExpander,
+      commitProjector,
+      fileProjector,
+      sink,
+      checkpointStore: this.stateStore,
+      reporter: this.reporter,
+    };
+    const coordinator = new DefaultExtractionCoordinator(deps);
 
-      const commitFacts = traverser.extract(
-        {
-          repositoryPath: repoPath,
-          repoName,
-          remoteUrl,
-          plans,
-          range: this.config.range,
-        },
-        this.reporter,
-      );
-
-      const recordStream =
-        this.config.outputMode === "file"
-          ? fileProjector.project(expander.expand(commitFacts, repoPath))
-          : commitProjector.project(commitFacts);
-
-      for await (const record of recordStream) {
-        await writer.write(record);
-        recordsRef.count++;
-        this.reporter.progress(recordsRef.count);
-      }
-    } finally {
-      this.reporter.done(recordsRef.count);
-      await writer.close();
-    }
-
-    // Write checkpoint atomically — only reached on success (no exception)
-    if (this.stateStore && candidateCheckpoint.branches.length > 0) {
-      await this.stateStore.write(candidateCheckpoint);
-    }
+    const result = await coordinator.run({
+      repositoryPath: repoPath,
+      repoName,
+      remoteUrl,
+      branches: [...this.config.branches],
+      granularity: this.config.outputMode,
+      range: this.config.range,
+      priorCheckpoint,
+      sessionTimestamp,
+    });
 
     return {
-      recordsWritten: recordsRef.count,
-      filesCreated: writer.filesCreated,
-      bytesWritten: writer.bytesWritten,
+      recordsWritten: result.recordsWritten,
+      filesCreated: sink.filesCreated,
+      bytesWritten: sink.bytesWritten,
       elapsedMs: this.monotonicNow() - startTime,
-      branches: candidateCheckpoint.branches.map((b) => b.name),
+      branches: result.branches,
     };
   }
 }

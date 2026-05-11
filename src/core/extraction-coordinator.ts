@@ -1,6 +1,7 @@
 import { withProfilerAsync } from "./profiler-utils.js";
 import type {
   BranchCheckpoint,
+  CommitFact,
   CoordinatorDependencies,
   CoordinatorRequest,
   CoordinatorResult,
@@ -10,6 +11,28 @@ import type {
 /** Core-owned interface for the extraction orchestration stage. */
 export interface ExtractionCoordinator {
   run(request: CoordinatorRequest): Promise<CoordinatorResult>;
+}
+
+async function* deduplicateCommits(
+  source: AsyncIterable<CommitFact>,
+  visited: Set<string>,
+): AsyncIterable<CommitFact> {
+  for await (const fact of source) {
+    if (!visited.has(fact.oid)) {
+      visited.add(fact.oid);
+      yield fact;
+    }
+  }
+}
+
+async function* wrapCommitCounter(
+  source: AsyncIterable<CommitFact>,
+  onCommit: () => void,
+): AsyncIterable<CommitFact> {
+  for await (const fact of source) {
+    onCommit();
+    yield fact;
+  }
 }
 
 export class DefaultExtractionCoordinator implements ExtractionCoordinator {
@@ -33,8 +56,10 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     } = this.deps;
 
     // -----------------------------------------------------------------------
-    // 1. Plan branch traversal boundaries.
+    // 1. Preparing phase: plan branch traversal boundaries.
     // -----------------------------------------------------------------------
+    reporter.emit({ type: "phase-start", phase: "preparing" });
+
     const priorBranchMap = new Map(
       request.priorCheckpoint.branches.map((b) => [b.name, b.lastCommitHash]),
     );
@@ -50,6 +75,8 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
       reporter,
     );
 
+    reporter.emit({ type: "phase-end", phase: "preparing" });
+
     // Build the candidate checkpoint from successfully resolved branch heads.
     const candidateCheckpoint: ExtractionCheckpoint = {
       version: 1,
@@ -61,52 +88,77 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     };
 
     // -----------------------------------------------------------------------
-    // 2. Extract commit facts from all branches.
+    // 2. Extracting phase: per-branch extraction with coordinator-level dedup.
     // -----------------------------------------------------------------------
-    const commitFacts = traversalExtractor.extract(
-      {
-        repositoryPath: request.repositoryPath,
-        repoName: request.repoName,
-        remoteUrl: request.remoteUrl,
-        plans,
-        range: request.range,
-      },
-      reporter,
-    );
+    reporter.emit({ type: "phase-start", phase: "extracting" });
 
-    // -----------------------------------------------------------------------
-    // 3. Select the output pipeline once, before entering the write loop.
-    // -----------------------------------------------------------------------
-    const recordStream =
-      request.granularity === "file"
-        ? fileProjector.project(fileChangeExpander.expand(commitFacts, request.repositoryPath))
-        : commitProjector.project(commitFacts);
-
-    // -----------------------------------------------------------------------
-    // 4. Write loop: advance progress only after a successful write.
-    // -----------------------------------------------------------------------
+    const allVisited = new Set<string>();
+    let commitsTraversed = 0;
     let recordsWritten = 0;
+    const branchCount = plans.length;
+
     try {
-      for await (const record of recordStream) {
-        await withProfilerAsync(profiler, () => sink.write(record));
-        recordsWritten++;
-        reporter.progress(recordsWritten);
+      for (let i = 0; i < plans.length; i++) {
+        const plan = plans[i]!;
+        const branchIndex = i;
+
+        const rawStream = traversalExtractor.extract(
+          {
+            repositoryPath: request.repositoryPath,
+            repoName: request.repoName,
+            remoteUrl: request.remoteUrl,
+            plans: [plan],
+            range: request.range,
+          },
+          reporter,
+        );
+
+        const dedupedStream = deduplicateCommits(rawStream, allVisited);
+        const countedStream = wrapCommitCounter(dedupedStream, () => {
+          commitsTraversed++;
+        });
+
+        const recordStream =
+          request.granularity === "file"
+            ? fileProjector.project(
+                fileChangeExpander.expand(countedStream, request.repositoryPath),
+              )
+            : commitProjector.project(countedStream);
+
+        for await (const record of recordStream) {
+          await withProfilerAsync(profiler, () => sink.write(record));
+          recordsWritten++;
+          reporter.emit({
+            type: "extracting-progress",
+            phase: "extracting",
+            branchIndex,
+            branchCount,
+            commitsTraversed,
+            recordsWritten,
+            bytesWritten: sink.bytesWritten,
+          });
+        }
       }
     } finally {
-      reporter.done(recordsWritten);
       await withProfilerAsync(profiler, () => sink.close());
     }
 
+    reporter.emit({ type: "phase-end", phase: "extracting" });
+
     // -----------------------------------------------------------------------
-    // 5. Persist checkpoint — only reached when the pipeline completed without
-    //    exception AND sink.close() succeeded.
+    // 3. Finalizing phase: persist checkpoint.
     // -----------------------------------------------------------------------
+    reporter.emit({ type: "phase-start", phase: "finalizing" });
+
     if (checkpointStore !== undefined && candidateCheckpoint.branches.length > 0) {
       await checkpointStore.write(candidateCheckpoint);
     }
 
+    reporter.emit({ type: "phase-end", phase: "finalizing" });
+
     return {
       recordsWritten,
+      commitsTraversed,
       branches: candidateCheckpoint.branches.map((b) => b.name),
     };
   }

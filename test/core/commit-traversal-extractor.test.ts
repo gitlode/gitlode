@@ -6,7 +6,8 @@ import type {
   CommitFact,
   CommitHash,
   CommitTraversalRequest,
-  Reporter,
+  ProgressEvent,
+  ProgressReporter,
 } from "../../src/core/index.js";
 import { GitAdapterError } from "../../src/git/index.js";
 import type { GitAdapter, RawCommit } from "../../src/git/index.js";
@@ -25,15 +26,13 @@ function makeRawCommit(n: number, parents: number[] = []): RawCommit {
   };
 }
 
-function makeReporter(): Reporter & { warnings: string[] } {
+function makeReporter(): ProgressReporter & { warnings: string[] } {
   const warnings: string[] = [];
   return {
     warnings,
-    warn: (msg) => {
-      warnings.push(msg);
+    emit(event: ProgressEvent) {
+      if (event.type === "warning") warnings.push(event.message);
     },
-    progress: vi.fn(),
-    done: vi.fn(),
   };
 }
 

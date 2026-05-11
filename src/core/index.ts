@@ -21,19 +21,16 @@ export type {
   MonotonicClock,
   OutputSink,
   PersonIdentity,
-  Reporter,
+  ProgressEvent,
+  ProgressPhase,
+  ProgressReporter,
   RotationConfig,
   StageProfiler,
-  // Compatibility aliases (kept until Phase 4 cleanup)
-  StateBranchEntry,
-  StateFile,
-  StateStore,
   WallClock,
 } from "./types.js";
 export { assertNever, isCommitHash } from "./types.js";
 export { DefaultBranchTraversalPlanner } from "./branch-traversal-planner.js";
 export { CommitRecordProjector, DefaultCommitRecordProjector } from "./commit-record-projector.js";
-export { Extractor } from "./extractor.js";
 export { ExtractionCoordinator, DefaultExtractionCoordinator } from "./extraction-coordinator.js";
 export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";
 export { DefaultFileChangeExpander } from "./file-change-expander.js";

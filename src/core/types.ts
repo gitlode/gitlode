@@ -68,14 +68,26 @@ export interface ExtractorConfig {
   readonly range?: ExtractionRange;
   readonly stateFilePath?: string;
   readonly perFile: boolean;
-  /** When true, collect stage-level profiling entries in addition to root elapsed timing. */
-  readonly enableProfiling?: boolean;
 }
 
-export interface Reporter {
-  warn(message: string): void;
-  progress(recordsWritten: number): void;
-  done(recordsWritten: number): void;
+export type ProgressPhase = "preparing" | "extracting" | "finalizing";
+
+export type ProgressEvent =
+  | { readonly type: "phase-start"; readonly phase: ProgressPhase }
+  | {
+      readonly type: "extracting-progress";
+      readonly phase: "extracting";
+      readonly branchIndex: number;
+      readonly branchCount: number;
+      readonly commitsTraversed: number;
+      readonly recordsWritten: number;
+      readonly bytesWritten: number;
+    }
+  | { readonly type: "phase-end"; readonly phase: ProgressPhase }
+  | { readonly type: "warning"; readonly message: string };
+
+export interface ProgressReporter {
+  emit(event: ProgressEvent): void;
 }
 
 export interface CheckpointStore {
@@ -98,10 +110,7 @@ export interface ExtractionCheckpoint {
   readonly branches: readonly BranchCheckpoint[];
 }
 
-// Compatibility aliases — kept until Phase 4 cleanup
-export type StateBranchEntry = BranchCheckpoint;
-export type StateFile = ExtractionCheckpoint;
-export type StateStore = CheckpointStore;
+// Compatibility aliases removed in Phase 7 cleanup
 
 /** A single timing measurement produced by a {@link StageProfiler}. */
 export interface ProfilingEntry {
@@ -214,7 +223,7 @@ export interface BranchTraversalPlanningRequest {
 export interface BranchTraversalPlanner {
   plan(
     request: BranchTraversalPlanningRequest,
-    reporter: Reporter,
+    reporter: ProgressReporter,
   ): Promise<readonly BranchTraversalPlan[]>;
 }
 
@@ -234,7 +243,7 @@ export interface CommitTraversalRequest {
 
 /** Core-owned interface for the commit traversal stage. */
 export interface CommitTraversalExtractor {
-  extract(request: CommitTraversalRequest, reporter: Reporter): AsyncIterable<CommitFact>;
+  extract(request: CommitTraversalRequest, reporter: ProgressReporter): AsyncIterable<CommitFact>;
 }
 
 // ---------------------------------------------------------------------------
@@ -282,6 +291,7 @@ export interface CoordinatorRequest {
 
 export interface CoordinatorResult {
   readonly recordsWritten: number;
+  readonly commitsTraversed: number;
   /** Branches for which a head was successfully resolved (skipped branches are omitted). */
   readonly branches: readonly string[];
 }
@@ -304,7 +314,7 @@ export interface CoordinatorDependencies {
   };
   readonly sink: OutputSink;
   readonly checkpointStore: CheckpointStore | undefined;
-  readonly reporter: Reporter;
+  readonly reporter: ProgressReporter;
   /** Optional profiler for accumulating writeMs across sink.write() and sink.close() calls. */
   readonly profiler?: StageProfiler;
 }

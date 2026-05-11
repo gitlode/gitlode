@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { DefaultBranchTraversalPlanner } from "../../src/core/branch-traversal-planner.js";
-import type { BranchTraversalPlanningRequest, CommitHash, Reporter } from "../../src/core/index.js";
+import type {
+  BranchTraversalPlanningRequest,
+  CommitHash,
+  ProgressEvent,
+  ProgressReporter,
+} from "../../src/core/index.js";
 import { GitAdapterError } from "../../src/git/index.js";
 import type { GitAdapter } from "../../src/git/index.js";
 
@@ -9,15 +14,13 @@ function makeHash(n: number): CommitHash {
   return n.toString(16).padStart(40, "0") as CommitHash;
 }
 
-function makeReporter(): Reporter & { warnings: string[] } {
+function makeReporter(): ProgressReporter & { warnings: string[] } {
   const warnings: string[] = [];
   return {
     warnings,
-    warn: (msg) => {
-      warnings.push(msg);
+    emit(event: ProgressEvent) {
+      if (event.type === "warning") warnings.push(event.message);
     },
-    progress: vi.fn(),
-    done: vi.fn(),
   };
 }
 

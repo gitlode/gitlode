@@ -7,7 +7,7 @@ import type {
   BranchTraversalPlanningRequest,
   CommitHash,
   ExtractionRange,
-  Reporter,
+  ProgressReporter,
   StageProfiler,
 } from "./types.js";
 import { assertNever } from "./types.js";
@@ -41,7 +41,7 @@ export class DefaultBranchTraversalPlanner implements BranchTraversalPlanner {
 
   async plan(
     request: BranchTraversalPlanningRequest,
-    reporter: Reporter,
+    reporter: ProgressReporter,
   ): Promise<readonly BranchTraversalPlan[]> {
     return withProfilerAsync(this.profiler, async () => {
       const { repositoryPath, branches, mode, priorBranchMap, range } = request;
@@ -66,9 +66,10 @@ export class DefaultBranchTraversalPlanner implements BranchTraversalPlanner {
           head = await this.adapter.resolveRef(repositoryPath, branch);
         } catch (err) {
           if (err instanceof GitAdapterError && err.code === "REF_NOT_FOUND") {
-            reporter.warn(
-              `Warning: Branch "${branch}" no longer exists in the repository. Skipping.`,
-            );
+            reporter.emit({
+              type: "warning",
+              message: `Warning: Branch "${branch}" no longer exists in the repository. Skipping.`,
+            });
             continue;
           }
           throw err;

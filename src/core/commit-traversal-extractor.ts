@@ -7,7 +7,7 @@ import type {
   CommitTraversalExtractor,
   CommitTraversalRequest,
   ExtractionRange,
-  Reporter,
+  ProgressReporter,
   StageProfiler,
 } from "./types.js";
 
@@ -49,7 +49,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
     this.profiler = profiler;
   }
 
-  extract(request: CommitTraversalRequest, reporter: Reporter): AsyncIterable<CommitFact> {
+  extract(request: CommitTraversalRequest, reporter: ProgressReporter): AsyncIterable<CommitFact> {
     const { repositoryPath, repoName, remoteUrl, plans, range } = request;
     return this.iterateCommitFacts(plans, repositoryPath, repoName, remoteUrl, range, reporter);
   }
@@ -60,7 +60,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
     repoName: string,
     remoteUrl: string | null,
     range: ExtractionRange | undefined,
-    reporter: Reporter,
+    reporter: ProgressReporter,
   ): AsyncIterable<CommitFact> {
     // Run-scoped visited set shared across all branches for cross-branch deduplication.
     const visited = new Set<string>();
@@ -85,7 +85,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
     remoteUrl: string | null,
     range: ExtractionRange | undefined,
     visited: Set<string>,
-    reporter: Reporter,
+    reporter: ProgressReporter,
   ): AsyncIterable<CommitFact> {
     // Process a single raw commit: deduplication + --since-date skip-and-continue filter.
     // Returns null to signal "skip this commit" without aborting traversal.
@@ -112,9 +112,10 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
       }
     } catch (err) {
       if (err instanceof GitAdapterError && err.code === "COMMIT_NOT_FOUND") {
-        reporter.warn(
-          `Warning: Last commit hash for branch "${plan.name}" no longer exists. Falling back to full extraction.`,
-        );
+        reporter.emit({
+          type: "warning",
+          message: `Warning: Last commit hash for branch "${plan.name}" no longer exists. Falling back to full extraction.`,
+        });
         // Full traversal without excludeHash; already-visited commits are skipped via deduplication.
         for await (const rawCommit of this.adapter.walkCommits(repositoryPath, plan.head)) {
           const fact = withProfiler(this.profiler, () => processRawCommit(rawCommit));

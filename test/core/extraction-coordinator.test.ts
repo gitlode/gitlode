@@ -17,7 +17,8 @@ import type {
   ExtractionCheckpoint,
   FileChangeExpander,
   FileChangeFact,
-  Reporter,
+  ProgressEvent,
+  ProgressReporter,
 } from "../../src/core/types.js";
 import type { OutputSink } from "../../src/core/types.js";
 import type { OutputRecord } from "../../src/output/types.js";
@@ -56,26 +57,18 @@ function emptyCheckpoint(repositoryPath = "/repo"): ExtractionCheckpoint {
   return { version: 1, generatedAt: "", repositoryPath, branches: [] };
 }
 
-function makeReporter(): Reporter & {
-  progressCalls: number[];
-  doneCalls: number[];
+function makeProgressReporter(): ProgressReporter & {
+  events: ProgressEvent[];
   warnings: string[];
 } {
-  const progressCalls: number[] = [];
-  const doneCalls: number[] = [];
+  const events: ProgressEvent[] = [];
   const warnings: string[] = [];
   return {
-    progressCalls,
-    doneCalls,
+    events,
     warnings,
-    warn(m) {
-      warnings.push(m);
-    },
-    progress(n) {
-      progressCalls.push(n);
-    },
-    done(n) {
-      doneCalls.push(n);
+    emit(event: ProgressEvent) {
+      events.push(event);
+      if (event.type === "warning") warnings.push(event.message);
     },
   };
 }
@@ -197,7 +190,7 @@ function makeDeps(
     fileProjector: overrides.fileProjector ?? fileProjector,
     sink,
     checkpointStore: overrides.checkpointStore,
-    reporter: overrides.reporter ?? makeReporter(),
+    reporter: overrides.reporter ?? makeProgressReporter(),
     profiler: overrides.profiler,
   };
 }
@@ -244,8 +237,17 @@ describe("DefaultExtractionCoordinator", () => {
     expect(deps.sink.records[0]!.oid).toBe(`${"1".padStart(40, "0")}-file`);
   });
 
-  it("progress-after-write: progress call count matches write count", async () => {
-    const reporter = makeReporter();
+  it("commitsTraversed: result contains correct commit count", async () => {
+    const oids = ["1".padStart(40, "0"), "2".padStart(40, "0"), "3".padStart(40, "0")];
+    const deps = makeDeps({ oids });
+    const coord = new DefaultExtractionCoordinator(deps);
+    const result = await coord.run(baseRequest());
+
+    expect(result.commitsTraversed).toBe(3);
+  });
+
+  it("extracting-progress events: one event emitted per record written", async () => {
+    const reporter = makeProgressReporter();
     const deps = makeDeps({
       reporter,
       oids: ["1".padStart(40, "0"), "2".padStart(40, "0"), "3".padStart(40, "0")],
@@ -253,14 +255,66 @@ describe("DefaultExtractionCoordinator", () => {
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
 
-    expect(reporter.progressCalls).toEqual([1, 2, 3]);
+    const progressEvents = reporter.events.filter((e) => e.type === "extracting-progress");
+    expect(progressEvents).toHaveLength(3);
     expect(deps.sink.records).toHaveLength(3);
-    // Each progress call happened AFTER the corresponding write
-    expect(reporter.progressCalls).toHaveLength(deps.sink.records.length);
+    // Each progress event happened after the corresponding write
+    expect(progressEvents).toHaveLength(deps.sink.records.length);
   });
 
-  it("done() is always called (even after sink.write() failure)", async () => {
-    const reporter = makeReporter();
+  it("phase event sequence: emits prepare/extract/finalize in order", async () => {
+    const reporter = makeProgressReporter();
+    const deps = makeDeps({ reporter, oids: ["1".padStart(40, "0")] });
+    const coord = new DefaultExtractionCoordinator(deps);
+    await coord.run(baseRequest());
+
+    const phaseEvents = reporter.events
+      .filter((e) => e.type === "phase-start" || e.type === "phase-end")
+      .map((e) => `${e.type}:${(e as { phase: string }).phase}`);
+
+    expect(phaseEvents).toEqual([
+      "phase-start:preparing",
+      "phase-end:preparing",
+      "phase-start:extracting",
+      "phase-end:extracting",
+      "phase-start:finalizing",
+      "phase-end:finalizing",
+    ]);
+  });
+
+  it("branchIndex: tracking increments across multi-branch runs", async () => {
+    const reporter = makeProgressReporter();
+    const plans: readonly BranchTraversalPlan[] = [
+      { name: "main", head: FAKE_HEAD as never, excludeHash: undefined },
+      { name: "develop", head: FAKE_HEAD_2 as never, excludeHash: undefined },
+    ];
+    // Each branch yields a unique commit so dedup doesn't discard them
+    const uniqueOids = ["1".padStart(40, "0"), "2".padStart(40, "0")];
+    const traverser: CommitTraversalExtractor = {
+      extract(req: CommitTraversalRequest): AsyncIterable<CommitFact> {
+        const planName = req.plans[0]?.name ?? "";
+        const oid = planName === "main" ? uniqueOids[0]! : uniqueOids[1]!;
+        return (async function* () {
+          yield makeCommitFact(oid);
+        })();
+      },
+    };
+    const deps = makeDeps({ reporter, plans, traversalExtractor: traverser });
+    const coord = new DefaultExtractionCoordinator(deps);
+    await coord.run(baseRequest({ branches: ["main", "develop"] }));
+
+    const progressEvents = reporter.events.filter(
+      (e): e is Extract<ProgressEvent, { type: "extracting-progress" }> =>
+        e.type === "extracting-progress",
+    );
+    expect(progressEvents[0]?.branchIndex).toBe(0);
+    expect(progressEvents[0]?.branchCount).toBe(2);
+    expect(progressEvents[1]?.branchIndex).toBe(1);
+    expect(progressEvents[1]?.branchCount).toBe(2);
+  });
+
+  it("phase-end extracting NOT emitted when sink.write() throws", async () => {
+    const reporter = makeProgressReporter();
     const failingSink: OutputSink = {
       async write() {
         throw new Error("write failure");
@@ -277,8 +331,10 @@ describe("DefaultExtractionCoordinator", () => {
     const coord = new DefaultExtractionCoordinator(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write failure");
 
-    expect(reporter.doneCalls).toHaveLength(1);
-    expect(reporter.doneCalls[0]).toBe(0);
+    const phaseEndExtract = reporter.events.filter(
+      (e) => e.type === "phase-end" && (e as { phase: string }).phase === "extracting",
+    );
+    expect(phaseEndExtract).toHaveLength(0);
   });
 
   it("close() is always called (even after sink.write() failure)", async () => {
@@ -401,9 +457,9 @@ describe("DefaultExtractionCoordinator", () => {
     // No error — just not written
   });
 
-  it("zero-record run: done() and close() called; no checkpoint written when empty branches", async () => {
+  it("zero-record run: close() called; no checkpoint written when empty branches", async () => {
     const checkpointStore = makeCheckpointStore();
-    const reporter = makeReporter();
+    const reporter = makeProgressReporter();
     const deps = makeDeps({
       plans: [], // no branches resolved
       oids: [],
@@ -415,25 +471,21 @@ describe("DefaultExtractionCoordinator", () => {
 
     expect(result.recordsWritten).toBe(0);
     expect(result.branches).toEqual([]);
-    expect(reporter.doneCalls).toHaveLength(1);
-    expect(reporter.doneCalls[0]).toBe(0);
     // branches.length === 0 → checkpoint skipped
     expect(checkpointStore.stored).toBeNull();
   });
 
   it("no-branch-head case: planner returns empty plans, zero records, no checkpoint", async () => {
     const checkpointStore = makeCheckpointStore();
-    const reporter = makeReporter();
     const deps = makeDeps({
       plans: [],
       oids: [],
       checkpointStore,
-      reporter,
     });
     const coord = new DefaultExtractionCoordinator(deps);
-    await coord.run(baseRequest({ branches: ["nonexistent"] }));
+    const result = await coord.run(baseRequest({ branches: ["nonexistent"] }));
 
-    expect(reporter.doneCalls[0]).toBe(0);
+    expect(result.recordsWritten).toBe(0);
     expect(checkpointStore.stored).toBeNull();
   });
 
@@ -443,11 +495,20 @@ describe("DefaultExtractionCoordinator", () => {
       { name: "main", head: FAKE_HEAD as never, excludeHash: undefined },
       { name: "develop", head: FAKE_HEAD_2 as never, excludeHash: undefined },
     ];
-    // Traversal still returns oids for one branch
+    // Each branch yields a unique commit so dedup doesn't discard them
+    const traverser: CommitTraversalExtractor = {
+      extract(req: CommitTraversalRequest): AsyncIterable<CommitFact> {
+        const planName = req.plans[0]?.name ?? "";
+        const oid = planName === "main" ? "1".padStart(40, "0") : "2".padStart(40, "0");
+        return (async function* () {
+          yield makeCommitFact(oid);
+        })();
+      },
+    };
     const deps = makeDeps({
       plans,
       checkpointStore,
-      oids: ["1".padStart(40, "0")],
+      traversalExtractor: traverser,
     });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ branches: ["main", "develop"] }));

@@ -188,7 +188,7 @@ expander → file projector, else commit projector`) before consuming the projec
 - Failure-path partial timing output is out of scope for Phase 6; extraction errors preserve the
   current error-path behavior.
 
-### Phase 7 progress and cleanup contract (finalized after design refinement)
+### Phase 7 progress and cleanup contract (implemented)
 
 - Phase 7 design refinement is complete. The UX contract and implementation design are finalized
   and ready for implementation session.

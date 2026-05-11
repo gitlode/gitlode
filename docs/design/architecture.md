@@ -127,7 +127,12 @@ Notably, state file reading and writing are not CLI responsibilities.
 
 Files:
 
-- `src/core/extractor.ts`
+- `src/core/extraction-coordinator.ts`
+- `src/core/branch-traversal-planner.ts`
+- `src/core/commit-traversal-extractor.ts`
+- `src/core/file-change-expander.ts`
+- `src/core/commit-record-projector.ts`
+- `src/core/file-change-record-projector.ts`
 - `src/core/types.ts`
 - `src/core/index.ts`
 
@@ -181,7 +186,7 @@ Core provides rotation settings, but Writer owns enforcement.
 ## End-to-End Runtime Flow
 
 1. CLI parses args, validates rules, and builds `ExtractorConfig`.
-2. CLI creates `IsomorphicGitAdapter` and `Extractor`.
+2. CLI creates `IsomorphicGitAdapter`, `ProgressController`, and stage instances; calls `DefaultExtractionCoordinator.run()` directly.
 3. Core loads state if configured.
 4. For each branch:
    - Resolve branch head.
@@ -265,7 +270,7 @@ Profiling entries are accumulated by the stage that owns each operation:
 
 | Entry path                 | Owning stage                                          | What is measured                                                       |
 | -------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------- |
-| `elapsed`                  | `Extractor` root profiler                             | Total extraction wall/work duration                                    |
+| `elapsed`                  | `src/index.ts` root profiler                          | Total extraction wall/work duration                                    |
 | `elapsed/planning`         | `BranchTraversalPlanner`                              | Branch-head resolution and exclude-hash planning                       |
 | `elapsed/traversal`        | `CommitTraversalExtractor`                            | Commit traversal and commit-fact materialization                       |
 | `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector` | Fact-to-output-record mapping                                          |
@@ -274,9 +279,9 @@ Profiling entries are accumulated by the stage that owns each operation:
 | `elapsed/git/diff`         | `IsomorphicGitAdapter`                                | Time computing line-level diff statistics per file                     |
 | `elapsed/git/...` children | `IsomorphicGitAdapter`                                | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
 
-A `StageProfiler` object is created per run inside `Extractor` and passed to each stage
+A `StageProfiler` object is created per run at the runtime edge (`src/index.ts`) and passed to each stage
 constructor. `IsomorphicGitAdapter` exposes a `setProfiler()` method (not on the `GitAdapter`
-interface) that `Extractor` calls via duck-typing. This keeps the `GitAdapter` contract stable
+interface) that `src/index.ts` calls via duck-typing. This keeps the `GitAdapter` contract stable
 while enabling profiling of adapter internals.
 
 `ExtractionResult.profilingEntries` is populated on every successful run. The root `elapsed` entry

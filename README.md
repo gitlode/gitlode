@@ -6,7 +6,7 @@ A CLI tool that extracts commit history from a local Git repository and outputs 
 
 - Reads the local `.git` directory directly via [isomorphic-git](https://isomorphic-git.org/) — no `git` CLI required at runtime
 - Outputs one commit per line in JSON Lines format
-- Explicit extraction modes: `--mode snapshot` for independent extraction, `--mode incremental` for differential extraction using a state file
+- Two extraction modes: snapshot (full extraction each run) and `--incremental` (differential extraction using a state file)
 - Handles multi-branch extraction with cross-branch deduplication
 
 ## Requirements
@@ -28,7 +28,7 @@ gitrail -b main ./my-repo
 
 # Continuous extraction — fetch remote changes, then extract new commits
 git -C ./my-repo fetch origin
-gitrail -m incremental -b origin/main -s ./gitrail-state.json --on-missing-state snapshot ./my-repo
+gitrail --incremental -b origin/main -s ./gitrail-state.json --missing-state snapshot ./my-repo
 ```
 
 See the [User Guide](docs/usage.md) for detailed workflow patterns including incremental setup,
@@ -54,10 +54,10 @@ gitrail [options] <repository-path>
 | `--per-file`               |       | boolean             |          | `false` | When set, emits one record per changed file per commit; when absent, emits one record per commit (default). |
 | `--rotate-lines <n>`       |       | number              |          | —       | Start new file after `n` lines                                                                              |
 | `--rotate-size <bytes>`    |       | number              |          | —       | Start new file after `n` bytes                                                                              |
-| `--quiet`                  | `-q`  | boolean             |          | `false` | Suppress progress and summary output                                                                        |
+| `--quiet`                  | `-q`  | boolean             |          | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.               |
 | `--profile`                |       | boolean             |          | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`.        |
 
-Progress updates and the final summary are written to **stderr**; use `--quiet` to suppress them.
+Progress, summary, and profile output are written to **stderr**; use `--quiet` to suppress them.
 Validation errors exit with code `1`; runtime errors with code `2`. See the
 [User Guide](docs/usage.md#cli-reference) for the full list of mutual exclusion rules.
 

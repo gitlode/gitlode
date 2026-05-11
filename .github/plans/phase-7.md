@@ -353,23 +353,25 @@ interface TerminalSink {
 Replace the old scalar `Reporter` with a phase-aware `ProgressReporter` and event union. Do not
 keep a dual pathway (`Reporter` + side-channel sink).
 
+Core progress events must remain wall-clock independent. Elapsed-time calculation for UI rendering
+belongs to the runtime edge (CLI) using injected clocks.
+
 ```ts
 type ProgressPhase = "preparing" | "extracting" | "finalizing";
 
 type ProgressEvent =
-  | { type: "phase-start"; phase: ProgressPhase; atMs: number }
+  | { type: "phase-start"; phase: ProgressPhase }
   | {
       type: "extracting-progress";
       phase: "extracting";
-      atMs: number;
       branchIndex: number; // 1-based among resolved branches
       branchCount: number;
       commitsTraversed: number;
       recordsWritten: number;
       bytesWritten: number;
     }
-  | { type: "phase-end"; phase: ProgressPhase; atMs: number }
-  | { type: "warning"; atMs: number; message: string };
+  | { type: "phase-end"; phase: ProgressPhase }
+  | { type: "warning"; message: string };
 
 interface ProgressReporter {
   emit(event: ProgressEvent): void;

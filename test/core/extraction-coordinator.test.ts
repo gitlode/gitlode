@@ -466,32 +466,40 @@ describe("DefaultExtractionCoordinator", () => {
     expect(checkpointStore.stored?.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
-  it("profiler.addWriteMs called for write and close but NOT checkpoint write", async () => {
+  it("profiler.resume/stop called for write and close but NOT checkpoint write", async () => {
     let time = 0;
-    const profilerStub = {
-      now: () => ++time,
-      addTraversalMs: (_ms: number) => {},
-      addBlobReadMs: (_ms: number) => {},
-      addDiffMs: (_ms: number) => {},
-      addProjectionMs: (_ms: number) => {},
-      writeMs: 0,
-      addWriteMs(ms: number) {
-        this.writeMs += ms;
+    let resumeCount = 0;
+    let stopCount = 0;
+    let measureWorkCount = 0;
+    const profilerStub: import("../../src/core/types.js").StageProfiler = {
+      name: "write",
+      start() {},
+      resume() {
+        resumeCount++;
       },
-      snapshot: () => ({
-        traversalMs: 0,
-        blobReadMs: 0,
-        diffMs: 0,
-        projectionMs: 0,
-        writeMs: time,
-      }),
+      stop() {
+        stopCount++;
+      },
+      measureWork<T>(fn: () => T): T {
+        measureWorkCount++;
+        time++;
+        return fn();
+      },
+      createScopedProfiler(_name: string) {
+        return profilerStub;
+      },
+      entries() {
+        return [{ name: "write", wallMs: time, workMs: measureWorkCount }];
+      },
     };
 
     const deps = makeDeps({ oids: ["1".padStart(40, "0")], profiler: profilerStub });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
 
-    // writeMs accumulated from write + close calls; must be > 0 with incrementing clock
-    expect(profilerStub.writeMs).toBeGreaterThan(0);
+    // resume/stop called once for write, once for close (2 pairs total)
+    expect(resumeCount).toBe(2);
+    expect(stopCount).toBe(2);
+    expect(measureWorkCount).toBe(2);
   });
 });

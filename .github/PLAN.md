@@ -63,7 +63,7 @@ The primary focus is the roadmap item `Architecture: Fact-based extraction pipel
 ### Phase 6: Stage-Aligned Profiling Instrumentation
 
 - **File**: [`plans/phase-6.md`](plans/phase-6.md)
-- **Status**: Planned
+- **Status**: In progress
 
 ### Phase 7: Progress Reporting Redesign and Obsolete-Path Cleanup
 

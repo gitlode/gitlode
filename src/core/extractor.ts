@@ -97,19 +97,23 @@ export class Extractor {
   }
 
   async run(): Promise<ExtractionResult> {
-    const startTime = this.monotonicNow();
     const repoPath = resolve(this.config.repositoryPath);
+    const enableProfiling = this.config.enableProfiling === true;
 
     const remoteUrl = await this.adapter.getRemoteUrl(repoPath);
     const repoName = deriveRepoName(remoteUrl, repoPath);
 
-    // Create a fresh profiler for this run.
-    const profiler: StageProfiler = new DefaultStageProfiler(this.monotonicNow);
+    // Create a fresh root profiler for this run and start it immediately.
+    const rootProfiler = new DefaultStageProfiler("elapsed", this.monotonicNow);
+    rootProfiler.start();
 
-    // Wire profiler to adapter if it supports setProfiler (duck-typed; GitAdapter interface unchanged).
-    const profilable = this.adapter as unknown as { setProfiler?: (p: StageProfiler) => void };
-    if (typeof profilable.setProfiler === "function") {
-      profilable.setProfiler(profiler);
+    // Wire a scoped "git" profiler only when stage-level profiling is enabled.
+    if (enableProfiling) {
+      const gitProfiler = rootProfiler.createScopedProfiler("git");
+      const profilable = this.adapter as unknown as { setProfiler?: (p: StageProfiler) => void };
+      if (typeof profilable.setProfiler === "function") {
+        profilable.setProfiler(gitProfiler);
+      }
     }
 
     // Load and validate prior checkpoint (includes missing-state warning emission).
@@ -124,12 +128,31 @@ export class Extractor {
     );
     const sink = new OutputWriterSink(writer);
 
-    // Construct stage instances — pass profiler to each timed stage.
-    const traversalPlanner = new DefaultBranchTraversalPlanner(this.adapter);
-    const traversalExtractor = new DefaultCommitTraversalExtractor(this.adapter, profiler);
+    // Create per-stage scoped profilers only when enabled.
+    const planningProfiler = enableProfiling
+      ? rootProfiler.createScopedProfiler("planning")
+      : undefined;
+    const traversalProfiler = enableProfiling
+      ? rootProfiler.createScopedProfiler("traversal")
+      : undefined;
+    const projectionProfiler = enableProfiling
+      ? rootProfiler.createScopedProfiler("projection")
+      : undefined;
+    const writeProfiler = enableProfiling ? rootProfiler.createScopedProfiler("write") : undefined;
+
+    const traversalPlanner = new DefaultBranchTraversalPlanner(this.adapter, planningProfiler);
+    const traversalExtractor = new DefaultCommitTraversalExtractor(this.adapter, traversalProfiler);
     const fileChangeExpander = new DefaultFileChangeExpander(this.adapter);
-    const commitProjector = new DefaultCommitRecordProjector(repoName, remoteUrl, profiler);
-    const fileProjector = new DefaultFileChangeRecordProjector(repoName, remoteUrl, profiler);
+    const commitProjector = new DefaultCommitRecordProjector(
+      repoName,
+      remoteUrl,
+      projectionProfiler,
+    );
+    const fileProjector = new DefaultFileChangeRecordProjector(
+      repoName,
+      remoteUrl,
+      projectionProfiler,
+    );
 
     const deps: CoordinatorDependencies = {
       traversalPlanner,
@@ -140,7 +163,7 @@ export class Extractor {
       sink,
       checkpointStore: this.stateStore,
       reporter: this.reporter,
-      profiler,
+      profiler: writeProfiler,
     };
     const coordinator = new DefaultExtractionCoordinator(deps);
 
@@ -155,13 +178,14 @@ export class Extractor {
       sessionTimestamp,
     });
 
+    rootProfiler.stop();
+
     return {
       recordsWritten: result.recordsWritten,
       filesCreated: sink.filesCreated,
       bytesWritten: sink.bytesWritten,
-      elapsedMs: this.monotonicNow() - startTime,
       branches: result.branches,
-      timings: profiler.snapshot(),
+      profilingEntries: rootProfiler.entries(),
     };
   }
 }

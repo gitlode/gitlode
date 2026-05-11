@@ -367,6 +367,43 @@ help prioritize which alternative `DiffAdapter` implementations to pursue first.
 
 ### Long-term
 
+#### Development: Profiling interpretation model and usability
+
+The current profiling implementation is already sufficient as a measurement foundation, but its
+output still requires internal code knowledge to interpret confidently. This is not an urgent
+performance bottleneck item; it is a long-term quality improvement for profiling readability,
+operational diagnostics, and future optimization planning.
+
+**Current pain points observed after Phase 6**:
+
+- The relationship between pipeline phases (planning/traversal/projection/write) and git-internal
+  stages (`git/*`) is difficult to understand without knowing the program structure.
+- Nested scoped timings in the git stage can express containment, but are still hard to read in
+  day-to-day diagnostics.
+
+**Long-term improvement goals**:
+
+- Add a stable phase-to-git stage mapping model and document it explicitly.
+- Add self-time style visibility in addition to inclusive stage timings so local bottlenecks are
+  easier to identify.
+- Add count metrics alongside timing metrics (for example: read-commit calls, visited commits,
+  excluded commits, blob reads, diff invocations) to distinguish expensive-per-call from many-call
+  workloads.
+- Provide multiple profile views for different audiences (hierarchical detailed view, phase-level
+  summary, and top-contributor summary).
+- Add machine-readable profile export (for example JSON) for cross-run comparison and CI trend
+  analysis.
+- Clarify profiling interpretation guidance in docs, including nested timing semantics and overlap
+  behavior.
+- Evaluate and document profiling overhead characteristics to reduce over-interpretation of tiny
+  runs.
+
+**Design intent**:
+
+- Keep the existing profiling behavior as the stable baseline.
+- Treat these items as interpretation and observability UX improvements, not as mandatory
+  preconditions for current extraction correctness.
+
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
 
 Allow users to attach custom processing stages to gitrail's extraction pipeline so that

@@ -1,5 +1,6 @@
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
+import { withProfiler } from "./profiler-utils.js";
 import type {
   BranchTraversalPlan,
   CommitFact,
@@ -106,9 +107,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
         plan.head,
         plan.excludeHash,
       )) {
-        const t0 = this.profiler ? this.profiler.now() : 0;
-        const fact = processRawCommit(rawCommit);
-        if (this.profiler) this.profiler.addTraversalMs(this.profiler.now() - t0);
+        const fact = withProfiler(this.profiler, () => processRawCommit(rawCommit));
         if (fact !== null) yield fact;
       }
     } catch (err) {
@@ -118,9 +117,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
         );
         // Full traversal without excludeHash; already-visited commits are skipped via deduplication.
         for await (const rawCommit of this.adapter.walkCommits(repositoryPath, plan.head)) {
-          const t0 = this.profiler ? this.profiler.now() : 0;
-          const fact = processRawCommit(rawCommit);
-          if (this.profiler) this.profiler.addTraversalMs(this.profiler.now() - t0);
+          const fact = withProfiler(this.profiler, () => processRawCommit(rawCommit));
           if (fact !== null) yield fact;
         }
       } else {

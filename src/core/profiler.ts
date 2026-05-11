@@ -1,49 +1,95 @@
-import type { ExtractionTimings, MonotonicClock, StageProfiler } from "./types.js";
+import type { MonotonicClock, ProfilingEntry, StageProfiler } from "./types.js";
 
 export class DefaultStageProfiler implements StageProfiler {
-  private _traversalMs = 0;
-  private _blobReadMs = 0;
-  private _diffMs = 0;
-  private _projectionMs = 0;
-  private _writeMs = 0;
+  readonly name: string;
 
-  private readonly clock: MonotonicClock;
+  private readonly _clock: MonotonicClock;
+  /** Full slash-separated path from the root, used as the key in entries(). */
+  private readonly _fullPath: string;
+  private _activeCount = 0;
+  private _activeStart = 0;
+  private _wallMs = 0;
+  private _workMs = 0;
+  private readonly _children: DefaultStageProfiler[] = [];
 
-  constructor(clock: MonotonicClock) {
-    this.clock = clock;
+  constructor(name: string, clock: MonotonicClock, fullPath?: string) {
+    this.name = name;
+    this._clock = clock;
+    this._fullPath = fullPath ?? name;
   }
 
-  now(): number {
-    return this.clock();
+  start(): void {
+    if (this._activeCount > 0) return;
+    this._wallMs = 0;
+    this._workMs = 0;
+    this._activeCount = 1;
+    this._activeStart = this._clock();
   }
 
-  addTraversalMs(ms: number): void {
-    this._traversalMs += ms;
+  resume(): void {
+    if (this._activeCount === 0) {
+      this._activeStart = this._clock();
+    }
+    this._activeCount++;
   }
 
-  addBlobReadMs(ms: number): void {
-    this._blobReadMs += ms;
+  stop(): void {
+    if (this._activeCount === 0) return;
+    this._activeCount--;
+    if (this._activeCount === 0) {
+      this._wallMs += this._clock() - this._activeStart;
+    }
   }
 
-  addDiffMs(ms: number): void {
-    this._diffMs += ms;
+  private _addWorkMs(ms: number): void {
+    if (!Number.isFinite(ms) || ms < 0) return;
+    this._workMs += ms;
   }
 
-  addProjectionMs(ms: number): void {
-    this._projectionMs += ms;
+  measureWork<T>(fn: () => T): T {
+    const startedAt = this._clock();
+    try {
+      const result = fn();
+      if (this._isPromiseLike(result)) {
+        return result.finally(() => {
+          this._addWorkMs(this._clock() - startedAt);
+        }) as T;
+      }
+      this._addWorkMs(this._clock() - startedAt);
+      return result;
+    } catch (error) {
+      this._addWorkMs(this._clock() - startedAt);
+      throw error;
+    }
   }
 
-  addWriteMs(ms: number): void {
-    this._writeMs += ms;
+  private _isPromiseLike<T>(value: T): value is T & Promise<unknown> {
+    return typeof value === "object" && value !== null && "finally" in value;
   }
 
-  snapshot(): ExtractionTimings {
-    return {
-      traversalMs: this._traversalMs,
-      blobReadMs: this._blobReadMs,
-      diffMs: this._diffMs,
-      projectionMs: this._projectionMs,
-      writeMs: this._writeMs,
-    };
+  createScopedProfiler(name: string): StageProfiler {
+    // Escape `/` in caller-supplied name so the separator is unambiguous in full paths.
+    const escapedName = name.replace(/\//g, "//");
+    const childPath = `${this._fullPath}/${escapedName}`;
+    const child = new DefaultStageProfiler(escapedName, this._clock, childPath);
+    this._children.push(child);
+    return child;
+  }
+
+  entries(): readonly ProfilingEntry[] {
+    const currentWallMs =
+      this._activeCount > 0 ? this._wallMs + (this._clock() - this._activeStart) : this._wallMs;
+
+    const result: ProfilingEntry[] = [
+      { name: this._fullPath, wallMs: currentWallMs, workMs: this._workMs },
+    ];
+
+    for (const child of this._children) {
+      for (const entry of child.entries()) {
+        result.push(entry);
+      }
+    }
+
+    return result;
   }
 }

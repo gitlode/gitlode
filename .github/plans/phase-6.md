@@ -8,7 +8,7 @@ default stderr contract when profiling is not requested._
 #### Status
 
 - [x] Planned
-- [ ] In progress
+- [x] In progress
 - [ ] Completed
 
 #### Design Maturity

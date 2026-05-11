@@ -237,7 +237,7 @@ describe("Extractor", () => {
     expect(lines).toHaveLength(3);
   });
 
-  it("result.timings is defined with non-negative buckets on a successful commit-mode run", async () => {
+  it("result.profilingEntries is defined with non-negative buckets on a successful commit-mode run", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     await addCommit("a.txt", "v1", "first commit", 1000);
@@ -247,28 +247,32 @@ describe("Extractor", () => {
     const extractor = makeExtractor(config, adapter);
     const result = await extractor.run();
 
-    expect(result.timings).toBeDefined();
-    const t = result.timings!;
-    expect(t.traversalMs).toBeGreaterThanOrEqual(0);
-    expect(t.blobReadMs).toBeGreaterThanOrEqual(0);
-    expect(t.diffMs).toBeGreaterThanOrEqual(0);
-    expect(t.projectionMs).toBeGreaterThanOrEqual(0);
-    expect(t.writeMs).toBeGreaterThanOrEqual(0);
+    expect(result.profilingEntries.length).toBeGreaterThan(0);
+    for (const entry of result.profilingEntries) {
+      expect(entry.wallMs).toBeGreaterThanOrEqual(0);
+      expect(entry.workMs).toBeGreaterThanOrEqual(0);
+    }
   });
 
-  it("blobReadMs and diffMs are 0 in commit-granularity runs (getFileChanges is never called)", async () => {
+  it("blob-read and diff entries are 0 in commit-granularity runs (getFileChanges is never called)", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     await addCommit("a.txt", "v1", "first commit", 1000);
 
     const adapter = new IsomorphicGitAdapter(fs);
-    const config = makeConfig({ outputDir: tmpDir }); // default commit mode
+    const config = makeConfig({
+      outputDir: tmpDir,
+      enableProfiling: true,
+    }); // default commit mode
     const extractor = makeExtractor(config, adapter);
     const result = await extractor.run();
 
-    expect(result.timings).toBeDefined();
-    expect(result.timings!.blobReadMs).toBe(0);
-    expect(result.timings!.diffMs).toBe(0);
+    const blobEntry = result.profilingEntries.find((e) => e.name.endsWith("/blob-read"));
+    const diffEntry = result.profilingEntries.find((e) => e.name.endsWith("/diff"));
+    expect(blobEntry?.wallMs).toBe(0);
+    expect(blobEntry?.workMs).toBe(0);
+    expect(diffEntry?.wallMs).toBe(0);
+    expect(diffEntry?.workMs).toBe(0);
   });
 
   it("cross-branch deduplication: shared commits appear exactly once", async () => {
@@ -430,7 +434,7 @@ describe("Extractor", () => {
     expect(result.recordsWritten).toBe(3);
     expect(result.filesCreated).toBe(1);
     expect(result.bytesWritten).toBeGreaterThan(0);
-    expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
+    expect(result.profilingEntries.length).toBeGreaterThan(0);
     expect(result.branches).toEqual(["main"]);
   });
 

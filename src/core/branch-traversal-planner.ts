@@ -1,5 +1,6 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
+import { withProfilerAsync } from "./profiler-utils.js";
 import type {
   BranchTraversalPlan,
   BranchTraversalPlanner,
@@ -7,6 +8,7 @@ import type {
   CommitHash,
   ExtractionRange,
   Reporter,
+  StageProfiler,
 } from "./types.js";
 import { assertNever } from "./types.js";
 
@@ -30,52 +32,56 @@ function resolveExcludeHash(
 
 export class DefaultBranchTraversalPlanner implements BranchTraversalPlanner {
   private readonly adapter: GitAdapter;
+  private readonly profiler?: StageProfiler;
 
-  constructor(adapter: GitAdapter) {
+  constructor(adapter: GitAdapter, profiler?: StageProfiler) {
     this.adapter = adapter;
+    this.profiler = profiler;
   }
 
   async plan(
     request: BranchTraversalPlanningRequest,
     reporter: Reporter,
   ): Promise<readonly BranchTraversalPlan[]> {
-    const { repositoryPath, branches, mode, priorBranchMap, range } = request;
+    return withProfilerAsync(this.profiler, async () => {
+      const { repositoryPath, branches, mode, priorBranchMap, range } = request;
 
-    const newBranches = new Set<string>(
-      mode === "incremental" ? branches.filter((branch) => !priorBranchMap.has(branch)) : [],
-    );
-
-    let newBranchExclude: CommitHash | undefined;
-    if (newBranches.size > 0 && priorBranchMap.size > 0) {
-      const mergeBase = await this.adapter.findMergeBase(
-        repositoryPath,
-        Array.from(priorBranchMap.values()),
+      const newBranches = new Set<string>(
+        mode === "incremental" ? branches.filter((branch) => !priorBranchMap.has(branch)) : [],
       );
-      newBranchExclude = mergeBase ?? undefined;
-    }
 
-    const plans: BranchTraversalPlan[] = [];
-    for (const branch of branches) {
-      let head: CommitHash;
-      try {
-        head = await this.adapter.resolveRef(repositoryPath, branch);
-      } catch (err) {
-        if (err instanceof GitAdapterError && err.code === "REF_NOT_FOUND") {
-          reporter.warn(
-            `Warning: Branch "${branch}" no longer exists in the repository. Skipping.`,
-          );
-          continue;
-        }
-        throw err;
+      let newBranchExclude: CommitHash | undefined;
+      if (newBranches.size > 0 && priorBranchMap.size > 0) {
+        const mergeBase = await this.adapter.findMergeBase(
+          repositoryPath,
+          Array.from(priorBranchMap.values()),
+        );
+        newBranchExclude = mergeBase ?? undefined;
       }
 
-      plans.push({
-        name: branch,
-        head,
-        excludeHash: resolveExcludeHash(branch, priorBranchMap, newBranchExclude, range),
-      });
-    }
+      const plans: BranchTraversalPlan[] = [];
+      for (const branch of branches) {
+        let head: CommitHash;
+        try {
+          head = await this.adapter.resolveRef(repositoryPath, branch);
+        } catch (err) {
+          if (err instanceof GitAdapterError && err.code === "REF_NOT_FOUND") {
+            reporter.warn(
+              `Warning: Branch "${branch}" no longer exists in the repository. Skipping.`,
+            );
+            continue;
+          }
+          throw err;
+        }
 
-    return plans;
+        plans.push({
+          name: branch,
+          head,
+          excludeHash: resolveExcludeHash(branch, priorBranchMap, newBranchExclude, range),
+        });
+      }
+
+      return plans;
+    });
   }
 }

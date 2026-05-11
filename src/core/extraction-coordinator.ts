@@ -1,3 +1,4 @@
+import { withProfilerAsync } from "./profiler-utils.js";
 import type {
   BranchCheckpoint,
   CoordinatorDependencies,
@@ -87,17 +88,13 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     let recordsWritten = 0;
     try {
       for await (const record of recordStream) {
-        const tWrite = profiler ? profiler.now() : 0;
-        await sink.write(record);
-        if (profiler) profiler.addWriteMs(profiler.now() - tWrite);
+        await withProfilerAsync(profiler, () => sink.write(record));
         recordsWritten++;
         reporter.progress(recordsWritten);
       }
     } finally {
       reporter.done(recordsWritten);
-      const tClose = profiler ? profiler.now() : 0;
-      await sink.close();
-      if (profiler) profiler.addWriteMs(profiler.now() - tClose);
+      await withProfilerAsync(profiler, () => sink.close());
     }
 
     // -----------------------------------------------------------------------

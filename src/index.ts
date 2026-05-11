@@ -89,7 +89,7 @@ const main = defineCommand({
         ? new NodeCheckpointStore(parsed.stateFilePath)
         : undefined;
       const extractor = new Extractor(
-        parsed,
+        { ...parsed, enableProfiling: profile },
         adapter,
         reporter,
         () => new Date(),
@@ -98,7 +98,8 @@ const main = defineCommand({
       );
       const result = await extractor.run();
       if (!quiet) {
-        const elapsed = (result.elapsedMs / 1000).toFixed(1);
+        const elapsedMs = result.profilingEntries[0]?.wallMs ?? 0;
+        const elapsed = (elapsedMs / 1000).toFixed(1);
         process.stderr.write(`\nExtraction complete\n`);
         process.stderr.write(`  Records written : ${result.recordsWritten}\n`);
         process.stderr.write(`  Files created   : ${result.filesCreated}\n`);
@@ -107,14 +108,21 @@ const main = defineCommand({
         process.stderr.write(
           `  Branches        : ${result.branches.length > 0 ? result.branches.join(", ") : "(none)"}\n`,
         );
-        if (profile && result.timings) {
-          const t = result.timings;
+        if (profile) {
+          const nameWidth = Math.max(...result.profilingEntries.map((e) => e.name.length));
+          const wallWidth = Math.max(
+            ...result.profilingEntries.map((e) => e.wallMs.toFixed(2).length),
+          );
+          const workWidth = Math.max(
+            ...result.profilingEntries.map((e) => e.workMs.toFixed(2).length),
+          );
           process.stderr.write(`\nProfile\n`);
-          process.stderr.write(`  Traversal   : ${t.traversalMs.toFixed(2)}ms\n`);
-          process.stderr.write(`  Blob reads  : ${t.blobReadMs.toFixed(2)}ms\n`);
-          process.stderr.write(`  Diff        : ${t.diffMs.toFixed(2)}ms\n`);
-          process.stderr.write(`  Projection  : ${t.projectionMs.toFixed(2)}ms\n`);
-          process.stderr.write(`  Write       : ${t.writeMs.toFixed(2)}ms\n`);
+          for (const entry of result.profilingEntries) {
+            const label = entry.name.padEnd(nameWidth);
+            const wall = `${entry.wallMs.toFixed(2)}ms`.padStart(wallWidth + 2);
+            const work = `${entry.workMs.toFixed(2)}ms`.padStart(workWidth + 2);
+            process.stderr.write(`  ${label} : wall= ${wall}  work= ${work}\n`);
+          }
         }
       }
     } catch (e) {

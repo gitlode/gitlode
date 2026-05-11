@@ -7,13 +7,9 @@ import { defineCommand, runMain } from "citty";
 
 import type { ParsedArgs } from "./cli/args.js";
 import { cmdDefinition, parseArgs } from "./cli/index.js";
-import {
-  formatProfileLines,
-  formatSummaryLines,
-  ProgressController,
-  resolveUiMode,
-} from "./cli/progress.js";
-import type { TerminalSink } from "./cli/progress.js";
+import { ProgressController, resolveUiMode } from "./cli/progress/index.js";
+import type { TerminalSink } from "./cli/progress/index.js";
+import { formatProfileLines, formatSummaryLines } from "./cli/reporting/index.js";
 import {
   DefaultBranchTraversalPlanner,
   DefaultCommitRecordProjector,

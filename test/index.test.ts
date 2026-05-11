@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatElapsed,
-  formatProfileLines,
-  formatSummaryLines,
   humanizeBytes,
   ProgressController,
   resolveUiMode,
@@ -11,7 +9,8 @@ import {
   type Scheduler,
   type TerminalSink,
   type UiMode,
-} from "../src/cli/progress.js";
+} from "../src/cli/progress/index.js";
+import { formatProfileLines, formatSummaryLines } from "../src/cli/reporting/index.js";
 import type { ProgressEvent } from "../src/core/index.js";
 
 // ---------------------------------------------------------------------------

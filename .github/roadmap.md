@@ -28,71 +28,47 @@ This keeps the roadmap stable for both humans and LLMs while still making releas
 
 ### Near-term
 
-#### CLI UX: Parameter model redesign for extraction and output grain
+#### CLI UX: Release-boundary extraction workflow
 
-The current CLI parameter system mixes multiple conceptual axes in a way that is technically
-usable but not clean from a user-experience perspective. In particular, the combination of
-`--mode snapshot|incremental`, `--output-mode commit|file`, and `--on-missing-state` exposes an
-inconsistent parameter model: one axis is expressed as a generic `mode`, another as a prefixed
-`output-mode`, and the fallback behavior is named relative to the current implementation rather
-than the underlying extraction model.
+The current gitrail CLI can express "extract commits after a given ref" via `--since-ref`, but it
+does not provide an explicit, user-facing way to express the complementary release-oriented
+workflow that naturally appears in repositories using release tags: snapshot the history included
+in a release once, then continuously ingest only the post-release range as new commits accumulate.
 
-This should be treated as a **UX-level design bug**, not as a cosmetic naming issue. The problem
-is not limited to `--output-mode`; the full parameter system around extraction intent, output
-grain, and missing-state fallback should be redesigned together.
+This should not be treated as a simple request for the inverse of `--since-ref`. The user intent is
+not "the complement of commits after X" but "the commit set included in release ref X" as a stable
+extraction boundary. Conceptually, this is closer to treating a release ref as a traversal
+starting point or boundary than to subtracting one reachability set from another.
 
-**Decision taken from design discussion**:
+**Target workflow**:
 
-- replace `--mode snapshot|incremental` with boolean `--incremental`
-- replace `--output-mode commit|file` with boolean `--per-file`
-- replace `--on-missing-state error|snapshot` with `--missing-state=error|snapshot`
-- keep `snapshot` as an execution-model term in documentation and fallback semantics, but remove
-  it as a top-level CLI value
+- history at or before the latest stable release is assumed to be stable and can be extracted once as a snapshot
+- commits after that release continue to grow toward the next release
+- therefore, the post-release range should be bootstrapped once via `--since-ref` and then maintained through daily incremental extraction with a state file
 
-**Resulting parameter model**:
+**Current workaround and its limitations**:
 
-- default behavior: snapshot extraction
-- `--incremental`: extract only commits newer than the last recorded state
-- `--state <path>`: required with `--incremental`; without `--incremental`, acts as a write-only
-  recording path on successful snapshot extraction
-- `--missing-state=error|snapshot`: valid only with `--incremental`
-- `--per-file`: emit one record per changed file; without it, emit one record per commit
+- in Git terms, users may be able to approximate "extract up to release X" by creating a temporary ref fixed at that release and passing it to `--branch`
+- if `--branch <ref>` is treated as a true general ref traversal entry point, users may also be able to use the release tag itself directly rather than creating a temporary branch
+- however, neither approach is an intuitive CLI expression of the user's intent, and both require the user to translate a release-boundary question into lower-level ref manipulation
+- in addition, the ref-resolution behavior for lightweight tags, annotated tags, branch names, and raw commit hashes should be made explicit if release refs are to become part of the supported workflow model
 
-**Important design rationale**:
+This item should therefore be treated as a **UX and extraction-model design problem**, not merely
+as a request for one additional flag.
 
-- `--incremental` expresses user intent directly and removes the overly abstract `mode` parameter
-- snapshot remains an important concept in gitrail because it communicates independent extraction
-  from a mutable DAG-backed repository state; this meaning should remain in docs and behavior even
-  if it is no longer exposed as a CLI enum value
-- the core output grain should be treated as `commit|file`; finer-grained interpretation should be
-  handled later, if needed, through enrichment or pipeline extensions rather than by expanding the
-  default CLI grain model
-- `--missing-state=error|snapshot` is preferred over alternatives such as `ignore` or `full`
-  because it names the actual fallback behavior precisely
+**Questions to resolve at design time**:
 
-**Detailed design expectations**:
+- whether to add an explicit `--until-ref` style parameter, or instead make release-ref traversal a first-class documented workflow without introducing a new range flag
+- whether this capability should be defined as "snapshot the history included in the specified ref" rather than as the complement of `--since-ref`
+- how `--branch`, `--since-ref`, `--state`, and incremental bootstrap should fit together as one coherent release-boundary workflow
+- how ref resolution should be specified for tag names, branch names, commit hashes, and annotated-tag peeling behavior
+- whether this model should be limited to single-boundary release workflows, or whether a multi-branch interpretation is desirable and sufficiently clear
 
-- treat this parameter model as the baseline for the detailed design phase rather than reopening
-  the high-level direction from scratch
-- verify the mutual-exclusion rules and help text against the new model
-- update all user-facing documentation together so the new terminology is introduced consistently
-- design migration messaging appropriate for a pre-v1 CLI, where breaking changes are acceptable
-  but should still be explicit
+**Design priority**:
 
-#### CLI UX: Progress metrics quality and progress-display redesign
-
-The current Phase 2 implementation reports progress using the number of written commits (`Processed N commits...`). This is better than having no runtime visibility, and it remains acceptable for v0.1.4, but it is not always a good proxy for actual elapsed work.
-
-For example, runs that use a state file and ultimately write zero new commits can still spend substantial time traversing history or resolving repository state. In those situations, commit-count progress has only a weak relationship to elapsed time and user-perceived progress.
-
-**Future improvement goals**:
-
-- break the end-to-end extraction work into more meaningful phases and measure their durations separately
-- analyze where time is actually spent during traversal, filtering, state handling, and output writing
-- redesign progress reporting based on that evidence rather than using commit count alone
-- keep the current Phase 2 behavior in v0.1.4 as a pragmatic baseline, but treat it as a first iteration rather than a final UX design
-
-**Design dependency**: This redesign should be approached together with the "Granular performance profiling" item (see Medium-term section). Progress display redesign requires knowing what is measurable; performance profiling provides that evidence. Design both together in the same release.
+- users should be able to understand "extract up to the latest release once" and "bootstrap from the latest release, then switch to incremental" without having to reason in terms of temporary refs or Git-internal setup steps
+- the resulting UX should form a conceptually paired explanation with the existing `--since-ref` + state-file workflow for post-release ingestion
+- even if an internal workaround uses an auxiliary ref, that workaround should not become the primary user-facing workflow
 
 #### CLI UX: `--help` option grouping and discoverability
 
@@ -162,20 +138,142 @@ This means the expected behavior for gitrail is also **error on unknown argument
 
 ### Medium-term
 
-#### Development: Granular performance profiling
+---
 
-Add per-phase timing instrumentation to measure where time is actually spent during extraction. The target granularity is: DAG traversal, blob reads, diff computation (per-file), and output writing.
+#### Extraction/CLI: User-controlled guardrail for very large text diffs
 
-**Motivation**: File-level output mode (`--output-mode file`, introduced in v0.3.0) computes a tree diff for every commit, which increases processing time proportionally to the number of changed files. If performance is unacceptable on large repositories, the root cause needs to be identified precisely before any mitigation is considered — including the possibility of replacing isomorphic-git with a different Git backend.
+In per-file extraction mode, line-level diff computation can become a dominant cost for a small
+subset of files that are structurally valid text but operationally "machine-generated large text"
+(for example large lockfiles). Recent profiling and debug investigation showed that these files can
+produce multi-second to tens-of-seconds `diffLines` stalls in a single commit, which degrades both
+total throughput and interactive progress responsiveness.
 
-**Design considerations**:
+At the same time, gitrail should not silently reduce extracted information by default. Even when a
+file looks like an outlier, treating its diff as always meaningless is a policy decision that must
+remain in user control.
 
-- Expose timing data in `ExtractionResult` (e.g. `timings: { traversalMs, blobReadMs, diffMs, writeMs }`) for programmatic access and test coverage
-- Consider a `--profile` flag to print per-phase timing to stderr (off by default to avoid changing default output)
-- Instrument `GitAdapter.getFileChanges()` separately from commit traversal, since diff cost scales with file count per commit
-- Measure first on real repositories of varying sizes; optimize only where evidence shows a bottleneck
+**Design intent**:
 
-**Why deferred to v0.3.1**: The target of this measurement is v0.3.0's file-level output performance. v0.3.0 must be complete before meaningful baseline data exists. Implementing instrumentation before the feature exists would mean measuring against an incomplete workload.
+- keep current behavior as the default (no implicit data reduction)
+- provide an explicit opt-in mechanism to skip line-diff computation when file size exceeds a
+  user-defined threshold
+- represent skipped text diffs with the same null-count convention already used for binary files
+  (`additions: null`, `deletions: null`) so downstream contracts remain stable
+
+**CLI direction to evaluate at implementation time**:
+
+- add a dedicated option such as `--max-diff-bytes` (or equivalent naming)
+- default: disabled (full diff behavior)
+- when enabled: if either side of a text diff exceeds threshold, skip line diff and emit null
+  counts
+- evaluate whether an explicit mode flag is also needed (for example: `off|size-threshold`)
+
+**Operational considerations**:
+
+- document clearly that this is an extraction-fidelity vs. runtime trade-off selected by the user
+- include a summary/profile indicator for skipped large-text diffs so users can audit impact
+- ensure behavior is deterministic and reproducible under the same threshold settings
+
+---
+
+#### Architecture/Runtime: Worker-based extraction runtime for resilience and orchestration
+
+The current extraction pipeline runs in a single Node.js execution context. This keeps the
+implementation straightforward, but it also couples heavy extraction work with CLI lifecycle and
+interactive rendering. For long-running or computationally heavy workloads, this coupling makes
+stability, supervision, and execution strategy evolution harder than necessary.
+
+This item introduces a Worker-based runtime boundary: extraction executes in an isolated worker,
+while the main process remains responsible for CLI lifecycle, supervision, and user interaction.
+
+**Primary goals (core value)**:
+
+- improve long-run extraction stability via execution isolation
+- improve fault tolerance through clear failure boundaries and controlled shutdown semantics
+- establish a foundation for future orchestration flexibility (parallelism, scheduling, retry)
+- improve extensibility by formalizing runtime and messaging boundaries
+
+**Secondary outcomes (expected but non-primary)**:
+
+- smoother progress behavior under heavy extraction load
+- cleaner profiling/telemetry boundaries between extraction work and CLI supervision
+
+**Scope strategy (single entry, phased delivery)**:
+
+- **Phase A: runtime boundary only**
+  - run the existing extraction pipeline in one worker
+  - define a typed message protocol for progress, warning, result, and error events
+  - keep extraction semantics and output behavior unchanged
+- **Phase B: operational hardening**
+  - add cancellation, timeout, and supervision semantics
+  - make failure reporting and exit behavior deterministic
+- **Phase C: orchestration-ready foundation**
+  - prepare interfaces for future parallel strategies (branch-level or stage-level)
+  - do not require immediate parallel execution in this item
+
+**Non-goals for initial implementation**:
+
+- no guaranteed throughput improvement in the first delivery
+- no implicit data reduction or extraction-fidelity trade-off
+- no simultaneous rollout of broad parallel execution and plugin architecture
+
+**Design constraints**:
+
+- preserve current extraction correctness and checkpoint safety guarantees
+- maintain deterministic behavior under equivalent inputs and configuration
+- keep CLI UX backward compatible unless explicitly documented otherwise
+
+#### Architecture: Diff algorithm abstraction within `IsomorphicGitAdapter`
+
+Introduce a `DiffAdapter` interface as an internal strategy within `IsomorphicGitAdapter`,
+injectable via its constructor. This makes the line diff algorithm swappable without changing the
+`GitAdapter` interface that core depends on.
+
+**Motivation**:
+
+- **Performance**: The `diff` package used today is a pure-JS implementation. A native (e.g.
+  WebAssembly-backed) diff algorithm could significantly reduce per-commit processing time in
+  `--per-file` mode, where a tree diff and line diff are computed for every changed file. The
+  diff abstraction makes it possible to benchmark and swap implementations without touching
+  anything outside `IsomorphicGitAdapter`.
+- **Algorithm interchangeability**: Different diff algorithms (Myers, patience, histogram) produce
+  different `additions`/`deletions` counts for the same file pair. Making the algorithm explicit
+  and swappable ensures that the implementation choice is a deliberate, testable decision rather
+  than an implicit consequence of whichever library was installed.
+
+**Key design constraint — `DiffAdapter` must not surface to core**:
+
+If a future Git backend (e.g. a libgit2-based adapter) computes tree diff and line diff as a
+single native operation, splitting them at the `GitAdapter` boundary would be counterproductive.
+To avoid this, `DiffAdapter` is scoped strictly as an implementation detail of
+`IsomorphicGitAdapter`:
+
+- `GitAdapter` interface remains unchanged
+- `IsomorphicGitAdapter` accepts a `DiffAdapter` via constructor injection
+- A future `Libgit2Adapter` would implement `GitAdapter` independently and would not use
+  `DiffAdapter` at all
+
+**Sketch**:
+
+```ts
+interface DiffAdapter {
+  computeLineDiff(
+    before: Uint8Array,
+    after: Uint8Array,
+  ): { additions: number; deletions: number } | null; // null = binary
+}
+
+class IsomorphicGitAdapter implements GitAdapter {
+  constructor(
+    fsImpl?: FsClient,
+    diff: DiffAdapter = new JsDiffAdapter(),
+  ) { ... }
+}
+```
+
+**Design dependency**: This remains low-risk because the change is entirely internal to
+`IsomorphicGitAdapter`. Profiling data from the implemented `--profile` baseline can guide which
+alternative `DiffAdapter` implementations to prioritize first.
 
 ---
 
@@ -188,6 +286,43 @@ Add per-phase timing instrumentation to measure where time is actually spent dur
 ---
 
 ### Long-term
+
+#### Development: Profiling interpretation model and usability
+
+The current profiling implementation is already sufficient as a measurement foundation, but its
+output still requires internal code knowledge to interpret confidently. This is not an urgent
+performance bottleneck item; it is a long-term quality improvement for profiling readability,
+operational diagnostics, and future optimization planning.
+
+**Current pain points observed after Phase 6**:
+
+- The relationship between pipeline phases (planning/traversal/projection/write) and git-internal
+  stages (`git/*`) is difficult to understand without knowing the program structure.
+- Nested scoped timings in the git stage can express containment, but are still hard to read in
+  day-to-day diagnostics.
+
+**Long-term improvement goals**:
+
+- Add a stable phase-to-git stage mapping model and document it explicitly.
+- Add self-time style visibility in addition to inclusive stage timings so local bottlenecks are
+  easier to identify.
+- Add count metrics alongside timing metrics (for example: read-commit calls, visited commits,
+  excluded commits, blob reads, diff invocations) to distinguish expensive-per-call from many-call
+  workloads.
+- Provide multiple profile views for different audiences (hierarchical detailed view, phase-level
+  summary, and top-contributor summary).
+- Add machine-readable profile export (for example JSON) for cross-run comparison and CI trend
+  analysis.
+- Clarify profiling interpretation guidance in docs, including nested timing semantics and overlap
+  behavior.
+- Evaluate and document profiling overhead characteristics to reduce over-interpretation of tiny
+  runs.
+
+**Design intent**:
+
+- Keep the existing profiling behavior as the stable baseline.
+- Treat these items as interpretation and observability UX improvements, not as mandatory
+  preconditions for current extraction correctness.
 
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
 
@@ -272,6 +407,43 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ---
 
 ## Development Environment Improvements
+
+### Near-term
+
+#### Code hygiene: Identifier naming audit for semantic accuracy
+
+Several identifiers in the codebase carry names that imply a storage medium, lifecycle, or
+structural pattern that the definition itself does not reflect. These are not bugs and do not
+affect behavior, but they reduce the signal-to-noise ratio when reading the code and make type
+names harder to reason about in isolation.
+
+**Representative example**: `StateFile` is an interface describing a plain data structure
+`{ version, generatedAt, repositoryPath, branches }`. The suffix `File` implies a storage medium,
+but the interface carries no I/O semantics — that responsibility belongs to `StateStore`. A name
+such as `State` or `ExtractionState` would be more accurate.
+
+Other potential candidates (to be verified and decided at design time, not predetermined here):
+
+- `StateBranchEntry` — "Entry" adds no meaning; `StateBranch` may be sufficient
+- `PersonIdentity` — "Identity" is overloaded; `Person` or `PersonInfo` may be clearer
+
+**Acceptable impact boundary**:
+
+This item is scoped to changes that meet **all** of the following conditions simultaneously:
+
+- No change to the CLI interface (flag names, behavior, exit codes)
+- No change to the output JSON schema (field names, structure, `.jsonl` format)
+- No change to the state file JSON format on disk (field names, `version` value)
+- No behavioral change of any kind
+
+Renames that touch only internal TypeScript identifiers — types, interfaces, type aliases, and
+their import references — are within scope. Changes that require altering any of the above
+boundaries must not be bundled into this item and should be tracked separately.
+
+**At design time**: Re-examine all type and interface identifiers in `src/` for similar naming
+issues before finalizing the change list. The examples above are illustrative, not exhaustive.
+
+---
 
 ### Medium-term
 

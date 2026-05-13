@@ -47,6 +47,54 @@ ambiguity about where logic belongs or what behavior is correct, use these as th
 
 ---
 
+## Current Architecture Contract
+
+This file is a current-state contract, not a release history record. Historical implementation
+details belong in `CHANGELOG.md`.
+
+### Canonical vocabulary
+
+- `CommitFact` and `FileChangeFact` are the stable Core-owned intermediate terms.
+- `CheckpointStore`, `ExtractionCheckpoint`, and `BranchCheckpoint` are the stable checkpoint
+  persistence terms.
+- `ProfilingEntry` (`ExtractionResult.profilingEntries`) is the stable profiling term.
+- `ExtractionCoordinator`, `CommitTraversalExtractor`, `FileChangeExpander`,
+  `CommitRecordProjector`, `FileChangeRecordProjector`, and `OutputSink` are the stable pipeline
+  stage boundaries.
+
+### Ownership and boundary rules
+
+- The runtime edge (`src/index.ts`) constructs `DefaultExtractionCoordinator`, stage instances,
+  optional `CheckpointStore` (`--state`), `OutputSink`, and `ProgressReporter` directly.
+- Core owns traversal/extraction orchestration, pipeline branching by granularity, write-loop
+  progression, checkpoint commit timing, and structured progress events.
+- CLI owns rendering policy (TTY vs non-TTY, spinner/heartbeat, summary/profile layout, warning
+  redraw behavior) and top-level process/error behavior.
+- Git adapter owns Git-native repository access and raw commit/file-change retrieval. Core must
+  remain insulated from isomorphic-git details.
+- Output layer owns serialization and rotation mechanics. Core must not duplicate writer rotation
+  policy.
+
+### Progress and profiling contracts
+
+- Progress signaling is phase-aware via `ProgressReporter.emit(event)`.
+- Successful non-quiet runs use stage-oriented stderr output (`Preparing extraction`,
+  `Extracting history`, `Finalizing output`), then completion summary, then optional profile block.
+- `--quiet` suppresses progress-stage lines, completion summary, and profile block, but warnings
+  and errors remain visible.
+- `ExtractionResult.profilingEntries` is hierarchical and rooted at `elapsed`.
+- Adapter-facing contracts must not be polluted with profiling metadata.
+
+### Invariants
+
+- Checkpoint state is committed only after successful output completion and sink close.
+- `OutputSink.close()` must run on both success and failure paths.
+- Progress counters must advance only after successful write operations.
+- Filtering by date must continue traversal (`continue`, not `break`) because traversal order is
+  not chronological.
+
+---
+
 ## Component Responsibilities
 
 ### CLI Layer (`src/cli/`)
@@ -63,9 +111,18 @@ Responsibilities:
 
 - Orchestrate commit traversal by calling `GitAdapter`
 - Map raw commit data to the output JSON schema
-- Apply differential filtering (since-commit / since-date); uses `continue` (not `break`) for `--since-date` because BFS order is not chronological
+- Apply differential filtering (`--since-ref` / `--since-date`); uses `continue` (not `break`) for `--since-date` because BFS order is not chronological
 - Read the state file at startup; write it atomically (`.tmp` → rename) only after all output files are fully flushed and closed
 - Instantiate `OutputWriter` with the rotation config — rotation thresholds are enforced inside `OutputWriter`, not in Core
+
+After the Phase 7 cleanup, `ExtractionCoordinator` owns pipeline construction, granularity
+branching, the write loop, structured progress integration, sink lifecycle (`OutputSink.close()`),
+and checkpoint commit timing. The runtime edge constructs the coordinator, stage instances,
+checkpoint store, sink, and progress reporter directly; `Extractor` no longer exists.
+`CommitTraversalExtractor`, `FileChangeExpander`, `CommitRecordProjector`, and
+`FileChangeRecordProjector` own traversal, expansion, and projection respectively. `OutputSink`
+(backed by `OutputWriterSink`) owns record serialization and file rotation. `CheckpointStore`
+reads and writes checkpoints but does not decide timing.
 
 Key types:
 
@@ -78,7 +135,9 @@ interface ExtractorConfig {
   outputDir: string;
   outputPrefix: string;
   rotation: RotationConfig;
-  outputMode: "commit" | "file";
+  incremental: boolean;
+  missingState?: "error" | "snapshot";
+  perFile: boolean;
   range?: ExtractionRange;
   stateFilePath?: string;
 }
@@ -173,7 +232,7 @@ Every layer follows a consistent two-file pattern:
 - **`types.ts`** — all TypeScript interfaces and type aliases for that layer. No runtime code.
 - **`index.ts`** — re-export barrel only. No type definitions or logic.
 
-This separation was introduced in Phase 2 to keep type definitions discoverable and to prevent circular imports between layers.
+This separation keeps type definitions discoverable and helps prevent circular imports between layers.
 
 ---
 
@@ -184,11 +243,11 @@ Managed by Core Logic. Written atomically (write to temp file, then rename).
 Schema:
 
 ```typescript
-interface StateFile {
+interface ExtractionCheckpoint {
   version: 1;
   generatedAt: string; // ISO 8601
   repositoryPath: string;
-  branches: Array<{
+  branches: readonly Array<{
     name: string;
     lastCommitHash: string;
   }>;

@@ -29,6 +29,23 @@ Commits form a Directed Acyclic Graph (DAG). Each commit points to one or more p
 
 A commit X is "reachable" from commit Y if X can be found by following parent links starting from Y.
 
+## Stage Ownership Contract
+
+- `BranchTraversalPlanner` is the Core stage that owns branch-head resolution,
+  exclusion-boundary calculation, merge-base calculation for newly added branches, and
+  missing-branch warning behavior. It returns ordered `BranchTraversalPlan[]` values.
+- `CommitTraversalExtractor` is the Core stage that consumes those plans and owns sequential
+  branch traversal, cross-branch deduplication, `since-date` filtering, and `COMMIT_NOT_FOUND`
+  fallback behavior.
+- `ExtractionCoordinator` owns `CheckpointStore` write timing and `OutputSink` lifecycle. The
+  coordinator writes the checkpoint only after the pipeline completes without exception and
+  `sink.close()` succeeds. The runtime edge owns checkpoint reading, missing-state fallback
+  validation, and `CheckpointStore` injection into the coordinator.
+- The candidate `ExtractionCheckpoint` is built inside `DefaultExtractionCoordinator` from the
+  successfully resolved branch heads returned by the planner. This candidate checkpoint must not
+  be persisted until output writing and writer close both succeed. This ownership split must not
+  change any traversal semantics defined below.
+
 ---
 
 ## Traversal Algorithm
@@ -82,9 +99,11 @@ Incremental mode extracts only commits new since the last recorded state. Requir
 - `lastCommitHash` from stateMap is unreachable (e.g. after force push) → warn, full traversal for that branch
 - Branch not in stateMap → full traversal (may produce duplicates with prior runs; see Deduplication section)
 
-### Incremental + `--on-missing-state snapshot` Fallback
+### Incremental + `--missing-state snapshot` Fallback
 
-When `--mode incremental` is specified with `--on-missing-state snapshot` and the state file does not exist: behave as snapshot mode with no range filter (full traversal for all branches). Create state file on success.
+When `--incremental` is specified with `--missing-state snapshot` and the state file does not
+exist: behave as snapshot mode with no range filter (full traversal for all branches). Create
+state file on success.
 
 ---
 
@@ -286,5 +305,6 @@ Run 2: --branch main --branch develop
 If `findMergeBase` returns `null` (e.g. an orphan branch with detached history), fall back to full
 traversal for the new branch. Duplicate commits may appear in the output in this case.
 
-Recovery: discard prior output and re-run with `--mode snapshot` across all branches, then resume
+Recovery: discard prior output and re-run in snapshot mode (no `--incremental` flag) across all
+branches, then resume
 incremental extraction.

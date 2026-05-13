@@ -66,7 +66,7 @@ or small repositories. Incremental extraction becomes necessary when:
 - Re-processing full history on every run is too slow or too costly.
 - The downstream system uses an append-only or event-sourced ingestion model.
 
-In these cases, `--mode incremental` with a state file provides a reliable checkpoint mechanism.
+In these cases, `--incremental` with a state file provides a reliable checkpoint mechanism.
 
 ### Key implications of Git's data model
 
@@ -92,7 +92,8 @@ specified range, appears exactly once in a single run's output.
 
 ## System Overview
 
-gitrail is a Node.js CLI that extracts commit history from a local Git repository and writes one commit per line as JSON Lines.
+gitrail is a Node.js CLI that extracts commit history from a local Git repository and writes one
+record per line as JSON Lines (commit-granularity by default, file-granularity with `--per-file`).
 
 The architecture is layered:
 
@@ -118,7 +119,7 @@ Responsibilities:
 - Parse and validate command arguments.
 - Enforce mutual exclusion rules for differential options.
 - Resolve derived defaults (for example output prefix).
-- Convert validated args into `ExtractorConfig`.
+- Convert validated args into runtime extraction inputs for coordinator execution.
 - Handle top-level process exit behavior and user-facing errors.
 
 Notably, state file reading and writing are not CLI responsibilities.
@@ -127,7 +128,12 @@ Notably, state file reading and writing are not CLI responsibilities.
 
 Files:
 
-- `src/core/extractor.ts`
+- `src/core/extraction-coordinator.ts`
+- `src/core/branch-traversal-planner.ts`
+- `src/core/commit-traversal-extractor.ts`
+- `src/core/file-change-expander.ts`
+- `src/core/commit-record-projector.ts`
+- `src/core/file-change-record-projector.ts`
 - `src/core/types.ts`
 - `src/core/index.ts`
 
@@ -180,9 +186,9 @@ Core provides rotation settings, but Writer owns enforcement.
 
 ## End-to-End Runtime Flow
 
-1. CLI parses args, validates rules, and builds `ExtractorConfig`.
-2. CLI creates `IsomorphicGitAdapter` and `Extractor`.
-3. Core loads state if configured.
+1. CLI parses args, validates rules, and resolves runtime extraction inputs.
+2. CLI creates `IsomorphicGitAdapter`, `ProgressController`, and stage instances; calls `DefaultExtractionCoordinator.run()` directly.
+3. Runtime edge loads state/checkpoint context if configured and passes it in `CoordinatorRequest`.
 4. For each branch:
    - Resolve branch head.
    - Determine exclusion boundary.
@@ -246,7 +252,47 @@ Each layer follows:
 
 This improves type discoverability and keeps runtime modules focused.
 
-## Error Model
+## Profiling Instrumentation
+
+When `--profile` is set and extraction succeeds, gitrail emits per-stage timing to stderr:
+
+```
+Profile
+  elapsed                      : wall=  18.40ms  work=  18.40ms
+  elapsed/planning             : wall=   1.10ms  work=   1.10ms
+  elapsed/traversal            : wall=   8.25ms  work=   8.25ms
+  elapsed/projection           : wall=   3.75ms  work=   3.75ms
+  elapsed/write                : wall=   2.10ms  work=   2.10ms
+  elapsed/git/blob-read        : wall=   0.80ms  work=   0.80ms
+  elapsed/git/diff             : wall=   1.45ms  work=   1.45ms
+```
+
+Profiling entries are accumulated by the stage that owns each operation:
+
+| Entry path                 | Owning stage                                          | What is measured                                                       |
+| -------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------- |
+| `elapsed`                  | `src/index.ts` root profiler                          | Total extraction wall/work duration                                    |
+| `elapsed/planning`         | `BranchTraversalPlanner`                              | Branch-head resolution and exclude-hash planning                       |
+| `elapsed/traversal`        | `CommitTraversalExtractor`                            | Commit traversal and commit-fact materialization                       |
+| `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector` | Fact-to-output-record mapping                                          |
+| `elapsed/write`            | `ExtractionCoordinator`                               | `sink.write()` and `sink.close()` only (not checkpoint write)          |
+| `elapsed/git/blob-read`    | `IsomorphicGitAdapter`                                | Time reading file content blobs from the Git object store              |
+| `elapsed/git/diff`         | `IsomorphicGitAdapter`                                | Time computing line-level diff statistics per file                     |
+| `elapsed/git/...` children | `IsomorphicGitAdapter`                                | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
+
+A `StageProfiler` object is created per run at the runtime edge (`src/index.ts`) and passed to each stage
+constructor. `IsomorphicGitAdapter` exposes a `setProfiler()` method (not on the `GitAdapter`
+interface) that `src/index.ts` calls via duck-typing. This keeps the `GitAdapter` contract stable
+while enabling profiling of adapter internals.
+
+`ExtractionResult.profilingEntries` is populated on every successful run. The root `elapsed` entry
+is always present. The `--profile` flag controls stderr rendering of the aligned profile block and,
+via the current CLI wiring, enables the detailed stage profilers beneath the root entry.
+
+In commit-granularity mode (no `--per-file`), `elapsed/git/blob-read` and `elapsed/git/diff`
+remain at `0` because `getFileChanges()` is never called.
+
+`--quiet` suppresses the profile block together with the normal progress and summary output.
 
 - User input and validation errors are surfaced with clear single-line messages.
 - Adapter operational failures are represented as typed `GitAdapterError` values.

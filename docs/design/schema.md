@@ -217,7 +217,7 @@ JSONL line order reflects BFS traversal order across the Git DAG, not chronologi
 
 ## File-Level Output Schema
 
-When `--output-mode file` is used, each output line represents one changed file within a commit. Commits with multiple changed files produce multiple lines. Empty commits (no file changes) produce no lines.
+When `--per-file` is used, each output line represents one changed file within a commit. Commits with multiple changed files produce multiple lines. Empty commits (no file changes) produce no lines.
 
 Each line carries all commit fields from `OutputCommit` (denormalized) plus a `file` object:
 

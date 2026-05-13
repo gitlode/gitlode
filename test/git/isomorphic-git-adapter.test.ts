@@ -1,6 +1,6 @@
 import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { RawCommit } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
@@ -360,7 +360,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
   it("file deleted: additions = 0, correct deletion count", async () => {
     const { fs, init, addCommit, removeCommit } = makeRepoExt();
     await init();
-    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+    await addCommit("a.txt", "line1\nline2\n", "root commit");
     const sha2 = await addCommit("b.txt", "x\n", "add b.txt");
     const sha3 = await removeCommit("b.txt", "delete b.txt");
 
@@ -490,5 +490,62 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe("IsomorphicGitAdapter.setProfiler – adapter stage timing", () => {
+  it("adapter-level and file-change sub-stage entries accumulate when setProfiler is called", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "hello\nworld\n", "root commit");
+    const sha2 = await addCommit("a.txt", "hello\nuniverse\n", "modify file");
+
+    let time = 0;
+    const clock = () => ++time;
+
+    const { DefaultStageProfiler } = await import("../../src/core/profiler.js");
+    const profiler = new DefaultStageProfiler("git", clock);
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    adapter.setProfiler(profiler);
+
+    await adapter.getFileChanges("/", sha2 as never, sha1 as never);
+    // Also exercise resolve and merge-base paths so adapter-level buckets are populated.
+    await adapter.resolveRef("/", "main");
+    await adapter.findMergeBase("/", [sha2 as never, sha1 as never]);
+    for await (const _c of adapter.walkCommits("/", sha2 as never, sha1 as never)) {
+      // Drain iterator
+    }
+
+    const entries = profiler.entries();
+    const resolveRefEntry = entries.find((e) => e.name.endsWith("/resolve-ref"));
+    const mergeBaseEntry = entries.find((e) => e.name.endsWith("/merge-base"));
+    const walkEntry = entries.find((e) => e.name.endsWith("/walk-commits"));
+    const walkReadCommitEntry = entries.find((e) => e.name.endsWith("/walk-commits/read-commit"));
+    const excludeCollectEntry = entries.find((e) => e.name.endsWith("/exclude-collect"));
+    const excludeReadCommitEntry = entries.find((e) =>
+      e.name.endsWith("/exclude-collect/read-commit"),
+    );
+    const fileChangesEntry = entries.find((e) => e.name.endsWith("/file-changes"));
+    const blobEntry = entries.find((e) => e.name.endsWith("/blob-read"));
+    const diffEntry = entries.find((e) => e.name.endsWith("/diff"));
+    expect(resolveRefEntry?.wallMs).toBeGreaterThan(0);
+    expect(resolveRefEntry?.workMs).toBeGreaterThan(0);
+    expect(mergeBaseEntry?.wallMs).toBeGreaterThan(0);
+    expect(mergeBaseEntry?.workMs).toBeGreaterThan(0);
+    expect(walkEntry?.wallMs).toBeGreaterThan(0);
+    expect(walkEntry?.workMs).toBeGreaterThan(0);
+    expect(walkReadCommitEntry?.wallMs).toBeGreaterThan(0);
+    expect(walkReadCommitEntry?.workMs).toBeGreaterThan(0);
+    expect(excludeCollectEntry?.wallMs).toBeGreaterThan(0);
+    expect(excludeCollectEntry?.workMs).toBeGreaterThan(0);
+    expect(excludeReadCommitEntry?.wallMs).toBeGreaterThan(0);
+    expect(excludeReadCommitEntry?.workMs).toBeGreaterThan(0);
+    expect(fileChangesEntry?.wallMs).toBeGreaterThan(0);
+    expect(fileChangesEntry?.workMs).toBeGreaterThan(0);
+    expect(blobEntry?.wallMs).toBeGreaterThan(0);
+    expect(blobEntry?.workMs).toBeGreaterThan(0);
+    expect(diffEntry?.wallMs).toBeGreaterThan(0);
+    expect(diffEntry?.workMs).toBeGreaterThan(0);
   });
 });

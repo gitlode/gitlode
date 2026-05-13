@@ -10,6 +10,7 @@ import type { GitAdapter } from "../git/index.js";
 
 export interface ParsedArgs extends ExtractorConfig {
   quiet: boolean;
+  profile: boolean;
 }
 
 // Define all citty args on a defineCommand descriptor.
@@ -20,12 +21,11 @@ const argsDef = {
     required: true as const,
     description: "Local path to the Git repository",
   },
-  mode: {
-    type: "string" as const,
-    default: "snapshot",
-    alias: "m",
+  incremental: {
+    type: "boolean" as const,
+    default: false,
     description:
-      'Extraction mode: "snapshot" (default) extracts independently of prior state; "incremental" reads state to determine the commit boundary',
+      "When set, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state.",
   },
   branch: {
     type: "string" as const,
@@ -47,13 +47,12 @@ const argsDef = {
     type: "string" as const,
     alias: "s",
     description:
-      "Path to state file. In snapshot mode, content is ignored but file is updated on success. Required when --mode incremental.",
+      "Path to state file. In snapshot mode, content is ignored but file is updated on success. Required when --incremental.",
   },
-  "on-missing-state": {
+  "missing-state": {
     type: "string" as const,
-    default: "error",
     description:
-      'Behavior when --mode incremental and state file does not exist: "error" (default) exits with code 1; "snapshot" warns and falls back to full extraction. Only valid with --mode incremental.',
+      'Behavior when --incremental and state file does not exist: "error" (default) exits with code 1; "snapshot" warns and falls back to full extraction. Only valid with --incremental.',
   },
   "since-ref": {
     type: "string" as const,
@@ -78,11 +77,17 @@ const argsDef = {
     alias: "q",
     description: "Suppress progress and summary output (for CI, cron, and scripted usage)",
   },
-  "output-mode": {
-    type: "string" as const,
-    default: "commit",
+  profile: {
+    type: "boolean" as const,
+    default: false,
     description:
-      'Output record granularity: "commit" (default) emits one record per commit; "file" emits one record per changed file within each commit',
+      "Print per-stage timing information as an aligned block to stderr after a successful extraction. Suppressed by --quiet.",
+  },
+  "per-file": {
+    type: "boolean" as const,
+    default: false,
+    description:
+      "When set, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity).",
   },
 } satisfies ArgsDef;
 
@@ -128,44 +133,43 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     _: string[];
   };
 
-  const mode = (parsed["mode"] ?? "snapshot") as string;
+  const incremental = Boolean(parsed["incremental"]);
   const sinceRef = parsed["since-ref"] as string | undefined;
   const sinceDate = parsed["since-date"] as string | undefined;
   const state = parsed["state"] as string | undefined;
-  const onMissingState = (parsed["on-missing-state"] ?? "error") as string;
+  const missingStateRaw = parsed["missing-state"] as string | undefined;
   const outputDir = (parsed["output-dir"] ?? "./") as string;
   const outputPrefix = parsed["output-prefix"] as string | undefined;
   const rotateLinesRaw = parsed["rotate-lines"] as string | undefined;
   const rotateSizeRaw = parsed["rotate-size"] as string | undefined;
   const repoPath = parsed["repository-path"] as string | undefined;
   const quiet = Boolean(parsed["quiet"]);
-  const outputMode = (parsed["output-mode"] ?? "commit") as string;
+  const profile = Boolean(parsed["profile"]);
+  const perFile = Boolean(parsed["per-file"]);
 
   // --- Phase 1: Format and mutual exclusion checks (no I/O) ---
-  if (mode !== "snapshot" && mode !== "incremental") {
-    userError('--mode must be "snapshot" or "incremental"');
-  }
-  if (onMissingState !== "error" && onMissingState !== "snapshot") {
-    userError('--on-missing-state must be "error" or "snapshot"');
-  }
-  if (outputMode !== "commit" && outputMode !== "file") {
-    userError('--output-mode must be "commit" or "file"');
+  if (
+    missingStateRaw !== undefined &&
+    missingStateRaw !== "error" &&
+    missingStateRaw !== "snapshot"
+  ) {
+    userError('--missing-state must be "error" or "snapshot"');
   }
 
   if (sinceRef && sinceDate) {
     userError("--since-ref and --since-date cannot be used together");
   }
-  if (mode === "incremental" && sinceRef) {
-    userError("--since-ref cannot be used with --mode incremental");
+  if (incremental && sinceRef) {
+    userError("--since-ref cannot be used with --incremental");
   }
-  if (mode === "incremental" && sinceDate) {
-    userError("--since-date cannot be used with --mode incremental");
+  if (incremental && sinceDate) {
+    userError("--since-date cannot be used with --incremental");
   }
-  if (onMissingState !== "error" && mode !== "incremental") {
-    userError("--on-missing-state is only valid with --mode incremental");
+  if (missingStateRaw !== undefined && !incremental) {
+    userError("--missing-state is only valid with --incremental");
   }
-  if (mode === "incremental" && !state) {
-    userError("--state is required when using --mode incremental");
+  if (incremental && !state) {
+    userError("--state is required when using --incremental");
   }
 
   if (branches.length === 0) {
@@ -222,7 +226,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     if (!existsSync(stateParentDir)) {
       userError(`Parent directory for state file not found: ${stateParentDir}`);
     }
-    if (mode === "incremental" && onMissingState === "error" && !existsSync(resolvedStatePath)) {
+    if (incremental && missingStateRaw !== "snapshot" && !existsSync(resolvedStatePath)) {
       userError(`State file not found: ${resolvedStatePath}`);
     }
   }
@@ -277,15 +281,16 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     outputDir: resolvedOutputDir,
     outputPrefix: prefix,
     rotation: { maxLines, maxBytes },
-    mode: mode as "snapshot" | "incremental",
-    onMissingState: mode === "incremental" ? (onMissingState as "error" | "snapshot") : undefined,
+    incremental,
+    missingState: incremental ? ((missingStateRaw ?? "error") as "error" | "snapshot") : undefined,
     range: resolvedSinceRef
       ? { type: "ref", ref: resolvedSinceRef }
       : sinceDateObj
         ? { type: "date", since: sinceDateObj }
         : undefined,
     stateFilePath: state,
-    outputMode: outputMode as "commit" | "file",
+    perFile,
     quiet,
+    profile,
   };
 }

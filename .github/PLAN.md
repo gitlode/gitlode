@@ -1,50 +1,81 @@
-# gitrail — v0.3.0 Release Plan
+# gitrail — v0.4.0 Release Plan
 
 ## Overview
 
-v0.3.0 follows v0.2.0 without breaking CLI changes. The primary focus is **file-level ETL output**: a new `--output-mode file` flag that produces one output record per changed file per commit, making gitrail suitable for file-granularity analytics in data warehouses.
+v0.4.0 is a pre-v1 minor release centered on an architecture redesign. Because gitrail is still in a pre-release stage, this release may include large internal restructuring and intentional CLI breaking changes where they materially improve the long-term model.
 
-This release also includes two preparatory changes that improve internal quality and prevent future complexity growth: the `erasableSyntaxOnly` compiler flag and a structural decomposition of `Extractor.run()`.
+The primary focus is the roadmap item `Architecture: Fact-based extraction pipeline and orchestration split`, delivered together with closely related CLI and observability work that benefits from the same stage boundaries.
 
 ## Release Goals
 
-- Enforce `erasableSyntaxOnly` in `tsconfig.json` and fix the one existing violation, establishing a permanent guard against non-erasable syntax regressions
-- Decompose `Extractor.run()` into focused private methods to reduce cognitive load and localize future feature additions
-- Implement `GitAdapter.getFileChanges()` using `isomorphic-git`'s `walk()` API and the `diff` npm package, providing per-file line-level diff statistics
-- Introduce `--output-mode file` to produce one JSONL record per changed file per commit, enabling file-granularity dimensional modeling in downstream analytical systems
+- Replace the current mixed-responsibility extraction flow with a fact-based, stage-oriented pipeline and explicit orchestration boundary
+- Move checkpoint timing, sink lifecycle, and progress ownership out of `Extractor` and into the orchestration layer while preserving current extraction semantics
+- Redesign the CLI parameter model around extraction intent and record grain so the user-facing model matches the redesigned pipeline concepts
+- Add stage-aligned profiling and improved progress reporting based on meaningful execution boundaries rather than record count alone
 
 ## Scope Summary
 
-### Included in v0.3.0
+### Included in v0.4.0
 
-- `erasableSyntaxOnly: true` in `tsconfig.json`; expand `NodeStateStore` parameter property to explicit field + assignment
-- `Extractor.run()` decomposition: `initializeStateMap()`, `computeNewBranchExclude()`, `buildExcludeHash()`, `processBranch()` as private methods; `BranchRunContext` private interface
-- `GitAdapter.getFileChanges(repoPath, commitOid, parentOid?)` — returns `FileChange[]` with `path`, `status`, `additions`, `deletions` (including binary-file null handling)
-- `--output-mode commit | file` CLI flag (default `commit`); file mode produces one record per changed file with full commit metadata denormalized
-- `additions` and `deletions` line-level diff statistics in file-level records
-- `ExtractionResult.commitsWritten` renamed to `recordsWritten` (internal type; no external compatibility concern)
-- New runtime dependency: `diff` npm package (BSD-3-Clause)
+- `Architecture: Fact-based extraction pipeline and orchestration split` (mandatory release theme item)
+- `CLI UX: Parameter model redesign for extraction and output grain`
+- `Development: Granular performance profiling`
+- `CLI UX: Progress metrics quality and progress-display redesign`
 
-### Explicitly excluded from v0.3.0
+### Explicitly excluded from v0.4.0
 
-- `--include-files` flag (commit-embedded file array) — deemed a convenience feature; `--output-mode file` provides equivalent analytical value; deferred to a later release
-- Configurable field inclusion/exclusion (`--fields` / `--exclude-fields`) — separate subsequent release
-- `--rotate-size` human-readable suffixes — separate subsequent release
-- Granular performance profiling (`ExtractionResult.timings`) — deferred to v0.3.1 after file-level output performance can be measured empirically
-- Progress metrics quality redesign — depends on v0.3.1 performance profiling data; deferred
-- Rename detection in file diffs (`"renamed"` status) — isomorphic-git has no built-in support; out of scope
-- Submodule change detection — silently skipped
+- `CLI UX: Release-boundary extraction workflow` — adjacent to extraction semantics, but too large to combine with the architecture migration and CLI breaking-change set in one release
+- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter` — defer until profiling data from the redesigned pipeline shows whether diff interchangeability is an immediate priority
+- `Output: Configurable field inclusion/exclusion` — better scheduled after projector boundaries are stable and the new pipeline has landed
+- `Output: Repository metadata override` — compatible with the new projector split, but not foundational to the architecture redesign theme
+- `Output: Execution metadata line` — defer until sink responsibilities and release-level metadata needs are re-evaluated after the redesign
+- `Output: stdout support and stream-based OutputWriter` — depends on sink abstraction but is still user-need driven rather than release-defining
+- `Code hygiene: Identifier naming audit for semantic accuracy` — revisit after the redesign stabilizes the new internal vocabulary, to avoid renaming the same concepts twice
+- CLI-only polish items such as `--rotate-size` suffixes, unknown-argument diagnostics, and `--help` grouping — intentionally deferred to keep v0.4.0 focused on the architecture-led change set
 
 ## Development Phases
 
-| #   | Title                                                            | File                                  | Status    |
-| --- | ---------------------------------------------------------------- | ------------------------------------- | --------- |
-| 1   | TypeScript: `erasableSyntaxOnly` and Parameter Property Refactor | [phase-1.md](plans/v0.3.0/phase-1.md) | Completed |
-| 2   | `Extractor.run()` Decomposition                                  | [phase-2.md](plans/v0.3.0/phase-2.md) | Completed |
-| 3   | File Diff Computation in Git Adapter                             | [phase-3.md](plans/v0.3.0/phase-3.md) | Completed |
-| 4   | File-Level Output Mode (`--output-mode file`)                    | [phase-4.md](plans/v0.3.0/phase-4.md) | Completed |
+### Phase 1: Fact Vocabulary and Compatibility Facade
 
-**Phase dependency**: Phase 3 must complete before Phase 4. Phases 1 and 2 are independent and can be executed in any order.
+- **File**: [`plans/phase-1.md`](plans/phase-1.md)
+- **Status**: Completed
+
+### Phase 2: Commit Traversal Stage Extraction
+
+- **File**: [`plans/phase-2.md`](plans/phase-2.md)
+- **Status**: Completed
+
+### Phase 3: File-Change Expansion and Projector Split
+
+- **File**: [`plans/phase-3.md`](plans/phase-3.md)
+- **Status**: Completed
+
+### Phase 4: Coordinator, Output Sink, and Checkpoint Orchestration
+
+- **File**: [`plans/phase-4.md`](plans/phase-4.md)
+- **Status**: Completed
+
+### Phase 5: CLI Parameter Model Redesign
+
+- **File**: [`plans/phase-5.md`](plans/phase-5.md)
+- **Status**: Completed
+
+### Phase 6: Stage-Aligned Profiling Instrumentation
+
+- **File**: [`plans/phase-6.md`](plans/phase-6.md)
+- **Status**: Completed
+
+### Phase 7: Progress Reporting Redesign and Obsolete-Path Cleanup
+
+- **File**: [`plans/phase-7.md`](plans/phase-7.md)
+- **Status**: Completed
+
+Provisional dependency notes:
+
+- Phases 1 through 4 deliver the architecture migration in dependency order.
+- Phase 5 follows Phase 4 so the breaking CLI redesign can target the final orchestration and granularity model rather than temporary compatibility shapes.
+- Phase 6 depends on the Phase 4 stage boundaries being real, because profiling should instrument the actual coordinator, traversal, expansion, projection, and sink responsibilities.
+- Phase 7 depends on Phase 6 profiling outputs and also absorbs the final architecture cleanup step from the roadmap migration plan.
 
 ## Release Tasks
 
@@ -82,11 +113,9 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 #### Release-Specific Notes
 
-- `docs/usage.md`: Add `--output-mode` option documentation and a file-mode usage example
-- `.github/instructions/architecture.instructions.md`: Update "Git Adapter Interface" section (add `getFileChanges()`); update "Component Responsibilities — Core Logic Layer" section (add output mode branching)
-- `.github/instructions/cli.instructions.md`: Add `--output-mode` entry to the CLI parameter table
-- `.github/instructions/schema.instructions.md`: Verify "File-Level Output Schema" section matches implementation; remove "file-level diff stats per commit" from "Future Schema Extensions"
-- No breaking CLI changes in this release; no `### Migration` subsection required in CHANGELOG
+- Document the architecture redesign in the design docs and update any instructions files whose component boundaries or terminology are no longer accurate
+- Add explicit migration notes for CLI breaking changes introduced by the parameter model redesign
+- Reconcile progress-reporting and profiling documentation with the final stderr/output contract decided during phase design
 
 #### Verification
 
@@ -98,17 +127,14 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 ## Final Verification Checklist
 
-(to be filled when all phases are complete — run after all Development Phases and Release Tasks are marked complete)
-
-- [x] `npm run build` passes with no errors
-- [x] `npm test` passes with no failures
-- [x] `npm run format:check` passes
-- [x] `--output-mode file` produces valid JSONL with one record per changed file
-- [x] `--output-mode commit` (default) is identical to pre-v0.3.0 behavior
-- [x] Incremental extraction works correctly with `--output-mode file`
-- [x] File rotation (`--rotate-lines`) works correctly in file mode
-- [x] Binary files produce `additions: null, deletions: null`
-- [x] Root commits produce `"added"` entries for all files
-- [x] Empty commits produce no output records in file mode
-- [x] `CHANGELOG.md` has a `[0.3.0]` entry
-- [x] All roadmap entries with `Release target: v0.3.0` have been removed from `roadmap.md`
+- [x] All development phases (Phase 1-7) are marked Completed.
+- [x] `CHANGELOG.md` contains a finalized `v0.4.0` entry with `Added` / `Changed` / `Fixed` and
+      `Migration` sections.
+- [x] Human-oriented docs were reviewed and updated for v0.4.0 behavior (`README.md`,
+      `docs/usage.md`, `docs/design/architecture.md`, instructions files).
+- [x] Roadmap cleanup completed for implemented v0.4.0 items; remaining entries are forward-looking.
+- [x] Verification commands completed:
+  - `npm run build` pass
+  - `npm test` pass
+  - `npm run lint` pass
+  - `npm run format:check` pass

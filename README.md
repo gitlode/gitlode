@@ -5,8 +5,8 @@ A CLI tool that extracts commit history from a local Git repository and outputs 
 ## Features
 
 - Reads the local `.git` directory directly via [isomorphic-git](https://isomorphic-git.org/) — no `git` CLI required at runtime
-- Outputs one commit per line in JSON Lines format
-- Explicit extraction modes: `--mode snapshot` for independent extraction, `--mode incremental` for differential extraction using a state file
+- Outputs one record per line in JSON Lines format (commit-granularity by default)
+- Two extraction modes: snapshot (full extraction each run) and `--incremental` (differential extraction using a state file)
 - Handles multi-branch extraction with cross-branch deduplication
 
 ## Requirements
@@ -28,7 +28,7 @@ gitrail -b main ./my-repo
 
 # Continuous extraction — fetch remote changes, then extract new commits
 git -C ./my-repo fetch origin
-gitrail -m incremental -b origin/main -s ./gitrail-state.json --on-missing-state snapshot ./my-repo
+gitrail --incremental -b origin/main -s ./gitrail-state.json --missing-state snapshot ./my-repo
 ```
 
 See the [User Guide](docs/usage.md) for detailed workflow patterns including incremental setup,
@@ -40,29 +40,30 @@ release-tag-based extraction, and CI configuration.
 gitrail [options] <repository-path>
 ```
 
-| Parameter                  | Alias | Type                      | Required | Default    | Description                                                                                                     |
-| -------------------------- | ----- | ------------------------- | -------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
-| `<repository-path>`        |       | positional                | ✅       | —          | Local path to the Git repository                                                                                |
-| `--mode`                   | `-m`  | `snapshot \| incremental` |          | `snapshot` | Extraction mode. `snapshot` runs independently of state; `incremental` reads state to extract only new commits. |
-| `--branch <ref>`           | `-b`  | string (repeatable)       | ✅       | —          | Ref to traverse from. Specify one or more times.                                                                |
-| `--output-dir <path>`      | `-o`  | string                    |          | `./`       | Directory for output `.jsonl` files                                                                             |
-| `--output-prefix <string>` |       | string                    |          | derived    | Filename prefix (derived from remote origin if omitted)                                                         |
-| `--state <path>`           | `-s`  | string                    |          | —          | State file path. Required with `--mode incremental`.                                                            |
-| `--on-missing-state`       |       | `error \| snapshot`       |          | `error`    | Behavior when state file is absent. Only valid with `--mode incremental`.                                       |
-| `--since-ref <ref>`        |       | string                    |          | —          | Exclude commits reachable from this ref (tag, branch, or hash). Snapshot mode only.                             |
-| `--since-date <ISO8601>`   |       | string                    |          | —          | Include only commits after this datetime. Snapshot mode only.                                                   |
-| `--output-mode <mode>`     |       | `commit \| file`          |          | `commit`   | Output record granularity. `commit` emits one record per commit; `file` emits one record per changed file.      |
-| `--rotate-lines <n>`       |       | number                    |          | —          | Start new file after `n` lines                                                                                  |
-| `--rotate-size <bytes>`    |       | number                    |          | —          | Start new file after `n` bytes                                                                                  |
-| `--quiet`                  | `-q`  | boolean                   |          | `false`    | Suppress progress and summary output                                                                            |
+| Parameter                  | Alias | Type                | Required | Default | Description                                                                                                 |
+| -------------------------- | ----- | ------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `<repository-path>`        |       | positional          | ✅       | —       | Local path to the Git repository                                                                            |
+| `--incremental`            |       | boolean             |          | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.        |
+| `--branch <ref>`           | `-b`  | string (repeatable) | ✅       | —       | Ref to traverse from. Specify one or more times.                                                            |
+| `--output-dir <path>`      | `-o`  | string              |          | `./`    | Directory for output `.jsonl` files                                                                         |
+| `--output-prefix <string>` |       | string              |          | derived | Filename prefix (derived from remote origin if omitted)                                                     |
+| `--state <path>`           | `-s`  | string              |          | —       | State file path. Required with `--incremental`.                                                             |
+| `--missing-state`          |       | `error \| snapshot` |          | `error` | Behavior when state file is absent. Only valid with `--incremental`.                                        |
+| `--since-ref <ref>`        |       | string              |          | —       | Exclude commits reachable from this ref (tag, branch, or hash). Snapshot mode only.                         |
+| `--since-date <ISO8601>`   |       | string              |          | —       | Include only commits after this datetime. Snapshot mode only.                                               |
+| `--per-file`               |       | boolean             |          | `false` | When set, emits one record per changed file per commit; when absent, emits one record per commit (default). |
+| `--rotate-lines <n>`       |       | number              |          | —       | Start new file after `n` lines                                                                              |
+| `--rotate-size <bytes>`    |       | number              |          | —       | Start new file after `n` bytes                                                                              |
+| `--quiet`                  | `-q`  | boolean             |          | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.               |
+| `--profile`                |       | boolean             |          | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`.        |
 
-Progress updates and the final summary are written to **stderr**; use `--quiet` to suppress them.
+Progress, summary, and profile output are written to **stderr**; use `--quiet` to suppress them.
 Validation errors exit with code `1`; runtime errors with code `2`. See the
 [User Guide](docs/usage.md#cli-reference) for the full list of mutual exclusion rules.
 
 ## Output
 
-In the default `--output-mode commit`, each line in the output `.jsonl` file is a JSON object representing one commit. With `--output-mode file`, each line represents one changed file within a commit, with full commit metadata denormalized onto each record plus a `file` object containing `path`, `status`, `additions`, and `deletions`.
+In the default commit-granularity mode, each line in the output `.jsonl` file is a JSON object representing one commit. With `--per-file`, each line represents one changed file within a commit, with full commit metadata denormalized onto each record plus a `file` object containing `path`, `status`, `additions`, and `deletions`.
 
 Commit-mode record example:
 

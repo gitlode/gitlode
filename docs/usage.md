@@ -1,7 +1,7 @@
 # gitrail — User Guide
 
 gitrail extracts Git commit history from a local repository and writes it as
-[JSON Lines](https://jsonlines.org/) (`.jsonl`) files — one commit per line — suitable for
+[JSON Lines](https://jsonlines.org/) (`.jsonl`) files — one record per line — suitable for
 ingestion into data warehouses, analytics platforms, or any system that consumes
 newline-delimited JSON.
 
@@ -9,11 +9,11 @@ newline-delimited JSON.
 
 ## Extraction Modes
 
-gitrail has two extraction modes, selected with `--mode` (alias `-m`):
+gitrail has two extraction modes:
 
 ### Snapshot mode (default)
 
-`--mode snapshot` extracts commits independently of any prior state. It always walks from the
+By default (no `--incremental` flag), gitrail extracts commits independently of any prior state. It always walks from the
 current tip of the specified branch(es) back through history. No state file is consulted during
 extraction.
 
@@ -25,7 +25,7 @@ extraction.
 
 ### Incremental mode
 
-`--mode incremental` reads a state file to determine where the previous extraction ended, then
+`--incremental` reads a state file to determine where the previous extraction ended, then
 extracts only commits added since that point.
 
 **When to use:**
@@ -49,8 +49,8 @@ gitrail --branch main ./my-repo
 gitrail -b main ./my-repo
 ```
 
-Output is written to `./my-repo-000001.jsonl` (prefix derived from the remote origin URL, or the
-directory name if no remote is configured).
+Output is written to `./my-repo-<timestamp>-000001.jsonl` (prefix derived from the remote origin
+URL, or the directory name if no remote is configured).
 
 ---
 
@@ -68,7 +68,7 @@ For pipelines that regularly load new commits into a data warehouse.
 **Step 1 — initialize state (once):**
 
 ```bash
-gitrail -m snapshot -b main -s ./gitrail-state.json ./my-repo
+gitrail -b main -s ./gitrail-state.json ./my-repo
 ```
 
 This extracts all commits and writes a state file recording the current HEAD of each branch.
@@ -77,17 +77,17 @@ This extracts all commits and writes a state file recording the current HEAD of 
 
 ```bash
 git -C ./my-repo fetch origin
-gitrail -m incremental -b origin/main -s ./gitrail-state.json ./my-repo
+gitrail --incremental -b origin/main -s ./gitrail-state.json ./my-repo
 ```
 
 Only commits added since the last run are extracted. The state file is updated on success.
 
-**Simplified: auto-initialize with `--on-missing-state snapshot`**
+**Simplified: auto-initialize with `--missing-state snapshot`**
 
 If you prefer a single command that handles both the first run and all subsequent runs:
 
 ```bash
-gitrail -m incremental -b main -s ./gitrail-state.json --on-missing-state snapshot ./my-repo
+gitrail --incremental -b main -s ./gitrail-state.json --missing-state snapshot ./my-repo
 ```
 
 - First run (state file absent): emits a warning to stderr, performs full extraction, creates
@@ -140,13 +140,13 @@ No state file required. Suitable when the downstream system handles deduplicatio
 Store the state file on a persistent volume mounted into the container:
 
 ```bash
-gitrail -m incremental -b main \
+gitrail --incremental -b main \
   -s /mnt/state/gitrail-state.json \
-  --on-missing-state snapshot \
+  --missing-state snapshot \
   ./my-repo
 ```
 
-`--on-missing-state snapshot` ensures the first run after a new deployment or volume recreation
+`--missing-state snapshot` ensures the first run after a new deployment or volume recreation
 succeeds without manual intervention.
 
 ---
@@ -178,12 +178,12 @@ HEAD commit hash for each processed branch at the time of extraction:
 | `incremental` | Yes                  | Yes (updated with current HEAD on success) |
 
 In snapshot mode, `--state` serves only as a recording path — prior content has no effect on
-extraction. This makes it safe to run `--mode snapshot` to re-initialize state without affecting
+extraction. This makes it safe to run without `--incremental` to re-initialize state without affecting
 any output.
 
-### `--on-missing-state`
+### `--missing-state`
 
-Controls behavior when `--mode incremental` is used and the state file does not exist:
+Controls behavior when `--incremental` is used and the state file does not exist:
 
 | Value             | Behavior                                                                                  |
 | ----------------- | ----------------------------------------------------------------------------------------- |
@@ -222,7 +222,7 @@ already output in prior runs.
 state (e.g. an orphan branch created with `git checkout --orphan`), gitrail cannot find a merge
 base and falls back to full traversal for that branch. Duplicate commits may appear in the output
 in this case. If duplicates are unacceptable, discard prior output and re-run with
-`--mode snapshot` across all branches to re-extract cleanly, then resume incremental extraction.
+snapshot mode (without `--incremental`) across all branches to re-extract cleanly, then resume incremental extraction.
 
 For the detailed algorithm and worked examples see
 [Git Traversal design](design/git-traversal.md#across-runs).
@@ -293,10 +293,10 @@ gitrail [options] <repository-path>
 
 ### Extraction mode
 
-| Parameter        | Alias | Type                      | Default    | Description                                                                                                     |
-| ---------------- | ----- | ------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
-| `--mode`         | `-m`  | `snapshot \| incremental` | `snapshot` | Extraction mode. `snapshot` runs independently of state; `incremental` reads state to extract only new commits. |
-| `--branch <ref>` | `-b`  | string (repeatable)       | —          | Ref to traverse from. At least one required.                                                                    |
+| Parameter        | Alias | Type                | Default | Description                                                                                          |
+| ---------------- | ----- | ------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `--incremental`  |       | boolean             | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction. |
+| `--branch <ref>` | `-b`  | string (repeatable) | —       | Ref to traverse from. At least one required.                                                         |
 
 ### Range filter (snapshot mode only)
 
@@ -307,36 +307,74 @@ gitrail [options] <repository-path>
 
 ### State management
 
-| Parameter            | Alias | Type                | Default | Description                                                               |
-| -------------------- | ----- | ------------------- | ------- | ------------------------------------------------------------------------- |
-| `--state <path>`     | `-s`  | string              | —       | State file path. Required with `--mode incremental`.                      |
-| `--on-missing-state` |       | `error \| snapshot` | `error` | Behavior when state file is absent. Only valid with `--mode incremental`. |
+| Parameter         | Alias | Type                | Default | Description                                                          |
+| ----------------- | ----- | ------------------- | ------- | -------------------------------------------------------------------- |
+| `--state <path>`  | `-s`  | string              | —       | State file path. Required with `--incremental`.                      |
+| `--missing-state` |       | `error \| snapshot` | `error` | Behavior when state file is absent. Only valid with `--incremental`. |
 
 ### Output
 
-| Parameter                  | Alias | Type             | Default  | Description                                             |
-| -------------------------- | ----- | ---------------- | -------- | ------------------------------------------------------- |
-| `--output-dir <path>`      | `-o`  | string           | `./`     | Directory for output `.jsonl` files. Must exist.        |
-| `--output-prefix <string>` |       | string           | derived  | Filename prefix (derived from remote origin if omitted) |
-| `--output-mode <mode>`     |       | `commit \| file` | `commit` | Output record granularity (see below)                   |
-| `--rotate-lines <n>`       |       | number           | —        | Start new file after `n` lines                          |
-| `--rotate-size <bytes>`    |       | number           | —        | Start new file after `n` bytes                          |
+| Parameter                  | Alias | Type    | Default | Description                                             |
+| -------------------------- | ----- | ------- | ------- | ------------------------------------------------------- |
+| `--output-dir <path>`      | `-o`  | string  | `./`    | Directory for output `.jsonl` files. Must exist.        |
+| `--output-prefix <string>` |       | string  | derived | Filename prefix (derived from remote origin if omitted) |
+| `--per-file`               |       | boolean | `false` | When set, emit one record per changed file per commit   |
+| `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                          |
+| `--rotate-size <bytes>`    |       | number  | —       | Start new file after `n` bytes                          |
 
 ### Control
 
-| Parameter | Alias | Type    | Default | Description                                    |
-| --------- | ----- | ------- | ------- | ---------------------------------------------- |
-| `--quiet` | `-q`  | boolean | `false` | Suppress progress and summary output on stderr |
+| Parameter   | Alias | Type    | Default | Description                                                                                          |
+| ----------- | ----- | ------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.        |
+| `--profile` |       | boolean | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`. |
+
+### Profiling output
+
+When `--profile` is set and the run succeeds, gitrail appends an aligned block to stderr after the
+default completion summary:
+
+```
+Profile
+  elapsed                      : wall=  18.40ms  work=  18.40ms
+  elapsed/planning             : wall=   1.10ms  work=   1.10ms
+  elapsed/traversal            : wall=   8.25ms  work=   8.25ms
+  elapsed/projection           : wall=   3.75ms  work=   3.75ms
+  elapsed/write                : wall=   2.10ms  work=   2.10ms
+  elapsed/git/blob-read        : wall=   0.80ms  work=   0.80ms
+  elapsed/git/diff             : wall=   1.45ms  work=   1.45ms
+```
+
+Each line represents one profiling entry from the per-run profiler tree.
+
+| Entry path                 | What it measures                                                               |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| `elapsed`                  | Total extraction wall/work duration captured by the root profiler              |
+| `elapsed/planning`         | Branch-planning work before traversal begins                                   |
+| `elapsed/traversal`        | Commit traversal and commit-fact materialization                               |
+| `elapsed/projection`       | Fact-to-output-record mapping in the active projector                          |
+| `elapsed/write`            | `OutputSink.write()` and `OutputSink.close()` only                             |
+| `elapsed/git/blob-read`    | Blob reads inside `IsomorphicGitAdapter.getFileChanges()`                      |
+| `elapsed/git/diff`         | Diff-stat computation inside `IsomorphicGitAdapter.getFileChanges()`           |
+| `elapsed/git/...` children | Additional Git-internal sub-stages such as `resolve-ref`, `walk-commits`, etc. |
+
+`wall` shows elapsed time for that scoped profiler. `work` shows additive measured work inside the
+same scope. The root `elapsed` entry is always present on successful runs. Additional stage entries
+are populated when profiling is enabled.
+
+In commit-granularity mode (no `--per-file`), Git file-expansion sub-stages such as
+`elapsed/git/blob-read` and `elapsed/git/diff` remain at `0.00ms` because `getFileChanges()` is
+never called.
 
 ### Mutual exclusion rules
 
-| Combination                                       | Error                                          |
-| ------------------------------------------------- | ---------------------------------------------- |
-| `--since-ref` + `--since-date`                    | Cannot be combined                             |
-| `--since-ref` + `--mode incremental`              | `--since-ref` is snapshot mode only            |
-| `--since-date` + `--mode incremental`             | `--since-date` is snapshot mode only           |
-| `--on-missing-state` without `--mode incremental` | `--on-missing-state` requires incremental mode |
-| `--mode incremental` without `--state`            | `--state` is required for incremental mode     |
+| Combination                               | Error                                       |
+| ----------------------------------------- | ------------------------------------------- |
+| `--since-ref` + `--since-date`            | Cannot be combined                          |
+| `--since-ref` + `--incremental`           | `--since-ref` is snapshot mode only         |
+| `--since-date` + `--incremental`          | `--since-date` is snapshot mode only        |
+| `--missing-state` without `--incremental` | `--missing-state` requires incremental mode |
+| `--incremental` without `--state`         | `--state` is required for incremental mode  |
 
 ### Exit codes
 
@@ -350,12 +388,12 @@ gitrail [options] <repository-path>
 
 ## File-Level Output Mode
 
-By default, `--output-mode commit` (the default), each output record represents one commit.
+By default, each output record represents one commit.
 
-With `--output-mode file`, each record represents one changed **file** within a commit, with commit metadata denormalized onto every record. This enables file-granularity analytics without a join: each row is self-contained.
+With `--per-file`, each record represents one changed **file** within a commit, with commit metadata denormalized onto every record. This enables file-granularity analytics without a join: each row is self-contained.
 
 ```bash
-gitrail -b main --output-mode file ./my-repo
+gitrail -b main --per-file ./my-repo
 ```
 
 ### Output record shape (file mode)

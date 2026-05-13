@@ -14,7 +14,7 @@ applyTo: "src/output/**"
 
 ---
 
-## Initial Implementation Schema
+## Commit-Granularity Schema
 
 Each line is a single JSON object representing one Git commit.
 
@@ -148,17 +148,18 @@ Populated once per run and applied to every output line.
 ### Output Filename Pattern
 
 ```
-{prefix}-{sequenceNumber}.jsonl
+{prefix}-{timestamp}-{sequenceNumber}.jsonl
 ```
 
+- `timestamp` is captured once per run (`YYYYMMDDTHHmmssZ`) and shared by all files in that run
 - `sequenceNumber` is zero-padded to 6 digits: `000001`, `000002`, ...
 - Sequence resets to `000001` on each new run
 
 Example with prefix `my-repo`:
 
 ```
-my-repo-000001.jsonl
-my-repo-000002.jsonl
+my-repo-20260513T120000Z-000001.jsonl
+my-repo-20260513T120000Z-000002.jsonl
 ```
 
 ### Rotation Triggers
@@ -172,13 +173,15 @@ The check occurs **after** writing each line. The line that triggered the thresh
 
 ### Rotation Behavior When Neither Flag Is Set
 
-All output is written to a single file: `{prefix}-000001.jsonl`.
+All output is written to a single file: `{prefix}-{timestamp}-000001.jsonl`.
 
 ---
 
 ## File-Level Output Schema
 
-When `--output-mode file` is specified, each output line represents a single changed file within a commit. Commits with multiple changed files produce multiple output lines. Commits with no changed files (empty commits) produce no output lines.
+When `--per-file` is specified, each output line represents a single changed file within a commit.
+Commits with multiple changed files produce multiple output lines. Commits with no changed files
+(empty commits) produce no output lines.
 
 Each line carries the full commit metadata (denormalized) plus file-specific fields:
 
@@ -253,9 +256,9 @@ These fields are **not yet implemented** but are reserved and must not be used f
 
 ```typescript
 // Commit-level embedded file array (--include-files flag)
-// Deferred beyond v0.3.0 — file-level output mode (--output-mode file) provides
-// equivalent analytical capability. This remains a convenience feature for users
-// who prefer a single denormalized commit record with an embedded files array.
+// File-level output mode (--per-file) already provides equivalent analytical capability.
+// This remains a convenience feature for users who prefer a single denormalized commit
+// record with an embedded files array.
 interface OutputCommitWithFiles extends OutputCommit {
   files?: Array<{
     path: string;

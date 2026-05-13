@@ -239,6 +239,44 @@ remain in user control.
 
 ---
 
+#### Pipeline: Discriminated Fact union and unified projector contract
+
+gitrail currently treats commit-grain and file-grain facts through separate projector contracts,
+which duplicates projection logic and requires extension-oriented changes to be considered in two
+parallel pathways. Before v1.0.0, this is an appropriate point to consolidate internal pipeline
+contracts while preserving user-visible behavior.
+
+This item introduces a discriminated Fact union (for example via a `type` tag) and replaces
+separate commit/file projector interfaces with one unified projector contract that branches
+internally by Fact type.
+
+**Design intent**:
+
+- remove duplicated projection logic between commit and file pathways
+- simplify coordinator dependency shape and projection-stage composition
+- establish a single extension-facing contract for future plugin/enrichment stage design
+- complete this internal contract consolidation during the pre-v1.0 architecture-change window
+
+**Non-goals**:
+
+- no change to CLI flags, argument semantics, or exit behavior
+- no change to output JSON schema or JSONL file format
+- no change to traversal/filtering/checkpoint semantics
+
+**Design considerations**:
+
+- retain deterministic output ordering and current write/progress accounting guarantees
+- keep file-change expansion as a distinct stage even if projection is unified
+- define clear type-narrowing guarantees for plugin and projector implementations
+- decide migration strategy for internal interfaces currently split across commit/file projector slots
+
+**Design dependency and sequencing**:
+
+- should be delivered before, or as part of, plugin-stage implementation planning so plugin API
+  contracts do not inherit duplicated commit/file projector pathways
+
+---
+
 #### Architecture/Runtime: Worker-based extraction runtime for resilience and orchestration
 
 The current extraction pipeline runs in a single Node.js execution context. This keeps the

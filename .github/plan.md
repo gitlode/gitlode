@@ -1,81 +1,60 @@
-# gitrail — v0.4.0 Release Plan
+# gitrail — v0.4.1 Release Plan
 
 ## Overview
 
-v0.4.0 is a pre-v1 minor release centered on an architecture redesign. Because gitrail is still in a pre-release stage, this release may include large internal restructuring and intentional CLI breaking changes where they materially improve the long-term model.
-
-The primary focus is the roadmap item `Architecture: Fact-based extraction pipeline and orchestration split`, delivered together with closely related CLI and observability work that benefits from the same stage boundaries.
+v0.4.1 is a patch release that delivers two internal pipeline improvements and two small CLI UX fixes. There are no breaking changes to the CLI interface, the output JSON schema, or the state file format. All four items are self-contained, low-risk, and share the theme of tightening the codebase after the v0.4.0 architecture redesign.
 
 ## Release Goals
 
-- Replace the current mixed-responsibility extraction flow with a fact-based, stage-oriented pipeline and explicit orchestration boundary
-- Move checkpoint timing, sink lifecycle, and progress ownership out of `Extractor` and into the orchestration layer while preserving current extraction semantics
-- Redesign the CLI parameter model around extraction intent and record grain so the user-facing model matches the redesigned pipeline concepts
-- Add stage-aligned profiling and improved progress reporting based on meaningful execution boundaries rather than record count alone
+- Consolidate commit-grain and file-grain projection into a single discriminated Fact union and unified projector contract
+- Correct inaccurate internal type and interface names to reduce reading friction without changing any external contract
+- Make unknown CLI arguments a hard error to match git behavior and prevent silent typos
+- Accept human-readable size suffixes for `--rotate-size` to align with standard CLI conventions
 
 ## Scope Summary
 
-### Included in v0.4.0
+### Included in v0.4.1
 
-- `Architecture: Fact-based extraction pipeline and orchestration split` (mandatory release theme item)
-- `CLI UX: Parameter model redesign for extraction and output grain`
-- `Development: Granular performance profiling`
-- `CLI UX: Progress metrics quality and progress-display redesign`
+- `Pipeline: Discriminated Fact union and unified projector contract` — internal pipeline consolidation; no user-visible change
+- `Code hygiene: Identifier naming audit for semantic accuracy` — TypeScript identifier renames only; no behavioral change
+- `CLI UX: Warn on unknown CLI arguments` — error on unrecognized options, exit non-zero
+- `CLI UX: --rotate-size human-readable size suffixes` — accept `K`/`M`/`G` suffixes; backward compatible
 
-### Explicitly excluded from v0.4.0
+### Explicitly excluded from v0.4.1
 
-- `CLI UX: Release-boundary extraction workflow` — adjacent to extraction semantics, but too large to combine with the architecture migration and CLI breaking-change set in one release
-- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter` — defer until profiling data from the redesigned pipeline shows whether diff interchangeability is an immediate priority
-- `Output: Configurable field inclusion/exclusion` — better scheduled after projector boundaries are stable and the new pipeline has landed
-- `Output: Repository metadata override` — compatible with the new projector split, but not foundational to the architecture redesign theme
-- `Output: Execution metadata line` — defer until sink responsibilities and release-level metadata needs are re-evaluated after the redesign
-- `Output: stdout support and stream-based OutputWriter` — depends on sink abstraction but is still user-need driven rather than release-defining
-- `Code hygiene: Identifier naming audit for semantic accuracy` — revisit after the redesign stabilizes the new internal vocabulary, to avoid renaming the same concepts twice
-- CLI-only polish items such as `--rotate-size` suffixes, unknown-argument diagnostics, and `--help` grouping — intentionally deferred to keep v0.4.0 focused on the architecture-led change set
+- `CLI UX: Release-boundary extraction workflow` — design scope too large for a patch release
+- `CLI UX: --help option grouping` — cost/value ratio remains unfavorable; deferred rationale still valid
+- `Extraction/File Mode: Exact-content rename detection` — schema-visible change; minor release or later
+- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter` — research cost too high for this cycle
+- `Architecture/Runtime: Worker-based extraction runtime` — large architectural change; patch-incompatible
+- `Output: Configurable field inclusion/exclusion` — better scheduled after Discriminated Fact union stabilizes
 
 ## Development Phases
 
-### Phase 1: Fact Vocabulary and Compatibility Facade
+### Phase 1: Discriminated Fact Union and Unified Projector
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Completed
+- **Status**: Planned
 
-### Phase 2: Commit Traversal Stage Extraction
+### Phase 2: Identifier Naming Audit
 
 - **File**: [`plans/phase-2.md`](plans/phase-2.md)
-- **Status**: Completed
+- **Status**: Planned
 
-### Phase 3: File-Change Expansion and Projector Split
+### Phase 3: Unknown CLI Arguments Error
 
 - **File**: [`plans/phase-3.md`](plans/phase-3.md)
-- **Status**: Completed
+- **Status**: Planned
 
-### Phase 4: Coordinator, Output Sink, and Checkpoint Orchestration
+### Phase 4: `--rotate-size` Size Suffixes
 
 - **File**: [`plans/phase-4.md`](plans/phase-4.md)
-- **Status**: Completed
-
-### Phase 5: CLI Parameter Model Redesign
-
-- **File**: [`plans/phase-5.md`](plans/phase-5.md)
-- **Status**: Completed
-
-### Phase 6: Stage-Aligned Profiling Instrumentation
-
-- **File**: [`plans/phase-6.md`](plans/phase-6.md)
-- **Status**: Completed
-
-### Phase 7: Progress Reporting Redesign and Obsolete-Path Cleanup
-
-- **File**: [`plans/phase-7.md`](plans/phase-7.md)
-- **Status**: Completed
+- **Status**: Planned
 
 Provisional dependency notes:
 
-- Phases 1 through 4 deliver the architecture migration in dependency order.
-- Phase 5 follows Phase 4 so the breaking CLI redesign can target the final orchestration and granularity model rather than temporary compatibility shapes.
-- Phase 6 depends on the Phase 4 stage boundaries being real, because profiling should instrument the actual coordinator, traversal, expansion, projection, and sink responsibilities.
-- Phase 7 depends on Phase 6 profiling outputs and also absorbs the final architecture cleanup step from the roadmap migration plan.
+- Phase 2 follows Phase 1: Naming audit runs after Discriminated Fact union so that newly introduced type names are included in the audit scope.
+- Phases 3 and 4 are independent of Phases 1–2 and of each other; they are ordered after Phase 2 for branch isolation.
 
 ## Release Tasks
 
@@ -85,9 +64,9 @@ _Update all human-oriented documentation to reflect the complete set of changes 
 
 #### Status
 
-- [x] Planned
-- [x] In progress
-- [x] Completed
+- [ ] Planned
+- [ ] In progress
+- [ ] Completed
 
 #### Mandatory Files
 
@@ -113,9 +92,7 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 #### Release-Specific Notes
 
-- Document the architecture redesign in the design docs and update any instructions files whose component boundaries or terminology are no longer accurate
-- Add explicit migration notes for CLI breaking changes introduced by the parameter model redesign
-- Reconcile progress-reporting and profiling documentation with the final stderr/output contract decided during phase design
+<!-- To be filled during 1c–1e -->
 
 #### Verification
 
@@ -127,14 +104,4 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 ## Final Verification Checklist
 
-- [x] All development phases (Phase 1-7) are marked Completed.
-- [x] `CHANGELOG.md` contains a finalized `v0.4.0` entry with `Added` / `Changed` / `Fixed` and
-      `Migration` sections.
-- [x] Human-oriented docs were reviewed and updated for v0.4.0 behavior (`README.md`,
-      `docs/usage.md`, `docs/design/architecture.md`, instructions files).
-- [x] Roadmap cleanup completed for implemented v0.4.0 items; remaining entries are forward-looking.
-- [x] Verification commands completed:
-  - `npm run build` pass
-  - `npm test` pass
-  - `npm run lint` pass
-  - `npm run format:check` pass
+<!-- To be filled when all phases are complete -->

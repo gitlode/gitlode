@@ -8,20 +8,10 @@ This roadmap is intentionally organized by product priority and time horizon, no
 
 ### Metadata Convention
 
-Use the following standardized metadata labels on selected items when needed:
+Roadmap entries use the following standardized metadata labels, placed immediately below the entry title:
 
-- **Release target**: the intended version, such as `v0.1.4`
-- **Depends on**: used when an item depends on one or more other roadmap entries
-
-The intended document flow is:
-
-- roadmap → future-facing backlog and release targeting
-- plan → active implementation tracking
-- changelog → released history
-
-Execution status is intentionally not tracked in the roadmap for now. If that becomes necessary later, it should be redesigned based on an actual operational need rather than kept as a weak placeholder.
-
-This keeps the roadmap stable for both humans and LLMs while still making release planning explicit.
+- **Release target**: `vX.Y.Z` — added when an item is selected for a release during planning
+- **Depends on**: Entry title(s) — indicates dependencies on other roadmap items
 
 ---
 
@@ -89,6 +79,8 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 #### CLI UX: `--rotate-size` human-readable size suffixes
 
+- **Release target**: v0.4.1
+
 `--rotate-size` currently accepts a raw byte count. In practice, users specify thresholds like 500 MB or 1 GB, making raw byte values impractical to type and error-prone to read.
 
 Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would align the option with the conventions used by popular CLI tools (e.g. GNU `split`, `logrotate`).
@@ -103,6 +95,8 @@ Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would ali
 ---
 
 #### CLI UX: Warn on unknown CLI arguments
+
+- **Release target**: v0.4.1
 
 Currently, citty parses arguments with `strict: false` (inherited from `node:util.parseArgs`), which means unrecognized options are silently ignored. A typo such as `--rotate-line` (instead of `--rotate-lines`) passes through without any diagnostic, and the option simply has no effect. This is indistinguishable from a bug in the program itself.
 
@@ -241,6 +235,8 @@ remain in user control.
 ---
 
 #### Pipeline: Discriminated Fact union and unified projector contract
+
+- **Release target**: v0.4.1
 
 gitrail currently treats commit-grain and file-grain facts through separate projector contracts,
 which duplicates projection logic and requires extension-oriented changes to be considered in two
@@ -537,6 +533,9 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ### Near-term
 
 #### Code hygiene: Identifier naming audit for semantic accuracy
+
+- **Release target**: v0.4.1
+- **Depends on**: Pipeline: Discriminated Fact union and unified projector contract
 
 Several identifiers in the codebase carry names that imply a storage medium, lifecycle, or
 structural pattern that the definition itself does not reflect. These are not bugs and do not

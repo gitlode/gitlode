@@ -68,7 +68,7 @@ The primary focus is the roadmap item `Architecture: Fact-based extraction pipel
 ### Phase 7: Progress Reporting Redesign and Obsolete-Path Cleanup
 
 - **File**: [`plans/phase-7.md`](plans/phase-7.md)
-- **Status**: Planned
+- **Status**: Completed
 
 Provisional dependency notes:
 

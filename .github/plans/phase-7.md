@@ -8,8 +8,8 @@ coordinator pipeline._
 #### Status
 
 - [x] Planned
-- [ ] In progress
-- [ ] Completed
+- [x] In progress
+- [x] Completed
 
 #### Design Maturity
 

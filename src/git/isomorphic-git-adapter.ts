@@ -275,12 +275,12 @@ export class IsomorphicGitAdapter implements GitAdapter {
     });
   }
 
-  private _buildFileChange(
+  private async _buildFileChange(
     path: string,
     status: "added" | "modified" | "deleted",
     contentA: Uint8Array,
     contentB: Uint8Array,
-  ): FileChange {
+  ): Promise<FileChange> {
     if (this._isBinary(contentA) || this._isBinary(contentB)) {
       return { path, status, additions: null, deletions: null };
     }
@@ -288,7 +288,6 @@ export class IsomorphicGitAdapter implements GitAdapter {
     const decoder = new TextDecoder("utf-8");
     const oldStr = decoder.decode(contentA);
     const newStr = decoder.decode(contentB);
-
     const parts = diffLines(oldStr, newStr);
     let additions = 0;
     let deletions = 0;

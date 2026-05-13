@@ -286,7 +286,7 @@ describe("ProgressController (tty-interactive)", () => {
   });
 
   it("extracting-progress: shows branch/commits/records/bytes in active line", () => {
-    const { ctrl, sink } = makeController("tty-interactive");
+    const { ctrl, sink, clock, scheduler } = makeController("tty-interactive");
     emit(ctrl, { type: "phase-start", phase: "extracting" });
     emit(ctrl, {
       type: "extracting-progress",
@@ -297,6 +297,10 @@ describe("ProgressController (tty-interactive)", () => {
       recordsWritten: 3,
       bytesWritten: 2048,
     });
+
+    // Rendering is heartbeat-driven; trigger a tick to flush the updated state.
+    clock.advanceMs(600);
+    scheduler.tick();
 
     const rewrites = sink.records.filter((r) => r.type === "rewriteLine");
     const last = rewrites[rewrites.length - 1]!;

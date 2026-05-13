@@ -1,5 +1,5 @@
 import type { ProgressEvent, ProgressPhase } from "../../core/index.js";
-import { HEARTBEAT_INTERVAL_MS, SEMANTIC_REDRAW_SUPPRESS_MS, SPINNER_FRAMES } from "./constants.js";
+import { HEARTBEAT_INTERVAL_MS, SPINNER_FRAMES } from "./constants.js";
 import { formatActiveLine, formatDoneLine } from "./formatters.js";
 import { DefaultHeartbeatScheduler } from "./heartbeat-scheduler.js";
 import type {
@@ -20,7 +20,6 @@ export class ProgressController {
   private currentPhase: ProgressPhase | null = null;
   private phaseStartMs = 0;
   private spinnerIndex = 0;
-  private lastSemanticRedrawMs = 0;
 
   private branchIndex = 0;
   private branchCount = 0;
@@ -84,7 +83,6 @@ export class ProgressController {
 
     const now = this.phaseStartMs;
     this.sink.rewriteLine(formatActiveLine(this.snapshot(now), this.currentSpinnerFrame()));
-    this.lastSemanticRedrawMs = now;
 
     this.heartbeat.start(HEARTBEAT_INTERVAL_MS, () => {
       this.onHeartbeatTick();
@@ -94,9 +92,6 @@ export class ProgressController {
   private onHeartbeatTick(): void {
     this.spinnerIndex++;
     const nowMs = this.clock.nowMs();
-    // Suppress heartbeat redraw if a semantic redraw was very recent.
-    // Note: spinnerIndex is always updated, but the redraw is suppressed.
-    if (nowMs - this.lastSemanticRedrawMs < SEMANTIC_REDRAW_SUPPRESS_MS) return;
     this.sink.rewriteLine(formatActiveLine(this.snapshot(nowMs), this.currentSpinnerFrame()));
   }
 
@@ -112,13 +107,6 @@ export class ProgressController {
     this.commitsTraversed = commitsTraversed;
     this.recordsWritten = recordsWritten;
     this.bytesWritten = bytesWritten;
-
-    if (this.mode !== "tty-interactive") return;
-
-    this.spinnerIndex++;
-    const now = this.clock.nowMs();
-    this.lastSemanticRedrawMs = now;
-    this.sink.rewriteLine(formatActiveLine(this.snapshot(now), this.currentSpinnerFrame()));
   }
 
   private onPhaseEnd(_phase: ProgressPhase): void {
@@ -145,10 +133,9 @@ export class ProgressController {
     if (this.mode === "tty-interactive" && this.currentPhase !== null) {
       this.sink.newline();
       this.sink.writeLine(message);
-      this.spinnerIndex++;
+      // Immediately restore the progress line after a warning interruption.
       const now = this.clock.nowMs();
       this.sink.rewriteLine(formatActiveLine(this.snapshot(now), this.currentSpinnerFrame()));
-      this.lastSemanticRedrawMs = now;
     } else {
       // non-tty-summary and quiet both show warnings via plain writeLine
       this.sink.writeLine(message);

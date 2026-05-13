@@ -1,6 +1,6 @@
 import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { RawCommit } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
@@ -360,7 +360,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
   it("file deleted: additions = 0, correct deletion count", async () => {
     const { fs, init, addCommit, removeCommit } = makeRepoExt();
     await init();
-    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+    await addCommit("a.txt", "line1\nline2\n", "root commit");
     const sha2 = await addCommit("b.txt", "x\n", "add b.txt");
     const sha3 = await removeCommit("b.txt", "delete b.txt");
 

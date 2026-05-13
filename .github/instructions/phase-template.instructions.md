@@ -28,10 +28,10 @@ This template is designed to reduce **undesirable pauses**. It does **not** atte
 
 | File                                                        | Role                                                                        |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `.github/PLAN.md`                                           | Active release plan; phase list with status and release-level context       |
+| `.github/plan.md`                                           | Active release plan; phase list with status and release-level context       |
 | `.github/plans/phase-N.md`                                  | Individual phase files using this template                                  |
 | `.github/instructions/development-workflow.instructions.md` | End-to-end development lifecycle; defines when and how phase files are used |
-| `.github/roadmap.md`                                        | Long-horizon backlog; feeds into PLAN.md releases                           |
+| `.github/roadmap.md`                                        | Long-horizon backlog; feeds into plan.md releases                           |
 | `.github/instructions/*.instructions.md`                    | Technical specifications; linked from phase Design References               |
 | `.github/copilot-instructions.md`                           | Project-level conventions                                                   |
 
@@ -51,18 +51,18 @@ Deferred design is not a general TODO state. It requires a completed Deferred De
 
 | Section                   | When                                                                                  | Owner                                      |
 | ------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Title, summary, Status    | When the phase file is first created                                                  | Planning session                           |
+| Title, summary, Status    | When the phase file is first created                                                  | Planning trunk session                     |
 | Design Maturity           | When the phase file is first created; update if deferred design is later resolved     | Planning/pre-implementation session        |
-| Design References         | Planning session                                                                      | Planning session                           |
+| Design References         | Planning trunk session                                                                | Planning trunk session                     |
 | Design Decisions          | **Before the implementation session starts**                                          | Planning/pre-implementation session        |
 | Deferred Design Controls  | During planning if the phase is marked deferred design; resolve before implementation | Planning/pre-implementation session        |
-| Non-Goals                 | Before implementation                                                                 | Planning session                           |
+| Non-Goals                 | Before implementation                                                                 | Planning trunk session                     |
 | Target Files              | Before implementation                                                                 | Planning/pre-implementation session        |
-| Documentation Touchpoints | Before implementation                                                                 | Planning session                           |
+| Documentation Touchpoints | Before implementation                                                                 | Planning trunk session                     |
 | Implementation Notes      | When non-obvious details are known                                                    | Pre-implementation or early implementation |
 | Verification              | Before implementation (commands); after first run (behavioral checks)                 | Pre-implementation session                 |
 
-The `Owner` column indicates planning-stage responsibility, not necessarily which session performs the edit. When Stage 1e-1 selects `planning branch session`, that branch session may fill or update the phase file directly during detailed design, while the planning session still owns initial creation, cross-phase review, and finalization. If a phase is marked deferred design, the later Stage 2 design refinement session may finalize the deferred sections before implementation begins.
+The `Owner` column indicates planning-stage responsibility, not necessarily which session performs the edit. During Stage 1e-1, the planning branch session fills or updates the phase file during detailed design, while the planning trunk session still owns initial creation, cross-phase review, and finalization. If a phase is marked deferred design, the later Stage 2 design refinement session may finalize the deferred sections before implementation begins.
 
 Sections marked "Before the implementation session starts" are the ones most likely to cause mid-session pauses if left blank.
 

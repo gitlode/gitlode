@@ -136,7 +136,70 @@ This means the expected behavior for gitrail is also **error on unknown argument
 
 ---
 
+#### Extraction/File Mode: Exact-content rename detection (limited scope)
+
+gitrail currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
+comparison and does not detect rename/move relationships. As a result, a pure file move appears as
+one full-path deletion plus one full-path addition, even when file content is unchanged.
+
+This near-term item introduces an explicit, limited-scope rename detection mode for the most
+deterministic case: pairing `deleted` and `added` records when blob identity is exactly equal.
+
+**Design intent**:
+
+- provide a practical first step for move-aware extraction without introducing heuristic ambiguity
+- keep default behavior backward compatible unless explicitly enabled
+- treat this as file-level rename detection; directory rename is represented as a set of file
+  renames, not as a separate Git primitive
+
+**Scope boundary (initial delivery)**:
+
+- detect only exact-content moves (equivalent to `R100` style outcomes)
+- do not infer rename when content has changed in the same commit
+- keep merge behavior aligned with current first-parent comparison semantics
+
+**Questions to resolve at design time**:
+
+- whether rename output should be represented via a new status/value shape or by optional
+  `oldPath`/`newPath` fields while preserving existing consumers
+- whether the feature should be opt-in via CLI (preferred for compatibility) or enabled by default
+- how to handle one-to-many and many-to-one exact matches deterministically
+- what summary/profile counters should be emitted so users can audit rename pairing impact
+
+---
+
 ### Medium-term
+
+---
+
+#### Extraction/File Mode: Similarity-based rename detection for edited moves
+
+Exact-content pairing alone is insufficient for common real-world moves where files are renamed and
+edited in the same commit. This item extends the limited near-term rename mode with
+similarity-based matching between deleted and added candidates.
+
+Unlike exact-content pairing, this is inherently heuristic. The design must therefore make
+fidelity, runtime cost, and determinism explicit and user-controllable.
+
+**Design intent**:
+
+- support rename detection when content changes during the move
+- keep matching behavior transparent and reproducible under fixed settings
+- avoid silent extraction-policy shifts by exposing thresholds and guardrails
+
+**Design/implementation considerations**:
+
+- similarity threshold model (single threshold vs tiered behavior)
+- candidate matching strategy and deterministic tie-breaking
+- runtime guardrails for large candidate sets to prevent worst-case blowups
+- compatibility with existing per-file metrics (`additions` / `deletions`) and profiling output
+
+**Open policy questions**:
+
+- whether copy detection should be out of scope initially and kept as a separate future item
+- whether this mode should remain opt-in even after stabilization
+- how explicitly the CLI/docs should label outputs as inferred relationships rather than stored Git
+  facts
 
 ---
 
@@ -286,6 +349,30 @@ alternative `DiffAdapter` implementations to prioritize first.
 ---
 
 ### Long-term
+
+#### Output/UX: Directory-move inference from file-rename clusters
+
+Git tracks file-level changes; directory rename is generally inferred from sets of path-level file
+moves. Once file-level rename detection is mature, gitrail can provide an optional higher-level
+view that groups compatible rename sets into inferred directory moves.
+
+This should be treated as an interpretation layer for usability, not as a replacement for
+file-grain facts.
+
+**Design intent**:
+
+- improve readability for refactors that mostly move files across path prefixes
+- preserve canonical file-level output as the primary factual grain
+- make inferred directory-level summaries clearly distinguishable from file-level facts
+
+**Design questions to resolve at implementation time**:
+
+- criteria for grouping rename pairs into a directory-level move inference
+- handling partial migrations and mixed commits (move + edit + add/delete)
+- whether directory inference belongs in primary output, sidecar metadata, or reporting-only views
+- how to expose confidence/coverage so downstream users can evaluate interpretation quality
+
+---
 
 #### Development: Profiling interpretation model and usability
 

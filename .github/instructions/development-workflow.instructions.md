@@ -742,7 +742,18 @@ Every development branch session must produce a summary in this format:
 
 ## Starting Prompt Template Formats
 
-Starting prompts are handoff artifacts. They must be concise, session-specific, and explicit about the required outcome. Include only information that is not already covered by `plan.md`, the phase file, or the relevant instructions files.
+Starting prompts are session-start artifacts. They must be concise, session-specific, and explicit about the required outcome. Include only information that is not already covered by `plan.md`, the phase file, or the relevant instructions files.
+
+### Planning Trunk Session Starting Prompt
+
+- **Artifact Type**: Starting Prompt
+- **Session Type**: Planning Trunk Session
+- **Purpose**: Orchestrate release planning, define phase boundaries, and prepare the planning branch session starting prompt.
+- **Input Files**: `roadmap.md`, `plan.md`, relevant instructions files, prior release context if needed
+- **Planning Focus**: {scope items, phase ordering, and decisions that still need human judgment}
+- **Phase Handoff**: {target phase and the planning branch session prompt to launch for that phase}
+- **Restrictions**: Do not begin implementation work or write phase design details that belong in the planning branch session.
+- **Required Output**: Planning completion artifacts and the planning branch session starting prompt for the next phase
 
 ### Planning Branch Session Starting Prompt
 
@@ -755,6 +766,17 @@ Starting prompts are handoff artifacts. They must be concise, session-specific, 
 - **Open Design Questions**: {specific design questions or ambiguity to resolve}
 - **Restrictions**: No implementation work is allowed.
 - **Required Output**: Planning Branch Session Summary
+
+### Development Trunk Session Starting Prompt
+
+- **Artifact Type**: Starting Prompt
+- **Session Type**: Development Trunk Session
+- **Purpose**: Orchestrate implementation, gate each phase, and prepare the next branch-session starting prompt when the workflow authorizes it.
+- **Input Files**: `plan.md`, all current phase files, relevant instructions files, prior branch-session summaries, current repository state
+- **Session Focus**: {current phase, gate being evaluated, carry-forward issues, and any required refinement or review}
+- **Branch Handoff**: {target phase and the development branch session prompt to launch when authorized}
+- **Restrictions**: Do not implement code in the trunk session; keep branch execution instructions separate from orchestration.
+- **Required Output**: Development trunk gate responses, review decisions, and the branch-session starting prompt for the next authorized phase
 
 ### Design Refinement Session Starting Prompt
 

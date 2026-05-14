@@ -93,7 +93,11 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 #### Release-Specific Notes
 
-<!-- To be filled during 1c–1e -->
+- Update `architecture.instructions.md` canonical vocabulary and ownership rules for `Fact`, `FactProjector`, and `DefaultFactProjector` (Phase 1 touchpoint).
+- Update `cli.instructions.md` to document: unknown-option fatal error policy (Phase 3) and `--rotate-size` suffix syntax and min/max bounds (Phase 4).
+- Update `README.md` and `docs/usage.md` for `--rotate-size` suffix support (Phase 4 touchpoint).
+- No migration notes required: no breaking CLI or schema changes in this release.
+- Note: `git-traversal.instructions.md` and `architecture.instructions.md` state/checkpoint vocabulary updates are tied to Phase 2 and will be executed after Phase 2 implementation completes.
 
 #### Verification
 
@@ -105,4 +109,14 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 ## Final Verification Checklist
 
-<!-- To be filled when all phases are complete -->
+- [ ] All development phases are marked Completed.
+- [ ] `CHANGELOG.md` contains a finalized this version's entry with `Added` / `Changed` / `Fixed` and
+      `Migration` (if needed) sections.
+- [ ] Human-oriented docs were reviewed and updated for latest behavior (`README.md`,
+      `docs/usage.md`, `docs/design/architecture.md`, instructions files).
+- [ ] Roadmap cleanup completed for implemented items in this version; remaining entries are forward-looking.
+- [ ] Verification commands completed:
+  - `npm run build` pass
+  - `npm test` pass
+  - `npm run lint` pass
+  - `npm run format:check` pass

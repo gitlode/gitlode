@@ -16,6 +16,7 @@ export interface PersonIdentity {
 
 /** Core-owned intermediate representation of a single commit, output-format-agnostic. */
 export interface CommitFact {
+  readonly type: "commit";
   readonly oid: string;
   readonly message: string;
   readonly author: {
@@ -39,6 +40,7 @@ export interface CommitFact {
 
 /** Core-owned intermediate representation of a single file change within a commit. */
 export interface FileChangeFact {
+  readonly type: "file-change";
   readonly commit: CommitFact;
   readonly file: {
     readonly path: string;
@@ -47,6 +49,8 @@ export interface FileChangeFact {
     readonly deletions: number | null;
   };
 }
+
+export type Fact = CommitFact | FileChangeFact;
 
 export interface RotationConfig {
   readonly maxLines?: number;
@@ -297,20 +301,16 @@ export interface CoordinatorResult {
 }
 
 /** Constructor dependencies injected into `DefaultExtractionCoordinator`.
- *  Projector slots use inline structural types to avoid importing from projector
- *  files (those files import from the output layer, which would create a circular
- *  import through core/index.ts). */
+ *  The projector slot uses an inline structural type to avoid importing from
+ *  fact-projector.ts (that file imports from the output layer, which would
+ *  create a circular import through core/index.ts). */
 export interface CoordinatorDependencies {
   readonly traversalPlanner: BranchTraversalPlanner;
   readonly traversalExtractor: CommitTraversalExtractor;
   readonly fileChangeExpander: FileChangeExpander;
   /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */
-  readonly commitProjector: {
-    project(commits: AsyncIterable<CommitFact>): AsyncIterable<OutputRecord>;
-  };
-  /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */
-  readonly fileProjector: {
-    project(fileChanges: AsyncIterable<FileChangeFact>): AsyncIterable<OutputRecord>;
+  readonly projector: {
+    project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord>;
   };
   readonly sink: OutputSink;
   readonly checkpointStore: CheckpointStore | undefined;

@@ -34,7 +34,7 @@ v0.4.1 is a patch release that delivers two internal pipeline improvements and t
 ### Phase 1: Discriminated Fact Union and Unified Projector
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 2: Identifier Naming Audit
 

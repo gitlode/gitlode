@@ -6,6 +6,7 @@ import type {
   CoordinatorRequest,
   CoordinatorResult,
   ExtractionCheckpoint,
+  Fact,
 } from "./types.js";
 
 /** Core-owned interface for the extraction orchestration stage. */
@@ -47,8 +48,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
       traversalPlanner,
       traversalExtractor,
       fileChangeExpander,
-      commitProjector,
-      fileProjector,
+      projector,
       sink,
       checkpointStore,
       reporter,
@@ -118,14 +118,12 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
           commitsTraversed++;
         });
 
-        const recordStream =
+        const factStream: AsyncIterable<Fact> =
           request.granularity === "file"
-            ? fileProjector.project(
-                fileChangeExpander.expand(countedStream, request.repositoryPath),
-              )
-            : commitProjector.project(countedStream);
+            ? fileChangeExpander.expand(countedStream, request.repositoryPath)
+            : countedStream;
 
-        for await (const record of recordStream) {
+        for await (const record of projector.project(factStream)) {
           await withProfilerAsync(profiler, () => sink.write(record));
           recordsWritten++;
           reporter.emit({

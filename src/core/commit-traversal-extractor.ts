@@ -17,6 +17,7 @@ function toCommitFact(
   remoteUrl: string | null,
 ): CommitFact {
   return {
+    type: "commit",
     oid: rawCommit.oid,
     message: rawCommit.message,
     author: {

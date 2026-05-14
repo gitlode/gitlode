@@ -12,11 +12,10 @@ import type { TerminalSink } from "./cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "./cli/reporting/index.js";
 import {
   DefaultBranchTraversalPlanner,
-  DefaultCommitRecordProjector,
   DefaultCommitTraversalExtractor,
   DefaultExtractionCoordinator,
+  DefaultFactProjector,
   DefaultFileChangeExpander,
-  DefaultFileChangeRecordProjector,
   DefaultStageProfiler,
 } from "./core/index.js";
 import type {
@@ -232,23 +231,13 @@ const main = defineCommand({
       const traversalPlanner = new DefaultBranchTraversalPlanner(adapter, planningProfiler);
       const traversalExtractor = new DefaultCommitTraversalExtractor(adapter, traversalProfiler);
       const fileChangeExpander = new DefaultFileChangeExpander(adapter);
-      const commitProjector = new DefaultCommitRecordProjector(
-        repoName,
-        remoteUrl,
-        projectionProfiler,
-      );
-      const fileProjector = new DefaultFileChangeRecordProjector(
-        repoName,
-        remoteUrl,
-        projectionProfiler,
-      );
+      const projector = new DefaultFactProjector(repoName, remoteUrl, projectionProfiler);
 
       const deps: CoordinatorDependencies = {
         traversalPlanner,
         traversalExtractor,
         fileChangeExpander,
-        commitProjector,
-        fileProjector,
+        projector,
         sink,
         checkpointStore: stateStore,
         reporter,

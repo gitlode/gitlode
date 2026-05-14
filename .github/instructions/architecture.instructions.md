@@ -55,17 +55,18 @@ details belong in `CHANGELOG.md`.
 ### Canonical vocabulary
 
 - `CommitFact` and `FileChangeFact` are the stable Core-owned intermediate terms.
+- `Fact = CommitFact | FileChangeFact` is the discriminated union over all pipeline fact types.
 - `CheckpointStore`, `ExtractionCheckpoint`, and `BranchCheckpoint` are the stable checkpoint
   persistence terms.
 - `ProfilingEntry` (`ExtractionResult.profilingEntries`) is the stable profiling term.
 - `ExtractionCoordinator`, `CommitTraversalExtractor`, `FileChangeExpander`,
-  `CommitRecordProjector`, `FileChangeRecordProjector`, and `OutputSink` are the stable pipeline
-  stage boundaries.
+  `FactProjector`, and `OutputSink` are the stable pipeline stage boundaries.
 
 ### Ownership and boundary rules
 
 - The runtime edge (`src/index.ts`) constructs `DefaultExtractionCoordinator`, stage instances,
   optional `CheckpointStore` (`--state`), `OutputSink`, and `ProgressReporter` directly.
+  `DefaultFactProjector` is the single projector instance passed to `DefaultExtractionCoordinator`.
 - Core owns traversal/extraction orchestration, pipeline branching by granularity, write-loop
   progression, checkpoint commit timing, and structured progress events.
 - CLI owns rendering policy (TTY vs non-TTY, spinner/heartbeat, summary/profile layout, warning
@@ -119,10 +120,11 @@ After the Phase 7 cleanup, `ExtractionCoordinator` owns pipeline construction, g
 branching, the write loop, structured progress integration, sink lifecycle (`OutputSink.close()`),
 and checkpoint commit timing. The runtime edge constructs the coordinator, stage instances,
 checkpoint store, sink, and progress reporter directly; `Extractor` no longer exists.
-`CommitTraversalExtractor`, `FileChangeExpander`, `CommitRecordProjector`, and
-`FileChangeRecordProjector` own traversal, expansion, and projection respectively. `OutputSink`
-(backed by `OutputWriterSink`) owns record serialization and file rotation. `CheckpointStore`
-reads and writes checkpoints but does not decide timing.
+`CommitTraversalExtractor`, `FileChangeExpander`, and `FactProjector` own traversal, expansion,
+and projection respectively. `FactProjector` receives a unified `AsyncIterable<Fact>` stream and
+dispatches internally by `fact.type`. `OutputSink` (backed by `OutputWriterSink`) owns record
+serialization and file rotation. `CheckpointStore` reads and writes checkpoints but does not
+decide timing.
 
 Key types:
 

@@ -4,9 +4,9 @@ _Introduce a `type` discriminant on `CommitFact` and `FileChangeFact`, define a 
 
 #### Status
 
-- [x] Planned
+- [ ] Planned
 - [ ] In progress
-- [ ] Completed
+- [x] Completed
 
 #### Design Maturity
 

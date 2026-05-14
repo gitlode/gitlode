@@ -15,6 +15,7 @@ import type {
   CommitTraversalRequest,
   CoordinatorDependencies,
   ExtractionCheckpoint,
+  Fact,
   FileChangeExpander,
   FileChangeFact,
   ProgressEvent,
@@ -32,6 +33,7 @@ const FAKE_HEAD_2 = "b".repeat(40) as CommitHash;
 
 function makeCommitFact(oid: string): CommitFact {
   return {
+    type: "commit",
     oid,
     message: `commit ${oid.slice(0, 7)}`,
     author: { name: "Test", email: "t@t.com", timestamp: 1_000_000, timezoneOffset: 0 },
@@ -93,33 +95,31 @@ function makeTraverser(oids: string[]): CommitTraversalExtractor {
   };
 }
 
-/** Commit projector stub: wraps each CommitFact as an OutputRecord. */
-const commitProjector = {
-  project(commits: AsyncIterable<CommitFact>): AsyncIterable<OutputRecord> {
-    return (async function* () {
-      for await (const fact of commits) yield makeOutputRecord(fact.oid);
-    })();
-  },
-};
-
-/** File projector stub: yields OutputRecord for each FileChangeFact. */
-const fileProjector = {
-  project(changes: AsyncIterable<FileChangeFact>): AsyncIterable<OutputRecord> {
-    return (async function* () {
-      for await (const fact of changes) yield makeOutputRecord(`${fact.commit.oid}-file`);
-    })();
-  },
-};
-
 /** Expander stub: yields one FileChangeFact per CommitFact. */
 const fileChangeExpander: FileChangeExpander = {
   expand(commits: AsyncIterable<CommitFact>): AsyncIterable<FileChangeFact> {
     return (async function* () {
       for await (const fact of commits) {
         yield {
+          type: "file-change",
           commit: fact,
           file: { path: "a.ts", status: "modified", additions: 1, deletions: 0 },
         };
+      }
+    })();
+  },
+};
+
+/** Single projector stub: dispatches commit and file-change facts to the appropriate output. */
+const projector = {
+  project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord> {
+    return (async function* () {
+      for await (const fact of facts) {
+        if (fact.type === "commit") {
+          yield makeOutputRecord(fact.oid);
+        } else {
+          yield makeOutputRecord(`${fact.commit.oid}-file`);
+        }
       }
     })();
   },
@@ -186,8 +186,7 @@ function makeDeps(
     traversalPlanner: overrides.traversalPlanner ?? makePlanner(plans),
     traversalExtractor: overrides.traversalExtractor ?? makeTraverser(oids),
     fileChangeExpander: overrides.fileChangeExpander ?? fileChangeExpander,
-    commitProjector: overrides.commitProjector ?? commitProjector,
-    fileProjector: overrides.fileProjector ?? fileProjector,
+    projector: overrides.projector ?? projector,
     sink,
     checkpointStore: overrides.checkpointStore,
     reporter: overrides.reporter ?? makeProgressReporter(),

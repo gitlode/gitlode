@@ -10,8 +10,8 @@ _Refine internal TypeScript identifier names so they match the actual domain con
 
 #### Design Maturity
 
-- [ ] Implementation-ready
-- [x] Deferred design
+- [x] Implementation-ready
+- [ ] Deferred design
 
 #### Design References
 
@@ -36,8 +36,6 @@ This phase remains a strict internal rename refactor and explicitly includes all
 
 Any rename that requires changing CLI-facing text contracts, output fields, or persisted JSON keys is out of scope.
 
-The finalized rename execution list is intentionally deferred until a post-Phase-1 refinement checkpoint (see Deferred Design Controls), but all constraints above are already fixed and non-negotiable.
-
 **Naming rules to apply consistently**
 
 - Use `State` for in-memory/domain data structures representing persisted extraction progress.
@@ -46,27 +44,54 @@ The finalized rename execution list is intentionally deferred until a post-Phase
 - Keep file paths stable (no file rename/move) to minimize path churn; rename symbols and usages only.
 - Keep existing state JSON keys (`version`, `generatedAt`, `repositoryPath`, `branches`, `name`, `lastCommitHash`) unchanged.
 
-**Current candidate rename list (to be revalidated before implementation)**
+**Module/file organization rules**
 
-The following identifiers are the current preferred mappings and must be revalidated against the implemented Phase 1 code before Phase 2 execution:
+- Keep `src/core/types.ts` as the single home for exported Core interfaces, type aliases, and structural dependency contracts.
+- Keep implementation modules (`src/core/*.ts`) focused on runtime classes, generators, and helpers; do not leave exported interface declarations in those files when the interface is part of the Core contract.
+- When a Core stage has both an interface and a default implementation, place the interface in `src/core/types.ts` and the default implementation in its own module file.
+- Prefer structural dependency slots in `CoordinatorDependencies` when that avoids circular imports, but do not use that as a reason to keep a public stage interface in an implementation module.
+- Preserve the existing file boundaries for git/output layers unless a similar split is required by a module-organization rule derived from the core cleanup.
+
+**Final rename list**
+
+The following identifiers are the finalized Phase 2 rename set:
 
 - `CheckpointStore` -> `StateStore`
-- `BranchCheckpoint` -> `BranchState`
 - `ExtractionCheckpoint` -> `ExtractionState`
+- `BranchCheckpoint` -> `BranchState`
+- `CoordinatorRequest.priorCheckpoint` -> `priorState`
+- `CoordinatorDependencies.checkpointStore` -> `stateStore`
 - `NodeCheckpointStore` -> `NodeStateStore`
 - `emptyCheckpoint` -> `emptyState`
 - `loadPriorCheckpoint` -> `loadPriorState`
-- `priorCheckpoint` -> `priorState`
 - `candidateCheckpoint` -> `candidateState`
+- `priorCheckpoint` local variable in `src/index.ts` -> `priorState`
+- `makeCheckpointStore` test helper -> `makeStateStore`
+- `emptyCheckpoint` test helper -> `emptyState`
 
 These renames are internal symbol-level changes only. File names remain unchanged.
 
-**Intentionally not renamed in Phase 2 (current decision, revalidated at refinement)**
+**Final target-file set**
 
-- `PersonIdentity` (kept): semantically acceptable for `{name,email}` and not part of the state/checkpoint naming drift targeted by this phase. Renaming would expand churn into output/git type contracts with low clarity gain.
-- `stateFilePath` (kept): reflects filesystem location semantics and is used in CLI parsing/runtime edge. Renaming to `statePath` would not materially improve clarity.
-- `Fact`, `FactProjector`, `DefaultFactProjector` (kept): introduced in Phase 1 and aligned with canonical vocabulary.
-- `perFile` (kept): known naming debt but tied to larger CLI terminology evolution; outside this internal-audit phase boundary.
+- `src/core/types.ts`: rename the state/store type names and the coordinator request/dependency field names.
+- `src/core/index.ts`: re-export the renamed core types.
+- `src/core/fact-projector.ts`: move the exported `FactProjector` interface out of the implementation module and keep only `DefaultFactProjector` there.
+- `src/core/branch-traversal-planner.ts`: move the exported `BranchTraversalPlanner` interface out of the implementation module and keep only `DefaultBranchTraversalPlanner` there.
+- `src/core/commit-traversal-extractor.ts`: move the exported `CommitTraversalExtractor` interface out of the implementation module and keep only `DefaultCommitTraversalExtractor` there.
+- `src/core/file-change-expander.ts`: move the exported `FileChangeExpander` interface out of the implementation module and keep only `DefaultFileChangeExpander` there.
+- `src/core/extraction-coordinator.ts`: move the exported `ExtractionCoordinator` interface out of the implementation module, rename the imported type names, and rename the local `candidateCheckpoint` variable.
+- `src/index.ts`: rename the Node-backed state store class and the local state-loading helper identifiers.
+- `test/core/extraction-coordinator.test.ts`: rename the imported types plus helper/test symbols that construct or wire the renamed core request/dependency fields.
+
+**Final exclusion list with rationale**
+
+- `stateFilePath` is kept: it denotes a filesystem location and is already the clearest runtime-edge term.
+- `PersonIdentity` is kept: it is semantically correct for `{name,email}` and does not belong to the state/store naming drift this phase addresses.
+- `Fact` remains a union type in `src/core/types.ts`.
+- `FactProjector` remains a Core concept, but the interface itself moves to `src/core/types.ts` so the implementation module stays runtime-only.
+- `DefaultFactProjector` remains the concrete projection implementation in `src/core/fact-projector.ts`.
+- `perFile` is kept: it is a broader CLI terminology concern and is outside this internal audit boundary.
+- `src/git/**` and `test/git/**` remain unchanged: no identifier in those areas is part of the finalized state/store rename surface.
 
 **Import/path churn control**
 
@@ -75,7 +100,7 @@ These renames are internal symbol-level changes only. File names remain unchange
 - Keep barrel exports in `src/core/index.ts` synchronized in the same change to avoid transient unresolved symbol chains.
 - Limit rename scope to affected symbols only; avoid opportunistic cleanup.
 
-**Migration order to avoid temporary type errors (locked approach)**
+**Migration order to avoid temporary type errors**
 
 1. Rename canonical state symbols in `src/core/types.ts`.
 2. Update re-exports in `src/core/index.ts`.
@@ -86,7 +111,7 @@ These renames are internal symbol-level changes only. File names remain unchange
 **Owning layers**
 
 - Core owns type vocabulary (`StateStore`, `ExtractionState`, `BranchState`) and coordinator-level variable naming.
-- Runtime edge (`src/index.ts`) owns Node-backed implementation class naming (`NodeStateStore`) and loader/helper symbol names.
+- Runtime edge (`src/index.ts`) owns the Node-backed implementation class naming (`NodeStateStore`) and the local state-loading helper names.
 - No ownership changes across CLI/Git/Output layers.
 
 **New runtime dependencies**
@@ -95,36 +120,29 @@ These renames are internal symbol-level changes only. File names remain unchange
 
 ---
 
-#### Deferred Design Controls
-
-- **Why deferred**: Phase 2 explicitly includes naming targets introduced/changed by Phase 1. Until Phase 1 implementation is complete and reviewed on branch, the exact rename surface cannot be finalized without risking stale or incorrect symbol mappings.
-- **Depends on**: Completed Phase 1 implementation state (including final exported names and file layout), plus latest `src/**` and `test/**` references on the Phase 2 implementation start point.
-- **Fixed before refinement**: Scope boundary constraints, naming rules (`State` vs `Store`, avoid `Checkpoint`), no file-path renames, no behavior change policy, and current candidate mappings as the baseline proposal.
-- **To be finalized in refinement**: Final rename list (exact before/after), final target-file set, final exclusion list, and any newly introduced Phase 1 symbols that must be included in rename propagation.
-- **Refinement trigger**: Start of Phase 2 implementation session after Phase 1 merge/rebase state is available in the working branch.
-- **Required inputs**: Latest `src/core/**`, `src/git/**`, `test/core/**`, `test/git/**`, `src/index.ts`, and updated instruction vocabulary references.
-
----
-
 #### Non-Goals
 
 - Renaming CLI option names, aliases, or parser/result fields.
 - Renaming persisted state JSON keys or versioning semantics.
 - Refactoring state read/write behavior, warning behavior, or incremental traversal behavior.
-- Renaming unrelated symbols in git/output layers unless required by direct type propagation from this phase's final mapping.
+- Renaming unrelated symbols in git/output layers unless required by direct type propagation from this phase's finalized mapping.
 - Any architecture changes introduced in Phase 1 (already completed design scope).
 
 ---
 
 #### Target Files
 
-| File                                       | Action | Notes                                                                                                                                                   |
-| ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/core/types.ts`                        | Modify | Rename state/checkpoint interfaces and store interface: `CheckpointStore`, `ExtractionCheckpoint`, `BranchCheckpoint`, `priorCheckpoint` reference type |
-| `src/core/index.ts`                        | Modify | Rename corresponding re-exported type names                                                                                                             |
-| `src/core/extraction-coordinator.ts`       | Modify | Rename imported types and local symbol `candidateCheckpoint` -> `candidateState`; preserve logic                                                        |
-| `src/index.ts`                             | Modify | Rename store class and state helper/function/variable identifiers (`NodeStateStore`, `emptyState`, `loadPriorState`, `priorState`)                      |
-| `test/core/extraction-coordinator.test.ts` | Modify | Rename imported types and helper/test symbols affected by state-related type name propagation                                                           |
+| File                                       | Action | Notes                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/types.ts`                        | Modify | Rename `CheckpointStore`/`ExtractionCheckpoint`/`BranchCheckpoint`; rename `CoordinatorRequest.priorCheckpoint` to `priorState`; rename `CoordinatorDependencies.checkpointStore` to `stateStore`; add moved stage interfaces (`FactProjector`, `BranchTraversalPlanner`, `CommitTraversalExtractor`, `FileChangeExpander`, `ExtractionCoordinator`) |
+| `src/core/index.ts`                        | Modify | Re-export the renamed core state types                                                                                                                                                                                                                                                                                                               |
+| `src/core/fact-projector.ts`               | Modify | Remove `export interface FactProjector` (moved to `types.ts`); keep `DefaultFactProjector` class unchanged                                                                                                                                                                                                                                           |
+| `src/core/branch-traversal-planner.ts`     | Modify | Remove `export interface BranchTraversalPlanner` (moved to `types.ts`); keep `DefaultBranchTraversalPlanner` class unchanged                                                                                                                                                                                                                         |
+| `src/core/commit-traversal-extractor.ts`   | Modify | Remove `export interface CommitTraversalExtractor` (moved to `types.ts`); keep `DefaultCommitTraversalExtractor` class unchanged                                                                                                                                                                                                                     |
+| `src/core/file-change-expander.ts`         | Modify | Remove `export interface FileChangeExpander` (moved to `types.ts`); keep `DefaultFileChangeExpander` class unchanged                                                                                                                                                                                                                                 |
+| `src/core/extraction-coordinator.ts`       | Modify | Remove `export interface ExtractionCoordinator` (moved to `types.ts`); rename imported types and local `candidateCheckpoint` to `candidateState`; preserve logic                                                                                                                                                                                     |
+| `src/index.ts`                             | Modify | Rename `NodeCheckpointStore` to `NodeStateStore`; rename `emptyCheckpoint` to `emptyState`, `loadPriorCheckpoint` to `loadPriorState`, and the local `priorCheckpoint` variable to `priorState`                                                                                                                                                      |
+| `test/core/extraction-coordinator.test.ts` | Modify | Rename imported types and helper/test symbols affected by state-related type name propagation, including `makeCheckpointStore` -> `makeStateStore` and `emptyCheckpoint` -> `emptyState`                                                                                                                                                             |
 
 Audited and intentionally no-change in this phase:
 
@@ -132,11 +150,7 @@ Audited and intentionally no-change in this phase:
 - `src/git/index.ts`
 - `test/git/**`
 
-Reason: no identifier in these files currently violates the selected state/checkpoint naming rules strongly enough to justify additional churn in v0.4.1.
-
-Provisional status note:
-
-- The table above is a provisional baseline and must be revalidated during the deferred-design refinement checkpoint before implementation begins.
+Reason: no identifier in these files is part of the finalized state/store rename surface.
 
 ---
 
@@ -145,8 +159,11 @@ Provisional status note:
 | File                                                 | Section                        | Action                                                                                                                              |
 | ---------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `.github/instructions/architecture.instructions.md`  | "Canonical vocabulary"         | Replace `CheckpointStore` / `ExtractionCheckpoint` / `BranchCheckpoint` terms with `StateStore` / `ExtractionState` / `BranchState` |
-| `.github/instructions/architecture.instructions.md`  | "Ownership and boundary rules" | Update the runtime-edge bullet that names the injected store abstraction                                                            |
-| `.github/instructions/git-traversal.instructions.md` | "Stage Ownership Contract"     | Update coordinator/runtime ownership wording to use renamed state/store identifiers                                                 |
+| `.github/instructions/architecture.instructions.md`  | "File Layout Convention"       | Add the rule that public Core interfaces live in `src/core/types.ts` and implementation modules stay runtime-only                   |
+| `.github/instructions/architecture.instructions.md`  | "Ownership and boundary rules" | Update the runtime-edge bullet and coordinator ownership wording to use `StateStore` and `ExtractionState`                          |
+| `.github/instructions/architecture.instructions.md`  | "State File"                   | Rename the state-file schema example type from `ExtractionCheckpoint` to `ExtractionState`                                          |
+| `.github/instructions/git-traversal.instructions.md` | "Stage Ownership Contract"     | Update coordinator/runtime ownership wording to use `StateStore`, `ExtractionState`, and `candidateState`                           |
+| `.github/instructions/git-traversal.instructions.md` | "State File Management"        | Keep the external state-file behavior unchanged while aligning the internal terminology with the refined state vocabulary           |
 
 No user-facing docs are expected to change because behavior and external contracts are unchanged.
 
@@ -157,15 +174,6 @@ No user-facing docs are expected to change because behavior and external contrac
 - Apply symbol renames as a single coherent refactor pass to keep CI green and avoid partial-type states.
 - Preserve existing comments unless they contain renamed identifiers; update only terminology, not behavioral wording.
 - Do not change function signatures or return shapes beyond identifier names in type positions.
-
-**Required question resolutions**
-
-- Which identifiers are definitely renamed? Deferred until refinement; current candidate mapping is defined and must be confirmed against post-Phase-1 code.
-- Which plausible candidates are intentionally not renamed now, and why? Currently resolved by the explicit keep-list and rationale; must be revalidated at refinement.
-- How is import/path churn controlled? Resolved: symbol-only rename, stable file paths, synchronized barrel updates.
-- What migration order avoids temporary type errors? Resolved by the five-step order above.
-- What test updates are required? Current baseline is rename-propagation updates in `test/core/extraction-coordinator.test.ts`; final set is confirmed at refinement.
-- What evidence confirms behavior is unchanged? Defined in Verification below.
 
 ---
 
@@ -186,4 +194,5 @@ npm run format:check
 - Run one commit-granularity extraction before and after the refactor on the same repository and args; confirm output JSONL records are byte-equivalent except for timestamp-dependent filename/session metadata.
 - Run one file-granularity extraction (`--per-file`) before and after the refactor on the same repository and args; confirm record content parity.
 - Run one incremental extraction with `--state` where prior state exists; confirm state file JSON keys/shape/version are unchanged and only expected commit-hash/head values differ by repository state.
-- Grep for legacy symbols (`CheckpointStore|ExtractionCheckpoint|BranchCheckpoint|NodeCheckpointStore|priorCheckpoint|candidateCheckpoint`) and confirm they no longer appear in `src/**` and relevant `test/**` code after implementation.
+- Grep for legacy symbols (`CheckpointStore|ExtractionCheckpoint|BranchCheckpoint|NodeCheckpointStore|priorCheckpoint|candidateCheckpoint|makeCheckpointStore`) and confirm they no longer appear in `src/**` and relevant `test/**` code after implementation.
+- Grep for `export interface` in `src/core/fact-projector.ts`, `src/core/branch-traversal-planner.ts`, `src/core/commit-traversal-extractor.ts`, `src/core/file-change-expander.ts`, and `src/core/extraction-coordinator.ts`, and confirm none appear (all stage interfaces have been moved to `types.ts`).

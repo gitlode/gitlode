@@ -56,8 +56,7 @@ details belong in `CHANGELOG.md`.
 
 - `CommitFact` and `FileChangeFact` are the stable Core-owned intermediate terms.
 - `Fact = CommitFact | FileChangeFact` is the discriminated union over all pipeline fact types.
-- `CheckpointStore`, `ExtractionCheckpoint`, and `BranchCheckpoint` are the stable checkpoint
-  persistence terms.
+- `StateStore`, `ExtractionState`, and `BranchState` are the stable state persistence terms.
 - `ProfilingEntry` (`ExtractionResult.profilingEntries`) is the stable profiling term.
 - `ExtractionCoordinator`, `CommitTraversalExtractor`, `FileChangeExpander`,
   `FactProjector`, and `OutputSink` are the stable pipeline stage boundaries.
@@ -65,10 +64,10 @@ details belong in `CHANGELOG.md`.
 ### Ownership and boundary rules
 
 - The runtime edge (`src/index.ts`) constructs `DefaultExtractionCoordinator`, stage instances,
-  optional `CheckpointStore` (`--state`), `OutputSink`, and `ProgressReporter` directly.
+  optional `StateStore` (`--state`), `OutputSink`, and `ProgressReporter` directly.
   `DefaultFactProjector` is the single projector instance passed to `DefaultExtractionCoordinator`.
 - Core owns traversal/extraction orchestration, pipeline branching by granularity, write-loop
-  progression, checkpoint commit timing, and structured progress events.
+  progression, state commit timing, and structured progress events.
 - CLI owns rendering policy (TTY vs non-TTY, spinner/heartbeat, summary/profile layout, warning
   redraw behavior) and top-level process/error behavior.
 - Git adapter owns Git-native repository access and raw commit/file-change retrieval. Core must
@@ -88,7 +87,7 @@ details belong in `CHANGELOG.md`.
 
 ### Invariants
 
-- Checkpoint state is committed only after successful output completion and sink close.
+- State is committed only after successful output completion and sink close.
 - `OutputSink.close()` must run on both success and failure paths.
 - Progress counters must advance only after successful write operations.
 - Filtering by date must continue traversal (`continue`, not `break`) because traversal order is
@@ -118,13 +117,12 @@ Responsibilities:
 
 After the Phase 7 cleanup, `ExtractionCoordinator` owns pipeline construction, granularity
 branching, the write loop, structured progress integration, sink lifecycle (`OutputSink.close()`),
-and checkpoint commit timing. The runtime edge constructs the coordinator, stage instances,
-checkpoint store, sink, and progress reporter directly; `Extractor` no longer exists.
+and state commit timing. The runtime edge constructs the coordinator, stage instances, state
+store, sink, and progress reporter directly; `Extractor` no longer exists.
 `CommitTraversalExtractor`, `FileChangeExpander`, and `FactProjector` own traversal, expansion,
 and projection respectively. `FactProjector` receives a unified `AsyncIterable<Fact>` stream and
 dispatches internally by `fact.type`. `OutputSink` (backed by `OutputWriterSink`) owns record
-serialization and file rotation. `CheckpointStore` reads and writes checkpoints but does not
-decide timing.
+serialization and file rotation. `StateStore` reads and writes state but does not decide timing.
 
 Key types:
 
@@ -229,10 +227,31 @@ The concrete implementation of `GitAdapter` using isomorphic-git.
 
 ## File Layout Convention
 
-Every layer follows a consistent two-file pattern:
+### Philosophy
 
-- **`types.ts`** — all TypeScript interfaces and type aliases for that layer. No runtime code.
-- **`index.ts`** — re-export barrel only. No type definitions or logic.
+The goal is to minimize the blast radius of change. When a new domain, stage, or feature is added, modifications should be localized: the contract definition goes in one place and the runtime implementation goes in another. This makes it possible to read `types.ts` as a complete map of what the layer does without opening implementation files, and to change an implementation without inadvertently affecting other consumers of the contract.
+
+Dependency direction is the core discipline:
+
+- `types.ts` must not depend on implementation modules.
+- Implementation modules depend on `types.ts`, never on each other's exported contracts.
+- When a new stage is introduced, add its interface to `types.ts` first; this makes the contract visible and reviewable before any runtime code is written.
+
+Violating this separation leads to circular imports, naming drift (interfaces accumulating in implementation files and becoming hard to discover), and changes propagating across module boundaries unexpectedly.
+
+### Rules for the Core layer (`src/core/`)
+
+- **`src/core/types.ts`** is the single home for all exported Core interfaces, type aliases, and structural dependency contracts. No runtime code (no classes, generators, or function implementations).
+- **`src/core/index.ts`** is a re-export barrel only. No type definitions or logic.
+- **Each implementation module** (`src/core/*.ts` other than `types.ts` and `index.ts`) holds only the concrete class(es) and helpers needed to satisfy one contract from `types.ts`. Exported interface declarations must not live in these files.
+- When a Core stage has both a public interface and a default implementation, the interface belongs in `src/core/types.ts` and the default implementation belongs in its own module file.
+- This rule applies to all current and future stage boundaries: `ExtractionCoordinator`, `BranchTraversalPlanner`, `CommitTraversalExtractor`, `FileChangeExpander`, `FactProjector`, `StateStore`, and any stage introduced by future phases.
+
+### Rules for other layers
+
+- **`types.ts`** in each layer — all TypeScript interfaces and type aliases for that layer. No runtime code.
+- **`index.ts`** in each layer — re-export barrel only. No type definitions or logic.
+- The same dependency-direction principle applies: type files must not depend on implementation files within the same layer.
 
 This separation keeps type definitions discoverable and helps prevent circular imports between layers.
 
@@ -245,7 +264,7 @@ Managed by Core Logic. Written atomically (write to temp file, then rename).
 Schema:
 
 ```typescript
-interface ExtractionCheckpoint {
+interface ExtractionState {
   version: 1;
   generatedAt: string; // ISO 8601
   repositoryPath: string;

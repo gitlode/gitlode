@@ -54,7 +54,8 @@ v0.4.1 is a patch release that delivers two internal pipeline improvements and t
 Provisional dependency notes:
 
 - Phase 2 follows Phase 1: Naming audit runs after Discriminated Fact union so that newly introduced type names are included in the audit scope.
-- Phases 3 and 4 are independent of Phases 1–2 and of each other; they are ordered after Phase 2 for branch isolation.
+- Phase 3 (Unknown CLI Arguments Error) and Phase 4 (`--rotate-size` Size Suffixes) are independent of Phases 1–2; however, both modify `src/cli/args.ts`. Phase 3 must complete before Phase 4 implementation starts to avoid merge conflicts. If Phase 4 branches before Phase 3 is merged, Phase 4 must rebase on Phase 3's result.
+- Phases 3 and 4 are ordered sequentially to accommodate this file-level conflict, not due to any semantic dependency.
 
 ## Release Tasks
 

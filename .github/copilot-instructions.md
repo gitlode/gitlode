@@ -36,7 +36,7 @@ gitrail/
 │   ├── workflows/
 │   │   ├── ci.yml
 │   │   └── release.yml
-│   ├── PLAN.md
+│   ├── plan.md
 │   └── roadmap.md
 ├── src/
 │   ├── index.ts                      # CLI entry point

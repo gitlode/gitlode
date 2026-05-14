@@ -8,19 +8,10 @@ This roadmap is intentionally organized by product priority and time horizon, no
 
 ### Metadata Convention
 
-Use the following field on selected items when needed:
+Roadmap entries use the following standardized metadata labels, placed immediately below the entry title:
 
-- **Release target**: the intended version, such as `v0.1.4`
-
-The intended document flow is:
-
-- roadmap → future-facing backlog and release targeting
-- plan → active implementation tracking
-- changelog → released history
-
-Execution status is intentionally not tracked in the roadmap for now. If that becomes necessary later, it should be redesigned based on an actual operational need rather than kept as a weak placeholder.
-
-This keeps the roadmap stable for both humans and LLMs while still making release planning explicit.
+- **Release target**: `vX.Y.Z` — added when an item is selected for a release during planning
+- **Depends on**: Entry title(s) — indicates dependencies on other roadmap items
 
 ---
 
@@ -88,6 +79,8 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 #### CLI UX: `--rotate-size` human-readable size suffixes
 
+- **Release target**: v0.4.1
+
 `--rotate-size` currently accepts a raw byte count. In practice, users specify thresholds like 500 MB or 1 GB, making raw byte values impractical to type and error-prone to read.
 
 Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would align the option with the conventions used by popular CLI tools (e.g. GNU `split`, `logrotate`).
@@ -102,6 +95,8 @@ Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would ali
 ---
 
 #### CLI UX: Warn on unknown CLI arguments
+
+- **Release target**: v0.4.1
 
 Currently, citty parses arguments with `strict: false` (inherited from `node:util.parseArgs`), which means unrecognized options are silently ignored. A typo such as `--rotate-line` (instead of `--rotate-lines`) passes through without any diagnostic, and the option simply has no effect. This is indistinguishable from a bug in the program itself.
 
@@ -136,7 +131,70 @@ This means the expected behavior for gitrail is also **error on unknown argument
 
 ---
 
+#### Extraction/File Mode: Exact-content rename detection (limited scope)
+
+gitrail currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
+comparison and does not detect rename/move relationships. As a result, a pure file move appears as
+one full-path deletion plus one full-path addition, even when file content is unchanged.
+
+This near-term item introduces an explicit, limited-scope rename detection mode for the most
+deterministic case: pairing `deleted` and `added` records when blob identity is exactly equal.
+
+**Design intent**:
+
+- provide a practical first step for move-aware extraction without introducing heuristic ambiguity
+- keep default behavior backward compatible unless explicitly enabled
+- treat this as file-level rename detection; directory rename is represented as a set of file
+  renames, not as a separate Git primitive
+
+**Scope boundary (initial delivery)**:
+
+- detect only exact-content moves (equivalent to `R100` style outcomes)
+- do not infer rename when content has changed in the same commit
+- keep merge behavior aligned with current first-parent comparison semantics
+
+**Questions to resolve at design time**:
+
+- whether rename output should be represented via a new status/value shape or by optional
+  `oldPath`/`newPath` fields while preserving existing consumers
+- whether the feature should be opt-in via CLI (preferred for compatibility) or enabled by default
+- how to handle one-to-many and many-to-one exact matches deterministically
+- what summary/profile counters should be emitted so users can audit rename pairing impact
+
+---
+
 ### Medium-term
+
+---
+
+#### Extraction/File Mode: Similarity-based rename detection for edited moves
+
+Exact-content pairing alone is insufficient for common real-world moves where files are renamed and
+edited in the same commit. This item extends the limited near-term rename mode with
+similarity-based matching between deleted and added candidates.
+
+Unlike exact-content pairing, this is inherently heuristic. The design must therefore make
+fidelity, runtime cost, and determinism explicit and user-controllable.
+
+**Design intent**:
+
+- support rename detection when content changes during the move
+- keep matching behavior transparent and reproducible under fixed settings
+- avoid silent extraction-policy shifts by exposing thresholds and guardrails
+
+**Design/implementation considerations**:
+
+- similarity threshold model (single threshold vs tiered behavior)
+- candidate matching strategy and deterministic tie-breaking
+- runtime guardrails for large candidate sets to prevent worst-case blowups
+- compatibility with existing per-file metrics (`additions` / `deletions`) and profiling output
+
+**Open policy questions**:
+
+- whether copy detection should be out of scope initially and kept as a separate future item
+- whether this mode should remain opt-in even after stabilization
+- how explicitly the CLI/docs should label outputs as inferred relationships rather than stored Git
+  facts
 
 ---
 
@@ -173,6 +231,46 @@ remain in user control.
 - document clearly that this is an extraction-fidelity vs. runtime trade-off selected by the user
 - include a summary/profile indicator for skipped large-text diffs so users can audit impact
 - ensure behavior is deterministic and reproducible under the same threshold settings
+
+---
+
+#### Pipeline: Discriminated Fact union and unified projector contract
+
+- **Release target**: v0.4.1
+
+gitrail currently treats commit-grain and file-grain facts through separate projector contracts,
+which duplicates projection logic and requires extension-oriented changes to be considered in two
+parallel pathways. Before v1.0.0, this is an appropriate point to consolidate internal pipeline
+contracts while preserving user-visible behavior.
+
+This item introduces a discriminated Fact union (for example via a `type` tag) and replaces
+separate commit/file projector interfaces with one unified projector contract that branches
+internally by Fact type.
+
+**Design intent**:
+
+- remove duplicated projection logic between commit and file pathways
+- simplify coordinator dependency shape and projection-stage composition
+- establish a single extension-facing contract for future plugin/enrichment stage design
+- complete this internal contract consolidation during the pre-v1.0 architecture-change window
+
+**Non-goals**:
+
+- no change to CLI flags, argument semantics, or exit behavior
+- no change to output JSON schema or JSONL file format
+- no change to traversal/filtering/checkpoint semantics
+
+**Design considerations**:
+
+- retain deterministic output ordering and current write/progress accounting guarantees
+- keep file-change expansion as a distinct stage even if projection is unified
+- define clear type-narrowing guarantees for plugin and projector implementations
+- decide migration strategy for internal interfaces currently split across commit/file projector slots
+
+**Design dependency and sequencing**:
+
+- should be delivered before, or as part of, plugin-stage implementation planning so plugin API
+  contracts do not inherit duplicated commit/file projector pathways
 
 ---
 
@@ -286,6 +384,30 @@ alternative `DiffAdapter` implementations to prioritize first.
 ---
 
 ### Long-term
+
+#### Output/UX: Directory-move inference from file-rename clusters
+
+Git tracks file-level changes; directory rename is generally inferred from sets of path-level file
+moves. Once file-level rename detection is mature, gitrail can provide an optional higher-level
+view that groups compatible rename sets into inferred directory moves.
+
+This should be treated as an interpretation layer for usability, not as a replacement for
+file-grain facts.
+
+**Design intent**:
+
+- improve readability for refactors that mostly move files across path prefixes
+- preserve canonical file-level output as the primary factual grain
+- make inferred directory-level summaries clearly distinguishable from file-level facts
+
+**Design questions to resolve at implementation time**:
+
+- criteria for grouping rename pairs into a directory-level move inference
+- handling partial migrations and mixed commits (move + edit + add/delete)
+- whether directory inference belongs in primary output, sidecar metadata, or reporting-only views
+- how to expose confidence/coverage so downstream users can evaluate interpretation quality
+
+---
 
 #### Development: Profiling interpretation model and usability
 
@@ -411,6 +533,9 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ### Near-term
 
 #### Code hygiene: Identifier naming audit for semantic accuracy
+
+- **Release target**: v0.4.1
+- **Depends on**: Pipeline: Discriminated Fact union and unified projector contract
 
 Several identifiers in the codebase carry names that imply a storage medium, lifecycle, or
 structural pattern that the definition itself does not reflect. These are not bugs and do not

@@ -8,6 +8,7 @@ const REPO_PATH = "/fake/repo";
 
 function makeCommitFact(overrides: Partial<CommitFact> = {}): CommitFact {
   return {
+    type: "commit",
     oid: "a".repeat(40),
     message: "commit message",
     author: { name: "Author", email: "author@example.com", timestamp: 1000, timezoneOffset: 0 },
@@ -179,5 +180,17 @@ describe("DefaultFileChangeExpander", () => {
     await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
 
     expect(capturedOid).toBe(commitOid);
+  });
+
+  it("sets type: 'file-change' on all yielded FileChangeFact objects", async () => {
+    const fileChanges: FileChange[] = [
+      { path: "src/a.ts", status: "added", additions: 1, deletions: 0 },
+    ];
+    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges));
+    const commit = makeCommitFact();
+    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.type).toBe("file-change");
   });
 });

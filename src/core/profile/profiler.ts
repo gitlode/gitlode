@@ -1,4 +1,4 @@
-import type { MonotonicClock, ProfilingEntry, StageProfiler } from "./types.js";
+import type { MonotonicClock, ProfilingEntry, StageProfiler } from "../types.js";
 
 export class DefaultStageProfiler implements StageProfiler {
   readonly name: string;

@@ -362,4 +362,21 @@ describe("DefaultCommitTraversalExtractor", () => {
 
     expect(facts).toHaveLength(0);
   });
+
+  it("sets type: 'commit' on all yielded CommitFact objects", async () => {
+    const commits = [makeRawCommit(1), makeRawCommit(2)];
+    const head = makeHash(1);
+    const traverser = new DefaultCommitTraversalExtractor(
+      makeAdapter({ commits: { [head]: toAsyncIter(commits) } }),
+    );
+
+    const facts = await collectFacts(
+      traverser.extract(baseRequest({ plans: [makePlan("main", head)] }), makeReporter()),
+    );
+
+    expect(facts.length).toBeGreaterThan(0);
+    for (const fact of facts) {
+      expect(fact.type).toBe("commit");
+    }
+  });
 });

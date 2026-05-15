@@ -5,7 +5,7 @@ import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
 import type { CommitHash, StageProfiler } from "../core/index.js";
-import { withProfilerAsync } from "../core/profiler-utils.js";
+import { withProfilerAsync } from "../core/profile/index.js";
 import { GitAdapterError } from "./errors.js";
 import type { FileChange, GitAdapter, RawCommit } from "./index.js";
 

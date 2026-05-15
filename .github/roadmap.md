@@ -19,6 +19,43 @@ Roadmap entries use the following standardized metadata labels, placed immediate
 
 ### Near-term
 
+#### Compatibility: Hash-algorithm-agnostic commit OID support
+
+gitrail currently documents and validates commit hashes as SHA-1/40-character values in several
+places. This creates a product-level gap for repositories that use non-SHA-1 object formats,
+because extraction intent is to faithfully export Git history, not to enforce one hash algorithm.
+
+This item upgrades the product contract from "SHA-1 commit hash" to "Git commit object ID"
+where feasible, and treats remaining limitations as explicit compatibility constraints rather than
+implicit runtime failures.
+
+**Design intent**:
+
+- make extraction behavior hash-algorithm-agnostic at the gitrail contract level
+- remove runtime assumptions that reject valid non-40-character commit OIDs
+- preserve checkpoint and traversal correctness guarantees while broadening compatibility
+
+**Required validation before implementation closure**:
+
+- verify isomorphic-git behavior for non-SHA-1 repositories in the exact operations gitrail uses
+  (`resolveRef`, `readCommit`, traversal, merge-base, and tree/file-change workflows)
+- confirm whether there are known object-format constraints in current dependency versions
+- define pass/fail criteria for compatibility tests and record results in repository docs
+
+**Fallback policy if dependency-level constraints are found**:
+
+- do not keep silent SHA-1 assumptions as implicit behavior
+- publish explicit compatibility limitations (supported hash algorithms/object formats)
+- fail with clear user-facing diagnostics when unsupported repository formats are detected
+
+**Scope hints for implementation planning**:
+
+- revisit runtime validators and branded-hash assumptions in state-file read/write paths
+- align README/User Guide/schema wording from SHA-1-specific terminology to algorithm-neutral
+  OID language when compatibility is confirmed
+- keep this work as a compatibility/correctness initiative, not an analytics or schema-extension
+  feature
+
 #### CLI UX: Release-boundary extraction workflow
 
 The current gitrail CLI can express "extract commits after a given ref" via `--since-ref`, but it
@@ -67,67 +104,12 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 - Group options under section headers: **Output**, **Differential Extraction**, **File Rotation**
 - Add a note to the `--state` description: "Primary mechanism for scheduled/incremental runs"
-- Evaluate whether citty supports option grouping natively; if not, consider a custom help renderer
 
-**Design resolution notes (v0.2.0 — deferred)**:
+**Design resolution notes (v0.2.0 — deferred; updated v0.4.1)**:
 
-- citty does not support option grouping natively (confirmed at v0.2.0 design time). A custom help renderer would be required.
-- Deferred on cost/value grounds: the option set (~10 options) is small enough to be readable without grouping, and gitrail usage patterns tend toward fixed, recurring invocations rather than exploratory CLI trial-and-error. The implementation cost of a custom renderer outweighs the discoverability benefit at this scale.
+- As of v0.4.1, gitrail uses commander (migrated from citty). commander supports option grouping natively — the CLI framework blocker is resolved.
+- Deferred on cost/value grounds: the option set (~10 options) is small enough to be readable without grouping, and gitrail usage patterns tend toward fixed, recurring invocations rather than exploratory CLI trial-and-error. The implementation cost outweighs the discoverability benefit at this scale.
 - `docs/usage.md` and README serve as the primary reference for workflow guidance in the interim.
-
----
-
-#### CLI UX: `--rotate-size` human-readable size suffixes
-
-- **Release target**: v0.4.1
-
-`--rotate-size` currently accepts a raw byte count. In practice, users specify thresholds like 500 MB or 1 GB, making raw byte values impractical to type and error-prone to read.
-
-Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would align the option with the conventions used by popular CLI tools (e.g. GNU `split`, `logrotate`).
-
-**Considerations to resolve at implementation time**:
-
-- Which suffixes to accept (`K`, `M`, `G`; case-insensitive or not)
-- Base convention: binary (1 K = 1024) vs. decimal (1 K = 1000) — survey popular CLI tools for the dominant convention at implementation time
-- Whether to continue accepting a plain integer as a raw byte count for backward compatibility
-- Error message wording for unrecognized suffix values
-
----
-
-#### CLI UX: Warn on unknown CLI arguments
-
-- **Release target**: v0.4.1
-
-Currently, citty parses arguments with `strict: false` (inherited from `node:util.parseArgs`), which means unrecognized options are silently ignored. A typo such as `--rotate-line` (instead of `--rotate-lines`) passes through without any diagnostic, and the option simply has no effect. This is indistinguishable from a bug in the program itself.
-
-Most mainstream CLI frameworks treat unknown arguments as an error or at minimum a warning (e.g. `argparse` exits with code 2, `commander` errors by default, `yargs` with `strict()` mode). The current behavior is inconsistent with user expectations and can be considered a usability defect.
-
-**Reference behavior: git**:
-
-git is the primary CLI reference for gitrail's UX standards. Although many users interact with git through IDEs or GUI clients rather than the terminal directly, gitrail operates on local git repositories — making git's own CLI conventions the most relevant baseline. When users do invoke gitrail manually, the mental model they bring is shaped by git's behavior.
-
-git treats unknown options as fatal errors and exits immediately without performing any work:
-
-```
-$ git log --unknown-option
-fatal: unrecognized argument: --unknown-option
-# exit code: 128
-```
-
-This means the expected behavior for gitrail is also **error on unknown arguments, exit non-zero, perform no extraction**. A `console.warn`-and-continue approach (warn but proceed) is inconsistent with this baseline and should be considered a fallback only if implementation constraints prevent a clean error path.
-
-**Fix directions to evaluate at design time**:
-
-- **`setup()` hook approach**: In the `defineCommand` `setup()` hook, compare `rawArgs` against the set of known option names (including aliases and kebab/camelCase variants) and emit a `console.warn` to stderr for each unrecognized option. Low implementation cost; no dependency changes.
-- **citty issue / upstream fix**: File a feature request upstream to expose a `strict` mode option. Monitor for resolution before implementing locally.
-- **Library migration**: `commander` and `yargs` have built-in strict modes, but migrating away from citty is a larger architectural change and is not warranted for this issue alone.
-
-**Design considerations**:
-
-- Warnings should go to stderr so they are not captured by output redirection.
-- `--quiet` suppresses progress and summary output but should **not** suppress unknown-argument warnings — a silent typo with `--quiet` would be the hardest failure mode to diagnose.
-- Positional arguments and `--` passthrough must be excluded from the unknown-option check.
-- The warning message should suggest the closest known option name (edit-distance heuristic) if feasible.
 
 ---
 
@@ -231,46 +213,6 @@ remain in user control.
 - document clearly that this is an extraction-fidelity vs. runtime trade-off selected by the user
 - include a summary/profile indicator for skipped large-text diffs so users can audit impact
 - ensure behavior is deterministic and reproducible under the same threshold settings
-
----
-
-#### Pipeline: Discriminated Fact union and unified projector contract
-
-- **Release target**: v0.4.1
-
-gitrail currently treats commit-grain and file-grain facts through separate projector contracts,
-which duplicates projection logic and requires extension-oriented changes to be considered in two
-parallel pathways. Before v1.0.0, this is an appropriate point to consolidate internal pipeline
-contracts while preserving user-visible behavior.
-
-This item introduces a discriminated Fact union (for example via a `type` tag) and replaces
-separate commit/file projector interfaces with one unified projector contract that branches
-internally by Fact type.
-
-**Design intent**:
-
-- remove duplicated projection logic between commit and file pathways
-- simplify coordinator dependency shape and projection-stage composition
-- establish a single extension-facing contract for future plugin/enrichment stage design
-- complete this internal contract consolidation during the pre-v1.0 architecture-change window
-
-**Non-goals**:
-
-- no change to CLI flags, argument semantics, or exit behavior
-- no change to output JSON schema or JSONL file format
-- no change to traversal/filtering/checkpoint semantics
-
-**Design considerations**:
-
-- retain deterministic output ordering and current write/progress accounting guarantees
-- keep file-change expansion as a distinct stage even if projection is unified
-- define clear type-narrowing guarantees for plugin and projector implementations
-- decide migration strategy for internal interfaces currently split across commit/file projector slots
-
-**Design dependency and sequencing**:
-
-- should be delivered before, or as part of, plugin-stage implementation planning so plugin API
-  contracts do not inherit duplicated commit/file projector pathways
 
 ---
 
@@ -532,43 +474,17 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 
 ### Near-term
 
-#### Code hygiene: Identifier naming audit for semantic accuracy
+#### CLI: Schema validation for parsed CLI options
 
-- **Release target**: v0.4.1
-- **Depends on**: Pipeline: Discriminated Fact union and unified projector contract
+`parseArgs()` currently uses `program.opts<T>()` with a manually-maintained type parameter. commander's `opts<T>()` is implemented as a type assertion (`return this._optionValues as T`) with no runtime enforcement. The type parameter and the `.option()` definitions on `program` are not linked at compile time — a mismatch introduced during code modification produces incorrect runtime behavior without a compile-time error.
 
-Several identifiers in the codebase carry names that imply a storage medium, lifecycle, or
-structural pattern that the definition itself does not reflect. These are not bugs and do not
-affect behavior, but they reduce the signal-to-noise ratio when reading the code and make type
-names harder to reason about in isolation.
+Introducing a schema validation step between `program.parse()` and the value extraction block in `parseArgs()` would provide runtime guarantees and make the type safe without relying on assertion alignment.
 
-**Representative example**: `StateFile` is an interface describing a plain data structure
-`{ version, generatedAt, repositoryPath, branches }`. The suffix `File` implies a storage medium,
-but the interface carries no I/O semantics — that responsibility belongs to `StateStore`. A name
-such as `State` or `ExtractionState` would be more accurate.
+**Direction to evaluate at design time**:
 
-Other potential candidates (to be verified and decided at design time, not predetermined here):
-
-- `StateBranchEntry` — "Entry" adds no meaning; `StateBranch` may be sufficient
-- `PersonIdentity` — "Identity" is overloaded; `Person` or `PersonInfo` may be clearer
-
-**Acceptable impact boundary**:
-
-This item is scoped to changes that meet **all** of the following conditions simultaneously:
-
-- No change to the CLI interface (flag names, behavior, exit codes)
-- No change to the output JSON schema (field names, structure, `.jsonl` format)
-- No change to the state file JSON format on disk (field names, `version` value)
-- No behavioral change of any kind
-
-Renames that touch only internal TypeScript identifiers — types, interfaces, type aliases, and
-their import references — are within scope. Changes that require altering any of the above
-boundaries must not be bundled into this item and should be tracked separately.
-
-**At design time**: Re-examine all type and interface identifiers in `src/` for similar naming
-issues before finalizing the change list. The examples above are illustrative, not exhaustive.
-
----
+- A schema validation library (zod or similar) is preferred over hand-written validation code to reduce maintenance surface and gain structured error reporting. The specific library choice should be made at planning time based on bundle size impact, ecosystem stability, and TypeScript integration quality at that point.
+- Validation scope: the shape of `program.opts()` only (not a re-implementation of the mutual exclusion or format checks that follow — those remain separate).
+- The inferred type from the schema can replace the manual type parameter on `opts<T>()`, eliminating the misalignment risk entirely.
 
 ### Medium-term
 

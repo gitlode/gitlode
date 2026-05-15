@@ -1,6 +1,6 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { withProfilerAsync } from "./profiler-utils.js";
+import { withProfilerAsync } from "./profile/index.js";
 import type {
   BranchTraversalPlan,
   BranchTraversalPlanner,

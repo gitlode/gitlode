@@ -73,4 +73,10 @@ describe("splitMessage", () => {
     expect(subject).toBe("commit msg");
     expect(body).toBe("body line");
   });
+
+  it("handles empty message", () => {
+    const { subject, body } = splitMessage("");
+    expect(subject).toBe("");
+    expect(body).toBe("");
+  });
 });

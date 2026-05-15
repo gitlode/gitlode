@@ -16,6 +16,7 @@ export interface PersonIdentity {
 
 /** Core-owned intermediate representation of a single commit, output-format-agnostic. */
 export interface CommitFact {
+  readonly type: "commit";
   readonly oid: string;
   readonly message: string;
   readonly author: {
@@ -39,6 +40,7 @@ export interface CommitFact {
 
 /** Core-owned intermediate representation of a single file change within a commit. */
 export interface FileChangeFact {
+  readonly type: "file-change";
   readonly commit: CommitFact;
   readonly file: {
     readonly path: string;
@@ -47,6 +49,8 @@ export interface FileChangeFact {
     readonly deletions: number | null;
   };
 }
+
+export type Fact = CommitFact | FileChangeFact;
 
 export interface RotationConfig {
   readonly maxLines?: number;
@@ -90,24 +94,24 @@ export interface ProgressReporter {
   emit(event: ProgressEvent): void;
 }
 
-export interface CheckpointStore {
-  read(): Promise<ExtractionCheckpoint | null>;
-  write(state: ExtractionCheckpoint): Promise<void>;
+export interface StateStore {
+  read(): Promise<ExtractionState | null>;
+  write(state: ExtractionState): Promise<void>;
 }
 
 export type WallClock = () => Date;
 export type MonotonicClock = () => number;
 
-export interface BranchCheckpoint {
+export interface BranchState {
   readonly name: string;
   readonly lastCommitHash: CommitHash;
 }
 
-export interface ExtractionCheckpoint {
+export interface ExtractionState {
   readonly version: 1;
   readonly generatedAt: string;
   readonly repositoryPath: string;
-  readonly branches: readonly BranchCheckpoint[];
+  readonly branches: readonly BranchState[];
 }
 
 // Compatibility aliases removed in Phase 7 cleanup
@@ -283,8 +287,8 @@ export interface CoordinatorRequest {
   /** Renamed from `outputMode`. */
   readonly granularity: "commit" | "file";
   readonly range?: ExtractionRange;
-  /** Loaded and validated by `Extractor.loadPriorCheckpoint()`. */
-  readonly priorCheckpoint: ExtractionCheckpoint;
+  /** Loaded and validated by `Extractor.loadPriorState()`. */
+  readonly priorState: ExtractionState;
   /** Wall-clock time at which the extraction session started. Used for checkpoint `generatedAt`. */
   readonly sessionTimestamp: Date;
 }
@@ -296,24 +300,25 @@ export interface CoordinatorResult {
   readonly branches: readonly string[];
 }
 
-/** Constructor dependencies injected into `DefaultExtractionCoordinator`.
- *  Projector slots use inline structural types to avoid importing from projector
- *  files (those files import from the output layer, which would create a circular
- *  import through core/index.ts). */
+/** Core-owned interface for the fact projection stage. */
+export interface FactProjector {
+  project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord>;
+}
+
+/** Core-owned interface for the extraction orchestration stage. */
+export interface ExtractionCoordinator {
+  run(request: CoordinatorRequest): Promise<CoordinatorResult>;
+}
+
+/** Constructor dependencies injected into `DefaultExtractionCoordinator`. */
 export interface CoordinatorDependencies {
   readonly traversalPlanner: BranchTraversalPlanner;
   readonly traversalExtractor: CommitTraversalExtractor;
   readonly fileChangeExpander: FileChangeExpander;
   /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */
-  readonly commitProjector: {
-    project(commits: AsyncIterable<CommitFact>): AsyncIterable<OutputRecord>;
-  };
-  /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */
-  readonly fileProjector: {
-    project(fileChanges: AsyncIterable<FileChangeFact>): AsyncIterable<OutputRecord>;
-  };
+  readonly projector: FactProjector;
   readonly sink: OutputSink;
-  readonly checkpointStore: CheckpointStore | undefined;
+  readonly stateStore: StateStore | undefined;
   readonly reporter: ProgressReporter;
   /** Optional profiler for accumulating writeMs across sink.write() and sink.close() calls. */
   readonly profiler?: StageProfiler;

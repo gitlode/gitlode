@@ -31,18 +31,24 @@ A commit X is "reachable" from commit Y if X can be found by following parent li
 
 ## Stage Ownership Contract
 
+### Module placement rule
+
+Every Core stage interface (`BranchTraversalPlanner`, `CommitTraversalExtractor`, `ExtractionCoordinator`, `FileChangeExpander`, `FactProjector`, `StateStore`) must be declared in `src/core/types.ts`. The corresponding `Default*` implementation class belongs in its own module file and must not re-declare or shadow the interface. When a new stage is introduced in any future phase, this split must be applied from the start: define the contract in `types.ts` first, then add the implementation module. This keeps `types.ts` a readable and complete map of all Core contracts and prevents implementation files from accumulating interface declarations that are hard to discover later.
+
+### Ownership by stage
+
 - `BranchTraversalPlanner` is the Core stage that owns branch-head resolution,
   exclusion-boundary calculation, merge-base calculation for newly added branches, and
   missing-branch warning behavior. It returns ordered `BranchTraversalPlan[]` values.
 - `CommitTraversalExtractor` is the Core stage that consumes those plans and owns sequential
   branch traversal, cross-branch deduplication, `since-date` filtering, and `COMMIT_NOT_FOUND`
   fallback behavior.
-- `ExtractionCoordinator` owns `CheckpointStore` write timing and `OutputSink` lifecycle. The
-  coordinator writes the checkpoint only after the pipeline completes without exception and
-  `sink.close()` succeeds. The runtime edge owns checkpoint reading, missing-state fallback
-  validation, and `CheckpointStore` injection into the coordinator.
-- The candidate `ExtractionCheckpoint` is built inside `DefaultExtractionCoordinator` from the
-  successfully resolved branch heads returned by the planner. This candidate checkpoint must not
+- `ExtractionCoordinator` owns `StateStore` write timing and `OutputSink` lifecycle. The
+  coordinator writes state only after the pipeline completes without exception and
+  `sink.close()` succeeds. The runtime edge owns state reading, missing-state fallback
+  validation, and `StateStore` injection into the coordinator.
+- The candidate `ExtractionState` is built inside `DefaultExtractionCoordinator` from the
+  successfully resolved branch heads returned by the planner. This candidate state must not
   be persisted until output writing and writer close both succeed. This ownership split must not
   change any traversal semantics defined below.
 

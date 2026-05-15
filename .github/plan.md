@@ -34,22 +34,22 @@ v0.4.1 is a patch release that delivers two internal pipeline improvements and t
 ### Phase 1: Discriminated Fact Union and Unified Projector
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 2: Identifier Naming Audit
 
 - **File**: [`plans/phase-2.md`](plans/phase-2.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 3: Unknown CLI Arguments Error
 
 - **File**: [`plans/phase-3.md`](plans/phase-3.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 4: `--rotate-size` Size Suffixes
 
 - **File**: [`plans/phase-4.md`](plans/phase-4.md)
-- **Status**: Planned
+- **Status**: Completed
 
 Provisional dependency notes:
 
@@ -67,7 +67,7 @@ _Update all human-oriented documentation to reflect the complete set of changes 
 
 - [ ] Planned
 - [ ] In progress
-- [ ] Completed
+- [x] Completed
 
 #### Mandatory Files
 
@@ -109,13 +109,13 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 ## Final Verification Checklist
 
-- [ ] All development phases are marked Completed.
-- [ ] `CHANGELOG.md` contains a finalized this version's entry with `Added` / `Changed` / `Fixed` and
+- [x] All development phases are marked Completed.
+- [x] `CHANGELOG.md` contains a finalized this version's entry with `Added` / `Changed` / `Fixed` and
       `Migration` (if needed) sections.
-- [ ] Human-oriented docs were reviewed and updated for latest behavior (`README.md`,
+- [x] Human-oriented docs were reviewed and updated for latest behavior (`README.md`,
       `docs/usage.md`, `docs/design/architecture.md`, instructions files).
-- [ ] Roadmap cleanup completed for implemented items in this version; remaining entries are forward-looking.
-- [ ] Verification commands completed:
+- [x] Roadmap cleanup completed for implemented items in this version; remaining entries are forward-looking.
+- [x] Verification commands completed:
   - `npm run build` pass
   - `npm test` pass
   - `npm run lint` pass

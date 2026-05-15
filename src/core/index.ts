@@ -1,9 +1,8 @@
 export type {
+  BranchState,
   BranchTraversalPlan,
   BranchTraversalPlanner,
   BranchTraversalPlanningRequest,
-  BranchCheckpoint,
-  CheckpointStore,
   CommitFact,
   CommitHash,
   CommitTraversalExtractor,
@@ -11,31 +10,30 @@ export type {
   CoordinatorDependencies,
   CoordinatorRequest,
   CoordinatorResult,
-  ExtractionCheckpoint,
+  ExtractionCoordinator,
   ExtractionRange,
   ExtractionResult,
+  ExtractionState,
   ExtractorConfig,
-  ProfilingEntry,
+  Fact,
+  FactProjector,
   FileChangeExpander,
   FileChangeFact,
   MonotonicClock,
   OutputSink,
   PersonIdentity,
+  ProfilingEntry,
   ProgressEvent,
   ProgressPhase,
   ProgressReporter,
   RotationConfig,
   StageProfiler,
+  StateStore,
   WallClock,
 } from "./types.js";
 export { assertNever, isCommitHash } from "./types.js";
 export { DefaultBranchTraversalPlanner } from "./branch-traversal-planner.js";
-export { CommitRecordProjector, DefaultCommitRecordProjector } from "./commit-record-projector.js";
-export { ExtractionCoordinator, DefaultExtractionCoordinator } from "./extraction-coordinator.js";
+export { DefaultExtractionCoordinator } from "./extraction-coordinator.js";
 export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";
 export { DefaultFileChangeExpander } from "./file-change-expander.js";
-export {
-  FileChangeRecordProjector,
-  DefaultFileChangeRecordProjector,
-} from "./file-change-record-projector.js";
-export { DefaultStageProfiler } from "./profiler.js";
+export { DefaultFactProjector } from "./fact-projector.js";

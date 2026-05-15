@@ -1,4 +1,4 @@
-import type { StageProfiler } from "./types.js";
+import type { StageProfiler } from "../types.js";
 
 /**
  * Runs a synchronous task with optional wall/work profiling.

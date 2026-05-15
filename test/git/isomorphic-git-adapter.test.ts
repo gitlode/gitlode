@@ -503,7 +503,7 @@ describe("IsomorphicGitAdapter.setProfiler – adapter stage timing", () => {
     let time = 0;
     const clock = () => ++time;
 
-    const { DefaultStageProfiler } = await import("../../src/core/profiler.js");
+    const { DefaultStageProfiler } = await import("../../src/core/profile/index.js");
     const profiler = new DefaultStageProfiler("git", clock);
 
     const adapter = new IsomorphicGitAdapter(fs);

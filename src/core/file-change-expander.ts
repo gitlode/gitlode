@@ -21,6 +21,7 @@ export class DefaultFileChangeExpander implements FileChangeExpander {
       );
       for (const fileChange of fileChanges) {
         yield {
+          type: "file-change",
           commit,
           file: {
             path: fileChange.path,

@@ -1,8 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
-import { defineCommand, parseArgs as parseCittyArgs } from "citty";
-import type { ArgsDef } from "citty";
+import { Argument, Command, CommanderError, Option } from "commander";
 
 import type { CommitHash, ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
@@ -13,139 +12,145 @@ export interface ParsedArgs extends ExtractorConfig {
   profile: boolean;
 }
 
-// Define all citty args on a defineCommand descriptor.
-// The schema is defined separately so it can be passed directly to parseCittyArgs.
-const argsDef = {
-  "repository-path": {
-    type: "positional" as const,
-    required: true as const,
-    description: "Local path to the Git repository",
-  },
-  incremental: {
-    type: "boolean" as const,
-    default: false,
-    description:
-      "When set, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state.",
-  },
-  branch: {
-    type: "string" as const,
-    alias: "b",
-    description:
-      "Ref (branch name) to use as traversal starting point. Repeatable for multiple branches.",
-  },
-  "output-dir": {
-    type: "string" as const,
-    default: "./",
-    alias: "o",
-    description: "Directory to write output .jsonl files",
-  },
-  "output-prefix": {
-    type: "string" as const,
-    description: "Filename prefix for output files (derived from remote origin if omitted)",
-  },
-  state: {
-    type: "string" as const,
-    alias: "s",
-    description:
-      "Path to state file. In snapshot mode, content is ignored but file is updated on success. Required when --incremental.",
-  },
-  "missing-state": {
-    type: "string" as const,
-    description:
-      'Behavior when --incremental and state file does not exist: "error" (default) exits with code 1; "snapshot" warns and falls back to full extraction. Only valid with --incremental.',
-  },
-  "since-ref": {
-    type: "string" as const,
-    description:
-      "Exclude commits reachable from this ref. Accepts commit hash, tag name, or branch name. Only valid in snapshot mode.",
-  },
-  "since-date": {
-    type: "string" as const,
-    description: "Extract only commits with committer timestamp after this datetime (ISO 8601)",
-  },
-  "rotate-lines": {
-    type: "string" as const,
-    description: "Start a new output file after N lines",
-  },
-  "rotate-size": {
-    type: "string" as const,
-    description: "Start a new output file after N bytes",
-  },
-  quiet: {
-    type: "boolean" as const,
-    default: false,
-    alias: "q",
-    description: "Suppress progress and summary output (for CI, cron, and scripted usage)",
-  },
-  profile: {
-    type: "boolean" as const,
-    default: false,
-    description:
-      "Print per-stage timing information as an aligned block to stderr after a successful extraction. Suppressed by --quiet.",
-  },
-  "per-file": {
-    type: "boolean" as const,
-    default: false,
-    description:
-      "When set, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity).",
-  },
-} satisfies ArgsDef;
-
-// defineCommand descriptor (provides structured metadata and enables --help generation
-// when imported by index.ts; run() is intentionally omitted here)
-export const cmdDefinition = defineCommand({
-  meta: {
-    name: "gitrail",
-    description: "Extract Git commit history to JSON Lines",
-  },
-  args: argsDef,
-});
+export const program = new Command()
+  .name("gitrail")
+  .description("Extract Git commit history to JSON Lines")
+  .addArgument(new Argument("<repository-path>", "Local path to the Git repository"))
+  .option(
+    "-b, --branch <ref>",
+    "Ref (branch name) to use as traversal starting point. Repeatable for multiple branches.",
+    (val, prev: string[]) => [...prev, val],
+    [],
+  )
+  .option(
+    "--incremental",
+    "When set, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state.",
+    false,
+  )
+  .addOption(
+    new Option("-o, --output-dir <path>", "Directory to write output .jsonl files").default("./"),
+  )
+  .option(
+    "--output-prefix <string>",
+    "Filename prefix for output files (derived from remote origin if omitted)",
+  )
+  .option(
+    "-s, --state <path>",
+    "Path to state file. In snapshot mode, content is ignored but file is updated on success. Required when --incremental.",
+  )
+  .option(
+    "--missing-state <error|snapshot>",
+    'Behavior when --incremental and state file does not exist: "error" (default) exits with code 1; "snapshot" warns and falls back to full extraction. Only valid with --incremental.',
+  )
+  .option(
+    "--since-ref <ref>",
+    "Exclude commits reachable from this ref. Accepts commit hash, tag name, or branch name. Only valid in snapshot mode.",
+  )
+  .option(
+    "--since-date <ISO8601>",
+    "Extract only commits with committer timestamp after this datetime (ISO 8601)",
+  )
+  .option("--rotate-lines <n>", "Start a new output file after N lines")
+  .option("--rotate-size <bytes>", "Start a new output file after N bytes")
+  .option(
+    "-q, --quiet",
+    "Suppress progress and summary output (for CI, cron, and scripted usage)",
+    false,
+  )
+  .option(
+    "--profile",
+    "Print per-stage timing information as an aligned block to stderr after a successful extraction. Suppressed by --quiet.",
+    false,
+  )
+  .option(
+    "--per-file",
+    "When set, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity).",
+    false,
+  );
 
 function userError(msg: string): never {
   process.stderr.write(msg + "\n");
   process.exit(1);
 }
 
-export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
-  const rawArgv = process.argv.slice(2);
+const ROTATE_SIZE_MIN = 1_048_576n; // 1 MiB
+const ROTATE_SIZE_MAX = 68_719_476_736n; // 64 GiB
 
-  // Citty only keeps the last occurrence of a string flag when it appears multiple times.
-  // Manually collect all --branch / -b values to support repeatable usage.
-  // Citty receives rawArgv unchanged because alias "b" is declared in argsDef,
-  // so mri correctly parses -b as a string flag and avoids positional arg corruption.
-  const branches: string[] = [];
-  for (let i = 0; i < rawArgv.length; i++) {
-    const arg = rawArgv[i]!;
-    if (arg === "--branch" || arg === "-b") {
-      const val = rawArgv[i + 1];
-      if (val !== undefined && !val.startsWith("-")) {
-        branches.push(val);
-        i++;
+function parseRotateSizeBytes(raw: string): number {
+  const trimmed = raw.trim();
+  const match = /^(\d+)([kKmMgG]?)$/.exec(trimmed);
+  if (!match) {
+    userError(
+      "--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)",
+    );
+  }
+  const numPart = BigInt(match[1]!);
+  const suffix = match[2]!.toUpperCase();
+  const multipliers: Record<string, bigint> = {
+    "": 1n,
+    K: 1024n,
+    M: 1_048_576n,
+    G: 1_073_741_824n,
+  };
+  const bytes = numPart * multipliers[suffix]!;
+  if (bytes < ROTATE_SIZE_MIN || bytes > ROTATE_SIZE_MAX) {
+    userError("--rotate-size must be between 1048576 and 68719476736 bytes");
+  }
+  return Number(bytes);
+}
+
+export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
+  program.exitOverride();
+  try {
+    program.parse(process.argv);
+  } catch (err) {
+    if (err instanceof CommanderError) {
+      if (err.code === "commander.helpDisplayed") process.exit(0);
+      if (err.code === "commander.unknownOption") {
+        // err.message format: "error: unknown option '--foo'"
+        // Extract just the option name for consistent userError style.
+        const match = /'(--[\w-]+)'/.exec(err.message);
+        userError(`Unknown option: ${match?.[1] ?? err.message.replace(/^error: /, "")}`);
       }
-    } else if (arg.startsWith("--branch=")) {
-      const val = arg.slice("--branch=".length);
-      if (val) branches.push(val);
+      userError(err.message.replace(/^error: /, ""));
     }
+    throw err;
   }
 
-  const parsed = parseCittyArgs(rawArgv, argsDef) as {
-    [key: string]: string | string[] | boolean | undefined;
-    _: string[];
-  };
+  // commander.opts<T>() is a type assertion internally (returns `this._optionValues as T`).
+  // The type parameter below must be kept in sync with the .option() calls on `program` above.
+  // There is no compile-time enforcement of this alignment; a mismatch will cause runtime bugs.
+  // See roadmap: "CLI: Schema validation for parsed CLI options" for a tracked follow-up.
+  const opts = program.opts<{
+    branch: string[];
+    incremental: boolean;
+    outputDir: string;
+    outputPrefix?: string;
+    state?: string;
+    missingState?: string;
+    sinceRef?: string;
+    sinceDate?: string;
+    rotateLines?: string;
+    rotateSize?: string;
+    quiet: boolean;
+    profile: boolean;
+    perFile: boolean;
+  }>();
 
-  const incremental = Boolean(parsed["incremental"]);
-  const sinceRef = parsed["since-ref"] as string | undefined;
-  const sinceDate = parsed["since-date"] as string | undefined;
-  const state = parsed["state"] as string | undefined;
-  const missingStateRaw = parsed["missing-state"] as string | undefined;
-  const outputDir = (parsed["output-dir"] ?? "./") as string;
-  const outputPrefix = parsed["output-prefix"] as string | undefined;
-  const rotateLinesRaw = parsed["rotate-lines"] as string | undefined;
-  const rotateSizeRaw = parsed["rotate-size"] as string | undefined;
-  const repoPath = parsed["repository-path"] as string | undefined;
-  const quiet = Boolean(parsed["quiet"]);
-  const profile = Boolean(parsed["profile"]);
-  const perFile = Boolean(parsed["per-file"]);
+  const branches: string[] = opts.branch;
+  const incremental = opts.incremental;
+  const sinceRef = opts.sinceRef;
+  const sinceDate = opts.sinceDate;
+  const state = opts.state;
+  const missingStateRaw = opts.missingState;
+  const outputDir = opts.outputDir;
+  const outputPrefix = opts.outputPrefix;
+  const rotateLinesRaw = opts.rotateLines;
+  const rotateSizeRaw = opts.rotateSize;
+  const repoPath = program.args[0] as string | undefined;
+  const quiet = opts.quiet;
+  const profile = opts.profile;
+  const perFile = opts.perFile;
 
   // --- Phase 1: Format and mutual exclusion checks (no I/O) ---
   if (
@@ -187,11 +192,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
 
   let maxBytes: number | undefined;
   if (rotateSizeRaw !== undefined) {
-    const n = Number(rotateSizeRaw);
-    if (!Number.isInteger(n) || n <= 0) {
-      userError("--rotate-size must be a positive integer");
-    }
-    maxBytes = n;
+    maxBytes = parseRotateSizeBytes(rotateSizeRaw);
   }
 
   let sinceDateObj: Date | undefined;

@@ -1,17 +1,14 @@
-import { withProfilerAsync } from "./profiler-utils.js";
+import { withProfilerAsync } from "./profile/index.js";
 import type {
-  BranchCheckpoint,
+  BranchState,
   CommitFact,
   CoordinatorDependencies,
   CoordinatorRequest,
   CoordinatorResult,
-  ExtractionCheckpoint,
+  ExtractionCoordinator,
+  ExtractionState,
+  Fact,
 } from "./types.js";
-
-/** Core-owned interface for the extraction orchestration stage. */
-export interface ExtractionCoordinator {
-  run(request: CoordinatorRequest): Promise<CoordinatorResult>;
-}
 
 async function* deduplicateCommits(
   source: AsyncIterable<CommitFact>,
@@ -47,10 +44,9 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
       traversalPlanner,
       traversalExtractor,
       fileChangeExpander,
-      commitProjector,
-      fileProjector,
+      projector,
       sink,
-      checkpointStore,
+      stateStore,
       reporter,
       profiler,
     } = this.deps;
@@ -61,7 +57,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     reporter.emit({ type: "phase-start", phase: "preparing" });
 
     const priorBranchMap = new Map(
-      request.priorCheckpoint.branches.map((b) => [b.name, b.lastCommitHash]),
+      request.priorState.branches.map((b) => [b.name, b.lastCommitHash]),
     );
 
     const plans = await traversalPlanner.plan(
@@ -77,14 +73,12 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
 
     reporter.emit({ type: "phase-end", phase: "preparing" });
 
-    // Build the candidate checkpoint from successfully resolved branch heads.
-    const candidateCheckpoint: ExtractionCheckpoint = {
+    // Build the candidate state from successfully resolved branch heads.
+    const candidateState: ExtractionState = {
       version: 1,
       generatedAt: request.sessionTimestamp.toISOString(),
       repositoryPath: request.repositoryPath,
-      branches: plans.map(
-        (plan): BranchCheckpoint => ({ name: plan.name, lastCommitHash: plan.head }),
-      ),
+      branches: plans.map((plan): BranchState => ({ name: plan.name, lastCommitHash: plan.head })),
     };
 
     // -----------------------------------------------------------------------
@@ -118,14 +112,12 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
           commitsTraversed++;
         });
 
-        const recordStream =
+        const factStream: AsyncIterable<Fact> =
           request.granularity === "file"
-            ? fileProjector.project(
-                fileChangeExpander.expand(countedStream, request.repositoryPath),
-              )
-            : commitProjector.project(countedStream);
+            ? fileChangeExpander.expand(countedStream, request.repositoryPath)
+            : countedStream;
 
-        for await (const record of recordStream) {
+        for await (const record of projector.project(factStream)) {
           await withProfilerAsync(profiler, () => sink.write(record));
           recordsWritten++;
           reporter.emit({
@@ -146,12 +138,12 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     reporter.emit({ type: "phase-end", phase: "extracting" });
 
     // -----------------------------------------------------------------------
-    // 3. Finalizing phase: persist checkpoint.
+    // 3. Finalizing phase: persist state.
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "finalizing" });
 
-    if (checkpointStore !== undefined && candidateCheckpoint.branches.length > 0) {
-      await checkpointStore.write(candidateCheckpoint);
+    if (stateStore !== undefined && candidateState.branches.length > 0) {
+      await stateStore.write(candidateState);
     }
 
     reporter.emit({ type: "phase-end", phase: "finalizing" });
@@ -159,7 +151,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     return {
       recordsWritten,
       commitsTraversed,
-      branches: candidateCheckpoint.branches.map((b) => b.name),
+      branches: candidateState.branches.map((b) => b.name),
     };
   }
 }

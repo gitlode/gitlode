@@ -1,6 +1,6 @@
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { withProfiler } from "./profiler-utils.js";
+import { withProfiler } from "./profile/index.js";
 import type {
   BranchTraversalPlan,
   CommitFact,
@@ -17,6 +17,7 @@ function toCommitFact(
   remoteUrl: string | null,
 ): CommitFact {
   return {
+    type: "commit",
     oid: rawCommit.oid,
     message: rawCommit.message,
     author: {

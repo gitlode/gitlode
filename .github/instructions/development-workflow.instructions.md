@@ -369,7 +369,11 @@ The phase loop must not skip any of these steps.
 
 Detailed design for each phase is performed in a dedicated planning branch session.
 
-- The planning trunk session creates a starting prompt for the branch session. The starting prompt includes the target phase identity, relevant design references, and the specific design questions or ambiguity to resolve.
+The planning branch session is a design-only session. It must not implement code, run implementation verification as a completion target, or emit a Branch Session Summary.
+
+- The planning trunk session creates the starting prompt for the branch session by filling the planning branch session template defined below.
+- The starting prompt must explicitly identify the session as a planning branch session and state that no implementation work is allowed.
+- The starting prompt must explicitly require the Planning Branch Session Summary format as the completion artifact.
 - The planning branch session performs the detailed design work and writes the resulting design directly into the target phase file.
 - The planning branch session must return a **Planning Branch Session Summary** in the standard format defined below.
 - That summary is supplemental only. The phase file remains the canonical design artifact, and the summary carries only unresolved questions, dependency notes, rationale, completion signaling, and other observations that do not belong in the phase file.
@@ -487,7 +491,7 @@ Repeat the following for each phase:
 If the current phase is marked as `Deferred design`, the development trunk session must run the following refinement flow before the normal pre-execution check. Otherwise skip this step.
 
 1. **Trigger check**: Confirm that the predecessor phase implementation, review, and any other refinement-trigger conditions named in the phase file are complete.
-2. **Prompt creation**: Create a starting prompt for a dedicated design refinement session.
+2. **Prompt creation**: Create a starting prompt for a dedicated design refinement session using the template defined below.
 3. **Design refinement**: The refinement session reads the target phase file, relevant predecessor artifacts, and the current repository state; then it resolves the deferred decisions directly in the phase file and updates any affected instructions files.
 4. **No implementation**: The refinement session does not implement code. Its responsibility ends when the phase file becomes implementation-ready or when it reports that the design still cannot be finalized.
 5. **Trunk review**: Review the updated phase file and the Design Refinement Session Summary. If the phase is now implementation-ready, continue to 2b. Otherwise revise the phase plan or escalate to the human.
@@ -517,7 +521,7 @@ Before starting a branch session, the development trunk session performs the fol
 2. **Prior-phase impact**: If the previous branch session summary contains "Deviations from Plan" or "Observations for Subsequent Phases", evaluate whether the current phase's Design Decisions or Target Files need adjustment.
 3. **Phase file completeness**: The current phase must be marked as `Implementation-ready`, and all sections required by that state must be filled. If Design Decisions contain gaps, or if the phase is still marked as `Deferred design`, do not proceed to implementation.
 4. **Phase sizing sanity check**: Confirm that the current phase still appears executable within one branch session at a reasonable level of scope and reviewability. If not, revise the phase plan before starting implementation.
-5. **If all checks pass**: Prepare the starting prompt for the branch session and present it in the same message as the Stage 2b gate so the human can review the exact prompt before choosing the next action.
+5. **If all checks pass**: Prepare the starting prompt for the branch session and present it in the same message as the Stage 2b gate so the human can review the exact prompt before choosing the next action. Use the development branch session starting prompt template defined below.
 
 **Required prompt before launching the branch session:**
 
@@ -736,6 +740,64 @@ Every development branch session must produce a summary in this format:
 
 ---
 
+## Starting Prompt Template Formats
+
+Starting prompts are session-start artifacts. They must be concise, session-specific, and explicit about the required outcome. Include only information that is not already covered by `plan.md`, the phase file, or the relevant instructions files.
+
+### Planning Trunk Session Starting Prompt
+
+- **Artifact Type**: Starting Prompt
+- **Session Type**: Planning Trunk Session
+- **Purpose**: Orchestrate release planning, define phase boundaries, and prepare the planning branch session starting prompt.
+- **Input Files**: `roadmap.md`, `plan.md`, relevant instructions files, prior release context if needed
+- **Restrictions**: Do not begin implementation work or write phase design details that belong in the planning branch session.
+- **Required Output**: Planning completion artifacts and the planning branch session starting prompt for the next phase
+
+### Planning Branch Session Starting Prompt
+
+- **Artifact Type**: Starting Prompt
+- **Session Type**: Planning Branch Session
+- **Phase**: {N} — {title}
+- **Purpose**: Resolve design questions for the target phase and write the resulting design into the phase file.
+- **Input Files**: `plan.md`, `plans/phase-{N}.md`, relevant instructions files
+- **Design References**: {relevant references}
+- **Open Design Questions**: {specific design questions or ambiguity to resolve}
+- **Restrictions**: No implementation work is allowed.
+- **Required Output**: Planning Branch Session Summary
+
+### Development Trunk Session Starting Prompt
+
+- **Artifact Type**: Starting Prompt
+- **Session Type**: Development Trunk Session
+- **Purpose**: Orchestrate implementation, gate each phase, and prepare the next branch-session starting prompt when the workflow authorizes it.
+- **Input Files**: `plan.md`, all current phase files, relevant instructions files, prior branch-session summaries, current repository state
+- **Restrictions**: Do not implement code in the trunk session; keep branch execution instructions separate from orchestration.
+- **Required Output**: Development trunk gate responses, review decisions, and the branch-session starting prompt for the next authorized phase
+
+### Design Refinement Session Starting Prompt
+
+- **Artifact Type**: Starting Prompt
+- **Session Type**: Design Refinement Session
+- **Phase**: {N} — {title}
+- **Purpose**: Resolve deferred design decisions for the target phase and update the phase file.
+- **Input Files**: `plan.md`, `plans/phase-{N}.md`, required predecessor artifacts, relevant instructions files, current repository state
+- **Refinement Trigger**: {predecessor phase or artifact that unlocks refinement}
+- **Deferred Decisions**: {bounded subset still awaiting implementation evidence}
+- **Restrictions**: No implementation work is allowed.
+- **Required Output**: Design Refinement Session Summary
+
+### Development Branch Session Starting Prompt
+
+- **Artifact Type**: Starting Prompt
+- **Session Type**: Development Branch Session
+- **Phase**: {N} — {title}
+- **Purpose**: Implement the phase exactly as specified in the phase file.
+- **Input Files**: `plan.md`, `plans/phase-{N}.md`, relevant instructions files
+- **Carry-forward Items**: {observations, deviations, or follow-ups that affect this phase; omit if none}
+- **Restrictions**: Follow the phase file as the implementation contract. Do not add design instructions that already belong to the phase file.
+- **Completion Instruction**: When implementation is complete, output a Branch Session Summary in the standard format.
+- **Verification Reminder**: Run all automated verification commands and include results in the summary.
+
 ## Role Expectations
 
 ### LLM Responsibilities
@@ -764,7 +826,7 @@ Every development branch session must produce a summary in this format:
 - After reviewing each branch-session result, summarize the current state and stop at the gate before advancing across a phase boundary.
 - Before moving from phase execution to Stage 3 release-completion work, ask the human to confirm that implementation-stage work is complete.
 
-#### In branch sessions
+#### In development branch sessions
 
 - Treat the phase file as the implementation contract, and do not implement from a phase file that is still marked as `Deferred design`.
 - Do not add features, refactoring, or improvements beyond what the phase file specifies.

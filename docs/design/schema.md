@@ -198,10 +198,10 @@ Rotation splits output across multiple numbered files rather than producing one 
 
 Thresholds (both optional, can be combined):
 
-| Option             | Trigger condition                                                |
-| ------------------ | ---------------------------------------------------------------- |
-| `--rotate-lines N` | After writing the Nth line, the next record opens a new file     |
-| `--rotate-size N`  | After the file reaches N bytes, the next record opens a new file |
+| Option             | Trigger condition                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `--rotate-lines N` | After writing the Nth line, the next record opens a new file                                                                |
+| `--rotate-size N`  | After the file reaches N bytes, the next record opens a new file (`N` can be raw bytes or `K`/`M`/`G`, range `1M` to `64G`) |
 
 When both are configured, rotation triggers when **either** threshold is reached.
 

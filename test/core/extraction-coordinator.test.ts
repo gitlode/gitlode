@@ -1,20 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  DefaultExtractionCoordinator,
-  type ExtractionCoordinator,
-} from "../../src/core/extraction-coordinator.js";
+import { DefaultExtractionCoordinator } from "../../src/core/extraction-coordinator.js";
 import type {
   BranchTraversalPlan,
   BranchTraversalPlanner,
   BranchTraversalPlanningRequest,
-  CheckpointStore,
+  StateStore,
   CommitFact,
   CommitHash,
   CommitTraversalExtractor,
   CommitTraversalRequest,
   CoordinatorDependencies,
-  ExtractionCheckpoint,
+  ExtractionCoordinator,
+  ExtractionState,
+  Fact,
   FileChangeExpander,
   FileChangeFact,
   ProgressEvent,
@@ -32,6 +31,7 @@ const FAKE_HEAD_2 = "b".repeat(40) as CommitHash;
 
 function makeCommitFact(oid: string): CommitFact {
   return {
+    type: "commit",
     oid,
     message: `commit ${oid.slice(0, 7)}`,
     author: { name: "Test", email: "t@t.com", timestamp: 1_000_000, timezoneOffset: 0 },
@@ -53,7 +53,7 @@ function makeOutputRecord(oid: string): OutputRecord {
   };
 }
 
-function emptyCheckpoint(repositoryPath = "/repo"): ExtractionCheckpoint {
+function emptyState(repositoryPath = "/repo"): ExtractionState {
   return { version: 1, generatedAt: "", repositoryPath, branches: [] };
 }
 
@@ -93,33 +93,31 @@ function makeTraverser(oids: string[]): CommitTraversalExtractor {
   };
 }
 
-/** Commit projector stub: wraps each CommitFact as an OutputRecord. */
-const commitProjector = {
-  project(commits: AsyncIterable<CommitFact>): AsyncIterable<OutputRecord> {
-    return (async function* () {
-      for await (const fact of commits) yield makeOutputRecord(fact.oid);
-    })();
-  },
-};
-
-/** File projector stub: yields OutputRecord for each FileChangeFact. */
-const fileProjector = {
-  project(changes: AsyncIterable<FileChangeFact>): AsyncIterable<OutputRecord> {
-    return (async function* () {
-      for await (const fact of changes) yield makeOutputRecord(`${fact.commit.oid}-file`);
-    })();
-  },
-};
-
 /** Expander stub: yields one FileChangeFact per CommitFact. */
 const fileChangeExpander: FileChangeExpander = {
   expand(commits: AsyncIterable<CommitFact>): AsyncIterable<FileChangeFact> {
     return (async function* () {
       for await (const fact of commits) {
         yield {
+          type: "file-change",
           commit: fact,
           file: { path: "a.ts", status: "modified", additions: 1, deletions: 0 },
         };
+      }
+    })();
+  },
+};
+
+/** Single projector stub: dispatches commit and file-change facts to the appropriate output. */
+const projector = {
+  project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord> {
+    return (async function* () {
+      for await (const fact of facts) {
+        if (fact.type === "commit") {
+          yield makeOutputRecord(fact.oid);
+        } else {
+          yield makeOutputRecord(`${fact.commit.oid}-file`);
+        }
       }
     })();
   },
@@ -154,9 +152,9 @@ function makeSink(): OutputSink & {
   };
 }
 
-/** In-memory CheckpointStore. */
-function makeCheckpointStore(): CheckpointStore & { stored: ExtractionCheckpoint | null } {
-  let stored: ExtractionCheckpoint | null = null;
+/** In-memory StateStore. */
+function makeStateStore(): StateStore & { stored: ExtractionState | null } {
+  let stored: ExtractionState | null = null;
   return {
     get stored() {
       return stored;
@@ -186,10 +184,9 @@ function makeDeps(
     traversalPlanner: overrides.traversalPlanner ?? makePlanner(plans),
     traversalExtractor: overrides.traversalExtractor ?? makeTraverser(oids),
     fileChangeExpander: overrides.fileChangeExpander ?? fileChangeExpander,
-    commitProjector: overrides.commitProjector ?? commitProjector,
-    fileProjector: overrides.fileProjector ?? fileProjector,
+    projector: overrides.projector ?? projector,
     sink,
-    checkpointStore: overrides.checkpointStore,
+    stateStore: overrides.stateStore,
     reporter: overrides.reporter ?? makeProgressReporter(),
     profiler: overrides.profiler,
   };
@@ -204,7 +201,7 @@ function baseRequest(
     remoteUrl: null,
     branches: ["main"],
     granularity: "commit",
-    priorCheckpoint: emptyCheckpoint(),
+    priorState: emptyState(),
     sessionTimestamp: new Date("2024-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -360,8 +357,8 @@ describe("DefaultExtractionCoordinator", () => {
     expect(closeCalled).toBe(true);
   });
 
-  it("checkpoint written after sink.close() succeeds", async () => {
-    const checkpointStore = makeCheckpointStore();
+  it("state written after sink.close() succeeds", async () => {
+    const stateStore = makeStateStore();
     const closeOrder: string[] = [];
 
     const trackingSink: OutputSink & { records: OutputRecord[] } = {
@@ -379,27 +376,27 @@ describe("DefaultExtractionCoordinator", () => {
         return 100;
       },
     };
-    // Patch checkpointStore.write to track call order
-    const origWrite = checkpointStore.write.bind(checkpointStore);
-    checkpointStore.write = async (s) => {
+    // Patch stateStore.write to track call order
+    const origWrite = stateStore.write.bind(stateStore);
+    stateStore.write = async (s) => {
       closeOrder.push("checkpoint");
       return origWrite(s);
     };
 
     const deps = makeDeps({
       sink: trackingSink as never,
-      checkpointStore,
+      stateStore,
       oids: ["1".padStart(40, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
 
     expect(closeOrder).toEqual(["close", "checkpoint"]);
-    expect(checkpointStore.stored).not.toBeNull();
+    expect(stateStore.stored).not.toBeNull();
   });
 
-  it("checkpoint NOT written when sink.close() throws", async () => {
-    const checkpointStore = makeCheckpointStore();
+  it("state NOT written when sink.close() throws", async () => {
+    const stateStore = makeStateStore();
     const closingFailSink: OutputSink = {
       async write() {},
       async close() {
@@ -414,17 +411,17 @@ describe("DefaultExtractionCoordinator", () => {
     };
     const deps = makeDeps({
       sink: closingFailSink as never,
-      checkpointStore,
+      stateStore,
       oids: ["1".padStart(40, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("close failure");
 
-    expect(checkpointStore.stored).toBeNull();
+    expect(stateStore.stored).toBeNull();
   });
 
-  it("checkpoint NOT written when sink.write() throws", async () => {
-    const checkpointStore = makeCheckpointStore();
+  it("state NOT written when sink.write() throws", async () => {
+    const stateStore = makeStateStore();
     const failSink: OutputSink = {
       async write() {
         throw new Error("write fail");
@@ -439,17 +436,17 @@ describe("DefaultExtractionCoordinator", () => {
     };
     const deps = makeDeps({
       sink: failSink as never,
-      checkpointStore,
+      stateStore,
       oids: ["1".padStart(40, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write fail");
 
-    expect(checkpointStore.stored).toBeNull();
+    expect(stateStore.stored).toBeNull();
   });
 
-  it("checkpoint NOT written when checkpointStore is undefined", async () => {
-    const deps = makeDeps({ checkpointStore: undefined, oids: ["1".padStart(40, "0")] });
+  it("state NOT written when stateStore is undefined", async () => {
+    const deps = makeDeps({ stateStore: undefined, oids: ["1".padStart(40, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest());
 
@@ -457,13 +454,13 @@ describe("DefaultExtractionCoordinator", () => {
     // No error — just not written
   });
 
-  it("zero-record run: close() called; no checkpoint written when empty branches", async () => {
-    const checkpointStore = makeCheckpointStore();
+  it("zero-record run: close() called; no state written when empty branches", async () => {
+    const stateStore = makeStateStore();
     const reporter = makeProgressReporter();
     const deps = makeDeps({
       plans: [], // no branches resolved
       oids: [],
-      checkpointStore,
+      stateStore,
       reporter,
     });
     const coord = new DefaultExtractionCoordinator(deps);
@@ -471,26 +468,26 @@ describe("DefaultExtractionCoordinator", () => {
 
     expect(result.recordsWritten).toBe(0);
     expect(result.branches).toEqual([]);
-    // branches.length === 0 → checkpoint skipped
-    expect(checkpointStore.stored).toBeNull();
+    // branches.length === 0 → state write skipped
+    expect(stateStore.stored).toBeNull();
   });
 
-  it("no-branch-head case: planner returns empty plans, zero records, no checkpoint", async () => {
-    const checkpointStore = makeCheckpointStore();
+  it("no-branch-head case: planner returns empty plans, zero records, no state written", async () => {
+    const stateStore = makeStateStore();
     const deps = makeDeps({
       plans: [],
       oids: [],
-      checkpointStore,
+      stateStore,
     });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ branches: ["nonexistent"] }));
 
     expect(result.recordsWritten).toBe(0);
-    expect(checkpointStore.stored).toBeNull();
+    expect(stateStore.stored).toBeNull();
   });
 
-  it("checkpoint branches contain only resolved branch names", async () => {
-    const checkpointStore = makeCheckpointStore();
+  it("state branches contain only resolved branch names", async () => {
+    const stateStore = makeStateStore();
     const plans: readonly BranchTraversalPlan[] = [
       { name: "main", head: FAKE_HEAD as never, excludeHash: undefined },
       { name: "develop", head: FAKE_HEAD_2 as never, excludeHash: undefined },
@@ -507,24 +504,24 @@ describe("DefaultExtractionCoordinator", () => {
     };
     const deps = makeDeps({
       plans,
-      checkpointStore,
+      stateStore,
       traversalExtractor: traverser,
     });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ branches: ["main", "develop"] }));
 
     expect(result.branches).toEqual(["main", "develop"]);
-    expect(checkpointStore.stored?.branches.map((b) => b.name)).toEqual(["main", "develop"]);
+    expect(stateStore.stored?.branches.map((b) => b.name)).toEqual(["main", "develop"]);
   });
 
-  it("checkpoint generatedAt uses request.sessionTimestamp", async () => {
-    const checkpointStore = makeCheckpointStore();
+  it("state generatedAt uses request.sessionTimestamp", async () => {
+    const stateStore = makeStateStore();
     const ts = new Date("2025-06-15T12:00:00Z");
-    const deps = makeDeps({ checkpointStore, oids: ["1".padStart(40, "0")] });
+    const deps = makeDeps({ stateStore, oids: ["1".padStart(40, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest({ sessionTimestamp: ts }));
 
-    expect(checkpointStore.stored?.generatedAt).toBe("2025-06-15T12:00:00.000Z");
+    expect(stateStore.stored?.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
   it("profiler.resume/stop called for write and close but NOT checkpoint write", async () => {

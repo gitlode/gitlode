@@ -264,12 +264,16 @@ files:
 # New file every 10,000 lines
 gitrail -b main --rotate-lines 10000 ./my-repo
 
-# New file every 100 MB
-gitrail -b main --rotate-size 104857600 ./my-repo
+# New file every 500 MiB
+gitrail -b main --rotate-size 500M ./my-repo
 
 # Both — rotation triggers on whichever threshold is reached first
-gitrail -b main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
+gitrail -b main --rotate-lines 10000 --rotate-size 1G ./my-repo
 ```
+
+`--rotate-size` accepts either a raw byte integer (for backward compatibility) or an integer
+with suffix `K`, `M`, or `G` (case-insensitive, binary base). Valid range is `1M` to `64G`
+inclusive.
 
 Output files are named `<prefix>-<timestamp>-000001.jsonl`, `<prefix>-<timestamp>-000002.jsonl`, etc. The prefix is
 derived from the repository's remote origin URL (last path segment, `.git` stripped). Use
@@ -314,13 +318,13 @@ gitrail [options] <repository-path>
 
 ### Output
 
-| Parameter                  | Alias | Type    | Default | Description                                             |
-| -------------------------- | ----- | ------- | ------- | ------------------------------------------------------- |
-| `--output-dir <path>`      | `-o`  | string  | `./`    | Directory for output `.jsonl` files. Must exist.        |
-| `--output-prefix <string>` |       | string  | derived | Filename prefix (derived from remote origin if omitted) |
-| `--per-file`               |       | boolean | `false` | When set, emit one record per changed file per commit   |
-| `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                          |
-| `--rotate-size <bytes>`    |       | number  | —       | Start new file after `n` bytes                          |
+| Parameter                  | Alias | Type    | Default | Description                                                                    |
+| -------------------------- | ----- | ------- | ------- | ------------------------------------------------------------------------------ |
+| `--output-dir <path>`      | `-o`  | string  | `./`    | Directory for output `.jsonl` files. Must exist.                               |
+| `--output-prefix <string>` |       | string  | derived | Filename prefix (derived from remote origin if omitted)                        |
+| `--per-file`               |       | boolean | `false` | When set, emit one record per changed file per commit                          |
+| `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                                                 |
+| `--rotate-size <bytes>`    |       | string  | —       | Start new file after threshold (raw bytes or `K`/`M`/`G`, range `1M` to `64G`) |
 
 ### Control
 

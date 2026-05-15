@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-05-15
+
+### Added
+
+- `--rotate-size` now accepts human-readable suffixes `K`, `M`, and `G` (case-insensitive) in
+  addition to raw byte integers.
+
+### Changed
+
+- Internal projection contracts were consolidated into a discriminated `Fact` union with a
+  unified `FactProjector` pipeline.
+- Internal state/checkpoint naming was normalized to `StateStore`, `ExtractionState`, and
+  `BranchState` terminology for semantic clarity.
+- CLI parser runtime migrated from `citty` to `commander`, enabling strict unknown-option
+  detection and native repeatable option parsing.
+
+### Fixed
+
+- Unknown CLI options now fail fast with exit code `1` and a clear `Unknown option: --<flag>`
+  message instead of being silently ignored.
+
+### Migration
+
+No migration action is required for v0.4.1. User-facing CLI and output/state schemas remain
+backward compatible.
+
 ## [0.4.0] - 2026-05-13
 
 ### Added
@@ -152,6 +178,7 @@ If your intent was to record state without differential extraction (snapshot wit
 - Timestamp output in ISO 8601 format with commit's own timezone offset
 - No system-installed Git required (uses isomorphic-git)
 
+[0.4.1]: https://github.com/tomo-waka/gitrail/releases/tag/v0.4.1
 [0.4.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.4.0
 [0.3.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.2.0

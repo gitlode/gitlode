@@ -53,7 +53,7 @@ gitrail [options] <repository-path>
 | `--since-date <ISO8601>`   |       | string              |          | —       | Include only commits after this datetime. Snapshot mode only.                                               |
 | `--per-file`               |       | boolean             |          | `false` | When set, emits one record per changed file per commit; when absent, emits one record per commit (default). |
 | `--rotate-lines <n>`       |       | number              |          | —       | Start new file after `n` lines                                                                              |
-| `--rotate-size <bytes>`    |       | number              |          | —       | Start new file after `n` bytes                                                                              |
+| `--rotate-size <bytes>`    |       | string              |          | —       | Start new file after threshold (raw bytes or `K`/`M`/`G` suffix, case-insensitive; range `1M` to `64G`)     |
 | `--quiet`                  | `-q`  | boolean             |          | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.               |
 | `--profile`                |       | boolean             |          | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`.        |
 

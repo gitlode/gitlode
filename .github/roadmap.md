@@ -113,23 +113,6 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 ---
 
-#### CLI UX: `--rotate-size` human-readable size suffixes
-
-- **Release target**: v0.4.1
-
-`--rotate-size` currently accepts a raw byte count. In practice, users specify thresholds like 500 MB or 1 GB, making raw byte values impractical to type and error-prone to read.
-
-Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would align the option with the conventions used by popular CLI tools (e.g. GNU `split`, `logrotate`).
-
-**Considerations to resolve at implementation time**:
-
-- Which suffixes to accept (`K`, `M`, `G`; case-insensitive or not)
-- Base convention: binary (1 K = 1024) vs. decimal (1 K = 1000) — survey popular CLI tools for the dominant convention at implementation time
-- Whether to continue accepting a plain integer as a raw byte count for backward compatibility
-- Error message wording for unrecognized suffix values
-
----
-
 #### Extraction/File Mode: Exact-content rename detection (limited scope)
 
 gitrail currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
@@ -230,46 +213,6 @@ remain in user control.
 - document clearly that this is an extraction-fidelity vs. runtime trade-off selected by the user
 - include a summary/profile indicator for skipped large-text diffs so users can audit impact
 - ensure behavior is deterministic and reproducible under the same threshold settings
-
----
-
-#### Pipeline: Discriminated Fact union and unified projector contract
-
-- **Release target**: v0.4.1
-
-gitrail currently treats commit-grain and file-grain facts through separate projector contracts,
-which duplicates projection logic and requires extension-oriented changes to be considered in two
-parallel pathways. Before v1.0.0, this is an appropriate point to consolidate internal pipeline
-contracts while preserving user-visible behavior.
-
-This item introduces a discriminated Fact union (for example via a `type` tag) and replaces
-separate commit/file projector interfaces with one unified projector contract that branches
-internally by Fact type.
-
-**Design intent**:
-
-- remove duplicated projection logic between commit and file pathways
-- simplify coordinator dependency shape and projection-stage composition
-- establish a single extension-facing contract for future plugin/enrichment stage design
-- complete this internal contract consolidation during the pre-v1.0 architecture-change window
-
-**Non-goals**:
-
-- no change to CLI flags, argument semantics, or exit behavior
-- no change to output JSON schema or JSONL file format
-- no change to traversal/filtering/checkpoint semantics
-
-**Design considerations**:
-
-- retain deterministic output ordering and current write/progress accounting guarantees
-- keep file-change expansion as a distinct stage even if projection is unified
-- define clear type-narrowing guarantees for plugin and projector implementations
-- decide migration strategy for internal interfaces currently split across commit/file projector slots
-
-**Design dependency and sequencing**:
-
-- should be delivered before, or as part of, plugin-stage implementation planning so plugin API
-  contracts do not inherit duplicated commit/file projector pathways
 
 ---
 
@@ -530,44 +473,6 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ## Development Environment Improvements
 
 ### Near-term
-
-#### Code hygiene: Identifier naming audit for semantic accuracy
-
-- **Release target**: v0.4.1
-- **Depends on**: Pipeline: Discriminated Fact union and unified projector contract
-
-Several identifiers in the codebase carry names that imply a storage medium, lifecycle, or
-structural pattern that the definition itself does not reflect. These are not bugs and do not
-affect behavior, but they reduce the signal-to-noise ratio when reading the code and make type
-names harder to reason about in isolation.
-
-**Representative example**: `StateFile` is an interface describing a plain data structure
-`{ version, generatedAt, repositoryPath, branches }`. The suffix `File` implies a storage medium,
-but the interface carries no I/O semantics — that responsibility belongs to `StateStore`. A name
-such as `State` or `ExtractionState` would be more accurate.
-
-Other potential candidates (to be verified and decided at design time, not predetermined here):
-
-- `StateBranchEntry` — "Entry" adds no meaning; `StateBranch` may be sufficient
-- `PersonIdentity` — "Identity" is overloaded; `Person` or `PersonInfo` may be clearer
-
-**Acceptable impact boundary**:
-
-This item is scoped to changes that meet **all** of the following conditions simultaneously:
-
-- No change to the CLI interface (flag names, behavior, exit codes)
-- No change to the output JSON schema (field names, structure, `.jsonl` format)
-- No change to the state file JSON format on disk (field names, `version` value)
-- No behavioral change of any kind
-
-Renames that touch only internal TypeScript identifiers — types, interfaces, type aliases, and
-their import references — are within scope. Changes that require altering any of the above
-boundaries must not be bundled into this item and should be tracked separately.
-
-**At design time**: Re-examine all type and interface identifiers in `src/` for similar naming
-issues before finalizing the change list. The examples above are illustrative, not exhaustive.
-
----
 
 #### CLI: Schema validation for parsed CLI options
 

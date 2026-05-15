@@ -419,7 +419,7 @@ operational diagnostics, and future optimization planning.
 
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
 
-Allow users to attach custom processing stages to gitrail's extraction pipeline so that
+Allow users to attach custom processing stages (plugins) to gitrail's extraction pipeline so that
 organization-specific semantics can be derived without expanding the core schema for every use
 case.
 
@@ -433,11 +433,93 @@ computed from diff content.
 - move organization-specific interpretation to a user-controlled extension boundary
 - allow enrichment without forcing the project to standardize every downstream analytical need
 
-**Open design questions**:
+**Architecture**:
 
-- whether the extension point should run in-process, as an external command, or via a streaming IPC boundary
-- what record shape and lifecycle guarantees plugins can rely on
-- how plugin failures should affect extraction success, state writing, and reproducibility
+- **Plugin implementation**: Users implement the `ProjectorPlugin` interface (`init?(): Promise<InitResult>` and `project(context, profiler?): Promise<ProjectionResult>`).
+- **Config-driven loading**: Plugins are loaded from a configuration file (format TBD — see **Open Design Question: CLI Interface** below) and instantiated via a `PluginFactory` function.
+- **Plugin types**:
+  - **npm packages** (e.g., `commit-message-analyze-projector`): Published plugins with shared logic and configuration.
+  - **script injection** (experimental): Local JavaScript files or modules with user-defined logic. No capability restrictions in initial implementation; security review and sandboxing deferred to future roadmap item.
+  - **IPC-based plugins** (future): External processes communicating via stdio (aligns with Worker-based runtime item).
+- **Execution model**:
+  - Sequential per-fact execution (no implicit parallelization in Phase 1).
+  - Plugins run after `DefaultFactProjector` and before output sink.
+  - Each plugin sees the base canonical record (from `DefaultFactProjector`) and the `Fact` input; other plugins' outputs are not visible (order independence).
+  - Plugins contribute data to the `extensions` field in the output record, keyed by namespace.
+
+**Type contract** (core types):
+
+```ts
+export type InitResult =
+  | { readonly type: "ready" }
+  | { readonly type: "fatal"; readonly message: string };
+
+export interface ProjectionContext {
+  readonly fact: Fact;
+  readonly baseRecord: Readonly<OutputRecord>; // from DefaultFactProjector
+}
+
+export type ProjectionResult =
+  | { readonly type: "success"; readonly data: Record<string, unknown> }
+  | { readonly type: "skip"; readonly reason: string }
+  | { readonly type: "fatal"; readonly message: string };
+
+export interface ProjectorPlugin {
+  init?(): Promise<InitResult>;
+  project(context: ProjectionContext, profiler?: StageProfiler): Promise<ProjectionResult>;
+}
+```
+
+**Output format** (backward compatible):
+
+- The `extensions` field is added to `OutputRecord` when plugins are configured; it is absent otherwise.
+- Structure: `extensions: { [namespace: string]: { [key: string]: unknown } | null }`.
+  - `null` value indicates a plugin returned `"skip"` for that fact.
+  - This addition is non-breaking: existing consumers ignore the field; new consumers opt-in to plugin data.
+
+**Plugin failure handling**:
+
+- **Default policy**: `"skip-fact"` — a plugin failure skips only that fact's enrichment; extraction continues.
+- **Alternative policy** (per-plugin): `"fatal"` — halts extraction, no state update.
+- Both policies emit warnings to the progress reporter.
+- Plugin timeout (if enforced) follows the configured failure policy.
+
+**Entrypoint resolution** (for config entry `"entrypoint": "xxx"`):
+
+1. Try as local file path: `./plugins/xxx.js`, `./plugins/xxx/index.js`, etc.
+2. Try as npm module: `require.resolve("xxx")`.
+3. Error if neither resolves.
+
+**Compatibility and constraints**:
+
+- State writing is not affected by plugin success or failure; state updates only after core extraction completes.
+- Plugins must not throw unhandled exceptions; they must return `InitResult.fatal` or `ProjectionResult.fatal` for errors.
+- Profile data: each plugin receives an optional scoped profiler for self-instrumentation.
+- Namespace validation: performed at config parse time; namespaces must be unique and match pattern `[a-z0-9-]+`.
+
+**Scope boundaries (initial Phase 1 implementation)**:
+
+- **In scope**: Single-process execution, init/project lifecycle, success/skip/fatal result contract, timeout control, profiler injection, namespace isolation, config loading (format TBD).
+- **Out of scope**: capability sandboxing for scripts, plugin output schema validation (defer to separate roadmap item), parallel execution, worker-thread boundaries (addressed by Worker-based Runtime item).
+- **Experimental**: `ScriptInjectProjector` — marked unstable; no security hardening in Phase 1; subject to future security review and capability restrictions.
+
+**Implementation guidance**:
+
+- Suggested order: (1) type definitions and plugin contract, (2) `DefaultFactProjector` refactor to extract single-record projection logic, (3) plugin config parsing and factory resolution, (4) `EnrichingFactProjector` orchestrator, (5) integration into `ExtractionCoordinator`, (6) basic example plugins.
+
+**Open Design Questions**:
+
+1. **CLI interface for plugin config**: How should plugins be specified at runtime?
+   - Option A: `--plugins-config ./gitrail-plugins.json`
+   - Option B: `--plugins-dir ./plugins/` with auto-discovery
+   - Option C: Environment variable + file discovery heuristics
+   - **Status**: Deferred to planning phase; scope to be finalized before implementation begins.
+   - Consider interactions with eventual Config File redesign and CLI ergonomics roadmap items.
+2. **Plugin documentation and examples**: Scope to be defined in a companion roadmap entry (see **Defer to separate entry** below).
+
+**Defer to separate entry**:
+
+- Documentation, tutorials, and examples for plugin authorship (including Conventional Commits parser reference implementation, custom-tagger template, etc.) — scope for a dedicated UX/docs roadmap item.
 
 #### Output: Branch reachability annotation per commit
 

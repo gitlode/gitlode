@@ -34,19 +34,19 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "commander": "^13.1.0",
+    "commander": "^14.0.3",
     "diff": "^9.0.0",
-    "isomorphic-git": "^1.37.5"
+    "isomorphic-git": "^1.37.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^4.1.4",
+    "@vitest/coverage-v8": "^4.1.6",
     "memfs": "^4.57.2",
-    "oxfmt": "^0.46.0",
-    "oxlint": "^1.61.0",
-    "tsx": "^4.21.0",
+    "oxfmt": "^0.49.0",
+    "oxlint": "^1.64.0",
+    "tsx": "^4.22.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.6"
   },
   "engines": {
     "node": ">=22.0.0"

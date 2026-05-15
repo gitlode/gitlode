@@ -3,10 +3,8 @@ import { rename, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { defineCommand, runMain } from "citty";
-
 import type { ParsedArgs } from "./cli/args.js";
-import { cmdDefinition, parseArgs } from "./cli/index.js";
+import { parseArgs } from "./cli/index.js";
 import { ProgressController, resolveUiMode } from "./cli/progress/index.js";
 import type { TerminalSink } from "./cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "./cli/reporting/index.js";
@@ -138,158 +136,154 @@ const stderrSink: TerminalSink = {
 // Main command
 // ---------------------------------------------------------------------------
 
-const main = defineCommand({
-  ...cmdDefinition,
-  async run() {
-    const adapter = new IsomorphicGitAdapter();
-    let parsed;
-    try {
-      parsed = await parseArgs(adapter);
-    } catch (e) {
-      if (e instanceof GitAdapterError) {
-        process.stderr.write(e.message + "\n");
-        process.exit(1);
-      }
-      process.stderr.write((e instanceof Error ? (e.stack ?? e.message) : String(e)) + "\n");
-      process.exit(2);
+async function main() {
+  const adapter = new IsomorphicGitAdapter();
+  let parsed;
+  try {
+    parsed = await parseArgs(adapter);
+  } catch (e) {
+    if (e instanceof GitAdapterError) {
+      process.stderr.write(e.message + "\n");
+      process.exit(1);
     }
-    try {
-      const { quiet, profile } = parsed;
-      const isTTY = process.stderr.isTTY === true;
-      const uiMode = resolveUiMode(quiet, isTTY);
+    process.stderr.write((e instanceof Error ? (e.stack ?? e.message) : String(e)) + "\n");
+    process.exit(2);
+  }
+  try {
+    const { quiet, profile } = parsed;
+    const isTTY = process.stderr.isTTY === true;
+    const uiMode = resolveUiMode(quiet, isTTY);
 
-      // Build ProgressReporter based on uiMode.
-      let reporter: ProgressReporter;
-      let controller: ProgressController | null = null;
-      if (uiMode === "quiet") {
-        reporter = {
-          emit(event) {
-            if (event.type === "warning") {
-              process.stderr.write(event.message + "\n");
-            }
-          },
-        };
-      } else {
-        controller = new ProgressController(
-          stderrSink,
-          { nowMs: () => performance.now() },
-          {
-            setInterval(fn, ms) {
-              const id = setInterval(fn, ms);
-              return () => clearInterval(id);
-            },
-          },
-          uiMode,
-        );
-        const ctrl = controller;
-        reporter = { emit: (event) => ctrl.handleEvent(event) };
-      }
-
-      const stateStore = parsed.stateFilePath
-        ? new NodeStateStore(parsed.stateFilePath)
-        : undefined;
-
-      const repoPath = resolve(parsed.repositoryPath);
-      const startMs = performance.now();
-
-      const remoteUrl = await adapter.getRemoteUrl(repoPath);
-      const repoName = deriveRepoName(remoteUrl, repoPath);
-
-      const rootProfiler = new DefaultStageProfiler("elapsed", () => performance.now());
-      rootProfiler.start();
-
-      if (profile) {
-        const gitProfiler = rootProfiler.createScopedProfiler("git");
-        const profilable = adapter as unknown as { setProfiler?: (p: StageProfiler) => void };
-        if (typeof profilable.setProfiler === "function") {
-          profilable.setProfiler(gitProfiler);
-        }
-      }
-
-      const priorState = await loadPriorState(stateStore, parsed, repoPath, reporter);
-
-      const sessionTimestamp = new Date();
-      const tsStr = formatSessionTimestamp(sessionTimestamp);
-      const writer = new OutputWriter(
-        parsed.outputDir,
-        (seq) => `${parsed.outputPrefix}-${tsStr}-${String(seq).padStart(6, "0")}.jsonl`,
-        parsed.rotation,
-      );
-      const sink = new OutputWriterSink(writer);
-
-      const planningProfiler = profile ? rootProfiler.createScopedProfiler("planning") : undefined;
-      const traversalProfiler = profile
-        ? rootProfiler.createScopedProfiler("traversal")
-        : undefined;
-      const projectionProfiler = profile
-        ? rootProfiler.createScopedProfiler("projection")
-        : undefined;
-      const writeProfiler = profile ? rootProfiler.createScopedProfiler("write") : undefined;
-
-      const traversalPlanner = new DefaultBranchTraversalPlanner(adapter, planningProfiler);
-      const traversalExtractor = new DefaultCommitTraversalExtractor(adapter, traversalProfiler);
-      const fileChangeExpander = new DefaultFileChangeExpander(adapter);
-      const projector = new DefaultFactProjector(repoName, remoteUrl, projectionProfiler);
-
-      const deps: CoordinatorDependencies = {
-        traversalPlanner,
-        traversalExtractor,
-        fileChangeExpander,
-        projector,
-        sink,
-        stateStore,
-        reporter,
-        profiler: writeProfiler,
+    // Build ProgressReporter based on uiMode.
+    let reporter: ProgressReporter;
+    let controller: ProgressController | null = null;
+    if (uiMode === "quiet") {
+      reporter = {
+        emit(event) {
+          if (event.type === "warning") {
+            process.stderr.write(event.message + "\n");
+          }
+        },
       };
-      const coordinator = new DefaultExtractionCoordinator(deps);
+    } else {
+      controller = new ProgressController(
+        stderrSink,
+        { nowMs: () => performance.now() },
+        {
+          setInterval(fn, ms) {
+            const id = setInterval(fn, ms);
+            return () => clearInterval(id);
+          },
+        },
+        uiMode,
+      );
+      const ctrl = controller;
+      reporter = { emit: (event) => ctrl.handleEvent(event) };
+    }
 
-      const result = await coordinator.run({
-        repositoryPath: repoPath,
-        repoName,
-        remoteUrl,
-        branches: [...parsed.branches],
-        granularity: parsed.perFile ? "file" : "commit",
-        range: parsed.range,
-        priorState,
-        sessionTimestamp,
+    const stateStore = parsed.stateFilePath ? new NodeStateStore(parsed.stateFilePath) : undefined;
+
+    const repoPath = resolve(parsed.repositoryPath);
+    const startMs = performance.now();
+
+    const remoteUrl = await adapter.getRemoteUrl(repoPath);
+    const repoName = deriveRepoName(remoteUrl, repoPath);
+
+    const rootProfiler = new DefaultStageProfiler("elapsed", () => performance.now());
+    rootProfiler.start();
+
+    if (profile) {
+      const gitProfiler = rootProfiler.createScopedProfiler("git");
+      const profilable = adapter as unknown as { setProfiler?: (p: StageProfiler) => void };
+      if (typeof profilable.setProfiler === "function") {
+        profilable.setProfiler(gitProfiler);
+      }
+    }
+
+    const priorState = await loadPriorState(stateStore, parsed, repoPath, reporter);
+
+    const sessionTimestamp = new Date();
+    const tsStr = formatSessionTimestamp(sessionTimestamp);
+    const writer = new OutputWriter(
+      parsed.outputDir,
+      (seq) => `${parsed.outputPrefix}-${tsStr}-${String(seq).padStart(6, "0")}.jsonl`,
+      parsed.rotation,
+    );
+    const sink = new OutputWriterSink(writer);
+
+    const planningProfiler = profile ? rootProfiler.createScopedProfiler("planning") : undefined;
+    const traversalProfiler = profile ? rootProfiler.createScopedProfiler("traversal") : undefined;
+    const projectionProfiler = profile
+      ? rootProfiler.createScopedProfiler("projection")
+      : undefined;
+    const writeProfiler = profile ? rootProfiler.createScopedProfiler("write") : undefined;
+
+    const traversalPlanner = new DefaultBranchTraversalPlanner(adapter, planningProfiler);
+    const traversalExtractor = new DefaultCommitTraversalExtractor(adapter, traversalProfiler);
+    const fileChangeExpander = new DefaultFileChangeExpander(adapter);
+    const projector = new DefaultFactProjector(repoName, remoteUrl, projectionProfiler);
+
+    const deps: CoordinatorDependencies = {
+      traversalPlanner,
+      traversalExtractor,
+      fileChangeExpander,
+      projector,
+      sink,
+      stateStore,
+      reporter,
+      profiler: writeProfiler,
+    };
+    const coordinator = new DefaultExtractionCoordinator(deps);
+
+    const result = await coordinator.run({
+      repositoryPath: repoPath,
+      repoName,
+      remoteUrl,
+      branches: [...parsed.branches],
+      granularity: parsed.perFile ? "file" : "commit",
+      range: parsed.range,
+      priorState,
+      sessionTimestamp,
+    });
+
+    rootProfiler.stop();
+
+    const elapsedMs = performance.now() - startMs;
+
+    if (!quiet) {
+      const summaryLines = formatSummaryLines({
+        recordsWritten: result.recordsWritten,
+        commitsTraversed: result.commitsTraversed,
+        filesCreated: sink.filesCreated,
+        bytesWritten: sink.bytesWritten,
+        elapsedMs,
+        branches: result.branches,
       });
-
-      rootProfiler.stop();
-
-      const elapsedMs = performance.now() - startMs;
-
-      if (!quiet) {
-        const summaryLines = formatSummaryLines({
-          recordsWritten: result.recordsWritten,
-          commitsTraversed: result.commitsTraversed,
-          filesCreated: sink.filesCreated,
-          bytesWritten: sink.bytesWritten,
-          elapsedMs,
-          branches: result.branches,
-        });
-        process.stderr.write("\n");
-        for (const line of summaryLines) {
-          process.stderr.write(line + "\n");
-        }
-        if (profile) {
-          const profileLines = formatProfileLines(rootProfiler.entries());
-          if (profileLines.length > 0) {
-            process.stderr.write("\n");
-            for (const line of profileLines) {
-              process.stderr.write(line + "\n");
-            }
+      process.stderr.write("\n");
+      for (const line of summaryLines) {
+        process.stderr.write(line + "\n");
+      }
+      if (profile) {
+        const profileLines = formatProfileLines(rootProfiler.entries());
+        if (profileLines.length > 0) {
+          process.stderr.write("\n");
+          for (const line of profileLines) {
+            process.stderr.write(line + "\n");
           }
         }
       }
-    } catch (e) {
-      if (e instanceof GitAdapterError) {
-        process.stderr.write(e.message + "\n");
-        process.exit(1);
-      }
-      process.stderr.write((e instanceof Error ? (e.stack ?? e.message) : String(e)) + "\n");
-      process.exit(2);
     }
-  },
-});
+  } catch (e) {
+    if (e instanceof GitAdapterError) {
+      process.stderr.write(e.message + "\n");
+      process.exit(1);
+    }
+    process.stderr.write((e instanceof Error ? (e.stack ?? e.message) : String(e)) + "\n");
+    process.exit(2);
+  }
+}
 
-runMain(main);
+main().catch((e) => {
+  process.stderr.write((e instanceof Error ? (e.stack ?? e.message) : String(e)) + "\n");
+  process.exit(2);
+});

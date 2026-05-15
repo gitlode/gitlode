@@ -6,7 +6,7 @@ _Migrate the CLI parsing layer from `citty` to `commander`, gaining native unkno
 
 - [ ] Planned
 - [ ] In progress
-- [ ] Completed
+- [x] Completed
 
 #### Design Maturity
 

@@ -679,3 +679,34 @@ describe("parseArgs – --per-file", () => {
     expect(parsed.perFile).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Unknown option rejection
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – unknown option rejection", () => {
+  it("exits with code 1 and prints 'Unknown option: --unknown-flag'", async () => {
+    setArgv("--unknown-flag", "--branch", "main", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith("Unknown option: --unknown-flag\n");
+  });
+
+  it("exits with code 1 for a typo resembling a known option", async () => {
+    setArgv("--rotaet-lines", "100", "--branch", "main", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith("Unknown option: --rotaet-lines\n");
+  });
+
+  it("does not reject tokens after -- as unknown options", async () => {
+    setArgv("--branch", "main", ".", "--", "--ignored");
+    // Should not throw an unknown-option error (may fail later for other reasons)
+    const result = await parseArgs(noopAdapter).catch((e: unknown) => e);
+    if (result instanceof Error && result.message.includes("process.exit")) {
+      expect(stderrSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Unknown option: --ignored"),
+      );
+    }
+  });
+});

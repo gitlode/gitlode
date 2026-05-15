@@ -44,7 +44,7 @@ v0.4.1 is a patch release that delivers two internal pipeline improvements and t
 ### Phase 3: Unknown CLI Arguments Error
 
 - **File**: [`plans/phase-3.md`](plans/phase-3.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 4: `--rotate-size` Size Suffixes
 

@@ -34,7 +34,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "citty": "^0.2.2",
+    "commander": "^13.1.0",
     "diff": "^9.0.0",
     "isomorphic-git": "^1.37.5"
   },

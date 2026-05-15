@@ -285,44 +285,61 @@ gitrail -b main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
 
 ## CLI Framework
 
-**[citty](https://github.com/unjs/citty)** — decided and in use. TypeScript-native, zero legacy overhead.
+**[commander](https://github.com/tj/commander.js)** — decided and in use as of v0.4.1 (migrated from citty). TypeScript-compatible, zero legacy overhead, native strict-mode unknown-option detection, native repeatable option support.
+
+---
+
+## Unknown Option Behavior
+
+Unknown options (flags not registered in the command definition) are a **hard error** in gitrail. This behavior mirrors mainstream CLI conventions and git's own fatal-on-unknown-option policy.
+
+### Error output
+
+```
+Unknown option: --<flag>
+```
+
+Written to stderr. No `"error:"` or `"fatal:"` prefix — consistent with the existing user-error message style.
+
+### Exit code
+
+`1` — same as all other user-input validation errors.
+
+### Scope of the check
+
+The following are **not** flagged as unknown options:
+
+- `--` (terminates option parsing; tokens after `--` are treated as positional arguments)
+- The positional `<repository-path>` argument
+- Values for recognized options (e.g. `main` in `--branch main`)
+- Repeated recognized options (e.g. `--branch main --branch develop`)
+- Short alias forms (`-b`, `-o`, `-s`, `-q`)
+
+### Interaction with `--quiet`
+
+Unknown option errors are **not** suppressed by `--quiet`. A silent typo with `--quiet` would be the hardest failure mode to diagnose.
+
+### Typo suggestion
+
+Edit-distance heuristics (suggesting the closest known option name) are **not implemented**. Deferred as a follow-up roadmap item.
 
 ---
 
 ## Implementation Notes
 
-### `--branch` / `-b` multi-occurrence workaround
+### `program` export
 
-citty only retains the **last** occurrence when a string flag appears multiple times. Because `--branch` must be repeatable, all `--branch` and `-b` values are collected by manually scanning `process.argv` **before** delegating to `parseCittyArgs`. citty then parses everything else.
+`src/cli/args.ts` exports a module-level `Command` instance named `program`. This object defines all option and argument metadata and is used in two places:
 
-```typescript
-const branches: string[] = [];
-for (let i = 0; i < rawArgv.length; i++) {
-  if (rawArgv[i] === "--branch" || rawArgv[i] === "-b") {
-    const val = rawArgv[i + 1];
-    if (val !== undefined && !val.startsWith("-")) {
-      branches.push(val);
-      i++;
-    }
-  } else if (rawArgv[i]?.startsWith("--branch=")) {
-    const val = rawArgv[i]!.slice("--branch=".length);
-    if (val) branches.push(val);
-  }
-}
-```
+- `parseArgs()` — calls `program.parse(process.argv)`
+- `cmd-definition.test.ts` — inspects registered options and arguments without calling `parseArgs()`
 
-### `cmdDefinition` export
+### `--branch` / `-b` repeatable option
 
-`src/cli/args.ts` exports `cmdDefinition` — a `defineCommand` descriptor with `meta` and `args` but no `run()`. This object is spread into the `defineCommand` call in `src/index.ts` so that citty can populate `--help` output with all argument descriptions:
+commander handles repeatable options natively via the accumulator pattern:
 
 ```typescript
-// src/index.ts
-import { cmdDefinition } from "./cli/index.js";
-
-const main = defineCommand({
-  ...cmdDefinition, // brings in meta + args
-  async run() { ... },
-});
+.option('-b, --branch <ref>', 'description', (val, prev: string[]) => [...prev, val], [])
 ```
 
-This separation keeps argument definitions co-located with `parseArgs` while allowing the entry point to own the `run()` implementation.
+The resulting value is `string[]`. No manual pre-scan of `process.argv` is needed.

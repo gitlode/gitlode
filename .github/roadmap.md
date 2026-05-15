@@ -67,12 +67,11 @@ The `--help` output lists all options in a flat list with no grouping. The jump 
 
 - Group options under section headers: **Output**, **Differential Extraction**, **File Rotation**
 - Add a note to the `--state` description: "Primary mechanism for scheduled/incremental runs"
-- Evaluate whether citty supports option grouping natively; if not, consider a custom help renderer
 
-**Design resolution notes (v0.2.0 — deferred)**:
+**Design resolution notes (v0.2.0 — deferred; updated v0.4.1)**:
 
-- citty does not support option grouping natively (confirmed at v0.2.0 design time). A custom help renderer would be required.
-- Deferred on cost/value grounds: the option set (~10 options) is small enough to be readable without grouping, and gitrail usage patterns tend toward fixed, recurring invocations rather than exploratory CLI trial-and-error. The implementation cost of a custom renderer outweighs the discoverability benefit at this scale.
+- As of v0.4.1, gitrail uses commander (migrated from citty). commander supports option grouping natively — the CLI framework blocker is resolved.
+- Deferred on cost/value grounds: the option set (~10 options) is small enough to be readable without grouping, and gitrail usage patterns tend toward fixed, recurring invocations rather than exploratory CLI trial-and-error. The implementation cost outweighs the discoverability benefit at this scale.
 - `docs/usage.md` and README serve as the primary reference for workflow guidance in the interim.
 
 ---
@@ -91,43 +90,6 @@ Supporting suffixes such as `--rotate-size 500M` or `--rotate-size 1G` would ali
 - Base convention: binary (1 K = 1024) vs. decimal (1 K = 1000) — survey popular CLI tools for the dominant convention at implementation time
 - Whether to continue accepting a plain integer as a raw byte count for backward compatibility
 - Error message wording for unrecognized suffix values
-
----
-
-#### CLI UX: Warn on unknown CLI arguments
-
-- **Release target**: v0.4.1
-
-Currently, citty parses arguments with `strict: false` (inherited from `node:util.parseArgs`), which means unrecognized options are silently ignored. A typo such as `--rotate-line` (instead of `--rotate-lines`) passes through without any diagnostic, and the option simply has no effect. This is indistinguishable from a bug in the program itself.
-
-Most mainstream CLI frameworks treat unknown arguments as an error or at minimum a warning (e.g. `argparse` exits with code 2, `commander` errors by default, `yargs` with `strict()` mode). The current behavior is inconsistent with user expectations and can be considered a usability defect.
-
-**Reference behavior: git**:
-
-git is the primary CLI reference for gitrail's UX standards. Although many users interact with git through IDEs or GUI clients rather than the terminal directly, gitrail operates on local git repositories — making git's own CLI conventions the most relevant baseline. When users do invoke gitrail manually, the mental model they bring is shaped by git's behavior.
-
-git treats unknown options as fatal errors and exits immediately without performing any work:
-
-```
-$ git log --unknown-option
-fatal: unrecognized argument: --unknown-option
-# exit code: 128
-```
-
-This means the expected behavior for gitrail is also **error on unknown arguments, exit non-zero, perform no extraction**. A `console.warn`-and-continue approach (warn but proceed) is inconsistent with this baseline and should be considered a fallback only if implementation constraints prevent a clean error path.
-
-**Fix directions to evaluate at design time**:
-
-- **`setup()` hook approach**: In the `defineCommand` `setup()` hook, compare `rawArgs` against the set of known option names (including aliases and kebab/camelCase variants) and emit a `console.warn` to stderr for each unrecognized option. Low implementation cost; no dependency changes.
-- **citty issue / upstream fix**: File a feature request upstream to expose a `strict` mode option. Monitor for resolution before implementing locally.
-- **Library migration**: `commander` and `yargs` have built-in strict modes, but migrating away from citty is a larger architectural change and is not warranted for this issue alone.
-
-**Design considerations**:
-
-- Warnings should go to stderr so they are not captured by output redirection.
-- `--quiet` suppresses progress and summary output but should **not** suppress unknown-argument warnings — a silent typo with `--quiet` would be the hardest failure mode to diagnose.
-- Positional arguments and `--` passthrough must be excluded from the unknown-option check.
-- The warning message should suggest the closest known option name (edit-distance heuristic) if feasible.
 
 ---
 
@@ -569,6 +531,18 @@ boundaries must not be bundled into this item and should be tracked separately.
 issues before finalizing the change list. The examples above are illustrative, not exhaustive.
 
 ---
+
+#### CLI: Schema validation for parsed CLI options
+
+`parseArgs()` currently uses `program.opts<T>()` with a manually-maintained type parameter. commander's `opts<T>()` is implemented as a type assertion (`return this._optionValues as T`) with no runtime enforcement. The type parameter and the `.option()` definitions on `program` are not linked at compile time — a mismatch introduced during code modification produces incorrect runtime behavior without a compile-time error.
+
+Introducing a schema validation step between `program.parse()` and the value extraction block in `parseArgs()` would provide runtime guarantees and make the type safe without relying on assertion alignment.
+
+**Direction to evaluate at design time**:
+
+- A schema validation library (zod or similar) is preferred over hand-written validation code to reduce maintenance surface and gain structured error reporting. The specific library choice should be made at planning time based on bundle size impact, ecosystem stability, and TypeScript integration quality at that point.
+- Validation scope: the shape of `program.opts()` only (not a re-implementation of the mutual exclusion or format checks that follow — those remain separate).
+- The inferred type from the schema can replace the manual type parameter on `opts<T>()`, eliminating the misalignment risk entirely.
 
 ### Medium-term
 

@@ -21,6 +21,8 @@ Roadmap entries use the following standardized metadata labels, placed immediate
 
 #### Compatibility: Hash-algorithm-agnostic commit OID support
 
+- **Release target**: `v0.5.0`
+
 gitrail currently documents and validates commit hashes as SHA-1/40-character values in several
 places. This creates a product-level gap for repositories that use non-SHA-1 object formats,
 because extraction intent is to faithfully export Git history, not to enforce one hash algorithm.
@@ -57,6 +59,8 @@ implicit runtime failures.
   feature
 
 #### CLI UX: Release-boundary extraction workflow
+
+- **Release target**: `v0.5.0`
 
 The current gitrail CLI can express "extract commits after a given ref" via `--since-ref`, but it
 does not provide an explicit, user-facing way to express the complementary release-oriented
@@ -99,6 +103,8 @@ as a request for one additional flag.
 - even if an internal workaround uses an auxiliary ref, that workaround should not become the primary user-facing workflow
 
 #### CLI UX: `--help` option grouping and discoverability
+
+- **Release target**: `v0.5.0`
 
 The `--help` output lists all options in a flat list with no grouping. The jump from "I want incremental extraction" to "I need `--state`" is non-obvious.
 
@@ -586,6 +592,8 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ### Near-term
 
 #### CLI: Schema validation for parsed CLI options
+
+- **Release target**: `v0.5.0`
 
 `parseArgs()` currently uses `program.opts<T>()` with a manually-maintained type parameter. commander's `opts<T>()` is implemented as a type assertion (`return this._optionValues as T`) with no runtime enforcement. The type parameter and the `.option()` definitions on `program` are not linked at compile time — a mismatch introduced during code modification produces incorrect runtime behavior without a compile-time error.
 

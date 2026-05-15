@@ -73,6 +73,32 @@ function userError(msg: string): never {
   process.exit(1);
 }
 
+const ROTATE_SIZE_MIN = 1_048_576n; // 1 MiB
+const ROTATE_SIZE_MAX = 68_719_476_736n; // 64 GiB
+
+function parseRotateSizeBytes(raw: string): number {
+  const trimmed = raw.trim();
+  const match = /^(\d+)([kKmMgG]?)$/.exec(trimmed);
+  if (!match) {
+    userError(
+      "--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)",
+    );
+  }
+  const numPart = BigInt(match[1]!);
+  const suffix = match[2]!.toUpperCase();
+  const multipliers: Record<string, bigint> = {
+    "": 1n,
+    K: 1024n,
+    M: 1_048_576n,
+    G: 1_073_741_824n,
+  };
+  const bytes = numPart * multipliers[suffix]!;
+  if (bytes < ROTATE_SIZE_MIN || bytes > ROTATE_SIZE_MAX) {
+    userError("--rotate-size must be between 1048576 and 68719476736 bytes");
+  }
+  return Number(bytes);
+}
+
 export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
   program.exitOverride();
   try {
@@ -166,11 +192,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
 
   let maxBytes: number | undefined;
   if (rotateSizeRaw !== undefined) {
-    const n = Number(rotateSizeRaw);
-    if (!Number.isInteger(n) || n <= 0) {
-      userError("--rotate-size must be a positive integer");
-    }
-    maxBytes = n;
+    maxBytes = parseRotateSizeBytes(rotateSizeRaw);
   }
 
   let sinceDateObj: Date | undefined;

@@ -204,11 +204,43 @@ describe("parseArgs – --rotate-lines validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseArgs – --rotate-size validation", () => {
-  it("rejects invalid --rotate-size", async () => {
-    setArgv("--branch", "main", "--rotate-size", "abc", ".");
-    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith("--rotate-size must be a positive integer\n");
+  it.each([["abc"], ["1MiB"], ["1.5G"], ["+1M"], ["-1M"], ["1 M"], ["1MB"]])(
+    "rejects invalid format %s",
+    async (val) => {
+      setArgv("--branch", "main", "--rotate-size", val, ".");
+      await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(stderrSpy).toHaveBeenCalledWith(
+        "--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)\n",
+      );
+    },
+  );
+
+  it.each([["1"], ["1048575"], ["1K"], ["68719476737"], ["65G"]])(
+    "rejects out-of-range value %s",
+    async (val) => {
+      setArgv("--branch", "main", "--rotate-size", val, ".");
+      await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(stderrSpy).toHaveBeenCalledWith(
+        "--rotate-size must be between 1048576 and 68719476736 bytes\n",
+      );
+    },
+  );
+
+  it.each([
+    ["1048576", 1_048_576],
+    ["104857600", 104_857_600],
+    ["500M", 524_288_000],
+    ["1G", 1_073_741_824],
+    ["1g", 1_073_741_824],
+    ["1024K", 1_048_576],
+    ["64G", 68_719_476_736],
+    [" 500M ", 524_288_000],
+  ] as [string, number][])("accepts valid --rotate-size %s", async (val, expected) => {
+    setArgv("--branch", "main", "--rotate-size", val, ".");
+    const parsed = await parseArgs(noopAdapter);
+    expect(parsed.rotation.maxBytes).toBe(expected);
   });
 });
 

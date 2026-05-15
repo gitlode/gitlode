@@ -76,10 +76,10 @@ These parameters are only valid in snapshot mode (no `--incremental` flag). They
 
 ### File Rotation
 
-| Parameter               | Type   | Default | Description                             |
-| ----------------------- | ------ | ------- | --------------------------------------- |
-| `--rotate-lines <n>`    | number | none    | Start a new output file after `n` lines |
-| `--rotate-size <bytes>` | number | none    | Start a new output file after `n` bytes |
+| Parameter               | Type          | Default | Description                                                                                                                                                                                                                                                              |
+| ----------------------- | ------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--rotate-lines <n>`    | number        | none    | Start a new output file after `n` lines                                                                                                                                                                                                                                  |
+| `--rotate-size <value>` | bytes or size | none    | Start a new output file after `n` bytes. Accepts a plain integer (bytes) or an integer with suffix `K`, `M`, or `G` (binary: 1K=1024, 1M=1048576, 1G=1073741824). Suffixes are case-insensitive. Minimum: `1M` (1,048,576 bytes). Maximum: `64G` (68,719,476,736 bytes). |
 
 Both may be specified simultaneously — rotation triggers when **either** threshold is reached.
 
@@ -217,18 +217,20 @@ All validation must complete before extraction and file output begin. Validation
   - `--missing-state error` (default when absent) → exit with code 1
   - `--missing-state snapshot` → emit warning to stderr, set fallback flag (behave as snapshot with no range filter)
 
-| Condition                                                     | Phase | Error                                                                                 |
-| ------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
-| `<repository-path>` does not exist                            | 2     | `Repository not found: <path>`                                                        |
-| `<repository-path>` is not a Git repository                   | 3     | `Not a Git repository: <path>`                                                        |
-| `--branch` not specified                                      | 1     | `At least one --branch must be specified`                                             |
-| `--missing-state` value invalid                               | 1     | `--missing-state must be "error" or "snapshot"`                                       |
-| `--output-dir` does not exist                                 | 2     | `Output directory not found: <path>`                                                  |
-| `--state` parent directory does not exist                     | 2     | `Parent directory for state file not found: <dir>`                                    |
-| `--since-date` is not valid ISO 8601                          | 1     | `Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)` |
-| `--since-ref` ref not found in repository                     | 3     | `Ref not found: <ref>`                                                                |
-| `--rotate-lines` or `--rotate-size` is not a positive integer | 1     | `<param> must be a positive integer`                                                  |
-| State file `repositoryPath` mismatch                          | 3     | `State file was created for a different repository: <recorded-path>`                  |
+| Condition                                   | Phase | Error                                                                                                   |
+| ------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| `<repository-path>` does not exist          | 2     | `Repository not found: <path>`                                                                          |
+| `<repository-path>` is not a Git repository | 3     | `Not a Git repository: <path>`                                                                          |
+| `--branch` not specified                    | 1     | `At least one --branch must be specified`                                                               |
+| `--missing-state` value invalid             | 1     | `--missing-state must be "error" or "snapshot"`                                                         |
+| `--output-dir` does not exist               | 2     | `Output directory not found: <path>`                                                                    |
+| `--state` parent directory does not exist   | 2     | `Parent directory for state file not found: <dir>`                                                      |
+| `--since-date` is not valid ISO 8601        | 1     | `Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)`                   |
+| `--since-ref` ref not found in repository   | 3     | `Ref not found: <ref>`                                                                                  |
+| `--rotate-lines` is not a positive integer  | 1     | `--rotate-lines must be a positive integer`                                                             |
+| `--rotate-size` has invalid format          | 1     | `--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)` |
+| `--rotate-size` value is out of range       | 1     | `--rotate-size must be between 1048576 and 68719476736 bytes`                                           |
+| State file `repositoryPath` mismatch        | 3     | `State file was created for a different repository: <recorded-path>`                                    |
 
 ---
 
@@ -277,8 +279,9 @@ gitrail --per-file -b main ./my-repo
 # Successful-run profiling output on stderr
 gitrail --profile -b main ./my-repo
 
-# With file rotation
+# With file rotation (plain bytes or human-readable suffix)
 gitrail -b main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
+gitrail -b main --rotate-lines 10000 --rotate-size 100M ./my-repo
 ```
 
 ---

@@ -49,7 +49,7 @@ v0.4.1 is a patch release that delivers two internal pipeline improvements and t
 ### Phase 4: `--rotate-size` Size Suffixes
 
 - **File**: [`plans/phase-4.md`](plans/phase-4.md)
-- **Status**: Planned
+- **Status**: Completed
 
 Provisional dependency notes:
 

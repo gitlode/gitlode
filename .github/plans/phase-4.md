@@ -4,9 +4,9 @@ _Add human-readable size suffix support (`K`, `M`, `G`) to `--rotate-size` while
 
 #### Status
 
-- [x] Planned
+- [ ] Planned
 - [ ] In progress
-- [ ] Completed
+- [x] Completed
 
 #### Design Maturity
 

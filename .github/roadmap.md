@@ -143,6 +143,35 @@ deterministic case: pairing `deleted` and `added` records when blob identity is 
 - how to handle one-to-many and many-to-one exact matches deterministically
 - what summary/profile counters should be emitted so users can audit rename pairing impact
 
+#### CLI UX: Terminal output styling and readability
+
+With recent CLI enhancements, terminal output has become richer but also more information-dense,
+making it harder for users to locate essential information. When many "label: value" entries are
+listed sequentially, target data becomes difficult to find.
+
+This item improves terminal presentation from several angles:
+
+- **Text formatting**: Restructure and align output to improve visual hierarchy and scanability
+- **Color support**: Use strategic coloring to distinguish different information categories
+- **Overall UX**: Refine typography and spacing to reduce cognitive load
+
+**Design questions to resolve at design time**:
+
+- library selection: whether to adopt a package like `chalk` (cross-platform ANSI management,
+  well-tested) or implement color support in-house (no dependency addition, but requires Windows
+  ANSI handling)
+- scope of formatting improvements: which output sections are highest priority for visual
+  restructuring
+- backwards compatibility: whether ANSI stripping for non-TTY outputs should be automatic or
+  user-controlled
+- color scheme and accessibility: ensure sufficient contrast and consider colorblind-safe palettes
+
+**Scope boundary**:
+
+- focus on interactive CLI output (progress reporting, status messages, result summaries)
+- does not include JSON output (`--output` files remain unchanged)
+- preserve deterministic, scriptable behavior when stdout is piped or redirected
+
 ---
 
 ### Medium-term

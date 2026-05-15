@@ -25,8 +25,7 @@ import type {
 } from "./core/index.js";
 import { DefaultStageProfiler } from "./core/profile/index.js";
 import { GitAdapterError, IsomorphicGitAdapter } from "./git/index.js";
-import { OutputWriter, formatSessionTimestamp } from "./output/index.js";
-import { OutputWriterSink } from "./output/output-writer-sink.js";
+import { OutputWriter, formatSessionTimestamp, OutputWriterSink } from "./output/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

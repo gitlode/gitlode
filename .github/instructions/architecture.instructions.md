@@ -316,7 +316,7 @@ class GitAdapterError extends Error {
 
 Core Logic must inspect `code` to determine the appropriate response:
 
-| Code               | Severity  | Core Behavior                                               |
+| Code               | Severity  | Core Behavior                                                |
 | ------------------ | --------- | ------------------------------------------------------------ |
 | `REF_NOT_FOUND`    | Fatal     | Abort with user-facing error message                         |
 | `COMMIT_NOT_FOUND` | Fatal     | Abort with user-facing error message                         |

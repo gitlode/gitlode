@@ -49,20 +49,22 @@ Deferred design is not a general TODO state. It requires a completed Deferred De
 
 ## When to Fill Each Section
 
-| Section                   | When                                                                                  | Owner                                      |
-| ------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Title, summary, Status    | When the phase file is first created                                                  | Planning trunk session                     |
-| Design Maturity           | When the phase file is first created; update if deferred design is later resolved     | Planning/pre-implementation session        |
-| Design References         | Planning trunk session                                                                | Planning trunk session                     |
-| Design Decisions          | **Before the implementation session starts**                                          | Planning/pre-implementation session        |
-| Deferred Design Controls  | During planning if the phase is marked deferred design; resolve before implementation | Planning/pre-implementation session        |
-| Non-Goals                 | Before implementation                                                                 | Planning trunk session                     |
-| Target Files              | Before implementation                                                                 | Planning/pre-implementation session        |
-| Documentation Touchpoints | Before implementation                                                                 | Planning trunk session                     |
-| Implementation Notes      | When non-obvious details are known                                                    | Pre-implementation or early implementation |
-| Verification              | Before implementation (commands); after first run (behavioral checks)                 | Pre-implementation session                 |
+| Section                   | When                                                                                   | Owner                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Title, summary            | When the phase file is first created                                                   | Planning trunk session                                                   |
+| Design Maturity           | When the phase file is first created; update when deferred design is resolved          | Planning branch session (design refinement session when deferred)        |
+| Design References         | During detailed design                                                                 | Planning branch session                                                  |
+| Design Decisions          | **Before the implementation session starts**                                           | Planning branch session                                                  |
+| Deferred Design Controls  | During planning if the phase is marked deferred design; finalize before implementation | Planning branch session (design refinement session when deferred)        |
+| Non-Goals                 | During detailed design                                                                 | Planning branch session                                                  |
+| Target Files              | Before implementation                                                                  | Planning branch session (design refinement session when deferred)        |
+| Documentation Touchpoints | During planning/design to enumerate required updates; executed during implementation   | Planning branch session (design refinement session when deferred)        |
+| Implementation Notes      | When non-obvious details are known                                                     | Planning branch session or development branch session                    |
+| Verification              | Before implementation (commands); after first run (behavioral checks)                  | Planning branch session (commands), development branch session (results) |
 
-The `Owner` column indicates planning-stage responsibility, not necessarily which session performs the edit. During Stage 1e-1, the planning branch session fills or updates the phase file during detailed design, while the planning trunk session still owns initial creation, cross-phase review, and finalization. If a phase is marked deferred design, the later Stage 2 design refinement session may finalize the deferred sections before implementation begins.
+The `Owner` column identifies the session that normally edits each section. Planning trunk session creates the initial file shell and reviews plan-level consistency. During Stage 1e-1, planning branch session fills design sections. If a phase is marked deferred design, design refinement session finalizes deferred sections before implementation. Development trunk session may perform documentation-only consistency fixes during review.
+
+Implementation progress is tracked only in `plan.md`. Do not duplicate progress status in phase files.
 
 Sections marked "Before the implementation session starts" are the ones most likely to cause mid-session pauses if left blank.
 
@@ -77,12 +79,6 @@ Copy the block below into a new phase file at `.github/plans/phase-N.md` when cr
 ### Phase N: <Title>
 
 _<One- or two-sentence statement of what this phase accomplishes and the specific mechanism used. Avoid vague goals; name the API, pattern, or change._
-
-#### Status
-
-- [ ] Planned
-- [ ] In progress
-- [ ] Completed
 
 #### Design Maturity
 
@@ -142,7 +138,7 @@ _Files to create or modify. Enough detail to start without a workspace explorati
 
 #### Documentation Touchpoints
 
-_Sections in `docs/`, `instructions/`, or other markdown files that describe behavior this phase changes or resolves. Enumerate every section that will become stale or incorrect after implementation — including "known limitation", "future work", and "future enhancement" entries that the phase implements. If the phase is deferred design, list the touchpoints already known during planning and finalize them during refinement before implementation._
+_Sections in `docs/`, `instructions/`, or other markdown files that describe behavior this phase changes or resolves. Enumerate every section that will become stale or incorrect after implementation — including "known limitation", "future work", and "future enhancement" entries that the phase implements. Planning/design sessions are responsible for listing these touchpoints. Development branch sessions are responsible for applying the listed updates during implementation. If the phase is deferred design, list touchpoints known during planning and finalize them during refinement before implementation._
 
 _Omit this section entirely if the phase makes no change to documented behavior._
 
@@ -187,4 +183,4 @@ npm run format:check
 - Behavioral verification items should cover user-visible changes. "Build and tests pass" alone is not sufficient when the phase changes CLI behavior or output format.
 - Keep Implementation Notes minimal. If an implementation detail is important enough to note, consider whether it belongs in Design Decisions instead.
 - Implementation Notes are for execution guidance only. If a note changes the technical approach, ownership boundary, external behavior, or any other substantive design choice, it belongs in Design Decisions instead.
-- **Documentation Touchpoints are a planning obligation, not a post-implementation cleanup.** Identify them by reading every file listed under Design References and asking: "Does this file contain text that describes the world before this phase?" Phases that resolve a roadmap item, implement a "future work" entry, or remove a "known limitation" will almost always have at least one touchpoint. These sections must be listed explicitly — a vague "update docs/" in the Documentation Update release task is not a substitute.
+- **Documentation Touchpoints are a planning/design obligation and an implementation obligation.** Planning/design sessions must list them explicitly; development branch sessions must execute those listed updates. Identify touchpoints by reading every file listed under Design References and asking: "Does this file contain text that describes the world before this phase?" Phases that resolve a roadmap item, implement a "future work" entry, or remove a "known limitation" will almost always have at least one touchpoint.

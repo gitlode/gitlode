@@ -1,61 +1,59 @@
-# gitrail — v0.4.1 Release Plan
+# gitrail — v0.5.0 Release Plan
 
 ## Overview
 
-v0.4.1 is a patch release that delivers two internal pipeline improvements and two small CLI UX fixes. There are no breaking changes to the CLI interface, the output JSON schema, or the state file format. All four items are self-contained, low-risk, and share the theme of tightening the codebase after the v0.4.0 architecture redesign.
+v0.5.0 is a minor release focused on making release-oriented extraction a first-class workflow and tightening the surrounding CLI contract. The release should improve how users bootstrap extraction around release refs, remove avoidable SHA-1-specific assumptions from the documented and validated surface, and harden or clarify the CLI paths that become more important once the workflow is promoted to a first-class feature. Pre-1.0 minor releases may include behavior and contract adjustments when they reduce larger v1.0 migration risk; this release should keep that latitude focused on a coherent workflow-and-compatibility theme rather than broad internal churn.
 
 ## Release Goals
 
-- Consolidate commit-grain and file-grain projection into a single discriminated Fact union and unified projector contract
-- Correct inaccurate internal type and interface names to reduce reading friction without changing any external contract
-- Make unknown CLI arguments a hard error to match git behavior and prevent silent typos
-- Accept human-readable size suffixes for `--rotate-size` to align with standard CLI conventions
+- Make release-boundary extraction a clear, supported user workflow rather than an implicit ref-manipulation workaround
+- Clarify and, where dependency support allows, broaden the product contract from SHA-1-specific commit hashes to Git commit object IDs
+- Improve CLI robustness and discoverability in the same surface area touched by the release-boundary workflow
+- Keep the release centered on workflow, compatibility, and CLI quality instead of mixing in unrelated architecture or output-surface expansion
 
 ## Scope Summary
 
-### Included in v0.4.1
+### Included in v0.5.0
 
-- `Pipeline: Discriminated Fact union and unified projector contract` — internal pipeline consolidation; no user-visible change
-- `Code hygiene: Identifier naming audit for semantic accuracy` — TypeScript identifier renames only; no behavioral change
-- `CLI UX: Warn on unknown CLI arguments` — error on unrecognized options, exit non-zero
-- `CLI UX: --rotate-size human-readable size suffixes` — accept `K`/`M`/`G` suffixes; backward compatible
+- `CLI UX: Release-boundary extraction workflow` — mandatory scope item for this release; define and implement a first-class release-oriented extraction workflow around release refs, snapshot bootstrap, and incremental follow-up
+- `Compatibility: Hash-algorithm-agnostic commit OID support` — compatibility/correctness companion item that aligns the product contract with Git object IDs and removes avoidable SHA-1-only assumptions where supported
+- `CLI: Schema validation for parsed CLI options` — small hardening item that becomes more valuable as the CLI parameter model grows more nuanced; reduces type-assertion drift risk in `parseArgs()` without reopening higher-level workflow semantics
+- `CLI UX: --help option grouping and discoverability` — small documentation/UX companion for a release that adds or clarifies differential-extraction workflow guidance; improves discoverability of the state- and boundary-related options users must understand together
 
-### Explicitly excluded from v0.4.1
+### Explicitly excluded from v0.5.0
 
-- `CLI UX: Release-boundary extraction workflow` — design scope too large for a patch release
-- `CLI UX: --help option grouping` — cost/value ratio remains unfavorable; deferred rationale still valid
-- `Extraction/File Mode: Exact-content rename detection` — schema-visible change; minor release or later
-- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter` — research cost too high for this cycle
-- `Architecture/Runtime: Worker-based extraction runtime` — large architectural change; patch-incompatible
-- `Output: Configurable field inclusion/exclusion` — better scheduled after Discriminated Fact union stabilizes
+- `Extraction/File Mode: Exact-content rename detection` — valuable, but it broadens the release into output-schema and file-mode semantics that are unrelated to the release-boundary workflow
+- `Extraction/CLI: User-controlled guardrail for very large text diffs` — worthwhile performance-control item, but it is operationally separate from the v0.5.0 workflow and compatibility theme
+- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter` — internal design work without enough user-facing value for this release theme
+- `Architecture/Runtime: Worker-based extraction runtime` — too large and cross-cutting for the same release as a workflow-model change
+- `Pipeline: Pluggable enrichment stage for organization-specific metadata` — still required before v1.0.0, but too large to combine with the release-boundary design work in this release
+- `Output: Configurable field inclusion/exclusion` — better planned alongside projection/output-surface priorities rather than this release's extraction-boundary theme
+- `Output: Repository metadata override` — genuinely small, but it pulls the release toward output customization rather than the chosen extraction-workflow theme
+- `Output: Execution metadata line` — also small, but unrelated to the release-boundary and compatibility objectives
 
 ## Development Phases
 
-### Phase 1: Discriminated Fact Union and Unified Projector
+### Phase 1: Release-Boundary Extraction Workflow
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Completed
+- **Status**: Planned
 
-### Phase 2: Identifier Naming Audit
+### Phase 2: Commit OID Compatibility Contract
 
 - **File**: [`plans/phase-2.md`](plans/phase-2.md)
-- **Status**: Completed
+- **Status**: Planned
 
-### Phase 3: Unknown CLI Arguments Error
+### Phase 3: CLI Parser Hardening and Help Discoverability
 
 - **File**: [`plans/phase-3.md`](plans/phase-3.md)
-- **Status**: Completed
-
-### Phase 4: `--rotate-size` Size Suffixes
-
-- **File**: [`plans/phase-4.md`](plans/phase-4.md)
-- **Status**: Completed
+- **Status**: Planned
 
 Provisional dependency notes:
 
-- Phase 2 follows Phase 1: Naming audit runs after Discriminated Fact union so that newly introduced type names are included in the audit scope.
-- Phase 3 (Unknown CLI Arguments Error) and Phase 4 (`--rotate-size` Size Suffixes) are independent of Phases 1–2; however, both modify `src/cli/args.ts`. Phase 3 must complete before Phase 4 implementation starts to avoid merge conflicts. If Phase 4 branches before Phase 3 is merged, Phase 4 must rebase on Phase 3's result.
-- Phases 3 and 4 are ordered sequentially to accommodate this file-level conflict, not due to any semantic dependency.
+- Phase 1 is first because it is the primary release feature and the main source of CLI/workflow semantics for v0.5.0.
+- Phase 2 follows Phase 1: commit-OID compatibility should be aligned against the finalized release-boundary workflow, ref-resolution behavior, and any user-visible wording chosen in Phase 1.
+- Phase 3 follows Phase 1 because schema validation and help grouping both depend on the final CLI option surface and help text after the release-boundary workflow design is fixed.
+- Phase 3 is kept after Phase 2 as well to avoid repeated edits to the same CLI-facing files and documentation while terminology is still moving.
 
 ## Release Tasks
 
@@ -67,7 +65,7 @@ _Update all human-oriented documentation to reflect the complete set of changes 
 
 - [ ] Planned
 - [ ] In progress
-- [x] Completed
+- [ ] Completed
 
 #### Mandatory Files
 
@@ -93,11 +91,9 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 #### Release-Specific Notes
 
-- Update `architecture.instructions.md` canonical vocabulary and ownership rules for `Fact`, `FactProjector`, and `DefaultFactProjector` (Phase 1 touchpoint).
-- Update `cli.instructions.md` to document: unknown-option fatal error policy (Phase 3) and `--rotate-size` suffix syntax and min/max bounds (Phase 4).
-- Update `README.md` and `docs/usage.md` for `--rotate-size` suffix support (Phase 4 touchpoint).
-- No migration notes required: no breaking CLI or schema changes in this release.
-- Note: `git-traversal.instructions.md` and `architecture.instructions.md` state/checkpoint vocabulary updates are tied to Phase 2 and will be executed after Phase 2 implementation completes.
+- Update CLI and usage documentation for the final release-boundary workflow and any new or revised parameter semantics.
+- Update Git traversal and architecture documentation if release-ref resolution, ref-boundary semantics, or commit OID terminology change.
+- Add migration notes if user-visible CLI behavior or documented compatibility guarantees change.
 
 #### Verification
 
@@ -109,13 +105,11 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 ## Final Verification Checklist
 
-- [x] All development phases are marked Completed.
-- [x] `CHANGELOG.md` contains a finalized this version's entry with `Added` / `Changed` / `Fixed` and
-      `Migration` (if needed) sections.
-- [x] Human-oriented docs were reviewed and updated for latest behavior (`README.md`,
-      `docs/usage.md`, `docs/design/architecture.md`, instructions files).
-- [x] Roadmap cleanup completed for implemented items in this version; remaining entries are forward-looking.
-- [x] Verification commands completed:
+- [ ] All development phases are marked Completed.
+- [ ] `CHANGELOG.md` contains a finalized this version's entry with `Added` / `Changed` / `Fixed` and `Migration` (if needed) sections.
+- [ ] Human-oriented docs were reviewed and updated for latest behavior (`README.md`, `docs/usage.md`, `docs/design/`, instructions files as applicable).
+- [ ] Roadmap cleanup completed for implemented items in this version; remaining entries are forward-looking.
+- [ ] Verification commands completed:
   - `npm run build` pass
   - `npm test` pass
   - `npm run lint` pass

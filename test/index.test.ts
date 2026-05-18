@@ -142,7 +142,7 @@ describe("formatSummaryLines", () => {
       filesCreated: 0,
       bytesWritten: 0,
       elapsedMs: 0,
-      branches: [],
+      refs: [],
     });
     expect(lines[0]).toBe("Extraction complete");
   });
@@ -154,7 +154,7 @@ describe("formatSummaryLines", () => {
       filesCreated: 2,
       bytesWritten: 1024,
       elapsedMs: 3000,
-      branches: ["main"],
+      refs: ["main"],
     });
 
     const fieldLines = lines.slice(1);
@@ -163,7 +163,7 @@ describe("formatSummaryLines", () => {
     expect(fieldLines[2]).toMatch(/Files created/);
     expect(fieldLines[3]).toMatch(/Bytes written/);
     expect(fieldLines[4]).toMatch(/Elapsed time/);
-    expect(fieldLines[5]).toMatch(/Branches/);
+    expect(fieldLines[5]).toMatch(/Refs/);
   });
 
   it("label column is padded to 18 characters", () => {
@@ -173,7 +173,7 @@ describe("formatSummaryLines", () => {
       filesCreated: 0,
       bytesWritten: 0,
       elapsedMs: 0,
-      branches: [],
+      refs: [],
     });
     // Each field line: "  " + label.padEnd(18) + ": " + value
     for (const line of lines.slice(1)) {
@@ -191,23 +191,23 @@ describe("formatSummaryLines", () => {
       filesCreated: 0,
       bytesWritten: 2048,
       elapsedMs: 0,
-      branches: [],
+      refs: [],
     });
     const bytesLine = lines.find((l) => l.includes("Bytes written"));
     expect(bytesLine).toContain("2.0 KB");
   });
 
-  it("shows '(none)' for empty branches", () => {
+  it("shows '(none)' for empty refs", () => {
     const lines = formatSummaryLines({
       recordsWritten: 0,
       commitsTraversed: 0,
       filesCreated: 0,
       bytesWritten: 0,
       elapsedMs: 0,
-      branches: [],
+      refs: [],
     });
-    const branchLine = lines.find((l) => l.includes("Branches"));
-    expect(branchLine).toContain("(none)");
+    const refLine = lines.find((l) => l.includes("Refs"));
+    expect(refLine).toContain("(none)");
   });
 });
 
@@ -291,8 +291,8 @@ describe("ProgressController (tty-interactive)", () => {
     emit(ctrl, {
       type: "extracting-progress",
       phase: "extracting",
-      branchIndex: 0,
-      branchCount: 2,
+      refIndex: 0,
+      refCount: 2,
       commitsTraversed: 5,
       recordsWritten: 3,
       bytesWritten: 2048,
@@ -304,7 +304,7 @@ describe("ProgressController (tty-interactive)", () => {
 
     const rewrites = sink.records.filter((r) => r.type === "rewriteLine");
     const last = rewrites[rewrites.length - 1]!;
-    expect(last.text).toMatch(/branch 1\/2/);
+    expect(last.text).toMatch(/refs 1\/2/);
     expect(last.text).toMatch(/commits 5/);
     expect(last.text).toMatch(/records 3/);
     expect(last.text).toMatch(/2\.0 KB/);
@@ -380,8 +380,8 @@ describe("ProgressController (quiet)", () => {
     emit(ctrl, {
       type: "extracting-progress",
       phase: "extracting",
-      branchIndex: 0,
-      branchCount: 1,
+      refIndex: 0,
+      refCount: 1,
       commitsTraversed: 1,
       recordsWritten: 1,
       bytesWritten: 100,

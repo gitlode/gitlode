@@ -63,7 +63,7 @@ export type ExtractionRange =
 
 export interface ExtractorConfig {
   readonly repositoryPath: string;
-  readonly branches: readonly string[];
+  readonly refs: readonly string[];
   readonly outputDir: string;
   readonly outputPrefix: string;
   readonly rotation: RotationConfig;
@@ -81,8 +81,8 @@ export type ProgressEvent =
   | {
       readonly type: "extracting-progress";
       readonly phase: "extracting";
-      readonly branchIndex: number;
-      readonly branchCount: number;
+      readonly refIndex: number;
+      readonly refCount: number;
       readonly commitsTraversed: number;
       readonly recordsWritten: number;
       readonly bytesWritten: number;
@@ -188,7 +188,7 @@ export interface ExtractionResult {
   readonly recordsWritten: number;
   readonly filesCreated: number;
   readonly bytesWritten: number;
-  readonly branches: readonly string[];
+  readonly refs: readonly string[];
   /**
    * Profiling entries from the root profiler, in preorder.
    * The first entry is always the root (e.g. `"elapsed"`) and represents total run duration.
@@ -202,33 +202,35 @@ export interface ExtractionResult {
 // ---------------------------------------------------------------------------
 
 /** Resolved branch traversal boundary for one branch in a single run. */
-export interface BranchTraversalPlan {
+export interface TraversalPlan {
   readonly name: string;
   readonly head: CommitHash;
   readonly excludeHash: CommitHash | undefined;
+  /** True when the ref is a branch (exists under refs/heads/). False for tags and raw OIDs. */
+  readonly isBranch: boolean;
 }
 
-/** Input to the BranchTraversalPlanner stage. */
-export interface BranchTraversalPlanningRequest {
+/** Input to the TraversalPlanner stage. */
+export interface TraversalPlanningRequest {
   /** Resolved absolute path to the repository. */
   readonly repositoryPath: string;
-  /** Ordered list of branches to plan. */
-  readonly branches: readonly string[];
-  /** Extraction mode; controls whether priorBranchMap is used for exclude-hash selection. */
+  /** Ordered list of refs to plan. */
+  readonly refs: readonly string[];
+  /** Extraction mode; controls whether priorRefMap is used for exclude-hash selection. */
   readonly mode: "snapshot" | "incremental";
-  /** Validated branch→lastCommitHash map loaded from a prior checkpoint.
+  /** Validated ref→lastCommitHash map loaded from a prior checkpoint.
    *  Empty in snapshot mode or when no prior checkpoint exists. */
-  readonly priorBranchMap: ReadonlyMap<string, CommitHash>;
+  readonly priorRefMap: ReadonlyMap<string, CommitHash>;
   /** Optional extraction range; controls exclusion-boundary selection. */
   readonly range?: ExtractionRange;
 }
 
-/** Core-owned interface for the branch-planning stage. */
-export interface BranchTraversalPlanner {
+/** Core-owned interface for the traversal-planning stage. */
+export interface TraversalPlanner {
   plan(
-    request: BranchTraversalPlanningRequest,
+    request: TraversalPlanningRequest,
     reporter: ProgressReporter,
-  ): Promise<readonly BranchTraversalPlan[]>;
+  ): Promise<readonly TraversalPlan[]>;
 }
 
 /** Input to the CommitTraversalExtractor stage. */
@@ -240,7 +242,7 @@ export interface CommitTraversalRequest {
   /** Remote origin URL, or null if unavailable. */
   readonly remoteUrl: string | null;
   /** Ordered list of per-branch traversal plans. */
-  readonly plans: readonly BranchTraversalPlan[];
+  readonly plans: readonly TraversalPlan[];
   /** Optional extraction range; controls commit filtering within each branch. */
   readonly range?: ExtractionRange;
 }
@@ -283,7 +285,7 @@ export interface CoordinatorRequest {
   readonly repositoryPath: string;
   readonly repoName: string;
   readonly remoteUrl: string | null;
-  readonly branches: readonly string[];
+  readonly refs: readonly string[];
   /** Renamed from `outputMode`. */
   readonly granularity: "commit" | "file";
   readonly range?: ExtractionRange;
@@ -296,8 +298,8 @@ export interface CoordinatorRequest {
 export interface CoordinatorResult {
   readonly recordsWritten: number;
   readonly commitsTraversed: number;
-  /** Branches for which a head was successfully resolved (skipped branches are omitted). */
-  readonly branches: readonly string[];
+  /** Refs for which a head was successfully resolved (skipped refs are omitted). */
+  readonly refs: readonly string[];
 }
 
 /** Core-owned interface for the fact projection stage. */
@@ -312,7 +314,7 @@ export interface ExtractionCoordinator {
 
 /** Constructor dependencies injected into `DefaultExtractionCoordinator`. */
 export interface CoordinatorDependencies {
-  readonly traversalPlanner: BranchTraversalPlanner;
+  readonly traversalPlanner: TraversalPlanner;
   readonly traversalExtractor: CommitTraversalExtractor;
   readonly fileChangeExpander: FileChangeExpander;
   /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */

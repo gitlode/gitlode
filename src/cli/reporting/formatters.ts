@@ -10,7 +10,7 @@ export function formatSummaryLines(data: SummaryData): string[] {
     ["Files created", String(data.filesCreated)],
     ["Bytes written", humanizeBytes(data.bytesWritten)],
     ["Elapsed time", formatElapsed(data.elapsedMs)],
-    ["Branches", data.branches.join(", ") || "(none)"],
+    ["Refs", data.refs.join(", ") || "(none)"],
   ];
   for (const [label, value] of fields) {
     lines.push(`  ${label.padEnd(18)}: ${value}`);

@@ -9,7 +9,7 @@ import { ProgressController, resolveUiMode } from "./cli/progress/index.js";
 import type { TerminalSink } from "./cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "./cli/reporting/index.js";
 import {
-  DefaultBranchTraversalPlanner,
+  DefaultTraversalPlanner,
   DefaultCommitTraversalExtractor,
   DefaultExtractionCoordinator,
   DefaultFactProjector,
@@ -217,7 +217,7 @@ async function main() {
       : undefined;
     const writeProfiler = profile ? rootProfiler.createScopedProfiler("write") : undefined;
 
-    const traversalPlanner = new DefaultBranchTraversalPlanner(adapter, planningProfiler);
+    const traversalPlanner = new DefaultTraversalPlanner(adapter, planningProfiler);
     const traversalExtractor = new DefaultCommitTraversalExtractor(adapter, traversalProfiler);
     const fileChangeExpander = new DefaultFileChangeExpander(adapter);
     const projector = new DefaultFactProjector(repoName, remoteUrl, projectionProfiler);
@@ -238,7 +238,7 @@ async function main() {
       repositoryPath: repoPath,
       repoName,
       remoteUrl,
-      branches: [...parsed.branches],
+      refs: [...parsed.refs],
       granularity: parsed.perFile ? "file" : "commit",
       range: parsed.range,
       priorState,
@@ -256,7 +256,7 @@ async function main() {
         filesCreated: sink.filesCreated,
         bytesWritten: sink.bytesWritten,
         elapsedMs,
-        branches: result.branches,
+        refs: result.refs,
       });
       process.stderr.write("\n");
       for (const line of summaryLines) {

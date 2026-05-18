@@ -23,8 +23,12 @@ export interface FileChange {
 }
 
 export interface GitAdapter {
-  /** Resolve a ref (branch name) to a commit hash */
+  /** Resolve a ref (branch name, tag, or raw OID) to a commit hash */
   resolveRef(repoPath: string, ref: string): Promise<CommitHash>;
+
+  /** Return true if the given ref is a branch (i.e. exists under refs/heads/). Returns false
+   *  for tags, raw commit OIDs, or any non-branch ref. */
+  isRefBranch(repoPath: string, ref: string): Promise<boolean>;
 
   /** Walk commits reachable from `head`, stopping before `excludeHash` if provided */
   walkCommits(

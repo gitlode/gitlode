@@ -36,7 +36,7 @@ v0.5.0 is a minor release focused on making release-oriented extraction a first-
 ### Phase 1: Release-Boundary Extraction Workflow
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 2: Commit OID Compatibility Contract
 

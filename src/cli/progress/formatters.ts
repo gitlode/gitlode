@@ -19,12 +19,12 @@ export function formatActiveLine(snapshot: PhaseSnapshot, spinnerFrame: string):
   const elapsed = formatElapsed(snapshot.nowMs - snapshot.startMs);
   const label = phaseLabel(snapshot.phase);
 
-  if (snapshot.phase === "extracting" && snapshot.branchCount > 0) {
-    const branchField = `branch ${snapshot.branchIndex + 1}/${snapshot.branchCount}`;
+  if (snapshot.phase === "extracting" && snapshot.refCount > 0) {
+    const refField = `refs ${snapshot.refIndex + 1}/${snapshot.refCount}`;
     const bytes = humanizeBytes(snapshot.bytesWritten);
     const commits = snapshot.commitsTraversed.toLocaleString("en-US");
     const records = snapshot.recordsWritten.toLocaleString("en-US");
-    return `${spinnerFrame} ${label}  ${branchField}  commits ${commits}  records ${records}  written ${bytes}  elapsed ${elapsed}`;
+    return `${spinnerFrame} ${label}  ${refField}  commits ${commits}  records ${records}  written ${bytes}  elapsed ${elapsed}`;
   }
 
   return `${spinnerFrame} ${label}  elapsed ${elapsed}`;
@@ -34,12 +34,12 @@ export function formatDoneLine(snapshot: PhaseSnapshot): string {
   const elapsed = formatElapsed(snapshot.nowMs - snapshot.startMs);
   const label = phaseLabel(snapshot.phase);
 
-  if (snapshot.phase === "extracting" && snapshot.branchCount > 0) {
-    const branchField = `branch ${snapshot.branchCount}/${snapshot.branchCount}`;
+  if (snapshot.phase === "extracting" && snapshot.refCount > 0) {
+    const refField = `refs ${snapshot.refCount}/${snapshot.refCount}`;
     const bytes = humanizeBytes(snapshot.bytesWritten);
     const commits = snapshot.commitsTraversed.toLocaleString("en-US");
     const records = snapshot.recordsWritten.toLocaleString("en-US");
-    return `  ${label}  ${branchField}  commits ${commits}  records ${records}  written ${bytes}  elapsed ${elapsed}`;
+    return `  ${label}  ${refField}  commits ${commits}  records ${records}  written ${bytes}  elapsed ${elapsed}`;
   }
 
   return `  ${label}  elapsed ${elapsed}`;

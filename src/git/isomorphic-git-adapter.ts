@@ -5,6 +5,7 @@ import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
 import type { CommitHash, StageProfiler } from "../core/index.js";
+import { isCommitHash } from "../core/index.js";
 import { withProfilerAsync } from "../core/profile/index.js";
 import { GitAdapterError } from "./errors.js";
 import type { FileChange, GitAdapter, RawCommit } from "./index.js";
@@ -41,14 +42,24 @@ export class IsomorphicGitAdapter implements GitAdapter {
   }
 
   async resolveRef(repoPath: string, ref: string): Promise<CommitHash> {
+    let oid: string;
     try {
-      return (await withProfilerAsync(this._resolveRefProfiler, async () =>
+      oid = (await withProfilerAsync(this._resolveRefProfiler, async () =>
         git.resolveRef({ fs: this._fs, dir: repoPath, ref }),
-      )) as CommitHash;
+      )) as string;
     } catch (err) {
       if (err instanceof Error) {
         const name = err.name;
         if (name === "NotFoundError" || name === "ResolveRefError") {
+          // Fallback: treat the input as a raw commit object ID (40-hex SHA-1).
+          if (isCommitHash(ref)) {
+            try {
+              await git.readCommit({ fs: this._fs, dir: repoPath, oid: ref });
+              return ref as CommitHash;
+            } catch {
+              // Not a valid commit object — fall through to REF_NOT_FOUND.
+            }
+          }
           throw new GitAdapterError(`Ref not found: ${ref}`, "REF_NOT_FOUND", err);
         }
         if (
@@ -64,6 +75,31 @@ export class IsomorphicGitAdapter implements GitAdapter {
         "UNKNOWN",
         err,
       );
+    }
+    // Peel annotated tags to their target commit.
+    oid = await this._peelToCommit(repoPath, oid);
+    return oid as CommitHash;
+  }
+
+  async isRefBranch(repoPath: string, ref: string): Promise<boolean> {
+    if (isCommitHash(ref)) return false;
+    try {
+      await git.resolveRef({ fs: this._fs, dir: repoPath, ref: `refs/heads/${ref}` });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async _peelToCommit(repoPath: string, oid: string): Promise<string> {
+    try {
+      const result = await git.readTag({ fs: this._fs, dir: repoPath, oid });
+      if (result.tag.type === "commit") return result.tag.object;
+      // tag-of-tag: keep peeling
+      return this._peelToCommit(repoPath, result.tag.object);
+    } catch {
+      // Not a tag object — the OID already points to a commit
+      return oid;
     }
   }
 

@@ -12,7 +12,7 @@ describe("program – help output wiring", () => {
     const longFlags = program.options.map((o) => o.long);
 
     const expectedLongFlags = [
-      "--branch",
+      "--ref",
       "--incremental",
       "--output-dir",
       "--output-prefix",

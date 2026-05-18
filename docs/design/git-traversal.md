@@ -156,7 +156,7 @@ Outcome:
 
 ### Across runs
 
-When a new branch is added to `--branch` in an incremental run, gitrail automatically deduplicates
+When a new branch is added to `--ref` in an incremental run, gitrail automatically deduplicates
 against prior runs using **merge base computation**.
 
 **Repository topology used in the examples below:**
@@ -183,9 +183,9 @@ afterward; `develop` is the branch being added in Run 2.
 
 **Why naive full traversal produces duplicates:**
 
-- Run 1 uses `--branch main --branch release`.
+- Run 1 uses `--ref main --ref release`.
 - Run 1 output (session-deduplicated): `[3, 2, 1, 5, 4]`. State: `{ main: "3", release: "5" }`.
-- Run 2 uses `--branch main --branch release --branch develop`.
+- Run 2 uses `--ref main --ref release --ref develop`.
 - For `main`: differential from state hash `"3"` → no new commits in this example.
 - For `release`: differential from state hash `"5"` → no new commits in this example.
 - For `develop`: no prior state → without deduplication, full traversal yields `[B, A, 2, 1]`.
@@ -193,7 +193,7 @@ afterward; `develop` is the branch being added in Run 2.
 
 **How merge base deduplication prevents this:**
 
-Before the per-branch traversal loop, gitrail identifies new branches (present in `--branch` args
+Before the per-branch traversal loop, gitrail identifies new branches (present in `--ref` args
 but absent from the state file). If the state file already contains at least one branch, gitrail
 calls `adapter.findMergeBase()` with the `lastCommitHash` values from the state file as `oids`.
 The returned hash is used as `excludeHash` for all new branches, applying the same exclusion

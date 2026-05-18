@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DefaultCommitTraversalExtractor } from "../../src/core/commit-traversal-extractor.js";
 import type {
-  BranchTraversalPlan,
+  TraversalPlan,
   CommitFact,
   CommitHash,
   CommitTraversalRequest,
@@ -44,10 +44,7 @@ function makeAdapter(
 ): GitAdapter {
   return {
     async resolveRef() {
-      throw new GitAdapterError(
-        "Ref resolution is owned by BranchTraversalPlanner",
-        "REF_NOT_FOUND",
-      );
+      throw new GitAdapterError("Ref resolution is owned by TraversalPlanner", "REF_NOT_FOUND");
     },
     async *walkCommits(_repo, head, excludeHash) {
       if (
@@ -89,7 +86,7 @@ async function collectFacts(iterable: AsyncIterable<CommitFact>): Promise<Commit
   return result;
 }
 
-function makePlan(name: string, head: CommitHash, excludeHash?: CommitHash): BranchTraversalPlan {
+function makePlan(name: string, head: CommitHash, excludeHash?: CommitHash): TraversalPlan {
   return { name, head, excludeHash };
 }
 
@@ -287,10 +284,7 @@ describe("DefaultCommitTraversalExtractor", () => {
     const walkSpy = vi.fn(async function* () {});
     const traverser = new DefaultCommitTraversalExtractor({
       async resolveRef() {
-        throw new GitAdapterError(
-          "Ref resolution is owned by BranchTraversalPlanner",
-          "REF_NOT_FOUND",
-        );
+        throw new GitAdapterError("Ref resolution is owned by TraversalPlanner", "REF_NOT_FOUND");
       },
       walkCommits: walkSpy,
       async getRemoteUrl() {
@@ -321,10 +315,7 @@ describe("DefaultCommitTraversalExtractor", () => {
     let walkCallCount = 0;
     const traverser = new DefaultCommitTraversalExtractor({
       async resolveRef() {
-        throw new GitAdapterError(
-          "Ref resolution is owned by BranchTraversalPlanner",
-          "REF_NOT_FOUND",
-        );
+        throw new GitAdapterError("Ref resolution is owned by TraversalPlanner", "REF_NOT_FOUND");
       },
       async *walkCommits(_repo, _head, excludeHash) {
         walkCallCount++;

@@ -31,8 +31,8 @@ export type UiMode = "quiet" | "tty-interactive" | "non-tty-summary";
 export interface PhaseSnapshot {
   phase: ProgressPhase;
   startMs: number;
-  branchIndex: number;
-  branchCount: number;
+  refIndex: number;
+  refCount: number;
   commitsTraversed: number;
   recordsWritten: number;
   bytesWritten: number;

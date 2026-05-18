@@ -154,7 +154,8 @@ The interface abstracts all Git operations. Core Logic must program against this
 
 ```typescript
 interface GitAdapter {
-  /** Resolve a ref (branch name) to a commit hash */
+  /** Resolve a ref (branch name, tag, or raw 40-hex commit OID) to a commit hash.
+   *  Annotated tags are peeled to the target commit OID automatically. */
   resolveRef(repoPath: string, ref: string): Promise<string>;
 
   /** Walk commits reachable from `head`, stopping before `excludeHash` if provided.

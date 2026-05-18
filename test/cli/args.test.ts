@@ -83,7 +83,7 @@ async function makeRealRepo(options?: { remoteUrl?: string; branch?: string }): 
 
 describe("parseArgs – mutual exclusion", () => {
   it("--since-ref + --since-date → exits with code 1", async () => {
-    setArgv("--branch", "main", "--since-ref", "v1.0", "--since-date", "2024-01-01T00:00:00Z", ".");
+    setArgv("--ref", "main", "--since-ref", "v1.0", "--since-date", "2024-01-01T00:00:00Z", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith(
@@ -92,16 +92,7 @@ describe("parseArgs – mutual exclusion", () => {
   });
 
   it("--incremental + --since-ref → exits with code 1", async () => {
-    setArgv(
-      "--incremental",
-      "--branch",
-      "main",
-      "--state",
-      "state.json",
-      "--since-ref",
-      "v1.0",
-      ".",
-    );
+    setArgv("--incremental", "--ref", "main", "--state", "state.json", "--since-ref", "v1.0", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith("--since-ref cannot be used with --incremental\n");
@@ -110,7 +101,7 @@ describe("parseArgs – mutual exclusion", () => {
   it("--incremental + --since-date → exits with code 1", async () => {
     setArgv(
       "--incremental",
-      "--branch",
+      "--ref",
       "main",
       "--state",
       "state.json",
@@ -124,14 +115,14 @@ describe("parseArgs – mutual exclusion", () => {
   });
 
   it("--missing-state without --incremental → exits with code 1", async () => {
-    setArgv("--branch", "main", "--missing-state", "snapshot", ".");
+    setArgv("--ref", "main", "--missing-state", "snapshot", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith("--missing-state is only valid with --incremental\n");
   });
 
   it("--incremental without --state → exits with code 1", async () => {
-    setArgv("--incremental", "--branch", "main", ".");
+    setArgv("--incremental", "--ref", "main", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith("--state is required when using --incremental\n");
@@ -140,7 +131,7 @@ describe("parseArgs – mutual exclusion", () => {
   it("--state + --since-ref is permitted in snapshot mode (no error)", async () => {
     // In snapshot mode, --state and --since-ref are allowed together.
     // The test verifies no mutual exclusion error — further processing may still fail.
-    setArgv("--branch", "main", "--state", "/tmp/state.json", "--since-ref", "v1.0", ".");
+    setArgv("--ref", "main", "--state", "/tmp/state.json", "--since-ref", "v1.0", ".");
     const result = await parseArgs(noopAdapter).catch((e: unknown) => e);
     if (result instanceof Error && result.message.includes("process.exit")) {
       expect(stderrSpy).not.toHaveBeenCalledWith(
@@ -152,7 +143,7 @@ describe("parseArgs – mutual exclusion", () => {
 
   it("--state + --since-date is permitted in snapshot mode (no error)", async () => {
     setArgv(
-      "--branch",
+      "--ref",
       "main",
       "--state",
       "/tmp/state.json",
@@ -174,12 +165,12 @@ describe("parseArgs – mutual exclusion", () => {
 // Missing --branch
 // ---------------------------------------------------------------------------
 
-describe("parseArgs – missing --branch", () => {
+describe("parseArgs – missing --ref", () => {
   it("exits with code 1 when no --branch is provided", async () => {
     setArgv(".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith("At least one --branch must be specified\n");
+    expect(stderrSpy).toHaveBeenCalledWith("At least one --ref must be specified\n");
   });
 });
 
@@ -191,7 +182,7 @@ describe("parseArgs – --rotate-lines validation", () => {
   it.each([["abc"], ["0"], ["-1"], ["1.5"]])(
     "rejects non-positive-integer value %s",
     async (val) => {
-      setArgv("--branch", "main", "--rotate-lines", val, ".");
+      setArgv("--ref", "main", "--rotate-lines", val, ".");
       await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
       expect(exitSpy).toHaveBeenCalledWith(1);
       expect(stderrSpy).toHaveBeenCalledWith("--rotate-lines must be a positive integer\n");
@@ -207,7 +198,7 @@ describe("parseArgs – --rotate-size validation", () => {
   it.each([["abc"], ["1MiB"], ["1.5G"], ["+1M"], ["-1M"], ["1 M"], ["1MB"]])(
     "rejects invalid format %s",
     async (val) => {
-      setArgv("--branch", "main", "--rotate-size", val, ".");
+      setArgv("--ref", "main", "--rotate-size", val, ".");
       await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
       expect(exitSpy).toHaveBeenCalledWith(1);
       expect(stderrSpy).toHaveBeenCalledWith(
@@ -219,7 +210,7 @@ describe("parseArgs – --rotate-size validation", () => {
   it.each([["1"], ["1048575"], ["1K"], ["68719476737"], ["65G"]])(
     "rejects out-of-range value %s",
     async (val) => {
-      setArgv("--branch", "main", "--rotate-size", val, ".");
+      setArgv("--ref", "main", "--rotate-size", val, ".");
       await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
       expect(exitSpy).toHaveBeenCalledWith(1);
       expect(stderrSpy).toHaveBeenCalledWith(
@@ -238,7 +229,7 @@ describe("parseArgs – --rotate-size validation", () => {
     ["64G", 68_719_476_736],
     [" 500M ", 524_288_000],
   ] as [string, number][])("accepts valid --rotate-size %s", async (val, expected) => {
-    setArgv("--branch", "main", "--rotate-size", val, ".");
+    setArgv("--ref", "main", "--rotate-size", val, ".");
     const parsed = await parseArgs(noopAdapter);
     expect(parsed.rotation.maxBytes).toBe(expected);
   });
@@ -250,7 +241,7 @@ describe("parseArgs – --rotate-size validation", () => {
 
 describe("parseArgs – --since-date validation", () => {
   it("rejects invalid ISO 8601 date", async () => {
-    setArgv("--branch", "main", "--since-date", "not-a-date", ".");
+    setArgv("--ref", "main", "--since-date", "not-a-date", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith(
@@ -261,7 +252,7 @@ describe("parseArgs – --since-date validation", () => {
   it("accepts a valid ISO 8601 date (validation passes)", async () => {
     // Validation passes — this test verifies that no format error is thrown
     // (further processing may still fail due to no real repo; we only check the stderr)
-    setArgv("--branch", "main", "--since-date", "2024-01-01T00:00:00Z", ".");
+    setArgv("--ref", "main", "--since-date", "2024-01-01T00:00:00Z", ".");
     // Process exits with 1 because "." may or may not be a valid git repo in CI,
     // but the important thing is the message is NOT about --since-date format
     const result = await parseArgs(noopAdapter).catch((e: unknown) => e);
@@ -288,7 +279,7 @@ describe("parseArgs – --output-prefix derivation", () => {
   it("derives prefix from remote origin URL when available", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputPrefix).toBe("my-repo");
   });
@@ -296,7 +287,7 @@ describe("parseArgs – --output-prefix derivation", () => {
   it("derives prefix from SSH-style remote URL", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "git@github.com:org/another-repo.git" });
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputPrefix).toBe("another-repo");
   });
@@ -304,7 +295,7 @@ describe("parseArgs – --output-prefix derivation", () => {
   it("falls back to directory basename when no remote", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     // The prefix should be the basename of the temp dir
     const expected = repoDir.split(/[/\\]/).pop()!;
@@ -314,15 +305,7 @@ describe("parseArgs – --output-prefix derivation", () => {
   it("uses explicit --output-prefix when provided", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
     const adapter = new IsomorphicGitAdapter();
-    setArgv(
-      "--branch",
-      "main",
-      "--output-dir",
-      repoDir,
-      "--output-prefix",
-      "custom-prefix",
-      repoDir,
-    );
+    setArgv("--ref", "main", "--output-dir", repoDir, "--output-prefix", "custom-prefix", repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputPrefix).toBe("custom-prefix");
   });
@@ -343,9 +326,9 @@ describe("parseArgs – valid args round-trip", () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
     const adapter = new IsomorphicGitAdapter();
     setArgv(
-      "--branch",
+      "--ref",
       "main",
-      "--branch",
+      "--ref",
       "develop",
       "--output-dir",
       repoDir,
@@ -356,7 +339,7 @@ describe("parseArgs – valid args round-trip", () => {
     // "develop" branch doesn't exist but that's OK — extractor handles it
     const parsed = await parseArgs(adapter);
     expect(parsed.repositoryPath).toBe(repoDir);
-    expect(parsed.branches).toEqual(["main", "develop"]);
+    expect(parsed.refs).toEqual(["main", "develop"]);
     expect(parsed.outputPrefix).toBe("test-prefix");
     expect(parsed.rotation).toEqual({ maxLines: undefined, maxBytes: undefined });
     expect(parsed.range).toBeUndefined();
@@ -368,7 +351,7 @@ describe("parseArgs – valid args round-trip", () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
     setArgv(
-      "--branch",
+      "--ref",
       "main",
       "--rotate-lines",
       "1000",
@@ -386,7 +369,7 @@ describe("parseArgs – valid args round-trip", () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
     setArgv(
-      "--branch",
+      "--ref",
       "main",
       "--since-date",
       "2024-06-01T00:00:00Z",
@@ -402,7 +385,7 @@ describe("parseArgs – valid args round-trip", () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
     const stateFilePath = join(repoDir, "state.json");
-    setArgv("--branch", "main", "--state", stateFilePath, "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--state", stateFilePath, "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.stateFilePath).toBe(stateFilePath);
   });
@@ -410,7 +393,7 @@ describe("parseArgs – valid args round-trip", () => {
   it("sets quiet=true when --quiet is provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--quiet", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--quiet", "--output-dir", repoDir, repoDir);
     const { quiet } = await parseArgs(adapter);
     expect(quiet).toBe(true);
   });
@@ -418,7 +401,7 @@ describe("parseArgs – valid args round-trip", () => {
   it("sets quiet=false when --quiet is not provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const { quiet } = await parseArgs(adapter);
     expect(quiet).toBe(false);
   });
@@ -426,7 +409,7 @@ describe("parseArgs – valid args round-trip", () => {
   it("sets profile=true when --profile is provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--profile", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--profile", "--output-dir", repoDir, repoDir);
     const { profile } = await parseArgs(adapter);
     expect(profile).toBe(true);
   });
@@ -434,7 +417,7 @@ describe("parseArgs – valid args round-trip", () => {
   it("sets profile=false when --profile is not provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const { profile } = await parseArgs(adapter);
     expect(profile).toBe(false);
   });
@@ -454,7 +437,7 @@ describe("parseArgs – --incremental", () => {
   it("incremental defaults to false when --incremental is not provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.incremental).toBe(false);
   });
@@ -472,7 +455,7 @@ describe("parseArgs – --incremental", () => {
     const adapter = new IsomorphicGitAdapter();
     setArgv(
       "--incremental",
-      "--branch",
+      "--ref",
       "main",
       "--state",
       stateFile,
@@ -509,7 +492,7 @@ describe("parseArgs – incremental mode", () => {
     const adapter = new IsomorphicGitAdapter();
     setArgv(
       "--incremental",
-      "--branch",
+      "--ref",
       "main",
       "--state",
       stateFile,
@@ -526,7 +509,7 @@ describe("parseArgs – incremental mode", () => {
   it("exits 1 when --incremental and state file missing (default --missing-state error)", async () => {
     stateDir = await mkdtemp(join(tmpdir(), "gitrail-args-state-"));
     const missingStatePath = join(stateDir, "nonexistent.json");
-    setArgv("--incremental", "--branch", "main", "--state", missingStatePath, ".");
+    setArgv("--incremental", "--ref", "main", "--state", missingStatePath, ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("State file not found:"));
@@ -539,7 +522,7 @@ describe("parseArgs – incremental mode", () => {
     const adapter = new IsomorphicGitAdapter();
     setArgv(
       "--incremental",
-      "--branch",
+      "--ref",
       "main",
       "--state",
       missingStatePath,
@@ -557,7 +540,7 @@ describe("parseArgs – incremental mode", () => {
   it("rejects --missing-state with invalid value", async () => {
     setArgv(
       "--incremental",
-      "--branch",
+      "--ref",
       "main",
       "--state",
       "state.json",
@@ -577,7 +560,7 @@ describe("parseArgs – incremental mode", () => {
 
 describe("parseArgs – state parent directory validation", () => {
   it("exits 1 when state parent directory does not exist", async () => {
-    setArgv("--branch", "main", "--state", "/nonexistent-dir-abc/state.json", ".");
+    setArgv("--ref", "main", "--state", "/nonexistent-dir-abc/state.json", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith(
@@ -600,7 +583,7 @@ describe("parseArgs – --since-ref", () => {
   it("returns range with type 'ref' when --since-ref is provided", async () => {
     repoDir = await makeRealRepo();
     // The noopAdapter resolveRef always returns a hash, so since-ref validation passes
-    setArgv("--branch", "main", "--since-ref", "v1.0", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--since-ref", "v1.0", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(noopAdapter);
     expect(parsed.range).toEqual({
       type: "ref",
@@ -623,7 +606,7 @@ describe("parseArgs – --since-ref", () => {
       findMergeBase: async () => null,
       getFileChanges: async () => [],
     };
-    setArgv("--branch", "main", "--since-ref", "nonexistent-tag", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--since-ref", "nonexistent-tag", "--output-dir", repoDir, repoDir);
     await expect(parseArgs(failAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith("Ref not found: nonexistent-tag\n");
@@ -641,27 +624,27 @@ describe("parseArgs – shorthand aliases", () => {
     if (repoDir) await rm(repoDir, { recursive: true, force: true });
   });
 
-  it("-b collects branch values", async () => {
+  it("-r collects ref values", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("-b", "main", "--output-dir", repoDir, repoDir);
+    setArgv("-r", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
-    expect(parsed.branches).toContain("main");
+    expect(parsed.refs).toContain("main");
   });
 
-  it("-b can be used multiple times (repeatable)", async () => {
+  it("-r can be used multiple times (repeatable)", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("-b", "main", "-b", "develop", "--output-dir", repoDir, repoDir);
+    setArgv("-r", "main", "-r", "develop", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
-    expect(parsed.branches).toContain("main");
-    expect(parsed.branches).toContain("develop");
+    expect(parsed.refs).toContain("main");
+    expect(parsed.refs).toContain("develop");
   });
 
   it("-o is accepted as alias for --output-dir", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "-o", repoDir, repoDir);
+    setArgv("--ref", "main", "-o", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputDir).toBe(repoDir);
   });
@@ -670,7 +653,7 @@ describe("parseArgs – shorthand aliases", () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
     const stateFilePath = join(repoDir, "state.json");
-    setArgv("--branch", "main", "-s", stateFilePath, "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "-s", stateFilePath, "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.stateFilePath).toBe(stateFilePath);
   });
@@ -678,7 +661,7 @@ describe("parseArgs – shorthand aliases", () => {
   it("-q is accepted as alias for --quiet", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "-q", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "-q", "--output-dir", repoDir, repoDir);
     const { quiet } = await parseArgs(adapter);
     expect(quiet).toBe(true);
   });
@@ -698,7 +681,7 @@ describe("parseArgs – --per-file", () => {
   it("defaults perFile to false when --per-file is not provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.perFile).toBe(false);
   });
@@ -706,7 +689,7 @@ describe("parseArgs – --per-file", () => {
   it("sets perFile=true when --per-file is provided", async () => {
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
-    setArgv("--per-file", "--branch", "main", "--output-dir", repoDir, repoDir);
+    setArgv("--per-file", "--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.perFile).toBe(true);
   });
@@ -718,21 +701,21 @@ describe("parseArgs – --per-file", () => {
 
 describe("parseArgs – unknown option rejection", () => {
   it("exits with code 1 and prints 'Unknown option: --unknown-flag'", async () => {
-    setArgv("--unknown-flag", "--branch", "main", ".");
+    setArgv("--unknown-flag", "--ref", "main", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith("Unknown option: --unknown-flag\n");
   });
 
   it("exits with code 1 for a typo resembling a known option", async () => {
-    setArgv("--rotaet-lines", "100", "--branch", "main", ".");
+    setArgv("--rotaet-lines", "100", "--ref", "main", ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith("Unknown option: --rotaet-lines\n");
   });
 
   it("does not reject tokens after -- as unknown options", async () => {
-    setArgv("--branch", "main", ".", "--", "--ignored");
+    setArgv("--ref", "main", ".", "--", "--ignored");
     // Should not throw an unknown-option error (may fail later for other reasons)
     const result = await parseArgs(noopAdapter).catch((e: unknown) => e);
     if (result instanceof Error && result.message.includes("process.exit")) {

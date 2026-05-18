@@ -17,8 +17,8 @@ export const program = new Command()
   .description("Extract Git commit history to JSON Lines")
   .addArgument(new Argument("<repository-path>", "Local path to the Git repository"))
   .option(
-    "-b, --branch <ref>",
-    "Ref (branch name) to use as traversal starting point. Repeatable for multiple branches.",
+    "-r, --ref <ref>",
+    "Ref to use as traversal starting point. Accepts branch name, tag, or commit object ID. Repeatable.",
     (val, prev: string[]) => [...prev, val],
     [],
   )
@@ -122,7 +122,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
   // There is no compile-time enforcement of this alignment; a mismatch will cause runtime bugs.
   // See roadmap: "CLI: Schema validation for parsed CLI options" for a tracked follow-up.
   const opts = program.opts<{
-    branch: string[];
+    ref: string[];
     incremental: boolean;
     outputDir: string;
     outputPrefix?: string;
@@ -137,7 +137,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     perFile: boolean;
   }>();
 
-  const branches: string[] = opts.branch;
+  const refs: string[] = opts.ref;
   const incremental = opts.incremental;
   const sinceRef = opts.sinceRef;
   const sinceDate = opts.sinceDate;
@@ -177,8 +177,8 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     userError("--state is required when using --incremental");
   }
 
-  if (branches.length === 0) {
-    userError("At least one --branch must be specified");
+  if (refs.length === 0) {
+    userError("At least one --ref must be specified");
   }
 
   let maxLines: number | undefined;
@@ -234,7 +234,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
 
   // --- Phase 3: Git validation ---
   try {
-    await adapter.resolveRef(resolvedRepoPath, branches[0]!);
+    await adapter.resolveRef(resolvedRepoPath, refs[0]!);
   } catch (e) {
     if (e instanceof GitAdapterError) {
       if (e.code === "NOT_A_REPOSITORY") {
@@ -243,7 +243,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
       if (e.code !== "REF_NOT_FOUND") {
         throw e;
       }
-      // REF_NOT_FOUND means valid repo but branch doesn't exist — extractor will surface this
+      // REF_NOT_FOUND means valid repo but ref doesn't exist — extractor will surface this
     } else {
       throw e;
     }
@@ -278,7 +278,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
 
   return {
     repositoryPath: repoPath,
-    branches,
+    refs,
     outputDir: resolvedOutputDir,
     outputPrefix: prefix,
     rotation: { maxLines, maxBytes },

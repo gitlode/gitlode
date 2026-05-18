@@ -21,8 +21,8 @@ export class ProgressController {
   private phaseStartMs = 0;
   private spinnerIndex = 0;
 
-  private branchIndex = 0;
-  private branchCount = 0;
+  private refIndex = 0;
+  private refCount = 0;
   private commitsTraversed = 0;
   private recordsWritten = 0;
   private bytesWritten = 0;
@@ -41,8 +41,8 @@ export class ProgressController {
         break;
       case "extracting-progress":
         this.onProgress(
-          event.branchIndex,
-          event.branchCount,
+          event.refIndex,
+          event.refCount,
           event.commitsTraversed,
           event.recordsWritten,
           event.bytesWritten,
@@ -61,8 +61,8 @@ export class ProgressController {
     return {
       phase: this.currentPhase!,
       startMs: this.phaseStartMs,
-      branchIndex: this.branchIndex,
-      branchCount: this.branchCount,
+      refIndex: this.refIndex,
+      refCount: this.refCount,
       commitsTraversed: this.commitsTraversed,
       recordsWritten: this.recordsWritten,
       bytesWritten: this.bytesWritten,
@@ -96,14 +96,14 @@ export class ProgressController {
   }
 
   private onProgress(
-    branchIndex: number,
-    branchCount: number,
+    refIndex: number,
+    refCount: number,
     commitsTraversed: number,
     recordsWritten: number,
     bytesWritten: number,
   ): void {
-    this.branchIndex = branchIndex;
-    this.branchCount = branchCount;
+    this.refIndex = refIndex;
+    this.refCount = refCount;
     this.commitsTraversed = commitsTraversed;
     this.recordsWritten = recordsWritten;
     this.bytesWritten = bytesWritten;
@@ -122,8 +122,8 @@ export class ProgressController {
     this.sink.newline();
 
     this.currentPhase = null;
-    this.branchIndex = 0;
-    this.branchCount = 0;
+    this.refIndex = 0;
+    this.refCount = 0;
     this.commitsTraversed = 0;
     this.recordsWritten = 0;
     this.bytesWritten = 0;

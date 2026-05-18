@@ -149,13 +149,43 @@ deterministic case: pairing `deleted` and `added` records when blob identity is 
 - how to handle one-to-many and many-to-one exact matches deterministically
 - what summary/profile counters should be emitted so users can audit rename pairing impact
 
+#### State/Incremental: Track non-branch refs in state for reliable incremental extraction
+
+Currently, only branch refs are recorded in the state file after each extraction. Tags and raw
+commit OIDs specified via `--ref` are not recorded, so they are re-extracted in full on every
+incremental run. This may produce duplicate records in downstream data warehouses when users
+specify tag or OID refs alongside `--state`.
+
+As a short-term safeguard, gitrail emits a warning when `--state` is active and a non-branch ref
+is encountered. The full fix is to extend the state file to record the resolved commit hash for
+each ref regardless of ref type — so that all refs benefit from incremental tracking.
+
+**Design intent**:
+
+- record the resolved commit OID per ref at the end of each successful run, regardless of whether
+  the ref is a branch, tag, or raw OID
+- use the recorded OID as the traversal lower bound on the next incremental run, the same way
+  branch `lastCommitHash` is used today
+- branch refs continue to be tracked under `state.branches` for backward compatibility;
+  non-branch refs require a separate state structure or an extended per-ref entry shape
+- once this is implemented, the non-branch warning should be revisited: OID and annotated tag
+  refs still have limited incremental utility (the ref is static and the recorded OID is always
+  the same), so the warning for those ref types remains valuable even after this fix
+
+**Scope**:
+
+- extend `ExtractionState` or introduce a parallel per-ref record alongside `branches`
+- update state read/write paths and the traversal planner to use recorded OIDs for non-branch refs
+- update `docs/usage.md` to document that all ref types now support reliable incremental tracking,
+  with a noted caveat for OID and annotated tag refs that point to a fixed commit
+
+---
+
 #### CLI UX: Terminal output styling and readability
 
 With recent CLI enhancements, terminal output has become richer but also more information-dense,
 making it harder for users to locate essential information. When many "label: value" entries are
 listed sequentially, target data becomes difficult to find.
-
-This item improves terminal presentation from several angles:
 
 - **Text formatting**: Restructure and align output to improve visual hierarchy and scanability
 - **Color support**: Use strategic coloring to distinguish different information categories

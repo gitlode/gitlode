@@ -25,20 +25,20 @@ gitrail [options] <repository-path>
 
 ### Extraction Mode
 
-| Parameter        | Alias | Type                | Required | Default | Description                                                                                                                                    |
-| ---------------- | ----- | ------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--incremental`  |       | boolean             |          | `false` | When present, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state. |
-| `--branch <ref>` | `-b`  | string (repeatable) | ✅       |         | Ref to use as traversal starting point. May be specified multiple times.                                                                       |
+| Parameter       | Alias | Type                | Required | Default | Description                                                                                                                                    |
+| --------------- | ----- | ------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--incremental` |       | boolean             |          | `false` | When present, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state. |
+| `--ref <ref>`   | `-r`  | string (repeatable) | ✅       |         | Ref to use as traversal starting point. Accepts branch name, tag, or commit object ID. May be specified multiple times.                        |
 
 Snapshot extraction is the default mode (no flag needed). The term "snapshot" is used in
 documentation and `--missing-state=snapshot` to name this extraction model, but it is no longer a
 CLI parameter value.
 
-`--branch` must be specified at least once. There is no default. Accepting multiple values:
+`--ref` must be specified at least once. There is no default. Accepting multiple values:
 
 ```bash
-gitrail --branch main --branch develop ./my-repo
-gitrail -b main -b develop ./my-repo
+gitrail --ref main --ref develop ./my-repo
+gitrail -r main -r develop ./my-repo
 ```
 
 ### Range Filter (snapshot mode only)
@@ -209,7 +209,7 @@ All validation must complete before extraction and file output begin. Validation
 
 1. **Format / mutual exclusion** — no I/O (mutual exclusion rules, branch count, `--missing-state` value, numeric arg formats, ISO 8601 format for `--since-date`)
 2. **File system** — `<repository-path>` existence, `--output-dir` existence, `--state` parent directory existence, `--state` file existence check (result passed to subsequent logic)
-3. **Git** — repository identity (`resolveRef` on first branch), each `--branch` ref resolution, `--since-ref` resolution via `resolveRef()`, state file content validation (JSON structure, `version`, `repositoryPath` match)
+3. **Git** — repository identity (`resolveRef` on first ref), each `--ref` ref resolution, `--since-ref` resolution via `resolveRef()`, state file content validation (JSON structure, `version`, `repositoryPath` match)
 
 **Validation stage 2 — state file existence handling for incremental mode:**
 
@@ -221,7 +221,7 @@ All validation must complete before extraction and file output begin. Validation
 | ------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------- |
 | `<repository-path>` does not exist          | 2     | `Repository not found: <path>`                                                                          |
 | `<repository-path>` is not a Git repository | 3     | `Not a Git repository: <path>`                                                                          |
-| `--branch` not specified                    | 1     | `At least one --branch must be specified`                                                               |
+| `--ref` not specified                       | 1     | `At least one --ref must be specified`                                                                  |
 | `--missing-state` value invalid             | 1     | `--missing-state must be "error" or "snapshot"`                                                         |
 | `--output-dir` does not exist               | 2     | `Output directory not found: <path>`                                                                    |
 | `--state` parent directory does not exist   | 2     | `Parent directory for state file not found: <dir>`                                                      |
@@ -248,40 +248,40 @@ All validation must complete before extraction and file output begin. Validation
 
 ```bash
 # Snapshot extraction of main branch (default mode — no flag needed)
-gitrail --branch main ./my-repo
-gitrail -b main ./my-repo
+gitrail --ref main ./my-repo
+gitrail -r main ./my-repo
 
 # Multiple branches, custom output dir
-gitrail -b main -b develop -o ./output ./my-repo
+gitrail -r main -r develop -o ./output ./my-repo
 
 # Snapshot with state recording (for later incremental runs)
-gitrail --branch main --state ./gitrail-state.json ./my-repo
+gitrail --ref main --state ./gitrail-state.json ./my-repo
 
 # Incremental run using state file
-gitrail --incremental --branch main --state ./gitrail-state.json ./my-repo
-gitrail --incremental -b main -s ./gitrail-state.json ./my-repo
+gitrail --incremental --ref main --state ./gitrail-state.json ./my-repo
+gitrail --incremental -r main -s ./gitrail-state.json ./my-repo
 
 # Incremental with auto-initialization on first run (fall back to full snapshot if no state)
-gitrail --incremental -b main -s ./gitrail-state.json --missing-state snapshot ./my-repo
+gitrail --incremental -r main -s ./gitrail-state.json --missing-state snapshot ./my-repo
 
 # Snapshot from a release tag (extract only commits after v1.0)
-gitrail --branch main --since-ref v1.0 ./my-repo
+gitrail --ref main --since-ref v1.0 ./my-repo
 
 # Snapshot from a release tag with state recording
-gitrail -b main -b develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
+gitrail -r main -r develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
 
 # Time-based snapshot
-gitrail --branch main --since-date 2024-01-01T00:00:00Z ./my-repo
+gitrail --ref main --since-date 2024-01-01T00:00:00Z ./my-repo
 
 # File-granularity output (one record per changed file per commit)
-gitrail --per-file -b main ./my-repo
+gitrail --per-file -r main ./my-repo
 
 # Successful-run profiling output on stderr
-gitrail --profile -b main ./my-repo
+gitrail --profile -r main ./my-repo
 
 # With file rotation (plain bytes or human-readable suffix)
-gitrail -b main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
-gitrail -b main --rotate-lines 10000 --rotate-size 100M ./my-repo
+gitrail -r main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
+gitrail -r main --rotate-lines 10000 --rotate-size 100M ./my-repo
 ```
 
 ---
@@ -314,9 +314,9 @@ The following are **not** flagged as unknown options:
 
 - `--` (terminates option parsing; tokens after `--` are treated as positional arguments)
 - The positional `<repository-path>` argument
-- Values for recognized options (e.g. `main` in `--branch main`)
-- Repeated recognized options (e.g. `--branch main --branch develop`)
-- Short alias forms (`-b`, `-o`, `-s`, `-q`)
+- Values for recognized options (e.g. `main` in `--ref main`)
+- Repeated recognized options (e.g. `--ref main --ref develop`)
+- Short alias forms (`-r`, `-o`, `-s`, `-q`)
 
 ### Interaction with `--quiet`
 
@@ -337,12 +337,12 @@ Edit-distance heuristics (suggesting the closest known option name) are **not im
 - `parseArgs()` — calls `program.parse(process.argv)`
 - `cmd-definition.test.ts` — inspects registered options and arguments without calling `parseArgs()`
 
-### `--branch` / `-b` repeatable option
+### `--ref` / `-r` repeatable option
 
 commander handles repeatable options natively via the accumulator pattern:
 
 ```typescript
-.option('-b, --branch <ref>', 'description', (val, prev: string[]) => [...prev, val], [])
+.option('-r, --ref <ref>', 'description', (val, prev: string[]) => [...prev, val], [])
 ```
 
 The resulting value is `string[]`. No manual pre-scan of `process.argv` is needed.

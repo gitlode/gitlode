@@ -8,8 +8,8 @@ describe("formatActiveLine", () => {
     const snapshot: PhaseSnapshot = {
       phase: "preparing",
       startMs: 1000,
-      branchIndex: 0,
-      branchCount: 0,
+      refIndex: 0,
+      refCount: 0,
       commitsTraversed: 0,
       recordsWritten: 0,
       bytesWritten: 0,
@@ -23,8 +23,8 @@ describe("formatActiveLine", () => {
     const snapshot: PhaseSnapshot = {
       phase: "extracting",
       startMs: 1000,
-      branchIndex: 1,
-      branchCount: 3,
+      refIndex: 1,
+      refCount: 3,
       commitsTraversed: 1234,
       recordsWritten: 5678,
       bytesWritten: 987654321,
@@ -32,7 +32,7 @@ describe("formatActiveLine", () => {
     };
     const line = formatActiveLine(snapshot, "/");
     expect(line).toBe(
-      "/ Extracting history  branch 2/3  commits 1,234  records 5,678  written 941.9 MB  elapsed 1.5s",
+      "/ Extracting history  refs 2/3  commits 1,234  records 5,678  written 941.9 MB  elapsed 1.5s",
     );
   });
 
@@ -40,8 +40,8 @@ describe("formatActiveLine", () => {
     const snapshot: PhaseSnapshot = {
       phase: "finalizing",
       startMs: 1000,
-      branchIndex: 0,
-      branchCount: 0,
+      refIndex: 0,
+      refCount: 0,
       commitsTraversed: 0,
       recordsWritten: 0,
       bytesWritten: 0,
@@ -57,8 +57,8 @@ describe("formatDoneLine", () => {
     const snapshot: PhaseSnapshot = {
       phase: "preparing",
       startMs: 1000,
-      branchIndex: 0,
-      branchCount: 0,
+      refIndex: 0,
+      refCount: 0,
       commitsTraversed: 0,
       recordsWritten: 0,
       bytesWritten: 0,
@@ -71,8 +71,8 @@ describe("formatDoneLine", () => {
     const snapshot: PhaseSnapshot = {
       phase: "extracting",
       startMs: 1000,
-      branchIndex: 1,
-      branchCount: 3,
+      refIndex: 1,
+      refCount: 3,
       commitsTraversed: 1234,
       recordsWritten: 5678,
       bytesWritten: 987654321,
@@ -80,15 +80,15 @@ describe("formatDoneLine", () => {
     };
     const line = formatDoneLine(snapshot);
     expect(line).toBe(
-      "  Extracting history  branch 3/3  commits 1,234  records 5,678  written 941.9 MB  elapsed 1.5s",
+      "  Extracting history  refs 3/3  commits 1,234  records 5,678  written 941.9 MB  elapsed 1.5s",
     );
   });
   it("formats done line for finalizing phase", () => {
     const snapshot: PhaseSnapshot = {
       phase: "finalizing",
       startMs: 1000,
-      branchIndex: 0,
-      branchCount: 0,
+      refIndex: 0,
+      refCount: 0,
       commitsTraversed: 0,
       recordsWritten: 0,
       bytesWritten: 0,

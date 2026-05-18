@@ -56,16 +56,14 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "preparing" });
 
-    const priorBranchMap = new Map(
-      request.priorState.branches.map((b) => [b.name, b.lastCommitHash]),
-    );
+    const priorRefMap = new Map(request.priorState.branches.map((b) => [b.name, b.lastCommitHash]));
 
     const plans = await traversalPlanner.plan(
       {
         repositoryPath: request.repositoryPath,
-        branches: [...request.branches],
-        mode: priorBranchMap.size > 0 ? "incremental" : "snapshot",
-        priorBranchMap,
+        refs: [...request.refs],
+        mode: priorRefMap.size > 0 ? "incremental" : "snapshot",
+        priorRefMap,
         range: request.range,
       },
       reporter,
@@ -73,12 +71,30 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
 
     reporter.emit({ type: "phase-end", phase: "preparing" });
 
-    // Build the candidate state from successfully resolved branch heads.
+    // Warn when state tracking is active but non-branch refs are present.
+    // Non-branch refs (tags, raw OIDs) are not recorded in the state file, so
+    // they will be re-extracted in full on every incremental run and may produce
+    // duplicate records in downstream systems. Use snapshot mode for tag or OID
+    // traversal, or track only branch refs in incremental workflows.
+    if (stateStore !== undefined) {
+      for (const plan of plans) {
+        if (!plan.isBranch) {
+          reporter.emit({
+            type: "warning",
+            message: `Warning: Ref "${plan.name}" is not a branch and will not be recorded in the state file. It will be re-extracted in full on every incremental run, which may produce duplicate records in downstream systems. Use snapshot mode for tag or raw OID traversal.`,
+          });
+        }
+      }
+    }
+
+    // Build the candidate state from successfully resolved ref heads.
     const candidateState: ExtractionState = {
       version: 1,
       generatedAt: request.sessionTimestamp.toISOString(),
       repositoryPath: request.repositoryPath,
-      branches: plans.map((plan): BranchState => ({ name: plan.name, lastCommitHash: plan.head })),
+      branches: plans
+        .filter((plan) => plan.isBranch)
+        .map((plan): BranchState => ({ name: plan.name, lastCommitHash: plan.head })),
     };
 
     // -----------------------------------------------------------------------
@@ -89,12 +105,12 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     const allVisited = new Set<string>();
     let commitsTraversed = 0;
     let recordsWritten = 0;
-    const branchCount = plans.length;
+    const refCount = plans.length;
 
     try {
       for (let i = 0; i < plans.length; i++) {
         const plan = plans[i]!;
-        const branchIndex = i;
+        const refIndex = i;
 
         const rawStream = traversalExtractor.extract(
           {
@@ -123,8 +139,8 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
           reporter.emit({
             type: "extracting-progress",
             phase: "extracting",
-            branchIndex,
-            branchCount,
+            refIndex,
+            refCount,
             commitsTraversed,
             recordsWritten,
             bytesWritten: sink.bytesWritten,
@@ -151,7 +167,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     return {
       recordsWritten,
       commitsTraversed,
-      branches: candidateState.branches.map((b) => b.name),
+      refs: plans.map((p) => p.name),
     };
   }
 }

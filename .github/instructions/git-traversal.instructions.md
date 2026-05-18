@@ -56,22 +56,33 @@ Every Core stage interface (`BranchTraversalPlanner`, `CommitTraversalExtractor`
 
 ## Traversal Algorithm
 
-### Snapshot Mode (default)
+### `resolveRef()` Contract
+
+`GitAdapter.resolveRef(repoPath, ref)` resolves a ref string to a commit hash. The implementation must handle all of the following input types:
+
+- **Branch name** (e.g. `main`, `develop`) — resolved via the standard Git ref namespace
+- **Lightweight tag** (e.g. `v1.0`) — resolves directly to the tagged commit OID
+- **Annotated tag** (e.g. `v1.0-rc1`) — `git.resolveRef()` returns the tag object OID, not the commit OID; the implementation must peel the tag object recursively until a commit OID is reached. The peel uses `git.readObject()` and follows the `object` field of each tag object until a non-`tag` type is found.
+- **Raw 40-hex commit OID** — when ref resolution via the Git ref namespace fails, the implementation falls back to reading the commit object directly via `git.readCommit({ oid: ref })`. If the read succeeds, the OID is returned as-is.
+
+If none of these resolve successfully, `REF_NOT_FOUND` is thrown.
+
+**SHA-256 OIDs are not supported** (Phase 2 scope). Only 40-hex SHA-1 OIDs are handled by the raw-OID fallback.
 
 Snapshot mode extracts commits independently of any prior state. The extraction range can be further controlled by `--since-ref` or `--since-date`.
 
 #### No range filter (full snapshot)
 
-For each specified `--branch`:
+For each specified `--ref`:
 
-1. Resolve the ref to a commit hash via `GitAdapter.resolveRef()`
+1. Resolve the ref to a commit hash via `GitAdapter.resolveRef()` (accepts branch name, tag, or raw commit OID)
 2. Walk all commits reachable from that hash via `GitAdapter.walkCommits(head, excludeHash: undefined)`
 3. Write each commit to output
 
 #### `--since-ref`
 
 1. Resolve `--since-ref` to a commit hash via `GitAdapter.resolveRef()` (accepts commit hash, tag name, or branch name)
-2. For each specified `--branch`:
+2. For each specified `--ref`:
    - Resolve the ref to HEAD hash
    - Use the resolved since-ref hash as `excludeHash` in `GitAdapter.walkCommits(head, excludeHash)`
    - The traversal yields only commits reachable from HEAD but **not** reachable from `excludeHash`
@@ -80,7 +91,7 @@ This is equivalent to `git log <since-ref>..<head>` and correctly handles merged
 
 #### `--since-date`
 
-1. For each specified `--branch`:
+1. For each specified `--ref`:
    - Walk all commits reachable from HEAD (no `excludeHash`)
    - Filter: include only commits where `committer.timestamp` (as Unix seconds) is **after** the specified date
    - Use `committer.timestamp` (not `author.timestamp`) as the filter criterion
@@ -91,7 +102,7 @@ This is equivalent to `git log <since-ref>..<head>` and correctly handles merged
 Incremental mode extracts only commits new since the last recorded state. Requires `--state`.
 
 1. Read state file → build `stateMap: Map<branchName, lastCommitHash>`
-2. For each specified `--branch`:
+2. For each specified `--ref`:
    - Resolve ref to current HEAD hash
    - If branch exists in stateMap: use `stateMap.get(branch)` as `excludeHash`
    - If branch not in stateMap: no `excludeHash` (full traversal for that branch)
@@ -202,9 +213,9 @@ Specified by `--state <path>`. The path is fully user-controlled. No default loc
 
 ### State File Records HEAD, Not Filtered Range
 
-When `--since-ref` or `--since-date` is used in snapshot mode with `--state`, the state file records each branch's **current HEAD hash** — not the boundary of the filtered range. This means the state reflects the repository state at extraction time, independent of what was actually output.
+When `--since-ref` or `--since-date` is used in snapshot mode with `--state`, the state file records each ref's **current HEAD hash** — not the boundary of the filtered range. This means the state reflects the repository state at extraction time, independent of what was actually output.
 
-**Warning condition**: If `--state` + `--since-ref` is used and a branch's HEAD is reachable from the since-ref (resulting in 0 commits output for that branch), emit a warning to stderr: subsequent incremental runs may output commits between the branch HEAD and the since-ref that were excluded in this run.
+**Warning condition**: If `--state` + `--since-ref` is used and a ref's HEAD is reachable from the since-ref (resulting in 0 commits output for that ref), emit a warning to stderr: subsequent incremental runs may output commits between the ref HEAD and the since-ref that were excluded in this run.
 
 ### Read on Startup
 
@@ -233,8 +244,8 @@ This ensures that a crash during output writing does not corrupt the state file.
 
 At the start of an incremental run using `--state`:
 
-- Branches in `--branch` args but **not in state file**: if `stateMap.size > 0`, gitrail computes the merge base between all existing state-file HEADs (`lastCommitHash` values) and uses the result as `excludeHash` for the new branch, preventing cross-run duplicates. If no common ancestor exists (`null` result from `findMergeBase`), falls back to full traversal. If `stateMap.size === 0` (no existing branches in state), all branches are fully extracted (expected for the first incremental run). See "Across Runs (merge base deduplication)" in the Deduplication section.
-- Branches in state file but **not in `--branch` args**: ignored (not re-extracted, not removed from state)
+- Branches in `--ref` args but **not in state file**: if `stateMap.size > 0`, gitrail computes the merge base between all existing state-file HEADs (`lastCommitHash` values) and uses the result as `excludeHash` for the new branch, preventing cross-run duplicates. If no common ancestor exists (`null` result from `findMergeBase`), falls back to full traversal. If `stateMap.size === 0` (no existing branches in state), all branches are fully extracted (expected for the first incremental run). See "Across Runs (merge base deduplication)" in the Deduplication section.
+- Branches in state file but **not in `--ref` args**: ignored (not re-extracted, not removed from state)
 - Branches in both: differential extraction using recorded `lastCommitHash`
 
 After a successful run (in either mode), the state file is updated to reflect the current HEAD hash for each processed branch.
@@ -246,13 +257,15 @@ Log a warning (do not abort) when:
 - A branch recorded in the state file no longer exists in the repository
 - The recorded `lastCommitHash` for a branch no longer exists in the repository (e.g. after a force push) — fall back to full extraction for that branch
 
+A run that produces zero records (e.g. because the traversal range is empty — boundary equals HEAD) is **not** a warning or error condition. The output sink is closed and the state file is written normally.
+
 ---
 
 ## Multi-Branch Traversal Order
 
-When multiple `--branch` values are specified, each branch is traversed sequentially. Output lines from different branches are **not interleaved** — all commits from branch 1 are written before branch 2 begins.
+When multiple `--ref` values are specified, each ref is traversed sequentially. Output lines from different refs are **not interleaved** — all commits from ref 1 are written before ref 2 begins.
 
-The order of output follows the order of `--branch` arguments.
+The order of output follows the order of `--ref` arguments.
 
 ---
 
@@ -299,8 +312,8 @@ traversal.
 **Example:**
 
 ```
-Run 1: --branch main         → outputs [3, 2, 1]. state: { main: "3" }
-Run 2: --branch main --branch develop
+Run 1: --ref main         → outputs [3, 2, 1]. state: { main: "3" }
+Run 2: --ref main --ref develop
          main   → excludeHash = "3" (from state) → differential → no new commits in this example
          develop → new; existingHeads = ["3"]; findMergeBase → "3"
                    excludeHash = "3" → yields [5, 4] only ✅ (no duplicates)

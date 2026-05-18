@@ -2,7 +2,7 @@ import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import { withProfiler } from "./profile/index.js";
 import type {
-  BranchTraversalPlan,
+  TraversalPlan,
   CommitFact,
   CommitTraversalExtractor,
   CommitTraversalRequest,
@@ -56,7 +56,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
   }
 
   private async *iterateCommitFacts(
-    plans: readonly BranchTraversalPlan[],
+    plans: readonly TraversalPlan[],
     repositoryPath: string,
     repoName: string,
     remoteUrl: string | null,
@@ -80,7 +80,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
   }
 
   private async *traverseBranch(
-    plan: BranchTraversalPlan,
+    plan: TraversalPlan,
     repositoryPath: string,
     repoName: string,
     remoteUrl: string | null,

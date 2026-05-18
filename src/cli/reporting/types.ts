@@ -4,5 +4,5 @@ export interface SummaryData {
   filesCreated: number;
   bytesWritten: number;
   elapsedMs: number;
-  branches: readonly string[];
+  refs: readonly string[];
 }

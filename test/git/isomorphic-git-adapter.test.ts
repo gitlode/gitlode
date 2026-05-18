@@ -265,6 +265,106 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
     const resolved = await adapter.resolveRef("/", "main");
     expect(resolved).toBe(sha);
   });
+
+  it("resolves a lightweight tag directly to the commit OID", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha = await addCommit("f.txt", "v1", "initial");
+    await git.tag({ fs, dir: "/", ref: "v1.0" });
+    const adapter = new IsomorphicGitAdapter(fs);
+    const resolved = await adapter.resolveRef("/", "v1.0");
+    expect(resolved).toBe(sha);
+  });
+
+  it("peels an annotated tag to the target commit OID", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha = await addCommit("f.txt", "v1", "initial");
+    await git.tag({
+      fs,
+      dir: "/",
+      ref: "v1.0-ann",
+      object: sha,
+      tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
+      message: "release v1.0",
+    });
+    const adapter = new IsomorphicGitAdapter(fs);
+    const resolved = await adapter.resolveRef("/", "v1.0-ann");
+    expect(resolved).toBe(sha);
+  });
+
+  it("resolves a raw 40-hex commit OID when the ref name is not found", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha = await addCommit("f.txt", "v1", "initial");
+    const adapter = new IsomorphicGitAdapter(fs);
+    const resolved = await adapter.resolveRef("/", sha);
+    expect(resolved).toBe(sha);
+  });
+
+  it("throws REF_NOT_FOUND for a nonexistent ref name", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    await addCommit("f.txt", "v1", "initial");
+    const { GitAdapterError } = await import("../../src/git/index.js");
+    const adapter = new IsomorphicGitAdapter(fs);
+    const err = await adapter.resolveRef("/", "nonexistent").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(GitAdapterError);
+    expect((err as InstanceType<typeof GitAdapterError>).code).toBe("REF_NOT_FOUND");
+  });
+});
+
+describe("IsomorphicGitAdapter.isRefBranch", () => {
+  it("returns true for a branch ref", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    await addCommit("f.txt", "v1", "initial commit");
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(await adapter.isRefBranch("/", "main")).toBe(true);
+  });
+
+  it("returns false for a lightweight tag", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha = await addCommit("f.txt", "v1", "initial");
+    await git.tag({ fs, dir: "/", ref: "v1.0" });
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(await adapter.isRefBranch("/", "v1.0")).toBe(false);
+    // Sanity: the tag still resolves correctly
+    expect(await adapter.resolveRef("/", "v1.0")).toBe(sha);
+  });
+
+  it("returns false for an annotated tag", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha = await addCommit("f.txt", "v1", "initial");
+    await git.tag({
+      fs,
+      dir: "/",
+      ref: "v1.0-ann",
+      object: sha,
+      tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
+      message: "release v1.0",
+    });
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(await adapter.isRefBranch("/", "v1.0-ann")).toBe(false);
+  });
+
+  it("returns false for a raw 40-hex commit OID", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha = await addCommit("f.txt", "v1", "initial");
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(await adapter.isRefBranch("/", sha)).toBe(false);
+  });
+
+  it("returns false for a nonexistent ref name", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    await addCommit("f.txt", "v1", "initial");
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(await adapter.isRefBranch("/", "nonexistent")).toBe(false);
+  });
 });
 
 /** Extend makeRepo with helpers for deletion and binary content. */

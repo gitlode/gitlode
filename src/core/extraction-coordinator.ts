@@ -98,7 +98,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     };
 
     // -----------------------------------------------------------------------
-    // 2. Extracting phase: per-branch extraction with coordinator-level dedup.
+    // 2. Extracting phase: per-branch extraction with coordinator-level dedupe.
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "extracting" });
 

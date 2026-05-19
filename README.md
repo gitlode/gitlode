@@ -24,11 +24,11 @@ npm install -g gitrail
 
 ```bash
 # One-time extraction from a local clone
-gitrail -b main ./my-repo
+gitrail -r main ./my-repo
 
 # Continuous extraction — fetch remote changes, then extract new commits
 git -C ./my-repo fetch origin
-gitrail --incremental -b origin/main -s ./gitrail-state.json --missing-state snapshot ./my-repo
+gitrail --incremental -r origin/main -s ./gitrail-state.json --missing-state snapshot ./my-repo
 ```
 
 See the [User Guide](docs/usage.md) for detailed workflow patterns including incremental setup,
@@ -44,7 +44,7 @@ gitrail [options] <repository-path>
 | -------------------------- | ----- | ------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------- |
 | `<repository-path>`        |       | positional          | ✅       | —       | Local path to the Git repository                                                                            |
 | `--incremental`            |       | boolean             |          | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.        |
-| `--branch <ref>`           | `-b`  | string (repeatable) | ✅       | —       | Ref to traverse from. Specify one or more times.                                                            |
+| `--ref <ref>`              | `-r`  | string (repeatable) | ✅       | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. Specify one or more times.               |
 | `--output-dir <path>`      | `-o`  | string              |          | `./`    | Directory for output `.jsonl` files                                                                         |
 | `--output-prefix <string>` |       | string              |          | derived | Filename prefix (derived from remote origin if omitted)                                                     |
 | `--state <path>`           | `-s`  | string              |          | —       | State file path. Required with `--incremental`.                                                             |
@@ -99,7 +99,7 @@ Commit-mode record example:
 | `repository.name`                          | Repository name derived from remote origin URL (falls back to directory name)             |
 | `repository.url`                           | Remote origin URL, or `null` if no remote is configured                                   |
 
-Current runtime support is limited to repositories using the `sha1` object format due
+Current runtime support is limited to repositories using the `sha1` object format due to
 `isomorphic-git` behavior in gitrail-used operations. Repositories with unsupported object
 formats fail fast with:
 `Unsupported repository object format: <format>. Supported formats: sha1.`

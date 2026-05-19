@@ -113,7 +113,7 @@ Use `--since-ref` to extract only commits that appeared after a given ref — eq
 gitrail -r main --since-ref v1.0 ./my-repo
 ```
 
-`--since-ref` accepts a tag name, branch name, or full commit hash.
+`--since-ref` accepts a tag name, branch name, or full commit object ID (OID).
 
 **With state recording** (for subsequent incremental runs):
 
@@ -121,10 +121,14 @@ gitrail -r main --since-ref v1.0 ./my-repo
 gitrail -r main -r develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
 ```
 
-> **Note:** The state file records each branch's current HEAD hash — not the `--since-ref`
+> **Note:** The state file records each branch's current HEAD OID — not the `--since-ref`
 > boundary. A subsequent incremental run picks up commits since the HEAD recorded at this run,
 > not since `v1.0`. If a branch's HEAD is reachable from the since-ref (meaning zero commits
 > would be output for that branch), gitrail emits a warning to stderr.
+
+> **Compatibility note:** Runtime support is currently limited to repositories using the `sha1`
+> object format. Unsupported formats fail before traversal/output with:
+> `Unsupported repository object format: <format>. Supported formats: sha1.`
 
 ---
 
@@ -163,7 +167,7 @@ succeeds without manual intervention.
 ### What the state file records
 
 After a successful run, gitrail writes a JSON file at the path given by `--state`. It records the
-HEAD commit hash for each processed branch at the time of extraction:
+HEAD commit OID for each processed branch at the time of extraction:
 
 ```json
 {
@@ -179,10 +183,10 @@ HEAD commit hash for each processed branch at the time of extraction:
 
 ### Role of `--state` in each mode
 
-| Mode          | State file read?     | State file written?                        |
-| ------------- | -------------------- | ------------------------------------------ |
-| `snapshot`    | No (content ignored) | Yes (created or overwritten on success)    |
-| `incremental` | Yes                  | Yes (updated with current HEAD on success) |
+| Mode          | State file read?     | State file written?                            |
+| ------------- | -------------------- | ---------------------------------------------- |
+| `snapshot`    | No (content ignored) | Yes (created or overwritten on success)        |
+| `incremental` | Yes                  | Yes (updated with current HEAD OID on success) |
 
 In snapshot mode, `--state` serves only as a recording path — prior content has no effect on
 extraction. This makes it safe to run without `--incremental` to re-initialize state without affecting
@@ -213,7 +217,7 @@ gitrail -r main -r develop -r release/1.x ./my-repo
 ```
 
 **Deduplication:** commits shared between refs are written exactly once. gitrail maintains a
-visited hash set across all refs within a single run.
+visited OID set across all refs within a single run.
 
 **Output order:** all commits from the first ref are written before the second ref begins,
 in the order `--ref` arguments were given.
@@ -249,8 +253,8 @@ chronological ordering.** Sort by `committer.timestamp` in your downstream syste
 ### Commits carry no branch information
 
 A Git commit object contains no branch field. "Extracting branch X" means "walk from the commit
-that ref X currently points to." The same commit hash may be reachable from multiple branches;
-gitrail deduplicates by hash within each run but does not record which branch a commit was reached
+that ref X currently points to." The same commit OID may be reachable from multiple branches;
+gitrail deduplicates by OID within each run but does not record which branch a commit was reached
 through.
 
 ### Branch refs are mutable
@@ -311,10 +315,10 @@ gitrail [options] <repository-path>
 
 ### Range filter (snapshot mode only)
 
-| Parameter                | Type   | Description                                                                        |
-| ------------------------ | ------ | ---------------------------------------------------------------------------------- |
-| `--since-ref <ref>`      | string | Exclude commits reachable from this ref. Accepts tag, branch name, or commit hash. |
-| `--since-date <ISO8601>` | string | Include only commits with committer timestamp after this datetime.                 |
+| Parameter                | Type   | Description                                                                                   |
+| ------------------------ | ------ | --------------------------------------------------------------------------------------------- |
+| `--since-ref <ref>`      | string | Exclude commits reachable from this ref. Accepts tag, branch name, or commit object ID (OID). |
+| `--since-date <ISO8601>` | string | Include only commits with committer timestamp after this datetime.                            |
 
 ### State management
 

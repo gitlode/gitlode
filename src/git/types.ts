@@ -1,4 +1,9 @@
-import type { CommitHash, PersonIdentity } from "../core/index.js";
+import type { CommitOid, OidProfile, PersonIdentity } from "../core/index.js";
+
+export type RepositoryObjectFormat = string;
+
+/** Git's default object format when `extensions.objectformat` is unset. */
+export const DEFAULT_REPOSITORY_OBJECT_FORMAT: OidProfile = "sha1";
 
 export interface RawPerson extends PersonIdentity {
   readonly timestamp: number;
@@ -6,11 +11,11 @@ export interface RawPerson extends PersonIdentity {
 }
 
 export interface RawCommit {
-  readonly oid: CommitHash;
+  readonly oid: CommitOid;
   readonly message: string;
   readonly author: RawPerson;
   readonly committer: RawPerson;
-  readonly parents: readonly string[];
+  readonly parents: readonly CommitOid[];
 }
 
 export interface FileChange {
@@ -23,32 +28,34 @@ export interface FileChange {
 }
 
 export interface GitAdapter {
-  /** Resolve a ref (branch name, tag, or raw OID) to a commit hash */
-  resolveRef(repoPath: string, ref: string): Promise<CommitHash>;
+  /** Object formats this adapter implementation can handle for gitrail-used operations. */
+  supportedObjectFormats(): readonly OidProfile[];
+
+  /** Resolve a ref (branch name, tag, or raw commit OID) to a commit OID. */
+  resolveRef(repoPath: string, ref: string): Promise<CommitOid>;
+
+  /** Detect repository object format. Defaults to "sha1" when unset. */
+  getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat>;
 
   /** Return true if the given ref is a branch (i.e. exists under refs/heads/). Returns false
    *  for tags, raw commit OIDs, or any non-branch ref. */
   isRefBranch(repoPath: string, ref: string): Promise<boolean>;
 
   /** Walk commits reachable from `head`, stopping before `excludeHash` if provided */
-  walkCommits(
-    repoPath: string,
-    head: CommitHash,
-    excludeHash?: CommitHash,
-  ): AsyncIterable<RawCommit>;
+  walkCommits(repoPath: string, head: CommitOid, excludeHash?: CommitOid): AsyncIterable<RawCommit>;
 
   /** Return the remote URL for `origin`, or null if not set */
   getRemoteUrl(repoPath: string): Promise<string | null>;
 
-  /** Find the lowest common ancestor of all given commit hashes.
+  /** Find the lowest common ancestor of all given commit OIDs.
    *  Returns null if no common ancestor exists (detached histories). */
-  findMergeBase(repoPath: string, oids: readonly CommitHash[]): Promise<CommitHash | null>;
+  findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null>;
 
   /** Return per-file change information between a commit and its parent.
    *  Pass parentOid for normal commits; omit for root commits (all files are "added"). */
   getFileChanges(
     repoPath: string,
-    commitOid: CommitHash,
-    parentOid?: CommitHash,
+    commitOid: CommitOid,
+    parentOid?: CommitOid,
   ): Promise<readonly FileChange[]>;
 }

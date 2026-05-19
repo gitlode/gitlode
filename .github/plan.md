@@ -41,7 +41,7 @@ v0.5.0 is a minor release focused on making release-oriented extraction a first-
 ### Phase 2: Commit OID Compatibility Contract
 
 - **File**: [`plans/phase-2.md`](plans/phase-2.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 3: CLI Parser Hardening and Help Discoverability
 

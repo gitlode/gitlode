@@ -58,16 +58,18 @@ Every Core stage interface (`BranchTraversalPlanner`, `CommitTraversalExtractor`
 
 ### `resolveRef()` Contract
 
-`GitAdapter.resolveRef(repoPath, ref)` resolves a ref string to a commit hash. The implementation must handle all of the following input types:
+`GitAdapter.resolveRef(repoPath, ref)` resolves a ref string to a commit OID. The implementation must handle all of the following input types:
 
 - **Branch name** (e.g. `main`, `develop`) — resolved via the standard Git ref namespace
 - **Lightweight tag** (e.g. `v1.0`) — resolves directly to the tagged commit OID
 - **Annotated tag** (e.g. `v1.0-rc1`) — `git.resolveRef()` returns the tag object OID, not the commit OID; the implementation must peel the tag object recursively until a commit OID is reached. The peel uses `git.readObject()` and follows the `object` field of each tag object until a non-`tag` type is found.
-- **Raw 40-hex commit OID** — when ref resolution via the Git ref namespace fails, the implementation falls back to reading the commit object directly via `git.readCommit({ oid: ref })`. If the read succeeds, the OID is returned as-is.
+- **Raw commit OID** — when ref resolution via the Git ref namespace fails, the implementation falls back to reading the commit object directly via `git.readCommit({ oid: ref })`. If the read succeeds, the OID is returned as-is.
 
 If none of these resolve successfully, `REF_NOT_FOUND` is thrown.
 
-**SHA-256 OIDs are not supported** (Phase 2 scope). Only 40-hex SHA-1 OIDs are handled by the raw-OID fallback.
+Repository object-format support is runtime-gated. The current support matrix is `sha1` only. Unsupported formats must fail fast before traversal/state consumption with:
+
+`Unsupported repository object format: <format>. Supported formats: <supported-list>.`
 
 Snapshot mode extracts commits independently of any prior state. The extraction range can be further controlled by `--since-ref` or `--since-date`.
 
@@ -75,17 +77,18 @@ Snapshot mode extracts commits independently of any prior state. The extraction 
 
 For each specified `--ref`:
 
-1. Resolve the ref to a commit hash via `GitAdapter.resolveRef()` (accepts branch name, tag, or raw commit OID)
-2. Walk all commits reachable from that hash via `GitAdapter.walkCommits(head, excludeHash: undefined)`
+1. Resolve the ref to a commit OID via `GitAdapter.resolveRef()` (accepts branch name, tag, or raw commit OID)
+2. Walk all commits reachable from that OID via `GitAdapter.walkCommits(head, excludeHash: undefined)`
 3. Write each commit to output
 
 #### `--since-ref`
 
-1. Resolve `--since-ref` to a commit hash via `GitAdapter.resolveRef()` (accepts commit hash, tag name, or branch name)
+1. Resolve `--since-ref` to a commit OID via `GitAdapter.resolveRef()` (accepts commit OID, tag name, or branch name)
 2. For each specified `--ref`:
-   - Resolve the ref to HEAD hash
-   - Use the resolved since-ref hash as `excludeHash` in `GitAdapter.walkCommits(head, excludeHash)`
-   - The traversal yields only commits reachable from HEAD but **not** reachable from `excludeHash`
+
+- Resolve the ref to HEAD OID
+- Use the resolved since-ref OID as `excludeHash` in `GitAdapter.walkCommits(head, excludeHash)`
+- The traversal yields only commits reachable from HEAD but **not** reachable from `excludeHash`
 
 This is equivalent to `git log <since-ref>..<head>` and correctly handles merged branches. See "Merge Commit Handling" below.
 
@@ -101,14 +104,16 @@ This is equivalent to `git log <since-ref>..<head>` and correctly handles merged
 
 Incremental mode extracts only commits new since the last recorded state. Requires `--state`.
 
-1. Read state file → build `stateMap: Map<branchName, lastCommitHash>`
+1. Read state file → build `stateMap: Map<branchName, lastCommitHash>` where `lastCommitHash` stores the last extracted commit OID
 2. For each specified `--ref`:
-   - Resolve ref to current HEAD hash
-   - If branch exists in stateMap: use `stateMap.get(branch)` as `excludeHash`
-   - If branch not in stateMap: no `excludeHash` (full traversal for that branch)
-   - Call `GitAdapter.walkCommits(head, excludeHash)`
+
+- Resolve ref to current HEAD OID
+- If branch exists in stateMap: use `stateMap.get(branch)` as `excludeHash`
+- If branch not in stateMap: no `excludeHash` (full traversal for that branch)
+- Call `GitAdapter.walkCommits(head, excludeHash)`
+
 3. Maintain global `visited: Set<string>` across all branches
-4. On success: write state file with each branch's current HEAD hash
+4. On success: write state file with each branch's current HEAD OID
 
 **Warning conditions**:
 
@@ -208,12 +213,12 @@ Specified by `--state <path>`. The path is fully user-controlled. No default loc
 
 ### Role of `--state` in Each Mode
 
-- **Snapshot mode**: State file content is **ignored** during extraction. On successful completion, the state file is written (created or overwritten) with each branch's current HEAD hash. This allows a snapshot run to initialize or reset state for subsequent incremental runs.
-- **Incremental mode**: State file is **read** to determine the `excludeHash` per branch. On successful completion, the state file is updated with each branch's current HEAD hash.
+- **Snapshot mode**: State file content is **ignored** during extraction. On successful completion, the state file is written (created or overwritten) with each branch's current HEAD OID. This allows a snapshot run to initialize or reset state for subsequent incremental runs.
+- **Incremental mode**: State file is **read** to determine the `excludeHash` per branch. On successful completion, the state file is updated with each branch's current HEAD OID.
 
 ### State File Records HEAD, Not Filtered Range
 
-When `--since-ref` or `--since-date` is used in snapshot mode with `--state`, the state file records each ref's **current HEAD hash** — not the boundary of the filtered range. This means the state reflects the repository state at extraction time, independent of what was actually output.
+When `--since-ref` or `--since-date` is used in snapshot mode with `--state`, the state file records each ref's **current HEAD OID** — not the boundary of the filtered range. This means the state reflects the repository state at extraction time, independent of what was actually output.
 
 **Warning condition**: If `--state` + `--since-ref` is used and a ref's HEAD is reachable from the since-ref (resulting in 0 commits output for that ref), emit a warning to stderr: subsequent incremental runs may output commits between the ref HEAD and the since-ref that were excluded in this run.
 
@@ -226,6 +231,8 @@ If `--state` is provided and the file exists:
    `State file was created for a different repository: <recorded-path>`
 3. In incremental mode: for each branch in the state file, use `lastCommitHash` as the `excludeHash` for that branch's traversal
 4. In snapshot mode: skip step 3 (state content is not used for extraction)
+
+Compatibility rule: repository object format must be validated before step 3. If format is unsupported, abort before consuming `lastCommitHash` values.
 
 Note: the `repositoryPath` value written to the state file must also be the `path.resolve()`-ed absolute path, not the raw CLI input.
 
@@ -248,7 +255,7 @@ At the start of an incremental run using `--state`:
 - Branches in state file but **not in `--ref` args**: ignored (not re-extracted, not removed from state)
 - Branches in both: differential extraction using recorded `lastCommitHash`
 
-After a successful run (in either mode), the state file is updated to reflect the current HEAD hash for each processed branch.
+After a successful run (in either mode), the state file is updated to reflect the current HEAD OID for each processed branch.
 
 ### Warning Conditions (non-fatal)
 

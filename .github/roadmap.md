@@ -166,6 +166,8 @@ each ref regardless of ref type — so that all refs benefit from incremental tr
   the ref is a branch, tag, or raw OID
 - use the recorded OID as the traversal lower bound on the next incremental run, the same way
   branch `lastCommitHash` is used today
+- because this work changes state-file structure, explicitly evaluate whether the wire field name
+  `lastCommitHash` should be renamed as part of the same breaking-change window
 - branch refs continue to be tracked under `state.branches` for backward compatibility;
   non-branch refs require a separate state structure or an extended per-ref entry shape
 - once this is implemented, the non-branch warning should be revisited: OID and annotated tag

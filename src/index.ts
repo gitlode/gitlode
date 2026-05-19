@@ -2,6 +2,7 @@
 import { rename, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
+import { pathToFileURL } from "node:url";
 
 import type { ParsedArgs } from "./cli/args.js";
 import { parseArgs } from "./cli/index.js";
@@ -14,7 +15,7 @@ import {
   DefaultExtractionCoordinator,
   DefaultFactProjector,
   DefaultFileChangeExpander,
-  isCommitHash,
+  isCommitOidForProfile,
 } from "./core/index.js";
 import type {
   CoordinatorDependencies,
@@ -23,9 +24,25 @@ import type {
   StageProfiler,
   StateStore,
 } from "./core/index.js";
+import type { OidProfile } from "./core/index.js";
 import { DefaultStageProfiler } from "./core/profile/index.js";
-import { GitAdapterError, IsomorphicGitAdapter } from "./git/index.js";
+import { GitAdapterError, IsomorphicGitAdapter, type RepositoryObjectFormat } from "./git/index.js";
 import { OutputWriter, formatSessionTimestamp, OutputWriterSink } from "./output/index.js";
+
+export function assertSupportedRepositoryObjectFormat(
+  format: RepositoryObjectFormat,
+  supportedFormats: readonly OidProfile[],
+): asserts format is OidProfile {
+  if (supportedFormats.includes(format as OidProfile)) {
+    return;
+  }
+
+  const supportedList = supportedFormats.join(", ");
+  throw new GitAdapterError(
+    `Unsupported repository object format: ${format}. Supported formats: ${supportedList}.`,
+    "UNSUPPORTED_OBJECT_FORMAT",
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,6 +65,7 @@ async function loadPriorState(
   stateStore: StateStore | undefined,
   parsed: ParsedArgs,
   repoPath: string,
+  oidProfile: OidProfile,
   reporter: ProgressReporter,
 ): Promise<ExtractionState> {
   if (!stateStore || !parsed.incremental) {
@@ -72,9 +90,9 @@ async function loadPriorState(
     throw new Error(`State file was created for a different repository: ${state.repositoryPath}`);
   }
   for (const entry of state.branches) {
-    if (!isCommitHash(entry.lastCommitHash)) {
+    if (!isCommitOidForProfile(entry.lastCommitHash, oidProfile)) {
       throw new Error(
-        `Invalid commit hash in state file for branch "${entry.name}": ${entry.lastCommitHash}`,
+        `Invalid commit OID in state file for branch "${entry.name}": ${entry.lastCommitHash}`,
       );
     }
   }
@@ -185,6 +203,10 @@ async function main() {
     const repoPath = resolve(parsed.repositoryPath);
     const startMs = performance.now();
 
+    const supportedObjectFormats = adapter.supportedObjectFormats();
+    const repositoryObjectFormat = await adapter.getRepositoryObjectFormat(repoPath);
+    assertSupportedRepositoryObjectFormat(repositoryObjectFormat, supportedObjectFormats);
+
     const remoteUrl = await adapter.getRemoteUrl(repoPath);
     const repoName = deriveRepoName(remoteUrl, repoPath);
 
@@ -199,7 +221,13 @@ async function main() {
       }
     }
 
-    const priorState = await loadPriorState(stateStore, parsed, repoPath, reporter);
+    const priorState = await loadPriorState(
+      stateStore,
+      parsed,
+      repoPath,
+      repositoryObjectFormat,
+      reporter,
+    );
 
     const sessionTimestamp = new Date();
     const tsStr = formatSessionTimestamp(sessionTimestamp);
@@ -282,7 +310,17 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  process.stderr.write((e instanceof Error ? (e.stack ?? e.message) : String(e)) + "\n");
-  process.exit(2);
-});
+function shouldRunAsCli(): boolean {
+  const argvEntry = process.argv[1];
+  if (!argvEntry) {
+    return false;
+  }
+  return pathToFileURL(argvEntry).href === import.meta.url;
+}
+
+if (shouldRunAsCli()) {
+  main().catch((e) => {
+    process.stderr.write((e instanceof Error ? (e.stack ?? e.message) : String(e)) + "\n");
+    process.exit(2);
+  });
+}

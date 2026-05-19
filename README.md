@@ -49,7 +49,7 @@ gitrail [options] <repository-path>
 | `--output-prefix <string>` |       | string              |          | derived | Filename prefix (derived from remote origin if omitted)                                                     |
 | `--state <path>`           | `-s`  | string              |          | —       | State file path. Required with `--incremental`.                                                             |
 | `--missing-state`          |       | `error \| snapshot` |          | `error` | Behavior when state file is absent. Only valid with `--incremental`.                                        |
-| `--since-ref <ref>`        |       | string              |          | —       | Exclude commits reachable from this ref (tag, branch, or hash). Snapshot mode only.                         |
+| `--since-ref <ref>`        |       | string              |          | —       | Exclude commits reachable from this ref (tag, branch, or commit object ID). Snapshot mode only.             |
 | `--since-date <ISO8601>`   |       | string              |          | —       | Include only commits after this datetime. Snapshot mode only.                                               |
 | `--per-file`               |       | boolean             |          | `false` | When set, emits one record per changed file per commit; when absent, emits one record per commit (default). |
 | `--rotate-lines <n>`       |       | number              |          | —       | Start new file after `n` lines                                                                              |
@@ -87,17 +87,22 @@ Commit-mode record example:
 }
 ```
 
-| Field                                      | Description                                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `oid`                                      | Full SHA-1 commit hash                                                                      |
-| `subject`                                  | First line of the commit message                                                            |
-| `body`                                     | Remainder of the commit message (empty string if none)                                      |
-| `author`                                   | Person who originally authored the changes                                                  |
-| `committer`                                | Person who committed (may differ from author after rebase/cherry-pick)                      |
-| `author.timestamp` / `committer.timestamp` | ISO 8601 datetime using the offset embedded in the commit object                            |
-| `parents`                                  | Array of parent commit hashes (empty for the initial commit; two entries for merge commits) |
-| `repository.name`                          | Repository name derived from remote origin URL (falls back to directory name)               |
-| `repository.url`                           | Remote origin URL, or `null` if no remote is configured                                     |
+| Field                                      | Description                                                                               |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `oid`                                      | Full commit object ID (OID)                                                               |
+| `subject`                                  | First line of the commit message                                                          |
+| `body`                                     | Remainder of the commit message (empty string if none)                                    |
+| `author`                                   | Person who originally authored the changes                                                |
+| `committer`                                | Person who committed (may differ from author after rebase/cherry-pick)                    |
+| `author.timestamp` / `committer.timestamp` | ISO 8601 datetime using the offset embedded in the commit object                          |
+| `parents`                                  | Array of parent commit OIDs (empty for the initial commit; two entries for merge commits) |
+| `repository.name`                          | Repository name derived from remote origin URL (falls back to directory name)             |
+| `repository.url`                           | Remote origin URL, or `null` if no remote is configured                                   |
+
+Current runtime support is limited to repositories using the `sha1` object format due
+`isomorphic-git` behavior in gitrail-used operations. Repositories with unsupported object
+formats fail fast with:
+`Unsupported repository object format: <format>. Supported formats: sha1.`
 
 Output files are named `<prefix>-<timestamp>-000001.jsonl`, `<prefix>-<timestamp>-000002.jsonl`, and so on. The prefix is
 derived from the repository's remote origin URL; use `--output-prefix` to override. The timestamp

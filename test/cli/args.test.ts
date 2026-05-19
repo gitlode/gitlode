@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 
 import { parseArgs } from "../../src/cli/args.js";
+import type { CommitOid } from "../../src/core/index.js";
 import type { GitAdapter } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
 
@@ -20,7 +21,10 @@ const AUTHOR = {
 
 // A minimal mock adapter for tests that don't reach Git access
 const noopAdapter: GitAdapter = {
-  resolveRef: async () => "abc123def456abc123def456abc123def456abc123",
+  supportedObjectFormats: () => ["sha1"],
+  resolveRef: async () => "abc123def456abc123def456abc123def456abc123" as CommitOid,
+  getRepositoryObjectFormat: async () => "sha1",
+  isRefBranch: async () => true,
   walkCommits: async function* () {},
   getRemoteUrl: async () => null,
   findMergeBase: async () => null,
@@ -595,12 +599,15 @@ describe("parseArgs – --since-ref", () => {
     repoDir = await makeRealRepo();
     const { GitAdapterError } = await import("../../src/git/index.js");
     const failAdapter: GitAdapter = {
+      supportedObjectFormats: () => ["sha1"],
       resolveRef: async (_repoPath, ref) => {
         if (ref === "nonexistent-tag") {
           throw new GitAdapterError("Ref not found", "REF_NOT_FOUND");
         }
-        return "abc123def456abc123def456abc123def456abc123";
+        return "abc123def456abc123def456abc123def456abc123" as CommitOid;
       },
+      getRepositoryObjectFormat: async () => "sha1",
+      isRefBranch: async () => true,
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
       findMergeBase: async () => null,

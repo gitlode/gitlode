@@ -5,7 +5,7 @@ import type {
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-  CommitHash,
+  CommitOid,
   ExtractionRange,
   ProgressReporter,
   StageProfiler,
@@ -14,10 +14,10 @@ import { assertNever } from "./types.js";
 
 function resolveExcludeHash(
   refName: string,
-  priorRefMap: ReadonlyMap<string, CommitHash>,
-  newRefExclude: CommitHash | undefined,
+  priorRefMap: ReadonlyMap<string, CommitOid>,
+  newRefExclude: CommitOid | undefined,
   range: ExtractionRange | undefined,
-): CommitHash | undefined {
+): CommitOid | undefined {
   if (range === undefined) {
     return priorRefMap.get(refName) ?? newRefExclude;
   }
@@ -50,7 +50,7 @@ export class DefaultTraversalPlanner implements TraversalPlanner {
         mode === "incremental" ? refs.filter((ref) => !priorRefMap.has(ref)) : [],
       );
 
-      let newRefExclude: CommitHash | undefined;
+      let newRefExclude: CommitOid | undefined;
       if (newRefs.size > 0 && priorRefMap.size > 0) {
         const mergeBase = await this.adapter.findMergeBase(
           repositoryPath,
@@ -61,7 +61,7 @@ export class DefaultTraversalPlanner implements TraversalPlanner {
 
       const plans: TraversalPlan[] = [];
       for (const ref of refs) {
-        let head: CommitHash;
+        let head: CommitOid;
         let isBranch: boolean;
         try {
           head = await this.adapter.resolveRef(repositoryPath, ref);

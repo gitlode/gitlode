@@ -1,8 +1,19 @@
-declare const _commitHashBrand: unique symbol;
-export type CommitHash = string & { readonly [_commitHashBrand]: "CommitHash" };
+declare const _commitOidBrand: unique symbol;
+export type CommitOid = string & { readonly [_commitOidBrand]: "CommitOid" };
 
-export function isCommitHash(v: unknown): v is CommitHash {
-  return typeof v === "string" && /^[0-9a-f]{40}$/.test(v);
+export type OidProfile = "sha1" | "sha256";
+
+const OID_PATTERN_BY_PROFILE: Readonly<Record<OidProfile, RegExp>> = {
+  sha1: /^[0-9a-f]{40}$/,
+  sha256: /^[0-9a-f]{64}$/,
+};
+
+export function isCommitOidForProfile(v: unknown, profile: OidProfile): v is CommitOid {
+  return typeof v === "string" && OID_PATTERN_BY_PROFILE[profile].test(v);
+}
+
+export function isCommitOid(v: unknown): v is CommitOid {
+  return isCommitOidForProfile(v, "sha1") || isCommitOidForProfile(v, "sha256");
 }
 
 export function assertNever(x: never): never {
@@ -17,7 +28,7 @@ export interface PersonIdentity {
 /** Core-owned intermediate representation of a single commit, output-format-agnostic. */
 export interface CommitFact {
   readonly type: "commit";
-  readonly oid: string;
+  readonly oid: CommitOid;
   readonly message: string;
   readonly author: {
     readonly name: string;
@@ -31,7 +42,7 @@ export interface CommitFact {
     readonly timestamp: number;
     readonly timezoneOffset: number;
   };
-  readonly parents: readonly string[];
+  readonly parents: readonly CommitOid[];
   readonly repository: {
     readonly name: string;
     readonly url: string | null;
@@ -58,7 +69,7 @@ export interface RotationConfig {
 }
 
 export type ExtractionRange =
-  | { readonly type: "ref"; readonly ref: CommitHash }
+  | { readonly type: "ref"; readonly ref: CommitOid }
   | { readonly type: "date"; readonly since: Date };
 
 export interface ExtractorConfig {
@@ -104,7 +115,7 @@ export type MonotonicClock = () => number;
 
 export interface BranchState {
   readonly name: string;
-  readonly lastCommitHash: CommitHash;
+  readonly lastCommitHash: CommitOid;
 }
 
 export interface ExtractionState {
@@ -204,8 +215,8 @@ export interface ExtractionResult {
 /** Resolved branch traversal boundary for one branch in a single run. */
 export interface TraversalPlan {
   readonly name: string;
-  readonly head: CommitHash;
-  readonly excludeHash: CommitHash | undefined;
+  readonly head: CommitOid;
+  readonly excludeHash: CommitOid | undefined;
   /** True when the ref is a branch (exists under refs/heads/). False for tags and raw OIDs. */
   readonly isBranch: boolean;
 }
@@ -220,7 +231,7 @@ export interface TraversalPlanningRequest {
   readonly mode: "snapshot" | "incremental";
   /** Validated ref→lastCommitHash map loaded from a prior checkpoint.
    *  Empty in snapshot mode or when no prior checkpoint exists. */
-  readonly priorRefMap: ReadonlyMap<string, CommitHash>;
+  readonly priorRefMap: ReadonlyMap<string, CommitOid>;
   /** Optional extraction range; controls exclusion-boundary selection. */
   readonly range?: ExtractionRange;
 }

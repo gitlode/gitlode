@@ -4,7 +4,7 @@ import { DefaultCommitTraversalExtractor } from "../../src/core/commit-traversal
 import type {
   TraversalPlan,
   CommitFact,
-  CommitHash,
+  CommitOid,
   CommitTraversalRequest,
   ProgressEvent,
   ProgressReporter,
@@ -12,17 +12,17 @@ import type {
 import { GitAdapterError } from "../../src/git/index.js";
 import type { GitAdapter, RawCommit } from "../../src/git/index.js";
 
-function makeHash(n: number): CommitHash {
-  return n.toString(16).padStart(40, "0") as CommitHash;
+function makeOid(n: number): CommitOid {
+  return n.toString(16).padStart(12, "0") as CommitOid;
 }
 
 function makeRawCommit(n: number, parents: number[] = []): RawCommit {
   return {
-    oid: makeHash(n),
+    oid: makeOid(n),
     message: `commit ${n}`,
     author: { name: "A", email: "a@a.com", timestamp: 1_000_000 + n, timezoneOffset: 0 },
     committer: { name: "A", email: "a@a.com", timestamp: 1_000_000 + n, timezoneOffset: 0 },
-    parents: parents.map(makeHash),
+    parents: parents.map(makeOid),
   };
 }
 
@@ -38,13 +38,22 @@ function makeReporter(): ProgressReporter & { warnings: string[] } {
 
 function makeAdapter(
   options: {
-    commits?: Record<CommitHash, AsyncIterable<RawCommit>>;
-    walkError?: { head: CommitHash; excludeHash: CommitHash; code: "COMMIT_NOT_FOUND" };
+    commits?: Record<CommitOid, AsyncIterable<RawCommit>>;
+    walkError?: { head: CommitOid; excludeHash: CommitOid; code: "COMMIT_NOT_FOUND" };
   } = {},
 ): GitAdapter {
   return {
+    supportedObjectFormats() {
+      return ["sha1"];
+    },
     async resolveRef() {
       throw new GitAdapterError("Ref resolution is owned by TraversalPlanner", "REF_NOT_FOUND");
+    },
+    async getRepositoryObjectFormat() {
+      return "sha1";
+    },
+    async isRefBranch() {
+      return true;
     },
     async *walkCommits(_repo, head, excludeHash) {
       if (
@@ -86,7 +95,7 @@ async function collectFacts(iterable: AsyncIterable<CommitFact>): Promise<Commit
   return result;
 }
 
-function makePlan(name: string, head: CommitHash, excludeHash?: CommitHash): TraversalPlan {
+function makePlan(name: string, head: CommitOid, excludeHash?: CommitOid): TraversalPlan {
   return { name, head, excludeHash };
 }
 
@@ -95,7 +104,7 @@ function baseRequest(overrides: Partial<CommitTraversalRequest> = {}): CommitTra
     repositoryPath: "/repo",
     repoName: "test-repo",
     remoteUrl: null,
-    plans: [makePlan("main", makeHash(1))],
+    plans: [makePlan("main", makeOid(1))],
     ...overrides,
   };
 }
@@ -103,7 +112,7 @@ function baseRequest(overrides: Partial<CommitTraversalRequest> = {}): CommitTra
 describe("DefaultCommitTraversalExtractor", () => {
   it("yields all commits for the provided plan", async () => {
     const commits = [makeRawCommit(3, [2]), makeRawCommit(2, [1]), makeRawCommit(1)];
-    const head = makeHash(3);
+    const head = makeOid(3);
     const traverser = new DefaultCommitTraversalExtractor(
       makeAdapter({ commits: { [head]: toAsyncIter(commits) } }),
     );
@@ -112,11 +121,11 @@ describe("DefaultCommitTraversalExtractor", () => {
       traverser.extract(baseRequest({ plans: [makePlan("main", head)] }), makeReporter()),
     );
 
-    expect(facts.map((fact) => fact.oid)).toEqual([makeHash(3), makeHash(2), makeHash(1)]);
+    expect(facts.map((fact) => fact.oid)).toEqual([makeOid(3), makeOid(2), makeOid(1)]);
   });
 
   it("maps repoName and remoteUrl onto CommitFact.repository", async () => {
-    const head = makeHash(1);
+    const head = makeOid(1);
     const traverser = new DefaultCommitTraversalExtractor(
       makeAdapter({ commits: { [head]: toAsyncIter([makeRawCommit(1)]) } }),
     );
@@ -139,8 +148,8 @@ describe("DefaultCommitTraversalExtractor", () => {
   });
 
   it("preserves branch order without interleaving", async () => {
-    const headMain = makeHash(100);
-    const headDevelop = makeHash(200);
+    const headMain = makeOid(100);
+    const headDevelop = makeOid(200);
     const traverser = new DefaultCommitTraversalExtractor(
       makeAdapter({
         commits: {
@@ -158,14 +167,14 @@ describe("DefaultCommitTraversalExtractor", () => {
     );
 
     const oids = facts.map((fact) => fact.oid);
-    expect(oids.indexOf(makeHash(100))).toBeLessThan(oids.indexOf(makeHash(200)));
-    expect(oids.indexOf(makeHash(101))).toBeLessThan(oids.indexOf(makeHash(200)));
+    expect(oids.indexOf(makeOid(100))).toBeLessThan(oids.indexOf(makeOid(200)));
+    expect(oids.indexOf(makeOid(101))).toBeLessThan(oids.indexOf(makeOid(200)));
   });
 
   it("emits shared commits only once across plans", async () => {
     const shared = makeRawCommit(1);
-    const headMain = makeHash(10);
-    const headDevelop = makeHash(20);
+    const headMain = makeOid(10);
+    const headDevelop = makeOid(20);
     const traverser = new DefaultCommitTraversalExtractor(
       makeAdapter({
         commits: {
@@ -183,13 +192,13 @@ describe("DefaultCommitTraversalExtractor", () => {
     );
 
     const oids = facts.map((fact) => fact.oid);
-    expect(oids.filter((oid) => oid === makeHash(1))).toHaveLength(1);
+    expect(oids.filter((oid) => oid === makeOid(1))).toHaveLength(1);
     expect(oids).toHaveLength(3);
   });
 
   it("skips commits at or before the since-date boundary without terminating traversal", async () => {
     const boundary = new Date("2024-01-15T00:00:00Z");
-    const head = makeHash(1);
+    const head = makeOid(1);
     const newCommit = {
       ...makeRawCommit(10),
       committer: {
@@ -231,13 +240,13 @@ describe("DefaultCommitTraversalExtractor", () => {
       ),
     );
 
-    expect(facts.map((fact) => fact.oid)).toEqual([makeHash(10), makeHash(20)]);
+    expect(facts.map((fact) => fact.oid)).toEqual([makeOid(10), makeOid(20)]);
   });
 
   it("skips commits exactly at the since-date boundary", async () => {
     const boundary = new Date("2024-01-15T00:00:00Z");
     const boundaryTs = boundary.getTime() / 1000;
-    const head = makeHash(1);
+    const head = makeOid(1);
     const traverser = new DefaultCommitTraversalExtractor(
       makeAdapter({
         commits: {
@@ -275,16 +284,25 @@ describe("DefaultCommitTraversalExtractor", () => {
       ),
     );
 
-    expect(facts.map((fact) => fact.oid)).toEqual([makeHash(2)]);
+    expect(facts.map((fact) => fact.oid)).toEqual([makeOid(2)]);
   });
 
   it("passes each plan excludeHash to walkCommits", async () => {
-    const head = makeHash(5);
-    const excludeHash = makeHash(2);
+    const head = makeOid(5);
+    const excludeHash = makeOid(2);
     const walkSpy = vi.fn(async function* () {});
     const traverser = new DefaultCommitTraversalExtractor({
+      supportedObjectFormats() {
+        return ["sha1"];
+      },
       async resolveRef() {
         throw new GitAdapterError("Ref resolution is owned by TraversalPlanner", "REF_NOT_FOUND");
+      },
+      async getRepositoryObjectFormat() {
+        return "sha1";
+      },
+      async isRefBranch() {
+        return true;
       },
       walkCommits: walkSpy,
       async getRemoteUrl() {
@@ -309,13 +327,22 @@ describe("DefaultCommitTraversalExtractor", () => {
   });
 
   it("warns and falls back to full traversal on COMMIT_NOT_FOUND", async () => {
-    const head = makeHash(5);
-    const staleExclude = makeHash(99);
+    const head = makeOid(5);
+    const staleExclude = makeOid(99);
     const fullCommits = [makeRawCommit(5, [4]), makeRawCommit(4)];
     let walkCallCount = 0;
     const traverser = new DefaultCommitTraversalExtractor({
+      supportedObjectFormats() {
+        return ["sha1"];
+      },
       async resolveRef() {
         throw new GitAdapterError("Ref resolution is owned by TraversalPlanner", "REF_NOT_FOUND");
+      },
+      async getRepositoryObjectFormat() {
+        return "sha1";
+      },
+      async isRefBranch() {
+        return true;
       },
       async *walkCommits(_repo, _head, excludeHash) {
         walkCallCount++;
@@ -356,7 +383,7 @@ describe("DefaultCommitTraversalExtractor", () => {
 
   it("sets type: 'commit' on all yielded CommitFact objects", async () => {
     const commits = [makeRawCommit(1), makeRawCommit(2)];
-    const head = makeHash(1);
+    const head = makeOid(1);
     const traverser = new DefaultCommitTraversalExtractor(
       makeAdapter({ commits: { [head]: toAsyncIter(commits) } }),
     );

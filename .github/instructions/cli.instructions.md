@@ -43,10 +43,10 @@ gitrail -r main -r develop ./my-repo
 
 ### Range Filter (snapshot mode only)
 
-| Parameter                | Type   | Description                                                                                                          |
-| ------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------- |
-| `--since-ref <ref>`      | string | Exclude commits reachable from this ref. Accepts commit hash, tag name, or branch name. Resolved via `resolveRef()`. |
-| `--since-date <ISO8601>` | string | Include only commits with committer timestamp after this datetime.                                                   |
+| Parameter                | Type   | Description                                                                                                                     |
+| ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `--since-ref <ref>`      | string | Exclude commits reachable from this ref. Accepts commit object ID (OID), tag name, or branch name. Resolved via `resolveRef()`. |
+| `--since-date <ISO8601>` | string | Include only commits with committer timestamp after this datetime.                                                              |
 
 These parameters are only valid in snapshot mode (no `--incremental` flag). They are mutually exclusive with `--incremental`.
 
@@ -209,7 +209,7 @@ All validation must complete before extraction and file output begin. Validation
 
 1. **Format / mutual exclusion** — no I/O (mutual exclusion rules, branch count, `--missing-state` value, numeric arg formats, ISO 8601 format for `--since-date`)
 2. **File system** — `<repository-path>` existence, `--output-dir` existence, `--state` parent directory existence, `--state` file existence check (result passed to subsequent logic)
-3. **Git** — repository identity (`resolveRef` on first ref), each `--ref` ref resolution, `--since-ref` resolution via `resolveRef()`, state file content validation (JSON structure, `version`, `repositoryPath` match)
+3. **Git** — repository identity (`resolveRef` on first ref), repository object-format compatibility gate, each `--ref` ref resolution, `--since-ref` resolution via `resolveRef()`, state file content validation (JSON structure, `version`, `repositoryPath` match)
 
 **Validation stage 2 — state file existence handling for incremental mode:**
 
@@ -230,6 +230,7 @@ All validation must complete before extraction and file output begin. Validation
 | `--rotate-lines` is not a positive integer  | 1     | `--rotate-lines must be a positive integer`                                                             |
 | `--rotate-size` has invalid format          | 1     | `--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)` |
 | `--rotate-size` value is out of range       | 1     | `--rotate-size must be between 1048576 and 68719476736 bytes`                                           |
+| Repository object format unsupported        | 3     | `Unsupported repository object format: <format>. Supported formats: <supported-list>.`                  |
 | State file `repositoryPath` mismatch        | 3     | `State file was created for a different repository: <recorded-path>`                                    |
 
 ---

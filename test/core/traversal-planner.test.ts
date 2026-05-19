@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   TraversalPlanningRequest,
-  CommitHash,
+  CommitOid,
   ProgressEvent,
   ProgressReporter,
 } from "../../src/core/index.js";
@@ -10,8 +10,8 @@ import { DefaultTraversalPlanner } from "../../src/core/traversal-planner.js";
 import { GitAdapterError } from "../../src/git/index.js";
 import type { GitAdapter } from "../../src/git/index.js";
 
-function makeHash(n: number): CommitHash {
-  return n.toString(16).padStart(40, "0") as CommitHash;
+function makeHash(n: number): CommitOid {
+  return n.toString(16).padStart(40, "0") as CommitOid;
 }
 
 function makeReporter(): ProgressReporter & { warnings: string[] } {
@@ -25,13 +25,16 @@ function makeReporter(): ProgressReporter & { warnings: string[] } {
 }
 
 function makeAdapter(options: {
-  refs?: Record<string, CommitHash>;
-  mergeBase?: CommitHash | null;
+  refs?: Record<string, CommitOid>;
+  mergeBase?: CommitOid | null;
   resolveRefError?: { branch: string; code: "REF_NOT_FOUND" };
   branchRefs?: Set<string>;
 }): GitAdapter {
   const branchRefs = options.branchRefs ?? new Set(Object.keys(options.refs ?? {}));
   return {
+    supportedObjectFormats() {
+      return ["sha1"];
+    },
     async resolveRef(_repo, ref) {
       if (options.resolveRefError && ref === options.resolveRefError.branch) {
         throw new GitAdapterError(`Ref not found: ${ref}`, options.resolveRefError.code);
@@ -42,6 +45,9 @@ function makeAdapter(options: {
     },
     async isRefBranch(_repo, ref) {
       return branchRefs.has(ref);
+    },
+    async getRepositoryObjectFormat() {
+      return "sha1";
     },
     async *walkCommits() {},
     async getRemoteUrl() {

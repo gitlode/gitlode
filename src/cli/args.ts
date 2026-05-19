@@ -3,7 +3,7 @@ import { basename, dirname, resolve } from "node:path";
 
 import { Argument, Command, CommanderError, Option } from "commander";
 
-import type { CommitHash, ExtractorConfig } from "../core/index.js";
+import type { CommitOid, ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { GitAdapter } from "../git/index.js";
 
@@ -44,7 +44,7 @@ export const program = new Command()
   )
   .option(
     "--since-ref <ref>",
-    "Exclude commits reachable from this ref. Accepts commit hash, tag name, or branch name. Only valid in snapshot mode.",
+    "Exclude commits reachable from this ref. Accepts commit object ID (OID), tag name, or branch name. Only valid in snapshot mode.",
   )
   .option(
     "--since-date <ISO8601>",
@@ -249,7 +249,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     }
   }
 
-  let resolvedSinceRef: CommitHash | undefined;
+  let resolvedSinceRef: CommitOid | undefined;
   if (sinceRef) {
     try {
       resolvedSinceRef = await adapter.resolveRef(resolvedRepoPath, sinceRef);

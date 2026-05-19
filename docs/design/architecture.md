@@ -159,7 +159,8 @@ Files:
 
 Responsibilities:
 
-- Resolve refs to commit hashes.
+- Resolve refs to commit object IDs (OIDs).
+- Detect repository object format (defaulting to `sha1` when unset).
 - Read origin URL when available.
 - Traverse commits reachable from a head commit, optionally excluding history reachable from `excludeHash`.
 - Translate library/runtime failures into `GitAdapterError` codes.

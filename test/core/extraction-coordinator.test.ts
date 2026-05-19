@@ -7,7 +7,7 @@ import type {
   TraversalPlanningRequest,
   StateStore,
   CommitFact,
-  CommitHash,
+  CommitOid,
   CommitTraversalExtractor,
   CommitTraversalRequest,
   CoordinatorDependencies,
@@ -26,8 +26,8 @@ import type { OutputRecord } from "../../src/output/types.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const FAKE_HEAD = "a".repeat(40) as CommitHash;
-const FAKE_HEAD_2 = "b".repeat(40) as CommitHash;
+const FAKE_HEAD = "a".repeat(12) as CommitOid;
+const FAKE_HEAD_2 = "b".repeat(12) as CommitOid;
 
 function makeCommitFact(oid: string): CommitFact {
   return {
@@ -213,7 +213,7 @@ function baseRequest(
 
 describe("DefaultExtractionCoordinator", () => {
   it("commit-mode: runs the commit pipeline and returns correct result", async () => {
-    const deps = makeDeps({ oids: ["1".padStart(40, "0"), "2".padStart(40, "0")] });
+    const deps = makeDeps({ oids: ["1".padStart(12, "0"), "2".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ granularity: "commit" }));
 
@@ -221,21 +221,21 @@ describe("DefaultExtractionCoordinator", () => {
     expect(result.refs).toEqual(["main"]);
     expect(deps.sink.records).toHaveLength(2);
     // commit projector preserves oid (no "-file" suffix)
-    expect(deps.sink.records[0]!.oid).toBe("1".padStart(40, "0"));
+    expect(deps.sink.records[0]!.oid).toBe("1".padStart(12, "0"));
   });
 
   it("file-mode: runs the file-change pipeline and returns correct result", async () => {
-    const deps = makeDeps({ oids: ["1".padStart(40, "0"), "2".padStart(40, "0")] });
+    const deps = makeDeps({ oids: ["1".padStart(12, "0"), "2".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ granularity: "file" }));
 
     expect(result.recordsWritten).toBe(2);
     // file projector appends "-file" to oid
-    expect(deps.sink.records[0]!.oid).toBe(`${"1".padStart(40, "0")}-file`);
+    expect(deps.sink.records[0]!.oid).toBe(`${"1".padStart(12, "0")}-file`);
   });
 
   it("commitsTraversed: result contains correct commit count", async () => {
-    const oids = ["1".padStart(40, "0"), "2".padStart(40, "0"), "3".padStart(40, "0")];
+    const oids = ["1".padStart(12, "0"), "2".padStart(12, "0"), "3".padStart(12, "0")];
     const deps = makeDeps({ oids });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest());
@@ -247,7 +247,7 @@ describe("DefaultExtractionCoordinator", () => {
     const reporter = makeProgressReporter();
     const deps = makeDeps({
       reporter,
-      oids: ["1".padStart(40, "0"), "2".padStart(40, "0"), "3".padStart(40, "0")],
+      oids: ["1".padStart(12, "0"), "2".padStart(12, "0"), "3".padStart(12, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
@@ -261,7 +261,7 @@ describe("DefaultExtractionCoordinator", () => {
 
   it("phase event sequence: emits prepare/extract/finalize in order", async () => {
     const reporter = makeProgressReporter();
-    const deps = makeDeps({ reporter, oids: ["1".padStart(40, "0")] });
+    const deps = makeDeps({ reporter, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
 
@@ -286,7 +286,7 @@ describe("DefaultExtractionCoordinator", () => {
       { name: "develop", head: FAKE_HEAD_2 as never, excludeHash: undefined, isBranch: true },
     ];
     // Each branch yields a unique commit so dedup doesn't discard them
-    const uniqueOids = ["1".padStart(40, "0"), "2".padStart(40, "0")];
+    const uniqueOids = ["1".padStart(12, "0"), "2".padStart(12, "0")];
     const traverser: CommitTraversalExtractor = {
       extract(req: CommitTraversalRequest): AsyncIterable<CommitFact> {
         const planName = req.plans[0]?.name ?? "";
@@ -386,7 +386,7 @@ describe("DefaultExtractionCoordinator", () => {
     const deps = makeDeps({
       sink: trackingSink as never,
       stateStore,
-      oids: ["1".padStart(40, "0")],
+      oids: ["1".padStart(12, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
@@ -412,7 +412,7 @@ describe("DefaultExtractionCoordinator", () => {
     const deps = makeDeps({
       sink: closingFailSink as never,
       stateStore,
-      oids: ["1".padStart(40, "0")],
+      oids: ["1".padStart(12, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("close failure");
@@ -437,7 +437,7 @@ describe("DefaultExtractionCoordinator", () => {
     const deps = makeDeps({
       sink: failSink as never,
       stateStore,
-      oids: ["1".padStart(40, "0")],
+      oids: ["1".padStart(12, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write fail");
@@ -446,7 +446,7 @@ describe("DefaultExtractionCoordinator", () => {
   });
 
   it("state NOT written when stateStore is undefined", async () => {
-    const deps = makeDeps({ stateStore: undefined, oids: ["1".padStart(40, "0")] });
+    const deps = makeDeps({ stateStore: undefined, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest());
 
@@ -518,7 +518,7 @@ describe("DefaultExtractionCoordinator", () => {
     const traverser: CommitTraversalExtractor = {
       extract(req: CommitTraversalRequest): AsyncIterable<CommitFact> {
         const planName = req.plans[0]?.name ?? "";
-        const oid = planName === "main" ? "1".padStart(40, "0") : "2".padStart(40, "0");
+        const oid = planName === "main" ? "1".padStart(12, "0") : "2".padStart(12, "0");
         return (async function* () {
           yield makeCommitFact(oid);
         })();
@@ -545,7 +545,7 @@ describe("DefaultExtractionCoordinator", () => {
     const traverser: CommitTraversalExtractor = {
       extract(req: CommitTraversalRequest): AsyncIterable<CommitFact> {
         const planName = req.plans[0]?.name ?? "";
-        const oid = planName === "main" ? "1".padStart(40, "0") : "2".padStart(40, "0");
+        const oid = planName === "main" ? "1".padStart(12, "0") : "2".padStart(12, "0");
         return (async function* () {
           yield makeCommitFact(oid);
         })();
@@ -568,7 +568,7 @@ describe("DefaultExtractionCoordinator", () => {
       { name: "main", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: true },
       { name: "v1.0", head: FAKE_HEAD_2 as never, excludeHash: undefined, isBranch: false },
     ];
-    const deps = makeDeps({ plans, stateStore, reporter, oids: ["1".padStart(40, "0")] });
+    const deps = makeDeps({ plans, stateStore, reporter, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest({ refs: ["main", "v1.0"] }));
 
@@ -581,7 +581,7 @@ describe("DefaultExtractionCoordinator", () => {
     const plans: readonly TraversalPlan[] = [
       { name: "v1.0", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: false },
     ];
-    const deps = makeDeps({ plans, reporter, oids: ["1".padStart(40, "0")] });
+    const deps = makeDeps({ plans, reporter, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest({ refs: ["v1.0"] }));
 
@@ -591,7 +591,7 @@ describe("DefaultExtractionCoordinator", () => {
   it("state generatedAt uses request.sessionTimestamp", async () => {
     const stateStore = makeStateStore();
     const ts = new Date("2025-06-15T12:00:00Z");
-    const deps = makeDeps({ stateStore, oids: ["1".padStart(40, "0")] });
+    const deps = makeDeps({ stateStore, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest({ sessionTimestamp: ts }));
 
@@ -625,7 +625,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     };
 
-    const deps = makeDeps({ oids: ["1".padStart(40, "0")], profiler: profilerStub });
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")], profiler: profilerStub });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
 

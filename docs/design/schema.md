@@ -68,7 +68,7 @@ interface OutputCommit {
 
 ### `oid`
 
-Full 40-character SHA-1 commit hash. Sourced directly from the Git object database.
+Full commit object ID (OID). Sourced directly from the Git object database.
 
 ### `subject` and `body`
 
@@ -150,7 +150,7 @@ Local date    = 2024-01-16T03:00:00+09:00  ← final output
 
 ### `parents`
 
-Array of parent commit hashes:
+Array of parent commit OIDs:
 
 | Commit type     | `parents` length | Example                |
 | --------------- | ---------------- | ---------------------- |

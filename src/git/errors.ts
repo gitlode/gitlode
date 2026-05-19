@@ -2,6 +2,7 @@ export type GitAdapterErrorCode =
   | "REF_NOT_FOUND"
   | "COMMIT_NOT_FOUND"
   | "NOT_A_REPOSITORY"
+  | "UNSUPPORTED_OBJECT_FORMAT"
   | "REMOTE_NOT_FOUND"
   | "MERGE_BASE_NOT_FOUND"
   | "UNKNOWN";

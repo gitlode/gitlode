@@ -69,7 +69,7 @@ interface OutputCommit {
 
 ### `oid`
 
-The full 40-character commit hash.
+The full commit object ID (OID) string for the repository object format.
 
 ### `subject` and `body`
 

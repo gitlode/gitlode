@@ -293,7 +293,7 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
     expect(resolved).toBe(sha);
   });
 
-  it("resolves a raw 40-hex commit OID when the ref name is not found", async () => {
+  it("resolves a raw commit OID when the ref name is not found", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
@@ -350,7 +350,7 @@ describe("IsomorphicGitAdapter.isRefBranch", () => {
     expect(await adapter.isRefBranch("/", "v1.0-ann")).toBe(false);
   });
 
-  it("returns false for a raw 40-hex commit OID", async () => {
+  it("returns false for a raw commit OID", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
@@ -364,6 +364,40 @@ describe("IsomorphicGitAdapter.isRefBranch", () => {
     await addCommit("f.txt", "v1", "initial");
     const adapter = new IsomorphicGitAdapter(fs);
     expect(await adapter.isRefBranch("/", "nonexistent")).toBe(false);
+  });
+});
+
+describe("IsomorphicGitAdapter.getRepositoryObjectFormat", () => {
+  it("defaults to sha1 when extensions.objectformat is unset", async () => {
+    const { fs, init } = makeRepo();
+    await init();
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(await adapter.getRepositoryObjectFormat("/")).toBe("sha1");
+  });
+
+  it("returns configured repository object format", async () => {
+    const { fs, init } = makeRepo();
+    await init();
+    await git.setConfig({
+      fs,
+      dir: "/",
+      path: "extensions.objectformat",
+      value: "sha256",
+    });
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(await adapter.getRepositoryObjectFormat("/")).toBe("sha256");
+  });
+});
+
+describe("IsomorphicGitAdapter.supportedObjectFormats", () => {
+  it("returns the adapter capability list for object formats", async () => {
+    const { fs, init } = makeRepo();
+    await init();
+
+    const adapter = new IsomorphicGitAdapter(fs);
+    expect(adapter.supportedObjectFormats()).toEqual(["sha1"]);
   });
 });
 

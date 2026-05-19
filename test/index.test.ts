@@ -12,6 +12,7 @@ import {
 } from "../src/cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "../src/cli/reporting/index.js";
 import type { ProgressEvent } from "../src/core/index.js";
+import { assertSupportedRepositoryObjectFormat } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -389,5 +390,21 @@ describe("ProgressController (quiet)", () => {
     emit(ctrl, { type: "phase-end", phase: "extracting" });
 
     expect(sink.records).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Object-format compatibility gate
+// ---------------------------------------------------------------------------
+
+describe("assertSupportedRepositoryObjectFormat", () => {
+  it("accepts sha1 repositories", () => {
+    expect(() => assertSupportedRepositoryObjectFormat("sha1", ["sha1"])).not.toThrow();
+  });
+
+  it("rejects unsupported formats with the required diagnostic text", () => {
+    expect(() => assertSupportedRepositoryObjectFormat("sha256", ["sha1"])).toThrow(
+      "Unsupported repository object format: sha256. Supported formats: sha1.",
+    );
   });
 });

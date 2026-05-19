@@ -38,7 +38,7 @@ v0.6.0 is a minor release focused on CLI reliability and operator control for in
 ### Phase 2: Large Text-Diff Guardrail
 
 - **File**: [`plans/phase-2.md`](plans/phase-2.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 3: CLI Readability and Metadata Override
 

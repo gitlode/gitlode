@@ -57,8 +57,22 @@ describe("DefaultFileChangeExpander", () => {
 
   it("expands a commit with multiple file changes into multiple FileChangeFacts", async () => {
     const fileChanges: FileChange[] = [
-      { path: "src/a.ts", status: "added", additions: 5, deletions: 0 },
-      { path: "src/b.ts", status: "modified", additions: 2, deletions: 1 },
+      {
+        path: "src/a.ts",
+        status: "added",
+        beforeSize: 0,
+        afterSize: 100,
+        additions: 5,
+        deletions: 0,
+      },
+      {
+        path: "src/b.ts",
+        status: "modified",
+        beforeSize: 120,
+        afterSize: 140,
+        additions: 2,
+        deletions: 1,
+      },
     ];
     const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges));
     const commit = makeCommitFact();
@@ -84,7 +98,16 @@ describe("DefaultFileChangeExpander", () => {
       getRemoteUrl: async () => null,
       getFileChanges: async (_repo, _oid, parentOid) => {
         capturedParentOid = parentOid;
-        return [{ path: "README.md", status: "added", additions: 3, deletions: 0 }];
+        return [
+          {
+            path: "README.md",
+            status: "added",
+            beforeSize: 0,
+            afterSize: 24,
+            additions: 3,
+            deletions: 0,
+          },
+        ];
       },
       findMergeBase: async () => null,
     };
@@ -125,6 +148,8 @@ describe("DefaultFileChangeExpander", () => {
     const binaryFileChange: FileChange = {
       path: "assets/image.png",
       status: "added",
+      beforeSize: 0,
+      afterSize: 4096,
       additions: null,
       deletions: null,
     };
@@ -141,12 +166,38 @@ describe("DefaultFileChangeExpander", () => {
     const commit1 = makeCommitFact({ oid: "a".repeat(40) });
     const commit2 = makeCommitFact({ oid: "b".repeat(40) });
     const fileChangeMap = new Map<string, FileChange[]>([
-      ["a".repeat(40), [{ path: "file1.ts", status: "added", additions: 1, deletions: 0 }]],
+      [
+        "a".repeat(40),
+        [
+          {
+            path: "file1.ts",
+            status: "added",
+            beforeSize: 0,
+            afterSize: 20,
+            additions: 1,
+            deletions: 0,
+          },
+        ],
+      ],
       [
         "b".repeat(40),
         [
-          { path: "file2.ts", status: "modified", additions: 2, deletions: 1 },
-          { path: "file3.ts", status: "deleted", additions: 0, deletions: 4 },
+          {
+            path: "file2.ts",
+            status: "modified",
+            beforeSize: 50,
+            afterSize: 55,
+            additions: 2,
+            deletions: 1,
+          },
+          {
+            path: "file3.ts",
+            status: "deleted",
+            beforeSize: 70,
+            afterSize: 0,
+            additions: 0,
+            deletions: 4,
+          },
         ],
       ],
     ]);
@@ -199,7 +250,14 @@ describe("DefaultFileChangeExpander", () => {
 
   it("sets type: 'file-change' on all yielded FileChangeFact objects", async () => {
     const fileChanges: FileChange[] = [
-      { path: "src/a.ts", status: "added", additions: 1, deletions: 0 },
+      {
+        path: "src/a.ts",
+        status: "added",
+        beforeSize: 0,
+        afterSize: 16,
+        additions: 1,
+        deletions: 0,
+      },
     ];
     const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges));
     const commit = makeCommitFact();
@@ -207,5 +265,65 @@ describe("DefaultFileChangeExpander", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]!.type).toBe("file-change");
+  });
+
+  it("sets additions/deletions to null when either side exceeds maxDiffSize", async () => {
+    const fileChanges: FileChange[] = [
+      {
+        path: "generated.txt",
+        status: "modified",
+        beforeSize: 150_000,
+        afterSize: 2_000,
+        additions: 200,
+        deletions: 100,
+      },
+    ];
+    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges), 100_000);
+    const commit = makeCommitFact();
+    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.file.additions).toBeNull();
+    expect(results[0]!.file.deletions).toBeNull();
+    expect(expander.skippedDiffCount).toBe(1);
+  });
+
+  it("keeps numeric additions/deletions when maxDiffSize is not exceeded", async () => {
+    const fileChanges: FileChange[] = [
+      {
+        path: "small.txt",
+        status: "modified",
+        beforeSize: 80,
+        afterSize: 90,
+        additions: 3,
+        deletions: 2,
+      },
+    ];
+    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges), 100_000);
+    const commit = makeCommitFact();
+    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.file.additions).toBe(3);
+    expect(results[0]!.file.deletions).toBe(2);
+    expect(expander.skippedDiffCount).toBe(0);
+  });
+
+  it("counts binary diffs as skipped", async () => {
+    const fileChanges: FileChange[] = [
+      {
+        path: "assets/large.bin",
+        status: "added",
+        beforeSize: 0,
+        afterSize: 10_000,
+        additions: null,
+        deletions: null,
+      },
+    ];
+    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges), 100_000);
+    const commit = makeCommitFact();
+    await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+
+    expect(expander.skippedDiffCount).toBe(1);
   });
 });

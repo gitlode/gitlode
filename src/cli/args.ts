@@ -24,6 +24,7 @@ const RawOptsSchema = z.object({
   sinceDate: z.string().optional(),
   rotateLines: z.string().optional(),
   rotateSize: z.string().optional(),
+  maxDiffSize: z.string().optional(),
   quiet: z.boolean(),
   profile: z.boolean(),
   perFile: z.boolean(),
@@ -77,6 +78,12 @@ export const program = new Command()
   )
   .addOption(
     new Option(
+      "--max-diff-size <bytes>",
+      "Skip line-level diff computation for files exceeding this size (e.g. 100K, 1M). Skipped diffs are emitted with null additions/deletions counts. Default: disabled (off). Only applies with --per-file extraction mode.",
+    ).helpGroup("Output"),
+  )
+  .addOption(
+    new Option(
       "--incremental",
       "When set, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state.",
     )
@@ -126,12 +133,25 @@ function userError(msg: string): never {
 const ROTATE_SIZE_MIN = 1_048_576n; // 1 MiB
 const ROTATE_SIZE_MAX = 68_719_476_736n; // 64 GiB
 
-function parseRotateSizeBytes(raw: string): number {
+/**
+ * Parse a binary size string (e.g. "100K", "1M") to bytes.
+ * Supports suffixes K (1024), M (1048576), G (1073741824).
+ * @param raw - Raw input string
+ * @param minBytes - Minimum allowed value in bytes; null for no minimum
+ * @param maxBytes - Maximum allowed value in bytes; null for no maximum
+ * @param optionName - CLI option name for error messages
+ */
+function parseBinarySize(
+  raw: string,
+  minBytes: bigint | null,
+  maxBytes: bigint | null,
+  optionName: string,
+): number {
   const trimmed = raw.trim();
   const match = /^(\d+)([kKmMgG]?)$/.exec(trimmed);
   if (!match) {
     userError(
-      "--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)",
+      `${optionName} must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)`,
     );
   }
   const numPart = BigInt(match[1]!);
@@ -143,10 +163,25 @@ function parseRotateSizeBytes(raw: string): number {
     G: 1_073_741_824n,
   };
   const bytes = numPart * multipliers[suffix]!;
-  if (bytes < ROTATE_SIZE_MIN || bytes > ROTATE_SIZE_MAX) {
-    userError("--rotate-size must be between 1048576 and 68719476736 bytes");
+  if (minBytes !== null && maxBytes !== null && (bytes < minBytes || bytes > maxBytes)) {
+    userError(`${optionName} must be between ${Number(minBytes)} and ${Number(maxBytes)} bytes`);
+  }
+  if (minBytes !== null && maxBytes === null && bytes < minBytes) {
+    userError(`${optionName} must be at least ${Number(minBytes)} byte`);
+  }
+  if (minBytes === null && maxBytes !== null && bytes > maxBytes) {
+    userError(`${optionName} must be at most ${Number(maxBytes)} bytes`);
   }
   return Number(bytes);
+}
+
+function parseRotateSizeBytes(raw: string): number {
+  return parseBinarySize(raw, ROTATE_SIZE_MIN, ROTATE_SIZE_MAX, "--rotate-size");
+}
+
+function parseMaxDiffSizeBytes(raw: string): number {
+  // Allow any value from 1 byte with no upper limit (users may set very high thresholds)
+  return parseBinarySize(raw, 1n, null, "--max-diff-size");
 }
 
 export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
@@ -187,6 +222,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
   const outputPrefix = opts.outputPrefix;
   const rotateLinesRaw = opts.rotateLines;
   const rotateSizeRaw = opts.rotateSize;
+  const maxDiffSizeRaw = opts.maxDiffSize;
   const repoPath = program.args[0] as string | undefined;
   const quiet = opts.quiet;
   const profile = opts.profile;
@@ -233,6 +269,11 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
   let maxBytes: number | undefined;
   if (rotateSizeRaw !== undefined) {
     maxBytes = parseRotateSizeBytes(rotateSizeRaw);
+  }
+
+  let maxDiffSize: number | undefined;
+  if (maxDiffSizeRaw !== undefined) {
+    maxDiffSize = parseMaxDiffSizeBytes(maxDiffSizeRaw);
   }
 
   let sinceDateObj: Date | undefined;
@@ -331,6 +372,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
         : undefined,
     stateFilePath: state,
     perFile,
+    maxDiffSize,
     quiet,
     profile,
   };

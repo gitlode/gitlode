@@ -25,7 +25,7 @@ assignments are:
 | Group                     | Options                                                                      |
 | ------------------------- | ---------------------------------------------------------------------------- |
 | `General`                 | `--quiet`, `--profile`                                                       |
-| `Output`                  | `--output-dir`, `--output-prefix`, `--per-file`                              |
+| `Output`                  | `--output-dir`, `--output-prefix`, `--per-file`, `--max-diff-size`           |
 | `Differential Extraction` | `--incremental`, `--state`, `--missing-state`, `--since-ref`, `--since-date` |
 | `File Rotation`           | `--rotate-lines`, `--rotate-size`                                            |
 
@@ -74,11 +74,12 @@ These parameters are only valid in snapshot mode (no `--incremental` flag). They
 
 ### Output
 
-| Parameter                  | Alias | Type    | Default                    | Description                                                                                                                       |
-| -------------------------- | ----- | ------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `--output-dir <path>`      | `-o`  | string  | `./`                       | Directory to write output `.jsonl` files. Must exist.                                                                             |
-| `--output-prefix <string>` |       | string  | derived from remote origin | Filename prefix for output files.                                                                                                 |
-| `--per-file`               |       | boolean | `false`                    | When present, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity). |
+| Parameter                  | Alias | Type    | Default                    | Description                                                                                                                                                                        |
+| -------------------------- | ----- | ------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--output-dir <path>`      | `-o`  | string  | `./`                       | Directory to write output `.jsonl` files. Must exist.                                                                                                                              |
+| `--output-prefix <string>` |       | string  | derived from remote origin | Filename prefix for output files.                                                                                                                                                  |
+| `--per-file`               |       | boolean | `false`                    | When present, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity).                                                  |
+| `--max-diff-size <value>`  |       | string  | disabled                   | Skip line-level diff computation for files exceeding this size (accepts bytes or `K`/`M`/`G`). Emits `null` additions/deletions for skipped files. Applies only with `--per-file`. |
 
 **`--output-prefix` derivation logic** (when not specified):
 

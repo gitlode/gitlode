@@ -21,6 +21,10 @@ export interface RawCommit {
 export interface FileChange {
   readonly path: string;
   readonly status: "added" | "modified" | "deleted";
+  /** Blob byte size before this change (0 for added files). */
+  readonly beforeSize: number;
+  /** Blob byte size after this change (0 for deleted files). */
+  readonly afterSize: number;
   /** null for binary files */
   readonly additions: number | null;
   /** null for binary files */

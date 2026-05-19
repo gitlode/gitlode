@@ -258,7 +258,7 @@ async function main() {
 
     const traversalPlanner = new DefaultTraversalPlanner(adapter, planningProfiler);
     const traversalExtractor = new DefaultCommitTraversalExtractor(adapter, traversalProfiler);
-    const fileChangeExpander = new DefaultFileChangeExpander(adapter);
+    const fileChangeExpander = new DefaultFileChangeExpander(adapter, parsed.maxDiffSize);
     const projector = new DefaultFactProjector(repoName, remoteUrl, projectionProfiler);
 
     const deps: CoordinatorDependencies = {
@@ -302,7 +302,7 @@ async function main() {
         process.stderr.write(line + "\n");
       }
       if (profile) {
-        const profileLines = formatProfileLines(rootProfiler.entries());
+        const profileLines = formatProfileLines(rootProfiler.entries(), result.skippedDiffs);
         if (profileLines.length > 0) {
           process.stderr.write("\n");
           for (const line of profileLines) {

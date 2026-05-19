@@ -16,6 +16,7 @@ describe("program – help output wiring", () => {
       "--incremental",
       "--output-dir",
       "--output-prefix",
+      "--max-diff-size",
       "--state",
       "--missing-state",
       "--since-ref",
@@ -65,6 +66,7 @@ describe("program – help output wiring", () => {
     expect(optionsByLong.get("--output-dir")?.helpGroupHeading).toBe("Output");
     expect(optionsByLong.get("--output-prefix")?.helpGroupHeading).toBe("Output");
     expect(optionsByLong.get("--per-file")?.helpGroupHeading).toBe("Output");
+    expect(optionsByLong.get("--max-diff-size")?.helpGroupHeading).toBe("Output");
 
     expect(optionsByLong.get("--incremental")?.helpGroupHeading).toBe("Differential Extraction");
     expect(optionsByLong.get("--state")?.helpGroupHeading).toBe("Differential Extraction");

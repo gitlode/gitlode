@@ -83,6 +83,7 @@ export interface ExtractorConfig {
   readonly range?: ExtractionRange;
   readonly stateFilePath?: string;
   readonly perFile: boolean;
+  readonly maxDiffSize?: number;
 }
 
 export type ProgressPhase = "preparing" | "extracting" | "finalizing";
@@ -212,6 +213,8 @@ export interface ExtractionResult {
    * Populated on every successful run.
    */
   readonly profilingEntries: readonly ProfilingEntry[];
+  /** Number of file diffs skipped due to size threshold (--max-diff-size). */
+  readonly skippedDiffs: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +278,8 @@ export interface CommitTraversalExtractor {
 /** Core-owned interface for the file-change expansion stage. */
 export interface FileChangeExpander {
   expand(commits: AsyncIterable<CommitFact>, repositoryPath: string): AsyncIterable<FileChangeFact>;
+  /** Get the count of file diffs skipped due to size threshold. */
+  readonly skippedDiffCount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +321,8 @@ export interface CoordinatorResult {
   readonly commitsTraversed: number;
   /** Refs for which a head was successfully resolved (skipped refs are omitted). */
   readonly refs: readonly string[];
+  /** Number of file diffs skipped due to size threshold (--max-diff-size). */
+  readonly skippedDiffs: number;
 }
 
 /** Core-owned interface for the fact projection stage. */

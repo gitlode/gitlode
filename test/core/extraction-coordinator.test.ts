@@ -106,6 +106,7 @@ const fileChangeExpander: FileChangeExpander = {
       }
     })();
   },
+  skippedDiffCount: 0,
 };
 
 /** Single projector stub: dispatches commit and file-change facts to the appropriate output. */
@@ -230,8 +231,32 @@ describe("DefaultExtractionCoordinator", () => {
     const result = await coord.run(baseRequest({ granularity: "file" }));
 
     expect(result.recordsWritten).toBe(2);
+    expect(result.skippedDiffs).toBe(0);
     // file projector appends "-file" to oid
     expect(deps.sink.records[0]!.oid).toBe(`${"1".padStart(12, "0")}-file`);
+  });
+
+  it("returns skippedDiffs from file-change expander in file mode", async () => {
+    const customExpander: FileChangeExpander = {
+      skippedDiffCount: 3,
+      expand(commits: AsyncIterable<CommitFact>): AsyncIterable<FileChangeFact> {
+        return (async function* () {
+          for await (const fact of commits) {
+            yield {
+              type: "file-change",
+              commit: fact,
+              file: { path: "a.ts", status: "modified", additions: null, deletions: null },
+            };
+          }
+        })();
+      },
+    };
+
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")], fileChangeExpander: customExpander });
+    const coord = new DefaultExtractionCoordinator(deps);
+    const result = await coord.run(baseRequest({ granularity: "file" }));
+
+    expect(result.skippedDiffs).toBe(3);
   });
 
   it("commitsTraversed: result contains correct commit count", async () => {

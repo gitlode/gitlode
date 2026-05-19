@@ -240,6 +240,43 @@ describe("parseArgs – --rotate-size validation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// --max-diff-size validation
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --max-diff-size validation", () => {
+  it.each([["abc"], ["1MiB"], ["1.5G"], ["+1M"], ["-1M"], ["1 M"], ["1MB"]])(
+    "rejects invalid format %s",
+    async (val) => {
+      setArgv("--ref", "main", "--max-diff-size", val, ".");
+      await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(stderrSpy).toHaveBeenCalledWith(
+        "--max-diff-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)\n",
+      );
+    },
+  );
+
+  it("rejects zero", async () => {
+    setArgv("--ref", "main", "--max-diff-size", "0", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith("--max-diff-size must be at least 1 byte\n");
+  });
+
+  it.each([
+    ["1", 1],
+    ["100K", 102_400],
+    ["1M", 1_048_576],
+    ["2G", 2_147_483_648],
+    [" 500M ", 524_288_000],
+  ] as [string, number][])("accepts valid --max-diff-size %s", async (val, expected) => {
+    setArgv("--ref", "main", "--max-diff-size", val, ".");
+    const parsed = await parseArgs(noopAdapter);
+    expect(parsed.maxDiffSize).toBe(expected);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // --since-date validation
 // ---------------------------------------------------------------------------
 

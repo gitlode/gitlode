@@ -336,13 +336,14 @@ gitrail [options] <repository-path>
 
 ### Output
 
-| Parameter                  | Alias | Type    | Default | Description                                                                    |
-| -------------------------- | ----- | ------- | ------- | ------------------------------------------------------------------------------ |
-| `--output-dir <path>`      | `-o`  | string  | `./`    | Directory for output `.jsonl` files. Must exist.                               |
-| `--output-prefix <string>` |       | string  | derived | Filename prefix (derived from remote origin if omitted)                        |
-| `--per-file`               |       | boolean | `false` | When set, emit one record per changed file per commit                          |
-| `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                                                 |
-| `--rotate-size <bytes>`    |       | string  | —       | Start new file after threshold (raw bytes or `K`/`M`/`G`, range `1M` to `64G`) |
+| Parameter                  | Alias | Type    | Default | Description                                                                                                                                                                   |
+| -------------------------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--output-dir <path>`      | `-o`  | string  | `./`    | Directory for output `.jsonl` files. Must exist.                                                                                                                              |
+| `--output-prefix <string>` |       | string  | derived | Filename prefix (derived from remote origin if omitted)                                                                                                                       |
+| `--per-file`               |       | boolean | `false` | When set, emit one record per changed file per commit                                                                                                                         |
+| `--max-diff-size <value>`  |       | string  | —       | Skip line-level diff computation for files above this size (bytes or `K`/`M`/`G` suffix). Emits `null` additions/deletions for skipped files. Applies only with `--per-file`. |
+| `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                                                                                                                                                |
+| `--rotate-size <bytes>`    |       | string  | —       | Start new file after threshold (raw bytes or `K`/`M`/`G`, range `1M` to `64G`)                                                                                                |
 
 ### Control
 
@@ -365,6 +366,7 @@ Profile
   elapsed/write                : wall=   2.10ms  work=   2.10ms
   elapsed/git/blob-read        : wall=   0.80ms  work=   0.80ms
   elapsed/git/diff             : wall=   1.45ms  work=   1.45ms
+  skipped_diffs                : 12
 ```
 
 Each line represents one profiling entry from the per-run profiler tree.
@@ -383,6 +385,9 @@ Each line represents one profiling entry from the per-run profiler tree.
 `wall` shows elapsed time for that scoped profiler. `work` shows additive measured work inside the
 same scope. The root `elapsed` entry is always present on successful runs. Additional stage entries
 are populated when profiling is enabled.
+
+`skipped_diffs` reports how many file-level diffs were emitted with `null` additions/deletions due
+to either binary content or the `--max-diff-size` guardrail.
 
 In commit-granularity mode (no `--per-file`), Git file-expansion sub-stages such as
 `elapsed/git/blob-read` and `elapsed/git/diff` remain at `0.00ms` because `getFileChanges()` is
@@ -460,6 +465,29 @@ Every record extends the commit-mode schema with a `file` object:
 - **Empty commits** (no changed files) produce **no output records** in file mode.
 - **Merge commits** diff against the first parent only.
 - **Binary files** produce `"additions": null, "deletions": null`.
+- **Large text diffs**: with `--max-diff-size`, if either the before or after blob size exceeds the threshold, gitrail emits `"additions": null, "deletions": null` for that file.
 - **Root commits** (no parent) treat all files as `"added"`.
 - **File rotation** (`--rotate-lines`, `--rotate-size`) applies per record; a single commit's file records may span rotation boundaries.
 - Progress output reflects the number of file-level records written, not the number of commits processed.
+
+### Large-file diff guardrail
+
+Use `--max-diff-size` to avoid line-level diff cost on very large files when running in file mode:
+
+```bash
+# Skip diff counts for files larger than 100 KiB
+gitrail -r main --per-file --max-diff-size 100K ./my-repo
+
+# Same option with plain bytes
+gitrail -r main --per-file --max-diff-size 100000 ./my-repo
+```
+
+Details:
+
+- The option is disabled by default.
+- It only affects `--per-file` mode.
+- Accepted values: raw bytes (`100000`) or binary suffixes `K`, `M`, `G` (for example `100K`, `1M`).
+- A file is considered over threshold when either its before-blob size or after-blob size exceeds the configured value.
+- Over-threshold files are still emitted as file records, but with `additions` and `deletions` set to `null`.
+
+Suggested starting values are `100K` or `1M`, depending on repository characteristics.

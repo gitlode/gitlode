@@ -18,12 +18,15 @@ export function formatSummaryLines(data: SummaryData): string[] {
   return lines;
 }
 
-export function formatProfileLines(entries: readonly ProfilingEntry[]): string[] {
+export function formatProfileLines(
+  entries: readonly ProfilingEntry[],
+  skippedDiffs?: number,
+): string[] {
   if (entries.length === 0) return [];
   const nameWidth = Math.max(...entries.map((e) => e.name.length));
   const wallWidth = Math.max(...entries.map((e) => e.wallMs.toFixed(2).length));
   const workWidth = Math.max(...entries.map((e) => e.workMs.toFixed(2).length));
-  return [
+  const lines = [
     "Profile",
     ...entries.map((e) => {
       const label = e.name.padEnd(nameWidth);
@@ -32,4 +35,8 @@ export function formatProfileLines(entries: readonly ProfilingEntry[]): string[]
       return `  ${label} : wall= ${wall}  work= ${work}`;
     }),
   ];
+  if (skippedDiffs !== undefined) {
+    lines.push(`  skipped_diffs : ${skippedDiffs}`);
+  }
+  return lines;
 }

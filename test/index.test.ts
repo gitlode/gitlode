@@ -344,6 +344,11 @@ describe("formatProfileLines", () => {
     expect(lines[1]).toMatch(/^  elapsed\s+: wall=/);
     expect(lines[2]).toMatch(/^  elapsed\/planning\s*: wall=/);
   });
+
+  it("appends skipped_diffs line when provided", () => {
+    const lines = formatProfileLines([{ name: "elapsed", wallMs: 18.4, workMs: 15.6 }], 7);
+    expect(lines[lines.length - 1]).toBe("  skipped_diffs : 7");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -170,6 +170,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
       recordsWritten,
       commitsTraversed,
       refs: plans.map((p) => p.name),
+      skippedDiffs: request.granularity === "file" ? fileChangeExpander.skippedDiffCount : 0,
     };
   }
 }

@@ -396,8 +396,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
     contentA: Uint8Array,
     contentB: Uint8Array,
   ): Promise<FileChange> {
+    const beforeSize = contentA.length;
+    const afterSize = contentB.length;
     if (this._isBinary(contentA) || this._isBinary(contentB)) {
-      return { path, status, additions: null, deletions: null };
+      return { path, status, beforeSize, afterSize, additions: null, deletions: null };
     }
 
     const decoder = new TextDecoder("utf-8");
@@ -411,7 +413,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
       if (part.removed) deletions += part.count;
     }
 
-    return { path, status, additions, deletions };
+    return { path, status, beforeSize, afterSize, additions, deletions };
   }
 
   private _isBinary(content: Uint8Array): boolean {

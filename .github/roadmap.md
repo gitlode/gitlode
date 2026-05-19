@@ -116,6 +116,34 @@ listed sequentially, target data becomes difficult to find.
 
 ---
 
+#### CLI UX: User-controlled color policy for non-TTY and CI logs
+
+For v0.6.0, color output is intentionally auto-disabled in non-TTY contexts and no user-facing
+override option is introduced. That default keeps redirected output and scripted usage stable.
+
+This item evaluates a future CLI color policy option surface that preserves the current safe
+default while allowing explicit operator control when non-TTY color is desirable.
+
+**Design intent**:
+
+- keep default behavior as `auto` (TTY-aware enablement, non-TTY disablement)
+- provide explicit overrides for advanced workflows (for example CI log viewers or pagers)
+- maintain deterministic behavior and avoid surprising ANSI escape leakage in machine-oriented
+  pipelines
+
+**Options to evaluate**:
+
+- CLI shape: `--color <auto|always|never>` vs boolean-style split flags
+- environment-variable interoperability (`NO_COLOR`, `FORCE_COLOR`)
+- precedence rules between CLI option, environment variables, and TTY detection
+- documentation and troubleshooting guidance for Windows terminal/CI differences
+
+**Non-goal for this item**:
+
+- no redesign of JSON output contracts; this is terminal presentation policy only
+
+---
+
 ### Medium-term
 
 ---

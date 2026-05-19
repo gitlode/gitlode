@@ -7,7 +7,7 @@ import * as git from "isomorphic-git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 
-import { parseArgs } from "../../src/cli/args.js";
+import { parseArgs, program } from "../../src/cli/args.js";
 import type { CommitOid } from "../../src/core/index.js";
 import type { GitAdapter } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
@@ -730,5 +730,32 @@ describe("parseArgs – unknown option rejection", () => {
         expect.stringContaining("Unknown option: --ignored"),
       );
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Parser schema validation boundary
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – schema validation boundary", () => {
+  let repoDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("converts parsed option shape errors to user-facing stderr + exit code 1", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
+
+    vi.spyOn(program, "opts").mockReturnValueOnce({
+      ...program.opts(),
+      ref: "main",
+    } as never);
+
+    await expect(parseArgs(adapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("expected array"));
   });
 });

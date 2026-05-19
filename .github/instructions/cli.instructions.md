@@ -17,6 +17,21 @@ gitrail [options] <repository-path>
 
 ## Parameter Reference
 
+### Help Option Groups
+
+`gitrail --help` uses commander 14 native option grouping. The grouped option sections and
+assignments are:
+
+| Group                     | Options                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `General`                 | `--quiet`, `--profile`                                                       |
+| `Output`                  | `--output-dir`, `--output-prefix`, `--per-file`                              |
+| `Differential Extraction` | `--incremental`, `--state`, `--missing-state`, `--since-ref`, `--since-date` |
+| `File Rotation`           | `--rotate-lines`, `--rotate-size`                                            |
+
+`<repository-path>` remains a positional argument in the synopsis. `--ref` remains available on
+the post-Phase-1 option surface and is not duplicated into the grouped sections above.
+
 ### Positional
 
 | Parameter           | Type   | Required | Description                      |

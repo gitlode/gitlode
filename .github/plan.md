@@ -46,7 +46,7 @@ v0.5.0 is a minor release focused on making release-oriented extraction a first-
 ### Phase 3: CLI Parser Hardening and Help Discoverability
 
 - **File**: [`plans/phase-3.md`](plans/phase-3.md)
-- **Status**: Planned
+- **Status**: Completed
 
 Provisional dependency notes:
 

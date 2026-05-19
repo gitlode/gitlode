@@ -55,4 +55,33 @@ describe("program – help output wiring", () => {
       ).toBeGreaterThan(0);
     }
   });
+
+  it("assigns options to the documented help groups", () => {
+    const optionsByLong = new Map(program.options.map((option) => [option.long, option]));
+
+    expect(optionsByLong.get("--quiet")?.helpGroupHeading).toBe("General");
+    expect(optionsByLong.get("--profile")?.helpGroupHeading).toBe("General");
+
+    expect(optionsByLong.get("--output-dir")?.helpGroupHeading).toBe("Output");
+    expect(optionsByLong.get("--output-prefix")?.helpGroupHeading).toBe("Output");
+    expect(optionsByLong.get("--per-file")?.helpGroupHeading).toBe("Output");
+
+    expect(optionsByLong.get("--incremental")?.helpGroupHeading).toBe("Differential Extraction");
+    expect(optionsByLong.get("--state")?.helpGroupHeading).toBe("Differential Extraction");
+    expect(optionsByLong.get("--missing-state")?.helpGroupHeading).toBe("Differential Extraction");
+    expect(optionsByLong.get("--since-ref")?.helpGroupHeading).toBe("Differential Extraction");
+    expect(optionsByLong.get("--since-date")?.helpGroupHeading).toBe("Differential Extraction");
+
+    expect(optionsByLong.get("--rotate-lines")?.helpGroupHeading).toBe("File Rotation");
+    expect(optionsByLong.get("--rotate-size")?.helpGroupHeading).toBe("File Rotation");
+  });
+
+  it("renders grouped help headings", () => {
+    const help = program.helpInformation();
+
+    expect(help).toContain("General");
+    expect(help).toContain("Output");
+    expect(help).toContain("Differential Extraction");
+    expect(help).toContain("File Rotation");
+  });
 });

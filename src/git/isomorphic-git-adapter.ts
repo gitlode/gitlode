@@ -4,14 +4,22 @@ import { diffLines } from "diff";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
-import type { CommitHash, StageProfiler } from "../core/index.js";
+import type { CommitOid, OidProfile, StageProfiler } from "../core/index.js";
+import { isCommitOid } from "../core/index.js";
 import { withProfilerAsync } from "../core/profile/index.js";
 import { GitAdapterError } from "./errors.js";
-import type { FileChange, GitAdapter, RawCommit } from "./index.js";
+import {
+  DEFAULT_REPOSITORY_OBJECT_FORMAT,
+  type FileChange,
+  type GitAdapter,
+  type RawCommit,
+  type RepositoryObjectFormat,
+} from "./index.js";
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private _resolveRefProfiler?: StageProfiler;
+  private _repositoryObjectFormatProfiler?: StageProfiler;
   private _getRemoteUrlProfiler?: StageProfiler;
   private _walkCommitsProfiler?: StageProfiler;
   private _walkReadCommitProfiler?: StageProfiler;
@@ -26,8 +34,16 @@ export class IsomorphicGitAdapter implements GitAdapter {
     this._fs = fsImpl ?? (nodeFs as FsClient);
   }
 
+  supportedObjectFormats(): readonly OidProfile[] {
+    // Verified Phase 2 support boundary for gitrail-used operations.
+    return ["sha1"];
+  }
+
   setProfiler(profiler: StageProfiler): void {
     this._resolveRefProfiler = profiler.createScopedProfiler("resolve-ref");
+    this._repositoryObjectFormatProfiler = profiler.createScopedProfiler(
+      "repository-object-format",
+    );
     this._getRemoteUrlProfiler = profiler.createScopedProfiler("get-remote-url");
     this._walkCommitsProfiler = profiler.createScopedProfiler("walk-commits");
     this._walkReadCommitProfiler = this._walkCommitsProfiler.createScopedProfiler("read-commit");
@@ -40,15 +56,25 @@ export class IsomorphicGitAdapter implements GitAdapter {
     this._diffProfiler = profiler.createScopedProfiler("diff");
   }
 
-  async resolveRef(repoPath: string, ref: string): Promise<CommitHash> {
+  async resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
+    let oid: string;
     try {
-      return (await withProfilerAsync(this._resolveRefProfiler, async () =>
+      oid = (await withProfilerAsync(this._resolveRefProfiler, async () =>
         git.resolveRef({ fs: this._fs, dir: repoPath, ref }),
-      )) as CommitHash;
+      )) as string;
     } catch (err) {
       if (err instanceof Error) {
         const name = err.name;
         if (name === "NotFoundError" || name === "ResolveRefError") {
+          // Fallback: treat the input as a raw commit object ID.
+          if (isCommitOid(ref)) {
+            try {
+              await git.readCommit({ fs: this._fs, dir: repoPath, oid: ref });
+              return ref as CommitOid;
+            } catch {
+              // Not a valid commit object — fall through to REF_NOT_FOUND.
+            }
+          }
           throw new GitAdapterError(`Ref not found: ${ref}`, "REF_NOT_FOUND", err);
         }
         if (
@@ -64,6 +90,65 @@ export class IsomorphicGitAdapter implements GitAdapter {
         "UNKNOWN",
         err,
       );
+    }
+    // Peel annotated tags to their target commit.
+    oid = await this._peelToCommit(repoPath, oid);
+    return oid as CommitOid;
+  }
+
+  async getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat> {
+    try {
+      const raw = await withProfilerAsync(this._repositoryObjectFormatProfiler, async () =>
+        git.getConfig({
+          fs: this._fs,
+          dir: repoPath,
+          path: "extensions.objectformat",
+        }),
+      );
+
+      // Per Git behavior, repository object format defaults to sha1 when unset.
+      if (raw === undefined || raw === null) {
+        return DEFAULT_REPOSITORY_OBJECT_FORMAT;
+      }
+
+      const normalized = String(raw).trim().toLowerCase();
+      return normalized.length === 0 ? DEFAULT_REPOSITORY_OBJECT_FORMAT : normalized;
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.name === "NotGitDataError" ||
+          err.name === "UnknownTransportError" ||
+          err.message.includes("ENOENT"))
+      ) {
+        throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY", err);
+      }
+      throw new GitAdapterError(
+        `Unexpected error reading repository object format: ${String(err)}`,
+        "UNKNOWN",
+        err,
+      );
+    }
+  }
+
+  async isRefBranch(repoPath: string, ref: string): Promise<boolean> {
+    if (isCommitOid(ref)) return false;
+    try {
+      await git.resolveRef({ fs: this._fs, dir: repoPath, ref: `refs/heads/${ref}` });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async _peelToCommit(repoPath: string, oid: string): Promise<string> {
+    try {
+      const result = await git.readTag({ fs: this._fs, dir: repoPath, oid });
+      if (result.tag.type === "commit") return result.tag.object;
+      // tag-of-tag: keep peeling
+      return this._peelToCommit(repoPath, result.tag.object);
+    } catch {
+      // Not a tag object — the OID already points to a commit
+      return oid;
     }
   }
 
@@ -91,8 +176,8 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async *walkCommits(
     repoPath: string,
-    head: CommitHash,
-    excludeHash?: CommitHash,
+    head: CommitOid,
+    excludeHash?: CommitOid,
   ): AsyncIterable<RawCommit> {
     const excluded = excludeHash
       ? await this._collectReachable(repoPath, excludeHash)
@@ -121,7 +206,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
       if (next === null) continue;
 
       yield {
-        oid: next.hash as CommitHash,
+        oid: next.hash as CommitOid,
         message: next.commit.message,
         author: {
           name: next.commit.author.name,
@@ -135,7 +220,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
           timestamp: next.commit.committer.timestamp,
           timezoneOffset: next.commit.committer.timezoneOffset,
         },
-        parents: next.commit.parent,
+        parents: next.commit.parent as CommitOid[],
       };
 
       for (const parent of next.commit.parent) {
@@ -146,7 +231,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
     }
   }
 
-  async findMergeBase(repoPath: string, oids: readonly CommitHash[]): Promise<CommitHash | null> {
+  async findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null> {
     try {
       const result = await withProfilerAsync(this._mergeBaseProfiler, async () =>
         git.findMergeBase({
@@ -156,7 +241,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
         }),
       );
       if (result.length === 0) return null;
-      return result[0] as CommitHash;
+      return result[0] as CommitOid;
     } catch (err) {
       throw new GitAdapterError(
         `Unexpected error finding merge base: ${String(err)}`,
@@ -168,8 +253,8 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async getFileChanges(
     repoPath: string,
-    commitOid: CommitHash,
-    parentOid?: CommitHash,
+    commitOid: CommitOid,
+    parentOid?: CommitOid,
   ): Promise<readonly FileChange[]> {
     return withProfilerAsync(this._fileChangesProfiler, async () => {
       const changes: FileChange[] = [];

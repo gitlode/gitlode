@@ -35,6 +35,13 @@ extracts only commits added since that point.
 
 Incremental mode requires `--state`.
 
+> **Note:** Incremental extraction is designed for **branch refs** only. The state file records
+> each branch's current HEAD so that subsequent runs can pick up only new commits.
+> Tags and raw commit OIDs are **not** recorded in the state file. If you specify a tag or raw OID
+> with `--state`, gitrail will warn you and re-extract those refs in full on every run, which may
+> produce duplicate records in downstream systems. For tag or raw OID traversal, use snapshot mode
+> (omit `--incremental`) instead.
+
 ---
 
 ## Typical Workflows
@@ -44,9 +51,9 @@ Incremental mode requires `--state`.
 Extract all commits reachable from a branch:
 
 ```bash
-gitrail --branch main ./my-repo
+gitrail --ref main ./my-repo
 # or with shorthand aliases
-gitrail -b main ./my-repo
+gitrail -r main ./my-repo
 ```
 
 Output is written to `./my-repo-<timestamp>-000001.jsonl` (prefix derived from the remote origin
@@ -61,14 +68,14 @@ For pipelines that regularly load new commits into a data warehouse.
 > gitrail reads only the local `.git` directory. To pick up newly pushed commits, run
 > `git fetch` before each gitrail invocation. Note that `git fetch` updates **remote-tracking
 > refs** (e.g. `origin/main`), not local branch refs (`main`). Use the remote-tracking ref
-> name with `--branch` (e.g. `-b origin/main`) so that a plain `git fetch` is sufficient.
+> name with `--ref` (e.g. `-r origin/main`) so that a plain `git fetch` is sufficient.
 > Alternatively, use `git pull` to advance the local branch, or work with a **bare clone**
 > where `git fetch` updates refs directly.
 
 **Step 1 — initialize state (once):**
 
 ```bash
-gitrail -b main -s ./gitrail-state.json ./my-repo
+gitrail -r main -s ./gitrail-state.json ./my-repo
 ```
 
 This extracts all commits and writes a state file recording the current HEAD of each branch.
@@ -77,7 +84,7 @@ This extracts all commits and writes a state file recording the current HEAD of 
 
 ```bash
 git -C ./my-repo fetch origin
-gitrail --incremental -b origin/main -s ./gitrail-state.json ./my-repo
+gitrail --incremental -r origin/main -s ./gitrail-state.json ./my-repo
 ```
 
 Only commits added since the last run are extracted. The state file is updated on success.
@@ -87,7 +94,7 @@ Only commits added since the last run are extracted. The state file is updated o
 If you prefer a single command that handles both the first run and all subsequent runs:
 
 ```bash
-gitrail --incremental -b main -s ./gitrail-state.json --missing-state snapshot ./my-repo
+gitrail --incremental -r main -s ./gitrail-state.json --missing-state snapshot ./my-repo
 ```
 
 - First run (state file absent): emits a warning to stderr, performs full extraction, creates
@@ -103,21 +110,25 @@ Use `--since-ref` to extract only commits that appeared after a given ref — eq
 
 ```bash
 # All commits on main that are not reachable from v1.0
-gitrail -b main --since-ref v1.0 ./my-repo
+gitrail -r main --since-ref v1.0 ./my-repo
 ```
 
-`--since-ref` accepts a tag name, branch name, or full commit hash.
+`--since-ref` accepts a tag name, branch name, or full commit object ID (OID).
 
 **With state recording** (for subsequent incremental runs):
 
 ```bash
-gitrail -b main -b develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
+gitrail -r main -r develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
 ```
 
-> **Note:** The state file records each branch's current HEAD hash — not the `--since-ref`
+> **Note:** The state file records each branch's current HEAD OID — not the `--since-ref`
 > boundary. A subsequent incremental run picks up commits since the HEAD recorded at this run,
 > not since `v1.0`. If a branch's HEAD is reachable from the since-ref (meaning zero commits
 > would be output for that branch), gitrail emits a warning to stderr.
+
+> **Compatibility note:** Runtime support is currently limited to repositories using the `sha1`
+> object format. Unsupported formats fail before traversal/output with:
+> `Unsupported repository object format: <format>. Supported formats: sha1.`
 
 ---
 
@@ -129,7 +140,7 @@ your setup:
 **Option A — stateless snapshot (simplest)**
 
 ```bash
-gitrail -b main ./my-repo
+gitrail -r main ./my-repo
 ```
 
 No state file required. Suitable when the downstream system handles deduplication
@@ -140,7 +151,7 @@ No state file required. Suitable when the downstream system handles deduplicatio
 Store the state file on a persistent volume mounted into the container:
 
 ```bash
-gitrail --incremental -b main \
+gitrail --incremental -r main \
   -s /mnt/state/gitrail-state.json \
   --missing-state snapshot \
   ./my-repo
@@ -156,7 +167,7 @@ succeeds without manual intervention.
 ### What the state file records
 
 After a successful run, gitrail writes a JSON file at the path given by `--state`. It records the
-HEAD commit hash for each processed branch at the time of extraction:
+HEAD commit OID for each processed branch at the time of extraction:
 
 ```json
 {
@@ -172,10 +183,10 @@ HEAD commit hash for each processed branch at the time of extraction:
 
 ### Role of `--state` in each mode
 
-| Mode          | State file read?     | State file written?                        |
-| ------------- | -------------------- | ------------------------------------------ |
-| `snapshot`    | No (content ignored) | Yes (created or overwritten on success)    |
-| `incremental` | Yes                  | Yes (updated with current HEAD on success) |
+| Mode          | State file read?     | State file written?                            |
+| ------------- | -------------------- | ---------------------------------------------- |
+| `snapshot`    | No (content ignored) | Yes (created or overwritten on success)        |
+| `incremental` | Yes                  | Yes (updated with current HEAD OID on success) |
 
 In snapshot mode, `--state` serves only as a recording path — prior content has no effect on
 extraction. This makes it safe to run without `--incremental` to re-initialize state without affecting
@@ -199,21 +210,21 @@ that persists across runs.
 
 ## Multi-Branch Extraction
 
-Specify `--branch` (or `-b`) multiple times to extract from several branches in one run:
+Specify `--ref` (or `-r`) multiple times to extract from several branches in one run:
 
 ```bash
-gitrail -b main -b develop -b release/1.x ./my-repo
+gitrail -r main -r develop -r release/1.x ./my-repo
 ```
 
-**Deduplication:** commits shared between branches are written exactly once. gitrail maintains a
-visited hash set across all branches within a single run.
+**Deduplication:** commits shared between refs are written exactly once. gitrail maintains a
+visited OID set across all refs within a single run.
 
-**Output order:** all commits from the first branch are written before the second branch begins,
-in the order `--branch` arguments were given.
+**Output order:** all commits from the first ref are written before the second ref begins,
+in the order `--ref` arguments were given.
 
 ### Adding a new branch to an existing incremental workflow
 
-When a branch listed in `--branch` has no entry in the state file, gitrail automatically prevents
+When a ref listed in `--ref` has no entry in the state file, gitrail automatically prevents
 cross-run duplicates. It computes the **merge base** of all branches already recorded in the
 state file and uses that commit as the extraction boundary for the new branch, excluding commits
 already output in prior runs.
@@ -242,8 +253,8 @@ chronological ordering.** Sort by `committer.timestamp` in your downstream syste
 ### Commits carry no branch information
 
 A Git commit object contains no branch field. "Extracting branch X" means "walk from the commit
-that ref X currently points to." The same commit hash may be reachable from multiple branches;
-gitrail deduplicates by hash within each run but does not record which branch a commit was reached
+that ref X currently points to." The same commit OID may be reachable from multiple branches;
+gitrail deduplicates by OID within each run but does not record which branch a commit was reached
 through.
 
 ### Branch refs are mutable
@@ -262,13 +273,13 @@ files:
 
 ```bash
 # New file every 10,000 lines
-gitrail -b main --rotate-lines 10000 ./my-repo
+gitrail -r main --rotate-lines 10000 ./my-repo
 
 # New file every 500 MiB
-gitrail -b main --rotate-size 500M ./my-repo
+gitrail -r main --rotate-size 500M ./my-repo
 
 # Both — rotation triggers on whichever threshold is reached first
-gitrail -b main --rotate-lines 10000 --rotate-size 1G ./my-repo
+gitrail -r main --rotate-lines 10000 --rotate-size 1G ./my-repo
 ```
 
 `--rotate-size` accepts either a raw byte integer (for backward compatibility) or an integer
@@ -297,17 +308,17 @@ gitrail [options] <repository-path>
 
 ### Extraction mode
 
-| Parameter        | Alias | Type                | Default | Description                                                                                          |
-| ---------------- | ----- | ------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `--incremental`  |       | boolean             | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction. |
-| `--branch <ref>` | `-b`  | string (repeatable) | —       | Ref to traverse from. At least one required.                                                         |
+| Parameter       | Alias | Type                | Default | Description                                                                                                                                                                                                                          |
+| --------------- | ----- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--incremental` |       | boolean             | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.                                                                                                                                 |
+| `--ref <ref>`   | `-r`  | string (repeatable) | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. At least one required. For incremental workflows (`--state`), only branch refs are tracked in state; tags and raw OIDs will be re-extracted in full on every run. |
 
 ### Range filter (snapshot mode only)
 
-| Parameter                | Type   | Description                                                                        |
-| ------------------------ | ------ | ---------------------------------------------------------------------------------- |
-| `--since-ref <ref>`      | string | Exclude commits reachable from this ref. Accepts tag, branch name, or commit hash. |
-| `--since-date <ISO8601>` | string | Include only commits with committer timestamp after this datetime.                 |
+| Parameter                | Type   | Description                                                                                   |
+| ------------------------ | ------ | --------------------------------------------------------------------------------------------- |
+| `--since-ref <ref>`      | string | Exclude commits reachable from this ref. Accepts tag, branch name, or commit object ID (OID). |
+| `--since-date <ISO8601>` | string | Include only commits with committer timestamp after this datetime.                            |
 
 ### State management
 
@@ -397,7 +408,7 @@ By default, each output record represents one commit.
 With `--per-file`, each record represents one changed **file** within a commit, with commit metadata denormalized onto every record. This enables file-granularity analytics without a join: each row is self-contained.
 
 ```bash
-gitrail -b main --per-file ./my-repo
+gitrail -r main --per-file ./my-repo
 ```
 
 ### Output record shape (file mode)

@@ -36,7 +36,10 @@ async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
 
 function makeAdapter(fileChanges: FileChange[]): GitAdapter {
   return {
+    supportedObjectFormats: () => ["sha1"],
     resolveRef: async () => "a".repeat(40),
+    getRepositoryObjectFormat: async () => "sha1",
+    isRefBranch: async () => true,
     walkCommits: async function* () {},
     getRemoteUrl: async () => null,
     getFileChanges: async () => fileChanges,
@@ -73,7 +76,10 @@ describe("DefaultFileChangeExpander", () => {
   it("calls getFileChanges with parentOid=undefined for a root commit (no parents)", async () => {
     let capturedParentOid: string | undefined = "not-called";
     const adapter: GitAdapter = {
+      supportedObjectFormats: () => ["sha1"],
       resolveRef: async () => "a".repeat(40),
+      getRepositoryObjectFormat: async () => "sha1",
+      isRefBranch: async () => true,
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
       getFileChanges: async (_repo, _oid, parentOid) => {
@@ -95,7 +101,10 @@ describe("DefaultFileChangeExpander", () => {
     const secondParent = "2".repeat(40);
     let capturedParentOid: string | undefined;
     const adapter: GitAdapter = {
+      supportedObjectFormats: () => ["sha1"],
       resolveRef: async () => "a".repeat(40),
+      getRepositoryObjectFormat: async () => "sha1",
+      isRefBranch: async () => true,
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
       getFileChanges: async (_repo, _oid, parentOid) => {
@@ -142,7 +151,10 @@ describe("DefaultFileChangeExpander", () => {
       ],
     ]);
     const adapter: GitAdapter = {
+      supportedObjectFormats: () => ["sha1"],
       resolveRef: async () => "a".repeat(40),
+      getRepositoryObjectFormat: async () => "sha1",
+      isRefBranch: async () => true,
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
       getFileChanges: async (_repo, oid) => fileChangeMap.get(oid) ?? [],
@@ -165,7 +177,10 @@ describe("DefaultFileChangeExpander", () => {
     const commitOid = "c".repeat(40);
     let capturedOid: string | undefined;
     const adapter: GitAdapter = {
+      supportedObjectFormats: () => ["sha1"],
       resolveRef: async () => "a".repeat(40),
+      getRepositoryObjectFormat: async () => "sha1",
+      isRefBranch: async () => true,
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
       getFileChanges: async (_repo, oid) => {

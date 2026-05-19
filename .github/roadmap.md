@@ -19,100 +19,6 @@ Roadmap entries use the following standardized metadata labels, placed immediate
 
 ### Near-term
 
-#### Compatibility: Hash-algorithm-agnostic commit OID support
-
-gitrail currently documents and validates commit hashes as SHA-1/40-character values in several
-places. This creates a product-level gap for repositories that use non-SHA-1 object formats,
-because extraction intent is to faithfully export Git history, not to enforce one hash algorithm.
-
-This item upgrades the product contract from "SHA-1 commit hash" to "Git commit object ID"
-where feasible, and treats remaining limitations as explicit compatibility constraints rather than
-implicit runtime failures.
-
-**Design intent**:
-
-- make extraction behavior hash-algorithm-agnostic at the gitrail contract level
-- remove runtime assumptions that reject valid non-40-character commit OIDs
-- preserve checkpoint and traversal correctness guarantees while broadening compatibility
-
-**Required validation before implementation closure**:
-
-- verify isomorphic-git behavior for non-SHA-1 repositories in the exact operations gitrail uses
-  (`resolveRef`, `readCommit`, traversal, merge-base, and tree/file-change workflows)
-- confirm whether there are known object-format constraints in current dependency versions
-- define pass/fail criteria for compatibility tests and record results in repository docs
-
-**Fallback policy if dependency-level constraints are found**:
-
-- do not keep silent SHA-1 assumptions as implicit behavior
-- publish explicit compatibility limitations (supported hash algorithms/object formats)
-- fail with clear user-facing diagnostics when unsupported repository formats are detected
-
-**Scope hints for implementation planning**:
-
-- revisit runtime validators and branded-hash assumptions in state-file read/write paths
-- align README/User Guide/schema wording from SHA-1-specific terminology to algorithm-neutral
-  OID language when compatibility is confirmed
-- keep this work as a compatibility/correctness initiative, not an analytics or schema-extension
-  feature
-
-#### CLI UX: Release-boundary extraction workflow
-
-The current gitrail CLI can express "extract commits after a given ref" via `--since-ref`, but it
-does not provide an explicit, user-facing way to express the complementary release-oriented
-workflow that naturally appears in repositories using release tags: snapshot the history included
-in a release once, then continuously ingest only the post-release range as new commits accumulate.
-
-This should not be treated as a simple request for the inverse of `--since-ref`. The user intent is
-not "the complement of commits after X" but "the commit set included in release ref X" as a stable
-extraction boundary. Conceptually, this is closer to treating a release ref as a traversal
-starting point or boundary than to subtracting one reachability set from another.
-
-**Target workflow**:
-
-- history at or before the latest stable release is assumed to be stable and can be extracted once as a snapshot
-- commits after that release continue to grow toward the next release
-- therefore, the post-release range should be bootstrapped once via `--since-ref` and then maintained through daily incremental extraction with a state file
-
-**Current workaround and its limitations**:
-
-- in Git terms, users may be able to approximate "extract up to release X" by creating a temporary ref fixed at that release and passing it to `--branch`
-- if `--branch <ref>` is treated as a true general ref traversal entry point, users may also be able to use the release tag itself directly rather than creating a temporary branch
-- however, neither approach is an intuitive CLI expression of the user's intent, and both require the user to translate a release-boundary question into lower-level ref manipulation
-- in addition, the ref-resolution behavior for lightweight tags, annotated tags, branch names, and raw commit hashes should be made explicit if release refs are to become part of the supported workflow model
-
-This item should therefore be treated as a **UX and extraction-model design problem**, not merely
-as a request for one additional flag.
-
-**Questions to resolve at design time**:
-
-- whether to add an explicit `--until-ref` style parameter, or instead make release-ref traversal a first-class documented workflow without introducing a new range flag
-- whether this capability should be defined as "snapshot the history included in the specified ref" rather than as the complement of `--since-ref`
-- how `--branch`, `--since-ref`, `--state`, and incremental bootstrap should fit together as one coherent release-boundary workflow
-- how ref resolution should be specified for tag names, branch names, commit hashes, and annotated-tag peeling behavior
-- whether this model should be limited to single-boundary release workflows, or whether a multi-branch interpretation is desirable and sufficiently clear
-
-**Design priority**:
-
-- users should be able to understand "extract up to the latest release once" and "bootstrap from the latest release, then switch to incremental" without having to reason in terms of temporary refs or Git-internal setup steps
-- the resulting UX should form a conceptually paired explanation with the existing `--since-ref` + state-file workflow for post-release ingestion
-- even if an internal workaround uses an auxiliary ref, that workaround should not become the primary user-facing workflow
-
-#### CLI UX: `--help` option grouping and discoverability
-
-The `--help` output lists all options in a flat list with no grouping. The jump from "I want incremental extraction" to "I need `--state`" is non-obvious.
-
-- Group options under section headers: **Output**, **Differential Extraction**, **File Rotation**
-- Add a note to the `--state` description: "Primary mechanism for scheduled/incremental runs"
-
-**Design resolution notes (v0.2.0 — deferred; updated v0.4.1)**:
-
-- As of v0.4.1, gitrail uses commander (migrated from citty). commander supports option grouping natively — the CLI framework blocker is resolved.
-- Deferred on cost/value grounds: the option set (~10 options) is small enough to be readable without grouping, and gitrail usage patterns tend toward fixed, recurring invocations rather than exploratory CLI trial-and-error. The implementation cost outweighs the discoverability benefit at this scale.
-- `docs/usage.md` and README serve as the primary reference for workflow guidance in the interim.
-
----
-
 #### Extraction/File Mode: Exact-content rename detection (limited scope)
 
 gitrail currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
@@ -142,6 +48,67 @@ deterministic case: pairing `deleted` and `added` records when blob identity is 
 - whether the feature should be opt-in via CLI (preferred for compatibility) or enabled by default
 - how to handle one-to-many and many-to-one exact matches deterministically
 - what summary/profile counters should be emitted so users can audit rename pairing impact
+
+#### State/Incremental: Track non-branch refs in state for reliable incremental extraction
+
+Currently, only branch refs are recorded in the state file after each extraction. Tags and raw
+commit OIDs specified via `--ref` are not recorded, so they are re-extracted in full on every
+incremental run. This may produce duplicate records in downstream data warehouses when users
+specify tag or OID refs alongside `--state`.
+
+As a short-term safeguard, gitrail emits a warning when `--state` is active and a non-branch ref
+is encountered. The full fix is to extend the state file to record the resolved commit hash for
+each ref regardless of ref type — so that all refs benefit from incremental tracking.
+
+**Design intent**:
+
+- record the resolved commit OID per ref at the end of each successful run, regardless of whether
+  the ref is a branch, tag, or raw OID
+- use the recorded OID as the traversal lower bound on the next incremental run, the same way
+  branch `lastCommitHash` is used today
+- because this work changes state-file structure, explicitly evaluate whether the wire field name
+  `lastCommitHash` should be renamed as part of the same breaking-change window
+- branch refs continue to be tracked under `state.branches` for backward compatibility;
+  non-branch refs require a separate state structure or an extended per-ref entry shape
+- once this is implemented, the non-branch warning should be revisited: OID and annotated tag
+  refs still have limited incremental utility (the ref is static and the recorded OID is always
+  the same), so the warning for those ref types remains valuable even after this fix
+
+**Scope**:
+
+- extend `ExtractionState` or introduce a parallel per-ref record alongside `branches`
+- update state read/write paths and the traversal planner to use recorded OIDs for non-branch refs
+- update `docs/usage.md` to document that all ref types now support reliable incremental tracking,
+  with a noted caveat for OID and annotated tag refs that point to a fixed commit
+
+---
+
+#### CLI UX: Terminal output styling and readability
+
+With recent CLI enhancements, terminal output has become richer but also more information-dense,
+making it harder for users to locate essential information. When many "label: value" entries are
+listed sequentially, target data becomes difficult to find.
+
+- **Text formatting**: Restructure and align output to improve visual hierarchy and scanability
+- **Color support**: Use strategic coloring to distinguish different information categories
+- **Overall UX**: Refine typography and spacing to reduce cognitive load
+
+**Design questions to resolve at design time**:
+
+- library selection: whether to adopt a package like `chalk` (cross-platform ANSI management,
+  well-tested) or implement color support in-house (no dependency addition, but requires Windows
+  ANSI handling)
+- scope of formatting improvements: which output sections are highest priority for visual
+  restructuring
+- backwards compatibility: whether ANSI stripping for non-TTY outputs should be automatic or
+  user-controlled
+- color scheme and accessibility: ensure sufficient contrast and consider colorblind-safe palettes
+
+**Scope boundary**:
+
+- focus on interactive CLI output (progress reporting, status messages, result summaries)
+- does not include JSON output (`--output` files remain unchanged)
+- preserve deterministic, scriptable behavior when stdout is piped or redirected
 
 ---
 
@@ -319,35 +286,20 @@ alternative `DiffAdapter` implementations to prioritize first.
 
 #### Output: Configurable field inclusion/exclusion
 
+This is an output-surface convenience feature rather than a core extraction requirement. In many
+pipelines, downstream warehouses can drop or mask columns after ingest, so the feature's value is
+strongest when users need to minimize exposure or payload size at extraction time instead of in a
+later projection step.
+
 - Add `--fields` or `--exclude-fields` CLI option
-- Allows omitting PII fields such as `author.email`, `committer.email`
-- Enables trimming output size for use cases that don't need all fields
+- Allows omitting PII fields such as `author.email`, `committer.email` when source-side control is
+  desirable
+- Enables trimming output size for use cases that do not need all fields, while keeping the
+  default extraction contract fully populated
 
 ---
 
 ### Long-term
-
-#### Output/UX: Directory-move inference from file-rename clusters
-
-Git tracks file-level changes; directory rename is generally inferred from sets of path-level file
-moves. Once file-level rename detection is mature, gitrail can provide an optional higher-level
-view that groups compatible rename sets into inferred directory moves.
-
-This should be treated as an interpretation layer for usability, not as a replacement for
-file-grain facts.
-
-**Design intent**:
-
-- improve readability for refactors that mostly move files across path prefixes
-- preserve canonical file-level output as the primary factual grain
-- make inferred directory-level summaries clearly distinguishable from file-level facts
-
-**Design questions to resolve at implementation time**:
-
-- criteria for grouping rename pairs into a directory-level move inference
-- handling partial migrations and mixed commits (move + edit + add/delete)
-- whether directory inference belongs in primary output, sidecar metadata, or reporting-only views
-- how to expose confidence/coverage so downstream users can evaluate interpretation quality
 
 ---
 
@@ -390,7 +342,7 @@ operational diagnostics, and future optimization planning.
 
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
 
-Allow users to attach custom processing stages to gitrail's extraction pipeline so that
+Allow users to attach custom processing stages (plugins) to gitrail's extraction pipeline so that
 organization-specific semantics can be derived without expanding the core schema for every use
 case.
 
@@ -404,11 +356,93 @@ computed from diff content.
 - move organization-specific interpretation to a user-controlled extension boundary
 - allow enrichment without forcing the project to standardize every downstream analytical need
 
-**Open design questions**:
+**Architecture**:
 
-- whether the extension point should run in-process, as an external command, or via a streaming IPC boundary
-- what record shape and lifecycle guarantees plugins can rely on
-- how plugin failures should affect extraction success, state writing, and reproducibility
+- **Plugin implementation**: Users implement the `ProjectorPlugin` interface (`init?(): Promise<InitResult>` and `project(context, profiler?): Promise<ProjectionResult>`).
+- **Config-driven loading**: Plugins are loaded from a configuration file (format TBD — see **Open Design Question: CLI Interface** below) and instantiated via a `PluginFactory` function.
+- **Plugin types**:
+  - **npm packages** (e.g., `commit-message-analyze-projector`): Published plugins with shared logic and configuration.
+  - **script injection** (experimental): Local JavaScript files or modules with user-defined logic. No capability restrictions in initial implementation; security review and sandboxing deferred to future roadmap item.
+  - **IPC-based plugins** (future): External processes communicating via stdio (aligns with Worker-based runtime item).
+- **Execution model**:
+  - Sequential per-fact execution (no implicit parallelization in Phase 1).
+  - Plugins run after `DefaultFactProjector` and before output sink.
+  - Each plugin sees the base canonical record (from `DefaultFactProjector`) and the `Fact` input; other plugins' outputs are not visible (order independence).
+  - Plugins contribute data to the `extensions` field in the output record, keyed by namespace.
+
+**Type contract** (core types):
+
+```ts
+export type InitResult =
+  | { readonly type: "ready" }
+  | { readonly type: "fatal"; readonly message: string };
+
+export interface ProjectionContext {
+  readonly fact: Fact;
+  readonly baseRecord: Readonly<OutputRecord>; // from DefaultFactProjector
+}
+
+export type ProjectionResult =
+  | { readonly type: "success"; readonly data: Record<string, unknown> }
+  | { readonly type: "skip"; readonly reason: string }
+  | { readonly type: "fatal"; readonly message: string };
+
+export interface ProjectorPlugin {
+  init?(): Promise<InitResult>;
+  project(context: ProjectionContext, profiler?: StageProfiler): Promise<ProjectionResult>;
+}
+```
+
+**Output format** (backward compatible):
+
+- The `extensions` field is added to `OutputRecord` when plugins are configured; it is absent otherwise.
+- Structure: `extensions: { [namespace: string]: { [key: string]: unknown } | null }`.
+  - `null` value indicates a plugin returned `"skip"` for that fact.
+  - This addition is non-breaking: existing consumers ignore the field; new consumers opt-in to plugin data.
+
+**Plugin failure handling**:
+
+- **Default policy**: `"skip-fact"` — a plugin failure skips only that fact's enrichment; extraction continues.
+- **Alternative policy** (per-plugin): `"fatal"` — halts extraction, no state update.
+- Both policies emit warnings to the progress reporter.
+- Plugin timeout (if enforced) follows the configured failure policy.
+
+**Entrypoint resolution** (for config entry `"entrypoint": "xxx"`):
+
+1. Try as local file path: `./plugins/xxx.js`, `./plugins/xxx/index.js`, etc.
+2. Try as npm module: `require.resolve("xxx")`.
+3. Error if neither resolves.
+
+**Compatibility and constraints**:
+
+- State writing is not affected by plugin success or failure; state updates only after core extraction completes.
+- Plugins must not throw unhandled exceptions; they must return `InitResult.fatal` or `ProjectionResult.fatal` for errors.
+- Profile data: each plugin receives an optional scoped profiler for self-instrumentation.
+- Namespace validation: performed at config parse time; namespaces must be unique and match pattern `[a-z0-9-]+`.
+
+**Scope boundaries (initial Phase 1 implementation)**:
+
+- **In scope**: Single-process execution, init/project lifecycle, success/skip/fatal result contract, timeout control, profiler injection, namespace isolation, config loading (format TBD).
+- **Out of scope**: capability sandboxing for scripts, plugin output schema validation (defer to separate roadmap item), parallel execution, worker-thread boundaries (addressed by Worker-based Runtime item).
+- **Experimental**: `ScriptInjectProjector` — marked unstable; no security hardening in Phase 1; subject to future security review and capability restrictions.
+
+**Implementation guidance**:
+
+- Suggested order: (1) type definitions and plugin contract, (2) `DefaultFactProjector` refactor to extract single-record projection logic, (3) plugin config parsing and factory resolution, (4) `EnrichingFactProjector` orchestrator, (5) integration into `ExtractionCoordinator`, (6) basic example plugins.
+
+**Open Design Questions**:
+
+1. **CLI interface for plugin config**: How should plugins be specified at runtime?
+   - Option A: `--plugins-config ./gitrail-plugins.json`
+   - Option B: `--plugins-dir ./plugins/` with auto-discovery
+   - Option C: Environment variable + file discovery heuristics
+   - **Status**: Deferred to planning phase; scope to be finalized before implementation begins.
+   - Consider interactions with eventual Config File redesign and CLI ergonomics roadmap items.
+2. **Plugin documentation and examples**: Scope to be defined in a companion roadmap entry (see **Defer to separate entry** below).
+
+**Defer to separate entry**:
+
+- Documentation, tutorials, and examples for plugin authorship (including Conventional Commits parser reference implementation, custom-tagger template, etc.) — scope for a dedicated UX/docs roadmap item.
 
 #### Output: Branch reachability annotation per commit
 
@@ -471,20 +505,6 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 ---
 
 ## Development Environment Improvements
-
-### Near-term
-
-#### CLI: Schema validation for parsed CLI options
-
-`parseArgs()` currently uses `program.opts<T>()` with a manually-maintained type parameter. commander's `opts<T>()` is implemented as a type assertion (`return this._optionValues as T`) with no runtime enforcement. The type parameter and the `.option()` definitions on `program` are not linked at compile time — a mismatch introduced during code modification produces incorrect runtime behavior without a compile-time error.
-
-Introducing a schema validation step between `program.parse()` and the value extraction block in `parseArgs()` would provide runtime guarantees and make the type safe without relying on assertion alignment.
-
-**Direction to evaluate at design time**:
-
-- A schema validation library (zod or similar) is preferred over hand-written validation code to reduce maintenance surface and gain structured error reporting. The specific library choice should be made at planning time based on bundle size impact, ecosystem stability, and TypeScript integration quality at that point.
-- Validation scope: the shape of `program.opts()` only (not a re-implementation of the mutual exclusion or format checks that follow — those remain separate).
-- The inferred type from the schema can replace the manual type parameter on `opts<T>()`, eliminating the misalignment risk entirely.
 
 ### Medium-term
 

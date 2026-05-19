@@ -154,8 +154,12 @@ The interface abstracts all Git operations. Core Logic must program against this
 
 ```typescript
 interface GitAdapter {
-  /** Resolve a ref (branch name) to a commit hash */
+  /** Resolve a ref (branch name, tag, or raw commit OID) to a commit OID.
+   *  Annotated tags are peeled to the target commit OID automatically. */
   resolveRef(repoPath: string, ref: string): Promise<string>;
+
+  /** Detect repository object format. Defaults to "sha1" when unset. */
+  getRepositoryObjectFormat(repoPath: string): Promise<string>;
 
   /** Walk commits reachable from `head`, stopping before `excludeHash` if provided.
    *  Commit order is not guaranteed — consumers must not rely on line order for
@@ -174,9 +178,9 @@ interface GitAdapter {
     parentOid?: string,
   ): Promise<readonly FileChange[]>;
 
-  /** Find the common ancestor (merge base) commit hash among all provided commit hashes.
+  /** Find the common ancestor (merge base) commit OID among all provided commit OIDs.
    *  Returns null if no common ancestor exists (e.g. orphan branches). */
-  findMergeBase(repoPath: string, commitHashes: string[]): Promise<string | null>;
+  findMergeBase(repoPath: string, commitOids: string[]): Promise<string | null>;
 }
 
 interface RawCommit {
@@ -270,7 +274,7 @@ interface ExtractionState {
   repositoryPath: string;
   branches: readonly Array<{
     name: string;
-    lastCommitHash: string;
+    lastCommitHash: string; // last extracted commit OID (wire field name kept for compatibility)
   }>;
 }
 ```
@@ -280,6 +284,7 @@ Rules:
 - State file is written **only after all output files for that run are fully flushed and closed**
 - If extraction fails mid-run, the previous state file must remain unchanged
 - On next run, if a branch in the state file no longer exists in the repo, log a warning and skip that branch
+- Runtime must gate unsupported repository object formats before consuming state boundaries
 
 ---
 
@@ -294,8 +299,9 @@ Rules:
 ```typescript
 type GitAdapterErrorCode =
   | "REF_NOT_FOUND" // Specified branch/ref does not exist in the repository
-  | "COMMIT_NOT_FOUND" // Specified commit hash does not exist or is not reachable
+  | "COMMIT_NOT_FOUND" // Specified commit OID does not exist or is not reachable
   | "NOT_A_REPOSITORY" // Target path is not a Git repository
+  | "UNSUPPORTED_OBJECT_FORMAT" // Repository object format is outside runtime support
   | "REMOTE_NOT_FOUND" // Remote origin is not configured (non-fatal; triggers fallback)
   | "UNKNOWN"; // Unexpected error from the underlying library
 
@@ -315,7 +321,7 @@ class GitAdapterError extends Error {
 
 Core Logic must inspect `code` to determine the appropriate response:
 
-| Code               | Severity  | Core Behaviour                                               |
+| Code               | Severity  | Core Behavior                                                |
 | ------------------ | --------- | ------------------------------------------------------------ |
 | `REF_NOT_FOUND`    | Fatal     | Abort with user-facing error message                         |
 | `COMMIT_NOT_FOUND` | Fatal     | Abort with user-facing error message                         |

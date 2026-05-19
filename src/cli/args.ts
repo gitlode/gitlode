@@ -2,8 +2,9 @@ import { existsSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
 import { Argument, Command, CommanderError, Option } from "commander";
+import { z } from "zod";
 
-import type { CommitHash, ExtractorConfig } from "../core/index.js";
+import type { CommitOid, ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { GitAdapter } from "../git/index.js";
 
@@ -12,60 +13,109 @@ export interface ParsedArgs extends ExtractorConfig {
   profile: boolean;
 }
 
+const RawOptsSchema = z.object({
+  ref: z.array(z.string()),
+  incremental: z.boolean(),
+  outputDir: z.string(),
+  outputPrefix: z.string().optional(),
+  state: z.string().optional(),
+  missingState: z.string().optional(),
+  sinceRef: z.string().optional(),
+  sinceDate: z.string().optional(),
+  rotateLines: z.string().optional(),
+  rotateSize: z.string().optional(),
+  quiet: z.boolean(),
+  profile: z.boolean(),
+  perFile: z.boolean(),
+});
+
 export const program = new Command()
   .name("gitrail")
   .description("Extract Git commit history to JSON Lines")
   .addArgument(new Argument("<repository-path>", "Local path to the Git repository"))
+  .addHelpOption(new Option("-h, --help", "display help for command").hideHelp())
   .option(
-    "-b, --branch <ref>",
-    "Ref (branch name) to use as traversal starting point. Repeatable for multiple branches.",
+    "-r, --ref <ref>",
+    "Ref to use as traversal starting point. Accepts branch name, tag, or commit object ID. Repeatable.",
     (val, prev: string[]) => [...prev, val],
     [],
   )
-  .option(
-    "--incremental",
-    "When set, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state.",
-    false,
+  .addOption(
+    new Option(
+      "-q, --quiet",
+      "Suppress progress and summary output (for CI, cron, and scripted usage)",
+    )
+      .default(false)
+      .helpGroup("General"),
   )
   .addOption(
-    new Option("-o, --output-dir <path>", "Directory to write output .jsonl files").default("./"),
+    new Option(
+      "--profile",
+      "Print per-stage timing information as an aligned block to stderr after a successful extraction. Suppressed by --quiet.",
+    )
+      .default(false)
+      .helpGroup("General"),
   )
-  .option(
-    "--output-prefix <string>",
-    "Filename prefix for output files (derived from remote origin if omitted)",
+  .addOption(
+    new Option("-o, --output-dir <path>", "Directory to write output .jsonl files")
+      .default("./")
+      .helpGroup("Output"),
   )
-  .option(
-    "-s, --state <path>",
-    "Path to state file. In snapshot mode, content is ignored but file is updated on success. Required when --incremental.",
+  .addOption(
+    new Option(
+      "--output-prefix <string>",
+      "Filename prefix for output files (derived from remote origin if omitted)",
+    ).helpGroup("Output"),
   )
-  .option(
-    "--missing-state <error|snapshot>",
-    'Behavior when --incremental and state file does not exist: "error" (default) exits with code 1; "snapshot" warns and falls back to full extraction. Only valid with --incremental.',
+  .addOption(
+    new Option(
+      "--per-file",
+      "When set, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity).",
+    )
+      .default(false)
+      .helpGroup("Output"),
   )
-  .option(
-    "--since-ref <ref>",
-    "Exclude commits reachable from this ref. Accepts commit hash, tag name, or branch name. Only valid in snapshot mode.",
+  .addOption(
+    new Option(
+      "--incremental",
+      "When set, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state.",
+    )
+      .default(false)
+      .helpGroup("Differential Extraction"),
   )
-  .option(
-    "--since-date <ISO8601>",
-    "Extract only commits with committer timestamp after this datetime (ISO 8601)",
+  .addOption(
+    new Option(
+      "-s, --state <path>",
+      "Path to state file. In snapshot mode, content is ignored but file is updated on success. Required when --incremental.",
+    ).helpGroup("Differential Extraction"),
   )
-  .option("--rotate-lines <n>", "Start a new output file after N lines")
-  .option("--rotate-size <bytes>", "Start a new output file after N bytes")
-  .option(
-    "-q, --quiet",
-    "Suppress progress and summary output (for CI, cron, and scripted usage)",
-    false,
+  .addOption(
+    new Option(
+      "--missing-state <error|snapshot>",
+      'Behavior when --incremental and state file does not exist: "error" (default) exits with code 1; "snapshot" warns and falls back to full extraction. Only valid with --incremental.',
+    ).helpGroup("Differential Extraction"),
   )
-  .option(
-    "--profile",
-    "Print per-stage timing information as an aligned block to stderr after a successful extraction. Suppressed by --quiet.",
-    false,
+  .addOption(
+    new Option(
+      "--since-ref <ref>",
+      "Exclude commits reachable from this ref. Accepts commit object ID (OID), tag name, or branch name. Only valid in snapshot mode.",
+    ).helpGroup("Differential Extraction"),
   )
-  .option(
-    "--per-file",
-    "When set, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity).",
-    false,
+  .addOption(
+    new Option(
+      "--since-date <ISO8601>",
+      "Extract only commits with committer timestamp after this datetime (ISO 8601)",
+    ).helpGroup("Differential Extraction"),
+  )
+  .addOption(
+    new Option("--rotate-lines <n>", "Start a new output file after N lines").helpGroup(
+      "File Rotation",
+    ),
+  )
+  .addOption(
+    new Option("--rotate-size <bytes>", "Start a new output file after N bytes").helpGroup(
+      "File Rotation",
+    ),
   );
 
 function userError(msg: string): never {
@@ -117,27 +167,17 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     throw err;
   }
 
-  // commander.opts<T>() is a type assertion internally (returns `this._optionValues as T`).
-  // The type parameter below must be kept in sync with the .option() calls on `program` above.
-  // There is no compile-time enforcement of this alignment; a mismatch will cause runtime bugs.
-  // See roadmap: "CLI: Schema validation for parsed CLI options" for a tracked follow-up.
-  const opts = program.opts<{
-    branch: string[];
-    incremental: boolean;
-    outputDir: string;
-    outputPrefix?: string;
-    state?: string;
-    missingState?: string;
-    sinceRef?: string;
-    sinceDate?: string;
-    rotateLines?: string;
-    rotateSize?: string;
-    quiet: boolean;
-    profile: boolean;
-    perFile: boolean;
-  }>();
+  let opts: z.infer<typeof RawOptsSchema>;
+  try {
+    opts = RawOptsSchema.parse(program.opts());
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      userError(err.issues[0]?.message ?? "Invalid CLI options");
+    }
+    throw err;
+  }
 
-  const branches: string[] = opts.branch;
+  const refs: string[] = opts.ref;
   const incremental = opts.incremental;
   const sinceRef = opts.sinceRef;
   const sinceDate = opts.sinceDate;
@@ -177,8 +217,8 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     userError("--state is required when using --incremental");
   }
 
-  if (branches.length === 0) {
-    userError("At least one --branch must be specified");
+  if (refs.length === 0) {
+    userError("At least one --ref must be specified");
   }
 
   let maxLines: number | undefined;
@@ -234,7 +274,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
 
   // --- Phase 3: Git validation ---
   try {
-    await adapter.resolveRef(resolvedRepoPath, branches[0]!);
+    await adapter.resolveRef(resolvedRepoPath, refs[0]!);
   } catch (e) {
     if (e instanceof GitAdapterError) {
       if (e.code === "NOT_A_REPOSITORY") {
@@ -243,13 +283,13 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
       if (e.code !== "REF_NOT_FOUND") {
         throw e;
       }
-      // REF_NOT_FOUND means valid repo but branch doesn't exist — extractor will surface this
+      // REF_NOT_FOUND means valid repo but ref doesn't exist — extractor will surface this
     } else {
       throw e;
     }
   }
 
-  let resolvedSinceRef: CommitHash | undefined;
+  let resolvedSinceRef: CommitOid | undefined;
   if (sinceRef) {
     try {
       resolvedSinceRef = await adapter.resolveRef(resolvedRepoPath, sinceRef);
@@ -278,7 +318,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
 
   return {
     repositoryPath: repoPath,
-    branches,
+    refs,
     outputDir: resolvedOutputDir,
     outputPrefix: prefix,
     rotation: { maxLines, maxBytes },

@@ -1,10 +1,9 @@
 export type {
-  BranchState,
-  BranchTraversalPlan,
-  BranchTraversalPlanner,
-  BranchTraversalPlanningRequest,
+  TraversalPlan,
+  TraversalPlanner,
+  TraversalPlanningRequest,
   CommitFact,
-  CommitHash,
+  CommitOid,
   CommitTraversalExtractor,
   CommitTraversalRequest,
   CoordinatorDependencies,
@@ -26,13 +25,15 @@ export type {
   ProgressEvent,
   ProgressPhase,
   ProgressReporter,
+  BranchState,
   RotationConfig,
   StageProfiler,
   StateStore,
+  OidProfile,
   WallClock,
 } from "./types.js";
-export { assertNever, isCommitHash } from "./types.js";
-export { DefaultBranchTraversalPlanner } from "./branch-traversal-planner.js";
+export { assertNever, isCommitOid, isCommitOidForProfile } from "./types.js";
+export { DefaultTraversalPlanner } from "./traversal-planner.js";
 export { DefaultExtractionCoordinator } from "./extraction-coordinator.js";
 export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";
 export { DefaultFileChangeExpander } from "./file-change-expander.js";

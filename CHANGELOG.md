@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-19
+
+### Added
+
+- Release-boundary extraction workflow guidance using `--ref`, `--since-ref`, `--state`, and
+  `--incremental`, including explicit snapshot-bootstrap and incremental follow-up patterns.
+- Runtime warning for non-branch refs when `--state` is active, clarifying that tags/raw OIDs are
+  not tracked in state and will be re-extracted on incremental runs.
+- Native help grouping in CLI output via commander option groups:
+  `General`, `Output`, `Differential Extraction`, and `File Rotation`.
+
+### Changed
+
+- **Breaking:** CLI traversal option renamed from `--branch` (`-b`) to `--ref` (`-r`).
+- Compatibility contract terminology is now commit object ID (OID)-first across runtime
+  diagnostics, contracts, and docs.
+- Runtime now performs fail-fast repository object-format gating before traversal/state-boundary
+  consumption. Current supported format is `sha1`.
+- CLI parse boundary now uses runtime schema validation (zod) instead of the previous
+  `opts<T>()` trust boundary.
+
+### Fixed
+
+- State/incremental behavior for non-branch refs is now explicitly surfaced to users via warning
+  diagnostics, reducing silent duplicate-ingestion risk in downstream systems.
+- Unsupported repository object formats now fail deterministically with a user-facing diagnostic
+  before extraction output/state writes begin.
+
+### Migration
+
+- Replace all `--branch`/`-b` usages with `--ref`/`-r` in scripts and CI jobs.
+- No output schema migration is required for this release.
+
 ## [0.4.1] - 2026-05-15
 
 ### Added
@@ -178,6 +211,7 @@ If your intent was to record state without differential extraction (snapshot wit
 - Timestamp output in ISO 8601 format with commit's own timezone offset
 - No system-installed Git required (uses isomorphic-git)
 
+[0.5.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.5.0
 [0.4.1]: https://github.com/tomo-waka/gitrail/releases/tag/v0.4.1
 [0.4.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.4.0
 [0.3.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.3.0

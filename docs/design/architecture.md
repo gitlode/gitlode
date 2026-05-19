@@ -139,12 +139,12 @@ Files:
 
 Responsibilities:
 
-- Coordinate branch traversal through the adapter.
+- Coordinate ref traversal through the adapter.
 - Apply differential behavior for `--state`, `--since-ref`, and `--since-date`.
-- Deduplicate commits across branches in one run.
+- Deduplicate commits across refs in one run.
 - Map raw commit data to output schema objects.
 - Coordinate output writer lifecycle.
-- Read state at startup and write state atomically after successful completion.
+- Read state at startup and write v2 state checkpoints atomically after successful completion.
 
 Important behavior: for date filtering, Core skips old commits and continues traversal. It does not terminate early, because BFS graph traversal order is not chronological.
 
@@ -190,15 +190,16 @@ Core provides rotation settings, but Writer owns enforcement.
 1. CLI parses args, validates rules, and resolves runtime extraction inputs.
 2. CLI creates `IsomorphicGitAdapter`, `ProgressController`, and stage instances; calls `DefaultExtractionCoordinator.run()` directly.
 3. Runtime edge loads state/checkpoint context if configured and passes it in `CoordinatorRequest`.
-4. For each branch:
-   - Resolve branch head.
-   - Determine exclusion boundary.
+4. For each requested ref:
+   - Resolve ref head.
+   - Classify runtime ref type.
+   - Determine exclusion boundary (exact checkpoint match, or branch merge-base fallback for newly added branches).
    - Traverse commits from adapter.
    - Deduplicate within this run.
    - Apply optional date filter.
    - Map and write output.
 5. Writer closes in `finally`.
-6. If successful, Core writes new state atomically.
+6. If successful, Core writes new v2 state (`refs[]`) atomically.
 
 ## Design Decisions and Trade-offs
 

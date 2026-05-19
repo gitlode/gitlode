@@ -47,10 +47,7 @@ _Add reliable incremental-state tracking for non-branch refs by extending state 
   - State files with version other than `2` are rejected as unsupported in incremental mode.
 - **Static ref warning policy after implementation**:
   - Remove the old warning text about non-branch refs being untracked.
-  - Keep a focused warning for static refs where incremental gain is inherently limited:
-    - commit OID refs
-    - annotated tag refs
-  - Lightweight tags do not emit the static-ref warning.
+  - Keep a focused warning for all non-branch refs (commit-oid, tag-annotated, and tag-lightweight) where incremental gain is inherently limited or variable.
   - The warning must explicitly state that tracking is active, but future deltas are usually empty unless the ref target changes.
 - **State write normalization policy**:
   - On successful completion, write v2 `refs[]` entries for all resolved refs processed in the run.

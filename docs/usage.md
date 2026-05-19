@@ -35,12 +35,9 @@ extracts only commits added since that point.
 
 Incremental mode requires `--state`.
 
-> **Note:** Incremental extraction is designed for **branch refs** only. The state file records
-> each branch's current HEAD so that subsequent runs can pick up only new commits.
-> Tags and raw commit OIDs are **not** recorded in the state file. If you specify a tag or raw OID
-> with `--state`, gitrail will warn you and re-extract those refs in full on every run, which may
-> produce duplicate records in downstream systems. For tag or raw OID traversal, use snapshot mode
-> (omit `--incremental`) instead.
+> **Note:** State tracking now covers all supported ref types (branches, tags, and raw commit OIDs).
+> For static refs (annotated tags and raw commit OIDs), checkpoints are still recorded, but future
+> incremental runs usually produce zero new records unless the ref target changes.
 
 ---
 
@@ -166,17 +163,27 @@ succeeds without manual intervention.
 
 ### What the state file records
 
-After a successful run, gitrail writes a JSON file at the path given by `--state`. It records the
-HEAD commit OID for each processed branch at the time of extraction:
+After a successful run, gitrail writes a JSON file at the path given by `--state`. It records a
+checkpoint entry for each processed ref at extraction time:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "generatedAt": "2024-06-01T12:00:00.000Z",
   "repositoryPath": "/absolute/path/to/my-repo",
-  "branches": [
-    { "name": "main", "lastCommitHash": "a1b2c3d4e5f6..." },
-    { "name": "develop", "lastCommitHash": "d4e5f6a7b8c9..." }
+  "refs": [
+    {
+      "ref": "main",
+      "refType": "branch",
+      "tipOid": "a1b2c3d4e5f6...",
+      "updatedAt": "2024-06-01T12:00:00.000Z"
+    },
+    {
+      "ref": "v1.0",
+      "refType": "tag-lightweight",
+      "tipOid": "d4e5f6a7b8c9...",
+      "updatedAt": "2024-06-01T12:00:00.000Z"
+    }
   ]
 }
 ```
@@ -224,10 +231,10 @@ in the order `--ref` arguments were given.
 
 ### Adding a new branch to an existing incremental workflow
 
-When a ref listed in `--ref` has no entry in the state file, gitrail automatically prevents
-cross-run duplicates. It computes the **merge base** of all branches already recorded in the
-state file and uses that commit as the extraction boundary for the new branch, excluding commits
-already output in prior runs.
+When a **branch** listed in `--ref` has no matching `(ref, refType)` entry in the state file,
+gitrail automatically prevents cross-run duplicates. It computes the **merge base** of all tracked
+branch checkpoints in state and uses that commit as the extraction boundary for the new branch,
+excluding commits already output in prior runs.
 
 **Fallback — no common ancestor:** if the new branch shares no history with any branch in the
 state (e.g. an orphan branch created with `git checkout --orphan`), gitrail cannot find a merge
@@ -308,10 +315,10 @@ gitrail [options] <repository-path>
 
 ### Extraction mode
 
-| Parameter       | Alias | Type                | Default | Description                                                                                                                                                                                                                          |
-| --------------- | ----- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--incremental` |       | boolean             | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.                                                                                                                                 |
-| `--ref <ref>`   | `-r`  | string (repeatable) | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. At least one required. For incremental workflows (`--state`), only branch refs are tracked in state; tags and raw OIDs will be re-extracted in full on every run. |
+| Parameter       | Alias | Type                | Default | Description                                                                                                                                                                            |
+| --------------- | ----- | ------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--incremental` |       | boolean             | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.                                                                                   |
+| `--ref <ref>`   | `-r`  | string (repeatable) | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. At least one required. In incremental workflows (`--state`), checkpoints are tracked per `(ref, refType)` identity. |
 
 ### Range filter (snapshot mode only)
 

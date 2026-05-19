@@ -24,7 +24,7 @@ const noopAdapter: GitAdapter = {
   supportedObjectFormats: () => ["sha1"],
   resolveRef: async () => "abc123def456abc123def456abc123def456abc123" as CommitOid,
   getRepositoryObjectFormat: async () => "sha1",
-  isRefBranch: async () => true,
+  classifyRefType: async () => "branch",
   walkCommits: async function* () {},
   getRemoteUrl: async () => null,
   findMergeBase: async () => null,
@@ -451,10 +451,7 @@ describe("parseArgs – --incremental", () => {
     const stateDir = repoDir;
     const stateFile = join(stateDir, "state.json");
     await import("node:fs/promises").then(({ writeFile: wf }) =>
-      wf(
-        stateFile,
-        JSON.stringify({ version: 1, generatedAt: "", repositoryPath: "/", branches: [] }),
-      ),
+      wf(stateFile, JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] })),
     );
     const adapter = new IsomorphicGitAdapter();
     setArgv(
@@ -490,7 +487,7 @@ describe("parseArgs – incremental mode", () => {
     const stateFile = join(stateDir, "state.json");
     await writeFile(
       stateFile,
-      JSON.stringify({ version: 1, generatedAt: "", repositoryPath: "/", branches: [] }),
+      JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] }),
     );
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
@@ -607,7 +604,7 @@ describe("parseArgs – --since-ref", () => {
         return "abc123def456abc123def456abc123def456abc123" as CommitOid;
       },
       getRepositoryObjectFormat: async () => "sha1",
-      isRefBranch: async () => true,
+      classifyRefType: async () => "branch",
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
       findMergeBase: async () => null,

@@ -16,15 +16,17 @@ import {
   DefaultFactProjector,
   DefaultFileChangeExpander,
   isCommitOidForProfile,
+  REF_TYPES,
 } from "./core/index.js";
 import type {
   CoordinatorDependencies,
   ExtractionState,
+  OidProfile,
   ProgressReporter,
+  RefType,
   StageProfiler,
   StateStore,
 } from "./core/index.js";
-import type { OidProfile } from "./core/index.js";
 import { DefaultStageProfiler } from "./core/profile/index.js";
 import { GitAdapterError, IsomorphicGitAdapter, type RepositoryObjectFormat } from "./git/index.js";
 import { OutputWriter, formatSessionTimestamp, OutputWriterSink } from "./output/index.js";
@@ -58,10 +60,14 @@ function deriveRepoName(remoteUrl: string | null, repoPath: string): string {
 }
 
 function emptyState(repositoryPath: string): ExtractionState {
-  return { version: 1, generatedAt: "", repositoryPath, branches: [] };
+  return { version: 2, generatedAt: "", repositoryPath, refs: [] };
 }
 
-async function loadPriorState(
+function isRefType(value: unknown): value is RefType {
+  return typeof value === "string" && REF_TYPES.includes(value as RefType);
+}
+
+export async function loadPriorState(
   stateStore: StateStore | undefined,
   parsed: ParsedArgs,
   repoPath: string,
@@ -82,18 +88,23 @@ async function loadPriorState(
     }
     return emptyState(repoPath);
   }
-  if (state.version !== 1) {
-    throw new Error(`Unsupported state file version: ${state.version}`);
+  if (state.version !== 2) {
+    throw new Error(
+      `Unsupported state file version: ${state.version}. Supported version: 2. Reinitialize the state file (for example, run without --incremental once with --state).`,
+    );
   }
   const recordedPath = resolve(state.repositoryPath);
   if (recordedPath !== repoPath) {
     throw new Error(`State file was created for a different repository: ${state.repositoryPath}`);
   }
-  for (const entry of state.branches) {
-    if (!isCommitOidForProfile(entry.lastCommitHash, oidProfile)) {
+  for (const entry of state.refs) {
+    if (!isRefType(entry.refType)) {
       throw new Error(
-        `Invalid commit OID in state file for branch "${entry.name}": ${entry.lastCommitHash}`,
+        `Invalid ref type in state file for ref "${entry.ref}": ${String(entry.refType)}`,
       );
+    }
+    if (!isCommitOidForProfile(entry.tipOid, oidProfile)) {
+      throw new Error(`Invalid commit OID in state file for ref "${entry.ref}": ${entry.tipOid}`);
     }
   }
   return state;

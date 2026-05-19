@@ -7,19 +7,24 @@ import type {
   TraversalPlanningRequest,
   CommitOid,
   ExtractionRange,
+  RefCheckpoint,
+  RefType,
   ProgressReporter,
   StageProfiler,
 } from "./types.js";
 import { assertNever } from "./types.js";
 
+function buildCheckpointKey(ref: string, refType: RefType): string {
+  return `${refType}:${ref}`;
+}
+
 function resolveExcludeHash(
-  refName: string,
-  priorRefMap: ReadonlyMap<string, CommitOid>,
-  newRefExclude: CommitOid | undefined,
+  checkpointTipOid: CommitOid | undefined,
+  mergeBaseExclude: CommitOid | undefined,
   range: ExtractionRange | undefined,
 ): CommitOid | undefined {
   if (range === undefined) {
-    return priorRefMap.get(refName) ?? newRefExclude;
+    return checkpointTipOid ?? mergeBaseExclude;
   }
   if (range.type === "ref") {
     return range.ref;
@@ -44,25 +49,44 @@ export class DefaultTraversalPlanner implements TraversalPlanner {
     reporter: ProgressReporter,
   ): Promise<readonly TraversalPlan[]> {
     return withProfilerAsync(this.profiler, async () => {
-      const { repositoryPath, refs, mode, priorRefMap, range } = request;
+      const { repositoryPath, refs, mode, priorRefs, range } = request;
 
-      const newRefs = new Set<string>(
-        mode === "incremental" ? refs.filter((ref) => !priorRefMap.has(ref)) : [],
+      const priorCheckpointByIdentity = new Map<string, RefCheckpoint>(
+        priorRefs.map((entry) => [buildCheckpointKey(entry.ref, entry.refType), entry]),
       );
 
-      let newRefExclude: CommitOid | undefined;
-      if (newRefs.size > 0 && priorRefMap.size > 0) {
-        const mergeBase = await this.adapter.findMergeBase(
-          repositoryPath,
-          Array.from(priorRefMap.values()),
-        );
-        newRefExclude = mergeBase ?? undefined;
+      const priorBranchTips = priorRefs
+        .filter((entry) => entry.refType === "branch")
+        .map((entry) => entry.tipOid);
+
+      const requestedRefMetadata: Array<{ name: string; refType: RefType }> = [];
+      for (const ref of refs) {
+        const refType = await this.adapter.classifyRefType(repositoryPath, ref);
+        requestedRefMetadata.push({ name: ref, refType });
       }
+
+      const hasNewBranchRefs =
+        mode === "incremental" &&
+        requestedRefMetadata.some(
+          (entry) =>
+            entry.refType === "branch" &&
+            !priorCheckpointByIdentity.has(buildCheckpointKey(entry.name, entry.refType)),
+        );
+
+      let mergeBaseForNewBranches: CommitOid | undefined;
+      if (hasNewBranchRefs && priorBranchTips.length > 0) {
+        const mergeBase = await this.adapter.findMergeBase(repositoryPath, priorBranchTips);
+        mergeBaseForNewBranches = mergeBase ?? undefined;
+      }
+
+      const requestedRefTypeByName = new Map<string, RefType>(
+        requestedRefMetadata.map((entry) => [entry.name, entry.refType]),
+      );
 
       const plans: TraversalPlan[] = [];
       for (const ref of refs) {
         let head: CommitOid;
-        let isBranch: boolean;
+        const refType = requestedRefTypeByName.get(ref)!;
         try {
           head = await this.adapter.resolveRef(repositoryPath, ref);
         } catch (err) {
@@ -75,13 +99,18 @@ export class DefaultTraversalPlanner implements TraversalPlanner {
           }
           throw err;
         }
-        isBranch = await this.adapter.isRefBranch(repositoryPath, ref);
+
+        const checkpoint = priorCheckpointByIdentity.get(buildCheckpointKey(ref, refType));
+        const mergeBaseExclude =
+          mode === "incremental" && refType === "branch" && checkpoint === undefined
+            ? mergeBaseForNewBranches
+            : undefined;
 
         plans.push({
           name: ref,
+          refType,
           head,
-          excludeHash: resolveExcludeHash(ref, priorRefMap, newRefExclude, range),
-          isBranch,
+          excludeHash: resolveExcludeHash(checkpoint?.tipOid, mergeBaseExclude, range),
         });
       }
 

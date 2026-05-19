@@ -33,7 +33,7 @@ v0.6.0 is a minor release focused on CLI reliability and operator control for in
 ### Phase 1: Non-Branch Ref State Tracking
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 2: Large Text-Diff Guardrail
 

@@ -52,8 +52,8 @@ function makeAdapter(
     async getRepositoryObjectFormat() {
       return "sha1";
     },
-    async isRefBranch() {
-      return true;
+    async classifyRefType() {
+      return "branch";
     },
     async *walkCommits(_repo, head, excludeHash) {
       if (
@@ -96,7 +96,7 @@ async function collectFacts(iterable: AsyncIterable<CommitFact>): Promise<Commit
 }
 
 function makePlan(name: string, head: CommitOid, excludeHash?: CommitOid): TraversalPlan {
-  return { name, head, excludeHash };
+  return { name, refType: "branch", head, excludeHash };
 }
 
 function baseRequest(overrides: Partial<CommitTraversalRequest> = {}): CommitTraversalRequest {
@@ -301,8 +301,8 @@ describe("DefaultCommitTraversalExtractor", () => {
       async getRepositoryObjectFormat() {
         return "sha1";
       },
-      async isRefBranch() {
-        return true;
+      async classifyRefType() {
+        return "branch";
       },
       walkCommits: walkSpy,
       async getRemoteUrl() {
@@ -341,8 +341,8 @@ describe("DefaultCommitTraversalExtractor", () => {
       async getRepositoryObjectFormat() {
         return "sha1";
       },
-      async isRefBranch() {
-        return true;
+      async classifyRefType() {
+        return "branch";
       },
       async *walkCommits(_repo, _head, excludeHash) {
         walkCallCount++;

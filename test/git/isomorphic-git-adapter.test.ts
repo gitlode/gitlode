@@ -280,7 +280,7 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
-    await git.tag({
+    await git.annotatedTag({
       fs,
       dir: "/",
       ref: "v1.0-ann",
@@ -314,31 +314,31 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
   });
 });
 
-describe("IsomorphicGitAdapter.isRefBranch", () => {
-  it("returns true for a branch ref", async () => {
+describe("IsomorphicGitAdapter.classifyRefType", () => {
+  it("returns 'branch' for a branch ref", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     await addCommit("f.txt", "v1", "initial commit");
     const adapter = new IsomorphicGitAdapter(fs);
-    expect(await adapter.isRefBranch("/", "main")).toBe(true);
+    expect(await adapter.classifyRefType("/", "main")).toBe("branch");
   });
 
-  it("returns false for a lightweight tag", async () => {
+  it("returns 'tag-lightweight' for a lightweight tag", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
     await git.tag({ fs, dir: "/", ref: "v1.0" });
     const adapter = new IsomorphicGitAdapter(fs);
-    expect(await adapter.isRefBranch("/", "v1.0")).toBe(false);
+    expect(await adapter.classifyRefType("/", "v1.0")).toBe("tag-lightweight");
     // Sanity: the tag still resolves correctly
     expect(await adapter.resolveRef("/", "v1.0")).toBe(sha);
   });
 
-  it("returns false for an annotated tag", async () => {
+  it("returns 'tag-annotated' for an annotated tag", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
-    await git.tag({
+    await git.annotatedTag({
       fs,
       dir: "/",
       ref: "v1.0-ann",
@@ -347,23 +347,23 @@ describe("IsomorphicGitAdapter.isRefBranch", () => {
       message: "release v1.0",
     });
     const adapter = new IsomorphicGitAdapter(fs);
-    expect(await adapter.isRefBranch("/", "v1.0-ann")).toBe(false);
+    expect(await adapter.classifyRefType("/", "v1.0-ann")).toBe("tag-annotated");
   });
 
-  it("returns false for a raw commit OID", async () => {
+  it("returns 'commit-oid' for a raw commit OID", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
     const adapter = new IsomorphicGitAdapter(fs);
-    expect(await adapter.isRefBranch("/", sha)).toBe(false);
+    expect(await adapter.classifyRefType("/", sha)).toBe("commit-oid");
   });
 
-  it("returns false for a nonexistent ref name", async () => {
+  it("returns 'commit-oid' for a nonexistent ref name", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     await addCommit("f.txt", "v1", "initial");
     const adapter = new IsomorphicGitAdapter(fs);
-    expect(await adapter.isRefBranch("/", "nonexistent")).toBe(false);
+    expect(await adapter.classifyRefType("/", "nonexistent")).toBe("commit-oid");
   });
 });
 

@@ -4,7 +4,7 @@ import { diffLines } from "diff";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
-import type { CommitOid, OidProfile, StageProfiler } from "../core/index.js";
+import type { CommitOid, OidProfile, RefType, StageProfiler } from "../core/index.js";
 import { isCommitOid } from "../core/index.js";
 import { withProfilerAsync } from "../core/profile/index.js";
 import { GitAdapterError } from "./errors.js";
@@ -130,13 +130,43 @@ export class IsomorphicGitAdapter implements GitAdapter {
     }
   }
 
-  async isRefBranch(repoPath: string, ref: string): Promise<boolean> {
-    if (isCommitOid(ref)) return false;
+  async classifyRefType(repoPath: string, ref: string): Promise<RefType> {
     try {
       await git.resolveRef({ fs: this._fs, dir: repoPath, ref: `refs/heads/${ref}` });
-      return true;
+      return "branch";
     } catch {
-      return false;
+      // Not a branch under refs/heads.
+    }
+
+    try {
+      const tagObjectOid = await git.resolveRef({
+        fs: this._fs,
+        dir: repoPath,
+        ref: `refs/tags/${ref}`,
+      });
+      try {
+        await git.readTag({ fs: this._fs, dir: repoPath, oid: tagObjectOid });
+        return "tag-annotated";
+      } catch {
+        return "tag-lightweight";
+      }
+    } catch {
+      // Not a tag under refs/tags.
+    }
+
+    if (isCommitOid(ref)) {
+      return "commit-oid";
+    }
+
+    try {
+      await git.resolveRef({ fs: this._fs, dir: repoPath, ref });
+      // Refs such as HEAD or refs/remotes/origin/main are treated as branch-like
+      // for merge-base fallback behavior.
+      return "branch";
+    } catch {
+      // Unknown symbolic ref. Resolution will fail later and the planner will
+      // emit the missing-ref warning based on resolveRef().
+      return "commit-oid";
     }
   }
 

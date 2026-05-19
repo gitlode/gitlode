@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { ParsedArgs } from "../src/cli/args.js";
 import {
   formatElapsed,
   humanizeBytes,
@@ -11,8 +12,8 @@ import {
   type UiMode,
 } from "../src/cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "../src/cli/reporting/index.js";
-import type { ProgressEvent } from "../src/core/index.js";
-import { assertSupportedRepositoryObjectFormat } from "../src/index.js";
+import type { ProgressEvent, StateStore } from "../src/core/index.js";
+import { assertSupportedRepositoryObjectFormat, loadPriorState } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -406,5 +407,125 @@ describe("assertSupportedRepositoryObjectFormat", () => {
     expect(() => assertSupportedRepositoryObjectFormat("sha256", ["sha1"])).toThrow(
       "Unsupported repository object format: sha256. Supported formats: sha1.",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// State loading (v2)
+// ---------------------------------------------------------------------------
+
+const TEST_REPO_PATH = process.cwd();
+
+function parsedArgs(overrides: Partial<ParsedArgs> = {}): ParsedArgs {
+  return {
+    repositoryPath: TEST_REPO_PATH,
+    refs: ["main"],
+    outputDir: "/out",
+    outputPrefix: "repo",
+    rotation: {},
+    incremental: true,
+    missingState: "error",
+    range: undefined,
+    stateFilePath: "/state.json",
+    perFile: false,
+    quiet: false,
+    profile: false,
+    ...overrides,
+  };
+}
+
+function makeStateStore(state: unknown): StateStore {
+  return {
+    async read() {
+      return state as never;
+    },
+    async write() {},
+  };
+}
+
+function makeReporter() {
+  const warnings: string[] = [];
+  return {
+    warnings,
+    emit(event: ProgressEvent) {
+      if (event.type === "warning") {
+        warnings.push(event.message);
+      }
+    },
+  };
+}
+
+describe("loadPriorState", () => {
+  it("rejects non-v2 state in incremental mode", async () => {
+    const store = makeStateStore({
+      version: 1,
+      generatedAt: "",
+      repositoryPath: TEST_REPO_PATH,
+      branches: [],
+    });
+
+    await expect(
+      loadPriorState(store, parsedArgs(), TEST_REPO_PATH, "sha1", makeReporter()),
+    ).rejects.toThrow("Unsupported state file version: 1. Supported version: 2.");
+  });
+
+  it("validates v2 tipOid shape for the repository object profile", async () => {
+    const store = makeStateStore({
+      version: 2,
+      generatedAt: "",
+      repositoryPath: TEST_REPO_PATH,
+      refs: [
+        {
+          ref: "main",
+          refType: "branch",
+          tipOid: "not-an-oid",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    await expect(
+      loadPriorState(store, parsedArgs(), TEST_REPO_PATH, "sha1", makeReporter()),
+    ).rejects.toThrow('Invalid commit OID in state file for ref "main": not-an-oid');
+  });
+
+  it("accepts mixed ref types in v2 state", async () => {
+    const sha1Oid = "a".repeat(40);
+    const store = makeStateStore({
+      version: 2,
+      generatedAt: "",
+      repositoryPath: TEST_REPO_PATH,
+      refs: [
+        { ref: "main", refType: "branch", tipOid: sha1Oid, updatedAt: "2026-01-01T00:00:00.000Z" },
+        {
+          ref: "v1.0",
+          refType: "tag-lightweight",
+          tipOid: sha1Oid,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          ref: "release-ann",
+          refType: "tag-annotated",
+          tipOid: sha1Oid,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          ref: sha1Oid,
+          refType: "commit-oid",
+          tipOid: sha1Oid,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const state = await loadPriorState(store, parsedArgs(), TEST_REPO_PATH, "sha1", makeReporter());
+
+    expect(state.version).toBe(2);
+    expect(state.refs.map((entry) => entry.refType)).toEqual([
+      "branch",
+      "tag-lightweight",
+      "tag-annotated",
+      "commit-oid",
+    ]);
   });
 });

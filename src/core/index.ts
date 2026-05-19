@@ -25,14 +25,15 @@ export type {
   ProgressEvent,
   ProgressPhase,
   ProgressReporter,
-  BranchState,
+  RefCheckpoint,
+  RefType,
   RotationConfig,
   StageProfiler,
   StateStore,
   OidProfile,
   WallClock,
 } from "./types.js";
-export { assertNever, isCommitOid, isCommitOidForProfile } from "./types.js";
+export { assertNever, isCommitOid, isCommitOidForProfile, REF_TYPES } from "./types.js";
 export { DefaultTraversalPlanner } from "./traversal-planner.js";
 export { DefaultExtractionCoordinator } from "./extraction-coordinator.js";
 export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";

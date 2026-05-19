@@ -56,8 +56,9 @@ Example BFS traversal result list:
 
 With `--state`:
 
-- Core reads per-branch `lastCommitHash`.
-- Each branch uses that OID as `excludeHash`.
+- Core reads v2 checkpoints from `refs[]` entries.
+- A checkpoint is matched by exact `(ref, refType)` identity.
+- The matched `tipOid` is used as `excludeHash`.
 - Traversal yields only the set difference: commits reachable from current head but not from `excludeHash`.
 
 Equivalent mental model: `excludeHash..currentHead`.
@@ -198,11 +199,10 @@ afterward; `develop` is the branch being added in Run 2.
 
 **How merge base deduplication prevents this:**
 
-Before the per-branch traversal loop, gitrail identifies new branches (present in `--ref` args
-but absent from the state file). If the state file already contains at least one branch, gitrail
-calls `adapter.findMergeBase()` with the `lastCommitHash` values from the state file as `oids`.
-The returned OID is used as `excludeHash` for all new branches, applying the same exclusion
-mechanism used for existing branches in incremental extraction.
+Before the per-ref traversal loop, gitrail identifies new branch refs (present in `--ref` args
+but absent from state for the same `(ref, refType)` identity). If state already contains at least
+one branch checkpoint, gitrail calls `adapter.findMergeBase()` with branch `tipOid` values from
+state as `oids`. The returned OID is used as `excludeHash` for new branch refs only.
 
 For the scenario above:
 
@@ -242,12 +242,14 @@ Core owns state management.
 Read phase:
 
 - Parse state JSON.
-- Validate version.
+- Validate version (`2` only for incremental mode).
 - Validate repository identity with resolved absolute paths.
+- Validate each `refs[]` entry (`refType`, `tipOid`).
 
 Write phase:
 
 - Run completes output writing first.
+- Build candidate v2 checkpoints from successfully resolved refs.
 - Write new state to temporary file.
 - Rename temp file to target path atomically.
 
@@ -267,8 +269,9 @@ Non-guarantees:
 
 ## Error and recovery behavior
 
-- Missing branch ref: warn and skip branch.
-- Missing old state boundary commit: warn and fall back to full traversal for that branch.
+- Missing requested ref: warn and skip that ref.
+- Missing old state boundary commit: warn and fall back to full traversal for that ref.
+- Static refs (`commit-oid`, `tag-annotated`) emit an informational warning when state tracking is active because future deltas are usually empty unless the target changes.
 - Non-repository path: fail fast during validation.
 
 This approach prioritizes successful extraction with explicit warnings in recoverable scenarios.

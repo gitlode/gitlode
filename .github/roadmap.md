@@ -112,29 +112,24 @@ fidelity, runtime cost, and determinism explicit and user-controllable.
 
 ---
 
-#### Architecture/Runtime: Worker-based extraction runtime for resilience and orchestration
+#### Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision
 
 The current extraction pipeline runs in a single Node.js execution context. This keeps the
 implementation straightforward, but it also couples heavy extraction work with CLI lifecycle and
 interactive rendering. For long-running or computationally heavy workloads, this coupling makes
-stability, supervision, and execution strategy evolution harder than necessary.
+stability and fault isolation harder than necessary.
 
-This item introduces a Worker-based runtime boundary: extraction executes in an isolated worker,
-while the main process remains responsible for CLI lifecycle, supervision, and user interaction.
+This entry introduces the Worker-based runtime boundary through the first two implementation
+phases: extraction executes in an isolated worker, while the main process remains responsible for
+CLI lifecycle, supervision, and user interaction.
 
 **Primary goals (core value)**:
 
 - improve long-run extraction stability via execution isolation
 - improve fault tolerance through clear failure boundaries and controlled shutdown semantics
-- establish a foundation for future orchestration flexibility (parallelism, scheduling, retry)
-- improve extensibility by formalizing runtime and messaging boundaries
+- formalize runtime and messaging boundaries as the baseline for later orchestration work
 
-**Secondary outcomes (expected but non-primary)**:
-
-- smoother progress behavior under heavy extraction load
-- cleaner profiling/telemetry boundaries between extraction work and CLI supervision
-
-**Scope strategy (single entry, phased delivery)**:
+**Scope (this entry)**:
 
 - **Phase A: runtime boundary only**
   - run the existing extraction pipeline in one worker
@@ -143,21 +138,37 @@ while the main process remains responsible for CLI lifecycle, supervision, and u
 - **Phase B: operational hardening**
   - add cancellation, timeout, and supervision semantics
   - make failure reporting and exit behavior deterministic
-- **Phase C: orchestration-ready foundation**
-  - prepare interfaces for future parallel strategies (branch-level or stage-level)
-  - do not require immediate parallel execution in this item
 
-**Non-goals for initial implementation**:
+**Non-goals for this entry**:
 
 - no guaranteed throughput improvement in the first delivery
 - no implicit data reduction or extraction-fidelity trade-off
-- no simultaneous rollout of broad parallel execution and plugin architecture
+- no immediate parallel extraction strategy rollout
 
 **Design constraints**:
 
 - preserve current extraction correctness and checkpoint safety guarantees
 - maintain deterministic behavior under equivalent inputs and configuration
 - keep CLI UX backward compatible unless explicitly documented otherwise
+
+#### Architecture/Runtime: Orchestration-ready runtime foundation (Phase C)
+
+- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision`
+
+After Phase A+B is complete, this entry prepares the runtime interfaces for future orchestration
+strategies while keeping execution behavior conservative.
+
+**Scope (this entry)**:
+
+- define and stabilize interfaces needed for future parallel strategies (branch-level or stage-level)
+- refine worker/main-process coordination contracts so scheduling strategies can be added safely
+- improve extension points for runtime-level orchestration without changing extraction semantics
+
+**Non-goals for this entry**:
+
+- no requirement to ship immediate parallel execution
+- no simultaneous rollout of broad parallel execution and plugin architecture
+- no changes that weaken current checkpoint/state safety guarantees
 
 #### Architecture: Diff algorithm abstraction within `IsomorphicGitAdapter`
 

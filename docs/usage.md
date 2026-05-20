@@ -334,7 +334,7 @@ gitrail [options] <repository-path>
 | `--state <path>`  | `-s`  | string              | —       | State file path. Required with `--incremental`.                      |
 | `--missing-state` |       | `error \| snapshot` | `error` | Behavior when state file is absent. Only valid with `--incremental`. |
 
-### Output
+### Output and Repository Metadata
 
 | Parameter                  | Alias | Type    | Default | Description                                                                                                                                                                   |
 | -------------------------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -344,6 +344,8 @@ gitrail [options] <repository-path>
 | `--max-diff-size <value>`  |       | string  | —       | Skip line-level diff computation for files above this size (bytes or `K`/`M`/`G` suffix). Emits `null` additions/deletions for skipped files. Applies only with `--per-file`. |
 | `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                                                                                                                                                |
 | `--rotate-size <bytes>`    |       | string  | —       | Start new file after threshold (raw bytes or `K`/`M`/`G`, range `1M` to `64G`)                                                                                                |
+| `--repo-name <string>`     |       | string  | —       | Override `repository.name` in all output records. Does not affect state-file identity or incremental behavior.                                                                |
+| `--repo-url <string>`      |       | string  | —       | Override `repository.url` in all output records. Does not affect state-file identity or incremental behavior.                                                                 |
 
 ### Control
 

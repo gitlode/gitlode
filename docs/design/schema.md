@@ -162,10 +162,12 @@ Array of parent commit OIDs:
 
 Carries repository metadata embedded in every record to make each line self-contained for downstream ingestion.
 
-| Field  | Source                                                                                              |
-| ------ | --------------------------------------------------------------------------------------------------- |
-| `name` | Derived from remote origin URL (last path segment, `.git` stripped), or directory name if no remote |
-| `url`  | Remote origin URL as-is, or `null` if not configured                                                |
+| Field  | Source                                                                                                                            |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `name` | Derived from remote origin URL (last path segment, `.git` stripped), or directory name if no remote. Override with `--repo-name`. |
+| `url`  | Remote origin URL as-is, or `null` if not configured. Override with `--repo-url`.                                                 |
+
+When `--repo-name` or `--repo-url` is provided, the override value replaces the auto-derived value in all output records. These overrides do not affect state-file identity or incremental extraction behavior.
 
 ## Complete example record
 

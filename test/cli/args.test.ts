@@ -737,6 +737,60 @@ describe("parseArgs – --per-file", () => {
 });
 
 // ---------------------------------------------------------------------------
+// --repo-name and --repo-url
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --repo-name and --repo-url", () => {
+  let repoDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("returns repoName from --repo-name", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--ref", "main", "--repo-name", "my-override", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoName).toBe("my-override");
+  });
+
+  it("returns repoUrl from --repo-url", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv(
+      "--ref",
+      "main",
+      "--repo-url",
+      "https://example.com/repo",
+      "--output-dir",
+      repoDir,
+      repoDir,
+    );
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoUrl).toBe("https://example.com/repo");
+  });
+
+  it("repoName and repoUrl default to undefined when not provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoName).toBeUndefined();
+    expect(parsed.repoUrl).toBeUndefined();
+  });
+
+  it("repoName and repoUrl can be provided independently", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--ref", "main", "--repo-name", "only-name", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoName).toBe("only-name");
+    expect(parsed.repoUrl).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Unknown option rejection
 // ---------------------------------------------------------------------------
 

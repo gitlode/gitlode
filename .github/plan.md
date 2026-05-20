@@ -43,7 +43,7 @@ v0.6.0 is a minor release focused on CLI reliability and operator control for in
 ### Phase 3: CLI Readability and Metadata Override
 
 - **File**: [`plans/phase-3.md`](plans/phase-3.md)
-- **Status**: Planned
+- **Status**: Completed
 
 Provisional dependency notes:
 

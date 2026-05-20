@@ -22,15 +22,16 @@ gitrail [options] <repository-path>
 `gitrail --help` uses commander 14 native option grouping. The grouped option sections and
 assignments are:
 
-| Group                     | Options                                                                      |
-| ------------------------- | ---------------------------------------------------------------------------- |
-| `General`                 | `--quiet`, `--profile`                                                       |
-| `Output`                  | `--output-dir`, `--output-prefix`, `--per-file`, `--max-diff-size`           |
-| `Differential Extraction` | `--incremental`, `--state`, `--missing-state`, `--since-ref`, `--since-date` |
-| `File Rotation`           | `--rotate-lines`, `--rotate-size`                                            |
+| Group                              | Options                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `Required Input`                   | `--ref`                                                                                         |
+| `Runtime and Diagnostics`          | `--quiet`, `--profile`                                                                          |
+| `Output and Repository Metadata`   | `--output-dir`, `--output-prefix`, `--per-file`, `--max-diff-size`, `--repo-name`, `--repo-url` |
+| `Extraction Range (Snapshot Mode)` | `--since-ref`, `--since-date`                                                                   |
+| `Incremental Extraction`           | `--incremental`, `--state`, `--missing-state`                                                   |
+| `File Rotation`                    | `--rotate-lines`, `--rotate-size`                                                               |
 
-`<repository-path>` remains a positional argument in the synopsis. `--ref` remains available on
-the post-Phase-1 option surface and is not duplicated into the grouped sections above.
+`<repository-path>` remains a positional argument in the synopsis.
 
 ### Positional
 
@@ -72,7 +73,7 @@ These parameters are only valid in snapshot mode (no `--incremental` flag). They
 | `--state <path>`                    | `-s`  | string              |                                     | Path to state file. In snapshot mode, state content is ignored but file is updated on success. In incremental mode, state is read to determine differential range. Required when `--incremental`.               |
 | `--missing-state <error\|snapshot>` |       | `error \| snapshot` | `error` (when `--incremental` used) | Behavior when `--incremental` is used and the state file does not exist. `error`: exit with code 1. `snapshot`: warn and fall back to full extraction, then create state file. Only valid with `--incremental`. |
 
-### Output
+### Output and Repository Metadata
 
 | Parameter                  | Alias | Type    | Default                    | Description                                                                                                                                                                        |
 | -------------------------- | ----- | ------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -80,6 +81,8 @@ These parameters are only valid in snapshot mode (no `--incremental` flag). They
 | `--output-prefix <string>` |       | string  | derived from remote origin | Filename prefix for output files.                                                                                                                                                  |
 | `--per-file`               |       | boolean | `false`                    | When present, emit one record per changed file within each commit. When absent, emit one record per commit (default granularity).                                                  |
 | `--max-diff-size <value>`  |       | string  | disabled                   | Skip line-level diff computation for files exceeding this size (accepts bytes or `K`/`M`/`G`). Emits `null` additions/deletions for skipped files. Applies only with `--per-file`. |
+| `--repo-name <string>`     |       | string  | —                          | Override `repository.name` in all output records. Does not affect state-file identity or incremental behavior.                                                                     |
+| `--repo-url <string>`      |       | string  | —                          | Override `repository.url` in all output records. Does not affect state-file identity or incremental behavior.                                                                      |
 
 **`--output-prefix` derivation logic** (when not specified):
 
@@ -120,28 +123,34 @@ When `--quiet` is not set and extraction succeeds, stderr output is fixed as fol
 3. An aligned completion summary block.
 4. When `--profile` is set, an aligned profile block after a single blank line.
 
-TTY-aware rendering is a CLI-edge concern. When `process.stderr.isTTY === true`, the stage lines
-are rendered in place using a braille spinner and the canonical layouts below:
+TTY-aware rendering is a CLI-edge concern. When `process.stderr.isTTY === true`, chalk-based
+color styling is applied (spinner, done marker, stage labels, field keys, values, units, refs, and
+severity badges). When `process.stderr.isTTY === false`, styling is disabled and the same text
+content is emitted with no ANSI escape sequences.
+
+When `process.stderr.isTTY === true`, the stage lines are rendered in place using a braille spinner:
 
 ```text
 ⠋ Preparing extraction  0.3s
-⠙ Extracting history  branch 2/3  commits 1542  records 3108  1.2 MB  8.5s
+⠙ Extracting history  branch 2/3  commits 1542  records 3108  1.2MB  8.5s
 ⠹ Finalizing output  0.8s
 ```
 
 The active line is the only line that updates in place. When a stage completes, the spinner is
-removed and the completed stage label is re-emitted in the same column with two leading spaces so
-the label column stays aligned:
+removed and the `✓` done marker is placed in the spinner column with a trailing space:
 
 ```text
-  Preparing extraction  0.3s
-  Extracting history  branch 3/3  commits 1542  records 3108  1.2 MB  8.5s
-  Finalizing output  0.8s
+✓ Preparing extraction  0.3s
+✓ Extracting history  branch 3/3  commits 1542  records 3108  1.2MB  8.5s
+✓ Finalizing output  0.8s
 ```
 
-The extracting line always renders fields in this order: spinner frame, stage label, branch
+Measured values use no-space `number+unit` tokens (e.g. `1.2MB`, `8.5s`, `12.34ms`).
+The numeric part is rendered with primary-value emphasis; the unit suffix is rendered with dim styling.
+
+The extracting line always renders fields in this order: spinner/done frame, stage label, branch
 position, `commits traversed`, `records written`, humanized `bytes written`, and elapsed time.
-The preparing and finalizing lines render only spinner + elapsed while active.
+The preparing and finalizing lines render only spinner/done + elapsed while active.
 
 When `process.stderr.isTTY === false`, the CLI suppresses the stage heartbeat UI entirely and emits
 only warnings and the final summary block. This non-TTY behavior is intentional and is not treated
@@ -171,6 +180,9 @@ The `Extracting history` line includes these fields, in this order:
 The `Preparing extraction` and `Finalizing output` lines show the spinner, stage label, and
 elapsed time while active.
 
+Warning lines are prefixed with `[WARN] ` in both TTY and non-TTY modes. In TTY mode, the badge
+is styled with `chalk.yellow.bold`; the message body uses default foreground.
+
 The default completion summary block uses this field order:
 
 - `Records written`
@@ -178,7 +190,7 @@ The default completion summary block uses this field order:
 - `Files created`
 - `Bytes written`
 - `Elapsed time`
-- `Branches`
+- `Refs`
 
 The aligned completion summary block has the following canonical layout, including zero-record
 successful runs:
@@ -188,9 +200,9 @@ Extraction complete
   Records written   : 3108
   Commits traversed : 1542
   Files created     : 524
-  Bytes written     : 1.2 MB
+  Bytes written     : 1.2MB
   Elapsed time      : 8.5s
-  Branches          : main, develop
+  Refs              : main, develop
 ```
 
 The default summary remains distinct from profiling output. Per-stage timings stay exclusive to

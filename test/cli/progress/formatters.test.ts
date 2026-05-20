@@ -32,7 +32,7 @@ describe("formatActiveLine", () => {
     };
     const line = formatActiveLine(snapshot, "/");
     expect(line).toBe(
-      "/ Extracting history  refs 2/3  commits 1,234  records 5,678  written 941.9 MB  elapsed 1.5s",
+      "/ Extracting history  refs 2/3  commits 1,234  records 5,678  written 941.9MB  elapsed 1.5s",
     );
   });
 
@@ -65,7 +65,7 @@ describe("formatDoneLine", () => {
       nowMs: 1500,
     };
     const line = formatDoneLine(snapshot);
-    expect(line).toBe("  Preparing extraction  elapsed 0.5s");
+    expect(line).toBe("✓ Preparing extraction  elapsed 0.5s");
   });
   it("formats done line for extracting phase with branch info", () => {
     const snapshot: PhaseSnapshot = {
@@ -80,7 +80,7 @@ describe("formatDoneLine", () => {
     };
     const line = formatDoneLine(snapshot);
     expect(line).toBe(
-      "  Extracting history  refs 3/3  commits 1,234  records 5,678  written 941.9 MB  elapsed 1.5s",
+      "✓ Extracting history  refs 3/3  commits 1,234  records 5,678  written 941.9MB  elapsed 1.5s",
     );
   });
   it("formats done line for finalizing phase", () => {
@@ -95,6 +95,6 @@ describe("formatDoneLine", () => {
       nowMs: 3000,
     };
     const line = formatDoneLine(snapshot);
-    expect(line).toBe("  Finalizing output  elapsed 2.0s");
+    expect(line).toBe("✓ Finalizing output  elapsed 2.0s");
   });
 });

@@ -6,7 +6,12 @@ import { pathToFileURL } from "node:url";
 
 import type { ParsedArgs } from "./cli/args.js";
 import { parseArgs } from "./cli/index.js";
-import { ProgressController, resolveUiMode } from "./cli/progress/index.js";
+import {
+  ProgressController,
+  resolveUiMode,
+  createStyling,
+  plainStyling,
+} from "./cli/progress/index.js";
 import type { TerminalSink } from "./cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "./cli/reporting/index.js";
 import {
@@ -82,7 +87,7 @@ export async function loadPriorState(
     if (parsed.missingState === "snapshot") {
       reporter.emit({
         type: "warning",
-        message: `Warning: State file not found: ${parsed.stateFilePath}. Falling back to full snapshot extraction.`,
+        message: `State file not found: ${parsed.stateFilePath}. Falling back to full snapshot extraction.`,
       });
       return emptyState(repoPath);
     }
@@ -181,6 +186,7 @@ async function main() {
     const { quiet, profile } = parsed;
     const isTTY = process.stderr.isTTY === true;
     const uiMode = resolveUiMode(quiet, isTTY);
+    const styling = createStyling(isTTY);
 
     // Build ProgressReporter based on uiMode.
     let reporter: ProgressReporter;
@@ -189,7 +195,8 @@ async function main() {
       reporter = {
         emit(event) {
           if (event.type === "warning") {
-            process.stderr.write(event.message + "\n");
+            const badge = plainStyling.warnBadge("[WARN]");
+            process.stderr.write(`${badge} ${event.message}\n`);
           }
         },
       };
@@ -204,6 +211,7 @@ async function main() {
           },
         },
         uiMode,
+        styling,
       );
       const ctrl = controller;
       reporter = { emit: (event) => ctrl.handleEvent(event) };
@@ -259,7 +267,13 @@ async function main() {
     const traversalPlanner = new DefaultTraversalPlanner(adapter, planningProfiler);
     const traversalExtractor = new DefaultCommitTraversalExtractor(adapter, traversalProfiler);
     const fileChangeExpander = new DefaultFileChangeExpander(adapter, parsed.maxDiffSize);
-    const projector = new DefaultFactProjector(repoName, remoteUrl, projectionProfiler);
+    const projector = new DefaultFactProjector(
+      repoName,
+      remoteUrl,
+      projectionProfiler,
+      parsed.repoName,
+      parsed.repoUrl,
+    );
 
     const deps: CoordinatorDependencies = {
       traversalPlanner,
@@ -289,20 +303,27 @@ async function main() {
     const elapsedMs = performance.now() - startMs;
 
     if (!quiet) {
-      const summaryLines = formatSummaryLines({
-        recordsWritten: result.recordsWritten,
-        commitsTraversed: result.commitsTraversed,
-        filesCreated: sink.filesCreated,
-        bytesWritten: sink.bytesWritten,
-        elapsedMs,
-        refs: result.refs,
-      });
+      const summaryLines = formatSummaryLines(
+        {
+          recordsWritten: result.recordsWritten,
+          commitsTraversed: result.commitsTraversed,
+          filesCreated: sink.filesCreated,
+          bytesWritten: sink.bytesWritten,
+          elapsedMs,
+          refs: result.refs,
+        },
+        styling,
+      );
       process.stderr.write("\n");
       for (const line of summaryLines) {
         process.stderr.write(line + "\n");
       }
       if (profile) {
-        const profileLines = formatProfileLines(rootProfiler.entries(), result.skippedDiffs);
+        const profileLines = formatProfileLines(
+          rootProfiler.entries(),
+          result.skippedDiffs,
+          styling,
+        );
         if (profileLines.length > 0) {
           process.stderr.write("\n");
           for (const line of profileLines) {

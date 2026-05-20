@@ -98,24 +98,24 @@ function emit(ctrl: ProgressController, event: ProgressEvent) {
 
 describe("humanizeBytes", () => {
   it("formats bytes", () => {
-    expect(humanizeBytes(0)).toBe("0 B");
-    expect(humanizeBytes(512)).toBe("512 B");
-    expect(humanizeBytes(1023)).toBe("1023 B");
+    expect(humanizeBytes(0)).toBe("0B");
+    expect(humanizeBytes(512)).toBe("512B");
+    expect(humanizeBytes(1023)).toBe("1023B");
   });
 
   it("formats kilobytes", () => {
-    expect(humanizeBytes(1024)).toBe("1.0 KB");
-    expect(humanizeBytes(2048)).toBe("2.0 KB");
-    expect(humanizeBytes(1536)).toBe("1.5 KB");
+    expect(humanizeBytes(1024)).toBe("1.0KB");
+    expect(humanizeBytes(2048)).toBe("2.0KB");
+    expect(humanizeBytes(1536)).toBe("1.5KB");
   });
 
   it("formats megabytes", () => {
-    expect(humanizeBytes(1024 * 1024)).toBe("1.0 MB");
-    expect(humanizeBytes(1024 * 1024 * 2.5)).toBe("2.5 MB");
+    expect(humanizeBytes(1024 * 1024)).toBe("1.0MB");
+    expect(humanizeBytes(1024 * 1024 * 2.5)).toBe("2.5MB");
   });
 
   it("formats gigabytes", () => {
-    expect(humanizeBytes(1024 * 1024 * 1024)).toBe("1.0 GB");
+    expect(humanizeBytes(1024 * 1024 * 1024)).toBe("1.0GB");
   });
 });
 
@@ -196,7 +196,7 @@ describe("formatSummaryLines", () => {
       refs: [],
     });
     const bytesLine = lines.find((l) => l.includes("Bytes written"));
-    expect(bytesLine).toContain("2.0 KB");
+    expect(bytesLine).toContain("2.0KB");
   });
 
   it("shows '(none)' for empty refs", () => {
@@ -254,7 +254,7 @@ describe("ProgressController (tty-interactive)", () => {
     // Last rewriteLine should contain done line (no spinner char at start)
     const rewrites = sink.records.filter((r) => r.type === "rewriteLine");
     const last = rewrites[rewrites.length - 1];
-    expect(last?.text).toMatch(/^ {2}Preparing extraction/);
+    expect(last?.text).toMatch(/^✓ Preparing extraction/);
 
     const newlines = sink.records.filter((r) => r.type === "newline");
     expect(newlines).toHaveLength(1);
@@ -282,7 +282,7 @@ describe("ProgressController (tty-interactive)", () => {
     const rewrites = sink.records.filter((r) => r.type === "rewriteLine");
 
     expect(newlines).toHaveLength(1);
-    expect(writes.some((w) => w.text === "Test warning")).toBe(true);
+    expect(writes.some((w) => w.text === "[WARN] Test warning")).toBe(true);
     // Redraw after the warning
     expect(rewrites.length).toBeGreaterThanOrEqual(2);
   });
@@ -309,7 +309,7 @@ describe("ProgressController (tty-interactive)", () => {
     expect(last.text).toMatch(/refs 1\/2/);
     expect(last.text).toMatch(/commits 5/);
     expect(last.text).toMatch(/records 3/);
-    expect(last.text).toMatch(/2\.0 KB/);
+    expect(last.text).toMatch(/2\.0KB/);
   });
 });
 
@@ -370,7 +370,7 @@ describe("ProgressController (non-tty-summary)", () => {
     emit(ctrl, { type: "warning", message: "Non-TTY warning" });
 
     const writes = sink.records.filter((r) => r.type === "writeLine");
-    expect(writes.some((w) => w.text === "Non-TTY warning")).toBe(true);
+    expect(writes.some((w) => w.text === "[WARN] Non-TTY warning")).toBe(true);
   });
 });
 

@@ -269,12 +269,14 @@ Schema:
 
 ```typescript
 interface ExtractionState {
-  version: 1;
+  version: 2;
   generatedAt: string; // ISO 8601
   repositoryPath: string;
-  branches: readonly Array<{
-    name: string;
-    lastCommitHash: string; // last extracted commit OID (wire field name kept for compatibility)
+  refs: readonly Array<{
+    ref: string; // exact --ref token
+    refType: "branch" | "tag-lightweight" | "tag-annotated" | "commit-oid";
+    tipOid: string; // last successful tip used as the next incremental exclude boundary
+    updatedAt: string; // ISO 8601
   }>;
 }
 ```
@@ -283,7 +285,8 @@ Rules:
 
 - State file is written **only after all output files for that run are fully flushed and closed**
 - If extraction fails mid-run, the previous state file must remain unchanged
-- On next run, if a branch in the state file no longer exists in the repo, log a warning and skip that branch
+- In incremental mode, only version `2` state is accepted (no automatic migration from legacy schema)
+- Checkpoint identity is strict by `(ref, refType)`
 - Runtime must gate unsupported repository object formats before consuming state boundaries
 
 ---

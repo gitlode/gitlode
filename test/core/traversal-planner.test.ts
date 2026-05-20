@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type {
-  TraversalPlanningRequest,
   CommitOid,
   ProgressEvent,
   ProgressReporter,
+  TraversalPlanningRequest,
 } from "../../src/core/index.js";
 import { DefaultTraversalPlanner } from "../../src/core/traversal-planner.js";
 import { GitAdapterError } from "../../src/git/index.js";
@@ -26,25 +26,24 @@ function makeReporter(): ProgressReporter & { warnings: string[] } {
 
 function makeAdapter(options: {
   refs?: Record<string, CommitOid>;
+  refTypes?: Record<string, "branch" | "tag-lightweight" | "tag-annotated" | "commit-oid">;
   mergeBase?: CommitOid | null;
-  resolveRefError?: { branch: string; code: "REF_NOT_FOUND" };
-  branchRefs?: Set<string>;
+  resolveRefError?: { ref: string; code: "REF_NOT_FOUND" };
 }): GitAdapter {
-  const branchRefs = options.branchRefs ?? new Set(Object.keys(options.refs ?? {}));
   return {
     supportedObjectFormats() {
       return ["sha1"];
     },
     async resolveRef(_repo, ref) {
-      if (options.resolveRefError && ref === options.resolveRefError.branch) {
+      if (options.resolveRefError && ref === options.resolveRefError.ref) {
         throw new GitAdapterError(`Ref not found: ${ref}`, options.resolveRefError.code);
       }
       const hash = options.refs?.[ref];
       if (!hash) throw new GitAdapterError(`Ref not found: ${ref}`, "REF_NOT_FOUND");
       return hash;
     },
-    async isRefBranch(_repo, ref) {
-      return branchRefs.has(ref);
+    async classifyRefType(_repo, ref) {
+      return options.refTypes?.[ref] ?? "branch";
     },
     async getRepositoryObjectFormat() {
       return "sha1";
@@ -67,13 +66,13 @@ function baseRequest(overrides: Partial<TraversalPlanningRequest> = {}): Travers
     repositoryPath: "/repo",
     refs: ["main"],
     mode: "snapshot",
-    priorRefMap: new Map(),
+    priorRefs: [],
     ...overrides,
   };
 }
 
 describe("DefaultTraversalPlanner", () => {
-  it("resolves branch heads into traversal plans in declaration order", async () => {
+  it("resolves heads in declaration order", async () => {
     const headMain = makeHash(5);
     const headDevelop = makeHash(10);
     const planner = new DefaultTraversalPlanner(
@@ -83,17 +82,17 @@ describe("DefaultTraversalPlanner", () => {
     const plans = await planner.plan(baseRequest({ refs: ["main", "develop"] }), makeReporter());
 
     expect(plans).toEqual([
-      { name: "main", head: headMain, excludeHash: undefined, isBranch: true },
-      { name: "develop", head: headDevelop, excludeHash: undefined, isBranch: true },
+      { name: "main", refType: "branch", head: headMain, excludeHash: undefined },
+      { name: "develop", refType: "branch", head: headDevelop, excludeHash: undefined },
     ]);
   });
 
-  it("emits a warning and omits missing branches", async () => {
+  it("warns and skips missing refs", async () => {
     const head = makeHash(1);
     const planner = new DefaultTraversalPlanner(
       makeAdapter({
         refs: { main: head },
-        resolveRefError: { branch: "gone", code: "REF_NOT_FOUND" },
+        resolveRefError: { ref: "gone", code: "REF_NOT_FOUND" },
       }),
     );
     const reporter = makeReporter();
@@ -102,69 +101,88 @@ describe("DefaultTraversalPlanner", () => {
 
     expect(reporter.warnings).toHaveLength(1);
     expect(reporter.warnings[0]).toContain("gone");
-    expect(plans).toEqual([{ name: "main", head, excludeHash: undefined, isBranch: true }]);
+    expect(plans).toEqual([{ name: "main", refType: "branch", head, excludeHash: undefined }]);
   });
 
-  it("returns no plans when all branches are missing", async () => {
-    const planner = new DefaultTraversalPlanner(
-      makeAdapter({ resolveRefError: { branch: "main", code: "REF_NOT_FOUND" } }),
-    );
-
-    const plans = await planner.plan(baseRequest(), makeReporter());
-
-    expect(plans).toEqual([]);
-  });
-
-  it("uses prior checkpoint hashes for existing branches in incremental mode", async () => {
+  it("matches checkpoints by exact (ref, refType)", async () => {
     const head = makeHash(5);
-    const lastHash = makeHash(2);
-    const planner = new DefaultTraversalPlanner(makeAdapter({ refs: { main: head } }));
+    const checkpointTip = makeHash(2);
+    const planner = new DefaultTraversalPlanner(
+      makeAdapter({ refs: { v1: head }, refTypes: { v1: "tag-annotated" } }),
+    );
 
     const plans = await planner.plan(
       baseRequest({
+        refs: ["v1"],
         mode: "incremental",
-        priorRefMap: new Map([["main", lastHash]]),
+        priorRefs: [
+          {
+            ref: "v1",
+            refType: "branch",
+            tipOid: makeHash(1),
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            ref: "v1",
+            refType: "tag-annotated",
+            tipOid: checkpointTip,
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
       }),
       makeReporter(),
     );
 
-    expect(plans).toEqual([{ name: "main", head, excludeHash: lastHash, isBranch: true }]);
+    expect(plans).toEqual([
+      { name: "v1", refType: "tag-annotated", head, excludeHash: checkpointTip },
+    ]);
   });
 
-  it("uses merge base as excludeHash for newly added branches when prior state exists", async () => {
+  it("uses merge base only for newly added branch refs", async () => {
     const headMain = makeHash(5);
-    const headDevelop = makeHash(10);
-    const existingHead = makeHash(3);
+    const headTag = makeHash(10);
+    const headDevelop = makeHash(20);
+    const existingMain = makeHash(3);
     const mergeBaseHash = makeHash(2);
     const planner = new DefaultTraversalPlanner(
       makeAdapter({
-        refs: { main: headMain, develop: headDevelop },
+        refs: { main: headMain, v1: headTag, develop: headDevelop },
+        refTypes: { main: "branch", v1: "tag-lightweight", develop: "branch" },
         mergeBase: mergeBaseHash,
       }),
     );
 
     const plans = await planner.plan(
       baseRequest({
-        refs: ["main", "develop"],
+        refs: ["main", "v1", "develop"],
         mode: "incremental",
-        priorRefMap: new Map([["main", existingHead]]),
+        priorRefs: [
+          {
+            ref: "main",
+            refType: "branch",
+            tipOid: existingMain,
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
       }),
       makeReporter(),
     );
 
     expect(plans).toEqual([
-      { name: "main", head: headMain, excludeHash: existingHead, isBranch: true },
-      { name: "develop", head: headDevelop, excludeHash: mergeBaseHash, isBranch: true },
+      { name: "main", refType: "branch", head: headMain, excludeHash: existingMain },
+      { name: "v1", refType: "tag-lightweight", head: headTag, excludeHash: undefined },
+      { name: "develop", refType: "branch", head: headDevelop, excludeHash: mergeBaseHash },
     ]);
   });
 
-  it("falls back to full traversal for new branches when no merge base exists", async () => {
+  it("falls back to full traversal for new branch when no merge base exists", async () => {
     const headMain = makeHash(5);
     const headOrphan = makeHash(99);
     const existingHead = makeHash(3);
     const planner = new DefaultTraversalPlanner(
       makeAdapter({
         refs: { main: headMain, orphan: headOrphan },
+        refTypes: { main: "branch", orphan: "branch" },
         mergeBase: null,
       }),
     );
@@ -173,18 +191,25 @@ describe("DefaultTraversalPlanner", () => {
       baseRequest({
         refs: ["main", "orphan"],
         mode: "incremental",
-        priorRefMap: new Map([["main", existingHead]]),
+        priorRefs: [
+          {
+            ref: "main",
+            refType: "branch",
+            tipOid: existingHead,
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
       }),
       makeReporter(),
     );
 
     expect(plans).toEqual([
-      { name: "main", head: headMain, excludeHash: existingHead, isBranch: true },
-      { name: "orphan", head: headOrphan, excludeHash: undefined, isBranch: true },
+      { name: "main", refType: "branch", head: headMain, excludeHash: existingHead },
+      { name: "orphan", refType: "branch", head: headOrphan, excludeHash: undefined },
     ]);
   });
 
-  it("uses the explicit ref range as excludeHash for every planned branch", async () => {
+  it("uses explicit since-ref range boundary", async () => {
     const head = makeHash(5);
     const sinceRef = makeHash(2);
     const planner = new DefaultTraversalPlanner(makeAdapter({ refs: { main: head } }));
@@ -194,10 +219,10 @@ describe("DefaultTraversalPlanner", () => {
       makeReporter(),
     );
 
-    expect(plans).toEqual([{ name: "main", head, excludeHash: sinceRef, isBranch: true }]);
+    expect(plans).toEqual([{ name: "main", refType: "branch", head, excludeHash: sinceRef }]);
   });
 
-  it("does not set excludeHash for since-date planning", async () => {
+  it("since-date does not set excludeHash", async () => {
     const head = makeHash(5);
     const planner = new DefaultTraversalPlanner(makeAdapter({ refs: { main: head } }));
 
@@ -206,17 +231,6 @@ describe("DefaultTraversalPlanner", () => {
       makeReporter(),
     );
 
-    expect(plans).toEqual([{ name: "main", head, excludeHash: undefined, isBranch: true }]);
-  });
-
-  it("isBranch is false for a tag ref (not under refs/heads/)", async () => {
-    const head = makeHash(5);
-    const planner = new DefaultTraversalPlanner(
-      makeAdapter({ refs: { "v1.0": head }, branchRefs: new Set() }),
-    );
-
-    const plans = await planner.plan(baseRequest({ refs: ["v1.0"] }), makeReporter());
-
-    expect(plans).toEqual([{ name: "v1.0", head, excludeHash: undefined, isBranch: false }]);
+    expect(plans).toEqual([{ name: "main", refType: "branch", head, excludeHash: undefined }]);
   });
 });

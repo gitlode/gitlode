@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { ParsedArgs } from "../src/cli/args.js";
 import {
   formatElapsed,
   humanizeBytes,
@@ -11,8 +12,8 @@ import {
   type UiMode,
 } from "../src/cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "../src/cli/reporting/index.js";
-import type { ProgressEvent } from "../src/core/index.js";
-import { assertSupportedRepositoryObjectFormat } from "../src/index.js";
+import type { ProgressEvent, StateStore } from "../src/core/index.js";
+import { assertSupportedRepositoryObjectFormat, loadPriorState } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -97,24 +98,24 @@ function emit(ctrl: ProgressController, event: ProgressEvent) {
 
 describe("humanizeBytes", () => {
   it("formats bytes", () => {
-    expect(humanizeBytes(0)).toBe("0 B");
-    expect(humanizeBytes(512)).toBe("512 B");
-    expect(humanizeBytes(1023)).toBe("1023 B");
+    expect(humanizeBytes(0)).toBe("0B");
+    expect(humanizeBytes(512)).toBe("512B");
+    expect(humanizeBytes(1023)).toBe("1023B");
   });
 
   it("formats kilobytes", () => {
-    expect(humanizeBytes(1024)).toBe("1.0 KB");
-    expect(humanizeBytes(2048)).toBe("2.0 KB");
-    expect(humanizeBytes(1536)).toBe("1.5 KB");
+    expect(humanizeBytes(1024)).toBe("1.0KB");
+    expect(humanizeBytes(2048)).toBe("2.0KB");
+    expect(humanizeBytes(1536)).toBe("1.5KB");
   });
 
   it("formats megabytes", () => {
-    expect(humanizeBytes(1024 * 1024)).toBe("1.0 MB");
-    expect(humanizeBytes(1024 * 1024 * 2.5)).toBe("2.5 MB");
+    expect(humanizeBytes(1024 * 1024)).toBe("1.0MB");
+    expect(humanizeBytes(1024 * 1024 * 2.5)).toBe("2.5MB");
   });
 
   it("formats gigabytes", () => {
-    expect(humanizeBytes(1024 * 1024 * 1024)).toBe("1.0 GB");
+    expect(humanizeBytes(1024 * 1024 * 1024)).toBe("1.0GB");
   });
 });
 
@@ -195,7 +196,7 @@ describe("formatSummaryLines", () => {
       refs: [],
     });
     const bytesLine = lines.find((l) => l.includes("Bytes written"));
-    expect(bytesLine).toContain("2.0 KB");
+    expect(bytesLine).toContain("2.0KB");
   });
 
   it("shows '(none)' for empty refs", () => {
@@ -253,7 +254,7 @@ describe("ProgressController (tty-interactive)", () => {
     // Last rewriteLine should contain done line (no spinner char at start)
     const rewrites = sink.records.filter((r) => r.type === "rewriteLine");
     const last = rewrites[rewrites.length - 1];
-    expect(last?.text).toMatch(/^ {2}Preparing extraction/);
+    expect(last?.text).toMatch(/^✓ Preparing extraction/);
 
     const newlines = sink.records.filter((r) => r.type === "newline");
     expect(newlines).toHaveLength(1);
@@ -281,7 +282,7 @@ describe("ProgressController (tty-interactive)", () => {
     const rewrites = sink.records.filter((r) => r.type === "rewriteLine");
 
     expect(newlines).toHaveLength(1);
-    expect(writes.some((w) => w.text === "Test warning")).toBe(true);
+    expect(writes.some((w) => w.text === "[WARN] Test warning")).toBe(true);
     // Redraw after the warning
     expect(rewrites.length).toBeGreaterThanOrEqual(2);
   });
@@ -308,7 +309,7 @@ describe("ProgressController (tty-interactive)", () => {
     expect(last.text).toMatch(/refs 1\/2/);
     expect(last.text).toMatch(/commits 5/);
     expect(last.text).toMatch(/records 3/);
-    expect(last.text).toMatch(/2\.0 KB/);
+    expect(last.text).toMatch(/2\.0KB/);
   });
 });
 
@@ -343,6 +344,11 @@ describe("formatProfileLines", () => {
     expect(lines[1]).toMatch(/^  elapsed\s+: wall=/);
     expect(lines[2]).toMatch(/^  elapsed\/planning\s*: wall=/);
   });
+
+  it("appends skipped_diffs line when provided", () => {
+    const lines = formatProfileLines([{ name: "elapsed", wallMs: 18.4, workMs: 15.6 }], 7);
+    expect(lines[lines.length - 1]).toBe("  skipped_diffs : 7");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -364,7 +370,7 @@ describe("ProgressController (non-tty-summary)", () => {
     emit(ctrl, { type: "warning", message: "Non-TTY warning" });
 
     const writes = sink.records.filter((r) => r.type === "writeLine");
-    expect(writes.some((w) => w.text === "Non-TTY warning")).toBe(true);
+    expect(writes.some((w) => w.text === "[WARN] Non-TTY warning")).toBe(true);
   });
 });
 
@@ -406,5 +412,125 @@ describe("assertSupportedRepositoryObjectFormat", () => {
     expect(() => assertSupportedRepositoryObjectFormat("sha256", ["sha1"])).toThrow(
       "Unsupported repository object format: sha256. Supported formats: sha1.",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// State loading (v2)
+// ---------------------------------------------------------------------------
+
+const TEST_REPO_PATH = process.cwd();
+
+function parsedArgs(overrides: Partial<ParsedArgs> = {}): ParsedArgs {
+  return {
+    repositoryPath: TEST_REPO_PATH,
+    refs: ["main"],
+    outputDir: "/out",
+    outputPrefix: "repo",
+    rotation: {},
+    incremental: true,
+    missingState: "error",
+    range: undefined,
+    stateFilePath: "/state.json",
+    perFile: false,
+    quiet: false,
+    profile: false,
+    ...overrides,
+  };
+}
+
+function makeStateStore(state: unknown): StateStore {
+  return {
+    async read() {
+      return state as never;
+    },
+    async write() {},
+  };
+}
+
+function makeReporter() {
+  const warnings: string[] = [];
+  return {
+    warnings,
+    emit(event: ProgressEvent) {
+      if (event.type === "warning") {
+        warnings.push(event.message);
+      }
+    },
+  };
+}
+
+describe("loadPriorState", () => {
+  it("rejects non-v2 state in incremental mode", async () => {
+    const store = makeStateStore({
+      version: 1,
+      generatedAt: "",
+      repositoryPath: TEST_REPO_PATH,
+      branches: [],
+    });
+
+    await expect(
+      loadPriorState(store, parsedArgs(), TEST_REPO_PATH, "sha1", makeReporter()),
+    ).rejects.toThrow("Unsupported state file version: 1. Supported version: 2.");
+  });
+
+  it("validates v2 tipOid shape for the repository object profile", async () => {
+    const store = makeStateStore({
+      version: 2,
+      generatedAt: "",
+      repositoryPath: TEST_REPO_PATH,
+      refs: [
+        {
+          ref: "main",
+          refType: "branch",
+          tipOid: "not-an-oid",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    await expect(
+      loadPriorState(store, parsedArgs(), TEST_REPO_PATH, "sha1", makeReporter()),
+    ).rejects.toThrow('Invalid commit OID in state file for ref "main": not-an-oid');
+  });
+
+  it("accepts mixed ref types in v2 state", async () => {
+    const sha1Oid = "a".repeat(40);
+    const store = makeStateStore({
+      version: 2,
+      generatedAt: "",
+      repositoryPath: TEST_REPO_PATH,
+      refs: [
+        { ref: "main", refType: "branch", tipOid: sha1Oid, updatedAt: "2026-01-01T00:00:00.000Z" },
+        {
+          ref: "v1.0",
+          refType: "tag-lightweight",
+          tipOid: sha1Oid,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          ref: "release-ann",
+          refType: "tag-annotated",
+          tipOid: sha1Oid,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          ref: sha1Oid,
+          refType: "commit-oid",
+          tipOid: sha1Oid,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const state = await loadPriorState(store, parsedArgs(), TEST_REPO_PATH, "sha1", makeReporter());
+
+    expect(state.version).toBe(2);
+    expect(state.refs.map((entry) => entry.refType)).toEqual([
+      "branch",
+      "tag-lightweight",
+      "tag-annotated",
+      "commit-oid",
+    ]);
   });
 });

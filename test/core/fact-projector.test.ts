@@ -280,8 +280,68 @@ describe("DefaultFactProjector — file-change mode", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Exhaustive dispatch: mixed fact stream
+// Metadata override
 // ---------------------------------------------------------------------------
+
+describe("DefaultFactProjector — metadata override", () => {
+  it("repoNameOverride takes precedence over derived repoName in CommitFact", async () => {
+    const projector = new DefaultFactProjector(
+      "auto-name",
+      "https://github.com/org/auto.git",
+      undefined,
+      "override-name",
+    );
+    const fact = makeCommitFact();
+    const [record] = await collect(projector.project(toAsyncIter([fact])));
+    expect(record!.repository.name).toBe("override-name");
+  });
+
+  it("repoUrlOverride takes precedence over remoteUrl in CommitFact", async () => {
+    const projector = new DefaultFactProjector(
+      "repo",
+      "https://github.com/org/original.git",
+      undefined,
+      undefined,
+      "https://example.com/override",
+    );
+    const fact = makeCommitFact();
+    const [record] = await collect(projector.project(toAsyncIter([fact])));
+    expect(record!.repository.url).toBe("https://example.com/override");
+  });
+
+  it("repoNameOverride takes precedence in FileChangeFact", async () => {
+    const projector = new DefaultFactProjector("auto-name", null, undefined, "override-name");
+    const fact = makeFileChangeFact();
+    const [record] = await collect(projector.project(toAsyncIter([fact])));
+    expect(record!.repository.name).toBe("override-name");
+  });
+
+  it("repoUrlOverride takes precedence in FileChangeFact", async () => {
+    const projector = new DefaultFactProjector(
+      "repo",
+      "https://github.com/org/original.git",
+      undefined,
+      undefined,
+      "https://example.com/override",
+    );
+    const fact = makeFileChangeFact();
+    const [record] = await collect(projector.project(toAsyncIter([fact])));
+    expect(record!.repository.url).toBe("https://example.com/override");
+  });
+
+  it("repoUrlOverride of empty string sets url to empty string", async () => {
+    const projector = new DefaultFactProjector(
+      "repo",
+      "https://github.com/org/original.git",
+      undefined,
+      undefined,
+      "",
+    );
+    const fact = makeCommitFact();
+    const [record] = await collect(projector.project(toAsyncIter([fact])));
+    expect(record!.repository.url).toBe("");
+  });
+});
 
 describe("DefaultFactProjector — exhaustive dispatch", () => {
   it("dispatches commit and file-change facts correctly in separate project() calls", async () => {

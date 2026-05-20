@@ -24,7 +24,7 @@ const noopAdapter: GitAdapter = {
   supportedObjectFormats: () => ["sha1"],
   resolveRef: async () => "abc123def456abc123def456abc123def456abc123" as CommitOid,
   getRepositoryObjectFormat: async () => "sha1",
-  isRefBranch: async () => true,
+  classifyRefType: async () => "branch",
   walkCommits: async function* () {},
   getRemoteUrl: async () => null,
   findMergeBase: async () => null,
@@ -240,6 +240,43 @@ describe("parseArgs – --rotate-size validation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// --max-diff-size validation
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --max-diff-size validation", () => {
+  it.each([["abc"], ["1MiB"], ["1.5G"], ["+1M"], ["-1M"], ["1 M"], ["1MB"]])(
+    "rejects invalid format %s",
+    async (val) => {
+      setArgv("--ref", "main", "--max-diff-size", val, ".");
+      await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(stderrSpy).toHaveBeenCalledWith(
+        "--max-diff-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)\n",
+      );
+    },
+  );
+
+  it("rejects zero", async () => {
+    setArgv("--ref", "main", "--max-diff-size", "0", ".");
+    await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith("--max-diff-size must be at least 1 byte\n");
+  });
+
+  it.each([
+    ["1", 1],
+    ["100K", 102_400],
+    ["1M", 1_048_576],
+    ["2G", 2_147_483_648],
+    [" 500M ", 524_288_000],
+  ] as [string, number][])("accepts valid --max-diff-size %s", async (val, expected) => {
+    setArgv("--ref", "main", "--max-diff-size", val, ".");
+    const parsed = await parseArgs(noopAdapter);
+    expect(parsed.maxDiffSize).toBe(expected);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // --since-date validation
 // ---------------------------------------------------------------------------
 
@@ -451,10 +488,7 @@ describe("parseArgs – --incremental", () => {
     const stateDir = repoDir;
     const stateFile = join(stateDir, "state.json");
     await import("node:fs/promises").then(({ writeFile: wf }) =>
-      wf(
-        stateFile,
-        JSON.stringify({ version: 1, generatedAt: "", repositoryPath: "/", branches: [] }),
-      ),
+      wf(stateFile, JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] })),
     );
     const adapter = new IsomorphicGitAdapter();
     setArgv(
@@ -490,7 +524,7 @@ describe("parseArgs – incremental mode", () => {
     const stateFile = join(stateDir, "state.json");
     await writeFile(
       stateFile,
-      JSON.stringify({ version: 1, generatedAt: "", repositoryPath: "/", branches: [] }),
+      JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] }),
     );
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();
@@ -607,7 +641,7 @@ describe("parseArgs – --since-ref", () => {
         return "abc123def456abc123def456abc123def456abc123" as CommitOid;
       },
       getRepositoryObjectFormat: async () => "sha1",
-      isRefBranch: async () => true,
+      classifyRefType: async () => "branch",
       walkCommits: async function* () {},
       getRemoteUrl: async () => null,
       findMergeBase: async () => null,
@@ -699,6 +733,60 @@ describe("parseArgs – --per-file", () => {
     setArgv("--per-file", "--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.perFile).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --repo-name and --repo-url
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --repo-name and --repo-url", () => {
+  let repoDir: string;
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("returns repoName from --repo-name", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--ref", "main", "--repo-name", "my-override", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoName).toBe("my-override");
+  });
+
+  it("returns repoUrl from --repo-url", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv(
+      "--ref",
+      "main",
+      "--repo-url",
+      "https://example.com/repo",
+      "--output-dir",
+      repoDir,
+      repoDir,
+    );
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoUrl).toBe("https://example.com/repo");
+  });
+
+  it("repoName and repoUrl default to undefined when not provided", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoName).toBeUndefined();
+    expect(parsed.repoUrl).toBeUndefined();
+  });
+
+  it("repoName and repoUrl can be provided independently", async () => {
+    repoDir = await makeRealRepo();
+    const adapter = new IsomorphicGitAdapter();
+    setArgv("--ref", "main", "--repo-name", "only-name", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.repoName).toBe("only-name");
+    expect(parsed.repoUrl).toBeUndefined();
   });
 });
 

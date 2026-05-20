@@ -1,59 +1,55 @@
-# gitrail — v0.5.0 Release Plan
+# gitrail — v0.6.0 Release Plan
 
 ## Overview
 
-v0.5.0 is a minor release focused on making release-oriented extraction a first-class workflow and tightening the surrounding CLI contract. The release should improve how users bootstrap extraction around release refs, remove avoidable SHA-1-specific assumptions from the documented and validated surface, and harden or clarify the CLI paths that become more important once the workflow is promoted to a first-class feature. Pre-1.0 minor releases may include behavior and contract adjustments when they reduce larger v1.0 migration risk; this release should keep that latitude focused on a coherent workflow-and-compatibility theme rather than broad internal churn.
+v0.6.0 is a minor release focused on CLI reliability and operator control for incremental extraction and per-file diff cost. This release prioritizes user-facing workflow correctness and practical usability improvements over deep architectural refactoring. As a pre-1.0 minor release, behavior and contract adjustments are allowed when they reduce future migration risk, but the scope should remain tightly aligned to CLI and extraction-operability outcomes.
 
 ## Release Goals
 
-- Make release-boundary extraction a clear, supported user workflow rather than an implicit ref-manipulation workaround
-- Clarify and, where dependency support allows, broaden the product contract from SHA-1-specific commit hashes to Git commit object IDs
-- Improve CLI robustness and discoverability in the same surface area touched by the release-boundary workflow
-- Keep the release centered on workflow, compatibility, and CLI quality instead of mixing in unrelated architecture or output-surface expansion
+- Make incremental extraction reliable across non-branch refs when state tracking is enabled
+- Give users explicit control over large text-diff cost in per-file extraction mode
+- Improve CLI readability and discoverability for interactive usage
+- Add low-risk CLI-level metadata override capability for repository context
 
 ## Scope Summary
 
-### Included in v0.5.0
+### Included in v0.6.0
 
-- `CLI UX: Release-boundary extraction workflow` — mandatory scope item for this release; define and implement a first-class release-oriented extraction workflow around release refs, snapshot bootstrap, and incremental follow-up
-- `Compatibility: Hash-algorithm-agnostic commit OID support` — compatibility/correctness companion item that aligns the product contract with Git object IDs and removes avoidable SHA-1-only assumptions where supported
-- `CLI: Schema validation for parsed CLI options` — small hardening item that becomes more valuable as the CLI parameter model grows more nuanced; reduces type-assertion drift risk in `parseArgs()` without reopening higher-level workflow semantics
-- `CLI UX: --help option grouping and discoverability` — small documentation/UX companion for a release that adds or clarifies differential-extraction workflow guidance; improves discoverability of the state- and boundary-related options users must understand together
+- `State/Incremental: Track non-branch refs in state for reliable incremental extraction`
+- `Extraction/CLI: User-controlled guardrail for very large text diffs`
+- `CLI UX: Terminal output styling and readability`
+- `Output: Repository metadata override`
 
-### Explicitly excluded from v0.5.0
+### Explicitly excluded from v0.6.0
 
-- `Extraction/File Mode: Exact-content rename detection` — valuable, but it broadens the release into output-schema and file-mode semantics that are unrelated to the release-boundary workflow
-- `Extraction/CLI: User-controlled guardrail for very large text diffs` — worthwhile performance-control item, but it is operationally separate from the v0.5.0 workflow and compatibility theme
-- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter` — internal design work without enough user-facing value for this release theme
-- `Architecture/Runtime: Worker-based extraction runtime` — too large and cross-cutting for the same release as a workflow-model change
-- `Pipeline: Pluggable enrichment stage for organization-specific metadata` — still required before v1.0.0, but too large to combine with the release-boundary design work in this release
-- `Output: Configurable field inclusion/exclusion` — better planned alongside projection/output-surface priorities rather than this release's extraction-boundary theme
-- `Output: Repository metadata override` — genuinely small, but it pulls the release toward output customization rather than the chosen extraction-workflow theme
-- `Output: Execution metadata line` — also small, but unrelated to the release-boundary and compatibility objectives
+- `Extraction/File Mode: Exact-content rename detection (limited scope)`
+- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter`
+- `Output: Execution metadata line`
+- `Pipeline: Pluggable enrichment stage for organization-specific metadata`
+- `Architecture/Runtime: Worker-based extraction runtime for resilience and orchestration`
 
 ## Development Phases
 
-### Phase 1: Release-Boundary Extraction Workflow
+### Phase 1: Non-Branch Ref State Tracking
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
 - **Status**: Completed
 
-### Phase 2: Commit OID Compatibility Contract
+### Phase 2: Large Text-Diff Guardrail
 
 - **File**: [`plans/phase-2.md`](plans/phase-2.md)
 - **Status**: Completed
 
-### Phase 3: CLI Parser Hardening and Help Discoverability
+### Phase 3: CLI Readability and Metadata Override
 
 - **File**: [`plans/phase-3.md`](plans/phase-3.md)
 - **Status**: Completed
 
 Provisional dependency notes:
 
-- Phase 1 is first because it is the primary release feature and the main source of CLI/workflow semantics for v0.5.0.
-- Phase 2 follows Phase 1: commit-OID compatibility should be aligned against the finalized release-boundary workflow, ref-resolution behavior, and any user-visible wording chosen in Phase 1.
-- Phase 3 follows Phase 1 because schema validation and help grouping both depend on the final CLI option surface and help text after the release-boundary workflow design is fixed.
-- Phase 3 is kept after Phase 2 as well to avoid repeated edits to the same CLI-facing files and documentation while terminology is still moving.
+- Phase 1 is first because state schema/tracking behavior is foundational for incremental extraction semantics.
+- Phase 2 follows to introduce performance guardrails without mixing state-format changes and diff-policy changes in one phase.
+- Phase 3 is last because it is mostly UX and CLI option-surface refinement that should align with finalized behavior from Phases 1 and 2.
 
 ## Release Tasks
 
@@ -63,8 +59,8 @@ _Update all human-oriented documentation to reflect the complete set of changes 
 
 #### Status
 
-- [ ] Planned
-- [ ] In progress
+- [x] Planned
+- [x] In progress
 - [x] Completed
 
 #### Mandatory Files
@@ -91,9 +87,9 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 #### Release-Specific Notes
 
-- Update CLI and usage documentation for the final release-boundary workflow and any new or revised parameter semantics.
-- Update Git traversal and architecture documentation if release-ref resolution, ref-boundary semantics, or commit OID terminology change.
-- Add migration notes if user-visible CLI behavior or documented compatibility guarantees change.
+- Update usage and troubleshooting guidance for non-branch ref incremental behavior under `--state`.
+- Document large text-diff guardrail behavior, defaults, and contract impact (`null` counters when skipped).
+- Reflect terminal output/readability changes and repository metadata override options in CLI documentation.
 
 #### Verification
 
@@ -105,12 +101,12 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 ## Final Verification Checklist
 
-- [x] All development phases are marked Completed.
-- [x] `CHANGELOG.md` contains a finalized this version's entry with `Added` / `Changed` / `Fixed` and `Migration` (if needed) sections.
-- [x] Human-oriented docs were reviewed and updated for latest behavior (`README.md`, `docs/usage.md`, `docs/design/`, instructions files as applicable).
-- [x] Roadmap cleanup completed for implemented items in this version; remaining entries are forward-looking.
-- [x] Verification commands completed:
-  - `npm run build` pass
-  - `npm test` pass
-  - `npm run lint` pass
-  - `npm run format:check` pass
+- [x] All implementation phases complete (Phase 1, Phase 2, Phase 3)
+- [x] `npm run build` — passes (tsc, exit 0)
+- [x] `npm test` — passes (259 tests, exit 0)
+- [x] `npm run format:check` — passes (exit 0)
+- [x] `CHANGELOG.md` updated with `[0.6.0]` section (Added, Changed, Migration subsections)
+- [x] `README.md` reviewed; `--max-diff-size`, `--repo-name`, `--repo-url` confirmed documented
+- [x] `roadmap.md` cleaned: all four `Release target: v0.6.0` entries removed
+- [ ] Phase files removed from `plans/` (requires human authorization before deletion)
+- [ ] Release operation: git tag, GitHub release, npm publish (human-performed)

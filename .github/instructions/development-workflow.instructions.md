@@ -755,7 +755,7 @@ Starting prompts are session-start artifacts. They must be concise, session-spec
 - **Artifact Type**: Starting Prompt
 - **Session Type**: Planning Trunk Session
 - **Purpose**: Orchestrate release planning, define phase boundaries, and prepare the planning branch session starting prompt.
-- **Input Files**: `roadmap.md`, `plan.md`, relevant instructions files, prior release context if needed
+- **Input Files**: `development-workflow.instructions.md`, `roadmap.md`, `plan.md`, relevant instructions files, prior release context if needed
 - **Restrictions**: Do not begin implementation work or write phase design details that belong in the planning branch session.
 - **Required Output**: Planning completion artifacts and the planning branch session starting prompt for the next phase
 
@@ -776,7 +776,7 @@ Starting prompts are session-start artifacts. They must be concise, session-spec
 - **Artifact Type**: Starting Prompt
 - **Session Type**: Development Trunk Session
 - **Purpose**: Orchestrate implementation, gate each phase, and prepare the next branch-session starting prompt when the workflow authorizes it.
-- **Input Files**: `plan.md`, all current phase files, relevant instructions files, prior branch-session summaries, current repository state
+- **Input Files**: `development-workflow.instructions.md`, `plan.md`, all current phase files, relevant instructions files, prior branch-session summaries, current repository state
 - **Restrictions**: Do not implement code in the trunk session; keep branch execution instructions separate from orchestration.
 - **Required Output**: Development trunk gate responses, review decisions, and the branch-session starting prompt for the next authorized phase
 

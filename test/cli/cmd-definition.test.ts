@@ -16,6 +16,7 @@ describe("program – help output wiring", () => {
       "--incremental",
       "--output-dir",
       "--output-prefix",
+      "--max-diff-size",
       "--state",
       "--missing-state",
       "--since-ref",
@@ -25,6 +26,8 @@ describe("program – help output wiring", () => {
       "--quiet",
       "--profile",
       "--per-file",
+      "--repo-name",
+      "--repo-url",
     ];
     for (const flag of expectedLongFlags) {
       expect(longFlags, `expected option "${flag}" to be registered`).toContain(flag);
@@ -59,18 +62,40 @@ describe("program – help output wiring", () => {
   it("assigns options to the documented help groups", () => {
     const optionsByLong = new Map(program.options.map((option) => [option.long, option]));
 
-    expect(optionsByLong.get("--quiet")?.helpGroupHeading).toBe("General");
-    expect(optionsByLong.get("--profile")?.helpGroupHeading).toBe("General");
+    expect(optionsByLong.get("--quiet")?.helpGroupHeading).toBe("Runtime and Diagnostics");
+    expect(optionsByLong.get("--profile")?.helpGroupHeading).toBe("Runtime and Diagnostics");
 
-    expect(optionsByLong.get("--output-dir")?.helpGroupHeading).toBe("Output");
-    expect(optionsByLong.get("--output-prefix")?.helpGroupHeading).toBe("Output");
-    expect(optionsByLong.get("--per-file")?.helpGroupHeading).toBe("Output");
+    expect(optionsByLong.get("--ref")?.helpGroupHeading).toBe("Required Input");
 
-    expect(optionsByLong.get("--incremental")?.helpGroupHeading).toBe("Differential Extraction");
-    expect(optionsByLong.get("--state")?.helpGroupHeading).toBe("Differential Extraction");
-    expect(optionsByLong.get("--missing-state")?.helpGroupHeading).toBe("Differential Extraction");
-    expect(optionsByLong.get("--since-ref")?.helpGroupHeading).toBe("Differential Extraction");
-    expect(optionsByLong.get("--since-date")?.helpGroupHeading).toBe("Differential Extraction");
+    expect(optionsByLong.get("--output-dir")?.helpGroupHeading).toBe(
+      "Output and Repository Metadata",
+    );
+    expect(optionsByLong.get("--output-prefix")?.helpGroupHeading).toBe(
+      "Output and Repository Metadata",
+    );
+    expect(optionsByLong.get("--per-file")?.helpGroupHeading).toBe(
+      "Output and Repository Metadata",
+    );
+    expect(optionsByLong.get("--max-diff-size")?.helpGroupHeading).toBe(
+      "Output and Repository Metadata",
+    );
+    expect(optionsByLong.get("--repo-name")?.helpGroupHeading).toBe(
+      "Output and Repository Metadata",
+    );
+    expect(optionsByLong.get("--repo-url")?.helpGroupHeading).toBe(
+      "Output and Repository Metadata",
+    );
+
+    expect(optionsByLong.get("--since-ref")?.helpGroupHeading).toBe(
+      "Extraction Range (Snapshot Mode)",
+    );
+    expect(optionsByLong.get("--since-date")?.helpGroupHeading).toBe(
+      "Extraction Range (Snapshot Mode)",
+    );
+
+    expect(optionsByLong.get("--incremental")?.helpGroupHeading).toBe("Incremental Extraction");
+    expect(optionsByLong.get("--state")?.helpGroupHeading).toBe("Incremental Extraction");
+    expect(optionsByLong.get("--missing-state")?.helpGroupHeading).toBe("Incremental Extraction");
 
     expect(optionsByLong.get("--rotate-lines")?.helpGroupHeading).toBe("File Rotation");
     expect(optionsByLong.get("--rotate-size")?.helpGroupHeading).toBe("File Rotation");
@@ -79,9 +104,11 @@ describe("program – help output wiring", () => {
   it("renders grouped help headings", () => {
     const help = program.helpInformation();
 
-    expect(help).toContain("General");
-    expect(help).toContain("Output");
-    expect(help).toContain("Differential Extraction");
+    expect(help).toContain("Required Input");
+    expect(help).toContain("Runtime and Diagnostics");
+    expect(help).toContain("Output and Repository Metadata");
+    expect(help).toContain("Extraction Range (Snapshot Mode)");
+    expect(help).toContain("Incremental Extraction");
     expect(help).toContain("File Rotation");
   });
 });

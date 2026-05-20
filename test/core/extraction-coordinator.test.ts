@@ -54,7 +54,7 @@ function makeOutputRecord(oid: string): OutputRecord {
 }
 
 function emptyState(repositoryPath = "/repo"): ExtractionState {
-  return { version: 1, generatedAt: "", repositoryPath, branches: [] };
+  return { version: 2, generatedAt: "", repositoryPath, refs: [] };
 }
 
 function makeProgressReporter(): ProgressReporter & {
@@ -106,6 +106,7 @@ const fileChangeExpander: FileChangeExpander = {
       }
     })();
   },
+  skippedDiffCount: 0,
 };
 
 /** Single projector stub: dispatches commit and file-change facts to the appropriate output. */
@@ -176,7 +177,7 @@ function makeDeps(
 ): CoordinatorDependencies & { sink: ReturnType<typeof makeSink> } {
   const sink = (overrides.sink as ReturnType<typeof makeSink> | undefined) ?? makeSink();
   const plans: readonly TraversalPlan[] = overrides.plans ?? [
-    { name: "main", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: true },
+    { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
   ];
   const oids = overrides.oids ?? ["aaaa1111".padEnd(40, "0")];
 
@@ -230,8 +231,32 @@ describe("DefaultExtractionCoordinator", () => {
     const result = await coord.run(baseRequest({ granularity: "file" }));
 
     expect(result.recordsWritten).toBe(2);
+    expect(result.skippedDiffs).toBe(0);
     // file projector appends "-file" to oid
     expect(deps.sink.records[0]!.oid).toBe(`${"1".padStart(12, "0")}-file`);
+  });
+
+  it("returns skippedDiffs from file-change expander in file mode", async () => {
+    const customExpander: FileChangeExpander = {
+      skippedDiffCount: 3,
+      expand(commits: AsyncIterable<CommitFact>): AsyncIterable<FileChangeFact> {
+        return (async function* () {
+          for await (const fact of commits) {
+            yield {
+              type: "file-change",
+              commit: fact,
+              file: { path: "a.ts", status: "modified", additions: null, deletions: null },
+            };
+          }
+        })();
+      },
+    };
+
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")], fileChangeExpander: customExpander });
+    const coord = new DefaultExtractionCoordinator(deps);
+    const result = await coord.run(baseRequest({ granularity: "file" }));
+
+    expect(result.skippedDiffs).toBe(3);
   });
 
   it("commitsTraversed: result contains correct commit count", async () => {
@@ -282,8 +307,13 @@ describe("DefaultExtractionCoordinator", () => {
   it("refIndex: tracking increments across multi-ref runs", async () => {
     const reporter = makeProgressReporter();
     const plans: readonly TraversalPlan[] = [
-      { name: "main", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: true },
-      { name: "develop", head: FAKE_HEAD_2 as never, excludeHash: undefined, isBranch: true },
+      { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
+      {
+        name: "develop",
+        refType: "branch",
+        head: FAKE_HEAD_2 as never,
+        excludeHash: undefined,
+      },
     ];
     // Each branch yields a unique commit so dedup doesn't discard them
     const uniqueOids = ["1".padStart(12, "0"), "2".padStart(12, "0")];
@@ -457,7 +487,12 @@ describe("DefaultExtractionCoordinator", () => {
   it("boundary-equals-head: traverser yields 0 commits, close() called, state written", async () => {
     const stateStore = makeStateStore();
     const plans: readonly TraversalPlan[] = [
-      { name: "main", head: FAKE_HEAD as never, excludeHash: FAKE_HEAD as never, isBranch: true },
+      {
+        name: "main",
+        refType: "branch",
+        head: FAKE_HEAD as never,
+        excludeHash: FAKE_HEAD as never,
+      },
     ];
     const emptyTraverser: CommitTraversalExtractor = {
       extract(_req: CommitTraversalRequest): AsyncIterable<CommitFact> {
@@ -470,10 +505,10 @@ describe("DefaultExtractionCoordinator", () => {
 
     expect(result.recordsWritten).toBe(0);
     expect(deps.sink.closeCalls).toBe(1);
-    // plans had 1 branch → state is written with that ref's head
+    // Plans had one resolved ref, so one state checkpoint entry is written.
     expect(stateStore.stored).not.toBeNull();
-    expect(stateStore.stored?.branches).toHaveLength(1);
-    expect(stateStore.stored?.branches[0]?.name).toBe("main");
+    expect(stateStore.stored?.refs).toHaveLength(1);
+    expect(stateStore.stored?.refs[0]?.ref).toBe("main");
   });
 
   it("zero-record run: close() called; no state written when empty branches", async () => {
@@ -490,7 +525,7 @@ describe("DefaultExtractionCoordinator", () => {
 
     expect(result.recordsWritten).toBe(0);
     expect(result.refs).toEqual([]);
-    // refs.length === 0 → state write skipped (note: result.refs is CoordinatorResult.refs, not ExtractionState.branches)
+    // refs.length === 0 -> state write skipped.
     expect(stateStore.stored).toBeNull();
   });
 
@@ -511,8 +546,13 @@ describe("DefaultExtractionCoordinator", () => {
   it("state refs contain only resolved ref names", async () => {
     const stateStore = makeStateStore();
     const plans: readonly TraversalPlan[] = [
-      { name: "main", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: true },
-      { name: "develop", head: FAKE_HEAD_2 as never, excludeHash: undefined, isBranch: true },
+      { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
+      {
+        name: "develop",
+        refType: "branch",
+        head: FAKE_HEAD_2 as never,
+        excludeHash: undefined,
+      },
     ];
     // Each branch yields a unique commit so dedup doesn't discard them
     const traverser: CommitTraversalExtractor = {
@@ -533,14 +573,19 @@ describe("DefaultExtractionCoordinator", () => {
     const result = await coord.run(baseRequest({ refs: ["main", "develop"] }));
 
     expect(result.refs).toEqual(["main", "develop"]);
-    expect(stateStore.stored?.branches.map((b) => b.name)).toEqual(["main", "develop"]);
+    expect(stateStore.stored?.refs.map((r) => r.ref)).toEqual(["main", "develop"]);
   });
 
-  it("non-branch refs (tags, raw OIDs) are not recorded in state.branches", async () => {
+  it("non-branch refs are recorded in state.refs with their refType", async () => {
     const stateStore = makeStateStore();
     const plans: readonly TraversalPlan[] = [
-      { name: "main", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: true },
-      { name: "v1.0", head: FAKE_HEAD_2 as never, excludeHash: undefined, isBranch: false },
+      { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
+      {
+        name: "v1.0",
+        refType: "tag-lightweight",
+        head: FAKE_HEAD_2 as never,
+        excludeHash: undefined,
+      },
     ];
     const traverser: CommitTraversalExtractor = {
       extract(req: CommitTraversalRequest): AsyncIterable<CommitFact> {
@@ -557,33 +602,59 @@ describe("DefaultExtractionCoordinator", () => {
 
     // Both refs appear in the result (CoordinatorResult.refs)
     expect(result.refs).toEqual(["main", "v1.0"]);
-    // Only the branch (main) is recorded in state.branches — the tag (v1.0) is excluded
-    expect(stateStore.stored?.branches.map((b) => b.name)).toEqual(["main"]);
+    expect(stateStore.stored?.refs.map((r) => [r.ref, r.refType])).toEqual([
+      ["main", "branch"],
+      ["v1.0", "tag-lightweight"],
+    ]);
   });
 
-  it("emits a warning for non-branch refs when state tracking is active", async () => {
+  it("emits static-ref warnings for all non-branch refs (commit-oid, tag-annotated, tag-lightweight)", async () => {
     const stateStore = makeStateStore();
     const reporter = makeProgressReporter();
     const plans: readonly TraversalPlan[] = [
-      { name: "main", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: true },
-      { name: "v1.0", head: FAKE_HEAD_2 as never, excludeHash: undefined, isBranch: false },
+      { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
+      {
+        name: "v1.0-ann",
+        refType: "tag-annotated",
+        head: FAKE_HEAD_2 as never,
+        excludeHash: undefined,
+      },
+      {
+        name: "abc123",
+        refType: "commit-oid",
+        head: FAKE_HEAD as never,
+        excludeHash: undefined,
+      },
+      {
+        name: "v1.0",
+        refType: "tag-lightweight",
+        head: FAKE_HEAD_2 as never,
+        excludeHash: undefined,
+      },
     ];
     const deps = makeDeps({ plans, stateStore, reporter, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
-    await coord.run(baseRequest({ refs: ["main", "v1.0"] }));
+    await coord.run(baseRequest({ refs: ["main", "v1.0-ann", "abc123", "v1.0"] }));
 
-    expect(reporter.warnings).toHaveLength(1);
-    expect(reporter.warnings[0]).toContain("v1.0");
+    expect(reporter.warnings).toHaveLength(3);
+    expect(reporter.warnings[0]).toContain("v1.0-ann");
+    expect(reporter.warnings[1]).toContain("abc123");
+    expect(reporter.warnings[2]).toContain("v1.0");
   });
 
-  it("does not warn for non-branch refs when state tracking is not active (no stateStore)", async () => {
+  it("does not emit static-ref warning when state tracking is not active", async () => {
     const reporter = makeProgressReporter();
     const plans: readonly TraversalPlan[] = [
-      { name: "v1.0", head: FAKE_HEAD as never, excludeHash: undefined, isBranch: false },
+      {
+        name: "v1.0-ann",
+        refType: "tag-annotated",
+        head: FAKE_HEAD as never,
+        excludeHash: undefined,
+      },
     ];
     const deps = makeDeps({ plans, reporter, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
-    await coord.run(baseRequest({ refs: ["v1.0"] }));
+    await coord.run(baseRequest({ refs: ["v1.0-ann"] }));
 
     expect(reporter.warnings).toHaveLength(0);
   });

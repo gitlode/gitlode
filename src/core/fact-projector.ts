@@ -8,11 +8,21 @@ export class DefaultFactProjector implements FactProjector {
   private readonly repoName: string;
   private readonly remoteUrl: string | null;
   private readonly profiler?: StageProfiler;
+  private readonly repoNameOverride?: string;
+  private readonly repoUrlOverride?: string;
 
-  constructor(repoName: string, remoteUrl: string | null, profiler?: StageProfiler) {
+  constructor(
+    repoName: string,
+    remoteUrl: string | null,
+    profiler?: StageProfiler,
+    repoNameOverride?: string,
+    repoUrlOverride?: string,
+  ) {
     this.repoName = repoName;
     this.remoteUrl = remoteUrl;
     this.profiler = profiler;
+    this.repoNameOverride = repoNameOverride;
+    this.repoUrlOverride = repoUrlOverride;
   }
 
   async *project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord> {
@@ -32,6 +42,14 @@ export class DefaultFactProjector implements FactProjector {
     }
   }
 
+  private effectiveName(): string {
+    return this.repoNameOverride ?? this.repoName;
+  }
+
+  private effectiveUrl(): string | null {
+    return this.repoUrlOverride !== undefined ? this.repoUrlOverride : this.remoteUrl;
+  }
+
   private projectCommit(fact: CommitFact): OutputRecord {
     const { subject, body } = splitMessage(fact.message);
     return {
@@ -49,7 +67,7 @@ export class DefaultFactProjector implements FactProjector {
         timestamp: toISO8601(fact.committer.timestamp, fact.committer.timezoneOffset),
       },
       parents: fact.parents,
-      repository: { name: this.repoName, url: this.remoteUrl },
+      repository: { name: this.effectiveName(), url: this.effectiveUrl() },
     };
   }
 
@@ -70,7 +88,7 @@ export class DefaultFactProjector implements FactProjector {
         timestamp: toISO8601(fact.commit.committer.timestamp, fact.commit.committer.timezoneOffset),
       },
       parents: fact.commit.parents,
-      repository: { name: this.repoName, url: this.remoteUrl },
+      repository: { name: this.effectiveName(), url: this.effectiveUrl() },
       file: fact.file,
     };
   }

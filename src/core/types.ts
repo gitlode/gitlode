@@ -83,6 +83,7 @@ export interface ExtractorConfig {
   readonly range?: ExtractionRange;
   readonly stateFilePath?: string;
   readonly perFile: boolean;
+  readonly maxDiffSize?: number;
 }
 
 export type ProgressPhase = "preparing" | "extracting" | "finalizing";
@@ -113,16 +114,22 @@ export interface StateStore {
 export type WallClock = () => Date;
 export type MonotonicClock = () => number;
 
-export interface BranchState {
-  readonly name: string;
-  readonly lastCommitHash: CommitOid;
+export const REF_TYPES = ["branch", "tag-lightweight", "tag-annotated", "commit-oid"] as const;
+
+export type RefType = (typeof REF_TYPES)[number];
+
+export interface RefCheckpoint {
+  readonly ref: string;
+  readonly refType: RefType;
+  readonly tipOid: CommitOid;
+  readonly updatedAt: string;
 }
 
 export interface ExtractionState {
-  readonly version: 1;
+  readonly version: 2;
   readonly generatedAt: string;
   readonly repositoryPath: string;
-  readonly branches: readonly BranchState[];
+  readonly refs: readonly RefCheckpoint[];
 }
 
 // Compatibility aliases removed in Phase 7 cleanup
@@ -206,6 +213,8 @@ export interface ExtractionResult {
    * Populated on every successful run.
    */
   readonly profilingEntries: readonly ProfilingEntry[];
+  /** Number of file diffs skipped due to size threshold (--max-diff-size). */
+  readonly skippedDiffs: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,10 +224,9 @@ export interface ExtractionResult {
 /** Resolved branch traversal boundary for one branch in a single run. */
 export interface TraversalPlan {
   readonly name: string;
+  readonly refType: RefType;
   readonly head: CommitOid;
   readonly excludeHash: CommitOid | undefined;
-  /** True when the ref is a branch (exists under refs/heads/). False for tags and raw OIDs. */
-  readonly isBranch: boolean;
 }
 
 /** Input to the TraversalPlanner stage. */
@@ -227,11 +235,11 @@ export interface TraversalPlanningRequest {
   readonly repositoryPath: string;
   /** Ordered list of refs to plan. */
   readonly refs: readonly string[];
-  /** Extraction mode; controls whether priorRefMap is used for exclude-hash selection. */
+  /** Extraction mode; controls whether prior ref checkpoints are used for exclude-hash selection. */
   readonly mode: "snapshot" | "incremental";
-  /** Validated ref→lastCommitHash map loaded from a prior checkpoint.
+  /** Validated ref checkpoints loaded from a prior state file.
    *  Empty in snapshot mode or when no prior checkpoint exists. */
-  readonly priorRefMap: ReadonlyMap<string, CommitOid>;
+  readonly priorRefs: readonly RefCheckpoint[];
   /** Optional extraction range; controls exclusion-boundary selection. */
   readonly range?: ExtractionRange;
 }
@@ -270,6 +278,8 @@ export interface CommitTraversalExtractor {
 /** Core-owned interface for the file-change expansion stage. */
 export interface FileChangeExpander {
   expand(commits: AsyncIterable<CommitFact>, repositoryPath: string): AsyncIterable<FileChangeFact>;
+  /** Get the count of file diffs skipped due to size threshold. */
+  readonly skippedDiffCount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -311,6 +321,8 @@ export interface CoordinatorResult {
   readonly commitsTraversed: number;
   /** Refs for which a head was successfully resolved (skipped refs are omitted). */
   readonly refs: readonly string[];
+  /** Number of file diffs skipped due to size threshold (--max-diff-size). */
+  readonly skippedDiffs: number;
 }
 
 /** Core-owned interface for the fact projection stage. */

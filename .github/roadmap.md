@@ -49,66 +49,31 @@ deterministic case: pairing `deleted` and `added` records when blob identity is 
 - how to handle one-to-many and many-to-one exact matches deterministically
 - what summary/profile counters should be emitted so users can audit rename pairing impact
 
-#### State/Incremental: Track non-branch refs in state for reliable incremental extraction
+#### CLI UX: User-controlled color policy for non-TTY and CI logs
 
-Currently, only branch refs are recorded in the state file after each extraction. Tags and raw
-commit OIDs specified via `--ref` are not recorded, so they are re-extracted in full on every
-incremental run. This may produce duplicate records in downstream data warehouses when users
-specify tag or OID refs alongside `--state`.
+For v0.6.0, color output is intentionally auto-disabled in non-TTY contexts and no user-facing
+override option is introduced. That default keeps redirected output and scripted usage stable.
 
-As a short-term safeguard, gitrail emits a warning when `--state` is active and a non-branch ref
-is encountered. The full fix is to extend the state file to record the resolved commit hash for
-each ref regardless of ref type — so that all refs benefit from incremental tracking.
+This item evaluates a future CLI color policy option surface that preserves the current safe
+default while allowing explicit operator control when non-TTY color is desirable.
 
 **Design intent**:
 
-- record the resolved commit OID per ref at the end of each successful run, regardless of whether
-  the ref is a branch, tag, or raw OID
-- use the recorded OID as the traversal lower bound on the next incremental run, the same way
-  branch `lastCommitHash` is used today
-- because this work changes state-file structure, explicitly evaluate whether the wire field name
-  `lastCommitHash` should be renamed as part of the same breaking-change window
-- branch refs continue to be tracked under `state.branches` for backward compatibility;
-  non-branch refs require a separate state structure or an extended per-ref entry shape
-- once this is implemented, the non-branch warning should be revisited: OID and annotated tag
-  refs still have limited incremental utility (the ref is static and the recorded OID is always
-  the same), so the warning for those ref types remains valuable even after this fix
+- keep default behavior as `auto` (TTY-aware enablement, non-TTY disablement)
+- provide explicit overrides for advanced workflows (for example CI log viewers or pagers)
+- maintain deterministic behavior and avoid surprising ANSI escape leakage in machine-oriented
+  pipelines
 
-**Scope**:
+**Options to evaluate**:
 
-- extend `ExtractionState` or introduce a parallel per-ref record alongside `branches`
-- update state read/write paths and the traversal planner to use recorded OIDs for non-branch refs
-- update `docs/usage.md` to document that all ref types now support reliable incremental tracking,
-  with a noted caveat for OID and annotated tag refs that point to a fixed commit
+- CLI shape: `--color <auto|always|never>` vs boolean-style split flags
+- environment-variable interoperability (`NO_COLOR`, `FORCE_COLOR`)
+- precedence rules between CLI option, environment variables, and TTY detection
+- documentation and troubleshooting guidance for Windows terminal/CI differences
 
----
+**Non-goal for this item**:
 
-#### CLI UX: Terminal output styling and readability
-
-With recent CLI enhancements, terminal output has become richer but also more information-dense,
-making it harder for users to locate essential information. When many "label: value" entries are
-listed sequentially, target data becomes difficult to find.
-
-- **Text formatting**: Restructure and align output to improve visual hierarchy and scanability
-- **Color support**: Use strategic coloring to distinguish different information categories
-- **Overall UX**: Refine typography and spacing to reduce cognitive load
-
-**Design questions to resolve at design time**:
-
-- library selection: whether to adopt a package like `chalk` (cross-platform ANSI management,
-  well-tested) or implement color support in-house (no dependency addition, but requires Windows
-  ANSI handling)
-- scope of formatting improvements: which output sections are highest priority for visual
-  restructuring
-- backwards compatibility: whether ANSI stripping for non-TTY outputs should be automatic or
-  user-controlled
-- color scheme and accessibility: ensure sufficient contrast and consider colorblind-safe palettes
-
-**Scope boundary**:
-
-- focus on interactive CLI output (progress reporting, status messages, result summaries)
-- does not include JSON output (`--output` files remain unchanged)
-- preserve deterministic, scriptable behavior when stdout is piped or redirected
+- no redesign of JSON output contracts; this is terminal presentation policy only
 
 ---
 
@@ -144,42 +109,6 @@ fidelity, runtime cost, and determinism explicit and user-controllable.
 - whether this mode should remain opt-in even after stabilization
 - how explicitly the CLI/docs should label outputs as inferred relationships rather than stored Git
   facts
-
----
-
-#### Extraction/CLI: User-controlled guardrail for very large text diffs
-
-In per-file extraction mode, line-level diff computation can become a dominant cost for a small
-subset of files that are structurally valid text but operationally "machine-generated large text"
-(for example large lockfiles). Recent profiling and debug investigation showed that these files can
-produce multi-second to tens-of-seconds `diffLines` stalls in a single commit, which degrades both
-total throughput and interactive progress responsiveness.
-
-At the same time, gitrail should not silently reduce extracted information by default. Even when a
-file looks like an outlier, treating its diff as always meaningless is a policy decision that must
-remain in user control.
-
-**Design intent**:
-
-- keep current behavior as the default (no implicit data reduction)
-- provide an explicit opt-in mechanism to skip line-diff computation when file size exceeds a
-  user-defined threshold
-- represent skipped text diffs with the same null-count convention already used for binary files
-  (`additions: null`, `deletions: null`) so downstream contracts remain stable
-
-**CLI direction to evaluate at implementation time**:
-
-- add a dedicated option such as `--max-diff-bytes` (or equivalent naming)
-- default: disabled (full diff behavior)
-- when enabled: if either side of a text diff exceeds threshold, skip line diff and emit null
-  counts
-- evaluate whether an explicit mode flag is also needed (for example: `off|size-threshold`)
-
-**Operational considerations**:
-
-- document clearly that this is an extraction-fidelity vs. runtime trade-off selected by the user
-- include a summary/profile indicator for skipped large-text diffs so users can audit impact
-- ensure behavior is deterministic and reproducible under the same threshold settings
 
 ---
 
@@ -459,14 +388,6 @@ Record which branch(es) each commit was reachable from at extraction time (e.g. 
 - Post-process an already-extracted snapshot: after all commits are written, re-traverse per-branch and annotate a secondary index file.
 - Limit to a configurable set of branches (e.g. `--annotate-branches main,develop`) to bound the cost.
 - Consider recording only the "most specific" branch (closest tip ancestor) as a heuristic.
-
----
-
-#### Output: Repository metadata override
-
-- Add `--repo-name` and `--repo-url` flags
-- Override the auto-derived `repository.name` and `repository.url` fields in output
-- Useful when remote origin is not set or when a canonical name is preferred
 
 ---
 

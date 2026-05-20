@@ -9,3 +9,5 @@ export type {
   TerminalSink,
   UiMode,
 } from "./types.js";
+export { createStyling, plainStyling } from "../styling.js";
+export type { Styling } from "../styling.js";

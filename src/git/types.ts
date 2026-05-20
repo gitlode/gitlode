@@ -1,4 +1,4 @@
-import type { CommitOid, OidProfile, PersonIdentity } from "../core/index.js";
+import type { CommitOid, OidProfile, PersonIdentity, RefType } from "../core/index.js";
 
 export type RepositoryObjectFormat = string;
 
@@ -21,6 +21,10 @@ export interface RawCommit {
 export interface FileChange {
   readonly path: string;
   readonly status: "added" | "modified" | "deleted";
+  /** Blob byte size before this change (0 for added files). */
+  readonly beforeSize: number;
+  /** Blob byte size after this change (0 for deleted files). */
+  readonly afterSize: number;
   /** null for binary files */
   readonly additions: number | null;
   /** null for binary files */
@@ -37,9 +41,8 @@ export interface GitAdapter {
   /** Detect repository object format. Defaults to "sha1" when unset. */
   getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat>;
 
-  /** Return true if the given ref is a branch (i.e. exists under refs/heads/). Returns false
-   *  for tags, raw commit OIDs, or any non-branch ref. */
-  isRefBranch(repoPath: string, ref: string): Promise<boolean>;
+  /** Classify a ref by runtime semantics for traversal/state handling. */
+  classifyRefType(repoPath: string, ref: string): Promise<RefType>;
 
   /** Walk commits reachable from `head`, stopping before `excludeHash` if provided */
   walkCommits(repoPath: string, head: CommitOid, excludeHash?: CommitOid): AsyncIterable<RawCommit>;

@@ -104,22 +104,25 @@ This is equivalent to `git log <since-ref>..<head>` and correctly handles merged
 
 Incremental mode extracts only commits new since the last recorded state. Requires `--state`.
 
-1. Read state file → build `stateMap: Map<branchName, lastCommitHash>` where `lastCommitHash` stores the last extracted commit OID
+1. Read v2 state file and consume `refs[]` entries.
 2. For each specified `--ref`:
 
-- Resolve ref to current HEAD OID
-- If branch exists in stateMap: use `stateMap.get(branch)` as `excludeHash`
-- If branch not in stateMap: no `excludeHash` (full traversal for that branch)
-- Call `GitAdapter.walkCommits(head, excludeHash)`
+- Resolve ref to current HEAD OID.
+- Classify runtime `refType` (`branch`, `tag-lightweight`, `tag-annotated`, `commit-oid`).
+- Match checkpoint by exact `(ref, refType)` identity.
+- If matched: use checkpoint `tipOid` as `excludeHash`.
+- If unmatched and `refType === "branch"`: optional merge-base fallback from existing branch checkpoints.
+- If unmatched and non-branch: full traversal for that ref.
+- Call `GitAdapter.walkCommits(head, excludeHash)`.
 
-3. Maintain global `visited: Set<string>` across all branches
-4. On success: write state file with each branch's current HEAD OID
+3. Maintain global `visited: Set<string>` across all refs.
+4. On success: write state file with each resolved ref's current head as `tipOid`.
 
 **Warning conditions**:
 
-- Branch in stateMap does not exist in repository → warn, skip
-- `lastCommitHash` from stateMap is unreachable (e.g. after force push) → warn, full traversal for that branch
-- Branch not in stateMap → full traversal (may produce duplicates with prior runs; see Deduplication section)
+- Requested ref no longer exists in repository -> warn, skip.
+- Stored boundary OID is unreachable (e.g. force-push) -> warn, full traversal for that ref.
+- Static refs (`commit-oid`, `tag-annotated`) may emit informational warnings that incremental deltas are usually empty unless target changes.
 
 ### Incremental + `--missing-state snapshot` Fallback
 
@@ -216,11 +219,11 @@ Specified by `--state <path>`. The path is fully user-controlled. No default loc
 - **Snapshot mode**: State file content is **ignored** during extraction. On successful completion, the state file is written (created or overwritten) with each branch's current HEAD OID. This allows a snapshot run to initialize or reset state for subsequent incremental runs.
 - **Incremental mode**: State file is **read** to determine the `excludeHash` per branch. On successful completion, the state file is updated with each branch's current HEAD OID.
 
-### State File Records HEAD, Not Filtered Range
+### State File Records Tip OID, Not Filtered Range
 
-When `--since-ref` or `--since-date` is used in snapshot mode with `--state`, the state file records each ref's **current HEAD OID** — not the boundary of the filtered range. This means the state reflects the repository state at extraction time, independent of what was actually output.
+When `--since-ref` or `--since-date` is used in snapshot mode with `--state`, each v2 `refs[]` entry records the ref's **current tip OID** (`tipOid`) — not the boundary of the filtered range. State reflects repository position at extraction time, independent of what was output.
 
-**Warning condition**: If `--state` + `--since-ref` is used and a ref's HEAD is reachable from the since-ref (resulting in 0 commits output for that ref), emit a warning to stderr: subsequent incremental runs may output commits between the ref HEAD and the since-ref that were excluded in this run.
+**Warning condition**: If `--state` + `--since-ref` is used and a ref's HEAD is reachable from the since-ref (0 commits output), emit a warning to stderr: later incremental runs may include commits between that ref's `tipOid` and the since-ref boundary from this run.
 
 ### Read on Startup
 
@@ -229,10 +232,10 @@ If `--state` is provided and the file exists:
 1. Parse and validate the JSON structure (check `version` field)
 2. Resolve both the recorded `repositoryPath` and the provided `<repository-path>` to absolute paths using `path.resolve()` before comparing. Simple string equality on raw input will produce false mismatches when the same path is expressed differently (e.g. `./my-repo` vs `/home/user/my-repo`). If they do not match after resolution, abort with error:
    `State file was created for a different repository: <recorded-path>`
-3. In incremental mode: for each branch in the state file, use `lastCommitHash` as the `excludeHash` for that branch's traversal
+3. In incremental mode: for each requested ref, match v2 checkpoint by `(ref, refType)` and use `tipOid` as `excludeHash`
 4. In snapshot mode: skip step 3 (state content is not used for extraction)
 
-Compatibility rule: repository object format must be validated before step 3. If format is unsupported, abort before consuming `lastCommitHash` values.
+Compatibility rule: repository object format must be validated before step 3. If format is unsupported, abort before consuming `tipOid` values.
 
 Note: the `repositoryPath` value written to the state file must also be the `path.resolve()`-ed absolute path, not the raw CLI input.
 
@@ -247,24 +250,27 @@ Write atomically:
 
 This ensures that a crash during output writing does not corrupt the state file.
 
-### Branch Reconciliation
+### Ref Reconciliation
 
 At the start of an incremental run using `--state`:
 
-- Branches in `--ref` args but **not in state file**: if `stateMap.size > 0`, gitrail computes the merge base between all existing state-file HEADs (`lastCommitHash` values) and uses the result as `excludeHash` for the new branch, preventing cross-run duplicates. If no common ancestor exists (`null` result from `findMergeBase`), falls back to full traversal. If `stateMap.size === 0` (no existing branches in state), all branches are fully extracted (expected for the first incremental run). See "Across Runs (merge base deduplication)" in the Deduplication section.
-- Branches in state file but **not in `--ref` args**: ignored (not re-extracted, not removed from state)
-- Branches in both: differential extraction using recorded `lastCommitHash`
+- Requested refs with no exact `(ref, refType)` checkpoint:
+  - If runtime `refType === "branch"` and branch checkpoints exist in state, compute merge base from branch `tipOid` values and use it as `excludeHash`.
+  - If runtime `refType` is non-branch (`tag-lightweight`, `tag-annotated`, `commit-oid`), do full traversal unless a direct checkpoint exists.
+- State entries not referenced by this run are ignored and dropped on rewrite.
+- Requested refs with exact checkpoint: differential extraction using stored `tipOid`.
 
-After a successful run (in either mode), the state file is updated to reflect the current HEAD OID for each processed branch.
+After a successful run (in either mode), write v2 `refs[]` entries for all resolved refs processed in that run.
 
 ### Warning Conditions (non-fatal)
 
 Log a warning (do not abort) when:
 
-- A branch recorded in the state file no longer exists in the repository
-- The recorded `lastCommitHash` for a branch no longer exists in the repository (e.g. after a force push) — fall back to full extraction for that branch
+- A requested ref no longer exists in the repository.
+- A stored checkpoint `tipOid` is no longer valid for traversal (e.g. force-push) -> fall back to full extraction for that ref.
+- Runtime ref type is `commit-oid` or `tag-annotated` and state tracking is active: tracking works, but future incremental deltas are usually empty unless target changes.
 
-A run that produces zero records (e.g. because the traversal range is empty — boundary equals HEAD) is **not** a warning or error condition. The output sink is closed and the state file is written normally.
+A run that produces zero records (e.g. boundary equals head) is **not** a warning or error condition. The output sink is closed and the state file is written normally.
 
 ---
 

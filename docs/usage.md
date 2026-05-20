@@ -35,12 +35,9 @@ extracts only commits added since that point.
 
 Incremental mode requires `--state`.
 
-> **Note:** Incremental extraction is designed for **branch refs** only. The state file records
-> each branch's current HEAD so that subsequent runs can pick up only new commits.
-> Tags and raw commit OIDs are **not** recorded in the state file. If you specify a tag or raw OID
-> with `--state`, gitrail will warn you and re-extract those refs in full on every run, which may
-> produce duplicate records in downstream systems. For tag or raw OID traversal, use snapshot mode
-> (omit `--incremental`) instead.
+> **Note:** State tracking now covers all supported ref types (branches, tags, and raw commit OIDs).
+> For static refs (annotated tags and raw commit OIDs), checkpoints are still recorded, but future
+> incremental runs usually produce zero new records unless the ref target changes.
 
 ---
 
@@ -166,17 +163,27 @@ succeeds without manual intervention.
 
 ### What the state file records
 
-After a successful run, gitrail writes a JSON file at the path given by `--state`. It records the
-HEAD commit OID for each processed branch at the time of extraction:
+After a successful run, gitrail writes a JSON file at the path given by `--state`. It records a
+checkpoint entry for each processed ref at extraction time:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "generatedAt": "2024-06-01T12:00:00.000Z",
   "repositoryPath": "/absolute/path/to/my-repo",
-  "branches": [
-    { "name": "main", "lastCommitHash": "a1b2c3d4e5f6..." },
-    { "name": "develop", "lastCommitHash": "d4e5f6a7b8c9..." }
+  "refs": [
+    {
+      "ref": "main",
+      "refType": "branch",
+      "tipOid": "a1b2c3d4e5f6...",
+      "updatedAt": "2024-06-01T12:00:00.000Z"
+    },
+    {
+      "ref": "v1.0",
+      "refType": "tag-lightweight",
+      "tipOid": "d4e5f6a7b8c9...",
+      "updatedAt": "2024-06-01T12:00:00.000Z"
+    }
   ]
 }
 ```
@@ -224,10 +231,10 @@ in the order `--ref` arguments were given.
 
 ### Adding a new branch to an existing incremental workflow
 
-When a ref listed in `--ref` has no entry in the state file, gitrail automatically prevents
-cross-run duplicates. It computes the **merge base** of all branches already recorded in the
-state file and uses that commit as the extraction boundary for the new branch, excluding commits
-already output in prior runs.
+When a **branch** listed in `--ref` has no matching `(ref, refType)` entry in the state file,
+gitrail automatically prevents cross-run duplicates. It computes the **merge base** of all tracked
+branch checkpoints in state and uses that commit as the extraction boundary for the new branch,
+excluding commits already output in prior runs.
 
 **Fallback — no common ancestor:** if the new branch shares no history with any branch in the
 state (e.g. an orphan branch created with `git checkout --orphan`), gitrail cannot find a merge
@@ -308,10 +315,10 @@ gitrail [options] <repository-path>
 
 ### Extraction mode
 
-| Parameter       | Alias | Type                | Default | Description                                                                                                                                                                                                                          |
-| --------------- | ----- | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--incremental` |       | boolean             | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.                                                                                                                                 |
-| `--ref <ref>`   | `-r`  | string (repeatable) | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. At least one required. For incremental workflows (`--state`), only branch refs are tracked in state; tags and raw OIDs will be re-extracted in full on every run. |
+| Parameter       | Alias | Type                | Default | Description                                                                                                                                                                            |
+| --------------- | ----- | ------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--incremental` |       | boolean             | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.                                                                                   |
+| `--ref <ref>`   | `-r`  | string (repeatable) | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. At least one required. In incremental workflows (`--state`), checkpoints are tracked per `(ref, refType)` identity. |
 
 ### Range filter (snapshot mode only)
 
@@ -327,15 +334,18 @@ gitrail [options] <repository-path>
 | `--state <path>`  | `-s`  | string              | —       | State file path. Required with `--incremental`.                      |
 | `--missing-state` |       | `error \| snapshot` | `error` | Behavior when state file is absent. Only valid with `--incremental`. |
 
-### Output
+### Output and Repository Metadata
 
-| Parameter                  | Alias | Type    | Default | Description                                                                    |
-| -------------------------- | ----- | ------- | ------- | ------------------------------------------------------------------------------ |
-| `--output-dir <path>`      | `-o`  | string  | `./`    | Directory for output `.jsonl` files. Must exist.                               |
-| `--output-prefix <string>` |       | string  | derived | Filename prefix (derived from remote origin if omitted)                        |
-| `--per-file`               |       | boolean | `false` | When set, emit one record per changed file per commit                          |
-| `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                                                 |
-| `--rotate-size <bytes>`    |       | string  | —       | Start new file after threshold (raw bytes or `K`/`M`/`G`, range `1M` to `64G`) |
+| Parameter                  | Alias | Type    | Default | Description                                                                                                                                                                   |
+| -------------------------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--output-dir <path>`      | `-o`  | string  | `./`    | Directory for output `.jsonl` files. Must exist.                                                                                                                              |
+| `--output-prefix <string>` |       | string  | derived | Filename prefix (derived from remote origin if omitted)                                                                                                                       |
+| `--per-file`               |       | boolean | `false` | When set, emit one record per changed file per commit                                                                                                                         |
+| `--max-diff-size <value>`  |       | string  | —       | Skip line-level diff computation for files above this size (bytes or `K`/`M`/`G` suffix). Emits `null` additions/deletions for skipped files. Applies only with `--per-file`. |
+| `--rotate-lines <n>`       |       | number  | —       | Start new file after `n` lines                                                                                                                                                |
+| `--rotate-size <bytes>`    |       | string  | —       | Start new file after threshold (raw bytes or `K`/`M`/`G`, range `1M` to `64G`)                                                                                                |
+| `--repo-name <string>`     |       | string  | —       | Override `repository.name` in all output records. Does not affect state-file identity or incremental behavior.                                                                |
+| `--repo-url <string>`      |       | string  | —       | Override `repository.url` in all output records. Does not affect state-file identity or incremental behavior.                                                                 |
 
 ### Control
 
@@ -358,6 +368,7 @@ Profile
   elapsed/write                : wall=   2.10ms  work=   2.10ms
   elapsed/git/blob-read        : wall=   0.80ms  work=   0.80ms
   elapsed/git/diff             : wall=   1.45ms  work=   1.45ms
+  skipped_diffs                : 12
 ```
 
 Each line represents one profiling entry from the per-run profiler tree.
@@ -376,6 +387,9 @@ Each line represents one profiling entry from the per-run profiler tree.
 `wall` shows elapsed time for that scoped profiler. `work` shows additive measured work inside the
 same scope. The root `elapsed` entry is always present on successful runs. Additional stage entries
 are populated when profiling is enabled.
+
+`skipped_diffs` reports how many file-level diffs were emitted with `null` additions/deletions due
+to either binary content or the `--max-diff-size` guardrail.
 
 In commit-granularity mode (no `--per-file`), Git file-expansion sub-stages such as
 `elapsed/git/blob-read` and `elapsed/git/diff` remain at `0.00ms` because `getFileChanges()` is
@@ -453,6 +467,29 @@ Every record extends the commit-mode schema with a `file` object:
 - **Empty commits** (no changed files) produce **no output records** in file mode.
 - **Merge commits** diff against the first parent only.
 - **Binary files** produce `"additions": null, "deletions": null`.
+- **Large text diffs**: with `--max-diff-size`, if either the before or after blob size exceeds the threshold, gitrail emits `"additions": null, "deletions": null` for that file.
 - **Root commits** (no parent) treat all files as `"added"`.
 - **File rotation** (`--rotate-lines`, `--rotate-size`) applies per record; a single commit's file records may span rotation boundaries.
 - Progress output reflects the number of file-level records written, not the number of commits processed.
+
+### Large-file diff guardrail
+
+Use `--max-diff-size` to avoid line-level diff cost on very large files when running in file mode:
+
+```bash
+# Skip diff counts for files larger than 100 KiB
+gitrail -r main --per-file --max-diff-size 100K ./my-repo
+
+# Same option with plain bytes
+gitrail -r main --per-file --max-diff-size 100000 ./my-repo
+```
+
+Details:
+
+- The option is disabled by default.
+- It only affects `--per-file` mode.
+- Accepted values: raw bytes (`100000`) or binary suffixes `K`, `M`, `G` (for example `100K`, `1M`).
+- A file is considered over threshold when either its before-blob size or after-blob size exceeds the configured value.
+- Over-threshold files are still emitted as file records, but with `additions` and `deletions` set to `null`.
+
+Suggested starting values are `100K` or `1M`, depending on repository characteristics.

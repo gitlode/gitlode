@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-20
+
+### Added
+
+- `--max-diff-size <value>` option to skip line-level diff computation for files exceeding a size threshold in `--per-file` mode. Skipped diffs are emitted with `null` additions/deletions counts, matching the binary-file convention. Accepts byte values with `K`/`M`/`G` suffixes.
+- `--repo-name` and `--repo-url` options to override auto-derived `repository.name` and `repository.url` fields in output records. Overrides apply only at projection time and do not affect state-file identity or incremental extraction behavior.
+- `skipped_diffs` count in `--profile` output, reporting the number of file diffs skipped due to `--max-diff-size` or binary detection during the extraction.
+- Terminal color output for TTY stderr: progress lines, completion summary, profile block, and warning/error badges use `chalk`-based styling with semantic color assignments. Non-TTY output remains plain text.
+
+### Changed
+
+- **Breaking:** State file format updated to version 2. Version 1 state files are rejected in incremental mode with an explicit unsupported-version error. Reinitialize the state file by running without `--incremental` once before resuming incremental extraction.
+- Incremental state tracking now covers all ref types — branch, lightweight tag, annotated tag, and raw commit OID. Previously only branch refs were recorded in state; non-branch refs were re-extracted in full on every incremental run.
+- Static-ref warning is now emitted for all non-branch refs (commit OID, annotated tag, and lightweight tag) when `--state` is active, reflecting that future incremental deltas for these refs are usually empty unless the ref target changes.
+- CLI help is reorganized into six groups: `Required Input`, `Extraction Range (Snapshot Mode)`, `Incremental Extraction`, `Output and Repository Metadata`, `File Rotation`, and `Runtime and Diagnostics`.
+- Completion summary field `Branches` renamed to `Refs` to reflect that all ref types are now tracked.
+- Measured values in progress, summary, and profile output now use no-space `number+unit` formatting (for example `1.2MB`, `8.5s`) with thousands separators on integer counters.
+- Done lines in progress output show `✓` in spinner position; warning lines carry a `[WARN]` badge prefix.
+
+### Migration
+
+- Delete or reinitialize any existing `--state` file before using `--incremental` with v0.6.0. Version 1 state files are no longer accepted; the runtime rejects them with an explicit unsupported-version error.
+- The `Branches` field in completion summary output has been renamed to `Refs`. Update any scripts or tooling that parse this field by name.
+
 ## [0.5.0] - 2026-05-19
 
 ### Added

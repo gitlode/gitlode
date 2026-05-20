@@ -138,8 +138,10 @@ Array of full commit hashes of parent commits.
 
 Populated once per run and applied to every output line.
 
-- `name`: derived from remote origin URL (last path segment, `.git` stripped), or directory name as fallback
-- `url`: raw remote origin URL string, or `null` if unavailable
+- `name`: derived from remote origin URL (last path segment, `.git` stripped), or directory name as fallback; overrideable with `--repo-name`
+- `url`: raw remote origin URL string, or `null` if unavailable; overrideable with `--repo-url`
+
+When `--repo-name` or `--repo-url` is provided, the override value replaces the auto-derived value in all output records. These overrides do not affect state-file identity or incremental extraction behavior.
 
 ---
 

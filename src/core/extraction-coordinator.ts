@@ -1,6 +1,5 @@
 import { withProfilerAsync } from "./profile/index.js";
 import type {
-  BranchState,
   CommitFact,
   CoordinatorDependencies,
   CoordinatorRequest,
@@ -8,6 +7,7 @@ import type {
   ExtractionCoordinator,
   ExtractionState,
   Fact,
+  RefCheckpoint,
 } from "./types.js";
 
 async function* deduplicateCommits(
@@ -56,14 +56,14 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "preparing" });
 
-    const priorRefMap = new Map(request.priorState.branches.map((b) => [b.name, b.lastCommitHash]));
+    const priorRefs = request.priorState.refs;
 
     const plans = await traversalPlanner.plan(
       {
         repositoryPath: request.repositoryPath,
         refs: [...request.refs],
-        mode: priorRefMap.size > 0 ? "incremental" : "snapshot",
-        priorRefMap,
+        mode: priorRefs.length > 0 ? "incremental" : "snapshot",
+        priorRefs,
         range: request.range,
       },
       reporter,
@@ -71,17 +71,14 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
 
     reporter.emit({ type: "phase-end", phase: "preparing" });
 
-    // Warn when state tracking is active but non-branch refs are present.
-    // Non-branch refs (tags, raw OIDs) are not recorded in the state file, so
-    // they will be re-extracted in full on every incremental run and may produce
-    // duplicate records in downstream systems. Use snapshot mode for tag or OID
-    // traversal, or track only branch refs in incremental workflows.
+    // Static refs (non-branch) are tracked in v2 state, but they usually produce no
+    // incremental delta unless the ref target itself changes between runs.
     if (stateStore !== undefined) {
       for (const plan of plans) {
-        if (!plan.isBranch) {
+        if (plan.refType !== "branch") {
           reporter.emit({
             type: "warning",
-            message: `Warning: Ref "${plan.name}" is not a branch and will not be recorded in the state file. It will be re-extracted in full on every incremental run, which may produce duplicate records in downstream systems. Use snapshot mode for tag or raw OID traversal.`,
+            message: `Warning: Ref "${plan.name}" (${plan.refType}) is tracked in state, but future incremental runs usually produce no new records unless the ref target changes.`,
           });
         }
       }
@@ -89,12 +86,17 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
 
     // Build the candidate state from successfully resolved ref heads.
     const candidateState: ExtractionState = {
-      version: 1,
+      version: 2,
       generatedAt: request.sessionTimestamp.toISOString(),
       repositoryPath: request.repositoryPath,
-      branches: plans
-        .filter((plan) => plan.isBranch)
-        .map((plan): BranchState => ({ name: plan.name, lastCommitHash: plan.head })),
+      refs: plans.map(
+        (plan): RefCheckpoint => ({
+          ref: plan.name,
+          refType: plan.refType,
+          tipOid: plan.head,
+          updatedAt: request.sessionTimestamp.toISOString(),
+        }),
+      ),
     };
 
     // -----------------------------------------------------------------------
@@ -158,7 +160,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "finalizing" });
 
-    if (stateStore !== undefined && candidateState.branches.length > 0) {
+    if (stateStore !== undefined && candidateState.refs.length > 0) {
       await stateStore.write(candidateState);
     }
 
@@ -168,6 +170,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
       recordsWritten,
       commitsTraversed,
       refs: plans.map((p) => p.name),
+      skippedDiffs: request.granularity === "file" ? fileChangeExpander.skippedDiffCount : 0,
     };
   }
 }

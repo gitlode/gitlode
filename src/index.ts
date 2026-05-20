@@ -6,7 +6,12 @@ import { pathToFileURL } from "node:url";
 
 import type { ParsedArgs } from "./cli/args.js";
 import { parseArgs } from "./cli/index.js";
-import { ProgressController, resolveUiMode } from "./cli/progress/index.js";
+import {
+  ProgressController,
+  resolveUiMode,
+  createStyling,
+  plainStyling,
+} from "./cli/progress/index.js";
 import type { TerminalSink } from "./cli/progress/index.js";
 import { formatProfileLines, formatSummaryLines } from "./cli/reporting/index.js";
 import {
@@ -16,15 +21,17 @@ import {
   DefaultFactProjector,
   DefaultFileChangeExpander,
   isCommitOidForProfile,
+  REF_TYPES,
 } from "./core/index.js";
 import type {
   CoordinatorDependencies,
   ExtractionState,
+  OidProfile,
   ProgressReporter,
+  RefType,
   StageProfiler,
   StateStore,
 } from "./core/index.js";
-import type { OidProfile } from "./core/index.js";
 import { DefaultStageProfiler } from "./core/profile/index.js";
 import { GitAdapterError, IsomorphicGitAdapter, type RepositoryObjectFormat } from "./git/index.js";
 import { OutputWriter, formatSessionTimestamp, OutputWriterSink } from "./output/index.js";
@@ -58,10 +65,14 @@ function deriveRepoName(remoteUrl: string | null, repoPath: string): string {
 }
 
 function emptyState(repositoryPath: string): ExtractionState {
-  return { version: 1, generatedAt: "", repositoryPath, branches: [] };
+  return { version: 2, generatedAt: "", repositoryPath, refs: [] };
 }
 
-async function loadPriorState(
+function isRefType(value: unknown): value is RefType {
+  return typeof value === "string" && REF_TYPES.includes(value as RefType);
+}
+
+export async function loadPriorState(
   stateStore: StateStore | undefined,
   parsed: ParsedArgs,
   repoPath: string,
@@ -76,24 +87,29 @@ async function loadPriorState(
     if (parsed.missingState === "snapshot") {
       reporter.emit({
         type: "warning",
-        message: `Warning: State file not found: ${parsed.stateFilePath}. Falling back to full snapshot extraction.`,
+        message: `State file not found: ${parsed.stateFilePath}. Falling back to full snapshot extraction.`,
       });
       return emptyState(repoPath);
     }
     return emptyState(repoPath);
   }
-  if (state.version !== 1) {
-    throw new Error(`Unsupported state file version: ${state.version}`);
+  if (state.version !== 2) {
+    throw new Error(
+      `Unsupported state file version: ${state.version}. Supported version: 2. Reinitialize the state file (for example, run without --incremental once with --state).`,
+    );
   }
   const recordedPath = resolve(state.repositoryPath);
   if (recordedPath !== repoPath) {
     throw new Error(`State file was created for a different repository: ${state.repositoryPath}`);
   }
-  for (const entry of state.branches) {
-    if (!isCommitOidForProfile(entry.lastCommitHash, oidProfile)) {
+  for (const entry of state.refs) {
+    if (!isRefType(entry.refType)) {
       throw new Error(
-        `Invalid commit OID in state file for branch "${entry.name}": ${entry.lastCommitHash}`,
+        `Invalid ref type in state file for ref "${entry.ref}": ${String(entry.refType)}`,
       );
+    }
+    if (!isCommitOidForProfile(entry.tipOid, oidProfile)) {
+      throw new Error(`Invalid commit OID in state file for ref "${entry.ref}": ${entry.tipOid}`);
     }
   }
   return state;
@@ -170,6 +186,7 @@ async function main() {
     const { quiet, profile } = parsed;
     const isTTY = process.stderr.isTTY === true;
     const uiMode = resolveUiMode(quiet, isTTY);
+    const styling = createStyling(isTTY);
 
     // Build ProgressReporter based on uiMode.
     let reporter: ProgressReporter;
@@ -178,7 +195,8 @@ async function main() {
       reporter = {
         emit(event) {
           if (event.type === "warning") {
-            process.stderr.write(event.message + "\n");
+            const badge = plainStyling.warnBadge("[WARN]");
+            process.stderr.write(`${badge} ${event.message}\n`);
           }
         },
       };
@@ -193,6 +211,7 @@ async function main() {
           },
         },
         uiMode,
+        styling,
       );
       const ctrl = controller;
       reporter = { emit: (event) => ctrl.handleEvent(event) };
@@ -247,8 +266,14 @@ async function main() {
 
     const traversalPlanner = new DefaultTraversalPlanner(adapter, planningProfiler);
     const traversalExtractor = new DefaultCommitTraversalExtractor(adapter, traversalProfiler);
-    const fileChangeExpander = new DefaultFileChangeExpander(adapter);
-    const projector = new DefaultFactProjector(repoName, remoteUrl, projectionProfiler);
+    const fileChangeExpander = new DefaultFileChangeExpander(adapter, parsed.maxDiffSize);
+    const projector = new DefaultFactProjector(
+      repoName,
+      remoteUrl,
+      projectionProfiler,
+      parsed.repoName,
+      parsed.repoUrl,
+    );
 
     const deps: CoordinatorDependencies = {
       traversalPlanner,
@@ -278,20 +303,27 @@ async function main() {
     const elapsedMs = performance.now() - startMs;
 
     if (!quiet) {
-      const summaryLines = formatSummaryLines({
-        recordsWritten: result.recordsWritten,
-        commitsTraversed: result.commitsTraversed,
-        filesCreated: sink.filesCreated,
-        bytesWritten: sink.bytesWritten,
-        elapsedMs,
-        refs: result.refs,
-      });
+      const summaryLines = formatSummaryLines(
+        {
+          recordsWritten: result.recordsWritten,
+          commitsTraversed: result.commitsTraversed,
+          filesCreated: sink.filesCreated,
+          bytesWritten: sink.bytesWritten,
+          elapsedMs,
+          refs: result.refs,
+        },
+        styling,
+      );
       process.stderr.write("\n");
       for (const line of summaryLines) {
         process.stderr.write(line + "\n");
       }
       if (profile) {
-        const profileLines = formatProfileLines(rootProfiler.entries());
+        const profileLines = formatProfileLines(
+          rootProfiler.entries(),
+          result.skippedDiffs,
+          styling,
+        );
         if (profileLines.length > 0) {
           process.stderr.write("\n");
           for (const line of profileLines) {

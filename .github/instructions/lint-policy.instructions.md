@@ -1,12 +1,12 @@
 ---
-description: oxlint rule adoption policy for gitrail — category policies, LLM autonomy boundaries, severity, and review cadence
+description: oxlint rule adoption policy for gitlode — category policies, LLM autonomy boundaries, severity, and review cadence
 ---
 
 # Lint Rule Adoption Policy
 
 ## Purpose & Scope
 
-This document defines the policy for evaluating and adopting oxlint rules in the gitrail project.
+This document defines the policy for evaluating and adopting oxlint rules in the gitlode project.
 It governs how rules are proposed, evaluated, and recorded in `.oxlintrc.json`.
 
 The policy is designed to balance quality with efficiency, using a human–LLM collaborative model

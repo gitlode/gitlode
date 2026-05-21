@@ -1,4 +1,4 @@
-# gitrail Architecture
+# gitlode Architecture
 
 ## Purpose
 
@@ -15,13 +15,13 @@ Use this document to understand design intent, boundaries, and trade-offs.
 
 ## Product Context
 
-### What gitrail is for
+### What gitlode is for
 
-gitrail is an ETL bridge between Git repositories and analytical systems (data warehouses, BI
+gitlode is an ETL bridge between Git repositories and analytical systems (data warehouses, BI
 tools, metrics pipelines). It converts Git's graph-structured commit history into a flat,
 streaming-friendly format that analytical systems can ingest without understanding Git internals.
 
-The analytical value gitrail targets is **aggregation**: grouping and counting commit events
+The analytical value gitlode targets is **aggregation**: grouping and counting commit events
 across dimensions such as author, time period, or changed file area. This kind of analysis
 requires loading the full history into a queryable system and cannot be done efficiently with
 standard git tooling.
@@ -33,7 +33,7 @@ Two broad categories of aggregation motivate extraction:
 - **Product dimension**: release cadence, codebase evolution, branch lifecycle, technical debt
   indicators, change velocity by area.
 
-gitrail's responsibility is faithful extraction. Interpretation — deriving metrics, aggregations,
+gitlode's responsibility is faithful extraction. Interpretation — deriving metrics, aggregations,
 or insights from the data — belongs to the downstream system.
 
 A useful design lens for output schema decisions: fields act as either **aggregation axes**
@@ -47,15 +47,15 @@ presentation may still be useful, but they are usually better treated as derived
 pipeline enrichments than as default first-class output records unless they establish a reusable
 axis/measure pair with broad value.
 
-This separation is also an extensibility principle: gitrail's core should expose canonical Git
+This separation is also an extensibility principle: gitlode's core should expose canonical Git
 facts, while organization-specific interpretation or enrichment should be attachable at the
 pipeline boundary rather than embedded into the core extraction model.
 
-### What gitrail is not for
+### What gitlode is not for
 
 Individual history inspection — "what commits touched this file?", "who last changed this
 line?" — is handled well by git clients and IDEs. If an analysis can be answered efficiently
-with `git log` or a standard git GUI, it is not a target use case for gitrail.
+with `git log` or a standard git GUI, it is not a target use case for gitlode.
 
 ### When incremental extraction matters
 
@@ -70,10 +70,10 @@ In these cases, `--incremental` with a state file provides a reliable checkpoint
 
 ### Key implications of Git's data model
 
-Several properties of Git's data model directly constrain what gitrail can and cannot guarantee.
-These are not limitations of gitrail — they are fundamental properties of Git objects:
+Several properties of Git's data model directly constrain what gitlode can and cannot guarantee.
+These are not limitations of gitlode — they are fundamental properties of Git objects:
 
-**Output order is not chronological.** gitrail traverses the commit DAG using BFS. Across merge
+**Output order is not chronological.** gitlode traverses the commit DAG using BFS. Across merge
 branches, BFS order does not match commit timestamp order. Downstream systems must sort by
 `committer.timestamp` if chronological order is required; they must not rely on line order in
 `.jsonl` output files.
@@ -87,12 +87,12 @@ branches simultaneously.
 by a force-push. Extracted data represents a snapshot of the repository at extraction time. Branch
 attribution inferred at extraction time may not hold after the repository changes.
 
-**gitrail's correctness guarantee:** every commit reachable from the specified refs, within the
+**gitlode's correctness guarantee:** every commit reachable from the specified refs, within the
 specified range, appears exactly once in a single run's output.
 
 ## System Overview
 
-gitrail is a Node.js CLI that extracts commit history from a local Git repository and writes one
+gitlode is a Node.js CLI that extracts commit history from a local Git repository and writes one
 record per line as JSON Lines (commit-granularity by default, file-granularity with `--per-file`).
 
 The architecture is layered:
@@ -256,7 +256,7 @@ This improves type discoverability and keeps runtime modules focused.
 
 ## Profiling Instrumentation
 
-When `--profile` is set and extraction succeeds, gitrail emits per-stage timing to stderr:
+When `--profile` is set and extraction succeeds, gitlode emits per-stage timing to stderr:
 
 ```
 Profile

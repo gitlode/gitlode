@@ -1,4 +1,4 @@
-# gitrail
+# gitlode
 
 A CLI tool that extracts commit history from a local Git repository and outputs it as [JSON Lines](https://jsonlines.org/) (`.jsonl`) files, suitable for ingestion into data warehouses and analytical systems.
 
@@ -12,23 +12,23 @@ A CLI tool that extracts commit history from a local Git repository and outputs 
 ## Requirements
 
 - Node.js ≥ 22.0.0
-- A local Git repository (cloned and fetched via your preferred method — gitrail reads `.git` data directly and does not require the `git` CLI)
+- A local Git repository (cloned and fetched via your preferred method — gitlode reads `.git` data directly and does not require the `git` CLI)
 
 ## Installation
 
 ```bash
-npm install -g gitrail
+npm install -g gitlode
 ```
 
 ## Quick Start
 
 ```bash
 # One-time extraction from a local clone
-gitrail -r main ./my-repo
+gitlode -r main ./my-repo
 
 # Continuous extraction — fetch remote changes, then extract new commits
 git -C ./my-repo fetch origin
-gitrail --incremental -r origin/main -s ./gitrail-state.json --missing-state snapshot ./my-repo
+gitlode --incremental -r origin/main -s ./gitlode-state.json --missing-state snapshot ./my-repo
 ```
 
 See the [User Guide](docs/usage.md) for detailed workflow patterns including incremental setup,
@@ -37,7 +37,7 @@ release-tag-based extraction, and CI configuration.
 ## CLI Reference
 
 ```bash
-gitrail [options] <repository-path>
+gitlode [options] <repository-path>
 ```
 
 | Parameter                  | Alias | Type                | Required | Default | Description                                                                                                                                                                      |
@@ -103,7 +103,7 @@ Commit-mode record example:
 | `repository.url`                           | Remote origin URL, or `null` if no remote is configured                                   |
 
 Current runtime support is limited to repositories using the `sha1` object format due to
-`isomorphic-git` behavior in gitrail-used operations. Repositories with unsupported object
+`isomorphic-git` behavior in gitlode-used operations. Repositories with unsupported object
 formats fail fast with:
 `Unsupported repository object format: <format>. Supported formats: sha1.`
 

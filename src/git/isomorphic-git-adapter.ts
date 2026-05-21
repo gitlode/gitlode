@@ -35,7 +35,6 @@ export class IsomorphicGitAdapter implements GitAdapter {
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
-    // Verified Phase 2 support boundary for gitrail-used operations.
     return ["sha1"];
   }
 

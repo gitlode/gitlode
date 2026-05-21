@@ -1,4 +1,4 @@
-# gitrail — Feature Roadmap
+# gitlode — Feature Roadmap
 
 This file records all planned improvements beyond the initial release: product features, CLI UX improvements, and development environment tasks.
 
@@ -21,7 +21,7 @@ Roadmap entries use the following standardized metadata labels, placed immediate
 
 #### Extraction/File Mode: Exact-content rename detection (limited scope)
 
-gitrail currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
+gitlode currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
 comparison and does not detect rename/move relationships. As a result, a pure file move appears as
 one full-path deletion plus one full-path addition, even when file content is unchanged.
 
@@ -112,29 +112,24 @@ fidelity, runtime cost, and determinism explicit and user-controllable.
 
 ---
 
-#### Architecture/Runtime: Worker-based extraction runtime for resilience and orchestration
+#### Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision
 
 The current extraction pipeline runs in a single Node.js execution context. This keeps the
 implementation straightforward, but it also couples heavy extraction work with CLI lifecycle and
 interactive rendering. For long-running or computationally heavy workloads, this coupling makes
-stability, supervision, and execution strategy evolution harder than necessary.
+stability and fault isolation harder than necessary.
 
-This item introduces a Worker-based runtime boundary: extraction executes in an isolated worker,
-while the main process remains responsible for CLI lifecycle, supervision, and user interaction.
+This entry introduces the Worker-based runtime boundary through the first two implementation
+phases: extraction executes in an isolated worker, while the main process remains responsible for
+CLI lifecycle, supervision, and user interaction.
 
 **Primary goals (core value)**:
 
 - improve long-run extraction stability via execution isolation
 - improve fault tolerance through clear failure boundaries and controlled shutdown semantics
-- establish a foundation for future orchestration flexibility (parallelism, scheduling, retry)
-- improve extensibility by formalizing runtime and messaging boundaries
+- formalize runtime and messaging boundaries as the baseline for later orchestration work
 
-**Secondary outcomes (expected but non-primary)**:
-
-- smoother progress behavior under heavy extraction load
-- cleaner profiling/telemetry boundaries between extraction work and CLI supervision
-
-**Scope strategy (single entry, phased delivery)**:
+**Scope (this entry)**:
 
 - **Phase A: runtime boundary only**
   - run the existing extraction pipeline in one worker
@@ -143,21 +138,37 @@ while the main process remains responsible for CLI lifecycle, supervision, and u
 - **Phase B: operational hardening**
   - add cancellation, timeout, and supervision semantics
   - make failure reporting and exit behavior deterministic
-- **Phase C: orchestration-ready foundation**
-  - prepare interfaces for future parallel strategies (branch-level or stage-level)
-  - do not require immediate parallel execution in this item
 
-**Non-goals for initial implementation**:
+**Non-goals for this entry**:
 
 - no guaranteed throughput improvement in the first delivery
 - no implicit data reduction or extraction-fidelity trade-off
-- no simultaneous rollout of broad parallel execution and plugin architecture
+- no immediate parallel extraction strategy rollout
 
 **Design constraints**:
 
 - preserve current extraction correctness and checkpoint safety guarantees
 - maintain deterministic behavior under equivalent inputs and configuration
 - keep CLI UX backward compatible unless explicitly documented otherwise
+
+#### Architecture/Runtime: Orchestration-ready runtime foundation (Phase C)
+
+- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision`
+
+After Phase A+B is complete, this entry prepares the runtime interfaces for future orchestration
+strategies while keeping execution behavior conservative.
+
+**Scope (this entry)**:
+
+- define and stabilize interfaces needed for future parallel strategies (branch-level or stage-level)
+- refine worker/main-process coordination contracts so scheduling strategies can be added safely
+- improve extension points for runtime-level orchestration without changing extraction semantics
+
+**Non-goals for this entry**:
+
+- no requirement to ship immediate parallel execution
+- no simultaneous rollout of broad parallel execution and plugin architecture
+- no changes that weaken current checkpoint/state safety guarantees
 
 #### Architecture: Diff algorithm abstraction within `IsomorphicGitAdapter`
 
@@ -226,6 +237,63 @@ later projection step.
 - Enables trimming output size for use cases that do not need all fields, while keeping the
   default extraction contract fully populated
 
+#### Repository/Build: npm-workspaces monorepo migration for core package continuity
+
+This entry scopes the repository migration to npm workspaces while preserving the user-facing core
+package contract (`gitlode`) and minimizing release risk.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
+
+**Design intent**:
+
+- migrate repository structure to monorepo without changing core CLI behavior
+- keep the published core package identity and install path stable (`gitlode`)
+- establish package boundaries that allow plugin packages to be added incrementally
+
+**Scope boundary (initial delivery)**:
+
+- repository/workspace restructuring and build-script adaptation only
+- no intentional output or CLI contract changes
+- accept only metadata/internal differences after migration; reject behavioral regressions
+
+#### Distribution/Compatibility: Official plugin package policy and version contract
+
+This entry defines how official plugins are distributed and how compatibility with `gitlode` is
+expressed and validated.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
+
+**Design intent**:
+
+- distribute official plugins as independent npm packages under `@gitlode/*`
+- keep core package naming stable while making official plugin ownership explicit
+- make compatibility explicit via `peerDependencies` plus runtime warning semantics
+
+**Scope boundary (initial delivery)**:
+
+- no plugin bundling into the core `gitlode` package
+- minor-bounded compatibility ranges and lower-bound/latest CI checks
+- per-plugin compatibility notes as part of package documentation
+
+#### Release Engineering: Staged monorepo CI/CD evolution with changesets adoption
+
+This entry introduces stage-based CI/CD evolution for multi-package operations and aligns release
+automation timing with plugin growth.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
+
+**Design intent**:
+
+- start with integrated workflows while package count is low
+- avoid premature operational complexity before scale pressure appears
+- move to package-oriented release automation as soon as it becomes operationally justified
+
+**Scope boundary (initial delivery)**:
+
+- keep current release operation practical in the short term
+- treat changesets adoption and CI/CD split as one coordinated migration window
+- trigger migration when official plugin count and release coordination complexity both increase
+
 ---
 
 ### Long-term
@@ -271,9 +339,11 @@ operational diagnostics, and future optimization planning.
 
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
 
-Allow users to attach custom processing stages (plugins) to gitrail's extraction pipeline so that
+Allow users to attach custom processing stages (plugins) to gitlode's extraction pipeline so that
 organization-specific semantics can be derived without expanding the core schema for every use
 case.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
 
 Example targets include parsing commit subjects that follow conventions such as Conventional
 Commits, deriving custom classification fields from file paths, or attaching additional metadata
@@ -281,7 +351,7 @@ computed from diff content.
 
 **Design intent**:
 
-- keep gitrail core focused on canonical Git facts and broadly reusable output grains
+- keep gitlode core focused on canonical Git facts and broadly reusable output grains
 - move organization-specific interpretation to a user-controlled extension boundary
 - allow enrichment without forcing the project to standardize every downstream analytical need
 
@@ -362,7 +432,7 @@ export interface ProjectorPlugin {
 **Open Design Questions**:
 
 1. **CLI interface for plugin config**: How should plugins be specified at runtime?
-   - Option A: `--plugins-config ./gitrail-plugins.json`
+   - Option A: `--plugins-config ./gitlode-plugins.json`
    - Option B: `--plugins-dir ./plugins/` with auto-discovery
    - Option C: Environment variable + file discovery heuristics
    - **Status**: Deferred to planning phase; scope to be finalized before implementation begins.

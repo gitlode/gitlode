@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Gitrail: full extract",
+      "name": "gitlode: full extract",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/src/index.ts",
@@ -25,7 +25,7 @@
     },
 
     {
-      "name": "Gitrail: continuous extract",
+      "name": "gitlode: continuous extract",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/src/index.ts",

@@ -1,5 +1,5 @@
 ---
-description: Output JSON schema and file rotation specification for gitrail
+description: Output JSON schema and file rotation specification for gitlode
 applyTo: "src/output/**"
 ---
 

@@ -25,7 +25,7 @@ describe("OutputWriterSink", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `gitrail-sink-test-${randomUUID()}`);
+    tmpDir = join(tmpdir(), `gitlode-sink-test-${randomUUID()}`);
     await mkdir(tmpDir, { recursive: true });
   });
 

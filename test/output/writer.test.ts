@@ -36,7 +36,7 @@ describe("OutputWriter", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `gitrail-test-${randomUUID()}`);
+    tmpDir = join(tmpdir(), `gitlode-test-${randomUUID()}`);
     await mkdir(tmpDir, { recursive: true });
   });
 

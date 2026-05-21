@@ -35,7 +35,7 @@ const RawOptsSchema = z.object({
 });
 
 export const program = new Command()
-  .name("gitrail")
+  .name("gitlode")
   .description("Extract Git commit history to JSON Lines")
   .addArgument(new Argument("<repository-path>", "Local path to the Git repository"))
   .addHelpOption(new Option("-h, --help", "display help for command").hideHelp())

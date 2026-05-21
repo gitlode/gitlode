@@ -1,5 +1,5 @@
 ---
-description: CLI interface specification for gitrail
+description: CLI interface specification for gitlode
 applyTo: "src/cli/**"
 ---
 
@@ -8,7 +8,7 @@ applyTo: "src/cli/**"
 ## Command Signature
 
 ```bash
-gitrail [options] <repository-path>
+gitlode [options] <repository-path>
 ```
 
 `<repository-path>` is a positional argument — the local filesystem path to the target Git repository.
@@ -19,7 +19,7 @@ gitrail [options] <repository-path>
 
 ### Help Option Groups
 
-`gitrail --help` uses commander 14 native option grouping. The grouped option sections and
+`gitlode --help` uses commander 14 native option grouping. The grouped option sections and
 assignments are:
 
 | Group                              | Options                                                                                         |
@@ -53,8 +53,8 @@ CLI parameter value.
 `--ref` must be specified at least once. There is no default. Accepting multiple values:
 
 ```bash
-gitrail --ref main --ref develop ./my-repo
-gitrail -r main -r develop ./my-repo
+gitlode --ref main --ref develop ./my-repo
+gitlode -r main -r develop ./my-repo
 ```
 
 ### Range Filter (snapshot mode only)
@@ -277,40 +277,40 @@ All validation must complete before extraction and file output begin. Validation
 
 ```bash
 # Snapshot extraction of main branch (default mode — no flag needed)
-gitrail --ref main ./my-repo
-gitrail -r main ./my-repo
+gitlode --ref main ./my-repo
+gitlode -r main ./my-repo
 
 # Multiple branches, custom output dir
-gitrail -r main -r develop -o ./output ./my-repo
+gitlode -r main -r develop -o ./output ./my-repo
 
 # Snapshot with state recording (for later incremental runs)
-gitrail --ref main --state ./gitrail-state.json ./my-repo
+gitlode --ref main --state ./gitlode-state.json ./my-repo
 
 # Incremental run using state file
-gitrail --incremental --ref main --state ./gitrail-state.json ./my-repo
-gitrail --incremental -r main -s ./gitrail-state.json ./my-repo
+gitlode --incremental --ref main --state ./gitlode-state.json ./my-repo
+gitlode --incremental -r main -s ./gitlode-state.json ./my-repo
 
 # Incremental with auto-initialization on first run (fall back to full snapshot if no state)
-gitrail --incremental -r main -s ./gitrail-state.json --missing-state snapshot ./my-repo
+gitlode --incremental -r main -s ./gitlode-state.json --missing-state snapshot ./my-repo
 
 # Snapshot from a release tag (extract only commits after v1.0)
-gitrail --ref main --since-ref v1.0 ./my-repo
+gitlode --ref main --since-ref v1.0 ./my-repo
 
 # Snapshot from a release tag with state recording
-gitrail -r main -r develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
+gitlode -r main -r develop --since-ref v1.0 -s ./gitlode-state.json ./my-repo
 
 # Time-based snapshot
-gitrail --ref main --since-date 2024-01-01T00:00:00Z ./my-repo
+gitlode --ref main --since-date 2024-01-01T00:00:00Z ./my-repo
 
 # File-granularity output (one record per changed file per commit)
-gitrail --per-file -r main ./my-repo
+gitlode --per-file -r main ./my-repo
 
 # Successful-run profiling output on stderr
-gitrail --profile -r main ./my-repo
+gitlode --profile -r main ./my-repo
 
 # With file rotation (plain bytes or human-readable suffix)
-gitrail -r main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
-gitrail -r main --rotate-lines 10000 --rotate-size 100M ./my-repo
+gitlode -r main --rotate-lines 10000 --rotate-size 104857600 ./my-repo
+gitlode -r main --rotate-lines 10000 --rotate-size 100M ./my-repo
 ```
 
 ---
@@ -323,7 +323,7 @@ gitrail -r main --rotate-lines 10000 --rotate-size 100M ./my-repo
 
 ## Unknown Option Behavior
 
-Unknown options (flags not registered in the command definition) are a **hard error** in gitrail. This behavior mirrors mainstream CLI conventions and git's own fatal-on-unknown-option policy.
+Unknown options (flags not registered in the command definition) are a **hard error** in gitlode. This behavior mirrors mainstream CLI conventions and git's own fatal-on-unknown-option policy.
 
 ### Error output
 

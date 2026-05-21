@@ -1,4 +1,4 @@
-# gitrail — Feature Roadmap
+# gitlode — Feature Roadmap
 
 This file records all planned improvements beyond the initial release: product features, CLI UX improvements, and development environment tasks.
 
@@ -21,7 +21,7 @@ Roadmap entries use the following standardized metadata labels, placed immediate
 
 #### Extraction/File Mode: Exact-content rename detection (limited scope)
 
-gitrail currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
+gitlode currently emits file changes as `added` / `modified` / `deleted` based on path-level tree
 comparison and does not detect rename/move relationships. As a result, a pure file move appears as
 one full-path deletion plus one full-path addition, even when file content is unchanged.
 
@@ -240,14 +240,14 @@ later projection step.
 #### Repository/Build: npm-workspaces monorepo migration for core package continuity
 
 This entry scopes the repository migration to npm workspaces while preserving the user-facing core
-package contract (`gitrail`) and minimizing release risk.
+package contract (`gitlode`) and minimizing release risk.
 
 See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
 
 **Design intent**:
 
 - migrate repository structure to monorepo without changing core CLI behavior
-- keep the published core package identity and install path stable (`gitrail`)
+- keep the published core package identity and install path stable (`gitlode`)
 - establish package boundaries that allow plugin packages to be added incrementally
 
 **Scope boundary (initial delivery)**:
@@ -258,20 +258,20 @@ See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
 
 #### Distribution/Compatibility: Official plugin package policy and version contract
 
-This entry defines how official plugins are distributed and how compatibility with `gitrail` is
+This entry defines how official plugins are distributed and how compatibility with `gitlode` is
 expressed and validated.
 
 See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
 
 **Design intent**:
 
-- distribute official plugins as independent npm packages under `@gitrail/*`
+- distribute official plugins as independent npm packages under `@gitlode/*`
 - keep core package naming stable while making official plugin ownership explicit
 - make compatibility explicit via `peerDependencies` plus runtime warning semantics
 
 **Scope boundary (initial delivery)**:
 
-- no plugin bundling into the core `gitrail` package
+- no plugin bundling into the core `gitlode` package
 - minor-bounded compatibility ranges and lower-bound/latest CI checks
 - per-plugin compatibility notes as part of package documentation
 
@@ -339,7 +339,7 @@ operational diagnostics, and future optimization planning.
 
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
 
-Allow users to attach custom processing stages (plugins) to gitrail's extraction pipeline so that
+Allow users to attach custom processing stages (plugins) to gitlode's extraction pipeline so that
 organization-specific semantics can be derived without expanding the core schema for every use
 case.
 
@@ -351,7 +351,7 @@ computed from diff content.
 
 **Design intent**:
 
-- keep gitrail core focused on canonical Git facts and broadly reusable output grains
+- keep gitlode core focused on canonical Git facts and broadly reusable output grains
 - move organization-specific interpretation to a user-controlled extension boundary
 - allow enrichment without forcing the project to standardize every downstream analytical need
 
@@ -432,7 +432,7 @@ export interface ProjectorPlugin {
 **Open Design Questions**:
 
 1. **CLI interface for plugin config**: How should plugins be specified at runtime?
-   - Option A: `--plugins-config ./gitrail-plugins.json`
+   - Option A: `--plugins-config ./gitlode-plugins.json`
    - Option B: `--plugins-dir ./plugins/` with auto-discovery
    - Option C: Environment variable + file discovery heuristics
    - **Status**: Deferred to planning phase; scope to be finalized before implementation begins.

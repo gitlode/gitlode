@@ -1,5 +1,5 @@
 ---
-description: Architecture and component design for gitrail
+description: Architecture and component design for gitlode
 applyTo: "src/**"
 ---
 
@@ -28,7 +28,7 @@ Each layer must only depend on the layer directly below it. The Core Logic layer
 These principles govern design decisions across all layers. When a new feature or change creates
 ambiguity about where logic belongs or what behavior is correct, use these as the deciding criteria.
 
-- **gitrail is a faithful extractor, not an analytics engine.** Map Git object data exactly as
+- **gitlode is a faithful extractor, not an analytics engine.** Map Git object data exactly as
   stored. Do not infer, derive, or add attributes beyond what the spec explicitly defines. Leave
   interpretation to downstream systems.
 - **The correctness guarantee is:** every commit reachable from the specified refs, within the
@@ -38,11 +38,11 @@ ambiguity about where logic belongs or what behavior is correct, use these as th
   correct subsets of the DAG. `snapshot` = extract independently of prior state; `incremental` =
   extract only commits new since the last recorded state. Neither mode may silently produce a
   superset or a subset of the intended range.
-- **Git's data model constraints are not gitrail limitations.** Commits carry no branch field;
+- **Git's data model constraints are not gitlode limitations.** Commits carry no branch field;
   output order is not chronological; branch refs are mutable. These properties must be respected
   and documented, not worked around with fragile heuristics.
-- **Interpretation belongs downstream.** gitrail outputs what Git stores. Derived attributes
-  (e.g. branch membership per commit, authorship statistics, release attribution) are not gitrail
+- **Interpretation belongs downstream.** gitlode outputs what Git stores. Derived attributes
+  (e.g. branch membership per commit, authorship statistics, release attribution) are not gitlode
   responsibilities and must not be added without a deliberate spec change.
 
 ---

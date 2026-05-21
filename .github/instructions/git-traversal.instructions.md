@@ -1,5 +1,5 @@
 ---
-description: Git DAG traversal, differential extraction, and state file management for gitrail
+description: Git DAG traversal, differential extraction, and state file management for gitlode
 applyTo: "src/git/**,src/core/**"
 ---
 
@@ -13,7 +13,7 @@ A Git commit object contains only: `tree`, `parent[]`, `author`, `committer`, `m
 
 A branch is a named pointer (ref) stored in `.git/refs/heads/` that points to exactly one commit. This pointer is mutable — it moves forward as new commits are added.
 
-**Implication for gitrail**: "Extracting commits for branch X" means "walk the commit graph starting from the commit that ref X currently points to." The extracted data represents a snapshot at the time of extraction. The same commit may be reachable from multiple branches.
+**Implication for gitlode**: "Extracting commits for branch X" means "walk the commit graph starting from the commit that ref X currently points to." The extracted data represents a snapshot at the time of extraction. The same commit may be reachable from multiple branches.
 
 ### Commit Graph is a DAG
 
@@ -305,7 +305,7 @@ Memory note: the `visited` set holds one hash per unique commit traversed. At ap
 
 ### Across Runs (merge base deduplication)
 
-When a new branch is added to `--branch` in an incremental run, gitrail automatically deduplicates
+When a new branch is added to `--branch` in an incremental run, gitlode automatically deduplicates
 against prior runs by computing the merge base between the new branch and all branches already
 recorded in the state file, then using that merge base as `excludeHash` for the new branch's
 traversal.

@@ -1,6 +1,6 @@
 {
-  "name": "gitrail",
-  "version": "0.6.0",
+  "name": "gitlode",
+  "version": "0.6.1",
   "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
   "keywords": [
     "cli",
@@ -12,10 +12,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tomo-waka/gitrail.git"
+    "url": "https://github.com/gitlode/gitlode.git"
   },
   "bin": {
-    "gitrail": "./dist/index.js"
+    "gitlode": "./dist/index.js"
   },
   "files": [
     "dist"

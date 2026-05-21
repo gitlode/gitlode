@@ -32,7 +32,7 @@ export interface FileChange {
 }
 
 export interface GitAdapter {
-  /** Object formats this adapter implementation can handle for gitrail-used operations. */
+  /** Object formats this adapter implementation can handle */
   supportedObjectFormats(): readonly OidProfile[];
 
   /** Resolve a ref (branch name, tag, or raw commit OID) to a commit OID. */

@@ -1,8 +1,8 @@
-# gitrail — Copilot Instructions
+# gitlode — Copilot Instructions
 
 ## What This Project Is
 
-`gitrail` is a CLI tool that extracts Git repository commit history and outputs it as JSON Lines (`.jsonl`) files, suitable for ingestion into data warehouses and analytical systems.
+`gitlode` is a CLI tool that extracts Git repository commit history and outputs it as JSON Lines (`.jsonl`) files, suitable for ingestion into data warehouses and analytical systems.
 
 Key characteristics:
 
@@ -24,7 +24,8 @@ Key characteristics:
 ## Repository Structure
 
 ```
-gitrail/
+gitlode/
+├── .github/
 ├── .github/
 │   ├── copilot-instructions.md       # This file
 │   ├── instructions/
@@ -81,7 +82,7 @@ gitrail/
 - Branch specification: required (no default); represents "ref to use as traversal starting point"
 - Differential extraction: controlled by `--state` file (preferred) or `--since-commit` / `--since-date`
 - Timestamp format: **ISO 8601** using the offset embedded in each commit object
-- Package/command name: **gitrail**
+- Package/command name: **gitlode**
 
 ## Detailed Specifications
 

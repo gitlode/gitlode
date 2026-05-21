@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-05-21
+
+### Changed
+
+- **Package rename:** Project renamed from `gitrail` to `gitlode` on npm. All `gitrail` v0.6.0 and earlier versions remain published under the old package name; `gitlode` starts at v0.6.1 with identical functionality.
+- CLI binary name updated to `gitlode` (previously `gitrail`).
+- All documentation, code comments, and examples updated to reference `gitlode`.
+
+### Migration
+
+- Replace `npm install gitrail` with `npm install gitlode` in your dependency manifests and CI/CD workflows.
+- Update any shell scripts, CI jobs, or documentation that invoke the `gitrail` CLI command to use `gitlode` instead.
+
 ## [0.6.0] - 2026-05-20
+
+> [!NOTE]
+> Unreleased — Versions 0.1.0 through 0.6.0
+> These versions were published to npm under the package name `gitrail` and are not re-published as `gitlode`.
+> The `gitlode` package starts at v0.6.1 with the same functionality as `gitrail` v0.6.0.
 
 ### Added
 
@@ -235,10 +253,12 @@ If your intent was to record state without differential extraction (snapshot wit
 - Timestamp output in ISO 8601 format with commit's own timezone offset
 - No system-installed Git required (uses isomorphic-git)
 
-[0.5.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.5.0
-[0.4.1]: https://github.com/tomo-waka/gitrail/releases/tag/v0.4.1
-[0.4.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.4.0
-[0.3.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.3.0
-[0.2.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.2.0
-[0.1.4]: https://github.com/tomo-waka/gitrail/releases/tag/v0.1.4
-[0.1.0]: https://github.com/tomo-waka/gitrail/releases/tag/v0.1.0
+[0.6.1]: https://github.com/gitlode/gitlode/releases/tag/v0.6.1
+[0.6.0]: https://github.com/gitlode/gitlode/releases/tag/v0.6.0
+[0.5.0]: https://github.com/gitlode/gitlode/releases/tag/v0.5.0
+[0.4.1]: https://github.com/gitlode/gitlode/releases/tag/v0.4.1
+[0.4.0]: https://github.com/gitlode/gitlode/releases/tag/v0.4.0
+[0.3.0]: https://github.com/gitlode/gitlode/releases/tag/v0.3.0
+[0.2.0]: https://github.com/gitlode/gitlode/releases/tag/v0.2.0
+[0.1.4]: https://github.com/gitlode/gitlode/releases/tag/v0.1.4
+[0.1.0]: https://github.com/gitlode/gitlode/releases/tag/v0.1.0

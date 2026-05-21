@@ -19,13 +19,13 @@ This document is the execution-focused strategy for plugin introduction, monorep
 | Topic                          | Current policy                                                             | Status  | Future direction / trigger                                                       |
 | ------------------------------ | -------------------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------- |
 | Development model              | Use npm workspaces monorepo.                                               | Decided | Keep unless repository scale requires stronger tooling.                          |
-| Distribution model             | Publish official plugins as separate npm packages.                         | Decided | Continue; no bundling into `gitrail` package.                                    |
-| Core package name              | Keep core package name as `gitrail`.                                       | Decided | No rename planned.                                                               |
-| Official plugin naming         | Use `@gitrail/*` scope for official plugins.                               | Decided | Scope secured; continue as baseline.                                             |
+| Distribution model             | Publish official plugins as separate npm packages.                         | Decided | Continue; no bundling into `gitlode` package.                                    |
+| Core package name              | Keep core package name as `gitlode`.                                       | Decided | No rename planned.                                                               |
+| Official plugin naming         | Use `@gitlode/*` scope for official plugins.                               | Decided | Scope secured; continue as baseline.                                             |
 | TypeScript config sharing      | Root shared config + per-package `extends`.                                | Decided | Add project references only when needed by package growth.                       |
-| Compatibility declaration      | Official plugins must declare `peerDependencies` on `gitrail`.             | Decided | Keep minor-bounded ranges and update on API boundary changes.                    |
+| Compatibility declaration      | Official plugins must declare `peerDependencies` on `gitlode`.             | Decided | Keep minor-bounded ranges and update on API boundary changes.                    |
 | Runtime compatibility behavior | Version mismatch should emit warning, not fatal by default.                | Decided | Revisit only if frequent unsafe mismatches occur.                                |
-| Compatibility CI matrix        | Validate plugin compatibility at lower bound + latest supported `gitrail`. | Decided | Expand matrix only when support range broadens.                                  |
+| Compatibility CI matrix        | Validate plugin compatibility at lower bound + latest supported `gitlode`. | Decided | Expand matrix only when support range broadens.                                  |
 | CI/CD architecture             | Start simple (integrated workflows), then evolve in stages.                | Decided | Move to split package workflows when plugin count and release frequency justify. |
 | Release management tool        | Keep changesets as near-future adoption target.                            | Planned | Introduce together with CI/CD split stage.                                       |
 | GitHub Web Releases            | Continue short-term as a practical operation path.                         | Planned | Reposition as summary channel after package-oriented automation matures.         |
@@ -34,13 +34,13 @@ This document is the execution-focused strategy for plugin introduction, monorep
 
 | Timing                                           | Intended reflection in project                                                             | Guardrails                                                                                                                      |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `v0.6.1`                                         | Monorepo migration and operational groundwork only.                                        | No intentional user-facing behavior change. Validate diffs post-migration and iterate until no unacceptable differences remain. |
+| `v0.6.2`                                         | Monorepo migration and operational groundwork only.                                        | No intentional user-facing behavior change. Validate diffs post-migration and iterate until no unacceptable differences remain. |
 | `v0.7.0`                                         | Introduce pluggable interface foundation in core.                                          | Keep plugin ecosystem initial scope controlled and explicit.                                                                    |
 | Early `v0.7.x`                                   | Ship first official plugins: hello-world oriented plugin first, then general-value plugin. | Preserve compatibility signaling (`peerDependencies`, warning policy, compatibility notes).                                     |
 | Plugin growth point (about 2-3 official plugins) | Adopt changesets and split CI/CD by package/release responsibility.                        | Keep migration transactional: introduce release tooling and CI/CD split together.                                               |
 | Mid-term scaling                                 | Expand TS build graph and CI matrix only when needed by package scale.                     | Avoid pre-optimization before concrete pressure appears.                                                                        |
 
-## Accepted Validation Approach for `v0.6.1`
+## Accepted Validation Approach for `v0.6.2`
 
 The accepted process is post-change validation and iteration, not strict pre-definition of equality.
 

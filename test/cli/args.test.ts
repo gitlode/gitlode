@@ -36,7 +36,7 @@ let stderrSpy: MockInstance;
 const originalArgv = process.argv.slice();
 
 function setArgv(...args: string[]) {
-  process.argv = ["node", "gitrail", ...args];
+  process.argv = ["node", "gitlode", ...args];
 }
 
 beforeEach(() => {
@@ -56,7 +56,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 async function makeRealRepo(options?: { remoteUrl?: string; branch?: string }): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "gitrail-args-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "gitlode-args-test-"));
   const branch = options?.branch ?? "main";
   await git.init({ fs: nodeFs, dir, defaultBranch: branch });
   await git.setConfig({ fs: nodeFs, dir, path: "user.name", value: "Tester" });
@@ -520,7 +520,7 @@ describe("parseArgs – incremental mode", () => {
   });
 
   it("accepts --incremental with --state pointing to an existing file", async () => {
-    stateDir = await mkdtemp(join(tmpdir(), "gitrail-args-state-"));
+    stateDir = await mkdtemp(join(tmpdir(), "gitlode-args-state-"));
     const stateFile = join(stateDir, "state.json");
     await writeFile(
       stateFile,
@@ -545,7 +545,7 @@ describe("parseArgs – incremental mode", () => {
   });
 
   it("exits 1 when --incremental and state file missing (default --missing-state error)", async () => {
-    stateDir = await mkdtemp(join(tmpdir(), "gitrail-args-state-"));
+    stateDir = await mkdtemp(join(tmpdir(), "gitlode-args-state-"));
     const missingStatePath = join(stateDir, "nonexistent.json");
     setArgv("--incremental", "--ref", "main", "--state", missingStatePath, ".");
     await expect(parseArgs(noopAdapter)).rejects.toThrow("process.exit(1)");
@@ -554,7 +554,7 @@ describe("parseArgs – incremental mode", () => {
   });
 
   it("accepts --missing-state snapshot when --incremental is set", async () => {
-    stateDir = await mkdtemp(join(tmpdir(), "gitrail-args-state-"));
+    stateDir = await mkdtemp(join(tmpdir(), "gitlode-args-state-"));
     const missingStatePath = join(stateDir, "nonexistent.json");
     repoDir = await makeRealRepo();
     const adapter = new IsomorphicGitAdapter();

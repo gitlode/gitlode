@@ -4,7 +4,7 @@ import { program } from "../../src/cli/index.js";
 
 describe("program – help output wiring", () => {
   it("has a name and description", () => {
-    expect(program.name()).toBe("gitrail");
+    expect(program.name()).toBe("gitlode");
     expect(program.description()).toBeTruthy();
   });
 

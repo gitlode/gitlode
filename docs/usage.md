@@ -1,6 +1,6 @@
-# gitrail — User Guide
+# gitlode — User Guide
 
-gitrail extracts Git commit history from a local repository and writes it as
+gitlode extracts Git commit history from a local repository and writes it as
 [JSON Lines](https://jsonlines.org/) (`.jsonl`) files — one record per line — suitable for
 ingestion into data warehouses, analytics platforms, or any system that consumes
 newline-delimited JSON.
@@ -9,11 +9,11 @@ newline-delimited JSON.
 
 ## Extraction Modes
 
-gitrail has two extraction modes:
+gitlode has two extraction modes:
 
 ### Snapshot mode (default)
 
-By default (no `--incremental` flag), gitrail extracts commits independently of any prior state. It always walks from the
+By default (no `--incremental` flag), gitlode extracts commits independently of any prior state. It always walks from the
 current tip of the specified branch(es) back through history. No state file is consulted during
 extraction.
 
@@ -48,9 +48,9 @@ Incremental mode requires `--state`.
 Extract all commits reachable from a branch:
 
 ```bash
-gitrail --ref main ./my-repo
+gitlode --ref main ./my-repo
 # or with shorthand aliases
-gitrail -r main ./my-repo
+gitlode -r main ./my-repo
 ```
 
 Output is written to `./my-repo-<timestamp>-000001.jsonl` (prefix derived from the remote origin
@@ -62,8 +62,8 @@ URL, or the directory name if no remote is configured).
 
 For pipelines that regularly load new commits into a data warehouse.
 
-> gitrail reads only the local `.git` directory. To pick up newly pushed commits, run
-> `git fetch` before each gitrail invocation. Note that `git fetch` updates **remote-tracking
+> gitlode reads only the local `.git` directory. To pick up newly pushed commits, run
+> `git fetch` before each gitlode invocation. Note that `git fetch` updates **remote-tracking
 > refs** (e.g. `origin/main`), not local branch refs (`main`). Use the remote-tracking ref
 > name with `--ref` (e.g. `-r origin/main`) so that a plain `git fetch` is sufficient.
 > Alternatively, use `git pull` to advance the local branch, or work with a **bare clone**
@@ -72,7 +72,7 @@ For pipelines that regularly load new commits into a data warehouse.
 **Step 1 — initialize state (once):**
 
 ```bash
-gitrail -r main -s ./gitrail-state.json ./my-repo
+gitlode -r main -s ./gitlode-state.json ./my-repo
 ```
 
 This extracts all commits and writes a state file recording the current HEAD of each branch.
@@ -81,7 +81,7 @@ This extracts all commits and writes a state file recording the current HEAD of 
 
 ```bash
 git -C ./my-repo fetch origin
-gitrail --incremental -r origin/main -s ./gitrail-state.json ./my-repo
+gitlode --incremental -r origin/main -s ./gitlode-state.json ./my-repo
 ```
 
 Only commits added since the last run are extracted. The state file is updated on success.
@@ -91,7 +91,7 @@ Only commits added since the last run are extracted. The state file is updated o
 If you prefer a single command that handles both the first run and all subsequent runs:
 
 ```bash
-gitrail --incremental -r main -s ./gitrail-state.json --missing-state snapshot ./my-repo
+gitlode --incremental -r main -s ./gitlode-state.json --missing-state snapshot ./my-repo
 ```
 
 - First run (state file absent): emits a warning to stderr, performs full extraction, creates
@@ -107,7 +107,7 @@ Use `--since-ref` to extract only commits that appeared after a given ref — eq
 
 ```bash
 # All commits on main that are not reachable from v1.0
-gitrail -r main --since-ref v1.0 ./my-repo
+gitlode -r main --since-ref v1.0 ./my-repo
 ```
 
 `--since-ref` accepts a tag name, branch name, or full commit object ID (OID).
@@ -115,13 +115,13 @@ gitrail -r main --since-ref v1.0 ./my-repo
 **With state recording** (for subsequent incremental runs):
 
 ```bash
-gitrail -r main -r develop --since-ref v1.0 -s ./gitrail-state.json ./my-repo
+gitlode -r main -r develop --since-ref v1.0 -s ./gitlode-state.json ./my-repo
 ```
 
 > **Note:** The state file records each branch's current HEAD OID — not the `--since-ref`
 > boundary. A subsequent incremental run picks up commits since the HEAD recorded at this run,
 > not since `v1.0`. If a branch's HEAD is reachable from the since-ref (meaning zero commits
-> would be output for that branch), gitrail emits a warning to stderr.
+> would be output for that branch), gitlode emits a warning to stderr.
 
 > **Compatibility note:** Runtime support is currently limited to repositories using the `sha1`
 > object format. Unsupported formats fail before traversal/output with:
@@ -137,7 +137,7 @@ your setup:
 **Option A — stateless snapshot (simplest)**
 
 ```bash
-gitrail -r main ./my-repo
+gitlode -r main ./my-repo
 ```
 
 No state file required. Suitable when the downstream system handles deduplication
@@ -148,8 +148,8 @@ No state file required. Suitable when the downstream system handles deduplicatio
 Store the state file on a persistent volume mounted into the container:
 
 ```bash
-gitrail --incremental -r main \
-  -s /mnt/state/gitrail-state.json \
+gitlode --incremental -r main \
+  -s /mnt/state/gitlode-state.json \
   --missing-state snapshot \
   ./my-repo
 ```
@@ -163,7 +163,7 @@ succeeds without manual intervention.
 
 ### What the state file records
 
-After a successful run, gitrail writes a JSON file at the path given by `--state`. It records a
+After a successful run, gitlode writes a JSON file at the path given by `--state`. It records a
 checkpoint entry for each processed ref at extraction time:
 
 ```json
@@ -210,7 +210,7 @@ Controls behavior when `--incremental` is used and the state file does not exist
 
 ### State file location
 
-gitrail does not infer a default path. Specify `--state <path>` explicitly and choose a location
+gitlode does not infer a default path. Specify `--state <path>` explicitly and choose a location
 that persists across runs.
 
 ---
@@ -220,10 +220,10 @@ that persists across runs.
 Specify `--ref` (or `-r`) multiple times to extract from several branches in one run:
 
 ```bash
-gitrail -r main -r develop -r release/1.x ./my-repo
+gitlode -r main -r develop -r release/1.x ./my-repo
 ```
 
-**Deduplication:** commits shared between refs are written exactly once. gitrail maintains a
+**Deduplication:** commits shared between refs are written exactly once. gitlode maintains a
 visited OID set across all refs within a single run.
 
 **Output order:** all commits from the first ref are written before the second ref begins,
@@ -232,12 +232,12 @@ in the order `--ref` arguments were given.
 ### Adding a new branch to an existing incremental workflow
 
 When a **branch** listed in `--ref` has no matching `(ref, refType)` entry in the state file,
-gitrail automatically prevents cross-run duplicates. It computes the **merge base** of all tracked
+gitlode automatically prevents cross-run duplicates. It computes the **merge base** of all tracked
 branch checkpoints in state and uses that commit as the extraction boundary for the new branch,
 excluding commits already output in prior runs.
 
 **Fallback — no common ancestor:** if the new branch shares no history with any branch in the
-state (e.g. an orphan branch created with `git checkout --orphan`), gitrail cannot find a merge
+state (e.g. an orphan branch created with `git checkout --orphan`), gitlode cannot find a merge
 base and falls back to full traversal for that branch. Duplicate commits may appear in the output
 in this case. If duplicates are unacceptable, discard prior output and re-run with
 snapshot mode (without `--incremental`) across all branches to re-extract cleanly, then resume incremental extraction.
@@ -249,11 +249,11 @@ For the detailed algorithm and worked examples see
 
 ## Git DAG Constraints
 
-These properties of Git's data model affect how gitrail output should be interpreted.
+These properties of Git's data model affect how gitlode output should be interpreted.
 
 ### Output order is not chronological
 
-gitrail traverses the commit graph using breadth-first search (BFS). Across merge branches, BFS
+gitlode traverses the commit graph using breadth-first search (BFS). Across merge branches, BFS
 order does not match commit timestamp order. **Do not rely on line order in `.jsonl` files for
 chronological ordering.** Sort by `committer.timestamp` in your downstream system.
 
@@ -261,14 +261,14 @@ chronological ordering.** Sort by `committer.timestamp` in your downstream syste
 
 A Git commit object contains no branch field. "Extracting branch X" means "walk from the commit
 that ref X currently points to." The same commit OID may be reachable from multiple branches;
-gitrail deduplicates by OID within each run but does not record which branch a commit was reached
+gitlode deduplicates by OID within each run but does not record which branch a commit was reached
 through.
 
 ### Branch refs are mutable
 
 A branch pointer moves forward with new commits. A force-push can rewrite history so that
 previously recorded commits are no longer reachable from the branch. If this occurs between runs,
-the recorded `lastCommitHash` in the state file may no longer be in the branch's history. gitrail
+the recorded `lastCommitHash` in the state file may no longer be in the branch's history. gitlode
 detects this and falls back to full extraction for that branch, emitting a warning to stderr.
 
 ---
@@ -280,13 +280,13 @@ files:
 
 ```bash
 # New file every 10,000 lines
-gitrail -r main --rotate-lines 10000 ./my-repo
+gitlode -r main --rotate-lines 10000 ./my-repo
 
 # New file every 500 MiB
-gitrail -r main --rotate-size 500M ./my-repo
+gitlode -r main --rotate-size 500M ./my-repo
 
 # Both — rotation triggers on whichever threshold is reached first
-gitrail -r main --rotate-lines 10000 --rotate-size 1G ./my-repo
+gitlode -r main --rotate-lines 10000 --rotate-size 1G ./my-repo
 ```
 
 `--rotate-size` accepts either a raw byte integer (for backward compatibility) or an integer
@@ -304,7 +304,7 @@ earlier runs.
 ## CLI Reference
 
 ```
-gitrail [options] <repository-path>
+gitlode [options] <repository-path>
 ```
 
 ### Positional
@@ -356,7 +356,7 @@ gitrail [options] <repository-path>
 
 ### Profiling output
 
-When `--profile` is set and the run succeeds, gitrail appends an aligned block to stderr after the
+When `--profile` is set and the run succeeds, gitlode appends an aligned block to stderr after the
 default completion summary:
 
 ```
@@ -422,7 +422,7 @@ By default, each output record represents one commit.
 With `--per-file`, each record represents one changed **file** within a commit, with commit metadata denormalized onto every record. This enables file-granularity analytics without a join: each row is self-contained.
 
 ```bash
-gitrail -r main --per-file ./my-repo
+gitlode -r main --per-file ./my-repo
 ```
 
 ### Output record shape (file mode)
@@ -467,7 +467,7 @@ Every record extends the commit-mode schema with a `file` object:
 - **Empty commits** (no changed files) produce **no output records** in file mode.
 - **Merge commits** diff against the first parent only.
 - **Binary files** produce `"additions": null, "deletions": null`.
-- **Large text diffs**: with `--max-diff-size`, if either the before or after blob size exceeds the threshold, gitrail emits `"additions": null, "deletions": null` for that file.
+- **Large text diffs**: with `--max-diff-size`, if either the before or after blob size exceeds the threshold, gitlode emits `"additions": null, "deletions": null` for that file.
 - **Root commits** (no parent) treat all files as `"added"`.
 - **File rotation** (`--rotate-lines`, `--rotate-size`) applies per record; a single commit's file records may span rotation boundaries.
 - Progress output reflects the number of file-level records written, not the number of commits processed.
@@ -478,10 +478,10 @@ Use `--max-diff-size` to avoid line-level diff cost on very large files when run
 
 ```bash
 # Skip diff counts for files larger than 100 KiB
-gitrail -r main --per-file --max-diff-size 100K ./my-repo
+gitlode -r main --per-file --max-diff-size 100K ./my-repo
 
 # Same option with plain bytes
-gitrail -r main --per-file --max-diff-size 100000 ./my-repo
+gitlode -r main --per-file --max-diff-size 100000 ./my-repo
 ```
 
 Details:

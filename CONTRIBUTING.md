@@ -1,4 +1,4 @@
-# Contributing to gitrail
+# Contributing to gitlode
 
 ## Prerequisites
 
@@ -8,8 +8,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/tomo-waka/gitrail.git
-cd gitrail
+git clone https://github.com/gitlode/gitlode.git
+cd gitlode
 npm install
 ```
 

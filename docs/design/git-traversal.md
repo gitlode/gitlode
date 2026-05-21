@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document explains how gitrail traverses Git history and applies differential extraction in the current implementation.
+This document explains how gitlode traverses Git history and applies differential extraction in the current implementation.
 
 Normative rules remain in `.github/instructions/git-traversal.instructions.md`.
 
@@ -162,7 +162,7 @@ Outcome:
 
 ### Across runs
 
-When a new branch is added to `--ref` in an incremental run, gitrail automatically deduplicates
+When a new branch is added to `--ref` in an incremental run, gitlode automatically deduplicates
 against prior runs using **merge base computation**.
 
 **Repository topology used in the examples below:**
@@ -199,9 +199,9 @@ afterward; `develop` is the branch being added in Run 2.
 
 **How merge base deduplication prevents this:**
 
-Before the per-ref traversal loop, gitrail identifies new branch refs (present in `--ref` args
+Before the per-ref traversal loop, gitlode identifies new branch refs (present in `--ref` args
 but absent from state for the same `(ref, refType)` identity). If state already contains at least
-one branch checkpoint, gitrail calls `adapter.findMergeBase()` with branch `tipOid` values from
+one branch checkpoint, gitlode calls `adapter.findMergeBase()` with branch `tipOid` values from
 state as `oids`. The returned OID is used as `excludeHash` for new branch refs only.
 
 For the scenario above:
@@ -229,7 +229,7 @@ across all of them, and the same `excludeHash` applies to every new branch.
 
 **Fallback — no common ancestor:**
 
-If `findMergeBase` returns `null` (e.g. an orphan branch with detached history), gitrail falls
+If `findMergeBase` returns `null` (e.g. an orphan branch with detached history), gitlode falls
 back to full traversal for the new branch. Duplicate commits may appear in the output.
 
 Recovery: discard prior output and re-run with `--mode snapshot` across all branches, then resume

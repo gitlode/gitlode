@@ -237,6 +237,63 @@ later projection step.
 - Enables trimming output size for use cases that do not need all fields, while keeping the
   default extraction contract fully populated
 
+#### Repository/Build: npm-workspaces monorepo migration for core package continuity
+
+This entry scopes the repository migration to npm workspaces while preserving the user-facing core
+package contract (`gitrail`) and minimizing release risk.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
+
+**Design intent**:
+
+- migrate repository structure to monorepo without changing core CLI behavior
+- keep the published core package identity and install path stable (`gitrail`)
+- establish package boundaries that allow plugin packages to be added incrementally
+
+**Scope boundary (initial delivery)**:
+
+- repository/workspace restructuring and build-script adaptation only
+- no intentional output or CLI contract changes
+- accept only metadata/internal differences after migration; reject behavioral regressions
+
+#### Distribution/Compatibility: Official plugin package policy and version contract
+
+This entry defines how official plugins are distributed and how compatibility with `gitrail` is
+expressed and validated.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
+
+**Design intent**:
+
+- distribute official plugins as independent npm packages under `@gitrail/*`
+- keep core package naming stable while making official plugin ownership explicit
+- make compatibility explicit via `peerDependencies` plus runtime warning semantics
+
+**Scope boundary (initial delivery)**:
+
+- no plugin bundling into the core `gitrail` package
+- minor-bounded compatibility ranges and lower-bound/latest CI checks
+- per-plugin compatibility notes as part of package documentation
+
+#### Release Engineering: Staged monorepo CI/CD evolution with changesets adoption
+
+This entry introduces stage-based CI/CD evolution for multi-package operations and aligns release
+automation timing with plugin growth.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
+
+**Design intent**:
+
+- start with integrated workflows while package count is low
+- avoid premature operational complexity before scale pressure appears
+- move to package-oriented release automation as soon as it becomes operationally justified
+
+**Scope boundary (initial delivery)**:
+
+- keep current release operation practical in the short term
+- treat changesets adoption and CI/CD split as one coordinated migration window
+- trigger migration when official plugin count and release coordination complexity both increase
+
 ---
 
 ### Long-term
@@ -285,6 +342,8 @@ operational diagnostics, and future optimization planning.
 Allow users to attach custom processing stages (plugins) to gitrail's extraction pipeline so that
 organization-specific semantics can be derived without expanding the core schema for every use
 case.
+
+See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
 
 Example targets include parsing commit subjects that follow conventions such as Conventional
 Commits, deriving custom classification fields from file paths, or attaching additional metadata

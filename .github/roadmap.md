@@ -239,6 +239,8 @@ later projection step.
 
 #### Repository/Build: npm-workspaces monorepo migration for core package continuity
 
+- **Release target**: `v0.6.2`
+
 This entry scopes the repository migration to npm workspaces while preserving the user-facing core
 package contract (`gitlode`) and minimizing release risk.
 

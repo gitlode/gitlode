@@ -112,7 +112,7 @@ fidelity, runtime cost, and determinism explicit and user-controllable.
 
 ---
 
-#### Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision
+#### Architecture/Runtime: Worker-based extraction runtime baseline for resilience and supervision
 
 The current extraction pipeline runs in a single Node.js execution context. This keeps the
 implementation straightforward, but it also couples heavy extraction work with CLI lifecycle and
@@ -151,11 +151,11 @@ CLI lifecycle, supervision, and user interaction.
 - maintain deterministic behavior under equivalent inputs and configuration
 - keep CLI UX backward compatible unless explicitly documented otherwise
 
-#### Architecture/Runtime: Orchestration-ready runtime foundation (Phase C)
+#### Architecture/Runtime: Orchestration-ready expansion of the extraction runtime foundation
 
-- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision`
+- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime baseline for resilience and supervision`
 
-After Phase A+B is complete, this entry prepares the runtime interfaces for future orchestration
+After the worker-based runtime baseline is complete, this entry prepares the runtime interfaces for future orchestration
 strategies while keeping execution behavior conservative.
 
 **Scope (this entry)**:

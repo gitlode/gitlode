@@ -172,6 +172,8 @@ strategies while keeping execution behavior conservative.
 
 #### Architecture: Diff algorithm abstraction within `IsomorphicGitAdapter`
 
+- **Release target**: `v0.7.0`
+
 Introduce a `DiffAdapter` interface as an internal strategy within `IsomorphicGitAdapter`,
 injectable via its constructor. This makes the line diff algorithm swappable without changing the
 `GitAdapter` interface that core depends on.
@@ -238,6 +240,8 @@ later projection step.
   default extraction contract fully populated
 
 #### Distribution/Compatibility: Official plugin package policy and version contract
+
+- **Release target**: `v0.7.0`
 
 This entry defines how official plugins are distributed and how compatibility with `gitlode` is
 expressed and validated.
@@ -319,6 +323,8 @@ operational diagnostics, and future optimization planning.
   preconditions for current extraction correctness.
 
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
+
+- **Release target**: `v0.7.0`
 
 Allow users to attach custom processing stages (plugins) to gitlode's extraction pipeline so that
 organization-specific semantics can be derived without expanding the core schema for every use

@@ -25,7 +25,7 @@ v0.6.2 is a narrowly scoped release dedicated to repository monorepo migration w
 ### Phase 1: npm Workspaces Monorepo Migration
 
 - **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Planned
+- **Status**: Completed
 
 Provisional dependency notes:
 
@@ -48,11 +48,11 @@ _Update all human-oriented documentation to reflect the complete set of changes 
 
 The following files are required for every release and must be updated regardless of scope:
 
-| File                 | Notes                                                                                                                                                                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CHANGELOG.md`       | Prepend a `[{version}]` section following Keep a Changelog format (Added / Changed / Fixed subsections). Breaking changes carry a **Breaking** prefix within Changed. Include a `### Migration` subsection for any breaking CLI changes. |
-| `README.md`          | Review for impact; update if CLI behavior or output format is described.                                                                                                                                                                 |
-| `.github/roadmap.md` | Remove all roadmap entries that were implemented in this release. Entries that were evaluated but explicitly deferred should remain. This cleanup step is required on every release to keep the roadmap forward-looking.                 |
+| File                            | Notes                                                                                                                                                                                                                                    |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/gitlode/CHANGELOG.md` | Prepend a `[{version}]` section following Keep a Changelog format (Added / Changed / Fixed subsections). Breaking changes carry a **Breaking** prefix within Changed. Include a `### Migration` subsection for any breaking CLI changes. |
+| `README.md`                     | Review for impact; update if CLI behavior or output format is described.                                                                                                                                                                 |
+| `.github/roadmap.md`            | Remove all roadmap entries that were implemented in this release. Entries that were evaluated but explicitly deferred should remain. This cleanup step is required on every release to keep the roadmap forward-looking.                 |
 
 #### Pre-Execution Step
 
@@ -61,8 +61,8 @@ Before starting this task, review all human-oriented documentation for content t
 Documentation to review:
 
 - `README.md`
-- `docs/usage.md`
-- `docs/design/` (all files)
+- `packages/gitlode/docs/usage.md`
+- `packages/gitlode/docs/design/` (all files)
 
 For each file, check against the actual implementation for: renamed CLI options, changed output formats, removed limitations, and new behaviors. Update any stale content found during the review.
 
@@ -73,7 +73,7 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 #### Verification
 
-- `CHANGELOG.md` has a `[{version}]` entry with the appropriate subsections
+- `packages/gitlode/CHANGELOG.md` has a `[{version}]` entry with the appropriate subsections
 - All roadmap entries with **Release target** equal to this version have been removed from `roadmap.md`
 - `npm run format:check` passes
 

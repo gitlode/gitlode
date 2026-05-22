@@ -26,7 +26,6 @@ Key characteristics:
 ```
 gitlode/
 ├── .github/
-├── .github/
 │   ├── copilot-instructions.md       # This file
 │   ├── instructions/
 │   │   ├── architecture.instructions.md
@@ -39,32 +38,48 @@ gitlode/
 │   │   └── release.yml
 │   ├── plan.md
 │   └── roadmap.md
-├── src/
-│   ├── index.ts                      # CLI entry point
-│   ├── cli/                          # CLI argument parsing
-│   │   ├── args.ts
-│   │   └── index.ts
-│   ├── core/                         # Core extraction logic
-│   │   ├── extractor.ts
-│   │   ├── index.ts
-│   │   └── types.ts
-│   ├── git/                          # Git Adapter layer
-│   │   ├── errors.ts
-│   │   ├── index.ts
-│   │   ├── isomorphic-git-adapter.ts
-│   │   └── types.ts
-│   └── output/                       # JSON serialization and file rotation
-│       ├── index.ts
-│       ├── types.ts
-│       ├── utils.ts
-│       └── writer.ts
-├── test/                             # Mirrors src/ layout
-│   ├── cli/
-│   ├── core/
-│   ├── git/
-│   └── output/
-├── package.json
-└── tsconfig.json
+├── packages/
+│   └── gitlode/                      # Published package (name: gitlode)
+│       ├── src/
+│       │   ├── index.ts              # CLI entry point
+│       │   ├── cli/                  # CLI argument parsing
+│       │   │   ├── args.ts
+│       │   │   └── index.ts
+│       │   ├── core/                 # Core extraction logic
+│       │   │   ├── extractor.ts
+│       │   │   ├── index.ts
+│       │   │   └── types.ts
+│       │   ├── git/                  # Git Adapter layer
+│       │   │   ├── errors.ts
+│       │   │   ├── index.ts
+│       │   │   ├── isomorphic-git-adapter.ts
+│       │   │   └── types.ts
+│       │   └── output/               # JSON serialization and file rotation
+│       │       ├── index.ts
+│       │       ├── types.ts
+│       │       ├── utils.ts
+│       │       └── writer.ts
+│       ├── test/                     # Mirrors src/ layout
+│       │   ├── cli/
+│       │   ├── core/
+│       │   ├── git/
+│       │   └── output/
+│       ├── docs/                     # User and design documentation
+│       │   ├── usage.md
+│       │   └── design/
+│       │       ├── architecture.md
+│       │       ├── git-traversal.md
+│       │       └── schema.md
+│       ├── package.json
+│       ├── tsconfig.json
+│       ├── vitest.config.ts
+│       ├── README.md
+│       ├── CHANGELOG.md
+│       ├── CONTRIBUTING.md
+│       └── LICENSE
+├── package.json                      # Workspace orchestrator (private: true)
+├── tsconfig.base.json                # Shared TypeScript compiler defaults
+└── tsconfig.json                     # Root coordination config
 ```
 
 ## Design Principles

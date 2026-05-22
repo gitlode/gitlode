@@ -1,55 +1,36 @@
-# gitrail — v0.6.0 Release Plan
+# gitrail — v0.6.2 Release Plan
 
 ## Overview
 
-v0.6.0 is a minor release focused on CLI reliability and operator control for incremental extraction and per-file diff cost. This release prioritizes user-facing workflow correctness and practical usability improvements over deep architectural refactoring. As a pre-1.0 minor release, behavior and contract adjustments are allowed when they reduce future migration risk, but the scope should remain tightly aligned to CLI and extraction-operability outcomes.
+v0.6.2 is a narrowly scoped release dedicated to repository monorepo migration with npm workspaces. The release intentionally excludes all other roadmap entries to minimize concurrent change risk and keep validation focused on structural continuity of the core package.
 
 ## Release Goals
 
-- Make incremental extraction reliable across non-branch refs when state tracking is enabled
-- Give users explicit control over large text-diff cost in per-file extraction mode
-- Improve CLI readability and discoverability for interactive usage
-- Add low-risk CLI-level metadata override capability for repository context
+- Migrate repository structure to npm workspaces without changing core CLI behavior
+- Preserve the published core package identity and installation path (`gitlode`)
+- Keep release validation focused on migration correctness and regression prevention
 
 ## Scope Summary
 
-### Included in v0.6.0
+### Included in v0.6.2
 
-- `State/Incremental: Track non-branch refs in state for reliable incremental extraction`
-- `Extraction/CLI: User-controlled guardrail for very large text diffs`
-- `CLI UX: Terminal output styling and readability`
-- `Output: Repository metadata override`
+- `Repository/Build: npm-workspaces monorepo migration for core package continuity`
 
-### Explicitly excluded from v0.6.0
+### Explicitly excluded from v0.6.2
 
-- `Extraction/File Mode: Exact-content rename detection (limited scope)`
-- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter`
-- `Output: Execution metadata line`
-- `Pipeline: Pluggable enrichment stage for organization-specific metadata`
-- `Architecture/Runtime: Worker-based extraction runtime for resilience and orchestration`
+- All other roadmap entries not listed above
 
 ## Development Phases
 
-### Phase 1: Non-Branch Ref State Tracking
+### Phase 1: npm Workspaces Monorepo Migration
 
-- **File**: [`plans/phase-1.md`](plans/phase-1.md)
-- **Status**: Completed
-
-### Phase 2: Large Text-Diff Guardrail
-
-- **File**: [`plans/phase-2.md`](plans/phase-2.md)
-- **Status**: Completed
-
-### Phase 3: CLI Readability and Metadata Override
-
-- **File**: [`plans/phase-3.md`](plans/phase-3.md)
+- **File**: Removed during Stage 3 cleanup (`plans/phase-1.md`)
 - **Status**: Completed
 
 Provisional dependency notes:
 
-- Phase 1 is first because state schema/tracking behavior is foundational for incremental extraction semantics.
-- Phase 2 follows to introduce performance guardrails without mixing state-format changes and diff-policy changes in one phase.
-- Phase 3 is last because it is mostly UX and CLI option-surface refinement that should align with finalized behavior from Phases 1 and 2.
+- Single-phase release: no cross-phase dependencies.
+- This phase is intentionally scoped to repository/workspace restructuring and build-script adaptation only.
 
 ## Release Tasks
 
@@ -59,19 +40,19 @@ _Update all human-oriented documentation to reflect the complete set of changes 
 
 #### Status
 
-- [x] Planned
-- [x] In progress
+- [ ] Planned
+- [ ] In progress
 - [x] Completed
 
 #### Mandatory Files
 
 The following files are required for every release and must be updated regardless of scope:
 
-| File                 | Notes                                                                                                                                                                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CHANGELOG.md`       | Prepend a `[{version}]` section following Keep a Changelog format (Added / Changed / Fixed subsections). Breaking changes carry a **Breaking** prefix within Changed. Include a `### Migration` subsection for any breaking CLI changes. |
-| `README.md`          | Review for impact; update if CLI behavior or output format is described.                                                                                                                                                                 |
-| `.github/roadmap.md` | Remove all roadmap entries that were implemented in this release. Entries that were evaluated but explicitly deferred should remain. This cleanup step is required on every release to keep the roadmap forward-looking.                 |
+| File                            | Notes                                                                                                                                                                                                                                    |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/gitlode/CHANGELOG.md` | Prepend a `[{version}]` section following Keep a Changelog format (Added / Changed / Fixed subsections). Breaking changes carry a **Breaking** prefix within Changed. Include a `### Migration` subsection for any breaking CLI changes. |
+| `README.md`                     | Review for impact; update if CLI behavior or output format is described.                                                                                                                                                                 |
+| `.github/roadmap.md`            | Remove all roadmap entries that were implemented in this release. Entries that were evaluated but explicitly deferred should remain. This cleanup step is required on every release to keep the roadmap forward-looking.                 |
 
 #### Pre-Execution Step
 
@@ -80,20 +61,19 @@ Before starting this task, review all human-oriented documentation for content t
 Documentation to review:
 
 - `README.md`
-- `docs/usage.md`
-- `docs/design/` (all files)
+- `packages/gitlode/docs/usage.md`
+- `packages/gitlode/docs/design/` (all files)
 
 For each file, check against the actual implementation for: renamed CLI options, changed output formats, removed limitations, and new behaviors. Update any stale content found during the review.
 
 #### Release-Specific Notes
 
-- Update usage and troubleshooting guidance for non-branch ref incremental behavior under `--state`.
-- Document large text-diff guardrail behavior, defaults, and contract impact (`null` counters when skipped).
-- Reflect terminal output/readability changes and repository metadata override options in CLI documentation.
+- Update migration-related documentation to reflect new workspace structure, package boundaries, and build/release commands if they changed.
+- Confirm user-facing CLI usage examples remain valid after monorepo migration.
 
 #### Verification
 
-- `CHANGELOG.md` has a `[{version}]` entry with the appropriate subsections
+- `packages/gitlode/CHANGELOG.md` has a `[{version}]` entry with the appropriate subsections
 - All roadmap entries with **Release target** equal to this version have been removed from `roadmap.md`
 - `npm run format:check` passes
 
@@ -101,12 +81,12 @@ For each file, check against the actual implementation for: renamed CLI options,
 
 ## Final Verification Checklist
 
-- [x] All implementation phases complete (Phase 1, Phase 2, Phase 3)
-- [x] `npm run build` — passes (tsc, exit 0)
-- [x] `npm test` — passes (259 tests, exit 0)
-- [x] `npm run format:check` — passes (exit 0)
-- [x] `CHANGELOG.md` updated with `[0.6.0]` section (Added, Changed, Migration subsections)
-- [x] `README.md` reviewed; `--max-diff-size`, `--repo-name`, `--repo-url` confirmed documented
-- [x] `roadmap.md` cleaned: all four `Release target: v0.6.0` entries removed
-- [ ] Phase files removed from `plans/` (requires human authorization before deletion)
-- [ ] Release operation: git tag, GitHub release, npm publish (human-performed)
+- [x] Phase 1 status is `Completed` in this plan
+- [x] `packages/gitlode/CHANGELOG.md` contains `[0.6.2]` entry with migration notes and explicit no-functional-change note
+- [x] Roadmap cleanup complete: removed entries tagged with `Release target: v0.6.2`
+- [x] Final automated verification passed:
+  - `npm run build`
+  - `npm test`
+  - `npm run lint`
+  - `npm run format:check`
+- [x] Release-phase artifact cleanup complete: removed `.github/plans/phase-1.md` with explicit human approval

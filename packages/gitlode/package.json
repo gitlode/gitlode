@@ -1,0 +1,46 @@
+{
+  "name": "gitlode",
+  "version": "0.6.2",
+  "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
+  "keywords": [
+    "cli",
+    "data-warehouse",
+    "etl",
+    "git",
+    "jsonl"
+  ],
+  "homepage": "https://github.com/gitlode/gitlode#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gitlode/gitlode.git"
+  },
+  "bin": {
+    "gitlode": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "format:check": "oxfmt --check",
+    "format:write": "oxfmt",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "diff": "^9.0.0",
+    "isomorphic-git": "^1.37.8",
+    "zod": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

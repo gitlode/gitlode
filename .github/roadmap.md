@@ -237,25 +237,6 @@ later projection step.
 - Enables trimming output size for use cases that do not need all fields, while keeping the
   default extraction contract fully populated
 
-#### Repository/Build: npm-workspaces monorepo migration for core package continuity
-
-This entry scopes the repository migration to npm workspaces while preserving the user-facing core
-package contract (`gitlode`) and minimizing release risk.
-
-See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
-
-**Design intent**:
-
-- migrate repository structure to monorepo without changing core CLI behavior
-- keep the published core package identity and install path stable (`gitlode`)
-- establish package boundaries that allow plugin packages to be added incrementally
-
-**Scope boundary (initial delivery)**:
-
-- repository/workspace restructuring and build-script adaptation only
-- no intentional output or CLI contract changes
-- accept only metadata/internal differences after migration; reject behavioral regressions
-
 #### Distribution/Compatibility: Official plugin package policy and version contract
 
 This entry defines how official plugins are distributed and how compatibility with `gitlode` is

@@ -13,6 +13,8 @@ cd gitlode
 npm install
 ```
 
+The repository uses npm workspaces. `npm install` at the root installs and links all packages.
+
 ## Build
 
 ```bash
@@ -43,6 +45,10 @@ npm run format:write
 # Verify formatting (what CI runs)
 npm run format:check
 ```
+
+All commands above run from the repository root and are forwarded to all workspace packages.
+To run commands in a specific package only, use `-w packages/gitlode`, for example:
+`npm run build -w packages/gitlode`.
 
 ## Submitting Changes
 

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-05-21
+
+### Changed
+
+- Repository migrated to npm workspaces monorepo layout. The published package (`gitlode`) is now
+  located under `packages/gitlode/`. All build, test, lint, and format commands continue to run
+  from the repository root unchanged; no changes to the installed CLI, output schema, or extraction
+  behavior.
+
+> [!NOTE]
+> No functional changes
+>
+> This release contains no changes to the CLI interface, output schema, extraction behavior, or
+> runtime dependencies. Existing invocations, state files, and downstream consumers are fully
+> compatible with v0.6.1.
+
 ## [0.6.1] - 2026-05-21
 
 ### Changed

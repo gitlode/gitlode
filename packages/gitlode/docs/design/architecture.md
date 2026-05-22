@@ -110,9 +110,9 @@ This layering keeps policy decisions in Core and implementation details in adapt
 
 Files:
 
-- `src/index.ts`
-- `src/cli/args.ts`
-- `src/cli/index.ts`
+- `packages/gitlode/src/index.ts`
+- `packages/gitlode/src/cli/args.ts`
+- `packages/gitlode/src/cli/index.ts`
 
 Responsibilities:
 
@@ -128,14 +128,14 @@ Notably, state file reading and writing are not CLI responsibilities.
 
 Files:
 
-- `src/core/extraction-coordinator.ts`
-- `src/core/branch-traversal-planner.ts`
-- `src/core/commit-traversal-extractor.ts`
-- `src/core/file-change-expander.ts`
-- `src/core/commit-record-projector.ts`
-- `src/core/file-change-record-projector.ts`
-- `src/core/types.ts`
-- `src/core/index.ts`
+- `packages/gitlode/src/core/extraction-coordinator.ts`
+- `packages/gitlode/src/core/branch-traversal-planner.ts`
+- `packages/gitlode/src/core/commit-traversal-extractor.ts`
+- `packages/gitlode/src/core/file-change-expander.ts`
+- `packages/gitlode/src/core/commit-record-projector.ts`
+- `packages/gitlode/src/core/file-change-record-projector.ts`
+- `packages/gitlode/src/core/types.ts`
+- `packages/gitlode/src/core/index.ts`
 
 Responsibilities:
 
@@ -152,10 +152,10 @@ Important behavior: for date filtering, Core skips old commits and continues tra
 
 Files:
 
-- `src/git/isomorphic-git-adapter.ts`
-- `src/git/errors.ts`
-- `src/git/types.ts`
-- `src/git/index.ts`
+- `packages/gitlode/src/git/isomorphic-git-adapter.ts`
+- `packages/gitlode/src/git/errors.ts`
+- `packages/gitlode/src/git/types.ts`
+- `packages/gitlode/src/git/index.ts`
 
 Responsibilities:
 
@@ -171,10 +171,10 @@ The adapter uses isomorphic-git internally and keeps those details from leaking 
 
 Files:
 
-- `src/output/writer.ts`
-- `src/output/utils.ts`
-- `src/output/types.ts`
-- `src/output/index.ts`
+- `packages/gitlode/src/output/writer.ts`
+- `packages/gitlode/src/output/utils.ts`
+- `packages/gitlode/src/output/types.ts`
+- `packages/gitlode/src/output/index.ts`
 
 Responsibilities:
 
@@ -273,7 +273,7 @@ Profiling entries are accumulated by the stage that owns each operation:
 
 | Entry path                 | Owning stage                                          | What is measured                                                       |
 | -------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------- |
-| `elapsed`                  | `src/index.ts` root profiler                          | Total extraction wall/work duration                                    |
+| `elapsed`                  | `packages/gitlode/src/index.ts` root profiler         | Total extraction wall/work duration                                    |
 | `elapsed/planning`         | `BranchTraversalPlanner`                              | Branch-head resolution and exclude-hash planning                       |
 | `elapsed/traversal`        | `CommitTraversalExtractor`                            | Commit traversal and commit-fact materialization                       |
 | `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector` | Fact-to-output-record mapping                                          |
@@ -282,9 +282,9 @@ Profiling entries are accumulated by the stage that owns each operation:
 | `elapsed/git/diff`         | `IsomorphicGitAdapter`                                | Time computing line-level diff statistics per file                     |
 | `elapsed/git/...` children | `IsomorphicGitAdapter`                                | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
 
-A `StageProfiler` object is created per run at the runtime edge (`src/index.ts`) and passed to each stage
+A `StageProfiler` object is created per run at the runtime edge (`packages/gitlode/src/index.ts`) and passed to each stage
 constructor. `IsomorphicGitAdapter` exposes a `setProfiler()` method (not on the `GitAdapter`
-interface) that `src/index.ts` calls via duck-typing. This keeps the `GitAdapter` contract stable
+interface) that `packages/gitlode/src/index.ts` calls via duck-typing. This keeps the `GitAdapter` contract stable
 while enabling profiling of adapter internals.
 
 `ExtractionResult.profilingEntries` is populated on every successful run. The root `elapsed` entry

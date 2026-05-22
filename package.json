@@ -1,44 +1,21 @@
 {
-  "name": "gitlode",
-  "version": "0.6.1",
-  "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
-  "keywords": [
-    "cli",
-    "data-warehouse",
-    "etl",
-    "git",
-    "jsonl"
+  "name": "@gitlode/root",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
   ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/gitlode/gitlode.git"
-  },
-  "bin": {
-    "gitlode": "./dist/index.js"
-  },
-  "files": [
-    "dist"
-  ],
-  "type": "module",
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
+    "build": "npm run build --workspaces --if-present",
+    "build:watch": "npm run build:watch -w packages/gitlode",
     "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",
-    "format:check": "oxfmt --check",
-    "format:write": "oxfmt",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
-  },
-  "dependencies": {
-    "chalk": "^5.6.2",
-    "commander": "^14.0.3",
-    "diff": "^9.0.0",
-    "isomorphic-git": "^1.37.8",
-    "zod": "^4.0.0"
+    "format:check": "npm run format:check --workspaces --if-present",
+    "format:write": "npm run format:write --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "test:watch": "npm run test:watch -w packages/gitlode",
+    "test:coverage": "npm run test:coverage -w packages/gitlode"
   },
   "devDependencies": {
     "@types/node": "^22.13.14",
@@ -49,8 +26,5 @@
     "tsx": "^4.22.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
-  },
-  "engines": {
-    "node": ">=22.0.0"
   }
 }

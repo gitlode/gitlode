@@ -112,7 +112,7 @@ fidelity, runtime cost, and determinism explicit and user-controllable.
 
 ---
 
-#### Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision
+#### Architecture/Runtime: Worker-based extraction runtime baseline for resilience and supervision
 
 The current extraction pipeline runs in a single Node.js execution context. This keeps the
 implementation straightforward, but it also couples heavy extraction work with CLI lifecycle and
@@ -151,11 +151,11 @@ CLI lifecycle, supervision, and user interaction.
 - maintain deterministic behavior under equivalent inputs and configuration
 - keep CLI UX backward compatible unless explicitly documented otherwise
 
-#### Architecture/Runtime: Orchestration-ready runtime foundation (Phase C)
+#### Architecture/Runtime: Orchestration-ready expansion of the extraction runtime foundation
 
-- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime (Phase A+B) for resilience and supervision`
+- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime baseline for resilience and supervision`
 
-After Phase A+B is complete, this entry prepares the runtime interfaces for future orchestration
+After the worker-based runtime baseline is complete, this entry prepares the runtime interfaces for future orchestration
 strategies while keeping execution behavior conservative.
 
 **Scope (this entry)**:
@@ -171,6 +171,8 @@ strategies while keeping execution behavior conservative.
 - no changes that weaken current checkpoint/state safety guarantees
 
 #### Architecture: Diff algorithm abstraction within `IsomorphicGitAdapter`
+
+- **Release target**: `v0.7.0`
 
 Introduce a `DiffAdapter` interface as an internal strategy within `IsomorphicGitAdapter`,
 injectable via its constructor. This makes the line diff algorithm swappable without changing the
@@ -239,6 +241,8 @@ later projection step.
 
 #### Distribution/Compatibility: Official plugin package policy and version contract
 
+- **Release target**: `v0.7.0`
+
 This entry defines how official plugins are distributed and how compatibility with `gitlode` is
 expressed and validated.
 
@@ -255,6 +259,45 @@ See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
 - no plugin bundling into the core `gitlode` package
 - minor-bounded compatibility ranges and lower-bound/latest CI checks
 - per-plugin compatibility notes as part of package documentation
+
+#### Configuration File: General-purpose configuration file beyond plugin loading
+
+- **Depends on**: `Pipeline: Pluggable enrichment stage for organization-specific metadata`
+
+The `--config <path>` JSON file introduced for plugin loading is structured to be forward-compatible
+(top-level `version` field, namespaced sections). The initial release implements only the
+`plugins` section; this entry tracks the broader expansion of the same configuration file into a
+general-purpose project configuration surface.
+
+**Design intent**:
+
+- consolidate gitlode operational settings (currently CLI-flag-only) into a single declarative
+  configuration file when their number or coordination cost warrants it
+- preserve the lean, CLI-centric philosophy: configuration file augments but does not replace CLI
+  flags for ad-hoc invocation
+- evolve toward a "config-centric, CLI-override" precedence model (CLI flag > config file value >
+  built-in default) without forcing all users onto a config file
+
+**Candidate sections to evaluate**:
+
+- output rotation defaults (lines/bytes thresholds, file naming pattern)
+- default refs / range selection presets per repository
+- progress / styling defaults (TTY-aware overrides)
+- profile defaults
+- per-repository `repoName` / `repoUrl` overrides (currently CLI-only)
+
+**Open design questions**:
+
+- exact precedence rules between CLI flags and config values for each setting class
+- whether to introduce `extends` for shared organization-wide defaults, and if so, the
+  composition semantics (merge vs override per section)
+- environment-variable interpolation policy (currently a Non-Goal for Phase 1)
+- whether to publish a JSON Schema document for the config file
+- migration path for users who already rely solely on CLI flags
+
+**Non-goal for this item**:
+
+- no change to the `extensions` section schema once stabilized; this item adds peer top-level sections, it does not redefine the plugin contract
 
 #### Release Engineering: Staged monorepo CI/CD evolution with changesets adoption
 
@@ -319,6 +362,8 @@ operational diagnostics, and future optimization planning.
   preconditions for current extraction correctness.
 
 #### Pipeline: Pluggable enrichment stage for organization-specific metadata
+
+- **Release target**: `v0.7.0`
 
 Allow users to attach custom processing stages (plugins) to gitlode's extraction pipeline so that
 organization-specific semantics can be derived without expanding the core schema for every use

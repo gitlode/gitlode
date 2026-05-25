@@ -153,6 +153,7 @@ Important behavior: for date filtering, Core skips old commits and continues tra
 Files:
 
 - `packages/gitlode/src/git/isomorphic-git-adapter.ts`
+- `packages/gitlode/src/git/diff-adapter.ts`
 - `packages/gitlode/src/git/errors.ts`
 - `packages/gitlode/src/git/types.ts`
 - `packages/gitlode/src/git/index.ts`
@@ -163,9 +164,17 @@ Responsibilities:
 - Detect repository object format (defaulting to `sha1` when unset).
 - Read origin URL when available.
 - Traverse commits reachable from a head commit, optionally excluding history reachable from `excludeHash`.
+- Compute per-file line-level diff statistics via an internal `DiffAdapter` strategy.
 - Translate library/runtime failures into `GitAdapterError` codes.
 
 The adapter uses isomorphic-git internally and keeps those details from leaking upward.
+
+Line-diff computation is delegated to an internal `DiffAdapter` strategy interface defined in
+`diff-adapter.ts`. The default implementation (`JsDiffAdapter`) reproduces the original behavior
+using the `diff` package's `diffLines` function with UTF-8 decoding. Binary detection (NUL-byte
+heuristic on the first 8000 bytes) is owned by `IsomorphicGitAdapter` and bypasses `DiffAdapter`
+entirely — binary files always produce `additions: null` and `deletions: null`. The `DiffAdapter`
+interface is internal to the git adapter layer and is not exported through `src/git/index.ts`.
 
 ### Output layer
 

@@ -231,6 +231,9 @@ The concrete implementation of `GitAdapter` using isomorphic-git.
 - Implements commit exclusion via reachability pre-computation (see `git-traversal.instructions.md`)
 - Must not leak isomorphic-git types outside this file
 - Accepts an optional `FsClient` in its constructor for dependency injection (defaults to `node:fs`)
+- Accepts an optional internal `DiffAdapter` in its constructor for line-diff strategy injection (defaults to `JsDiffAdapter`)
+- Delegates line-diff computation to the injected `DiffAdapter`; binary detection (NUL-byte heuristic, first 8000 bytes) and the resulting `null/null` output for binary files remain owned by `IsomorphicGitAdapter` and bypass `DiffAdapter` entirely
+- `DiffAdapter` and `JsDiffAdapter` are defined in `src/git/diff-adapter.ts` and are internal to the git adapter layer — not exported through `src/git/index.ts` or referenced by Core
 
 ### Output Layer (`src/output/`)
 

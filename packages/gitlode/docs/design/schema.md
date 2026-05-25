@@ -292,7 +292,12 @@ Rename detection is not performed. A renamed file appears as a `"deleted"` entry
 
 ### `file.additions` / `file.deletions`
 
-Line-level diff statistics computed using the `diff` package. `null` when the file is binary (contains NUL bytes in the first 8000 bytes).
+Line-level diff statistics. `null` when the file is binary (contains NUL bytes in the first 8000 bytes).
+
+Diff computation is delegated to an internal `DiffAdapter` strategy inside `IsomorphicGitAdapter`.
+The default implementation uses the `diff` package's `diffLines` function with UTF-8 decoding,
+producing behavior identical to previous versions. Binary detection and the `null` result for
+binary files are owned by `IsomorphicGitAdapter` and do not involve the `DiffAdapter` strategy.
 
 For `"added"` files: `deletions` is `0`, `additions` is the total line count.
 For `"deleted"` files: `additions` is `0`, `deletions` is the total line count.

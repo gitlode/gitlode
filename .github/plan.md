@@ -44,7 +44,7 @@ v0.7.0 is a plugin architecture release focused on enabling organization-specifi
 ### Phase 3: Internal DiffAdapter Abstraction in IsomorphicGitAdapter
 
 - **File**: `plans/phase-3.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ## Release Tasks
 

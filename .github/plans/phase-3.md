@@ -20,7 +20,7 @@ _Refactor line-diff computation behind an internal `DiffAdapter` strategy in `Is
 
 ##### Internal DiffAdapter contract and binary semantics
 
-- **Visibility/ownership**: `DiffAdapter` is an internal strategy owned by `IsomorphicGitAdapter`. It is not added to `src/git/types.ts`, not exported from `src/git/index.ts`, and not referenced by core-layer contracts.
+- **Visibility/ownership**: `DiffAdapter` is an internal strategy owned by `IsomorphicGitAdapter`. It is not exported from `src/git/index.ts`, and not referenced by core-layer contracts.
 - **Contract shape**: define an internal interface that computes text line deltas from byte inputs.
 
   ```ts
@@ -53,7 +53,6 @@ _Refactor line-diff computation behind an internal `DiffAdapter` strategy in `Is
 
 ##### Boundary guarantees
 
-- **Public `GitAdapter` non-change guarantee**: no signature or behavior contract changes in `src/git/types.ts` for `GitAdapter`, `FileChange`, or related core-facing types.
 - **Core isolation guarantee**:
   - Core modules (`src/core/**`) must not import, reference, or branch on any `DiffAdapter` detail.
   - Core continues to consume only `GitAdapter.getFileChanges(...)` output.
@@ -112,7 +111,7 @@ _Refactor line-diff computation behind an internal `DiffAdapter` strategy in `Is
 
 #### Implementation Notes
 
-- Keep the new abstraction internal to the git adapter implementation layer. Avoid adding any new export from `src/git/index.ts` or `src/git/types.ts` unless a hard technical constraint emerges.
+- Keep the new abstraction internal to the git adapter implementation layer. Avoid adding any new export from `src/git/index.ts` unless a hard technical constraint emerges.
 - Preserve existing profiler topology under `file-changes` and `diff`; abstraction should be behavior-preserving for profiling labels unless an explicit migration is planned.
 - Preferred implementation order:
   1.  Extract/create internal diff adapter module and default implementation.

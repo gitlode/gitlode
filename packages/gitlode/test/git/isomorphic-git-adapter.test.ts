@@ -436,6 +436,75 @@ function makeRepoExt() {
   return { ...base, removeCommit, addBinaryCommit };
 }
 
+describe("IsomorphicGitAdapter.getFileChanges – DiffAdapter substitution seam", () => {
+  it("uses injected adapter counts for text file changes", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+    const sha2 = await addCommit("a.txt", "line1\nline3\nline4\n", "modify a.txt");
+
+    let callCount = 0;
+    const stubAdapter = {
+      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => {
+        callCount++;
+        return { additions: 99, deletions: 77 };
+      },
+    };
+
+    const adapter = new IsomorphicGitAdapter(fs, stubAdapter);
+    const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "a.txt",
+      status: "modified",
+      additions: 99,
+      deletions: 77,
+    });
+    expect(callCount).toBe(1);
+  });
+
+  it("does not invoke injected adapter when blob is binary", async () => {
+    const { fs, init, addBinaryCommit } = makeRepoExt();
+    await init();
+    const sha1 = await addBinaryCommit("binary.bin", "add binary file");
+
+    let callCount = 0;
+    const stubAdapter = {
+      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => {
+        callCount++;
+        return { additions: 1, deletions: 1 };
+      },
+    };
+
+    const adapter = new IsomorphicGitAdapter(fs, stubAdapter);
+    const changes = await adapter.getFileChanges("/", sha1 as never);
+
+    expect(callCount).toBe(0);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({ additions: null, deletions: null });
+  });
+
+  it("throws when injected adapter returns negative additions", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\n", "root commit");
+
+    const badAdapter = {
+      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => ({
+        additions: -1,
+        deletions: 0,
+      }),
+    };
+
+    const adapter = new IsomorphicGitAdapter(fs, badAdapter);
+    const { GitAdapterError } = await import("../../src/git/index.js");
+    await expect(adapter.getFileChanges("/", sha1 as never)).rejects.toBeInstanceOf(
+      GitAdapterError,
+    );
+  });
+});
+
 describe("IsomorphicGitAdapter.getFileChanges", () => {
   it("root commit: all files are 'added'", async () => {
     const { fs, init, addCommit } = makeRepo();

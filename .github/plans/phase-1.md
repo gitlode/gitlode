@@ -35,7 +35,7 @@ _Introduce a projector-decorator plugin execution boundary in the extraction pip
   ```json
   {
     "version": 1,
-    "plugins": {
+    "extensions": {
       "<namespace>": {
         "entrypoint": "<local path or bare specifier>",
         "config": { /* arbitrary */ },
@@ -44,9 +44,10 @@ _Introduce a projector-decorator plugin execution boundary in the extraction pip
     }
   }
   ```
+  The config section name (`extensions`) intentionally matches the output record field name. Each key under `extensions` defines a namespace that appears in the output's `extensions.<namespace>`; the value declares which plugin populates that namespace and how. The same plugin module may be registered under multiple namespaces with different `config` values.
 - **`version` field**: required, must equal `1`. Any other value → hard error.
-- **Unknown top-level sections**: hard error (forward-compatible structure but Phase 1 implements only `plugins`).
-- **`plugins` section**: must contain at least one entry when `--config` is supplied. Therefore `extensions: {}` cannot appear in output (documented invariant).
+- **Unknown top-level sections**: hard error (forward-compatible structure but Phase 1 implements only `extensions`).
+- **`extensions` section**: must contain at least one entry when `--config` is supplied. Therefore `extensions: {}` cannot appear in output (documented invariant).
 - **Namespace pattern**: `[a-z0-9-]+`. Validated at config parse time. Uniqueness within the object is enforced by JSON object semantics; declaration order is preserved (JSON object insertion order).
 - **Entrypoint resolution** (performed from the config file's directory):
   - Strings starting with `.` or `/` → local path relative to the config file directory.
@@ -92,7 +93,7 @@ _Introduce a projector-decorator plugin execution boundary in the extraction pip
 - **Presence rule**: `extensions` is present iff at least one plugin is configured. Absent when no `--config` is supplied → full backward compatibility for existing consumers.
 - **Per-plugin key**: always emitted when plugins are configured. Value is either the `data` object (success) or `null` (skip / skip-fact-on-fatal).
 - **Key order**: config declaration order, via insertion order. Plugin-internal key order inside `data` is the plugin's responsibility.
-- **`extensions: {}` invariant**: cannot occur because the loader rejects an empty `plugins` section. Documented in `schema.md`.
+- **`extensions: {}` invariant**: cannot occur because the loader rejects an empty `extensions` section in the config file. Documented in `schema.md`.
 - **Output writer / sink / state schema**: unchanged. Serializer treats `extensions` as a normal optional field.
 
 ##### Layer ownership
@@ -132,7 +133,7 @@ Phase 1 fixes the following as the stable surface that `@gitlode/*` plugins (Pha
 - `PluginInitResult`, `ProjectionContext`, `PluginProjectionResult`
 - `PluginFailurePolicy`
 - `OutputRecordExtensions` and the `extensions` output field
-- Config file schema (`version: 1`, `plugins.<ns>.{entrypoint,config?,failurePolicy?}`)
+- Config file schema (`version: 1`, `extensions.<ns>.{entrypoint,config?,failurePolicy?}`)
 
 Phase 2 may add to this surface but must not change or remove existing entries.
 
@@ -188,41 +189,41 @@ Documentation:
 
 **New files:**
 
-| File                                                              | Action | Notes                                                                                   |
-| ----------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
-| `packages/gitlode/src/core/enriching-fact-projector.ts`           | Create | `EnrichingFactProjector` decorator implementing `FactProjector`                         |
-| `packages/gitlode/src/cli/plugins.ts`                             | Create | `loadPluginConfig`, `resolvePluginEntries`, `initializePlugins`, related types          |
-| `packages/gitlode/test/core/enriching-fact-projector.test.ts`     | Create | Per-fact plugin orchestration, declaration order, failure policy, throw-handling, empty-plugins bypass |
-| `packages/gitlode/test/cli/plugins.test.ts`                       | Create | Config parse, schema validation errors, entrypoint resolution (local + bare), factory invocation, `init()` failure aggregation |
-| `packages/gitlode/docs/design/plugins.md`                         | Create | Plugin contract, lifecycle, failure policy, `extensions` output format, config schema   |
+| File                                                          | Action | Notes                                                                                                                          |
+| ------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/gitlode/src/core/enriching-fact-projector.ts`       | Create | `EnrichingFactProjector` decorator implementing `FactProjector`                                                                |
+| `packages/gitlode/src/cli/plugins.ts`                         | Create | `loadPluginConfig`, `resolvePluginEntries`, `initializePlugins`, related types                                                 |
+| `packages/gitlode/test/core/enriching-fact-projector.test.ts` | Create | Per-fact plugin orchestration, declaration order, failure policy, throw-handling, empty-plugins bypass                         |
+| `packages/gitlode/test/cli/plugins.test.ts`                   | Create | Config parse, schema validation errors, entrypoint resolution (local + bare), factory invocation, `init()` failure aggregation |
+| `packages/gitlode/docs/design/plugins.md`                     | Create | Plugin contract, lifecycle, failure policy, `extensions` output format, config schema                                          |
 
 **Modified files:**
 
-| File                                              | Action | Notes                                                                                    |
-| ------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------- |
-| `packages/gitlode/src/core/types.ts`              | Modify | Add `ProjectorPlugin`, `PluginFactory`, `PluginInitResult`, `ProjectionContext`, `PluginProjectionResult`, `PluginEntry`, `PluginFailurePolicy` |
-| `packages/gitlode/src/core/fact-projector.ts`     | Modify | Extract pure `projectCommit` / `projectFileChange`; thin `DefaultFactProjector` wrapper  |
-| `packages/gitlode/src/core/index.ts`              | Modify | Barrel exports for new plugin types and `EnrichingFactProjector`                         |
-| `packages/gitlode/src/output/types.ts`            | Modify | Add optional `extensions?: OutputRecordExtensions` to `OutputCommit`; new type alias     |
-| `packages/gitlode/src/cli/args.ts`                | Modify | Add `--config` / `-c` option, "Configuration File" help group, validation entry         |
-| `packages/gitlode/src/index.ts`                   | Modify | Call loader pipeline before `preparing`; choose `EnrichingFactProjector` vs `DefaultFactProjector` based on plugin count; emit `initializing-plugins` progress |
-| `packages/gitlode/test/core/fact-projector.test.ts` | Modify | Add tests for pure functions; keep existing wrapper behavior covered                    |
-| `packages/gitlode/test/cli/args.test.ts`          | Modify | `--config` parsing tests                                                                |
-| `packages/gitlode/test/cli/cmd-definition.test.ts` | Modify | Help-group / option-definition surface tests                                            |
-| `packages/gitlode/test/output/*.test.ts`          | Modify | Adjust schema assertions to allow optional `extensions` field                            |
+| File                                                | Action | Notes                                                                                                                                                          |
+| --------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/gitlode/src/core/types.ts`                | Modify | Add `ProjectorPlugin`, `PluginFactory`, `PluginInitResult`, `ProjectionContext`, `PluginProjectionResult`, `PluginEntry`, `PluginFailurePolicy`                |
+| `packages/gitlode/src/core/fact-projector.ts`       | Modify | Extract pure `projectCommit` / `projectFileChange`; thin `DefaultFactProjector` wrapper                                                                        |
+| `packages/gitlode/src/core/index.ts`                | Modify | Barrel exports for new plugin types and `EnrichingFactProjector`                                                                                               |
+| `packages/gitlode/src/output/types.ts`              | Modify | Add optional `extensions?: OutputRecordExtensions` to `OutputCommit`; new type alias                                                                           |
+| `packages/gitlode/src/cli/args.ts`                  | Modify | Add `--config` / `-c` option, "Configuration File" help group, validation entry                                                                                |
+| `packages/gitlode/src/index.ts`                     | Modify | Call loader pipeline before `preparing`; choose `EnrichingFactProjector` vs `DefaultFactProjector` based on plugin count; emit `initializing-plugins` progress |
+| `packages/gitlode/test/core/fact-projector.test.ts` | Modify | Add tests for pure functions; keep existing wrapper behavior covered                                                                                           |
+| `packages/gitlode/test/cli/args.test.ts`            | Modify | `--config` parsing tests                                                                                                                                       |
+| `packages/gitlode/test/cli/cmd-definition.test.ts`  | Modify | Help-group / option-definition surface tests                                                                                                                   |
+| `packages/gitlode/test/output/*.test.ts`            | Modify | Adjust schema assertions to allow optional `extensions` field                                                                                                  |
 
 #### Documentation Touchpoints
 
-| File                                                          | Section                                              | Action                                                                                          |
-| ------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `packages/gitlode/docs/design/plugins.md`                     | (entire file, new)                                   | Create — plugin contract, lifecycle, failure policy, config schema, `extensions` output format  |
-| `packages/gitlode/docs/design/architecture.md`                | Pipeline / projector architecture                    | Update — add Plugin runtime subsection; link to `plugins.md` for details                        |
-| `packages/gitlode/docs/design/schema.md`                      | Output record field definitions                      | Update — add "Plugin Extensions" section; document `extensions` shape, presence rule, empty-extensions invariant |
-| `packages/gitlode/docs/usage.md`                              | CLI options and examples                             | Update — document `--config` and a minimal plugin config example                                |
-| `packages/gitlode/README.md`                                  | Features / Usage                                     | Update — short mention of plugin support and link to `docs/design/plugins.md`                   |
-| `.github/instructions/cli.instructions.md`                    | Options surface                                      | Update — add `--config` to the option contract                                                  |
-| `.github/instructions/architecture.instructions.md`           | Canonical vocabulary; boundary rules; CLI / Core responsibilities | Update — add `ProjectorPlugin`, `PluginEntry`, `EnrichingFactProjector` as stable terms; add plugin layer-ownership rules and boundary anti-patterns |
-| `.github/instructions/schema.instructions.md`                 | Output record fields                                 | Update — reflect optional `extensions` field at the spec level                                  |
+| File                                                | Section                                                           | Action                                                                                                                                               |
+| --------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/gitlode/docs/design/plugins.md`           | (entire file, new)                                                | Create — plugin contract, lifecycle, failure policy, config schema, `extensions` output format                                                       |
+| `packages/gitlode/docs/design/architecture.md`      | Pipeline / projector architecture                                 | Update — add Plugin runtime subsection; link to `plugins.md` for details                                                                             |
+| `packages/gitlode/docs/design/schema.md`            | Output record field definitions                                   | Update — add "Plugin Extensions" section; document `extensions` shape, presence rule, empty-extensions invariant                                     |
+| `packages/gitlode/docs/usage.md`                    | CLI options and examples                                          | Update — document `--config` and a minimal plugin config example                                                                                     |
+| `packages/gitlode/README.md`                        | Features / Usage                                                  | Update — short mention of plugin support and link to `docs/design/plugins.md`                                                                        |
+| `.github/instructions/cli.instructions.md`          | Options surface                                                   | Update — add `--config` to the option contract                                                                                                       |
+| `.github/instructions/architecture.instructions.md` | Canonical vocabulary; boundary rules; CLI / Core responsibilities | Update — add `ProjectorPlugin`, `PluginEntry`, `EnrichingFactProjector` as stable terms; add plugin layer-ownership rules and boundary anti-patterns |
+| `.github/instructions/schema.instructions.md`       | Output record fields                                              | Update — reflect optional `extensions` field at the spec level                                                                                       |
 
 #### Implementation Notes
 
@@ -250,6 +251,6 @@ npm run format:check
 - `failurePolicy: "skip-fact"` on a plugin throwing inside `project()`: extraction completes; the affected fact's `extensions.<ns>` is `null`; warning emitted; state file is updated.
 - `failurePolicy: "fatal"` on a plugin throwing inside `project()`: extraction halts; state file is NOT updated; process exits non-zero.
 - `init()` returning `fatal` on any plugin: process exits 1 before any extraction work; all fatal messages are printed one per line.
-- Invalid config (missing `version`, unknown top-level section, empty `plugins`, invalid namespace pattern, unresolvable entrypoint): exit 1 with a single-line error during CLI validation phase, before extraction starts. `--quiet` does not suppress these errors.
+- Invalid config (missing `version`, unknown top-level section, empty `extensions`, invalid namespace pattern, unresolvable entrypoint): exit 1 with a single-line error during CLI validation phase, before extraction starts. `--quiet` does not suppress these errors.
 - `--profile` with plugins configured: profile output includes `elapsed/projection/plugins/<namespace>` entries.
 - Public API surface review: confirm the exported types listed under "Public API surface for Phase 2" match the implemented `core/index.ts` barrel; this review is a Phase 1 Definition-of-Done item to prevent Phase 2 churn.

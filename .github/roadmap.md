@@ -297,49 +297,7 @@ general-purpose project configuration surface.
 
 **Non-goal for this item**:
 
-- no change to the plugin section schema once stabilized; this item adds peer sections, it does
-  not redefine the plugin contract
-
-#### Development: CLI runtime-edge extraction from `src/index.ts`
-
-The current `main()` function in `packages/gitlode/src/index.ts` has accumulated multiple
-responsibilities: argument parsing dispatch, progress reporter construction, state store wiring,
-repository inspection, profiler hierarchy setup, prior-state loading, output writer construction,
-projector selection, coordinator wiring, and summary/profile reporting. Each responsibility is
-small individually, but together they make `main()` long, hard to test in isolation, and
-inconvenient to extend (for example, the Phase 1 plugin lifecycle addition has to be inserted into
-this monolith as a guarded block).
-
-This entry tracks an internal refactoring that extracts CLI runtime-edge concerns into focused
-modules under `src/cli/` (and possibly a dedicated `src/cli/runtime-edge.ts`), keeping `main()`
-as a thin top-level orchestrator.
-
-**Design intent**:
-
-- improve readability of the entry point by separating "what the CLI does" from "how each step
-  is wired"
-- make individual edge steps unit-testable without invoking `main()` end-to-end
-- create a stable home for future edge concerns (additional lifecycle stages, alternative output
-  modes, etc.) without further enlarging `main()`
-
-**Candidate extractions**:
-
-- progress reporter construction (currently inline switch on `uiMode`)
-- profiler hierarchy setup (root profiler and scoped child profilers per stage)
-- output writer + sink construction (filename pattern, rotation policy)
-- projector selection (with/without plugins) and dependency assembly for the coordinator
-- final reporting (summary lines, profile lines)
-
-**Non-goal for this item**:
-
-- no change in observable CLI behavior, output format, exit codes, or progress event sequence
-- no change to the layered architecture; this is intra-CLI-layer reorganization only
-- no change to public exports unless required by extracted helpers' test surface
-
-**Trigger / priority signal**:
-
-- pursue when the next non-trivial edge addition (beyond Phase 1) is being planned, or sooner if
-  `main()` length becomes a recurring obstacle in implementation sessions
+- no change to the `extensions` section schema once stabilized; this item adds peer top-level sections, it does not redefine the plugin contract
 
 #### Release Engineering: Staged monorepo CI/CD evolution with changesets adoption
 

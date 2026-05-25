@@ -10,7 +10,7 @@ gitlode is a faithful extractor: it maps Git object data as stored and leaves in
 aggregation, and reporting to your downstream tools. If you already have an analytical system and
 want commit history in it, gitlode brings the data over.
 
-Named after the mining term lode (a vein of valuable ore), with a nod to load — gitlode (not gitload).
+_Named after the mining term lode (a vein of valuable ore), with a nod to load — gitlode (not gitload)._
 
 This repository is the gitlode monorepo. The flagship CLI is published as the
 [`gitlode`](https://www.npmjs.com/package/gitlode) package on npm. Official plugins will live

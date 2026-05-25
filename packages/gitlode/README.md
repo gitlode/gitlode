@@ -9,7 +9,7 @@ downstream systems can ingest commit history without understanding Git internals
 gitlode is a faithful extractor: it maps Git object data as stored and leaves interpretation,
 aggregation, and reporting to your downstream tools.
 
-Named after the mining term lode (a vein of valuable ore), with a nod to load — gitlode (not gitload).
+_Named after the mining term lode (a vein of valuable ore), with a nod to load — gitlode (not gitload)._
 
 ## Use cases
 

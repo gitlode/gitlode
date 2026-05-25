@@ -177,6 +177,85 @@ When a plugin returns `fatal` or throws on a given fact:
 
 ---
 
+## Plugin Package Policy
+
+This section defines the official policy for distributing and versioning plugins under the
+`@gitlode` scope. It applies to all first-party `@gitlode/plugin-*` packages. Third-party
+plugin authors are encouraged to follow the same conventions but are not required to.
+
+### Package Naming
+
+Official plugins are published as `@gitlode/plugin-<name>`. The `plugin-` prefix inside the
+`@gitlode` scope is mandatory to keep the scope available for future non-plugin packages
+(shared types, helpers, etc.). The core `gitlode` package remains unscoped.
+
+Community plugins may use the convention `gitlode-plugin-<name>` for npm discoverability, but
+the runtime imposes no naming requirements on third-party plugins.
+
+### Required `package.json` Metadata
+
+Every `@gitlode/plugin-*` package must include:
+
+| Field                        | Constraint                                                |
+| ---------------------------- | --------------------------------------------------------- |
+| `"name"`                     | `"@gitlode/plugin-<name>"`                                |
+| `"type"`                     | `"module"` — CJS dual-publish is not supported            |
+| `"exports"`                  | Single entry `{ ".": "./dist/index.js" }` (or equivalent) |
+| `"peerDependencies.gitlode"` | Semver range — see below                                  |
+
+`"engines.node": ">=22.0.0"` is recommended but not required. `"keywords"` should include
+`"gitlode-plugin"` for npm discoverability.
+
+### Peer Range Policy
+
+**Recommended form**: caret notation, e.g. `"gitlode": "^0.7.0"`.
+
+Pre-1.0 caret semantics: `^0.7.0` ≡ `>=0.7.0 <0.8.0`. Each minor bump in the pre-1.0 series
+may include breaking API changes; the implicit upper bound at the next minor is the right default.
+
+An explicit equivalent form (`>=0.7.0 <0.8.0`) is also acceptable for authors who prefer to
+avoid pre-1.0 caret ambiguity.
+
+**Lower bound**: the lowest `gitlode` version the plugin author has validated against. New
+plugins targeting the v0.7.0 API floor declare at least `^0.7.0`.
+
+**Multi-range syntax** (e.g. `^0.7.0 || ^0.8.0`) is permitted; the runtime uses
+`semver.satisfies` and accepts any valid `node-semver` range.
+
+**Bump cadence**: when the core API surface changes in a backward-compatible way, plugin authors
+may widen their peer range. When it changes in a breaking way, plugin authors must release a new
+version with an updated peer range.
+
+### Runtime Compatibility Check
+
+When `--config` is provided, gitlode performs a warning-only compatibility check before
+initializing plugins. It reads the `peerDependencies.gitlode` range from the nearest
+`package.json` of each plugin entrypoint and compares it against the running core version:
+
+| Condition                                          | Message (stderr)                                                                                                           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Range satisfied                                    | _(no output)_                                                                                                              |
+| Range declared but not satisfied                   | `Plugin "<ns>" declares peer gitlode <range>, but running gitlode is <version>. Continuing; behavior may be incompatible.` |
+| `peerDependencies.gitlode` absent                  | `Plugin "<ns>" does not declare peerDependencies.gitlode. Compatibility unknown; continuing.`                              |
+| `package.json` unreachable, unreadable, or invalid | `Plugin "<ns>" compatibility check skipped: unable to read package metadata at <path>.`                                    |
+
+These warnings are always written to stderr and are **not suppressed by `--quiet`**. The check is
+warning-only; mismatches never cause a non-zero exit.
+
+The check is skipped entirely when no `--config` is supplied.
+
+### Namespace Guidance
+
+The namespace key in the config file's `extensions` section becomes the key in each output
+record's `extensions` object. It identifies the plugin's output slot, not the plugin itself.
+
+If you have no specific preference, using the plugin's short name (the portion after
+`@gitlode/plugin-`) works well — for example, `@gitlode/plugin-conventional-commits` →
+`conventional-commits`. Choose a different name when you register the same plugin under multiple
+namespaces with different configs, or when you prefer a shorter label in output records.
+
+---
+
 ## Example Plugin
 
 ```typescript

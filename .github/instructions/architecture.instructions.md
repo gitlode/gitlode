@@ -115,7 +115,7 @@ details belong in `CHANGELOG.md`.
 - Instantiate Core and pass resolved config (including `stateFilePath` as a string — state file I/O is performed by Core, not CLI)
 - Handle top-level errors and format user-facing error messages
 - Exit with appropriate codes: `0` = success, `1` = user error, `2` = runtime error
-- `src/cli/plugins.ts` — plugin config loading, module resolution, factory invocation, and parallel `init()` orchestration
+- `src/cli/plugins.ts` — plugin config loading, module resolution, factory invocation, parallel `init()` orchestration, and plugin compatibility checking. **Plugin compatibility checking (version range validation against `peerDependencies.gitlode`) is a CLI-layer responsibility and must not be implemented in the core layer.**
 
 ### Core Logic Layer (`src/core/`)
 

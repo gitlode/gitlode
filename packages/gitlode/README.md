@@ -150,7 +150,7 @@ the same timestamp and will not overwrite files produced by earlier runs. Use
 - [Architecture](docs/design/architecture.md) — layer responsibilities, end-to-end flow, and key design decisions
 - [Git Traversal](docs/design/git-traversal.md) — DAG traversal, differential extraction modes, and deduplication strategy
 - [Output Schema](docs/design/schema.md) — JSONL format, field definitions, timestamp conversion, and file rotation
-- [Plugin System](docs/design/plugins.md) — plugin contract, configuration file format, and lifecycle
+- [Plugin System](docs/design/plugins.md) — plugin contract, configuration file format, lifecycle, and official plugin package policy
 - [Changelog](CHANGELOG.md) — release history and notable changes by version
 
 ## Project

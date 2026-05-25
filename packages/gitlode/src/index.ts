@@ -6,7 +6,12 @@ import { pathToFileURL } from "node:url";
 
 import type { ParsedArgs } from "./cli/args.js";
 import { parseArgs } from "./cli/index.js";
-import { loadPluginConfig, resolvePluginEntries, initializePlugins } from "./cli/plugins.js";
+import {
+  loadPluginConfig,
+  resolvePluginEntries,
+  checkPluginCompatibility,
+  initializePlugins,
+} from "./cli/plugins.js";
 import {
   ProgressController,
   resolveUiMode,
@@ -277,6 +282,8 @@ async function main() {
       reporter.emit({ type: "phase-start", phase: "initializing-plugins" });
       const pluginConfig = await loadPluginConfig(parsed.configPath);
       const pluginEntries = await resolvePluginEntries(pluginConfig, parsed.configPath);
+
+      await checkPluginCompatibility(pluginEntries, pluginConfig, parsed.configPath);
 
       if (profile) {
         const pluginsProfiler = projectionProfiler?.createScopedProfiler("plugins");

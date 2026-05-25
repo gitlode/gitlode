@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { satisfies, validRange } from "semver";
 import { z } from "zod";
 
 import type {
@@ -203,5 +204,144 @@ export async function initializePlugins(entries: PluginEntry[]): Promise<void> {
       process.stderr.write(`Plugin "${entry.namespace}" init failed: ${result.message}\n`);
     }
     process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Compatibility check
+// ---------------------------------------------------------------------------
+
+// Read core version once from this package's own package.json. Cached after
+// the first call. Returns null when the version cannot be determined.
+let _cachedCoreVersion: string | null | undefined = undefined;
+
+async function readCoreVersion(): Promise<string | null> {
+  if (_cachedCoreVersion !== undefined) {
+    return _cachedCoreVersion;
+  }
+  try {
+    const pkgUrl = new URL("../../package.json", import.meta.url);
+    const raw = await readFile(fileURLToPath(pkgUrl), "utf8");
+    const pkg = JSON.parse(raw) as { version?: unknown };
+    _cachedCoreVersion = typeof pkg.version === "string" ? pkg.version : null;
+  } catch {
+    _cachedCoreVersion = null;
+  }
+  return _cachedCoreVersion;
+}
+
+const MAX_WALK_STEPS = 20;
+
+async function findNearestPackageJson(
+  entrypointUrl: string,
+): Promise<{ filePath: string; data: unknown } | null> {
+  let dir: string;
+  try {
+    dir = dirname(fileURLToPath(entrypointUrl));
+  } catch {
+    return null;
+  }
+
+  for (let i = 0; i < MAX_WALK_STEPS; i++) {
+    const candidate = resolve(dir, "package.json");
+    try {
+      const raw = await readFile(candidate, "utf8");
+      return { filePath: candidate, data: JSON.parse(raw) };
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) {
+        break; // filesystem root reached
+      }
+      dir = parent;
+    }
+  }
+  return null;
+}
+
+function resolveEntrypointToUrl(entrypoint: string, configDir: string): string | null {
+  try {
+    if (entrypoint.startsWith(".") || isAbsolute(entrypoint)) {
+      return pathToFileURL(resolve(configDir, entrypoint)).href;
+    }
+    const req = createRequire(pathToFileURL(configDir + "/").href);
+    return pathToFileURL(req.resolve(entrypoint)).href;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check each plugin's declared `peerDependencies.gitlode` range against the
+ * running core version. Emits a warning to stderr for each mismatch or missing
+ * declaration. Never causes a non-zero exit — always warning-only.
+ *
+ * Must be called before `initializePlugins` and skipped when no config is
+ * provided (the caller is responsible for that guard).
+ */
+export async function checkPluginCompatibility(
+  entries: PluginEntry[],
+  config: PluginConfigFile,
+  configPath: string,
+): Promise<void> {
+  const coreVersion = await readCoreVersion();
+  if (coreVersion === null) {
+    return; // Cannot determine core version; skip all checks silently
+  }
+
+  const configDir = dirname(configPath);
+
+  for (const entry of entries) {
+    const extEntry = config.extensions[entry.namespace];
+    if (!extEntry) continue;
+
+    const entrypointUrl = resolveEntrypointToUrl(extEntry.entrypoint, configDir);
+    if (entrypointUrl === null) {
+      process.stderr.write(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${extEntry.entrypoint}.\n`,
+      );
+      continue;
+    }
+
+    const found = await findNearestPackageJson(entrypointUrl);
+    if (found === null) {
+      process.stderr.write(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${extEntry.entrypoint}.\n`,
+      );
+      continue;
+    }
+
+    const { filePath, data: pkgData } = found;
+
+    let peerRange: string | undefined;
+    try {
+      const pkg = pkgData as { peerDependencies?: Record<string, string> };
+      peerRange = pkg.peerDependencies?.["gitlode"];
+    } catch {
+      process.stderr.write(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.\n`,
+      );
+      continue;
+    }
+
+    if (peerRange === undefined) {
+      process.stderr.write(
+        `Plugin "${entry.namespace}" does not declare peerDependencies.gitlode. Compatibility unknown; continuing.\n`,
+      );
+      continue;
+    }
+
+    if (validRange(peerRange) === null) {
+      process.stderr.write(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.\n`,
+      );
+      continue;
+    }
+
+    if (!satisfies(coreVersion, peerRange)) {
+      process.stderr.write(
+        `Plugin "${entry.namespace}" declares peer gitlode ${peerRange}, but running gitlode is ${coreVersion}. Continuing; behavior may be incompatible.\n`,
+      );
+    }
+    // Range satisfied → no output
   }
 }

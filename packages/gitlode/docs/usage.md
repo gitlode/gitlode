@@ -583,3 +583,49 @@ export default async function factory(config) {
 ```
 
 For the full plugin contract specification, see [Plugin System Design](design/plugins.md).
+
+### Installing a plugin package
+
+Install the plugin as a regular npm dependency in the repository where you run gitlode:
+
+```bash
+npm install @gitlode/plugin-conventional-commits
+```
+
+Then reference the package name in your config:
+
+```json
+{
+  "version": 1,
+  "extensions": {
+    "conventional-commits": {
+      "entrypoint": "@gitlode/plugin-conventional-commits"
+    }
+  }
+}
+```
+
+#### Compatibility warnings
+
+When gitlode starts, it compares the running core version against the
+`peerDependencies.gitlode` range declared in each plugin's `package.json`.
+If the running version is outside the declared range, a warning is printed
+to stderr before extraction begins:
+
+```
+Plugin "conventional-commits" declares peer gitlode ^0.6.0, but running gitlode is 0.7.0. Continuing; behavior may be incompatible.
+```
+
+If a plugin does not declare `peerDependencies.gitlode`, a different warning is printed:
+
+```
+Plugin "conventional-commits" does not declare peerDependencies.gitlode. Compatibility unknown; continuing.
+```
+
+These warnings are always shown even when `--quiet` is passed. They do not cause a non-zero
+exit code; extraction continues regardless. To resolve a mismatch, update the plugin to a
+version compatible with the running gitlode core, or pin gitlode to a version within the
+plugin's declared range.
+
+For the plugin packaging rules and peer range policy, see the
+[Plugin Package Policy](design/plugins.md#plugin-package-policy) section of the design docs.

@@ -94,7 +94,7 @@ export interface ProjectedCommit {
   readonly extensions?: ProjectedExtensions;
 }
 
-export interface ProjectedFileRecord extends ProjectedCommit {
+export interface ProjectedFileChange extends ProjectedCommit {
   readonly file: {
     readonly path: string;
     readonly status: "added" | "modified" | "deleted";
@@ -113,7 +113,7 @@ export interface ProjectedFileRecord extends ProjectedCommit {
 
 interface FactPairMap {
   commit: { readonly fact: CommitFact; readonly record: ProjectedCommit };
-  "file-change": { readonly fact: FileChangeFact; readonly record: ProjectedFileRecord };
+  "file-change": { readonly fact: FileChangeFact; readonly record: ProjectedFileChange };
 }
 
 export type FactType = keyof FactPairMap;

@@ -158,7 +158,7 @@ plugin skipped that fact (due to a `skip` result or a `fatal` result with `failu
 "skip-fact"`). Key order in the serialized object matches plugin declaration order. When no
 plugins are configured, the field is omitted from output records entirely.
 
-The `extensions` field is also present on `ProjectedFileRecord` (via `ProjectedCommit` inheritance)
+The `extensions` field is also present on `ProjectedFileChange` (via `ProjectedCommit` inheritance)
 when plugins are active in `--per-file` mode.
 
 ---
@@ -206,7 +206,7 @@ Commits with multiple changed files produce multiple output lines. Commits with 
 Each line carries the full commit metadata (denormalized) plus file-specific fields:
 
 ```typescript
-interface ProjectedFileRecord extends ProjectedCommit {
+interface ProjectedFileChange extends ProjectedCommit {
   file: {
     path: string;
     status: "added" | "modified" | "deleted";

@@ -31,7 +31,7 @@ export type {
   PluginProjectionResult,
   ProjectedCommit,
   ProjectedExtensions,
-  ProjectedFileRecord,
+  ProjectedFileChange,
   ProjectedPerson,
   ProjectedRecord,
   ProjectedRecordFor,

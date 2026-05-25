@@ -268,7 +268,7 @@ When `--per-file` is used, each output line represents one changed file within a
 Each line carries all commit fields from `ProjectedCommit` (denormalized) plus a `file` object:
 
 ```typescript
-interface ProjectedFileRecord extends ProjectedCommit {
+interface ProjectedFileChange extends ProjectedCommit {
   file: {
     path: string;
     status: "added" | "modified" | "deleted";

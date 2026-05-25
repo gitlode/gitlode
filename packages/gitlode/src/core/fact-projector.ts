@@ -6,7 +6,7 @@ import type {
   FactProjector,
   FileChangeFact,
   ProjectedCommit,
-  ProjectedFileRecord,
+  ProjectedFileChange,
   ProjectedRecord,
   StageProfiler,
 } from "./types.js";
@@ -41,7 +41,7 @@ export function projectFileChange(
   fact: FileChangeFact,
   repoName: string,
   repoUrl: string | null,
-): ProjectedFileRecord {
+): ProjectedFileChange {
   const { subject, body } = splitMessage(fact.commit.message);
   return {
     oid: fact.commit.oid,

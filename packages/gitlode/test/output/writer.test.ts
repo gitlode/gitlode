@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { ProjectedCommit, ProjectedFileRecord } from "../../src/core/types.js";
+import type { ProjectedCommit, ProjectedFileChange } from "../../src/core/types.js";
 import { OutputWriter } from "../../src/output/writer.js";
 
 function makeCommit(oid: string): ProjectedCommit {
@@ -149,9 +149,9 @@ describe("OutputWriter", () => {
     }
   });
 
-  it("accepts ProjectedFileRecord (with file field) without error", async () => {
+  it("accepts ProjectedFileChange (with file field) without error", async () => {
     const base = makeCommit(oid(1));
-    const fileRecord: ProjectedFileRecord = {
+    const fileRecord: ProjectedFileChange = {
       ...base,
       file: {
         path: "src/index.ts",
@@ -166,7 +166,7 @@ describe("OutputWriter", () => {
     await writer.close();
 
     const content = await readFile(join(tmpDir, "repo-000001.jsonl"), "utf8");
-    const parsed = JSON.parse(content.trim()) as ProjectedFileRecord;
+    const parsed = JSON.parse(content.trim()) as ProjectedFileChange;
     expect(parsed.oid).toBe(base.oid);
     expect(parsed.file.path).toBe("src/index.ts");
     expect(parsed.file.status).toBe("modified");

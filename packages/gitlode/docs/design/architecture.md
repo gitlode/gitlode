@@ -322,7 +322,7 @@ attach to the extraction process and add optional fields to output records.
 - **`src/core/types.ts`** — all plugin contract types: `ProjectorPlugin`, `PluginEntry`,
   `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `ProjectionContext`,
   `PluginFailurePolicy`. Also defines the projection record shapes consumed downstream:
-  `ProjectedCommit`, `ProjectedFileRecord`, `ProjectedRecord`, and the `ProjectedExtensions`
+  `ProjectedCommit`, `ProjectedFileChange`, `ProjectedRecord`, and the `ProjectedExtensions`
   type alias used for the optional `extensions` field on every projected record.
 
 ### Wiring at the runtime edge (`src/index.ts`)

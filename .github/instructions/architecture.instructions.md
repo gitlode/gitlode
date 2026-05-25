@@ -234,7 +234,7 @@ The concrete implementation of `GitAdapter` using isomorphic-git.
 
 ### Output Layer (`src/output/`)
 
-- Serialize `ProjectedRecord` objects (`ProjectedCommit | ProjectedFileRecord`, defined in `src/core/types.ts`) to JSON Lines
+- Serialize `ProjectedRecord` objects (`ProjectedCommit | ProjectedFileChange`, defined in `src/core/types.ts`) to JSON Lines
 - Track current file's line count and byte size
 - Rotate to a new file when thresholds are exceeded
 - Generate output filenames: `{prefix}-{timestamp}-{sequenceNumber padded to 6 digits}.jsonl`

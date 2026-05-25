@@ -5,11 +5,11 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { ProjectedRecord } from "../../src/core/types.js";
 import { OutputWriterSink } from "../../src/output/output-writer-sink.js";
-import type { OutputRecord } from "../../src/output/types.js";
 import { OutputWriter } from "../../src/output/writer.js";
 
-function makeRecord(oid: string): OutputRecord {
+function makeRecord(oid: string): ProjectedRecord {
   return {
     oid,
     subject: `commit ${oid.slice(0, 7)}`,

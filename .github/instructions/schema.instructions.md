@@ -1,6 +1,6 @@
 ---
 description: Output JSON schema and file rotation specification for gitlode
-applyTo: "src/output/**"
+applyTo: "src/core/types.ts,src/output/**"
 ---
 
 # Output JSON Schema & File Format
@@ -19,7 +19,7 @@ applyTo: "src/output/**"
 Each line is a single JSON object representing one Git commit.
 
 ```typescript
-interface OutputCommit {
+interface ProjectedCommit {
   oid: string;
   subject: string;
   body: string;
@@ -150,7 +150,7 @@ When `--repo-name` or `--repo-url` is provided, the override value replaces the 
 Present only when `--config` is provided and at least one plugin is active.
 
 ```typescript
-type OutputRecordExtensions = Record<string, Record<string, unknown> | null>;
+type ProjectedExtensions = Record<string, Record<string, unknown> | null>;
 ```
 
 Each key is a plugin namespace declared in the configuration file. A value of `null` means the
@@ -158,7 +158,7 @@ plugin skipped that fact (due to a `skip` result or a `fatal` result with `failu
 "skip-fact"`). Key order in the serialized object matches plugin declaration order. When no
 plugins are configured, the field is omitted from output records entirely.
 
-The `extensions` field is also present on `OutputFileRecord` (via `OutputCommit` inheritance)
+The `extensions` field is also present on `ProjectedFileRecord` (via `ProjectedCommit` inheritance)
 when plugins are active in `--per-file` mode.
 
 ---
@@ -206,7 +206,7 @@ Commits with multiple changed files produce multiple output lines. Commits with 
 Each line carries the full commit metadata (denormalized) plus file-specific fields:
 
 ```typescript
-interface OutputFileRecord extends OutputCommit {
+interface ProjectedFileRecord extends ProjectedCommit {
   file: {
     path: string;
     status: "added" | "modified" | "deleted";
@@ -279,7 +279,7 @@ These fields are **not yet implemented** but are reserved and must not be used f
 // File-level output mode (--per-file) already provides equivalent analytical capability.
 // This remains a convenience feature for users who prefer a single denormalized commit
 // record with an embedded files array.
-interface OutputCommitWithFiles extends OutputCommit {
+interface ProjectedCommitWithFiles extends ProjectedCommit {
   files?: Array<{
     path: string;
     status: "added" | "modified" | "deleted" | "renamed";

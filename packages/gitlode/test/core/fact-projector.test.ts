@@ -64,7 +64,7 @@ function makeFileChangeFact(
 // ---------------------------------------------------------------------------
 
 describe("DefaultFactProjector — commit mode", () => {
-  it("maps all OutputCommit fields from CommitFact", async () => {
+  it("maps all ProjectedCommit fields from CommitFact", async () => {
     const projector = new DefaultFactProjector("repo", "https://github.com/org/repo.git");
     const fact = makeCommitFact();
     const [record] = await collect(projector.project(toAsyncIter([fact])));
@@ -181,7 +181,7 @@ describe("DefaultFactProjector — commit mode", () => {
 // ---------------------------------------------------------------------------
 
 describe("DefaultFactProjector — file-change mode", () => {
-  it("includes all OutputCommit fields denormalized into the file record", async () => {
+  it("includes all ProjectedCommit fields denormalized into the file record", async () => {
     const projector = new DefaultFactProjector("repo", "https://github.com/org/repo.git");
     const fact = makeFileChangeFact();
     const [record] = await collect(projector.project(toAsyncIter([fact])));

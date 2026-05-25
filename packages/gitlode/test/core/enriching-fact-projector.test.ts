@@ -11,7 +11,7 @@ import type {
   ProjectionContext,
   ProjectorPlugin,
 } from "../../src/core/types.js";
-import type { OutputRecord } from "../../src/output/types.js";
+import type { ProjectedRecord } from "../../src/core/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -332,7 +332,7 @@ describe("EnrichingFactProjector — ProjectionContext", () => {
   });
 
   it("baseRecord is frozen (read-only at runtime)", async () => {
-    let frozenBase: OutputRecord | null = null;
+    let frozenBase: ProjectedRecord | null = null;
     const plugin = makePlugin(async (ctx) => {
       frozenBase = ctx.baseRecord;
       return { type: "success", data: {} };

@@ -1,14 +1,22 @@
 import { splitMessage, toISO8601 } from "../output/index.js";
-import type { OutputRecord } from "../output/types.js";
 import { withProfiler } from "./profile/index.js";
-import type { CommitFact, Fact, FactProjector, FileChangeFact, StageProfiler } from "./types.js";
+import type {
+  CommitFact,
+  Fact,
+  FactProjector,
+  FileChangeFact,
+  ProjectedCommit,
+  ProjectedFileRecord,
+  ProjectedRecord,
+  StageProfiler,
+} from "./types.js";
 import { assertNever } from "./types.js";
 
 export function projectCommit(
   fact: CommitFact,
   repoName: string,
   repoUrl: string | null,
-): OutputRecord {
+): ProjectedCommit {
   const { subject, body } = splitMessage(fact.message);
   return {
     oid: fact.oid,
@@ -33,7 +41,7 @@ export function projectFileChange(
   fact: FileChangeFact,
   repoName: string,
   repoUrl: string | null,
-): OutputRecord {
+): ProjectedFileRecord {
   const { subject, body } = splitMessage(fact.commit.message);
   return {
     oid: fact.commit.oid,
@@ -76,7 +84,7 @@ export class DefaultFactProjector implements FactProjector {
     this.repoUrlOverride = repoUrlOverride;
   }
 
-  async *project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord> {
+  async *project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
     for await (const fact of facts) {
       switch (fact.type) {
         case "commit": {

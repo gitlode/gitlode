@@ -39,10 +39,10 @@ Prefix derivation (in priority order):
 
 ## Record schema
 
-Each line is a serialized `OutputCommit` object:
+Each line is a serialized `ProjectedCommit` object:
 
 ```typescript
-interface OutputCommit {
+interface ProjectedCommit {
   oid: string;
   subject: string;
   body: string;
@@ -265,10 +265,10 @@ JSONL line order reflects BFS traversal order across the Git DAG, not chronologi
 
 When `--per-file` is used, each output line represents one changed file within a commit. Commits with multiple changed files produce multiple lines. Empty commits (no file changes) produce no lines.
 
-Each line carries all commit fields from `OutputCommit` (denormalized) plus a `file` object:
+Each line carries all commit fields from `ProjectedCommit` (denormalized) plus a `file` object:
 
 ```typescript
-interface OutputFileRecord extends OutputCommit {
+interface ProjectedFileRecord extends ProjectedCommit {
   file: {
     path: string;
     status: "added" | "modified" | "deleted";
@@ -332,4 +332,4 @@ Changes are computed against the **first parent only**.
 - `.github/instructions/schema.instructions.md`
 - `src/output/utils.ts`
 - `src/output/writer.ts`
-- `src/output/types.ts`
+- `src/core/types.ts`

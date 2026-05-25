@@ -92,8 +92,8 @@ Multiple plugin failures are all reported before exiting.
 interface ProjectionContext {
   /** The raw fact (CommitFact or FileChangeFact) being projected. */
   readonly fact: Fact;
-  /** The base output record produced by gitlode's core projector. Frozen (read-only at runtime). */
-  readonly baseRecord: OutputRecord;
+  /** The base projected record produced by gitlode's core projector. Frozen (read-only at runtime). */
+  readonly baseRecord: ProjectedRecord;
 }
 ```
 
@@ -173,7 +173,7 @@ When a plugin returns `fatal` or throws on a given fact:
 - **Enrichment projection is a Core boundary concern.** `EnrichingFactProjector` (in `src/core/`) wraps the default projector and orchestrates per-fact plugin calls.
 - **Core types define the plugin contract.** `ProjectorPlugin`, `PluginEntry`, `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `ProjectionContext`, `PluginFailurePolicy` are all in `src/core/types.ts`.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
-- **The `extensions` field is a Core output concern.** `OutputRecordExtensions` is defined in `src/output/types.ts` as `Record<string, Record<string, unknown> | null>`.
+- **The `extensions` field is a Core projection concern.** `ProjectedExtensions` is defined in `src/core/types.ts` as `Record<string, Record<string, unknown> | null>`.
 
 ---
 

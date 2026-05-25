@@ -1,13 +1,11 @@
-import type { OutputRecord, OutputRecordFor } from "../output/types.js";
-import type { OutputRecordExtensions } from "../output/types.js";
 import { projectCommit, projectFileChange } from "./fact-projector.js";
 import type {
   Fact,
-  FactFor,
   FactProjector,
-  FactType,
   PluginEntry,
   ProgressReporter,
+  ProjectedExtensions,
+  ProjectedRecord,
   ProjectionContext,
 } from "./types.js";
 import { assertNever } from "./types.js";
@@ -30,20 +28,9 @@ export class EnrichingFactProjector implements FactProjector {
     this.remoteUrl = remoteUrl;
   }
 
-  async *project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord> {
+  async *project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
     for await (const fact of facts) {
       yield await this.projectOneFact(fact);
-    }
-  }
-
-  private buildBaseRecord<Type extends FactType>(fact: FactFor<Type>): OutputRecordFor<Type> {
-    switch (fact.type) {
-      case "commit":
-        return projectCommit(fact, this.repoName, this.remoteUrl) as OutputRecordFor<Type>;
-      case "file-change":
-        return projectFileChange(fact, this.repoName, this.remoteUrl) as OutputRecordFor<Type>;
-      default:
-        assertNever(fact);
     }
   }
 
@@ -58,13 +45,30 @@ export class EnrichingFactProjector implements FactProjector {
     }
   }
 
-  private async projectOneFact(fact: Fact): Promise<OutputRecord> {
-    const baseRecord = Object.freeze(this.buildBaseRecord(fact));
-    // The discriminated union invariant (CommitFact↔OutputCommit, FileChangeFact↔OutputFileRecord)
-    // is structurally guaranteed by buildBaseRecord's dispatch on fact.type. TypeScript cannot
-    // verify this automatically across the union boundary, so we use a cast here.
-    const ctx = { fact, baseRecord } as ProjectionContext;
-    const extensions: OutputRecordExtensions = {};
+  private async projectOneFact(fact: Fact): Promise<ProjectedRecord> {
+    // Dispatch on the discriminant inline so each arm produces a concrete
+    // (fact, baseRecord) pair that matches a single arm of ProjectionContext
+    // without any type assertions.
+    switch (fact.type) {
+      case "commit": {
+        const baseRecord = Object.freeze(projectCommit(fact, this.repoName, this.remoteUrl));
+        const ctx: ProjectionContext = { fact, baseRecord };
+        const extensions = await this.runPlugins(fact, ctx);
+        return { ...baseRecord, extensions };
+      }
+      case "file-change": {
+        const baseRecord = Object.freeze(projectFileChange(fact, this.repoName, this.remoteUrl));
+        const ctx: ProjectionContext = { fact, baseRecord };
+        const extensions = await this.runPlugins(fact, ctx);
+        return { ...baseRecord, extensions };
+      }
+      default:
+        assertNever(fact);
+    }
+  }
+
+  private async runPlugins(fact: Fact, ctx: ProjectionContext): Promise<ProjectedExtensions> {
+    const extensions: ProjectedExtensions = {};
 
     for (const entry of this.pluginEntries) {
       const { namespace, plugin, failurePolicy, profiler } = entry;
@@ -114,6 +118,6 @@ export class EnrichingFactProjector implements FactProjector {
       }
     }
 
-    return { ...baseRecord, extensions };
+    return extensions;
   }
 }

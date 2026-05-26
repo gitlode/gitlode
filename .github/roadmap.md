@@ -172,7 +172,7 @@ be `string`, `number`, or `boolean`.
 - exact wording of the responsibility-boundary statement in `docs/design/plugins.md`, including
   the explicit note that `null` is a core-reserved sentinel and not a permitted plugin
   `success.data` value
-- whether the existing `@gitlode/plugin-custom-fields` plugin should gain a "single-field scalar
+- whether the existing `@gitlode/plugin-custom-field` plugin should gain a "single-field scalar
   shorthand" mode as a follow-up, or remain object-only
 
 ---

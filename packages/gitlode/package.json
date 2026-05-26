@@ -1,6 +1,6 @@
 {
   "name": "gitlode",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
   "keywords": [
     "cli",
@@ -22,6 +22,13 @@
     "dist"
   ],
   "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./plugin-api": {
+      "types": "./dist/plugin-api.d.ts",
+      "default": "./dist/plugin-api.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",

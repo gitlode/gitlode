@@ -9,7 +9,7 @@ environment, run id, or other pipeline metadata.
 ## Installation
 
 ```bash
-npm install @gitlode/plugin-custom-fields
+npm install -g @gitlode/plugin-custom-fields
 ```
 
 ## Usage

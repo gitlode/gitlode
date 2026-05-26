@@ -30,6 +30,7 @@ assignments are:
 | `Extraction Range (Snapshot Mode)` | `--since-ref`, `--since-date`                                                                   |
 | `Incremental Extraction`           | `--incremental`, `--state`, `--missing-state`                                                   |
 | `File Rotation`                    | `--rotate-lines`, `--rotate-size`                                                               |
+| `Configuration File`               | `--config`                                                                                      |
 
 `<repository-path>` remains a positional argument in the synopsis.
 
@@ -108,6 +109,12 @@ Both may be specified simultaneously — rotation triggers when **either** thres
 | ----------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors are still emitted.                                    |
 | `--profile` |       | boolean | `false` | Print per-stage timing information as an aligned multi-line block to stderr after a successful extraction. Suppressed by `--quiet`. |
+
+### Configuration File
+
+| Parameter         | Alias | Type   | Default | Description                                                                                                                  |
+| ----------------- | ----- | ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `--config <path>` | `-c`  | string | —       | Path to the gitlode configuration file. When provided, enables the plugin enrichment pipeline. Path is resolved relative to CWD. File must exist or the run exits with code 1. |
 
 ### Successful-Run Stderr Contract
 

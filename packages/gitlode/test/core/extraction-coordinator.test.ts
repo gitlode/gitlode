@@ -20,7 +20,7 @@ import type {
   ProgressReporter,
 } from "../../src/core/types.js";
 import type { OutputSink } from "../../src/core/types.js";
-import type { OutputRecord } from "../../src/output/types.js";
+import type { ProjectedRecord } from "../../src/core/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,7 +41,7 @@ function makeCommitFact(oid: string): CommitFact {
   };
 }
 
-function makeOutputRecord(oid: string): OutputRecord {
+function makeOutputRecord(oid: string): ProjectedRecord {
   return {
     oid,
     subject: `commit ${oid.slice(0, 7)}`,
@@ -111,7 +111,7 @@ const fileChangeExpander: FileChangeExpander = {
 
 /** Single projector stub: dispatches commit and file-change facts to the appropriate output. */
 const projector = {
-  project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord> {
+  project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
     return (async function* () {
       for await (const fact of facts) {
         if (fact.type === "commit") {
@@ -126,12 +126,12 @@ const projector = {
 
 /** In-memory sink that records writes and tracks close calls. */
 function makeSink(): OutputSink & {
-  records: OutputRecord[];
+  records: ProjectedRecord[];
   closeCalls: number;
   bytesWritten: number;
   filesCreated: number;
 } {
-  const records: OutputRecord[] = [];
+  const records: ProjectedRecord[] = [];
   let closeCalls = 0;
   return {
     records,
@@ -391,7 +391,7 @@ describe("DefaultExtractionCoordinator", () => {
     const stateStore = makeStateStore();
     const closeOrder: string[] = [];
 
-    const trackingSink: OutputSink & { records: OutputRecord[] } = {
+    const trackingSink: OutputSink & { records: ProjectedRecord[] } = {
       records: [],
       async write(r) {
         this.records.push(r);

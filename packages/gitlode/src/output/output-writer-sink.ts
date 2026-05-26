@@ -1,5 +1,4 @@
-import type { OutputSink } from "../core/types.js";
-import type { OutputRecord } from "./types.js";
+import type { OutputSink, ProjectedRecord } from "../core/index.js";
 import { OutputWriter } from "./writer.js";
 
 /** Thin adapter that makes `OutputWriter` satisfy the Core-owned `OutputSink` interface. */
@@ -10,7 +9,7 @@ export class OutputWriterSink implements OutputSink {
     this.writer = writer;
   }
 
-  write(record: OutputRecord): Promise<void> {
+  write(record: ProjectedRecord): Promise<void> {
     return this.writer.write(record);
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "gitlode",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
   "keywords": [
     "cli",
@@ -38,7 +38,11 @@
     "commander": "^14.0.3",
     "diff": "^9.0.0",
     "isomorphic-git": "^1.37.8",
+    "semver": "^7.7.2",
     "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/semver": "^7.7.0"
   },
   "engines": {
     "node": ">=22.0.0"

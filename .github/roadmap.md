@@ -266,7 +266,7 @@ See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
 
 The `--config <path>` JSON file introduced for plugin loading is structured to be forward-compatible
 (top-level `version` field, namespaced sections). The initial release implements only the
-`plugins` section; this entry tracks the broader expansion of the same configuration file into a
+`extensions` section; this entry tracks the broader expansion of the same configuration file into a
 general-purpose project configuration surface.
 
 **Design intent**:

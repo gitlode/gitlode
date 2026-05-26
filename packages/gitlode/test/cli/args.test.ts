@@ -9,7 +9,7 @@ import type { MockInstance } from "vitest";
 
 import { parseArgs, program } from "../../src/cli/args.js";
 import type { CommitOid } from "../../src/core/index.js";
-import type { GitAdapter } from "../../src/git/index.js";
+import { JsDiffAdapter, type GitAdapter } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
 
 const AUTHOR = {
@@ -319,7 +319,7 @@ describe("parseArgs – --output-prefix derivation", () => {
 
   it("derives prefix from remote origin URL when available", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputPrefix).toBe("my-repo");
@@ -327,7 +327,7 @@ describe("parseArgs – --output-prefix derivation", () => {
 
   it("derives prefix from SSH-style remote URL", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "git@github.com:org/another-repo.git" });
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputPrefix).toBe("another-repo");
@@ -335,7 +335,7 @@ describe("parseArgs – --output-prefix derivation", () => {
 
   it("falls back to directory basename when no remote", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     // The prefix should be the basename of the temp dir
@@ -345,7 +345,7 @@ describe("parseArgs – --output-prefix derivation", () => {
 
   it("uses explicit --output-prefix when provided", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, "--output-prefix", "custom-prefix", repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputPrefix).toBe("custom-prefix");
@@ -365,7 +365,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("returns correct ExtractorConfig for full extraction", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv(
       "--ref",
       "main",
@@ -390,7 +390,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("returns correct rotation config", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv(
       "--ref",
       "main",
@@ -408,7 +408,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("returns correct range for --since-date", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv(
       "--ref",
       "main",
@@ -424,7 +424,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("sets stateFilePath when --state is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     const stateFilePath = join(repoDir, "state.json");
     setArgv("--ref", "main", "--state", stateFilePath, "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
@@ -433,7 +433,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("sets quiet=true when --quiet is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--quiet", "--output-dir", repoDir, repoDir);
     const { quiet } = await parseArgs(adapter);
     expect(quiet).toBe(true);
@@ -441,7 +441,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("sets quiet=false when --quiet is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const { quiet } = await parseArgs(adapter);
     expect(quiet).toBe(false);
@@ -449,7 +449,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("sets profile=true when --profile is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--profile", "--output-dir", repoDir, repoDir);
     const { profile } = await parseArgs(adapter);
     expect(profile).toBe(true);
@@ -457,7 +457,7 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("sets profile=false when --profile is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const { profile } = await parseArgs(adapter);
     expect(profile).toBe(false);
@@ -477,7 +477,7 @@ describe("parseArgs – --incremental", () => {
 
   it("incremental defaults to false when --incremental is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.incremental).toBe(false);
@@ -490,7 +490,7 @@ describe("parseArgs – --incremental", () => {
     await import("node:fs/promises").then(({ writeFile: wf }) =>
       wf(stateFile, JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] })),
     );
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv(
       "--incremental",
       "--ref",
@@ -527,7 +527,7 @@ describe("parseArgs – incremental mode", () => {
       JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] }),
     );
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv(
       "--incremental",
       "--ref",
@@ -557,7 +557,7 @@ describe("parseArgs – incremental mode", () => {
     stateDir = await mkdtemp(join(tmpdir(), "gitlode-args-state-"));
     const missingStatePath = join(stateDir, "nonexistent.json");
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv(
       "--incremental",
       "--ref",
@@ -667,7 +667,7 @@ describe("parseArgs – shorthand aliases", () => {
 
   it("-r collects ref values", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("-r", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.refs).toContain("main");
@@ -675,7 +675,7 @@ describe("parseArgs – shorthand aliases", () => {
 
   it("-r can be used multiple times (repeatable)", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("-r", "main", "-r", "develop", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.refs).toContain("main");
@@ -684,7 +684,7 @@ describe("parseArgs – shorthand aliases", () => {
 
   it("-o is accepted as alias for --output-dir", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "-o", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.outputDir).toBe(repoDir);
@@ -692,7 +692,7 @@ describe("parseArgs – shorthand aliases", () => {
 
   it("-s is accepted as alias for --state", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     const stateFilePath = join(repoDir, "state.json");
     setArgv("--ref", "main", "-s", stateFilePath, "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
@@ -701,7 +701,7 @@ describe("parseArgs – shorthand aliases", () => {
 
   it("-q is accepted as alias for --quiet", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "-q", "--output-dir", repoDir, repoDir);
     const { quiet } = await parseArgs(adapter);
     expect(quiet).toBe(true);
@@ -721,7 +721,7 @@ describe("parseArgs – --per-file", () => {
 
   it("defaults perFile to false when --per-file is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.perFile).toBe(false);
@@ -729,7 +729,7 @@ describe("parseArgs – --per-file", () => {
 
   it("sets perFile=true when --per-file is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--per-file", "--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.perFile).toBe(true);
@@ -746,10 +746,9 @@ describe("parseArgs – --repo-name and --repo-url", () => {
   afterEach(async () => {
     if (repoDir) await rm(repoDir, { recursive: true, force: true });
   });
-
   it("returns repoName from --repo-name", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--repo-name", "my-override", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.repoName).toBe("my-override");
@@ -757,7 +756,7 @@ describe("parseArgs – --repo-name and --repo-url", () => {
 
   it("returns repoUrl from --repo-url", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv(
       "--ref",
       "main",
@@ -773,7 +772,7 @@ describe("parseArgs – --repo-name and --repo-url", () => {
 
   it("repoName and repoUrl default to undefined when not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.repoName).toBeUndefined();
@@ -782,7 +781,7 @@ describe("parseArgs – --repo-name and --repo-url", () => {
 
   it("repoName and repoUrl can be provided independently", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--repo-name", "only-name", "--output-dir", repoDir, repoDir);
     const parsed = await parseArgs(adapter);
     expect(parsed.repoName).toBe("only-name");
@@ -834,7 +833,7 @@ describe("parseArgs – schema validation boundary", () => {
 
   it("converts parsed option shape errors to user-facing stderr + exit code 1", async () => {
     repoDir = await makeRealRepo();
-    const adapter = new IsomorphicGitAdapter();
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
 
     vi.spyOn(program, "opts").mockReturnValueOnce({
@@ -845,5 +844,63 @@ describe("parseArgs – schema validation boundary", () => {
     await expect(parseArgs(adapter)).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("expected array"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --config
+// ---------------------------------------------------------------------------
+
+describe("parseArgs – --config", () => {
+  let repoDir: string;
+  let configFile: string;
+
+  beforeEach(async () => {
+    repoDir = await makeRealRepo();
+    configFile = join(repoDir, "gitlode.config.json");
+    await writeFile(
+      configFile,
+      JSON.stringify({ version: 1, extensions: { "my-plugin": { entrypoint: "./plugin.js" } } }),
+    );
+  });
+
+  afterEach(async () => {
+    if (repoDir) await rm(repoDir, { recursive: true, force: true });
+  });
+
+  it("defaults configPath to undefined when --config is not provided", async () => {
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
+    setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.configPath).toBeUndefined();
+  });
+
+  it("resolves --config to an absolute path", async () => {
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
+    setArgv("--ref", "main", "--output-dir", repoDir, "-c", configFile, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.configPath).toBe(configFile);
+  });
+
+  it("accepts -c as alias for --config", async () => {
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
+    setArgv("--ref", "main", "--output-dir", repoDir, "-c", configFile, repoDir);
+    const parsed = await parseArgs(adapter);
+    expect(parsed.configPath).toBeDefined();
+  });
+
+  it("exits with code 1 when config file does not exist", async () => {
+    const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
+    setArgv(
+      "--ref",
+      "main",
+      "--output-dir",
+      repoDir,
+      "--config",
+      join(repoDir, "nonexistent.json"),
+      repoDir,
+    );
+    await expect(parseArgs(adapter)).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

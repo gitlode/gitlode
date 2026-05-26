@@ -34,6 +34,7 @@ _Named after the mining term lode (a vein of valuable ore), with a nod to load �
 - Outputs one record per line in JSON Lines format (commit-granularity by default)
 - Two extraction modes: snapshot (full extraction each run) and `--incremental` (differential extraction using a state file)
 - Handles multi-branch extraction with cross-branch deduplication
+- Plugin system for adding custom `extensions` data to output records via `--config`
 
 ## Requirements
 
@@ -85,6 +86,7 @@ gitlode [options] <repository-path>
 | `--rotate-size <bytes>`    |       | string              |          | —       | Start new file after threshold (raw bytes or `K`/`M`/`G` suffix, case-insensitive; range `1M` to `64G`)                                                                          |
 | `--quiet`                  | `-q`  | boolean             |          | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.                                                                                    |
 | `--profile`                |       | boolean             |          | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`.                                                                             |
+| `--config <path>`          | `-c`  | string              |          | —       | Path to gitlode configuration file. Enables plugin enrichment pipeline. See the [User Guide](docs/usage.md#plugin-enrichment) for details.                                       |
 
 Progress, summary, and profile output are written to **stderr**; use `--quiet` to suppress them.
 Validation errors exit with code `1`; runtime errors with code `2`. See the
@@ -148,6 +150,7 @@ the same timestamp and will not overwrite files produced by earlier runs. Use
 - [Architecture](docs/design/architecture.md) — layer responsibilities, end-to-end flow, and key design decisions
 - [Git Traversal](docs/design/git-traversal.md) — DAG traversal, differential extraction modes, and deduplication strategy
 - [Output Schema](docs/design/schema.md) — JSONL format, field definitions, timestamp conversion, and file rotation
+- [Plugin System](docs/design/plugins.md) — plugin contract, configuration file format, lifecycle, and official plugin package policy
 - [Changelog](CHANGELOG.md) — release history and notable changes by version
 
 ## Project

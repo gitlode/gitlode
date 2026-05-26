@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { RawCommit } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
+import { JsDiffAdapter } from "../../src/git/js-diff-adapter.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -211,7 +212,7 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     const results: RawCommit[] = [];
     for await (const c of adapter.walkCommits("/", sha5, sha3)) {
       results.push(c);
@@ -436,13 +437,82 @@ function makeRepoExt() {
   return { ...base, removeCommit, addBinaryCommit };
 }
 
+describe("IsomorphicGitAdapter.getFileChanges – DiffAdapter substitution seam", () => {
+  it("uses injected adapter counts for text file changes", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
+    const sha2 = await addCommit("a.txt", "line1\nline3\nline4\n", "modify a.txt");
+
+    let callCount = 0;
+    const stubAdapter = {
+      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => {
+        callCount++;
+        return { additions: 99, deletions: 77 };
+      },
+    };
+
+    const adapter = new IsomorphicGitAdapter(fs, stubAdapter);
+    const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "a.txt",
+      status: "modified",
+      additions: 99,
+      deletions: 77,
+    });
+    expect(callCount).toBe(1);
+  });
+
+  it("does not invoke injected adapter when blob is binary", async () => {
+    const { fs, init, addBinaryCommit } = makeRepoExt();
+    await init();
+    const sha1 = await addBinaryCommit("binary.bin", "add binary file");
+
+    let callCount = 0;
+    const stubAdapter = {
+      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => {
+        callCount++;
+        return { additions: 1, deletions: 1 };
+      },
+    };
+
+    const adapter = new IsomorphicGitAdapter(fs, stubAdapter);
+    const changes = await adapter.getFileChanges("/", sha1 as never);
+
+    expect(callCount).toBe(0);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({ additions: null, deletions: null });
+  });
+
+  it("throws when injected adapter returns negative additions", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const sha1 = await addCommit("a.txt", "line1\n", "root commit");
+
+    const badAdapter = {
+      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => ({
+        additions: -1,
+        deletions: 0,
+      }),
+    };
+
+    const adapter = new IsomorphicGitAdapter(fs, badAdapter);
+    const { GitAdapterError } = await import("../../src/git/index.js");
+    await expect(adapter.getFileChanges("/", sha1 as never)).rejects.toBeInstanceOf(
+      GitAdapterError,
+    );
+  });
+});
+
 describe("IsomorphicGitAdapter.getFileChanges", () => {
   it("root commit: all files are 'added'", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     const changes = await adapter.getFileChanges("/", sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -460,7 +530,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
     const sha2 = await addCommit("b.txt", "new1\n", "add b.txt");
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -479,7 +549,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     // Modify: remove line2, add line3 and line4
     const sha2 = await addCommit("a.txt", "line1\nline3\nline4\n", "modify a.txt");
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -498,7 +568,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     const sha2 = await addCommit("b.txt", "x\n", "add b.txt");
     const sha3 = await removeCommit("b.txt", "delete b.txt");
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     const changes = await adapter.getFileChanges("/", sha3 as never, sha2 as never);
 
     expect(changes).toHaveLength(1);
@@ -515,7 +585,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     await init();
     const sha1 = await addBinaryCommit("binary.bin", "add binary file");
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     const changes = await adapter.getFileChanges("/", sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -546,7 +616,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     const changes = await adapter.getFileChanges("/", emptyCommit as never, sha1 as never);
 
     expect(changes).toHaveLength(0);
@@ -577,7 +647,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     // Merge base of sha2 and shaA should be sha1 (their common ancestor)
     const result = await adapter.findMergeBase("/", [sha2, shaA] as never);
     expect(result).toBe(sha1);
@@ -602,7 +672,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     // sha1 and orphanSha have no common ancestor
     const result = await adapter.findMergeBase("/", [sha1, orphanSha] as never);
     expect(result).toBeNull();
@@ -612,7 +682,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
     const { fs, init } = makeRepo();
     await init();
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
 
     // Force git.findMergeBase to throw an unexpected error
     const spy = vi.spyOn(git, "findMergeBase").mockRejectedValueOnce(new Error("internal error"));
@@ -640,7 +710,7 @@ describe("IsomorphicGitAdapter.setProfiler – adapter stage timing", () => {
     const { DefaultStageProfiler } = await import("../../src/core/profile/index.js");
     const profiler = new DefaultStageProfiler("git", clock);
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
     adapter.setProfiler(profiler);
 
     await adapter.getFileChanges("/", sha2 as never, sha1 as never);

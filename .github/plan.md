@@ -34,23 +34,23 @@ v0.7.0 is a plugin architecture release focused on enabling organization-specifi
 ### Phase 1: Plugin Runtime and Enrichment Pipeline Integration
 
 - **File**: `plans/phase-1.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 2: Official Plugin Package Policy and Compatibility Contract
 
 - **File**: `plans/phase-2.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 3: Internal DiffAdapter Abstraction in IsomorphicGitAdapter
 
 - **File**: `plans/phase-3.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ## Release Tasks
 
 ### Documentation Update
 
-- **Status**: Planned
+- **Status**: Completed
 - Update release-facing docs and changelog for plugin architecture introduction and compatibility policy
 - Confirm plugin configuration and extension behavior documentation is consistent with implemented CLI and runtime behavior
 - Roadmap cleanup: remove entries with `Release target: v0.7.0` that were implemented
@@ -64,4 +64,12 @@ v0.7.0 is a plugin architecture release focused on enabling organization-specifi
 
 ## Final Verification Checklist
 
-- Pending (filled after all phases and release tasks are complete)
+- [x] Phase 1 completed and reviewed
+- [x] Phase 2 completed and reviewed
+- [x] Phase 3 completed and reviewed
+- [x] Documentation update tasks completed
+- [x] Roadmap cleanup completed for implemented v0.7.0 items
+- [x] `npm run build` passed
+- [x] `npm test` passed
+- [x] `npm run lint` passed (with one non-blocking warning)
+- [x] `npm run format:check` passed

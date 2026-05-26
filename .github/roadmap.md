@@ -113,6 +113,68 @@ units while preserving current CLI behavior.
 - no extraction semantic changes
 - no performance-optimization commitment beyond incidental improvements from refactoring
 
+#### Plugin Contract: Allow scalar values in `extensions.<namespace>`
+
+`ProjectedExtensions` currently constrains each namespace value to `Record<string, unknown> | null`,
+which forces every plugin to wrap its output in an object even when the natural result is a single
+scalar (for example, a commit classifier returning `"feat"` or a numeric score). This item relaxes
+that constraint so `PluginProjectionResult.success.data` and `ProjectedExtensions` values can also
+be `string`, `number`, or `boolean`.
+
+**Design intent**:
+
+- align the plugin contract with gitlode's "faithful extractor" responsibility boundary: gitlode
+  does not interpret or validate the inner shape of `extensions.<namespace>`, so requiring an
+  object wrapper is a constraint without a corresponding guarantee
+- restore plugin authors' freedom to express scalar-valued enrichments directly, without an
+  artificial wrapping convention imposed by gitlode
+- make explicit that `extensions.<namespace>` schema stability is a joint responsibility of the
+  plugin author and the user's config (namespace is user-declared), not of gitlode core
+- preserve `null` as a core-reserved sentinel meaning "the plugin ran but produced no value for
+  this fact" (skip / fatal-with-skip-fact). Plugin `success` results must therefore not include
+  `null`; otherwise the success-vs-skip distinction observable from output becomes ambiguous and
+  the projector's warning-emission semantics ([enriching-fact-projector.ts][efp]) lose their
+  invariant.
+
+**Scope (this entry)**:
+
+- widen `PluginProjectionResult.success.data` to
+  `Record<string, unknown> | string | number | boolean` (intentionally excluding `null`)
+- widen `ProjectedExtensions` value type to
+  `Record<string, unknown> | string | number | boolean | null`, retaining `null` as a value that
+  only the core projector assigns, never a value produced by a plugin's `success` result. This
+  asymmetry is the type-level expression of the "null is core-reserved" invariant
+- update the `EnrichingFactProjector` projection path so scalar results pass through unchanged
+  (the current code already assigns `result.data` directly; no branching logic is needed)
+- update plugin/schema documentation (`schema.instructions.md`, `docs/design/schema.md`,
+  `docs/design/plugins.md`) to reflect the widened contract and to document the responsibility
+  boundary: gitlode does not guarantee `extensions.<namespace>` shape stability; consumers that
+  need stability should pin plugin versions and freeze their config file. Documentation must also
+  state explicitly that `null` is core-reserved and not a valid plugin `success.data` value
+- add test coverage for scalar success results in the projector, and a negative/contract test that
+  demonstrates `null` is rejected at the type level for `success.data`
+
+[efp]: ../packages/gitlode/src/core/enriching-fact-projector.ts
+
+**Non-goals for this item**:
+
+- no change to projection semantics for plugins that continue to return objects (fully backward
+  compatible at the wire level for existing plugins)
+- no introduction of CLI-side "unwrap single-key object" shortcuts; the change lives entirely in
+  the plugin contract
+- no attempt to enforce or recommend object-versus-scalar choice in core; guidance belongs in
+  plugin authoring docs
+
+**Open questions to confirm at design time**:
+
+- whether to also allow arrays at the top level of a namespace value, or restrict the widening to
+  scalars only in this iteration
+- exact wording of the responsibility-boundary statement in `docs/design/plugins.md`, including
+  the explicit note that `null` is a core-reserved sentinel and not a permitted plugin
+  `success.data` value
+- whether the existing `@gitlode/plugin-custom-fields` plugin should gain a "single-field scalar
+  shorthand" mode as a follow-up, or remain object-only
+
 ---
 
 ### Medium-term

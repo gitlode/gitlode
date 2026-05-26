@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import nodeFs from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -41,7 +42,12 @@ import type {
   StateStore,
 } from "./core/index.js";
 import { DefaultStageProfiler } from "./core/profile/index.js";
-import { GitAdapterError, IsomorphicGitAdapter, type RepositoryObjectFormat } from "./git/index.js";
+import {
+  GitAdapterError,
+  IsomorphicGitAdapter,
+  JsDiffAdapter,
+  type RepositoryObjectFormat,
+} from "./git/index.js";
 import { OutputWriter, formatSessionTimestamp, OutputWriterSink } from "./output/index.js";
 
 export function assertSupportedRepositoryObjectFormat(
@@ -178,7 +184,7 @@ const stderrSink: TerminalSink = {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const adapter = new IsomorphicGitAdapter();
+  const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
   let parsed;
   try {
     parsed = await parseArgs(adapter);

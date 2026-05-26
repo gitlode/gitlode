@@ -1,12 +1,9 @@
-import nodeFs from "node:fs";
-
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
 import type { CommitOid, OidProfile, RefType, StageProfiler } from "../core/index.js";
 import { isCommitOid } from "../core/index.js";
 import { withProfilerAsync } from "../core/profile/index.js";
-import { JsDiffAdapter } from "./diff-adapter.js";
 import { GitAdapterError } from "./errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -32,9 +29,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
   private _blobReadProfiler?: StageProfiler;
   private _diffProfiler?: StageProfiler;
 
-  constructor(fsImpl?: FsClient, diffAdapterImpl?: DiffAdapter) {
-    this._fs = fsImpl ?? (nodeFs as FsClient);
-    this._diffAdapter = diffAdapterImpl ?? new JsDiffAdapter();
+  constructor(fsImpl: FsClient, diffAdapterImpl: DiffAdapter) {
+    this._fs = fsImpl;
+    this._diffAdapter = diffAdapterImpl;
   }
 
   supportedObjectFormats(): readonly OidProfile[] {

@@ -29,8 +29,7 @@ Configure gitlode with `--config`:
           "is_backfill": false,
           "notes": null
         }
-      },
-      "failurePolicy": "skip-fact"
+      }
     }
   }
 }

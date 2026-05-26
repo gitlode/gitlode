@@ -1,6 +1,6 @@
-# @gitlode/plugin-custom-fields
+# @gitlode/plugin-custom-field
 
-Add static custom fields to every gitlode output record under `extensions["custom-fields"]`.
+Add static custom fields to every gitlode output record under `extensions["custom-field"]`.
 
 This plugin is the first official gitlode plugin and is intended as a simple, practical
 session-labeling tool. Typical use cases include tagging extraction output with branch,
@@ -9,7 +9,7 @@ environment, run id, or other pipeline metadata.
 ## Installation
 
 ```bash
-npm install -g @gitlode/plugin-custom-fields
+npm install -g @gitlode/plugin-custom-field
 ```
 
 ## Usage
@@ -20,10 +20,10 @@ Configure gitlode with `--config`:
 {
   "version": 1,
   "extensions": {
-    "custom-fields": {
-      "entrypoint": "@gitlode/plugin-custom-fields",
+    "custom-field": {
+      "entrypoint": "@gitlode/plugin-custom-field",
       "config": {
-        "fields": {
+        "value": {
           "branch": "develop",
           "run_id": 20260526,
           "is_backfill": false,
@@ -46,7 +46,7 @@ Each emitted record will include:
 ```json
 {
   "extensions": {
-    "custom-fields": {
+    "custom-field": {
       "branch": "develop",
       "run_id": 20260526,
       "is_backfill": false,
@@ -62,7 +62,7 @@ Each emitted record will include:
 
 ```json
 {
-  "fields": {
+  "value": {
     "<fieldName>": "<string|number|boolean|null>"
   }
 }
@@ -70,7 +70,7 @@ Each emitted record will include:
 
 Rules:
 
-- `fields` is required and must contain at least one entry.
+- `value` is required and must be an object containing at least one entry.
 - Field names must match `^[A-Za-z_][A-Za-z0-9_-]*$`.
 - Field values must be scalar JSON values only: `string`, `number`, `boolean`, or `null`.
 - Number values must be finite (`NaN`, `Infinity`, and `-Infinity` are rejected).

@@ -2,7 +2,7 @@ import type { PluginFactory, PluginInitResult, PluginProjectionResult } from "gi
 
 type FieldValue = string | number | boolean | null;
 type ParseResult =
-  | { type: "ok"; fields: Readonly<Record<string, FieldValue>> }
+  | { type: "ok"; value: Readonly<Record<string, FieldValue>> }
   | { type: "error"; message: string };
 
 const FIELD_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -15,27 +15,27 @@ function parseConfig(rawConfig: unknown): ParseResult {
   if (!isRecord(rawConfig)) {
     return {
       type: "error",
-      message: 'Invalid plugin config: top-level value must be an object with a "fields" property.',
+      message: 'Invalid plugin config: top-level value must be an object with a "value" property.',
     };
   }
 
-  const fieldsRaw = rawConfig["fields"];
-  if (!isRecord(fieldsRaw)) {
+  const valueRaw = rawConfig["value"];
+  if (!isRecord(valueRaw)) {
     return {
       type: "error",
-      message: 'Invalid plugin config: "fields" must be an object containing at least one entry.',
+      message: 'Invalid plugin config: "value" must be an object containing at least one entry.',
     };
   }
 
-  const entries = Object.entries(fieldsRaw);
+  const entries = Object.entries(valueRaw);
   if (entries.length === 0) {
     return {
       type: "error",
-      message: 'Invalid plugin config: "fields" must contain at least one entry.',
+      message: 'Invalid plugin config: "value" must contain at least one entry.',
     };
   }
 
-  const parsedFields: Record<string, FieldValue> = {};
+  const parsedValue: Record<string, FieldValue> = {};
   for (const [fieldName, value] of entries) {
     if (!FIELD_NAME_PATTERN.test(fieldName)) {
       return {
@@ -47,7 +47,7 @@ function parseConfig(rawConfig: unknown): ParseResult {
     switch (typeof value) {
       case "string":
       case "boolean":
-        parsedFields[fieldName] = value;
+        parsedValue[fieldName] = value;
         break;
       case "number":
         if (!Number.isFinite(value)) {
@@ -56,11 +56,11 @@ function parseConfig(rawConfig: unknown): ParseResult {
             message: `Invalid plugin config: field "${fieldName}" must be a finite number.`,
           };
         }
-        parsedFields[fieldName] = value;
+        parsedValue[fieldName] = value;
         break;
       case "object":
         if (value === null) {
-          parsedFields[fieldName] = null;
+          parsedValue[fieldName] = null;
           break;
         }
         return {
@@ -75,7 +75,7 @@ function parseConfig(rawConfig: unknown): ParseResult {
     }
   }
 
-  return { type: "ok", fields: Object.freeze(parsedFields) };
+  return { type: "ok", value: Object.freeze(parsedValue) };
 }
 
 const factory: PluginFactory = async (rawConfig: unknown) => {
@@ -86,7 +86,7 @@ const factory: PluginFactory = async (rawConfig: unknown) => {
       : { type: "fatal", message: parsedConfig.message };
   const projectResult: PluginProjectionResult =
     parsedConfig.type === "ok"
-      ? { type: "success", data: parsedConfig.fields }
+      ? { type: "success", data: parsedConfig.value }
       : { type: "success", data: {} };
 
   return {

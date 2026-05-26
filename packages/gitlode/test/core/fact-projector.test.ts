@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { DefaultFactProjector } from "../../src/core/fact-projector.js";
+import {
+  DefaultFactProjector,
+  projectCommit,
+  projectFileChange,
+} from "../../src/core/fact-projector.js";
 import type { CommitFact, Fact, FileChangeFact } from "../../src/core/types.js";
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
@@ -60,7 +64,7 @@ function makeFileChangeFact(
 // ---------------------------------------------------------------------------
 
 describe("DefaultFactProjector — commit mode", () => {
-  it("maps all OutputCommit fields from CommitFact", async () => {
+  it("maps all ProjectedCommit fields from CommitFact", async () => {
     const projector = new DefaultFactProjector("repo", "https://github.com/org/repo.git");
     const fact = makeCommitFact();
     const [record] = await collect(projector.project(toAsyncIter([fact])));
@@ -177,7 +181,7 @@ describe("DefaultFactProjector — commit mode", () => {
 // ---------------------------------------------------------------------------
 
 describe("DefaultFactProjector — file-change mode", () => {
-  it("includes all OutputCommit fields denormalized into the file record", async () => {
+  it("includes all ProjectedCommit fields denormalized into the file record", async () => {
     const projector = new DefaultFactProjector("repo", "https://github.com/org/repo.git");
     const fact = makeFileChangeFact();
     const [record] = await collect(projector.project(toAsyncIter([fact])));
@@ -363,5 +367,43 @@ describe("DefaultFactProjector — exhaustive dispatch", () => {
     expect(fileRecords).toHaveLength(1);
     expect(fileRecords[0]!.oid).toBe("f".repeat(40));
     expect((fileRecords[0] as { file?: { path: string } })!.file!.path).toBe("x.ts");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pure function tests
+// ---------------------------------------------------------------------------
+
+describe("projectCommit — pure function", () => {
+  it("returns the same fields as DefaultFactProjector for a commit fact", () => {
+    const fact = makeCommitFact();
+    const record = projectCommit(fact, "my-repo", "https://github.com/org/my-repo");
+    expect(record.oid).toBe(fact.oid);
+    expect(record.repository.name).toBe("my-repo");
+    expect(record.repository.url).toBe("https://github.com/org/my-repo");
+    expect(record.subject).toBe("fix: correct bug");
+    expect(record.parents).toEqual(fact.parents);
+  });
+
+  it("accepts null remoteUrl", () => {
+    const fact = makeCommitFact();
+    const record = projectCommit(fact, "repo", null);
+    expect(record.repository.url).toBeNull();
+  });
+});
+
+describe("projectFileChange — pure function", () => {
+  it("returns the same fields as DefaultFactProjector for a file-change fact", () => {
+    const fact = makeFileChangeFact();
+    const record = projectFileChange(fact, "my-repo", "https://github.com/org/my-repo");
+    expect(record.oid).toBe(fact.commit.oid);
+    expect(record.repository.name).toBe("my-repo");
+    expect((record as { file?: { path: string } }).file?.path).toBe("src/index.ts");
+  });
+
+  it("accepts null remoteUrl", () => {
+    const fact = makeFileChangeFact();
+    const record = projectFileChange(fact, "repo", null);
+    expect(record.repository.url).toBeNull();
   });
 });

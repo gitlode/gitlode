@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-05-25
+
+### Added
+
+- Plugin runtime integration via `--config <path>` with `extensions` namespace output under each
+  record.
+- Plugin compatibility policy and warning-only runtime compatibility checks based on
+  `peerDependencies.gitlode`.
+- `DiffAdapter` abstraction in `IsomorphicGitAdapter`.
+
+### Changed
+
+- Output schema now supports optional `extensions` when plugins are configured.
+- Project documentation and instruction files now include plugin policy and git-adapter diff
+  strategy boundaries.
+
+### Migration
+
+- No migration action is required for existing no-plugin usage.
+- Users adopting plugin config should provide a valid JSON config file with `version: 1` and
+  non-empty `extensions` entries.
+
 ## [0.6.2] - 2026-05-21
 
 ### Changed

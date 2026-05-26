@@ -1,6 +1,3 @@
-import nodeFs from "node:fs";
-
-import { diffLines } from "diff";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
@@ -10,14 +7,16 @@ import { withProfilerAsync } from "../core/profile/index.js";
 import { GitAdapterError } from "./errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
+  type DiffAdapter,
   type FileChange,
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
-} from "./index.js";
+} from "./types.js";
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
+  private readonly _diffAdapter: DiffAdapter;
   private _resolveRefProfiler?: StageProfiler;
   private _repositoryObjectFormatProfiler?: StageProfiler;
   private _getRemoteUrlProfiler?: StageProfiler;
@@ -30,8 +29,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
   private _blobReadProfiler?: StageProfiler;
   private _diffProfiler?: StageProfiler;
 
-  constructor(fsImpl?: FsClient) {
-    this._fs = fsImpl ?? (nodeFs as FsClient);
+  constructor(fsImpl: FsClient, diffAdapterImpl: DiffAdapter) {
+    this._fs = fsImpl;
+    this._diffAdapter = diffAdapterImpl;
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -401,15 +401,20 @@ export class IsomorphicGitAdapter implements GitAdapter {
       return { path, status, beforeSize, afterSize, additions: null, deletions: null };
     }
 
-    const decoder = new TextDecoder("utf-8");
-    const oldStr = decoder.decode(contentA);
-    const newStr = decoder.decode(contentB);
-    const parts = diffLines(oldStr, newStr);
-    let additions = 0;
-    let deletions = 0;
-    for (const part of parts) {
-      if (part.added) additions += part.count;
-      if (part.removed) deletions += part.count;
+    const { additions, deletions } = this._diffAdapter.computeLineDiff(contentA, contentB);
+
+    if (
+      !Number.isFinite(additions) ||
+      !Number.isInteger(additions) ||
+      additions < 0 ||
+      !Number.isFinite(deletions) ||
+      !Number.isInteger(deletions) ||
+      deletions < 0
+    ) {
+      throw new GitAdapterError(
+        `DiffAdapter returned invalid values: additions=${String(additions)}, deletions=${String(deletions)}`,
+        "UNKNOWN",
+      );
     }
 
     return { path, status, beforeSize, afterSize, additions, deletions };

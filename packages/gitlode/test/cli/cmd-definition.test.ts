@@ -28,6 +28,7 @@ describe("program – help output wiring", () => {
       "--per-file",
       "--repo-name",
       "--repo-url",
+      "--config",
     ];
     for (const flag of expectedLongFlags) {
       expect(longFlags, `expected option "${flag}" to be registered`).toContain(flag);
@@ -99,6 +100,8 @@ describe("program – help output wiring", () => {
 
     expect(optionsByLong.get("--rotate-lines")?.helpGroupHeading).toBe("File Rotation");
     expect(optionsByLong.get("--rotate-size")?.helpGroupHeading).toBe("File Rotation");
+
+    expect(optionsByLong.get("--config")?.helpGroupHeading).toBe("Configuration File");
   });
 
   it("renders grouped help headings", () => {
@@ -110,5 +113,6 @@ describe("program – help output wiring", () => {
     expect(help).toContain("Extraction Range (Snapshot Mode)");
     expect(help).toContain("Incremental Extraction");
     expect(help).toContain("File Rotation");
+    expect(help).toContain("Configuration File");
   });
 });

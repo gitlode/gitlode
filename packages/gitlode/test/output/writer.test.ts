@@ -5,10 +5,10 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { OutputCommit, OutputFileRecord } from "../../src/output/types.js";
+import type { ProjectedCommit, ProjectedFileChange } from "../../src/core/types.js";
 import { OutputWriter } from "../../src/output/writer.js";
 
-function makeCommit(oid: string): OutputCommit {
+function makeCommit(oid: string): ProjectedCommit {
   return {
     oid,
     subject: `commit ${oid.slice(0, 7)}`,
@@ -124,7 +124,7 @@ describe("OutputWriter", () => {
     const content = await readFile(join(tmpDir, "repo-000001.jsonl"), "utf8");
     const lines = content.split("\n").filter(Boolean);
     expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0]!) as OutputCommit;
+    const parsed = JSON.parse(lines[0]!) as ProjectedCommit;
     expect(parsed.oid).toBe("a".repeat(40));
     expect(parsed.subject).toBe(commit.subject);
     expect(parsed.repository.url).toBeNull();
@@ -149,9 +149,9 @@ describe("OutputWriter", () => {
     }
   });
 
-  it("accepts OutputFileRecord (with file field) without error", async () => {
+  it("accepts ProjectedFileChange (with file field) without error", async () => {
     const base = makeCommit(oid(1));
-    const fileRecord: OutputFileRecord = {
+    const fileRecord: ProjectedFileChange = {
       ...base,
       file: {
         path: "src/index.ts",
@@ -166,7 +166,7 @@ describe("OutputWriter", () => {
     await writer.close();
 
     const content = await readFile(join(tmpDir, "repo-000001.jsonl"), "utf8");
-    const parsed = JSON.parse(content.trim()) as OutputFileRecord;
+    const parsed = JSON.parse(content.trim()) as ProjectedFileChange;
     expect(parsed.oid).toBe(base.oid);
     expect(parsed.file.path).toBe("src/index.ts");
     expect(parsed.file.status).toBe("modified");

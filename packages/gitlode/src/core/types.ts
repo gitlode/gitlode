@@ -61,7 +61,70 @@ export interface FileChangeFact {
   };
 }
 
-export type Fact = CommitFact | FileChangeFact;
+// ---------------------------------------------------------------------------
+// Projected record types
+//
+// These describe the shape produced by the `FactProjector` stage. They are
+// the values flowing through `OutputSink.write()` and passed to plugins as
+// `ProjectionContext.baseRecord`. The output layer serializes them as-is
+// (1:1 JSONL projection) and does not redefine the shape.
+// ---------------------------------------------------------------------------
+
+export interface ProjectedPerson extends PersonIdentity {
+  readonly timestamp: string; // ISO 8601 with commit's own timezone offset
+}
+
+export interface ProjectedRepository {
+  readonly name: string;
+  readonly url: string | null;
+}
+
+export interface ProjectedExtensions {
+  [namespace: string]: Record<string, unknown> | null;
+}
+
+export interface ProjectedCommit {
+  readonly oid: string;
+  readonly subject: string;
+  readonly body: string;
+  readonly author: ProjectedPerson;
+  readonly committer: ProjectedPerson;
+  readonly parents: readonly string[];
+  readonly repository: ProjectedRepository;
+  readonly extensions?: ProjectedExtensions;
+}
+
+export interface ProjectedFileChange extends ProjectedCommit {
+  readonly file: {
+    readonly path: string;
+    readonly status: "added" | "modified" | "deleted";
+    readonly additions: number | null;
+    readonly deletions: number | null;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fact / ProjectedRecord pairing — single source of truth.
+//
+// Each FactType maps to both its raw fact shape and the projected record
+// shape produced from it. `FactFor<T>` and `ProjectedRecordFor<T>` are
+// derived from this map so the pair invariant cannot drift.
+// ---------------------------------------------------------------------------
+
+interface FactPairMap {
+  commit: { readonly fact: CommitFact; readonly record: ProjectedCommit };
+  "file-change": { readonly fact: FileChangeFact; readonly record: ProjectedFileChange };
+}
+
+export type FactType = keyof FactPairMap;
+
+export type FactFor<Type extends FactType> = FactPairMap[Type]["fact"];
+
+export type Fact = FactFor<FactType>;
+
+export type ProjectedRecordFor<Type extends FactType> = FactPairMap[Type]["record"];
+
+export type ProjectedRecord = ProjectedRecordFor<FactType>;
 
 export interface RotationConfig {
   readonly maxLines?: number;
@@ -86,7 +149,7 @@ export interface ExtractorConfig {
   readonly maxDiffSize?: number;
 }
 
-export type ProgressPhase = "preparing" | "extracting" | "finalizing";
+export type ProgressPhase = "initializing-plugins" | "preparing" | "extracting" | "finalizing";
 
 export type ProgressEvent =
   | { readonly type: "phase-start"; readonly phase: ProgressPhase }
@@ -286,14 +349,9 @@ export interface FileChangeExpander {
 // Phase 4 coordinator / sink contract
 // ---------------------------------------------------------------------------
 
-// OutputRecord is imported here (type-only) to define OutputSink and CoordinatorDeps.
-// The circular path core/types.ts → output/types.ts → core/index.ts → core/types.ts
-// is type-only in both directions; TypeScript resolves it without issues.
-import type { OutputRecord } from "../output/types.js";
-
 /** Core-owned interface for output sink. Wraps the output layer's write/close contract. */
 export interface OutputSink {
-  write(record: OutputRecord): Promise<void>;
+  write(record: ProjectedRecord): Promise<void>;
   close(): Promise<void>;
   readonly filesCreated: number;
   readonly bytesWritten: number;
@@ -327,7 +385,7 @@ export interface CoordinatorResult {
 
 /** Core-owned interface for the fact projection stage. */
 export interface FactProjector {
-  project(facts: AsyncIterable<Fact>): AsyncIterable<OutputRecord>;
+  project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord>;
 }
 
 /** Core-owned interface for the extraction orchestration stage. */
@@ -335,12 +393,55 @@ export interface ExtractionCoordinator {
   run(request: CoordinatorRequest): Promise<CoordinatorResult>;
 }
 
+// ---------------------------------------------------------------------------
+// Plugin contract types
+// ---------------------------------------------------------------------------
+
+export type PluginFailurePolicy = "skip-fact" | "fatal";
+
+export type PluginInitResult = { type: "ready" } | { type: "fatal"; message: string };
+
+export type PluginProjectionResult =
+  | { type: "success"; data: Record<string, unknown> }
+  | { type: "skip"; message: string }
+  | { type: "fatal"; message: string };
+
+type ProjectionContextFor<Type extends FactType> = {
+  readonly fact: FactFor<Type>;
+  readonly baseRecord: Readonly<ProjectedRecordFor<Type>>;
+};
+
+/** Read-only snapshot of the projected base record; passed to plugins for enrichment context. */
+export type ProjectionContext = {
+  [Type in FactType]: ProjectionContextFor<Type>;
+}[FactType];
+
+/** Contract that every projector plugin must satisfy. */
+export interface ProjectorPlugin {
+  init?(): Promise<PluginInitResult>;
+  project(context: ProjectionContext, profiler?: StageProfiler): Promise<PluginProjectionResult>;
+}
+
+/** Module default-export signature for plugin factory functions. ESM only. */
+export type PluginFactory = (config: unknown) => ProjectorPlugin | Promise<ProjectorPlugin>;
+
+/** Validated plugin namespace string — must match /^[a-z0-9-]+$/. */
+export type Namespace = string & { readonly __brand: "Namespace" };
+
+/** Runtime registry record for a loaded, initialized plugin. */
+export interface PluginEntry {
+  readonly namespace: Namespace;
+  readonly plugin: ProjectorPlugin;
+  readonly failurePolicy: PluginFailurePolicy;
+  readonly profiler?: StageProfiler;
+}
+
 /** Constructor dependencies injected into `DefaultExtractionCoordinator`. */
 export interface CoordinatorDependencies {
   readonly traversalPlanner: TraversalPlanner;
   readonly traversalExtractor: CommitTraversalExtractor;
   readonly fileChangeExpander: FileChangeExpander;
-  /** Accepts any projector whose `project()` returns `AsyncIterable<OutputRecord>`. */
+  /** Accepts any projector whose `project()` returns `AsyncIterable<ProjectedRecord>`. */
   readonly projector: FactProjector;
   readonly sink: OutputSink;
   readonly stateStore: StateStore | undefined;

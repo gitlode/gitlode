@@ -13,6 +13,8 @@ export { formatElapsed, humanizeBytes };
 
 function phaseLabel(phase: ProgressPhase): string {
   switch (phase) {
+    case "initializing-plugins":
+      return "Initializing plugins";
     case "preparing":
       return "Preparing extraction";
     case "extracting":

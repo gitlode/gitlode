@@ -2,8 +2,7 @@ import { open } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { RotationConfig } from "../core/index.js";
-import type { OutputRecord } from "./types.js";
+import type { ProjectedRecord, RotationConfig } from "../core/index.js";
 
 export class OutputWriter {
   private seq = 0;
@@ -40,7 +39,7 @@ export class OutputWriter {
     return handle;
   }
 
-  async write(record: OutputRecord): Promise<void> {
+  async write(record: ProjectedRecord): Promise<void> {
     const handle = this.handle ?? (await this.openNext());
     const line = JSON.stringify(record) + "\n";
     const bytes = Buffer.byteLength(line, "utf8");

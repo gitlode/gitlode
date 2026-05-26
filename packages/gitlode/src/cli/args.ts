@@ -13,6 +13,7 @@ export interface ParsedArgs extends ExtractorConfig {
   profile: boolean;
   repoName?: string;
   repoUrl?: string;
+  configPath?: string;
 }
 
 const RawOptsSchema = z.object({
@@ -32,6 +33,7 @@ const RawOptsSchema = z.object({
   perFile: z.boolean(),
   repoName: z.string().optional(),
   repoUrl: z.string().optional(),
+  config: z.string().optional(),
 });
 
 export const program = new Command()
@@ -142,6 +144,12 @@ export const program = new Command()
     )
       .default(false)
       .helpGroup("Runtime and Diagnostics"),
+  )
+  .addOption(
+    new Option(
+      "-c, --config <path>",
+      "Path to a JSON configuration file for declaring enrichment plugins.",
+    ).helpGroup("Configuration File"),
   );
 
 function userError(msg: string): never {
@@ -248,6 +256,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
   const perFile = opts.perFile;
   const repoName = opts.repoName;
   const repoUrl = opts.repoUrl;
+  const configRaw = opts.config;
 
   // --- Phase 1: Format and mutual exclusion checks (no I/O) ---
   if (
@@ -334,6 +343,14 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     }
   }
 
+  let resolvedConfigPath: string | undefined;
+  if (configRaw !== undefined) {
+    resolvedConfigPath = resolve(configRaw);
+    if (!existsSync(resolvedConfigPath)) {
+      userError(`Config file not found: ${configRaw}`);
+    }
+  }
+
   // --- Phase 3: Git validation ---
   try {
     await adapter.resolveRef(resolvedRepoPath, refs[0]!);
@@ -398,5 +415,6 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
     profile,
     repoName,
     repoUrl,
+    configPath: resolvedConfigPath,
   };
 }

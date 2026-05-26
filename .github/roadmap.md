@@ -75,6 +75,44 @@ default while allowing explicit operator control when non-TTY color is desirable
 
 - no redesign of JSON output contracts; this is terminal presentation policy only
 
+#### Architecture/CLI Runtime: `main` orchestration refactoring and unit-test expansion
+
+The current CLI entrypoint has grown to include argument parsing, dependency wiring, runtime
+branching, error-to-exit-code mapping, and result reporting in a single `main` flow. This shape
+is workable, but it raises the maintenance cost of local changes and makes behavior-focused tests
+harder to write and review.
+
+This item improves maintainability and testability by splitting the entrypoint logic into semantic
+units while preserving current CLI behavior.
+
+**Design intent**:
+
+- reduce the cognitive load of `main` by extracting semantically coherent runtime steps
+- keep behavior stable (`no behavior change`) while improving structure and testability
+- increase confidence in runtime changes by adding unit tests around currently weakly covered paths
+
+**Scope boundary (initial delivery)**:
+
+- split entrypoint logic into focused helpers/modules (for example: reporter setup, runtime
+  dependency assembly, execution/reporting, error/exit mapping)
+- keep the runtime boundary role of the entrypoint explicit (composition and process-level control)
+- add or extend unit tests for extracted units and branching behavior currently concentrated in
+  `main`
+
+**Considerations required at design time**:
+
+- module boundary choices that improve readability without obscuring the runtime edge
+- dependency injection shape needed to unit-test success and failure branches without brittle mocks
+- expected test coverage targets for key branches (success, `GitAdapterError`, unexpected error,
+  quiet/profile and TTY/non-TTY behavior)
+- file/module naming and placement so the resulting structure remains discoverable for contributors
+
+**Non-goals for this item**:
+
+- no CLI option-surface changes
+- no extraction semantic changes
+- no performance-optimization commitment beyond incidental improvements from refactoring
+
 ---
 
 ### Medium-term

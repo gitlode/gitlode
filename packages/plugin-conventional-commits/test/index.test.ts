@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import factory from "../src/index.js";
 
-describe("@gitlode/plugin-conventional-commits-parser", () => {
+describe("@gitlode/plugin-conventional-commits", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });

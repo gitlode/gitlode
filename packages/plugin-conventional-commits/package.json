@@ -1,6 +1,6 @@
 {
-  "name": "@gitlode/plugin-conventional-commits-parser",
-  "version": "0.1.0",
+  "name": "@gitlode/plugin-conventional-commits",
+  "version": "0.2.0",
   "description": "Official gitlode plugin for parsing conventional commits",
   "keywords": [
     "gitlode",

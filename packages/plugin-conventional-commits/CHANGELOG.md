@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial release of `@gitlode/plugin-conventional-commits-parser`.
+- Initial release of `@gitlode/plugin-conventional-commits`.
 - Commit-message parsing via `conventional-commits-parser` with the parsed payload written under
   `extensions["conventional-commits"]`.
 - Projection for both commit records and file-change records using the source commit message.

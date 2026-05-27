@@ -1,4 +1,4 @@
-# @gitlode/plugin-conventional-commits-parser
+# @gitlode/plugin-conventional-commits
 
 Parse commit messages with [conventional-commits-parser](https://www.npmjs.com/package/conventional-commits-parser) and write the parsed result under
 `extensions["conventional-commits"]` in every gitlode output record.
@@ -9,7 +9,7 @@ facts, so the same parsed payload is available on both record types.
 ## Installation
 
 ```bash
-npm install -g @gitlode/plugin-conventional-commits-parser
+npm install -g @gitlode/plugin-conventional-commits
 ```
 
 ## Usage
@@ -21,7 +21,7 @@ Configure gitlode with `--config`:
   "version": 1,
   "extensions": {
     "conventional-commits": {
-      "entrypoint": "@gitlode/plugin-conventional-commits-parser"
+      "entrypoint": "@gitlode/plugin-conventional-commits"
     }
   }
 }
@@ -78,7 +78,7 @@ You can omit `config` entirely:
   "version": 1,
   "extensions": {
     "conventional-commits": {
-      "entrypoint": "@gitlode/plugin-conventional-commits-parser"
+      "entrypoint": "@gitlode/plugin-conventional-commits"
     }
   }
 }

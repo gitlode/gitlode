@@ -1,0 +1,46 @@
+{
+  "name": "@gitlode/plugin-conventional-commits-parser",
+  "version": "0.1.0",
+  "description": "Official gitlode plugin for parsing conventional commits",
+  "keywords": [
+    "gitlode",
+    "gitlode-plugin",
+    "plugin"
+  ],
+  "homepage": "https://github.com/gitlode/gitlode#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gitlode/gitlode.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "format:check": "oxfmt --check",
+    "format:write": "oxfmt",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "conventional-commits-parser": "^6.4.0"
+  },
+  "devDependencies": {
+    "gitlode": "^0.7.0"
+  },
+  "peerDependencies": {
+    "gitlode": "^0.7.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

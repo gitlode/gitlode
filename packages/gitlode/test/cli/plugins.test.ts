@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -347,22 +347,6 @@ describe("checkPluginCompatibility – version range checks", () => {
       plugin: { project: async () => ({ type: "success", data: {} }) },
       failurePolicy: "skip-fact",
     };
-  }
-
-  async function makePlugin(
-    dir: string,
-    entrypoint: string,
-    pkg: Record<string, unknown>,
-  ): Promise<void> {
-    const pluginDir = join(dir, entrypoint.replace(/\.mjs$/, ""));
-    await mkdir(pluginDir, { recursive: true });
-    await writeFile(
-      join(dir, entrypoint),
-      `export default async function factory() {
-        return { project: async () => ({ type: "success", data: {} }) };
-      }`,
-    );
-    await writeFile(join(dir, "package.json"), JSON.stringify(pkg));
   }
 
   it("(a) emits no output when declared peer range is satisfied", async () => {

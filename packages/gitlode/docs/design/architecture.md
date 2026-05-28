@@ -329,9 +329,10 @@ attach to the extraction process and add optional fields to output records.
 - **`src/core/enriching-fact-projector.ts`** — `EnrichingFactProjector` wraps the default
   projector and calls each configured plugin's `project()` per fact in declaration order.
 - **`src/core/types.ts`** — all plugin contract types: `ProjectorPlugin`, `PluginEntry`,
-  `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `ProjectionContext`,
-  `PluginFailurePolicy`. Also defines the projection record shapes consumed downstream:
-  `ProjectedCommit`, `ProjectedFileChange`, `ProjectedRecord`, and the `ProjectedExtensions`
+  `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`,
+  `ProjectionContext`, `PluginFailurePolicy`. Also defines the projection record shapes consumed
+  downstream: `ProjectedCommit`, `ProjectedFileChange`, `ProjectedRecord`, the
+  `ProjectedExtensionValue` type (`PluginProjectionValue | null`), and the `ProjectedExtensions`
   type alias used for the optional `extensions` field on every projected record.
 
 ### Wiring at the runtime edge (`src/index.ts`)

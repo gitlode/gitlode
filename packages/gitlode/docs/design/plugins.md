@@ -100,8 +100,14 @@ interface ProjectionContext {
 ### `PluginProjectionResult`
 
 ```typescript
+/**
+ * Scalar or object value a plugin may return as `success.data`.
+ * `null` is excluded — return `{ type: "skip" }` to signal no data.
+ */
+type PluginProjectionValue = string | number | boolean | Readonly<Record<string, unknown>>;
+
 type PluginProjectionResult =
-  | { type: "success"; data: Record<string, unknown> }
+  | { type: "success"; data: PluginProjectionValue }
   | { type: "skip"; message: string }
   | { type: "fatal"; message: string };
 ```
@@ -126,13 +132,16 @@ When at least one plugin is active, each output record gains an `extensions` obj
   "subject": "...",
   "extensions": {
     "my-plugin": { "score": 42 },
+    "label-plugin": "v1.0",
+    "flag-plugin": true,
     "other-plugin": null
   }
 }
 ```
 
 - Each key is a plugin namespace declared in the configuration file.
-- A value of `null` means the plugin skipped or encountered an error on this fact.
+- A value of `null` means the plugin skipped or encountered an error on this fact (core-reserved sentinel).
+- Non-null values are whatever `success.data` returned: a plain object, a string, a number, or a boolean.
 - Key order in `extensions` matches plugin declaration order in the configuration file.
 - If no plugins are configured, the `extensions` field is omitted from output records entirely.
 
@@ -171,9 +180,10 @@ When a plugin returns `fatal` or throws on a given fact:
 
 - **Plugin runtime is a CLI boundary concern.** Config loading, module resolution, and factory invocation happen in `src/cli/plugins.ts`.
 - **Enrichment projection is a Core boundary concern.** `EnrichingFactProjector` (in `src/core/`) wraps the default projector and orchestrates per-fact plugin calls.
-- **Core types define the plugin contract.** `ProjectorPlugin`, `PluginEntry`, `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `ProjectionContext`, `PluginFailurePolicy` are all in `src/core/types.ts`.
+- **Core types define the plugin contract.** `ProjectorPlugin`, `PluginEntry`, `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`, `ProjectionContext`, `PluginFailurePolicy` are all in `src/core/types.ts`.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
-- **The `extensions` field is a Core projection concern.** `ProjectedExtensions` is defined in `src/core/types.ts` as `Record<string, Record<string, unknown> | null>`.
+- **The `extensions` field is a Core projection concern.** `ProjectedExtensions` is defined in `src/core/types.ts` as `Record<string, ProjectedExtensionValue>` where `ProjectedExtensionValue = PluginProjectionValue | null`. The `null` sentinel is core-reserved: plugins produce it only indirectly via `skip` or `fatal`-with-`skip-fact` results, never by returning `null` directly in `success.data`.
+- **gitlode guarantees the outer `extensions` contract only:** namespace key placement, omission when no plugins are active, declaration-order preservation, and the meaning of `null`. The inner shape of a plugin's non-null payload is owned jointly by the plugin author and the user's chosen namespace/config pairing.
 
 ---
 

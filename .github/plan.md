@@ -32,7 +32,7 @@ semantics.
 ### Phase 1: Plugin Contract Scalar Values and Type-Safety Boundary
 
 - **File**: `plans/phase-1.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 2: Runtime/Plugin Responsibility Boundary Consolidation
 

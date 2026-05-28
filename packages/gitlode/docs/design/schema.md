@@ -62,7 +62,7 @@ interface ProjectedCommit {
     url: string | null;
   };
   // Present only when --config is used and plugins are active.
-  extensions?: Record<string, Record<string, unknown> | null>;
+  extensions?: Record<string, string | number | boolean | Readonly<Record<string, unknown>> | null>;
 }
 ```
 
@@ -177,9 +177,15 @@ Present only when `--config` is provided and at least one plugin is active.
 
 Each key is a plugin namespace declared in the configuration file. A value of `null` means the
 plugin skipped that fact (due to a `skip` result or a `fatal` result with `failurePolicy:
-"skip-fact"`). Key order matches plugin declaration order.
+"skip-fact"`). Non-null values are whatever `success.data` returned: a plain object, a string, a
+number, or a boolean. Key order matches plugin declaration order.
 
 When no plugins are configured, `extensions` is omitted from output records entirely.
+
+gitlode guarantees the outer contract of `extensions` only: namespace key placement, omission when
+no plugins are active, declaration-order preservation, and the meaning of `null`. The inner shape
+of a plugin's non-null payload is owned jointly by the plugin author and the user's chosen
+namespace/config pairing.
 
 ## Complete example record (no plugins)
 

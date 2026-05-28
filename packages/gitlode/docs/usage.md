@@ -545,12 +545,15 @@ Each output record gains an `extensions` object with one key per plugin:
   "subject": "Add caching layer",
   "extensions": {
     "my-plugin": { "score": 88 },
+    "label-plugin": "v1.0",
+    "flag-plugin": true,
     "other-plugin": null
   }
 }
 ```
 
-A value of `null` means the plugin skipped that fact.
+A non-null value is whatever the plugin returned as `success.data`: a plain object, a string, a
+number, or a boolean. A value of `null` means the plugin skipped that fact.
 
 ### Plugin failure policies
 

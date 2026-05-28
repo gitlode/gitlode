@@ -51,7 +51,7 @@ Deferred design is not a general TODO state. It requires a completed Deferred De
 
 | Section                   | When                                                                                   | Owner                                                                    |
 | ------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Title, summary            | When the phase file is first created                                                   | Planning trunk session                                                   |
+| Title, summary            | When the phase file is first created                                                   | Planning branch session                                                  |
 | Design Maturity           | When the phase file is first created; update when deferred design is resolved          | Planning branch session (design refinement session when deferred)        |
 | Design References         | During detailed design                                                                 | Planning branch session                                                  |
 | Design Decisions          | **Before the implementation session starts**                                           | Planning branch session                                                  |
@@ -62,7 +62,7 @@ Deferred design is not a general TODO state. It requires a completed Deferred De
 | Implementation Notes      | When non-obvious details are known                                                     | Planning branch session or development branch session                    |
 | Verification              | Before implementation (commands); after first run (behavioral checks)                  | Planning branch session (commands), development branch session (results) |
 
-The `Owner` column identifies the session that normally edits each section. Planning trunk session creates the initial file shell and reviews plan-level consistency. During Stage 1e-1, planning branch session fills design sections. If a phase is marked deferred design, design refinement session finalizes deferred sections before implementation. Development trunk session may perform documentation-only consistency fixes during review.
+The `Owner` column identifies the session that normally edits each section. During Stage 1e-1, planning branch session creates the phase file and fills design sections. Planning trunk session reviews plan-level consistency. If a phase is marked deferred design, design refinement session finalizes deferred sections before implementation. Development trunk session may perform documentation-only consistency fixes during review.
 
 Implementation progress is tracked only in `plan.md`. Do not duplicate progress status in phase files.
 

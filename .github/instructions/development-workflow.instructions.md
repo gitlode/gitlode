@@ -231,7 +231,7 @@ Planning trunk and development trunk starting prompts are session-start inputs p
 
 - **Planning → Development trunk**: plan.md and phase files are the handoff artifacts. No copy-paste or verbal summary is needed — the documents are the contract.
 - **Planning trunk session → Planning branch session**: Planning trunk session produces a starting prompt for the target phase design task.
-- **Planning branch session → Planning trunk session**: Branch session writes the detailed design directly into the target phase file and returns a structured Planning Branch Session Summary for unresolved questions, dependency notes, rationale, completion signaling, and other planning observations that do not belong in the phase file itself. Human copies the summary into the planning trunk session. The planning trunk session then reviews the updated phase file and summary together, checks for cross-phase and plan-level consistency, and finalizes the phase design and Documentation Touchpoints as needed.
+- **Planning branch session → Planning trunk session**: Branch session creates the target phase file from the template if needed, writes the detailed design directly into that file, and returns a structured Planning Branch Session Summary for unresolved questions, dependency notes, rationale, completion signaling, and other planning observations that do not belong in the phase file itself. Human copies the summary into the planning trunk session. The planning trunk session then reviews the updated phase file and summary together, checks for cross-phase and plan-level consistency, and finalizes Documentation Touchpoints as needed.
 - **Development trunk → Design refinement session**: When a phase is marked as deferred design and its refinement trigger is satisfied, the development trunk session produces a starting prompt for the refinement session.
 - **Design refinement session → Development trunk**: Refinement session resolves the deferred design directly in the phase file, finalizes any deferred Documentation Touchpoints, and returns a structured Design Refinement Session Summary.
 - **Development branch → Development trunk**: Branch session produces a structured summary (see Branch Session Summary below). Human copies the summary into the development trunk session.
@@ -377,7 +377,7 @@ The planning branch session is a design-only session. It must not implement code
 
 - The planning trunk session creates the starting prompt for the branch session by filling the Planning Branch Session Starting Prompt Template in the Starting Prompt Templates section.
 - The starting prompt must conform to that template as the canonical source of required sections and constraints.
-- The planning branch session performs the detailed design work and writes the resulting design directly into the target phase file.
+- The planning branch session creates `plans/phase-N.md` from the phase template, then performs the detailed design work and writes the resulting design directly into that file.
 - The planning branch session must return a **Planning Branch Session Summary** in the standard format defined below.
 - That summary is supplemental only. The phase file remains the canonical design artifact, and the summary carries only unresolved questions, dependency notes, rationale, completion signaling, and other observations that do not belong in the phase file.
 - The human provides that summary to the planning trunk session before 1e-1 is treated as complete.
@@ -460,7 +460,7 @@ Planning is complete when all of the following are true:
 - Cross-phase dependencies are identified and reflected in phase ordering.
 - Each selected roadmap item has a `Release target: vX.Y.Z` annotation in `roadmap.md`.
 
-Phase files created during planning are working artifacts for the current release only. They should remain stable during implementation, except when a deferred-design phase is intentionally reopened through the Stage 2 refinement flow defined below. They are not intended to be retained indefinitely after the release is completed.
+Phase files created during planning branch sessions are working artifacts for the current release only. They should remain stable during implementation, except when a deferred-design phase is intentionally reopened through the Stage 2 refinement flow defined below. They are not intended to be retained indefinitely after the release is completed.
 
 After these criteria are satisfied, the planning trunk session must summarize the completed planning state and ask the human for explicit confirmation before treating planning as complete or handing off to the development trunk session. It must not automatically transition to implementation.
 
@@ -818,7 +818,6 @@ Starting prompts are session-start artifacts. They must be concise, session-spec
 - Resolve design decisions for the target phase and write resulting design into the phase file.
 ### Inputs
 - plan.md
-- plans/phase-{N}.md
 - relevant instructions files
 ### Design References
 - {relevant references; or "None"}
@@ -830,6 +829,7 @@ Starting prompts are session-start artifacts. They must be concise, session-spec
 ### Restrictions
 - No implementation work.
 ### Required Output
+- plans/phase-{N}.md
 - Planning Branch Session Summary
 ```
 

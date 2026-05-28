@@ -77,6 +77,8 @@ default while allowing explicit operator control when non-TTY color is desirable
 
 #### Architecture/CLI Runtime: `main` orchestration refactoring and unit-test expansion
 
+- **Release target**: `v0.8.0`
+
 The current CLI entrypoint has grown to include argument parsing, dependency wiring, runtime
 branching, error-to-exit-code mapping, and result reporting in a single `main` flow. This shape
 is workable, but it raises the maintenance cost of local changes and makes behavior-focused tests
@@ -114,6 +116,8 @@ units while preserving current CLI behavior.
 - no performance-optimization commitment beyond incidental improvements from refactoring
 
 #### Architecture/CLI Runtime: Run-scoped responsibility boundaries and runtime service injection consistency
+
+- **Release target**: `v0.8.0`
 
 Several current runtime inconsistencies appear to be separate local issues at first glance: some
 warnings flow through the progress reporter while others write directly to stderr; some runtime
@@ -332,6 +336,8 @@ interface IsomorphicGitAdapterOptions {
 
 #### Plugin Contract: Allow scalar values in `extensions.<namespace>`
 
+- **Release target**: `v0.8.0`
+
 `ProjectedExtensions` currently constrains each namespace value to `Record<string, unknown> | null`,
 which forces every plugin to wrap its output in an object even when the natural result is a single
 scalar (for example, a commit classifier returning `"feat"` or a numeric score). This item relaxes
@@ -501,6 +507,8 @@ later projection step.
   default extraction contract fully populated
 
 #### Configuration File: General-purpose configuration file beyond plugin loading
+
+- **Release target**: `v0.8.0`
 
 The `--config <path>` JSON file introduced for plugin loading is structured to be forward-compatible
 (top-level `version` field, namespaced sections). The initial release implements only the

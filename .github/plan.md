@@ -1,59 +1,61 @@
-# gitrail — v0.7.0 Release Plan
+# gitlode — v0.8.0 Release Plan
 
 ## Overview
 
-v0.7.0 is a plugin architecture release focused on enabling organization-specific enrichment in the extraction pipeline while keeping the core Git fact model stable. The release also includes adjacent package compatibility policy and a contained Git diff abstraction needed for future optimization flexibility.
+v0.8.0 is a plugin-focused minor release. It expands plugin data-expression flexibility,
+clarifies runtime/plugin responsibility boundaries, improves CLI orchestration testability,
+and extends the configuration surface beyond plugin loading while preserving extraction
+semantics.
 
 ## Release Goals
 
-- Deliver pluggable enrichment execution as a first-class extension point
-- Define official plugin distribution and compatibility policy for `@gitlode/*` packages
-- Isolate line-diff algorithm choice behind an internal adapter without changing core `GitAdapter` contracts
+- Enable scalar-valued plugin extension outputs with clear contract boundaries.
+- Establish consistent run-scoped runtime and plugin service-injection responsibilities.
+- Improve main orchestration maintainability and behavioral test coverage without CLI behavior changes.
+- Define the next configuration-file expansion path beyond plugin loading.
 
 ## Scope Summary
 
-### Included in v0.7.0
+### Included in v0.8.0
 
-- `Pipeline: Pluggable enrichment stage for organization-specific metadata`
-- `Distribution/Compatibility: Official plugin package policy and version contract`
-- `Architecture: Diff algorithm abstraction within IsomorphicGitAdapter`
+- Architecture/CLI Runtime: Run-scoped responsibility boundaries and runtime service injection consistency
+- Plugin Contract: Allow scalar values in extensions.<namespace>
+- Architecture/CLI Runtime: main orchestration refactoring and unit-test expansion
+- Configuration File: General-purpose configuration file beyond plugin loading
 
-### Explicitly excluded from v0.7.0
+### Explicitly excluded from v0.8.0
 
-- `Architecture/Runtime: Worker-based extraction runtime baseline for resilience and supervision`
-- `Architecture/Runtime: Orchestration-ready expansion of the extraction runtime foundation`
-- `Release Engineering: Staged monorepo CI/CD evolution with changesets adoption`
-- `Extraction/File Mode: Exact-content rename detection (limited scope)`
-- `Extraction/File Mode: Similarity-based rename detection for edited moves`
-- `CLI UX: User-controlled color policy for non-TTY and CI logs`
-- `Output: Configurable field inclusion/exclusion`
-- `Development: Profiling interpretation model and usability`
+- Release Engineering: Staged monorepo CI/CD evolution with changesets adoption
 
 ## Development Phases
 
-### Phase 1: Plugin Runtime and Enrichment Pipeline Integration
+### Phase 1: Plugin Contract Scalar Values and Type-Safety Boundary
 
 - **File**: `plans/phase-1.md`
-- **Status**: Completed
+- **Status**: Planned
 
-### Phase 2: Official Plugin Package Policy and Compatibility Contract
+### Phase 2: Runtime/Plugin Responsibility Boundary Consolidation
 
 - **File**: `plans/phase-2.md`
-- **Status**: Completed
+- **Status**: Planned
 
-### Phase 3: Internal DiffAdapter Abstraction in IsomorphicGitAdapter
+### Phase 3: Main Orchestration Refactor and Unit-Test Expansion
 
 - **File**: `plans/phase-3.md`
-- **Status**: Completed
+- **Status**: Planned
+
+### Phase 4: Configuration File Expansion Beyond Plugin Loading
+
+- **File**: `plans/phase-4.md`
+- **Status**: Planned
 
 ## Release Tasks
 
 ### Documentation Update
 
-- **Status**: Completed
-- Update release-facing docs and changelog for plugin architecture introduction and compatibility policy
-- Confirm plugin configuration and extension behavior documentation is consistent with implemented CLI and runtime behavior
-- Roadmap cleanup: remove entries with `Release target: v0.7.0` that were implemented
+- **Status**: Planned
+- Update release-facing documentation (CHANGELOG, README, docs) for v0.8.0 scope.
+- Remove roadmap entries (or their `Release target: v0.8.0` metadata) that were implemented in this release.
 
 ### Verification
 
@@ -64,12 +66,10 @@ v0.7.0 is a plugin architecture release focused on enabling organization-specifi
 
 ## Final Verification Checklist
 
-- [x] Phase 1 completed and reviewed
-- [x] Phase 2 completed and reviewed
-- [x] Phase 3 completed and reviewed
-- [x] Documentation update tasks completed
-- [x] Roadmap cleanup completed for implemented v0.7.0 items
-- [x] `npm run build` passed
-- [x] `npm test` passed
-- [x] `npm run lint` passed (with one non-blocking warning)
-- [x] `npm run format:check` passed
+- [ ] All planned phases completed and reviewed
+- [ ] Documentation update tasks completed
+- [ ] Roadmap cleanup completed for implemented v0.8.0 items
+- [ ] `npm run build` passed
+- [ ] `npm test` passed
+- [ ] `npm run lint` passed
+- [ ] `npm run format:check` passed

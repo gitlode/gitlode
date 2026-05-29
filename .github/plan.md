@@ -37,7 +37,7 @@ semantics.
 ### Phase 2: Runtime/Plugin Responsibility Boundary Consolidation
 
 - **File**: `plans/phase-2.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 3: Main Orchestration Refactor and Unit-Test Expansion
 

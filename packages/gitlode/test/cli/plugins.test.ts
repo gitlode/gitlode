@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { MockInstance } from "vitest";
 
 import {
   checkPluginCompatibility,
@@ -11,21 +10,23 @@ import {
   loadPluginConfig,
   resolvePluginEntries,
 } from "../../src/cli/plugins.js";
-import type { PluginEntry, PluginInitResult } from "../../src/core/types.js";
-
-let exitSpy: MockInstance;
-let stderrSpy: MockInstance;
+import type { PluginEntry, PluginInitResult, PluginRuntimeContext } from "../../src/core/types.js";
 
 beforeEach(() => {
-  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
-    throw new Error(`process.exit(${code})`);
-  });
-  stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  vi.restoreAllMocks();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+function makeRuntimeContext(overrides: Partial<PluginRuntimeContext> = {}): PluginRuntimeContext {
+  return {
+    warn() {},
+    error() {},
+    ...overrides,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // loadPluginConfig — JSON parsing and schema validation
@@ -53,9 +54,16 @@ describe("loadPluginConfig – parse and validate", () => {
         },
       }),
     );
-    const config = await loadPluginConfig(configPath);
-    expect(config.version).toBe(1);
-    expect(config.extensions["my-plugin"]?.entrypoint).toBe("./plugin.js");
+    const result = await loadPluginConfig(configPath);
+    expect(result).toEqual({
+      kind: "loaded",
+      config: expect.objectContaining({
+        version: 1,
+        extensions: expect.objectContaining({
+          "my-plugin": expect.objectContaining({ entrypoint: "./plugin.js" }),
+        }),
+      }),
+    });
   });
 
   it("defaults failurePolicy to skip-fact when not specified", async () => {
@@ -64,8 +72,15 @@ describe("loadPluginConfig – parse and validate", () => {
       configPath,
       JSON.stringify({ version: 1, extensions: { p: { entrypoint: "./p.js" } } }),
     );
-    const config = await loadPluginConfig(configPath);
-    expect(config.extensions["p"]?.failurePolicy).toBe("skip-fact");
+    const result = await loadPluginConfig(configPath);
+    expect(result).toEqual({
+      kind: "loaded",
+      config: expect.objectContaining({
+        extensions: expect.objectContaining({
+          p: expect.objectContaining({ failurePolicy: "skip-fact" }),
+        }),
+      }),
+    });
   });
 
   it("preserves explicitly set failurePolicy=fatal", async () => {
@@ -77,53 +92,72 @@ describe("loadPluginConfig – parse and validate", () => {
         extensions: { p: { entrypoint: "./p.js", failurePolicy: "fatal" } },
       }),
     );
-    const config = await loadPluginConfig(configPath);
-    expect(config.extensions["p"]?.failurePolicy).toBe("fatal");
+    const result = await loadPluginConfig(configPath);
+    expect(result).toEqual({
+      kind: "loaded",
+      config: expect.objectContaining({
+        extensions: expect.objectContaining({
+          p: expect.objectContaining({ failurePolicy: "fatal" }),
+        }),
+      }),
+    });
   });
 
-  it("exits with code 1 for missing version field", async () => {
+  it("returns a tagged user error for missing version field", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(configPath, JSON.stringify({ extensions: { p: { entrypoint: "./p.js" } } }));
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 
-  it("exits with code 1 for version !== 1", async () => {
+  it("returns a tagged user error for version !== 1", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(
       configPath,
       JSON.stringify({ version: 2, extensions: { p: { entrypoint: "./p.js" } } }),
     );
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 
-  it("exits with code 1 for missing extensions field", async () => {
+  it("returns a tagged user error for missing extensions field", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(configPath, JSON.stringify({ version: 1 }));
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 
-  it("exits with code 1 for empty extensions object", async () => {
+  it("returns a tagged user error for empty extensions object", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(configPath, JSON.stringify({ version: 1, extensions: {} }));
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 
-  it("exits with code 1 for namespace violating [a-z0-9-]+ pattern", async () => {
+  it("returns a tagged user error for namespace violating [a-z0-9-]+ pattern", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(
       configPath,
       JSON.stringify({ version: 1, extensions: { "BAD_NS!": { entrypoint: "./p.js" } } }),
     );
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("BAD_NS!"));
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({
+        kind: "user-error",
+        message: expect.stringContaining("BAD_NS!"),
+      }),
+    });
   });
 
-  it("exits with code 1 for unknown top-level field", async () => {
+  it("returns a tagged user error for unknown top-level field", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(
       configPath,
@@ -133,24 +167,32 @@ describe("loadPluginConfig – parse and validate", () => {
         unknown: true,
       }),
     );
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 
-  it("exits with code 1 for invalid JSON", async () => {
+  it("returns a tagged user error for invalid JSON", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(configPath, "not json {{{");
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 
-  it("exits with code 1 when file does not exist", async () => {
-    await expect(loadPluginConfig(join(tmpDir, "nope.json"))).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("not found"));
+  it("returns a tagged user error when file does not exist", async () => {
+    await expect(loadPluginConfig(join(tmpDir, "nope.json"))).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({
+        kind: "user-error",
+        message: expect.stringContaining("not found"),
+      }),
+    });
   });
 
-  it("exits with code 1 for invalid failurePolicy value", async () => {
+  it("returns a tagged user error for invalid failurePolicy value", async () => {
     const configPath = join(tmpDir, "config.json");
     await writeFile(
       configPath,
@@ -159,8 +201,10 @@ describe("loadPluginConfig – parse and validate", () => {
         extensions: { p: { entrypoint: "./p.js", failurePolicy: "unknown-policy" } },
       }),
     );
-    await expect(loadPluginConfig(configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(loadPluginConfig(configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 });
 
@@ -197,13 +241,17 @@ describe("resolvePluginEntries – entrypoint resolution", () => {
       },
     };
 
-    const entries = await resolvePluginEntries(config, configPath);
-    expect(entries).toHaveLength(1);
-    expect(entries[0]!.namespace).toBe("test-plugin");
-    expect(typeof entries[0]!.plugin.project).toBe("function");
+    const result = await resolvePluginEntries(config, configPath);
+    expect(result.kind).toBe("resolved");
+    if (result.kind !== "resolved") {
+      throw new Error("Expected resolved plugin entries");
+    }
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]!.namespace).toBe("test-plugin");
+    expect(typeof result.entries[0]!.plugin.project).toBe("function");
   });
 
-  it("exits with code 1 when plugin module does not export a default function", async () => {
+  it("returns a tagged user error when plugin module does not export a default function", async () => {
     const pluginPath = join(tmpDir, "bad-plugin.mjs");
     await writeFile(pluginPath, "export const notDefault = 42;");
 
@@ -215,11 +263,13 @@ describe("resolvePluginEntries – entrypoint resolution", () => {
       },
     };
 
-    await expect(resolvePluginEntries(config, configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(resolvePluginEntries(config, configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 
-  it("exits with code 1 when factory does not return a valid ProjectorPlugin", async () => {
+  it("returns a tagged user error when factory does not return a valid ProjectorPlugin", async () => {
     const pluginPath = join(tmpDir, "invalid-plugin.mjs");
     await writeFile(pluginPath, "export default async function factory() { return null; }");
 
@@ -231,8 +281,10 @@ describe("resolvePluginEntries – entrypoint resolution", () => {
       },
     };
 
-    await expect(resolvePluginEntries(config, configPath)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(resolvePluginEntries(config, configPath)).resolves.toEqual({
+      kind: "termination",
+      termination: expect.objectContaining({ kind: "user-error" }),
+    });
   });
 });
 
@@ -241,18 +293,7 @@ describe("resolvePluginEntries – entrypoint resolution", () => {
 // ---------------------------------------------------------------------------
 
 describe("initializePlugins – parallel init and fatal aggregation", () => {
-  it("returns normally when no plugins have init()", async () => {
-    const entries: PluginEntry[] = [
-      {
-        namespace: "a",
-        plugin: { project: async () => ({ type: "success", data: {} }) },
-        failurePolicy: "skip-fact",
-      },
-    ];
-    await expect(initializePlugins(entries)).resolves.toBeUndefined();
-  });
-
-  it("returns normally when all init() results are ready", async () => {
+  it("returns ready outcomes when all init() results are ready", async () => {
     const entries: PluginEntry[] = [
       {
         namespace: "a",
@@ -263,10 +304,54 @@ describe("initializePlugins – parallel init and fatal aggregation", () => {
         failurePolicy: "skip-fact",
       },
     ];
-    await expect(initializePlugins(entries)).resolves.toBeUndefined();
+    await expect(initializePlugins(entries, () => makeRuntimeContext())).resolves.toEqual([
+      {
+        entry: entries[0],
+        result: { type: "ready" },
+      },
+    ]);
   });
 
-  it("exits with code 1 when one plugin returns fatal init result", async () => {
+  it("passes runtime context into plugin init and preserves plugin-scoped diagnostics", async () => {
+    const warnings: string[] = [];
+    const errors: string[] = [];
+    const entries: PluginEntry[] = [
+      {
+        namespace: "runtime-test",
+        plugin: {
+          init: async (runtime) => {
+            runtime.warn("warn message");
+            runtime.error("error message");
+            return { type: "ready" };
+          },
+          project: async () => ({ type: "success", data: {} }),
+        },
+        failurePolicy: "skip-fact",
+      },
+    ];
+
+    const results = await initializePlugins(entries, () =>
+      makeRuntimeContext({
+        warn(message) {
+          warnings.push(message);
+        },
+        error(message) {
+          errors.push(message);
+        },
+      }),
+    );
+
+    expect(results).toEqual([
+      {
+        entry: entries[0],
+        result: { type: "ready" },
+      },
+    ]);
+    expect(warnings).toEqual(["warn message"]);
+    expect(errors).toEqual(["error message"]);
+  });
+
+  it("returns a fatal outcome when one plugin returns fatal init result", async () => {
     const entries: PluginEntry[] = [
       {
         namespace: "bad",
@@ -277,12 +362,15 @@ describe("initializePlugins – parallel init and fatal aggregation", () => {
         failurePolicy: "skip-fact",
       },
     ];
-    await expect(initializePlugins(entries)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("init failed"));
+    await expect(initializePlugins(entries, () => makeRuntimeContext())).resolves.toEqual([
+      {
+        entry: entries[0],
+        result: { type: "fatal", message: "init failed" },
+      },
+    ]);
   });
 
-  it("reports all failing plugins before exiting", async () => {
+  it("returns all failing plugin init outcomes without aggregating them", async () => {
     const entries: PluginEntry[] = [
       {
         namespace: "a",
@@ -301,13 +389,20 @@ describe("initializePlugins – parallel init and fatal aggregation", () => {
         failurePolicy: "skip-fact",
       },
     ];
-    await expect(initializePlugins(entries)).rejects.toThrow("process.exit(1)");
-    const writeCalls = stderrSpy.mock.calls.map((c) => String(c[0]));
-    expect(writeCalls.some((m) => m.includes("err-a"))).toBe(true);
-    expect(writeCalls.some((m) => m.includes("err-b"))).toBe(true);
+
+    await expect(initializePlugins(entries, () => makeRuntimeContext())).resolves.toEqual([
+      {
+        entry: entries[0],
+        result: { type: "fatal", message: "err-a" },
+      },
+      {
+        entry: entries[1],
+        result: { type: "fatal", message: "err-b" },
+      },
+    ]);
   });
 
-  it("exits with code 1 when init() throws instead of returning fatal", async () => {
+  it("returns a fatal outcome when init() throws instead of returning fatal", async () => {
     const entries: PluginEntry[] = [
       {
         namespace: "thrower",
@@ -320,9 +415,12 @@ describe("initializePlugins – parallel init and fatal aggregation", () => {
         failurePolicy: "skip-fact",
       },
     ];
-    await expect(initializePlugins(entries)).rejects.toThrow("process.exit(1)");
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("boom"));
+    await expect(initializePlugins(entries, () => makeRuntimeContext())).resolves.toEqual([
+      {
+        entry: entries[0],
+        result: { type: "fatal", message: "boom" },
+      },
+    ]);
   });
 });
 
@@ -344,7 +442,10 @@ describe("checkPluginCompatibility – version range checks", () => {
   function makeEntry(namespace: string): PluginEntry {
     return {
       namespace: namespace as PluginEntry["namespace"],
-      plugin: { project: async () => ({ type: "success", data: {} }) },
+      plugin: {
+        init: async () => ({ type: "ready" }),
+        project: async () => ({ type: "success", data: {} }),
+      },
       failurePolicy: "skip-fact",
     };
   }
@@ -370,10 +471,15 @@ describe("checkPluginCompatibility – version range checks", () => {
     const configPath = join(tmpDir, "config.json");
 
     const entries: PluginEntry[] = [makeEntry("test-plugin")];
-    await checkPluginCompatibility(entries, config, configPath);
+    const warnings: string[] = [];
+    await checkPluginCompatibility(entries, config, configPath, {
+      warn(message) {
+        warnings.push(message);
+      },
+    });
 
     // No warning should have been written
-    expect(stderrSpy).not.toHaveBeenCalled();
+    expect(warnings).toEqual([]);
   });
 
   it("(b) emits 'range not satisfied' warning when range is declared but mismatches", async () => {
@@ -400,9 +506,14 @@ describe("checkPluginCompatibility – version range checks", () => {
     const configPath = join(tmpDir, "config.json");
 
     const entries: PluginEntry[] = [makeEntry("test-plugin")];
-    await checkPluginCompatibility(entries, config, configPath);
+    const warnings: string[] = [];
+    await checkPluginCompatibility(entries, config, configPath, {
+      warn(message) {
+        warnings.push(message);
+      },
+    });
 
-    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const written = warnings.join("\n");
     expect(written).toMatch(/declares peer gitlode/);
     expect(written).toMatch(/Continuing; behavior may be incompatible/);
   });
@@ -427,9 +538,14 @@ describe("checkPluginCompatibility – version range checks", () => {
     const configPath = join(tmpDir, "config.json");
 
     const entries: PluginEntry[] = [makeEntry("test-plugin")];
-    await checkPluginCompatibility(entries, config, configPath);
+    const warnings: string[] = [];
+    await checkPluginCompatibility(entries, config, configPath, {
+      warn(message) {
+        warnings.push(message);
+      },
+    });
 
-    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const written = warnings.join("\n");
     expect(written).toMatch(/does not declare peerDependencies\.gitlode/);
     expect(written).toMatch(/Compatibility unknown; continuing/);
   });
@@ -456,9 +572,14 @@ describe("checkPluginCompatibility – version range checks", () => {
       // We can't easily prevent the walk from finding a package.json in parent dirs,
       // so instead we test with a non-parseable package.json
       await writeFile(join(isolatedDir, "package.json"), "NOT VALID JSON {{{");
-      await checkPluginCompatibility(entries, config, configPath);
+      const warnings: string[] = [];
+      await checkPluginCompatibility(entries, config, configPath, {
+        warn(message) {
+          warnings.push(message);
+        },
+      });
 
-      const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+      const written = warnings.join("\n");
       expect(written).toMatch(/compatibility check skipped/);
       expect(written).toMatch(/unable to read package metadata/);
     } finally {
@@ -490,15 +611,18 @@ describe("checkPluginCompatibility – version range checks", () => {
     const configPath = join(tmpDir, "config.json");
 
     const entries: PluginEntry[] = [makeEntry("test-plugin")];
-    await checkPluginCompatibility(entries, config, configPath);
+    const warnings: string[] = [];
+    await checkPluginCompatibility(entries, config, configPath, {
+      warn(message) {
+        warnings.push(message);
+      },
+    });
 
     // No warning: satisfied range
-    expect(stderrSpy).not.toHaveBeenCalled();
+    expect(warnings).toEqual([]);
   });
 
-  it("(f) --quiet does not suppress compatibility warnings (warnings go directly to stderr)", async () => {
-    // checkPluginCompatibility writes directly to process.stderr, not via reporter.
-    // So quiet/non-quiet mode is irrelevant — the spy confirms warnings still appear.
+  it("(f) compatibility warnings are routed through the warning capability", async () => {
     const pluginFile = join(tmpDir, "plugin.mjs");
     await writeFile(
       pluginFile,
@@ -521,10 +645,14 @@ describe("checkPluginCompatibility – version range checks", () => {
     const configPath = join(tmpDir, "config.json");
 
     const entries: PluginEntry[] = [makeEntry("test-plugin")];
-    await checkPluginCompatibility(entries, config, configPath);
+    const warnings: string[] = [];
+    await checkPluginCompatibility(entries, config, configPath, {
+      warn(message) {
+        warnings.push(message);
+      },
+    });
 
-    // Warning appears regardless of quiet mode because writes go directly to process.stderr
-    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const written = warnings.join("\n");
     expect(written).toMatch(/Continuing; behavior may be incompatible/);
   });
 
@@ -537,7 +665,12 @@ describe("checkPluginCompatibility – version range checks", () => {
     } as unknown as Parameters<typeof checkPluginCompatibility>[1];
     const configPath = join(tmpDir, "config.json");
 
-    await checkPluginCompatibility([], config, configPath);
-    expect(stderrSpy).not.toHaveBeenCalled();
+    const warnings: string[] = [];
+    await checkPluginCompatibility([], config, configPath, {
+      warn(message) {
+        warnings.push(message);
+      },
+    });
+    expect(warnings).toEqual([]);
   });
 });

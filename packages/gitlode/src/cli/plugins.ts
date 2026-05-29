@@ -7,12 +7,34 @@ import { satisfies, validRange } from "semver";
 import { z } from "zod";
 
 import type {
+  DiagnosticReporter,
   Namespace,
   PluginEntry,
   PluginFactory,
   PluginFailurePolicy,
+  PluginRuntimeContext,
   ProjectorPlugin,
 } from "../core/index.js";
+
+export type PluginSetupTermination = { kind: "user-error"; message: string };
+
+export type LoadPluginConfigResult =
+  | { kind: "loaded"; config: PluginConfigFile }
+  | { kind: "termination"; termination: PluginSetupTermination };
+
+export type ResolvePluginEntriesResult =
+  | { kind: "resolved"; entries: PluginEntry[] }
+  | { kind: "termination"; termination: PluginSetupTermination };
+
+class PluginSetupSignal extends Error {
+  readonly termination: PluginSetupTermination;
+
+  constructor(termination: PluginSetupTermination) {
+    super(termination.message);
+    this.name = "PluginSetupSignal";
+    this.termination = termination;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Config file schema types
@@ -62,8 +84,7 @@ const PluginConfigFileSchema = z
   .strict();
 
 function configError(msg: string): never {
-  process.stderr.write(msg + "\n");
-  process.exit(1);
+  throw new PluginSetupSignal({ kind: "user-error", message: msg });
 }
 
 function validatePluginConfig(raw: unknown, configPath: string): PluginConfigFile {
@@ -84,26 +105,33 @@ function validatePluginConfig(raw: unknown, configPath: string): PluginConfigFil
 // ---------------------------------------------------------------------------
 
 /** Read and validate the config file at the given absolute path. */
-export async function loadPluginConfig(configPath: string): Promise<PluginConfigFile> {
-  let raw: string;
+export async function loadPluginConfig(configPath: string): Promise<LoadPluginConfigResult> {
   try {
-    raw = await readFile(configPath, "utf8");
+    let raw: string;
+    try {
+      raw = await readFile(configPath, "utf8");
+    } catch (err) {
+      const msg =
+        err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT"
+          ? `Config file not found: ${configPath}`
+          : `Failed to read config file: ${configPath}`;
+      configError(msg);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      configError(`Invalid config file: not valid JSON (${configPath})`);
+    }
+
+    return { kind: "loaded", config: validatePluginConfig(parsed, configPath) };
   } catch (err) {
-    const msg =
-      err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT"
-        ? `Config file not found: ${configPath}`
-        : `Failed to read config file: ${configPath}`;
-    configError(msg);
+    if (err instanceof PluginSetupSignal) {
+      return { kind: "termination", termination: err.termination };
+    }
+    throw err;
   }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    configError(`Invalid config file: not valid JSON (${configPath})`);
-  }
-
-  return validatePluginConfig(parsed, configPath);
 }
 
 /**
@@ -114,74 +142,87 @@ export async function loadPluginConfig(configPath: string): Promise<PluginConfig
 export async function resolvePluginEntries(
   config: PluginConfigFile,
   configPath: string,
-): Promise<PluginEntry[]> {
-  const configDir = dirname(configPath);
-  const entries: PluginEntry[] = [];
+): Promise<ResolvePluginEntriesResult> {
+  try {
+    const configDir = dirname(configPath);
+    const entries: PluginEntry[] = [];
 
-  for (const [namespace, extEntry] of Object.entries(config.extensions)) {
-    const { entrypoint, config: pluginConfig, failurePolicy } = extEntry;
+    for (const [namespace, extEntry] of Object.entries(config.extensions)) {
+      const { entrypoint, config: pluginConfig, failurePolicy } = extEntry;
 
-    let resolvedSpecifier: string;
-    if (entrypoint.startsWith(".") || isAbsolute(entrypoint)) {
-      resolvedSpecifier = pathToFileURL(resolve(configDir, entrypoint)).href;
-    } else {
-      // Bare specifier: resolve from config file's directory using require.resolve
+      let resolvedSpecifier: string;
+      if (entrypoint.startsWith(".") || isAbsolute(entrypoint)) {
+        resolvedSpecifier = pathToFileURL(resolve(configDir, entrypoint)).href;
+      } else {
+        // Bare specifier: resolve from config file's directory using require.resolve
+        try {
+          const req = createRequire(pathToFileURL(configDir + "/").href);
+          resolvedSpecifier = pathToFileURL(req.resolve(entrypoint)).href;
+        } catch {
+          configError(
+            `Cannot resolve plugin entrypoint "${entrypoint}" for namespace "${namespace}"`,
+          );
+        }
+      }
+
+      let mod: unknown;
       try {
-        const req = createRequire(pathToFileURL(configDir + "/").href);
-        resolvedSpecifier = pathToFileURL(req.resolve(entrypoint)).href;
-      } catch {
+        mod = await import(resolvedSpecifier);
+      } catch (err) {
         configError(
-          `Cannot resolve plugin entrypoint "${entrypoint}" for namespace "${namespace}"`,
+          `Failed to load plugin "${entrypoint}" for namespace "${namespace}": ${err instanceof Error ? err.message : String(err)}`,
         );
       }
+
+      const factory = (mod as { default?: unknown })?.default;
+      if (typeof factory !== "function") {
+        configError(
+          `Plugin "${entrypoint}" for namespace "${namespace}" does not export a default function`,
+        );
+      }
+
+      let plugin: ProjectorPlugin;
+      try {
+        plugin = (await (factory as PluginFactory)(pluginConfig)) as ProjectorPlugin;
+      } catch (err) {
+        configError(
+          `Plugin factory for namespace "${namespace}" threw an error: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+
+      if (typeof plugin !== "object" || plugin === null || typeof plugin.project !== "function") {
+        configError(
+          `Plugin factory for namespace "${namespace}" did not return a valid ProjectorPlugin`,
+        );
+      }
+
+      entries.push({ namespace: namespace as Namespace, plugin, failurePolicy });
     }
 
-    let mod: unknown;
-    try {
-      mod = await import(resolvedSpecifier);
-    } catch (err) {
-      configError(
-        `Failed to load plugin "${entrypoint}" for namespace "${namespace}": ${err instanceof Error ? err.message : String(err)}`,
-      );
+    return { kind: "resolved", entries };
+  } catch (err) {
+    if (err instanceof PluginSetupSignal) {
+      return { kind: "termination", termination: err.termination };
     }
-
-    const factory = (mod as { default?: unknown })?.default;
-    if (typeof factory !== "function") {
-      configError(
-        `Plugin "${entrypoint}" for namespace "${namespace}" does not export a default function`,
-      );
-    }
-
-    let plugin: ProjectorPlugin;
-    try {
-      plugin = (await (factory as PluginFactory)(pluginConfig)) as ProjectorPlugin;
-    } catch (err) {
-      configError(
-        `Plugin factory for namespace "${namespace}" threw an error: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-
-    if (typeof plugin !== "object" || plugin === null || typeof plugin.project !== "function") {
-      configError(
-        `Plugin factory for namespace "${namespace}" did not return a valid ProjectorPlugin`,
-      );
-    }
-
-    entries.push({ namespace: namespace as Namespace, plugin, failurePolicy });
+    throw err;
   }
-
-  return entries;
 }
 
-/** Invoke init() on each entry in parallel. Collects all fatal results and exits if any. */
-export async function initializePlugins(entries: PluginEntry[]): Promise<void> {
-  const results = await Promise.all(
+/** Invoke init() on each entry in parallel. Collects all fatal results and throws a typed user error if any. */
+export interface PluginInitializationOutcome {
+  readonly entry: PluginEntry;
+  readonly result: { type: "ready" } | { type: "fatal"; message: string };
+}
+
+/** Invoke init() on each entry in parallel and return each plugin's normalized outcome. */
+export async function initializePlugins(
+  entries: PluginEntry[],
+  createRuntimeContext: (entry: PluginEntry) => PluginRuntimeContext,
+): Promise<PluginInitializationOutcome[]> {
+  return Promise.all(
     entries.map(async (entry) => {
-      if (typeof entry.plugin.init !== "function") {
-        return null;
-      }
       try {
-        return { entry, result: await entry.plugin.init() };
+        return { entry, result: await entry.plugin.init(createRuntimeContext(entry)) };
       } catch (err) {
         return {
           entry,
@@ -193,18 +234,6 @@ export async function initializePlugins(entries: PluginEntry[]): Promise<void> {
       }
     }),
   );
-
-  const fatals = results.filter(
-    (r): r is { entry: PluginEntry; result: { type: "fatal"; message: string } } =>
-      r !== null && r.result.type === "fatal",
-  );
-
-  if (fatals.length > 0) {
-    for (const { entry, result } of fatals) {
-      process.stderr.write(`Plugin "${entry.namespace}" init failed: ${result.message}\n`);
-    }
-    process.exit(1);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -282,6 +311,7 @@ export async function checkPluginCompatibility(
   entries: PluginEntry[],
   config: PluginConfigFile,
   configPath: string,
+  reporter: Pick<DiagnosticReporter, "warn">,
 ): Promise<void> {
   const coreVersion = await readCoreVersion();
   if (coreVersion === null) {
@@ -296,16 +326,16 @@ export async function checkPluginCompatibility(
 
     const entrypointUrl = resolveEntrypointToUrl(extEntry.entrypoint, configDir);
     if (entrypointUrl === null) {
-      process.stderr.write(
-        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${extEntry.entrypoint}.\n`,
+      reporter.warn(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${extEntry.entrypoint}.`,
       );
       continue;
     }
 
     const found = await findNearestPackageJson(entrypointUrl);
     if (found === null) {
-      process.stderr.write(
-        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${extEntry.entrypoint}.\n`,
+      reporter.warn(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${extEntry.entrypoint}.`,
       );
       continue;
     }
@@ -317,29 +347,29 @@ export async function checkPluginCompatibility(
       const pkg = pkgData as { peerDependencies?: Record<string, string> };
       peerRange = pkg.peerDependencies?.["gitlode"];
     } catch {
-      process.stderr.write(
-        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.\n`,
+      reporter.warn(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.`,
       );
       continue;
     }
 
     if (peerRange === undefined) {
-      process.stderr.write(
-        `Plugin "${entry.namespace}" does not declare peerDependencies.gitlode. Compatibility unknown; continuing.\n`,
+      reporter.warn(
+        `Plugin "${entry.namespace}" does not declare peerDependencies.gitlode. Compatibility unknown; continuing.`,
       );
       continue;
     }
 
     if (validRange(peerRange) === null) {
-      process.stderr.write(
-        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.\n`,
+      reporter.warn(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.`,
       );
       continue;
     }
 
     if (!satisfies(coreVersion, peerRange)) {
-      process.stderr.write(
-        `Plugin "${entry.namespace}" declares peer gitlode ${peerRange}, but running gitlode is ${coreVersion}. Continuing; behavior may be incompatible.\n`,
+      reporter.warn(
+        `Plugin "${entry.namespace}" declares peer gitlode ${peerRange}, but running gitlode is ${coreVersion}. Continuing; behavior may be incompatible.`,
       );
     }
     // Range satisfied → no output

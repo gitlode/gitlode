@@ -27,6 +27,7 @@ import {
 } from "./core/index.js";
 import type {
   CoordinatorDependencies,
+  DiagnosticReporter,
   ExtractionState,
   FactProjector,
   OidProfile,
@@ -165,6 +166,27 @@ function writeStderrLine(text: string): void {
   process.stderr.write(text + "\n");
 }
 
+function createNamespacedDiagnosticReporter(
+  namespace: string,
+  presenter: { renderDiagnostic(severity: "warn" | "error", message: string): void },
+): DiagnosticReporter {
+  return {
+    warn(message) {
+      presenter.renderDiagnostic("warn", `Plugin "${namespace}": ${message}`);
+    },
+    error(message) {
+      presenter.renderDiagnostic("error", `Plugin "${namespace}": ${message}`);
+    },
+  };
+}
+
+function formatPluginInitializationFailure(entry: {
+  entry: { namespace: string };
+  result: { type: "fatal"; message: string };
+}): string {
+  return `Plugin "${entry.entry.namespace}" init failed: ${entry.result.message}`;
+}
+
 const stderrSink: TerminalSink = {
   writeLine: writeStderrLine,
   rewriteLine(text: string): void {
@@ -281,22 +303,53 @@ async function main() {
     let projector: FactProjector;
     if (parsed.configPath) {
       reporter.emit({ type: "phase-start", phase: "initializing-plugins" });
-      const pluginConfig = await loadPluginConfig(parsed.configPath);
-      const pluginEntries = await resolvePluginEntries(pluginConfig, parsed.configPath);
-
-      await checkPluginCompatibility(pluginEntries, pluginConfig, parsed.configPath);
-
-      if (profile) {
-        const pluginsProfiler = projectionProfiler?.createScopedProfiler("plugins");
-        if (pluginsProfiler) {
-          for (const entry of pluginEntries) {
-            const entryProfiler = pluginsProfiler.createScopedProfiler(entry.namespace);
-            (entry as { profiler?: unknown }).profiler = entryProfiler;
-          }
-        }
+      const pluginConfigResult = await loadPluginConfig(parsed.configPath);
+      if (pluginConfigResult.kind === "termination") {
+        presenter.renderUserError(pluginConfigResult.termination.message);
+        process.exitCode = 1;
+        return;
       }
 
-      await initializePlugins(pluginEntries);
+      const pluginEntriesResult = await resolvePluginEntries(
+        pluginConfigResult.config,
+        parsed.configPath,
+      );
+      if (pluginEntriesResult.kind === "termination") {
+        presenter.renderUserError(pluginEntriesResult.termination.message);
+        process.exitCode = 1;
+        return;
+      }
+
+      const pluginConfig = pluginConfigResult.config;
+      const pluginEntries = pluginEntriesResult.entries;
+
+      await checkPluginCompatibility(pluginEntries, pluginConfig, parsed.configPath, {
+        warn(message) {
+          presenter.renderDiagnostic("warn", message);
+        },
+      });
+
+      const pluginsProfiler = profile
+        ? projectionProfiler?.createScopedProfiler("plugins")
+        : undefined;
+
+      const pluginInitResults = await initializePlugins(pluginEntries, (entry) => ({
+        ...createNamespacedDiagnosticReporter(entry.namespace, presenter),
+        profiler: pluginsProfiler?.createScopedProfiler(entry.namespace),
+      }));
+
+      const pluginInitFailures = pluginInitResults.filter(
+        (entry): entry is typeof entry & { result: { type: "fatal"; message: string } } =>
+          entry.result.type === "fatal",
+      );
+      if (pluginInitFailures.length > 0) {
+        presenter.renderUserError(
+          pluginInitFailures.map((entry) => formatPluginInitializationFailure(entry)).join("\n"),
+        );
+        process.exitCode = 1;
+        return;
+      }
+
       reporter.emit({ type: "phase-end", phase: "initializing-plugins" });
 
       projector = new EnrichingFactProjector(

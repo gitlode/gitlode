@@ -1,5 +1,5 @@
 import type { ProfilingEntry, ProgressEvent } from "../core/index.js";
-import { writeDiagnosticLines, splitMessageLines } from "./diagnostics.js";
+import { writeDiagnosticLines, splitMessageLines, type DiagnosticSeverity } from "./diagnostics.js";
 import {
   ProgressController,
   type Clock,
@@ -12,6 +12,7 @@ import { formatProfileLines, formatSummaryLines, type SummaryData } from "./repo
 
 export interface RunPresenter {
   handleProgressEvent(event: ProgressEvent): void;
+  renderDiagnostic(severity: DiagnosticSeverity, message: string): void;
   renderUserError(message: string): void;
   renderRuntimeError(error: Error): void;
   renderSummary(data: SummaryData): void;
@@ -43,17 +44,27 @@ export function createRunPresenter(options: CreateRunPresenterOptions): RunPrese
     }
   }
 
+  function renderDiagnostic(severity: DiagnosticSeverity, message: string): void {
+    if (progressController) {
+      progressController.renderDiagnostic(severity, message);
+      return;
+    }
+
+    writeDiagnosticLines(sink.writeLine, severity, message, styling);
+  }
+
   return {
     handleProgressEvent(event) {
-      if (progressController) {
-        progressController.handleEvent(event);
+      if (event.type === "warning") {
+        renderDiagnostic("warn", event.message);
         return;
       }
 
-      if (event.type === "warning") {
-        writeDiagnosticLines(sink.writeLine, "warn", event.message, styling);
+      if (progressController) {
+        progressController.handleEvent(event);
       }
     },
+    renderDiagnostic,
     renderUserError(message) {
       prepareForNonProgressOutput();
       writePlainMessage(message);

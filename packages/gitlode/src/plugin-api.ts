@@ -3,6 +3,7 @@ export type {
   PluginInitResult,
   PluginProjectionResult,
   PluginProjectionValue,
+  PluginRuntimeContext,
   ProjectionContext,
   ProjectorPlugin,
 } from "./core/index.js";

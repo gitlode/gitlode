@@ -1,5 +1,5 @@
 import type { ProgressEvent, ProgressPhase } from "../../core/index.js";
-import { formatDiagnosticLines } from "../diagnostics.js";
+import { formatDiagnosticLines, type DiagnosticSeverity } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";
 import { HEARTBEAT_INTERVAL_MS, SPINNER_FRAMES } from "./constants.js";
 import { formatActiveLine, formatDoneLine } from "./formatters.js";
@@ -62,8 +62,27 @@ export class ProgressController {
         this.onPhaseEnd(event.phase);
         break;
       case "warning":
-        this.onWarning(event.message);
+        this.renderDiagnostic("warn", event.message);
         break;
+    }
+  }
+
+  renderDiagnostic(severity: DiagnosticSeverity, message: string): void {
+    const lines = formatDiagnosticLines(severity, message, this.styling);
+    if (this.mode === "tty-interactive" && this.currentPhase !== null) {
+      this.sink.newline();
+      for (const line of lines) {
+        this.sink.writeLine(line);
+      }
+      const now = this.clock.nowMs();
+      this.sink.rewriteLine(
+        formatActiveLine(this.snapshot(now), this.currentSpinnerFrame(), this.styling),
+      );
+      return;
+    }
+
+    for (const line of lines) {
+      this.sink.writeLine(line);
     }
   }
 
@@ -156,25 +175,5 @@ export class ProgressController {
     this.commitsTraversed = 0;
     this.recordsWritten = 0;
     this.bytesWritten = 0;
-  }
-
-  private onWarning(message: string): void {
-    const lines = formatDiagnosticLines("warn", message, this.styling);
-    if (this.mode === "tty-interactive" && this.currentPhase !== null) {
-      this.sink.newline();
-      for (const line of lines) {
-        this.sink.writeLine(line);
-      }
-      // Immediately restore the progress line after a warning interruption.
-      const now = this.clock.nowMs();
-      this.sink.rewriteLine(
-        formatActiveLine(this.snapshot(now), this.currentSpinnerFrame(), this.styling),
-      );
-    } else {
-      // non-tty-summary and quiet both show warnings via plain writeLine
-      for (const line of lines) {
-        this.sink.writeLine(line);
-      }
-    }
   }
 }

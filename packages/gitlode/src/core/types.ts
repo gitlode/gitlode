@@ -404,6 +404,11 @@ export interface ExtractionCoordinator {
 // Plugin contract types
 // ---------------------------------------------------------------------------
 
+export interface DiagnosticReporter {
+  warn(message: string): void;
+  error(message: string): void;
+}
+
 export type PluginFailurePolicy = "skip-fact" | "fatal";
 
 export type PluginInitResult = { type: "ready" } | { type: "fatal"; message: string };
@@ -430,10 +435,14 @@ export type ProjectionContext = {
   [Type in FactType]: ProjectionContextFor<Type>;
 }[FactType];
 
+export interface PluginRuntimeContext extends DiagnosticReporter {
+  readonly profiler?: StageProfiler;
+}
+
 /** Contract that every projector plugin must satisfy. */
 export interface ProjectorPlugin {
-  init?(): Promise<PluginInitResult>;
-  project(context: ProjectionContext, profiler?: StageProfiler): Promise<PluginProjectionResult>;
+  init(runtime: PluginRuntimeContext): Promise<PluginInitResult>;
+  project(context: ProjectionContext): Promise<PluginProjectionResult>;
 }
 
 /** Module default-export signature for plugin factory functions. ESM only. */
@@ -447,7 +456,6 @@ export interface PluginEntry {
   readonly namespace: Namespace;
   readonly plugin: ProjectorPlugin;
   readonly failurePolicy: PluginFailurePolicy;
-  readonly profiler?: StageProfiler;
 }
 
 /** Constructor dependencies injected into `DefaultExtractionCoordinator`. */

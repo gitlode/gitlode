@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import factory from "../src/index.js";
 
+const runtime = {
+  warn() {},
+  error() {},
+};
+
 describe("@gitlode/plugin-conventional-commits", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -11,7 +16,7 @@ describe("@gitlode/plugin-conventional-commits", () => {
   it("returns ready init result", async () => {
     const plugin = await factory(undefined);
 
-    await expect(plugin.init?.()).resolves.toEqual({ type: "ready" });
+    await expect(plugin.init(runtime)).resolves.toEqual({ type: "ready" });
   });
 
   it("projects using commit fact message", async () => {
@@ -20,7 +25,7 @@ describe("@gitlode/plugin-conventional-commits", () => {
       subject: "add tests",
     } as never);
     const plugin = await factory(undefined);
-    await plugin.init?.();
+    await plugin.init(runtime);
 
     const projected = await plugin.project({
       fact: {
@@ -46,7 +51,7 @@ describe("@gitlode/plugin-conventional-commits", () => {
       subject: "handle file change",
     } as never);
     const plugin = await factory(undefined);
-    await plugin.init?.();
+    await plugin.init(runtime);
 
     const projected = await plugin.project({
       fact: {

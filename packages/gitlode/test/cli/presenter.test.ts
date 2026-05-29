@@ -98,6 +98,30 @@ describe("createRunPresenter", () => {
     expect(sink.records).toEqual([{ type: "writeLine", text: "[WARN] warning message" }]);
   });
 
+  it("renders error diagnostics through the active progress surface and redraws the line", () => {
+    const sink = makeSink();
+    const presenter = createRunPresenter({
+      sink,
+      clock: makeClock(1000),
+      scheduler: makeScheduler(),
+      uiMode: "tty-interactive",
+      styling: plainStyling,
+    });
+
+    presenter.handleProgressEvent({ type: "phase-start", phase: "extracting" });
+    presenter.renderDiagnostic("error", "line 1\nline 2");
+
+    expect(sink.records.map((record) => record.type)).toEqual([
+      "rewriteLine",
+      "newline",
+      "writeLine",
+      "writeLine",
+      "rewriteLine",
+    ]);
+    expect(sink.records[2]).toEqual({ type: "writeLine", text: "[ERROR] line 1" });
+    expect(sink.records[3]).toEqual({ type: "writeLine", text: "[ERROR] line 2" });
+  });
+
   it("renders summary lines as non-progress output", () => {
     const sink = makeSink();
     const presenter = createRunPresenter({

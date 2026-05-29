@@ -64,7 +64,10 @@ const noopReporter: ProgressReporter = { emit: () => {} };
 function makePlugin(
   projectFn: (ctx: ProjectionContext) => Promise<PluginProjectionResult>,
 ): ProjectorPlugin {
-  return { project: projectFn };
+  return {
+    init: async () => ({ type: "ready" }),
+    project: projectFn,
+  };
 }
 
 function makeEntry(

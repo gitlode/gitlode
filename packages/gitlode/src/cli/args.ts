@@ -7,7 +7,7 @@ import { z } from "zod";
 import type { CommitOid, ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { GitAdapter } from "../git/index.js";
-import { type BootstrapTermination, TerminationSignal } from "./errors.js";
+import { type BootstrapTermination } from "./errors.js";
 
 export interface ParsedArgs extends ExtractorConfig {
   quiet: boolean;
@@ -161,6 +161,23 @@ export const program = new Command()
       "Path to a JSON configuration file for declaring enrichment plugins.",
     ).helpGroup("Configuration File"),
   );
+
+class TerminationSignal extends Error {
+  readonly termination: BootstrapTermination;
+
+  constructor(termination: BootstrapTermination) {
+    super(getTerminationMessage(termination));
+    this.name = "TerminationSignal";
+    this.termination = termination;
+  }
+}
+
+function getTerminationMessage(termination: BootstrapTermination): string {
+  if (termination.kind === "user-error") {
+    return termination.message;
+  }
+  return "Bootstrap terminated successfully";
+}
 
 function userError(msg: string): never {
   throw new TerminationSignal({ kind: "user-error", message: msg, exitCode: 1 });

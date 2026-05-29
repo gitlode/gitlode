@@ -6,16 +6,15 @@ import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
 import type { ParsedArgs } from "./cli/args.js";
-import { createBootstrapRenderer, parseArgs, writeDiagnosticLines } from "./cli/index.js";
+import { createBootstrapRenderer, createRunPresenter, parseArgs } from "./cli/index.js";
 import {
   loadPluginConfig,
   resolvePluginEntries,
   checkPluginCompatibility,
   initializePlugins,
 } from "./cli/plugins.js";
-import { ProgressController, resolveUiMode, createStyling } from "./cli/progress/index.js";
+import { resolveUiMode, createStyling } from "./cli/progress/index.js";
 import type { TerminalSink } from "./cli/progress/index.js";
-import { formatProfileLines, formatSummaryLines } from "./cli/reporting/index.js";
 import {
   DefaultTraversalPlanner,
   DefaultCommitTraversalExtractor,
@@ -206,37 +205,26 @@ async function main() {
     process.exitCode = 2;
     return;
   }
+
+  const uiMode = resolveUiMode(parsed.quiet, isTTY);
+  const presenter = createRunPresenter({
+    sink: stderrSink,
+    clock: { nowMs: () => performance.now() },
+    scheduler: {
+      setInterval(fn, ms) {
+        const id = setInterval(fn, ms);
+        return () => clearInterval(id);
+      },
+    },
+    uiMode,
+    styling,
+  });
+
   try {
     const { quiet, profile } = parsed;
-    const uiMode = resolveUiMode(quiet, isTTY);
 
     // Build ProgressReporter based on uiMode.
-    let reporter: ProgressReporter;
-    let controller: ProgressController | null = null;
-    if (uiMode === "quiet") {
-      reporter = {
-        emit(event) {
-          if (event.type === "warning") {
-            writeDiagnosticLines(writeStderrLine, "warn", event.message, styling);
-          }
-        },
-      };
-    } else {
-      controller = new ProgressController(
-        stderrSink,
-        { nowMs: () => performance.now() },
-        {
-          setInterval(fn, ms) {
-            const id = setInterval(fn, ms);
-            return () => clearInterval(id);
-          },
-        },
-        uiMode,
-        styling,
-      );
-      const ctrl = controller;
-      reporter = { emit: (event) => ctrl.handleEvent(event) };
-    }
+    const reporter: ProgressReporter = { emit: (event) => presenter.handleProgressEvent(event) };
 
     const stateStore = parsed.stateFilePath ? new NodeStateStore(parsed.stateFilePath) : undefined;
 
@@ -355,42 +343,25 @@ async function main() {
     const elapsedMs = performance.now() - startMs;
 
     if (!quiet) {
-      const summaryLines = formatSummaryLines(
-        {
-          recordsWritten: result.recordsWritten,
-          commitsTraversed: result.commitsTraversed,
-          filesCreated: sink.filesCreated,
-          bytesWritten: sink.bytesWritten,
-          elapsedMs,
-          refs: result.refs,
-        },
-        styling,
-      );
-      process.stderr.write("\n");
-      for (const line of summaryLines) {
-        process.stderr.write(line + "\n");
-      }
+      presenter.renderSummary({
+        recordsWritten: result.recordsWritten,
+        commitsTraversed: result.commitsTraversed,
+        filesCreated: sink.filesCreated,
+        bytesWritten: sink.bytesWritten,
+        elapsedMs,
+        refs: result.refs,
+      });
       if (profile) {
-        const profileLines = formatProfileLines(
-          rootProfiler.entries(),
-          result.skippedDiffs,
-          styling,
-        );
-        if (profileLines.length > 0) {
-          process.stderr.write("\n");
-          for (const line of profileLines) {
-            process.stderr.write(line + "\n");
-          }
-        }
+        presenter.renderProfile(rootProfiler.entries(), result.skippedDiffs);
       }
     }
   } catch (e) {
     if (e instanceof GitAdapterError) {
-      bootstrapRenderer.renderUserError(e.message);
+      presenter.renderUserError(e.message);
       process.exitCode = 1;
       return;
     }
-    bootstrapRenderer.renderRuntimeError(
+    presenter.renderRuntimeError(
       e instanceof Error ? e : new Error(typeof e === "string" ? e : String(e)),
     );
     process.exitCode = 2;

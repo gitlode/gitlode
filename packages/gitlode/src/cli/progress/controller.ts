@@ -67,6 +67,21 @@ export class ProgressController {
     }
   }
 
+  abortActiveDisplay(): void {
+    this.heartbeat.dispose();
+
+    if (this.mode === "tty-interactive" && this.currentPhase !== null) {
+      this.sink.newline();
+    }
+
+    this.currentPhase = null;
+    this.refIndex = 0;
+    this.refCount = 0;
+    this.commitsTraversed = 0;
+    this.recordsWritten = 0;
+    this.bytesWritten = 0;
+  }
+
   private snapshot(nowMs: number): PhaseSnapshot {
     return {
       phase: this.currentPhase!,

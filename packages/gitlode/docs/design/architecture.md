@@ -292,9 +292,9 @@ Profiling entries are accumulated by the stage that owns each operation:
 | `elapsed/git/...` children | `IsomorphicGitAdapter`                                | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
 
 A `StageProfiler` object is created per run at the runtime edge (`packages/gitlode/src/index.ts`) and passed to each stage
-constructor. `IsomorphicGitAdapter` exposes a `setProfiler()` method (not on the `GitAdapter`
-interface) that `packages/gitlode/src/index.ts` calls via duck-typing. This keeps the `GitAdapter` contract stable
-while enabling profiling of adapter internals.
+constructor. `IsomorphicGitAdapter` accepts profiling through its concrete dependency object
+(not on the `GitAdapter` interface). This keeps the `GitAdapter` contract stable while enabling
+profiling of adapter internals without mutable post-construction wiring.
 
 `ExtractionResult.profilingEntries` is populated on every successful run. The root `elapsed` entry
 is always present. The `--profile` flag controls stderr rendering of the aligned profile block and,

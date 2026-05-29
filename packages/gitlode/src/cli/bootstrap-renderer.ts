@@ -1,5 +1,5 @@
-import type { BootstrapTermination } from "./errors.js";
 import { splitMessageLines } from "./diagnostics.js";
+import type { BootstrapTermination } from "./errors.js";
 
 export interface BootstrapRenderer {
   renderTermination(termination: BootstrapTermination): void;

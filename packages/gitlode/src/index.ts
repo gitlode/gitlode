@@ -33,7 +33,6 @@ import type {
   OidProfile,
   ProgressReporter,
   RefType,
-  StageProfiler,
   StateStore,
 } from "./core/index.js";
 import { DefaultStageProfiler } from "./core/profile/index.js";
@@ -202,13 +201,16 @@ const stderrSink: TerminalSink = {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const adapter = new IsomorphicGitAdapter(nodeFs, new JsDiffAdapter());
+  const bootstrapAdapter = new IsomorphicGitAdapter({
+    fs: nodeFs,
+    diffAdapter: new JsDiffAdapter(),
+  });
   const isTTY = process.stderr.isTTY === true;
   const styling = createStyling(isTTY);
   const bootstrapRenderer = createBootstrapRenderer(writeStderrLine);
   let parsed: ParsedArgs;
   try {
-    const parseResult = await parseArgs(adapter);
+    const parseResult = await parseArgs(bootstrapAdapter);
     if (parseResult.kind === "termination") {
       bootstrapRenderer.renderTermination(parseResult.termination);
       process.exitCode = parseResult.termination.exitCode;
@@ -253,23 +255,21 @@ async function main() {
     const repoPath = resolve(parsed.repositoryPath);
     const startMs = performance.now();
 
+    const rootProfiler = new DefaultStageProfiler("elapsed", () => performance.now());
+    rootProfiler.start();
+
+    const adapter = new IsomorphicGitAdapter({
+      fs: nodeFs,
+      diffAdapter: new JsDiffAdapter(),
+      profiler: profile ? rootProfiler.createScopedProfiler("git") : undefined,
+    });
+
     const supportedObjectFormats = adapter.supportedObjectFormats();
     const repositoryObjectFormat = await adapter.getRepositoryObjectFormat(repoPath);
     assertSupportedRepositoryObjectFormat(repositoryObjectFormat, supportedObjectFormats);
 
     const remoteUrl = await adapter.getRemoteUrl(repoPath);
     const repoName = deriveRepoName(remoteUrl, repoPath);
-
-    const rootProfiler = new DefaultStageProfiler("elapsed", () => performance.now());
-    rootProfiler.start();
-
-    if (profile) {
-      const gitProfiler = rootProfiler.createScopedProfiler("git");
-      const profilable = adapter as unknown as { setProfiler?: (p: StageProfiler) => void };
-      if (typeof profilable.setProfiler === "function") {
-        profilable.setProfiler(gitProfiler);
-      }
-    }
 
     const priorState = await loadPriorState(
       stateStore,

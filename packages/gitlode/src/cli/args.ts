@@ -46,7 +46,10 @@ export const program = new Command()
   .description("Extract Git commit history to JSON Lines")
   .configureOutput({
     writeErr() {
-      // Parse-stage error presentation is owned by gitlode, not Commander.
+      // Intentionally suppress Commander stderr output for bootstrap errors.
+      // `parseArgs()` uses `exitOverride()` and catches the resulting
+      // `CommanderError`, so gitlode owns bootstrap error rendering instead of
+      // forwarding the raw Commander output from here.
     },
   })
   .addArgument(new Argument("<repository-path>", "Local path to the Git repository"))

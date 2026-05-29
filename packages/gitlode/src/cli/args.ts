@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { CommitOid, ExtractorConfig } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { GitAdapter } from "../git/index.js";
+import { type BootstrapTermination, TerminationSignal } from "./errors.js";
 
 export interface ParsedArgs extends ExtractorConfig {
   quiet: boolean;
@@ -153,8 +154,20 @@ export const program = new Command()
   );
 
 function userError(msg: string): never {
-  process.stderr.write(msg + "\n");
-  process.exit(1);
+  throw new TerminationSignal({ kind: "user-error", message: msg, exitCode: 1 });
+}
+
+function successTermination(): never {
+  throw new TerminationSignal({ kind: "success", exitCode: 0 });
+}
+
+function applyTermination(termination: BootstrapTermination): never {
+  if (termination.kind === "success") {
+    process.exit(termination.exitCode);
+  }
+
+  process.stderr.write(termination.message + "\n");
+  process.exit(termination.exitCode);
 }
 
 const ROTATE_SIZE_MIN = 1_048_576n; // 1 MiB
@@ -212,209 +225,218 @@ function parseMaxDiffSizeBytes(raw: string): number {
 }
 
 export async function parseArgs(adapter: GitAdapter): Promise<ParsedArgs> {
-  program.exitOverride();
   try {
-    program.parse(process.argv);
-  } catch (err) {
-    if (err instanceof CommanderError) {
-      if (err.code === "commander.helpDisplayed") process.exit(0);
-      if (err.code === "commander.unknownOption") {
-        // err.message format: "error: unknown option '--foo'"
-        // Extract just the option name for consistent userError style.
-        const match = /'(--[\w-]+)'/.exec(err.message);
-        userError(`Unknown option: ${match?.[1] ?? err.message.replace(/^error: /, "")}`);
+    program.exitOverride();
+    try {
+      program.parse(process.argv);
+    } catch (err) {
+      if (err instanceof CommanderError) {
+        if (err.code === "commander.helpDisplayed") successTermination();
+        if (err.code === "commander.unknownOption") {
+          // err.message format: "error: unknown option '--foo'"
+          // Extract just the option name for consistent userError style.
+          const match = /'(--[\w-]+)'/.exec(err.message);
+          userError(`Unknown option: ${match?.[1] ?? err.message.replace(/^error: /, "")}`);
+        }
+        userError(err.message.replace(/^error: /, ""));
       }
-      userError(err.message.replace(/^error: /, ""));
+      throw err;
     }
-    throw err;
-  }
 
-  let opts: z.infer<typeof RawOptsSchema>;
-  try {
-    opts = RawOptsSchema.parse(program.opts());
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      userError(err.issues[0]?.message ?? "Invalid CLI options");
-    }
-    throw err;
-  }
-
-  const refs: string[] = opts.ref;
-  const incremental = opts.incremental;
-  const sinceRef = opts.sinceRef;
-  const sinceDate = opts.sinceDate;
-  const state = opts.state;
-  const missingStateRaw = opts.missingState;
-  const outputDir = opts.outputDir;
-  const outputPrefix = opts.outputPrefix;
-  const rotateLinesRaw = opts.rotateLines;
-  const rotateSizeRaw = opts.rotateSize;
-  const maxDiffSizeRaw = opts.maxDiffSize;
-  const repoPath = program.args[0] as string | undefined;
-  const quiet = opts.quiet;
-  const profile = opts.profile;
-  const perFile = opts.perFile;
-  const repoName = opts.repoName;
-  const repoUrl = opts.repoUrl;
-  const configRaw = opts.config;
-
-  // --- Phase 1: Format and mutual exclusion checks (no I/O) ---
-  if (
-    missingStateRaw !== undefined &&
-    missingStateRaw !== "error" &&
-    missingStateRaw !== "snapshot"
-  ) {
-    userError('--missing-state must be "error" or "snapshot"');
-  }
-
-  if (sinceRef && sinceDate) {
-    userError("--since-ref and --since-date cannot be used together");
-  }
-  if (incremental && sinceRef) {
-    userError("--since-ref cannot be used with --incremental");
-  }
-  if (incremental && sinceDate) {
-    userError("--since-date cannot be used with --incremental");
-  }
-  if (missingStateRaw !== undefined && !incremental) {
-    userError("--missing-state is only valid with --incremental");
-  }
-  if (incremental && !state) {
-    userError("--state is required when using --incremental");
-  }
-
-  if (refs.length === 0) {
-    userError("At least one --ref must be specified");
-  }
-
-  let maxLines: number | undefined;
-  if (rotateLinesRaw !== undefined) {
-    const n = Number(rotateLinesRaw);
-    if (!Number.isInteger(n) || n <= 0) {
-      userError("--rotate-lines must be a positive integer");
-    }
-    maxLines = n;
-  }
-
-  let maxBytes: number | undefined;
-  if (rotateSizeRaw !== undefined) {
-    maxBytes = parseRotateSizeBytes(rotateSizeRaw);
-  }
-
-  let maxDiffSize: number | undefined;
-  if (maxDiffSizeRaw !== undefined) {
-    maxDiffSize = parseMaxDiffSizeBytes(maxDiffSizeRaw);
-  }
-
-  let sinceDateObj: Date | undefined;
-  if (sinceDate !== undefined) {
-    const d = new Date(sinceDate);
-    if (isNaN(d.getTime())) {
-      userError(
-        "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
-      );
-    }
-    sinceDateObj = d;
-  }
-
-  // --- Phase 2: File system validation ---
-  if (!repoPath) {
-    userError("Repository path is required");
-  }
-
-  const resolvedRepoPath = resolve(repoPath);
-  if (!existsSync(resolvedRepoPath)) {
-    userError(`Repository not found: ${repoPath}`);
-  }
-
-  const resolvedOutputDir = resolve(outputDir);
-  if (!existsSync(resolvedOutputDir)) {
-    userError(`Output directory not found: ${outputDir}`);
-  }
-
-  if (state) {
-    const resolvedStatePath = resolve(state);
-    const stateParentDir = dirname(resolvedStatePath);
-    if (!existsSync(stateParentDir)) {
-      userError(`Parent directory for state file not found: ${stateParentDir}`);
-    }
-    if (incremental && missingStateRaw !== "snapshot" && !existsSync(resolvedStatePath)) {
-      userError(`State file not found: ${resolvedStatePath}`);
-    }
-  }
-
-  let resolvedConfigPath: string | undefined;
-  if (configRaw !== undefined) {
-    resolvedConfigPath = resolve(configRaw);
-    if (!existsSync(resolvedConfigPath)) {
-      userError(`Config file not found: ${configRaw}`);
-    }
-  }
-
-  // --- Phase 3: Git validation ---
-  try {
-    await adapter.resolveRef(resolvedRepoPath, refs[0]!);
-  } catch (e) {
-    if (e instanceof GitAdapterError) {
-      if (e.code === "NOT_A_REPOSITORY") {
-        userError(`Not a Git repository: ${repoPath}`);
+    let opts: z.infer<typeof RawOptsSchema>;
+    try {
+      opts = RawOptsSchema.parse(program.opts());
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        userError(err.issues[0]?.message ?? "Invalid CLI options");
       }
-      if (e.code !== "REF_NOT_FOUND") {
+      throw err;
+    }
+
+    const refs: string[] = opts.ref;
+    const incremental = opts.incremental;
+    const sinceRef = opts.sinceRef;
+    const sinceDate = opts.sinceDate;
+    const state = opts.state;
+    const missingStateRaw = opts.missingState;
+    const outputDir = opts.outputDir;
+    const outputPrefix = opts.outputPrefix;
+    const rotateLinesRaw = opts.rotateLines;
+    const rotateSizeRaw = opts.rotateSize;
+    const maxDiffSizeRaw = opts.maxDiffSize;
+    const repoPath = program.args[0] as string | undefined;
+    const quiet = opts.quiet;
+    const profile = opts.profile;
+    const perFile = opts.perFile;
+    const repoName = opts.repoName;
+    const repoUrl = opts.repoUrl;
+    const configRaw = opts.config;
+
+    // --- Phase 1: Format and mutual exclusion checks (no I/O) ---
+    if (
+      missingStateRaw !== undefined &&
+      missingStateRaw !== "error" &&
+      missingStateRaw !== "snapshot"
+    ) {
+      userError('--missing-state must be "error" or "snapshot"');
+    }
+
+    if (sinceRef && sinceDate) {
+      userError("--since-ref and --since-date cannot be used together");
+    }
+    if (incremental && sinceRef) {
+      userError("--since-ref cannot be used with --incremental");
+    }
+    if (incremental && sinceDate) {
+      userError("--since-date cannot be used with --incremental");
+    }
+    if (missingStateRaw !== undefined && !incremental) {
+      userError("--missing-state is only valid with --incremental");
+    }
+    if (incremental && !state) {
+      userError("--state is required when using --incremental");
+    }
+
+    if (refs.length === 0) {
+      userError("At least one --ref must be specified");
+    }
+
+    let maxLines: number | undefined;
+    if (rotateLinesRaw !== undefined) {
+      const n = Number(rotateLinesRaw);
+      if (!Number.isInteger(n) || n <= 0) {
+        userError("--rotate-lines must be a positive integer");
+      }
+      maxLines = n;
+    }
+
+    let maxBytes: number | undefined;
+    if (rotateSizeRaw !== undefined) {
+      maxBytes = parseRotateSizeBytes(rotateSizeRaw);
+    }
+
+    let maxDiffSize: number | undefined;
+    if (maxDiffSizeRaw !== undefined) {
+      maxDiffSize = parseMaxDiffSizeBytes(maxDiffSizeRaw);
+    }
+
+    let sinceDateObj: Date | undefined;
+    if (sinceDate !== undefined) {
+      const d = new Date(sinceDate);
+      if (isNaN(d.getTime())) {
+        userError(
+          "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
+        );
+      }
+      sinceDateObj = d;
+    }
+
+    // --- Phase 2: File system validation ---
+    if (!repoPath) {
+      userError("Repository path is required");
+    }
+
+    const resolvedRepoPath = resolve(repoPath);
+    if (!existsSync(resolvedRepoPath)) {
+      userError(`Repository not found: ${repoPath}`);
+    }
+
+    const resolvedOutputDir = resolve(outputDir);
+    if (!existsSync(resolvedOutputDir)) {
+      userError(`Output directory not found: ${outputDir}`);
+    }
+
+    if (state) {
+      const resolvedStatePath = resolve(state);
+      const stateParentDir = dirname(resolvedStatePath);
+      if (!existsSync(stateParentDir)) {
+        userError(`Parent directory for state file not found: ${stateParentDir}`);
+      }
+      if (incremental && missingStateRaw !== "snapshot" && !existsSync(resolvedStatePath)) {
+        userError(`State file not found: ${resolvedStatePath}`);
+      }
+    }
+
+    let resolvedConfigPath: string | undefined;
+    if (configRaw !== undefined) {
+      resolvedConfigPath = resolve(configRaw);
+      if (!existsSync(resolvedConfigPath)) {
+        userError(`Config file not found: ${configRaw}`);
+      }
+    }
+
+    // --- Phase 3: Git validation ---
+    try {
+      await adapter.resolveRef(resolvedRepoPath, refs[0]!);
+    } catch (e) {
+      if (e instanceof GitAdapterError) {
+        if (e.code === "NOT_A_REPOSITORY") {
+          userError(`Not a Git repository: ${repoPath}`);
+        }
+        if (e.code !== "REF_NOT_FOUND") {
+          throw e;
+        }
+        // REF_NOT_FOUND means valid repo but ref doesn't exist — extractor will surface this
+      } else {
         throw e;
       }
-      // REF_NOT_FOUND means valid repo but ref doesn't exist — extractor will surface this
-    } else {
-      throw e;
     }
-  }
 
-  let resolvedSinceRef: CommitOid | undefined;
-  if (sinceRef) {
-    try {
-      resolvedSinceRef = await adapter.resolveRef(resolvedRepoPath, sinceRef);
-    } catch (e) {
-      if (e instanceof GitAdapterError && e.code === "REF_NOT_FOUND") {
-        userError(`Ref not found: ${sinceRef}`);
+    let resolvedSinceRef: CommitOid | undefined;
+    if (sinceRef) {
+      try {
+        resolvedSinceRef = await adapter.resolveRef(resolvedRepoPath, sinceRef);
+      } catch (e) {
+        if (e instanceof GitAdapterError && e.code === "REF_NOT_FOUND") {
+          userError(`Ref not found: ${sinceRef}`);
+        }
+        throw e;
       }
-      throw e;
     }
-  }
 
-  // --- Output prefix derivation ---
-  let prefix: string;
-  if (outputPrefix) {
-    prefix = outputPrefix;
-  } else {
-    const remoteUrl = await adapter.getRemoteUrl(resolvedRepoPath);
-    if (remoteUrl) {
-      const lastSegment = remoteUrl.split("/").pop() ?? "";
-      const stripped = lastSegment.replace(/\.git$/, "");
-      prefix = stripped || basename(resolvedRepoPath);
+    // --- Output prefix derivation ---
+    let prefix: string;
+    if (outputPrefix) {
+      prefix = outputPrefix;
     } else {
-      prefix = basename(resolvedRepoPath);
+      const remoteUrl = await adapter.getRemoteUrl(resolvedRepoPath);
+      if (remoteUrl) {
+        const lastSegment = remoteUrl.split("/").pop() ?? "";
+        const stripped = lastSegment.replace(/\.git$/, "");
+        prefix = stripped || basename(resolvedRepoPath);
+      } else {
+        prefix = basename(resolvedRepoPath);
+      }
     }
-  }
 
-  return {
-    repositoryPath: repoPath,
-    refs,
-    outputDir: resolvedOutputDir,
-    outputPrefix: prefix,
-    rotation: { maxLines, maxBytes },
-    incremental,
-    missingState: incremental ? ((missingStateRaw ?? "error") as "error" | "snapshot") : undefined,
-    range: resolvedSinceRef
-      ? { type: "ref", ref: resolvedSinceRef }
-      : sinceDateObj
-        ? { type: "date", since: sinceDateObj }
+    return {
+      repositoryPath: repoPath,
+      refs,
+      outputDir: resolvedOutputDir,
+      outputPrefix: prefix,
+      rotation: { maxLines, maxBytes },
+      incremental,
+      missingState: incremental
+        ? ((missingStateRaw ?? "error") as "error" | "snapshot")
         : undefined,
-    stateFilePath: state,
-    perFile,
-    maxDiffSize,
-    quiet,
-    profile,
-    repoName,
-    repoUrl,
-    configPath: resolvedConfigPath,
-  };
+      range: resolvedSinceRef
+        ? { type: "ref", ref: resolvedSinceRef }
+        : sinceDateObj
+          ? { type: "date", since: sinceDateObj }
+          : undefined,
+      stateFilePath: state,
+      perFile,
+      maxDiffSize,
+      quiet,
+      profile,
+      repoName,
+      repoUrl,
+      configPath: resolvedConfigPath,
+    };
+  } catch (err) {
+    if (err instanceof TerminationSignal) {
+      return applyTermination(err.termination);
+    }
+    throw err;
+  }
 }

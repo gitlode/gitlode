@@ -48,13 +48,58 @@ describe("@gitlode/plugin-custom-field", () => {
     const pluginMissing = await factory({});
     await expect(pluginMissing.init(runtime)).resolves.toEqual({
       type: "fatal",
-      message: 'Invalid plugin config: "value" must be an object containing at least one entry.',
+      message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
     });
 
     const pluginInvalid = await factory({ value: [] });
     await expect(pluginInvalid.init(runtime)).resolves.toEqual({
       type: "fatal",
-      message: 'Invalid plugin config: "value" must be an object containing at least one entry.',
+      message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
+    });
+  });
+
+  it("returns ready init result and projects scalar values", async () => {
+    const pluginString = await factory({ value: "release-2026-06" });
+    await expect(pluginString.init(runtime)).resolves.toEqual({ type: "ready" });
+    await expect(pluginString.project({} as never)).resolves.toEqual({
+      type: "success",
+      data: "release-2026-06",
+    });
+
+    const pluginNumber = await factory({ value: 20260602 });
+    await expect(pluginNumber.init(runtime)).resolves.toEqual({ type: "ready" });
+    await expect(pluginNumber.project({} as never)).resolves.toEqual({
+      type: "success",
+      data: 20260602,
+    });
+
+    const pluginBoolean = await factory({ value: true });
+    await expect(pluginBoolean.init(runtime)).resolves.toEqual({ type: "ready" });
+    await expect(pluginBoolean.project({} as never)).resolves.toEqual({
+      type: "success",
+      data: true,
+    });
+  });
+
+  it("returns fatal init result for non-finite top-level number", async () => {
+    const pluginNaN = await factory({ value: Number.NaN });
+    await expect(pluginNaN.init(runtime)).resolves.toEqual({
+      type: "fatal",
+      message: 'Invalid plugin config: "value" must be a finite number.',
+    });
+
+    const pluginInfinity = await factory({ value: Number.POSITIVE_INFINITY });
+    await expect(pluginInfinity.init(runtime)).resolves.toEqual({
+      type: "fatal",
+      message: 'Invalid plugin config: "value" must be a finite number.',
+    });
+  });
+
+  it("returns fatal init result when value is null at top-level", async () => {
+    const plugin = await factory({ value: null });
+    await expect(plugin.init(runtime)).resolves.toEqual({
+      type: "fatal",
+      message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
     });
   });
 

@@ -62,6 +62,14 @@ Each emitted record will include:
 
 ```json
 {
+  "value": "<string|number|boolean>"
+}
+```
+
+or
+
+```json
+{
   "value": {
     "<fieldName>": "<string|number|boolean|null>"
   }
@@ -70,7 +78,9 @@ Each emitted record will include:
 
 Rules:
 
-- `value` is required and must be an object containing at least one entry.
+- `value` is required and must be either:
+  - a scalar: `string`, finite `number`, or `boolean`, or
+  - an object containing at least one entry.
 - Field names must match `^[A-Za-z_][A-Za-z0-9_-]*$`.
 - Field values must be scalar JSON values only: `string`, `number`, `boolean`, or `null`.
 - Number values must be finite (`NaN`, `Infinity`, and `-Infinity` are rejected).

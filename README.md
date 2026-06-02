@@ -63,10 +63,11 @@ For the full CLI reference, output schema, and workflow patterns, see the
 
 This monorepo hosts the gitlode CLI and its official plugins.
 
-| Package                        | npm                                                | Description                                |
-| ------------------------------ | -------------------------------------------------- | ------------------------------------------ |
-| [`gitlode`](packages/gitlode/) | [`gitlode`](https://www.npmjs.com/package/gitlode) | The gitlode CLI — commit history extractor |
-| [`@gitlode/plugin-custom-fields`](packages/plugin-custom-fields/) | [`@gitlode/plugin-custom-fields`](https://www.npmjs.com/package/@gitlode/plugin-custom-fields) | Official plugin for static custom fields in `extensions` |
+| Package                                                                         | npm                                                                                                          | Description                                                        |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| [`gitlode`](packages/gitlode/)                                                  | [`gitlode`](https://www.npmjs.com/package/gitlode)                                                           | The gitlode CLI — commit history extractor                         |
+| [`@gitlode/plugin-conventional-commits`](packages/plugin-conventional-commits/) | [`@gitlode/plugin-conventional-commits`](https://www.npmjs.com/package/@gitlode/plugin-conventional-commits) | Official plugin for parsing conventional commits into `extensions` |
+| [`@gitlode/plugin-custom-field`](packages/plugin-custom-field/)                 | [`@gitlode/plugin-custom-field`](https://www.npmjs.com/package/@gitlode/plugin-custom-field)                 | Official plugin for static custom fields in `extensions`           |
 
 Additional official plugins will appear here as the plugin ecosystem grows, published under the
 `@gitlode/*` scope.
@@ -89,7 +90,8 @@ Additional official plugins will appear here as the plugin ecosystem grows, publ
 .
 ├── packages/
 │   ├── gitlode/        # gitlode CLI (published to npm as `gitlode`)
-│   └── plugin-custom-fields/  # official plugin (published as `@gitlode/plugin-custom-fields`)
+│   ├── plugin-conventional-commits/   # official plugin (published as `@gitlode/plugin-conventional-commits`)
+│   └── plugin-custom-field/           # official plugin (published as `@gitlode/plugin-custom-field`)
 ├── CONTRIBUTING.md     # Contribution guide for the whole repository
 ├── LICENSE
 └── README.md           # You are here

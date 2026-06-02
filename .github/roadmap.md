@@ -75,6 +75,44 @@ default while allowing explicit operator control when non-TTY color is desirable
 
 - no redesign of JSON output contracts; this is terminal presentation policy only
 
+#### Architecture/CLI Runtime: `main` orchestration refactoring and unit-test expansion
+
+The current CLI entrypoint has grown to include argument parsing, dependency wiring, runtime
+branching, error-to-exit-code mapping, and result reporting in a single `main` flow. This shape
+is workable, but it raises the maintenance cost of local changes and makes behavior-focused tests
+harder to write and review.
+
+This item improves maintainability and testability by splitting the entrypoint logic into semantic
+units while preserving current CLI behavior.
+
+**Design intent**:
+
+- reduce the cognitive load of `main` by extracting semantically coherent runtime steps
+- keep behavior stable (`no behavior change`) while improving structure and testability
+- increase confidence in runtime changes by adding unit tests around currently weakly covered paths
+
+**Scope boundary (initial delivery)**:
+
+- split entrypoint logic into focused helpers/modules (for example: reporter setup, runtime
+  dependency assembly, execution/reporting, error/exit mapping)
+- keep the runtime boundary role of the entrypoint explicit (composition and process-level control)
+- add or extend unit tests for extracted units and branching behavior currently concentrated in
+  `main`
+
+**Considerations required at design time**:
+
+- module boundary choices that improve readability without obscuring the runtime edge
+- dependency injection shape needed to unit-test success and failure branches without brittle mocks
+- expected test coverage targets for key branches (success, `GitAdapterError`, unexpected error,
+  quiet/profile and TTY/non-TTY behavior)
+- file/module naming and placement so the resulting structure remains discoverable for contributors
+
+**Non-goals for this item**:
+
+- no CLI option-surface changes
+- no extraction semantic changes
+- no performance-optimization commitment beyond incidental improvements from refactoring
+
 ---
 
 ### Medium-term
@@ -170,62 +208,6 @@ strategies while keeping execution behavior conservative.
 - no simultaneous rollout of broad parallel execution and plugin architecture
 - no changes that weaken current checkpoint/state safety guarantees
 
-#### Architecture: Diff algorithm abstraction within `IsomorphicGitAdapter`
-
-- **Release target**: `v0.7.0`
-
-Introduce a `DiffAdapter` interface as an internal strategy within `IsomorphicGitAdapter`,
-injectable via its constructor. This makes the line diff algorithm swappable without changing the
-`GitAdapter` interface that core depends on.
-
-**Motivation**:
-
-- **Performance**: The `diff` package used today is a pure-JS implementation. A native (e.g.
-  WebAssembly-backed) diff algorithm could significantly reduce per-commit processing time in
-  `--per-file` mode, where a tree diff and line diff are computed for every changed file. The
-  diff abstraction makes it possible to benchmark and swap implementations without touching
-  anything outside `IsomorphicGitAdapter`.
-- **Algorithm interchangeability**: Different diff algorithms (Myers, patience, histogram) produce
-  different `additions`/`deletions` counts for the same file pair. Making the algorithm explicit
-  and swappable ensures that the implementation choice is a deliberate, testable decision rather
-  than an implicit consequence of whichever library was installed.
-
-**Key design constraint — `DiffAdapter` must not surface to core**:
-
-If a future Git backend (e.g. a libgit2-based adapter) computes tree diff and line diff as a
-single native operation, splitting them at the `GitAdapter` boundary would be counterproductive.
-To avoid this, `DiffAdapter` is scoped strictly as an implementation detail of
-`IsomorphicGitAdapter`:
-
-- `GitAdapter` interface remains unchanged
-- `IsomorphicGitAdapter` accepts a `DiffAdapter` via constructor injection
-- A future `Libgit2Adapter` would implement `GitAdapter` independently and would not use
-  `DiffAdapter` at all
-
-**Sketch**:
-
-```ts
-interface DiffAdapter {
-  computeLineDiff(
-    before: Uint8Array,
-    after: Uint8Array,
-  ): { additions: number; deletions: number } | null; // null = binary
-}
-
-class IsomorphicGitAdapter implements GitAdapter {
-  constructor(
-    fsImpl?: FsClient,
-    diff: DiffAdapter = new JsDiffAdapter(),
-  ) { ... }
-}
-```
-
-**Design dependency**: This remains low-risk because the change is entirely internal to
-`IsomorphicGitAdapter`. Profiling data from the implemented `--profile` baseline can guide which
-alternative `DiffAdapter` implementations to prioritize first.
-
----
-
 #### Output: Configurable field inclusion/exclusion
 
 This is an output-surface convenience feature rather than a core extraction requirement. In many
@@ -239,30 +221,7 @@ later projection step.
 - Enables trimming output size for use cases that do not need all fields, while keeping the
   default extraction contract fully populated
 
-#### Distribution/Compatibility: Official plugin package policy and version contract
-
-- **Release target**: `v0.7.0`
-
-This entry defines how official plugins are distributed and how compatibility with `gitlode` is
-expressed and validated.
-
-See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
-
-**Design intent**:
-
-- distribute official plugins as independent npm packages under `@gitlode/*`
-- keep core package naming stable while making official plugin ownership explicit
-- make compatibility explicit via `peerDependencies` plus runtime warning semantics
-
-**Scope boundary (initial delivery)**:
-
-- no plugin bundling into the core `gitlode` package
-- minor-bounded compatibility ranges and lower-bound/latest CI checks
-- per-plugin compatibility notes as part of package documentation
-
 #### Configuration File: General-purpose configuration file beyond plugin loading
-
-- **Depends on**: `Pipeline: Pluggable enrichment stage for organization-specific metadata`
 
 The `--config <path>` JSON file introduced for plugin loading is structured to be forward-compatible
 (top-level `version` field, namespaced sections). The initial release implements only the
@@ -360,114 +319,6 @@ operational diagnostics, and future optimization planning.
 - Keep the existing profiling behavior as the stable baseline.
 - Treat these items as interpretation and observability UX improvements, not as mandatory
   preconditions for current extraction correctness.
-
-#### Pipeline: Pluggable enrichment stage for organization-specific metadata
-
-- **Release target**: `v0.7.0`
-
-Allow users to attach custom processing stages (plugins) to gitlode's extraction pipeline so that
-organization-specific semantics can be derived without expanding the core schema for every use
-case.
-
-See also: [Plugin and Monorepo Execution Strategy](plugin-monorepo-strategy.md)
-
-Example targets include parsing commit subjects that follow conventions such as Conventional
-Commits, deriving custom classification fields from file paths, or attaching additional metadata
-computed from diff content.
-
-**Design intent**:
-
-- keep gitlode core focused on canonical Git facts and broadly reusable output grains
-- move organization-specific interpretation to a user-controlled extension boundary
-- allow enrichment without forcing the project to standardize every downstream analytical need
-
-**Architecture**:
-
-- **Plugin implementation**: Users implement the `ProjectorPlugin` interface (`init?(): Promise<InitResult>` and `project(context, profiler?): Promise<ProjectionResult>`).
-- **Config-driven loading**: Plugins are loaded from a configuration file (format TBD — see **Open Design Question: CLI Interface** below) and instantiated via a `PluginFactory` function.
-- **Plugin types**:
-  - **npm packages** (e.g., `commit-message-analyze-projector`): Published plugins with shared logic and configuration.
-  - **script injection** (experimental): Local JavaScript files or modules with user-defined logic. No capability restrictions in initial implementation; security review and sandboxing deferred to future roadmap item.
-  - **IPC-based plugins** (future): External processes communicating via stdio (aligns with Worker-based runtime item).
-- **Execution model**:
-  - Sequential per-fact execution (no implicit parallelization in Phase 1).
-  - Plugins run after `DefaultFactProjector` and before output sink.
-  - Each plugin sees the base canonical record (from `DefaultFactProjector`) and the `Fact` input; other plugins' outputs are not visible (order independence).
-  - Plugins contribute data to the `extensions` field in the output record, keyed by namespace.
-
-**Type contract** (core types):
-
-```ts
-export type InitResult =
-  | { readonly type: "ready" }
-  | { readonly type: "fatal"; readonly message: string };
-
-export interface ProjectionContext {
-  readonly fact: Fact;
-  readonly baseRecord: Readonly<OutputRecord>; // from DefaultFactProjector
-}
-
-export type ProjectionResult =
-  | { readonly type: "success"; readonly data: Record<string, unknown> }
-  | { readonly type: "skip"; readonly reason: string }
-  | { readonly type: "fatal"; readonly message: string };
-
-export interface ProjectorPlugin {
-  init?(): Promise<InitResult>;
-  project(context: ProjectionContext, profiler?: StageProfiler): Promise<ProjectionResult>;
-}
-```
-
-**Output format** (backward compatible):
-
-- The `extensions` field is added to `OutputRecord` when plugins are configured; it is absent otherwise.
-- Structure: `extensions: { [namespace: string]: { [key: string]: unknown } | null }`.
-  - `null` value indicates a plugin returned `"skip"` for that fact.
-  - This addition is non-breaking: existing consumers ignore the field; new consumers opt-in to plugin data.
-
-**Plugin failure handling**:
-
-- **Default policy**: `"skip-fact"` — a plugin failure skips only that fact's enrichment; extraction continues.
-- **Alternative policy** (per-plugin): `"fatal"` — halts extraction, no state update.
-- Both policies emit warnings to the progress reporter.
-- Plugin timeout (if enforced) follows the configured failure policy.
-
-**Entrypoint resolution** (for config entry `"entrypoint": "xxx"`):
-
-1. Try as local file path: `./plugins/xxx.js`, `./plugins/xxx/index.js`, etc.
-2. Try as npm module: `require.resolve("xxx")`.
-3. Error if neither resolves.
-
-**Compatibility and constraints**:
-
-- State writing is not affected by plugin success or failure; state updates only after core extraction completes.
-- Plugins must not throw unhandled exceptions; they must return `InitResult.fatal` or `ProjectionResult.fatal` for errors.
-- Profile data: each plugin receives an optional scoped profiler for self-instrumentation.
-- Namespace validation: performed at config parse time; namespaces must be unique and match pattern `[a-z0-9-]+`.
-
-**Scope boundaries (initial Phase 1 implementation)**:
-
-- **In scope**: Single-process execution, init/project lifecycle, success/skip/fatal result contract, timeout control, profiler injection, namespace isolation, config loading (format TBD).
-- **Out of scope**: capability sandboxing for scripts, plugin output schema validation (defer to separate roadmap item), parallel execution, worker-thread boundaries (addressed by Worker-based Runtime item).
-- **Experimental**: `ScriptInjectProjector` — marked unstable; no security hardening in Phase 1; subject to future security review and capability restrictions.
-
-**Implementation guidance**:
-
-- Suggested order: (1) type definitions and plugin contract, (2) `DefaultFactProjector` refactor to extract single-record projection logic, (3) plugin config parsing and factory resolution, (4) `EnrichingFactProjector` orchestrator, (5) integration into `ExtractionCoordinator`, (6) basic example plugins.
-
-**Open Design Questions**:
-
-1. **CLI interface for plugin config**: How should plugins be specified at runtime?
-   - Option A: `--plugins-config ./gitlode-plugins.json`
-   - Option B: `--plugins-dir ./plugins/` with auto-discovery
-   - Option C: Environment variable + file discovery heuristics
-   - **Status**: Deferred to planning phase; scope to be finalized before implementation begins.
-   - Consider interactions with eventual Config File redesign and CLI ergonomics roadmap items.
-2. **Plugin documentation and examples**: Scope to be defined in a companion roadmap entry (see **Defer to separate entry** below).
-
-**Defer to separate entry**:
-
-- Documentation, tutorials, and examples for plugin authorship (including Conventional Commits parser reference implementation, custom-tagger template, etc.) — scope for a dedicated UX/docs roadmap item.
 
 #### Output: Branch reachability annotation per commit
 

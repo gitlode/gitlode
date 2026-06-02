@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/gitlode",
+    "packages/plugin-conventional-commits",
+    "packages/plugin-custom-field"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

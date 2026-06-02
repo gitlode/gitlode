@@ -53,7 +53,7 @@ semantics.
 
 ### Documentation Update
 
-- **Status**: Planned
+- **Status**: Completed
 - Update release-facing documentation (CHANGELOG, README, docs) for v0.8.0 scope.
 - Remove roadmap entries (or their `Release target: v0.8.0` metadata) that were implemented in this release.
 
@@ -66,10 +66,10 @@ semantics.
 
 ## Final Verification Checklist
 
-- [ ] All planned phases completed and reviewed
-- [ ] Documentation update tasks completed
-- [ ] Roadmap cleanup completed for implemented v0.8.0 items
-- [ ] `npm run build` passed
-- [ ] `npm test` passed
-- [ ] `npm run lint` passed
-- [ ] `npm run format:check` passed
+- [x] All planned phases completed and reviewed
+- [x] Documentation update tasks completed
+- [x] Roadmap cleanup completed for implemented v0.8.0 items
+- [x] `npm run build` passed
+- [x] `npm test` passed
+- [x] `npm run lint` passed
+- [x] `npm run format:check` passed

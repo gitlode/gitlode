@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-02
+
+### Added
+
+- General-purpose `--config` file support beyond plugin loading with versioned schema sections:
+  `extraction`, `output`, `repository`, `runtime`, and optional `extensions`.
+- Published official config schema artifact and generation flow for the supported v1 config surface.
+- Expanded CLI/runtime helper structure and focused unit-test coverage for entrypoint orchestration,
+  state-store handling, progress-runtime wiring, success reporting, and repository metadata derivation.
+
+### Changed
+
+- Plugin projection contract now accepts scalar success payloads (`string`, `number`, `boolean`) in
+  addition to object payloads.
+- Runtime/plugin boundaries were consolidated: plugins now use required
+  `init(runtime: PluginRuntimeContext)` and fact-scoped `project(context)`.
+- Typed termination and CLI presentation boundaries were clarified so runtime helpers no longer own
+  handled process exits.
+- `IsomorphicGitAdapter` profiler wiring now uses constructor/options injection rather than mutable
+  post-construction setup.
+- Config precedence and conflict handling now support config-backed defaults for refs, snapshot
+  range, output settings, repository metadata, and profile mode while preserving CLI override rules.
+
+### Migration
+
+- Plugin implementations must adopt the required `init(runtime)` lifecycle and should no longer
+  rely on the legacy `project(..., profiler?)` style.
+- Users can keep CLI-only usage unchanged, or adopt `--config` for declarative defaults with
+  precedence `CLI explicit > config > built-in`.
+
 ## [0.7.1] - 2026-05-26
 
 ### Added

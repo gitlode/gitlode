@@ -40,6 +40,8 @@ alongside it under [`packages/`](packages/).
 - One record per line in JSON Lines (commit-granularity by default, optional per-file granularity)
 - Snapshot and incremental extraction modes with atomic state-file checkpoints
 - Multi-ref extraction with cross-branch deduplication within a run
+- Explicit `--config` support for extraction/output/repository/runtime defaults
+- Plugin-based output enrichment via `extensions.<namespace>`
 
 ## Quick start
 

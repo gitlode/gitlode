@@ -79,8 +79,15 @@ export interface ProjectedRepository {
   readonly url: string | null;
 }
 
+/**
+ * The value written under an extension namespace key in a projected record.
+ * `null` is core-reserved and means skip or fatal-with-skip-fact; plugins
+ * cannot produce it directly — they return `{ type: "skip" }` instead.
+ */
+export type ProjectedExtensionValue = PluginProjectionValue | null;
+
 export interface ProjectedExtensions {
-  [namespace: string]: Record<string, unknown> | null;
+  [namespace: string]: ProjectedExtensionValue;
 }
 
 export interface ProjectedCommit {
@@ -397,12 +404,24 @@ export interface ExtractionCoordinator {
 // Plugin contract types
 // ---------------------------------------------------------------------------
 
+export interface DiagnosticReporter {
+  warn(message: string): void;
+  error(message: string): void;
+}
+
 export type PluginFailurePolicy = "skip-fact" | "fatal";
 
 export type PluginInitResult = { type: "ready" } | { type: "fatal"; message: string };
 
+/**
+ * The value a plugin may return as `success.data`. Scalars (`string`, `number`,
+ * `boolean`) and plain objects are allowed. `null` is excluded — return
+ * `{ type: "skip" }` to signal no data for a fact.
+ */
+export type PluginProjectionValue = string | number | boolean | Readonly<Record<string, unknown>>;
+
 export type PluginProjectionResult =
-  | { type: "success"; data: Record<string, unknown> }
+  | { type: "success"; data: PluginProjectionValue }
   | { type: "skip"; message: string }
   | { type: "fatal"; message: string };
 
@@ -416,10 +435,14 @@ export type ProjectionContext = {
   [Type in FactType]: ProjectionContextFor<Type>;
 }[FactType];
 
+export interface PluginRuntimeContext extends DiagnosticReporter {
+  readonly profiler?: StageProfiler;
+}
+
 /** Contract that every projector plugin must satisfy. */
 export interface ProjectorPlugin {
-  init?(): Promise<PluginInitResult>;
-  project(context: ProjectionContext, profiler?: StageProfiler): Promise<PluginProjectionResult>;
+  init(runtime: PluginRuntimeContext): Promise<PluginInitResult>;
+  project(context: ProjectionContext): Promise<PluginProjectionResult>;
 }
 
 /** Module default-export signature for plugin factory functions. ESM only. */
@@ -433,7 +456,6 @@ export interface PluginEntry {
   readonly namespace: Namespace;
   readonly plugin: ProjectorPlugin;
   readonly failurePolicy: PluginFailurePolicy;
-  readonly profiler?: StageProfiler;
 }
 
 /** Constructor dependencies injected into `DefaultExtractionCoordinator`. */

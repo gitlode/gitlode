@@ -1,4 +1,9 @@
-import type { PluginFactory, PluginInitResult, PluginProjectionResult } from "gitlode/plugin-api";
+import type {
+  PluginFactory,
+  PluginInitResult,
+  PluginProjectionResult,
+  PluginRuntimeContext,
+} from "gitlode/plugin-api";
 
 type FieldValue = string | number | boolean | null;
 type ParseResult =
@@ -90,7 +95,7 @@ const factory: PluginFactory = async (rawConfig: unknown) => {
       : { type: "success", data: {} };
 
   return {
-    async init() {
+    async init(_runtime: PluginRuntimeContext) {
       return initResult;
     },
     async project() {

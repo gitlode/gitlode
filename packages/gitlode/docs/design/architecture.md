@@ -113,13 +113,16 @@ Files:
 - `packages/gitlode/src/index.ts`
 - `packages/gitlode/src/cli/args.ts`
 - `packages/gitlode/src/cli/index.ts`
+- `packages/gitlode/src/cli/runtime/*`
 
 Responsibilities:
 
 - Parse and validate command arguments.
 - Enforce mutual exclusion rules for differential options.
-- Resolve derived defaults (for example output prefix).
+- Resolve effective settings from CLI/config precedence and derived defaults (for example output prefix).
 - Convert validated args into runtime extraction inputs for coordinator execution.
+- Own the runtime helpers that wire state loading, progress presentation, plugin bootstrap, and
+  successful-run rendering without widening `src/index.ts` beyond the process boundary.
 - Handle top-level process exit behavior and user-facing errors.
 
 Notably, state file reading and writing are not CLI responsibilities.
@@ -280,21 +283,21 @@ Profile
 
 Profiling entries are accumulated by the stage that owns each operation:
 
-| Entry path                 | Owning stage                                          | What is measured                                                       |
-| -------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------- |
-| `elapsed`                  | `packages/gitlode/src/index.ts` root profiler         | Total extraction wall/work duration                                    |
-| `elapsed/planning`         | `BranchTraversalPlanner`                              | Branch-head resolution and exclude-hash planning                       |
-| `elapsed/traversal`        | `CommitTraversalExtractor`                            | Commit traversal and commit-fact materialization                       |
-| `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector` | Fact-to-output-record mapping                                          |
-| `elapsed/write`            | `ExtractionCoordinator`                               | `sink.write()` and `sink.close()` only (not checkpoint write)          |
-| `elapsed/git/blob-read`    | `IsomorphicGitAdapter`                                | Time reading file content blobs from the Git object store              |
-| `elapsed/git/diff`         | `IsomorphicGitAdapter`                                | Time computing line-level diff statistics per file                     |
-| `elapsed/git/...` children | `IsomorphicGitAdapter`                                | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
+| Entry path                 | Owning stage                                                  | What is measured                                                       |
+| -------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `elapsed`                  | `packages/gitlode/src/cli/runtime/execution.ts` root profiler | Total extraction wall/work duration                                    |
+| `elapsed/planning`         | `BranchTraversalPlanner`                                      | Branch-head resolution and exclude-hash planning                       |
+| `elapsed/traversal`        | `CommitTraversalExtractor`                                    | Commit traversal and commit-fact materialization                       |
+| `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector`         | Fact-to-output-record mapping                                          |
+| `elapsed/write`            | `ExtractionCoordinator`                                       | `sink.write()` and `sink.close()` only (not checkpoint write)          |
+| `elapsed/git/blob-read`    | `IsomorphicGitAdapter`                                        | Time reading file content blobs from the Git object store              |
+| `elapsed/git/diff`         | `IsomorphicGitAdapter`                                        | Time computing line-level diff statistics per file                     |
+| `elapsed/git/...` children | `IsomorphicGitAdapter`                                        | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
 
-A `StageProfiler` object is created per run at the runtime edge (`packages/gitlode/src/index.ts`) and passed to each stage
-constructor. `IsomorphicGitAdapter` exposes a `setProfiler()` method (not on the `GitAdapter`
-interface) that `packages/gitlode/src/index.ts` calls via duck-typing. This keeps the `GitAdapter` contract stable
-while enabling profiling of adapter internals.
+A `StageProfiler` object is created per run inside `packages/gitlode/src/cli/runtime/execution.ts`
+and passed to each stage constructor. `IsomorphicGitAdapter` accepts profiling through its concrete
+dependency object (not on the `GitAdapter` interface). This keeps the `GitAdapter` contract stable
+while enabling profiling of adapter internals without mutable post-construction wiring.
 
 `ExtractionResult.profilingEntries` is populated on every successful run. The root `elapsed` entry
 is always present. The `--profile` flag controls stderr rendering of the aligned profile block and,
@@ -326,27 +329,40 @@ attach to the extraction process and add optional fields to output records.
 
 - **`src/cli/plugins.ts`** — config file loading and validation, module resolution, factory
   invocation, and parallel `init()` orchestration. All file I/O and dynamic imports happen here.
+- **`src/cli/runtime/execution.ts`** — run-scoped plugin bootstrap orchestration and projector
+  selection.
+- **`src/cli/runtime/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
+  stderr progress/success pipeline.
+- **`src/cli/runtime/success-report.ts`** — successful-run summary and profile rendering.
+- **`src/cli/runtime/state-store.ts`** — state persistence helpers and repository object-format
+  gating.
 - **`src/core/enriching-fact-projector.ts`** — `EnrichingFactProjector` wraps the default
   projector and calls each configured plugin's `project()` per fact in declaration order.
 - **`src/core/types.ts`** — all plugin contract types: `ProjectorPlugin`, `PluginEntry`,
-  `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `ProjectionContext`,
-  `PluginFailurePolicy`. Also defines the projection record shapes consumed downstream:
-  `ProjectedCommit`, `ProjectedFileChange`, `ProjectedRecord`, and the `ProjectedExtensions`
+  `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`,
+  `ProjectionContext`, `PluginFailurePolicy`. Also defines the projection record shapes consumed
+  downstream: `ProjectedCommit`, `ProjectedFileChange`, `ProjectedRecord`, the
+  `ProjectedExtensionValue` type (`PluginProjectionValue | null`), and the `ProjectedExtensions`
   type alias used for the optional `extensions` field on every projected record.
 
 ### Wiring at the runtime edge (`src/index.ts`)
 
+`src/index.ts` is now the process boundary only. It parses CLI input, constructs the bootstrap
+adapter, delegates runtime setup and execution to `src/cli/runtime/*`, and performs the final
+fatal stderr rendering and exit-code selection.
+
 When `--config` is provided:
 
-1. Config is loaded and validated (`loadPluginConfig`).
-2. Entries are resolved and instantiated (`resolvePluginEntries`).
-3. Per-entry profilers are attached if `--profile` is active.
-4. `init()` is called in parallel on all entries (`initializePlugins`). Any fatal result aborts.
-5. `EnrichingFactProjector` is used in place of `DefaultFactProjector`.
-6. Progress phase `"initializing-plugins"` runs before `"preparing"`.
+1. Config is loaded and validated by the generic loader (`src/cli/config/loader.ts`).
+2. Effective settings are merged (refs/range/output/repository/profile) using CLI-over-config precedence.
+3. Plugin entries are resolved and instantiated from the validated `extensions` subsection (`resolvePluginEntries`).
+4. Per-entry profilers are attached if effective profiling is enabled.
+5. `init()` is called in parallel on all entries (`initializePlugins`). Any fatal result aborts.
+6. `EnrichingFactProjector` is used in place of `DefaultFactProjector`.
+7. Progress phase `"initializing-plugins"` runs before `"preparing"` only when `extensions` is present.
 
-When `--config` is not provided, `DefaultFactProjector` is used directly and `extensions` is never
-written.
+When no `extensions` section is present, plugin loading and initialization are skipped,
+`DefaultFactProjector` is used directly, and `extensions` is omitted from output.
 
 ### Boundary rules
 

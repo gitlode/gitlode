@@ -32,22 +32,22 @@ semantics.
 ### Phase 1: Plugin Contract Scalar Values and Type-Safety Boundary
 
 - **File**: `plans/phase-1.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 2: Runtime/Plugin Responsibility Boundary Consolidation
 
 - **File**: `plans/phase-2.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 3: Main Orchestration Refactor and Unit-Test Expansion
 
 - **File**: `plans/phase-3.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ### Phase 4: Configuration File Expansion Beyond Plugin Loading
 
 - **File**: `plans/phase-4.md`
-- **Status**: Planned
+- **Status**: Completed
 
 ## Release Tasks
 

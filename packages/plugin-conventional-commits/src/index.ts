@@ -1,10 +1,10 @@
 import { CommitParser } from "conventional-commits-parser";
-import type { PluginFactory, ProjectionContext } from "gitlode/plugin-api";
+import type { PluginFactory, PluginRuntimeContext, ProjectionContext } from "gitlode/plugin-api";
 
 const factory: PluginFactory = async () => {
   let parser: CommitParser | undefined;
   return {
-    async init() {
+    async init(_runtime: PluginRuntimeContext) {
       parser = new CommitParser();
       return { type: "ready" };
     },

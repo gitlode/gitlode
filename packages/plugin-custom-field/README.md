@@ -2,7 +2,7 @@
 
 Add static custom fields to every gitlode output record under `extensions["custom-field"]`.
 
-This plugin is the first official gitlode plugin and is intended as a simple, practical
+This plugin is intended as a simple, practical
 session-labeling tool. Typical use cases include tagging extraction output with branch,
 environment, run id, or other pipeline metadata.
 
@@ -89,7 +89,7 @@ This package declares:
 
 ```json
 "peerDependencies": {
-	"gitlode": "^0.7.0"
+	"gitlode": "^0.8.0"
 }
 ```
 

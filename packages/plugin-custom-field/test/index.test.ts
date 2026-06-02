@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import factory from "../src/index.js";
 
+const runtime = {
+  warn() {},
+  error() {},
+};
+
 describe("@gitlode/plugin-custom-field", () => {
   it("returns ready init result and projects configured fields", async () => {
     const plugin = await factory({
@@ -13,7 +18,7 @@ describe("@gitlode/plugin-custom-field", () => {
       },
     });
 
-    await expect(plugin.init?.()).resolves.toEqual({ type: "ready" });
+    await expect(plugin.init(runtime)).resolves.toEqual({ type: "ready" });
 
     const projected = await plugin.project({} as never);
     expect(projected).toEqual({
@@ -33,7 +38,7 @@ describe("@gitlode/plugin-custom-field", () => {
 
   it("returns fatal init result when top-level config is not an object", async () => {
     const plugin = await factory("invalid-config");
-    await expect(plugin.init?.()).resolves.toEqual({
+    await expect(plugin.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: top-level value must be an object with a "value" property.',
     });
@@ -41,13 +46,13 @@ describe("@gitlode/plugin-custom-field", () => {
 
   it("returns fatal init result when value is missing or not an object", async () => {
     const pluginMissing = await factory({});
-    await expect(pluginMissing.init?.()).resolves.toEqual({
+    await expect(pluginMissing.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: "value" must be an object containing at least one entry.',
     });
 
     const pluginInvalid = await factory({ value: [] });
-    await expect(pluginInvalid.init?.()).resolves.toEqual({
+    await expect(pluginInvalid.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: "value" must be an object containing at least one entry.',
     });
@@ -55,7 +60,7 @@ describe("@gitlode/plugin-custom-field", () => {
 
   it("returns fatal init result when value is empty", async () => {
     const plugin = await factory({ value: {} });
-    await expect(plugin.init?.()).resolves.toEqual({
+    await expect(plugin.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: "value" must contain at least one entry.',
     });
@@ -63,7 +68,7 @@ describe("@gitlode/plugin-custom-field", () => {
 
   it("returns fatal init result for invalid field names", async () => {
     const plugin = await factory({ value: { "bad.name": "value" } });
-    await expect(plugin.init?.()).resolves.toEqual({
+    await expect(plugin.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: field name "bad.name" must match ^[A-Za-z_][A-Za-z0-9_-]*$.',
     });
@@ -71,13 +76,13 @@ describe("@gitlode/plugin-custom-field", () => {
 
   it("returns fatal init result for object and array field values", async () => {
     const pluginObject = await factory({ value: { nested: { key: "value" } } });
-    await expect(pluginObject.init?.()).resolves.toEqual({
+    await expect(pluginObject.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: field "nested" must be string, number, boolean, or null.',
     });
 
     const pluginArray = await factory({ value: { list: ["a", "b"] } });
-    await expect(pluginArray.init?.()).resolves.toEqual({
+    await expect(pluginArray.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: field "list" must be string, number, boolean, or null.',
     });
@@ -85,13 +90,13 @@ describe("@gitlode/plugin-custom-field", () => {
 
   it("returns fatal init result for non-finite number values", async () => {
     const pluginNaN = await factory({ value: { value: Number.NaN } });
-    await expect(pluginNaN.init?.()).resolves.toEqual({
+    await expect(pluginNaN.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: field "value" must be a finite number.',
     });
 
     const pluginInfinity = await factory({ value: { value: Number.POSITIVE_INFINITY } });
-    await expect(pluginInfinity.init?.()).resolves.toEqual({
+    await expect(pluginInfinity.init(runtime)).resolves.toEqual({
       type: "fatal",
       message: 'Invalid plugin config: field "value" must be a finite number.',
     });

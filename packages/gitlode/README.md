@@ -34,7 +34,8 @@ _Named after the mining term lode (a vein of valuable ore), with a nod to load �
 - Outputs one record per line in JSON Lines format (commit-granularity by default)
 - Two extraction modes: snapshot (full extraction each run) and `--incremental` (differential extraction using a state file)
 - Handles multi-branch extraction with cross-branch deduplication
-- Plugin system for adding custom `extensions` data to output records via `--config`
+- General-purpose `--config` file for extraction/output/repository/runtime defaults
+- Plugin system for extending output records via `extensions.<namespace>`
 
 ## Requirements
 
@@ -67,26 +68,26 @@ release-tag-based extraction, and CI configuration.
 gitlode [options] <repository-path>
 ```
 
-| Parameter                  | Alias | Type                | Required | Default | Description                                                                                                                                                                      |
-| -------------------------- | ----- | ------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<repository-path>`        |       | positional          | ✅       | —       | Local path to the Git repository                                                                                                                                                 |
-| `--incremental`            |       | boolean             |          | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.                                                                             |
-| `--ref <ref>`              | `-r`  | string (repeatable) | ✅       | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. Specify one or more times.                                                                                    |
-| `--output-dir <path>`      | `-o`  | string              |          | `./`    | Directory for output `.jsonl` files                                                                                                                                              |
-| `--output-prefix <string>` |       | string              |          | derived | Filename prefix (derived from remote origin if omitted)                                                                                                                          |
-| `--state <path>`           | `-s`  | string              |          | —       | State file path. Required with `--incremental`.                                                                                                                                  |
-| `--missing-state`          |       | `error \| snapshot` |          | `error` | Behavior when state file is absent. Only valid with `--incremental`.                                                                                                             |
-| `--since-ref <ref>`        |       | string              |          | —       | Exclude commits reachable from this ref (tag, branch, or commit object ID). Snapshot mode only.                                                                                  |
-| `--since-date <ISO8601>`   |       | string              |          | —       | Include only commits after this datetime. Snapshot mode only.                                                                                                                    |
-| `--per-file`               |       | boolean             |          | `false` | When set, emits one record per changed file per commit; when absent, emits one record per commit (default).                                                                      |
-| `--max-diff-size <value>`  |       | string              |          | —       | Skip line-level diff computation for files above this size (`K`/`M`/`G` suffix supported). Outputs `null` additions/deletions for skipped diffs. Applies only with `--per-file`. |
-| `--repo-name <string>`     |       | string              |          | —       | Override `repository.name` in all output records. Does not affect state-file identity or incremental behavior.                                                                   |
-| `--repo-url <string>`      |       | string              |          | —       | Override `repository.url` in all output records. Does not affect state-file identity or incremental behavior.                                                                    |
-| `--rotate-lines <n>`       |       | number              |          | —       | Start new file after `n` lines                                                                                                                                                   |
-| `--rotate-size <bytes>`    |       | string              |          | —       | Start new file after threshold (raw bytes or `K`/`M`/`G` suffix, case-insensitive; range `1M` to `64G`)                                                                          |
-| `--quiet`                  | `-q`  | boolean             |          | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.                                                                                    |
-| `--profile`                |       | boolean             |          | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`.                                                                             |
-| `--config <path>`          | `-c`  | string              |          | —       | Path to gitlode configuration file. Enables plugin enrichment pipeline. See the [User Guide](docs/usage.md#plugin-enrichment) for details.                                       |
+| Parameter                  | Alias | Type                | Required | Default | Description                                                                                                                                                                                                |
+| -------------------------- | ----- | ------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<repository-path>`        |       | positional          | ✅       | —       | Local path to the Git repository                                                                                                                                                                           |
+| `--incremental`            |       | boolean             |          | `false` | When set, reads state to extract only new commits. When absent, performs a full snapshot extraction.                                                                                                       |
+| `--ref <ref>`              | `-r`  | string (repeatable) | ✅       | —       | Ref to traverse from. Accepts branch name, tag, or raw commit OID. Specify one or more times.                                                                                                              |
+| `--output-dir <path>`      | `-o`  | string              |          | `./`    | Directory for output `.jsonl` files                                                                                                                                                                        |
+| `--output-prefix <string>` |       | string              |          | derived | Filename prefix (derived from remote origin if omitted)                                                                                                                                                    |
+| `--state <path>`           | `-s`  | string              |          | —       | State file path. Required with `--incremental`.                                                                                                                                                            |
+| `--missing-state`          |       | `error \| snapshot` |          | `error` | Behavior when state file is absent. Only valid with `--incremental`.                                                                                                                                       |
+| `--since-ref <ref>`        |       | string              |          | —       | Exclude commits reachable from this ref (tag, branch, or commit object ID). Snapshot mode only.                                                                                                            |
+| `--since-date <ISO8601>`   |       | string              |          | —       | Include only commits after this datetime. Snapshot mode only.                                                                                                                                              |
+| `--per-file`               |       | boolean             |          | `false` | When set, emits one record per changed file per commit; when absent, emits one record per commit (default).                                                                                                |
+| `--max-diff-size <value>`  |       | string              |          | —       | Skip line-level diff computation for files above this size (`K`/`M`/`G` suffix supported). Outputs `null` additions/deletions for skipped diffs. Applies only with `--per-file`.                           |
+| `--repo-name <string>`     |       | string              |          | —       | Override `repository.name` in all output records. Does not affect state-file identity or incremental behavior.                                                                                             |
+| `--repo-url <string>`      |       | string              |          | —       | Override `repository.url` in all output records. Does not affect state-file identity or incremental behavior.                                                                                              |
+| `--rotate-lines <n>`       |       | number              |          | —       | Start new file after `n` lines                                                                                                                                                                             |
+| `--rotate-size <bytes>`    |       | string              |          | —       | Start new file after threshold (raw bytes or `K`/`M`/`G` suffix, case-insensitive; range `1M` to `64G`)                                                                                                    |
+| `--quiet`                  | `-q`  | boolean             |          | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.                                                                                                              |
+| `--profile`                |       | boolean             |          | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`.                                                                                                       |
+| `--config <path>`          | `-c`  | string              |          | —       | Path to gitlode configuration file. Provides defaults for refs/range/output/repository/profile, and can declare plugin entries under `extensions`. See the [User Guide](docs/usage.md#configuration-file). |
 
 Progress, summary, and profile output are written to **stderr**; use `--quiet` to suppress them.
 Validation errors exit with code `1`; runtime errors with code `2`. See the
@@ -150,6 +151,7 @@ the same timestamp and will not overwrite files produced by earlier runs. Use
 - [Architecture](docs/design/architecture.md) — layer responsibilities, end-to-end flow, and key design decisions
 - [Git Traversal](docs/design/git-traversal.md) — DAG traversal, differential extraction modes, and deduplication strategy
 - [Output Schema](docs/design/schema.md) — JSONL format, field definitions, timestamp conversion, and file rotation
+- [Configuration File](docs/design/configuration.md) — config schema, precedence model, path resolution, and conflict rules
 - [Plugin System](docs/design/plugins.md) — plugin contract, configuration file format, lifecycle, and official plugin package policy
 - [Changelog](CHANGELOG.md) — release history and notable changes by version
 

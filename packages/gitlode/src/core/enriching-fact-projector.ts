@@ -71,20 +71,11 @@ export class EnrichingFactProjector implements FactProjector {
     const extensions: ProjectedExtensions = {};
 
     for (const entry of this.pluginEntries) {
-      const { namespace, plugin, failurePolicy, profiler } = entry;
+      const { namespace, plugin, failurePolicy } = entry;
       let result;
 
       try {
-        if (profiler) {
-          profiler.resume();
-          try {
-            result = await plugin.project(ctx, profiler);
-          } finally {
-            profiler.stop();
-          }
-        } else {
-          result = await plugin.project(ctx);
-        }
+        result = await plugin.project(ctx);
       } catch (err) {
         result = {
           type: "fatal" as const,

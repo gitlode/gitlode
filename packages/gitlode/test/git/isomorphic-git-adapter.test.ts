@@ -2,7 +2,7 @@ import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it, vi } from "vitest";
 
-import type { RawCommit } from "../../src/git/index.js";
+import type { IsomorphicGitAdapterDependencies, RawCommit } from "../../src/git/index.js";
 import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
 import { JsDiffAdapter } from "../../src/git/js-diff-adapter.js";
 
@@ -12,6 +12,17 @@ const AUTHOR = {
   timestamp: 1_000_000,
   timezoneOffset: 0,
 };
+
+function createAdapter(
+  fs: IsomorphicGitAdapterDependencies["fs"],
+  overrides: Partial<Omit<IsomorphicGitAdapterDependencies, "fs">> = {},
+): IsomorphicGitAdapter {
+  return new IsomorphicGitAdapter({
+    fs,
+    diffAdapter: overrides.diffAdapter ?? new JsDiffAdapter(),
+    profiler: overrides.profiler,
+  });
+}
 
 /** Create a fresh in-memory repo and return the memfs-compatible fs and a helper to commit files. */
 function makeRepo() {
@@ -69,7 +80,7 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     const sha2 = await addCommit("a.txt", "v2", "commit 2", 2000);
     const sha3 = await addCommit("a.txt", "v3", "commit 3", 3000);
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const commits = await collectAll(adapter, sha3);
 
     const oids = commits.map((c) => c.oid);
@@ -86,7 +97,7 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     const sha2 = await addCommit("a.txt", "v2", "commit 2", 2000);
     const sha3 = await addCommit("a.txt", "v3", "commit 3", 3000);
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     // Exclude sha1 and its ancestors — should only yield sha2 and sha3
     const commits = await collectAll(adapter, sha3, sha1);
 
@@ -212,7 +223,7 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     const results: RawCommit[] = [];
     for await (const c of adapter.walkCommits("/", sha5, sha3)) {
       results.push(c);
@@ -237,7 +248,7 @@ describe("IsomorphicGitAdapter.getRemoteUrl", () => {
   it("returns null when no remote is configured", async () => {
     const { fs, init } = makeRepo();
     await init();
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const url = await adapter.getRemoteUrl("/");
     expect(url).toBeNull();
   });
@@ -251,7 +262,7 @@ describe("IsomorphicGitAdapter.getRemoteUrl", () => {
       path: "remote.origin.url",
       value: "https://github.com/example/repo.git",
     });
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const url = await adapter.getRemoteUrl("/");
     expect(url).toBe("https://github.com/example/repo.git");
   });
@@ -262,7 +273,7 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial commit");
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const resolved = await adapter.resolveRef("/", "main");
     expect(resolved).toBe(sha);
   });
@@ -272,7 +283,7 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
     await git.tag({ fs, dir: "/", ref: "v1.0" });
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const resolved = await adapter.resolveRef("/", "v1.0");
     expect(resolved).toBe(sha);
   });
@@ -289,7 +300,7 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
       tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
       message: "release v1.0",
     });
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const resolved = await adapter.resolveRef("/", "v1.0-ann");
     expect(resolved).toBe(sha);
   });
@@ -298,7 +309,7 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const resolved = await adapter.resolveRef("/", sha);
     expect(resolved).toBe(sha);
   });
@@ -308,7 +319,7 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
     await init();
     await addCommit("f.txt", "v1", "initial");
     const { GitAdapterError } = await import("../../src/git/index.js");
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     const err = await adapter.resolveRef("/", "nonexistent").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(GitAdapterError);
     expect((err as InstanceType<typeof GitAdapterError>).code).toBe("REF_NOT_FOUND");
@@ -320,7 +331,7 @@ describe("IsomorphicGitAdapter.classifyRefType", () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     await addCommit("f.txt", "v1", "initial commit");
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(await adapter.classifyRefType("/", "main")).toBe("branch");
   });
 
@@ -329,7 +340,7 @@ describe("IsomorphicGitAdapter.classifyRefType", () => {
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
     await git.tag({ fs, dir: "/", ref: "v1.0" });
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(await adapter.classifyRefType("/", "v1.0")).toBe("tag-lightweight");
     // Sanity: the tag still resolves correctly
     expect(await adapter.resolveRef("/", "v1.0")).toBe(sha);
@@ -347,7 +358,7 @@ describe("IsomorphicGitAdapter.classifyRefType", () => {
       tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
       message: "release v1.0",
     });
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(await adapter.classifyRefType("/", "v1.0-ann")).toBe("tag-annotated");
   });
 
@@ -355,7 +366,7 @@ describe("IsomorphicGitAdapter.classifyRefType", () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha = await addCommit("f.txt", "v1", "initial");
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(await adapter.classifyRefType("/", sha)).toBe("commit-oid");
   });
 
@@ -363,7 +374,7 @@ describe("IsomorphicGitAdapter.classifyRefType", () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     await addCommit("f.txt", "v1", "initial");
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(await adapter.classifyRefType("/", "nonexistent")).toBe("commit-oid");
   });
 });
@@ -373,7 +384,7 @@ describe("IsomorphicGitAdapter.getRepositoryObjectFormat", () => {
     const { fs, init } = makeRepo();
     await init();
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(await adapter.getRepositoryObjectFormat("/")).toBe("sha1");
   });
 
@@ -387,7 +398,7 @@ describe("IsomorphicGitAdapter.getRepositoryObjectFormat", () => {
       value: "sha256",
     });
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(await adapter.getRepositoryObjectFormat("/")).toBe("sha256");
   });
 });
@@ -397,7 +408,7 @@ describe("IsomorphicGitAdapter.supportedObjectFormats", () => {
     const { fs, init } = makeRepo();
     await init();
 
-    const adapter = new IsomorphicGitAdapter(fs);
+    const adapter = createAdapter(fs);
     expect(adapter.supportedObjectFormats()).toEqual(["sha1"]);
   });
 });
@@ -452,7 +463,7 @@ describe("IsomorphicGitAdapter.getFileChanges – DiffAdapter substitution seam"
       },
     };
 
-    const adapter = new IsomorphicGitAdapter(fs, stubAdapter);
+    const adapter = createAdapter(fs, { diffAdapter: stubAdapter });
     const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -478,7 +489,7 @@ describe("IsomorphicGitAdapter.getFileChanges – DiffAdapter substitution seam"
       },
     };
 
-    const adapter = new IsomorphicGitAdapter(fs, stubAdapter);
+    const adapter = createAdapter(fs, { diffAdapter: stubAdapter });
     const changes = await adapter.getFileChanges("/", sha1 as never);
 
     expect(callCount).toBe(0);
@@ -498,7 +509,7 @@ describe("IsomorphicGitAdapter.getFileChanges – DiffAdapter substitution seam"
       }),
     };
 
-    const adapter = new IsomorphicGitAdapter(fs, badAdapter);
+    const adapter = createAdapter(fs, { diffAdapter: badAdapter });
     const { GitAdapterError } = await import("../../src/git/index.js");
     await expect(adapter.getFileChanges("/", sha1 as never)).rejects.toBeInstanceOf(
       GitAdapterError,
@@ -512,7 +523,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     await init();
     const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     const changes = await adapter.getFileChanges("/", sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -530,7 +541,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
     const sha2 = await addCommit("b.txt", "new1\n", "add b.txt");
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -549,7 +560,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     // Modify: remove line2, add line3 and line4
     const sha2 = await addCommit("a.txt", "line1\nline3\nline4\n", "modify a.txt");
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -568,7 +579,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     const sha2 = await addCommit("b.txt", "x\n", "add b.txt");
     const sha3 = await removeCommit("b.txt", "delete b.txt");
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     const changes = await adapter.getFileChanges("/", sha3 as never, sha2 as never);
 
     expect(changes).toHaveLength(1);
@@ -585,7 +596,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     await init();
     const sha1 = await addBinaryCommit("binary.bin", "add binary file");
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     const changes = await adapter.getFileChanges("/", sha1 as never);
 
     expect(changes).toHaveLength(1);
@@ -616,7 +627,7 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     const changes = await adapter.getFileChanges("/", emptyCommit as never, sha1 as never);
 
     expect(changes).toHaveLength(0);
@@ -647,7 +658,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     // Merge base of sha2 and shaA should be sha1 (their common ancestor)
     const result = await adapter.findMergeBase("/", [sha2, shaA] as never);
     expect(result).toBe(sha1);
@@ -672,7 +683,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
       },
     });
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
     // sha1 and orphanSha have no common ancestor
     const result = await adapter.findMergeBase("/", [sha1, orphanSha] as never);
     expect(result).toBeNull();
@@ -682,7 +693,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
     const { fs, init } = makeRepo();
     await init();
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
+    const adapter = createAdapter(fs);
 
     // Force git.findMergeBase to throw an unexpected error
     const spy = vi.spyOn(git, "findMergeBase").mockRejectedValueOnce(new Error("internal error"));
@@ -697,8 +708,8 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
   });
 });
 
-describe("IsomorphicGitAdapter.setProfiler – adapter stage timing", () => {
-  it("adapter-level and file-change sub-stage entries accumulate when setProfiler is called", async () => {
+describe("IsomorphicGitAdapter profiler injection", () => {
+  it("adapter-level and file-change sub-stage entries accumulate when a profiler is passed to the constructor", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha1 = await addCommit("a.txt", "hello\nworld\n", "root commit");
@@ -710,8 +721,7 @@ describe("IsomorphicGitAdapter.setProfiler – adapter stage timing", () => {
     const { DefaultStageProfiler } = await import("../../src/core/profile/index.js");
     const profiler = new DefaultStageProfiler("git", clock);
 
-    const adapter = new IsomorphicGitAdapter(fs, new JsDiffAdapter());
-    adapter.setProfiler(profiler);
+    const adapter = createAdapter(fs, { profiler });
 
     await adapter.getFileChanges("/", sha2 as never, sha1 as never);
     // Also exercise resolve and merge-base paths so adapter-level buckets are populated.

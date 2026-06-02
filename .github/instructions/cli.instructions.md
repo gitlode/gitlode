@@ -42,16 +42,19 @@ assignments are:
 
 ### Extraction Mode
 
-| Parameter       | Alias | Type                | Required | Default | Description                                                                                                                                    |
-| --------------- | ----- | ------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--incremental` |       | boolean             |          | `false` | When present, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state. |
-| `--ref <ref>`   | `-r`  | string (repeatable) | ✅       |         | Ref to use as traversal starting point. Accepts branch name, tag, or commit object ID. May be specified multiple times.                        |
+| Parameter       | Alias | Type                | Required | Default | Description                                                                                                                                                                   |
+| --------------- | ----- | ------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--incremental` |       | boolean             |          | `false` | When present, extract only commits new since the last recorded state. When absent, perform a snapshot extraction independently of prior state.                                |
+| `--ref <ref>`   | `-r`  | string (repeatable) |          |         | Ref to use as traversal starting point. Accepts branch name, tag, or commit object ID. May be specified multiple times. Required unless provided by config `extraction.refs`. |
 
 Snapshot extraction is the default mode (no flag needed). The term "snapshot" is used in
 documentation and `--missing-state=snapshot` to name this extraction model, but it is no longer a
 CLI parameter value.
 
-`--ref` must be specified at least once. There is no default. Accepting multiple values:
+`--ref` accepts multiple values. When absent, refs may come from config `extraction.refs`.
+If neither source provides refs, validation fails with `At least one --ref must be specified`.
+
+Accepting multiple values:
 
 ```bash
 gitlode --ref main --ref develop ./my-repo
@@ -112,9 +115,24 @@ Both may be specified simultaneously — rotation triggers when **either** thres
 
 ### Configuration File
 
-| Parameter         | Alias | Type   | Default | Description                                                                                                                  |
-| ----------------- | ----- | ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `--config <path>` | `-c`  | string | —       | Path to the gitlode configuration file. When provided, enables the plugin enrichment pipeline. Path is resolved relative to CWD. File must exist or the run exits with code 1. |
+| Parameter         | Alias | Type   | Default | Description                                                                                                                                                                                                              |
+| ----------------- | ----- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--config <path>` | `-c`  | string | —       | Path to the gitlode configuration file. When provided, enables config-backed defaults (`extraction`, `output`, `repository`, `runtime`) and optional plugin enrichment (`extensions`). Path is resolved relative to CWD. |
+
+Config root contract for `version: 1`:
+
+- Strict root object (`additionalProperties: false`)
+- Allowed sections: `extraction`, `output`, `repository`, `runtime`, `extensions`
+- Unknown keys at root or section level are user errors
+- `extensions` is optional; when present it must be non-empty
+
+Precedence model:
+
+- Scalar/path defaults: `CLI explicit value > config value > built-in default`
+- Refs: any CLI `--ref` replaces config `extraction.refs` (no merge)
+- Snapshot range: CLI `--since-ref` / `--since-date` replaces config `extraction.range` as a whole
+- Rotation thresholds resolve independently per field (`lines`, `size`)
+- Profile is enabled when `CLI --profile OR config runtime.profile`
 
 ### Successful-Run Stderr Contract
 
@@ -224,13 +242,14 @@ active stage line is then redrawn.
 
 The following combinations are invalid and must produce a clear error message before any processing begins:
 
-| Combination                               | Error Message                                          |
-| ----------------------------------------- | ------------------------------------------------------ |
-| `--since-ref` + `--since-date`            | `--since-ref and --since-date cannot be used together` |
-| `--incremental` + `--since-ref`           | `--since-ref cannot be used with --incremental`        |
-| `--incremental` + `--since-date`          | `--since-date cannot be used with --incremental`       |
-| `--missing-state` without `--incremental` | `--missing-state is only valid with --incremental`     |
-| `--incremental` + no `--state`            | `--state is required when using --incremental`         |
+| Combination                                 | Error Message                                               |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| `--since-ref` + `--since-date`              | `--since-ref and --since-date cannot be used together`      |
+| `--incremental` + `--since-ref`             | `--since-ref cannot be used with --incremental`             |
+| `--incremental` + `--since-date`            | `--since-date cannot be used with --incremental`            |
+| `--missing-state` without `--incremental`   | `--missing-state is only valid with --incremental`          |
+| `--incremental` + no `--state`              | `--state is required when using --incremental`              |
+| config `extraction.range` + `--incremental` | `Config extraction.range cannot be used with --incremental` |
 
 `--state` + `--since-*` is **permitted** in snapshot mode (no `--incremental`). `--state` serves
 only as a write-only recording path in that context; `--since-*` controls the extraction range
@@ -240,11 +259,13 @@ independently.
 
 ## Validation Rules
 
-All validation must complete before extraction and file output begin. Validation proceeds in three phases:
+All validation must complete before extraction and file output begin. Validation proceeds in five phases:
 
-1. **Format / mutual exclusion** — no I/O (mutual exclusion rules, branch count, `--missing-state` value, numeric arg formats, ISO 8601 format for `--since-date`)
-2. **File system** — `<repository-path>` existence, `--output-dir` existence, `--state` parent directory existence, `--state` file existence check (result passed to subsequent logic)
-3. **Git** — repository identity (`resolveRef` on first ref), repository object-format compatibility gate, each `--ref` ref resolution, `--since-ref` resolution via `resolveRef()`, state file content validation (JSON structure, `version`, `repositoryPath` match)
+1. **CLI format / mutual exclusion** — no file reads (`--missing-state` value, CLI mutual exclusions, numeric formats, ISO 8601 for CLI `--since-date`)
+2. **Config load/schema validation** (`--config` only) — read JSON, validate strict `version: 1` schema, normalize config-relative paths
+3. **CLI/config merge + conflict checks** — effective refs/range/profile/output/repository/rotation resolution, required-effective-ref check, config-range + incremental fail-fast rule
+4. **File system** — `<repository-path>` existence, effective output directory existence, `--state` parent directory existence, state-file presence checks for incremental mode
+5. **Git** — repository identity (`resolveRef` on first effective ref), repository object-format compatibility gate, effective `since-ref` resolution, state file content validation (JSON structure, `version`, `repositoryPath` match)
 
 **Validation stage 2 — state file existence handling for incremental mode:**
 
@@ -252,21 +273,22 @@ All validation must complete before extraction and file output begin. Validation
   - `--missing-state error` (default when absent) → exit with code 1
   - `--missing-state snapshot` → emit warning to stderr, set fallback flag (behave as snapshot with no range filter)
 
-| Condition                                   | Phase | Error                                                                                                   |
-| ------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------- |
-| `<repository-path>` does not exist          | 2     | `Repository not found: <path>`                                                                          |
-| `<repository-path>` is not a Git repository | 3     | `Not a Git repository: <path>`                                                                          |
-| `--ref` not specified                       | 1     | `At least one --ref must be specified`                                                                  |
-| `--missing-state` value invalid             | 1     | `--missing-state must be "error" or "snapshot"`                                                         |
-| `--output-dir` does not exist               | 2     | `Output directory not found: <path>`                                                                    |
-| `--state` parent directory does not exist   | 2     | `Parent directory for state file not found: <dir>`                                                      |
-| `--since-date` is not valid ISO 8601        | 1     | `Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)`                   |
-| `--since-ref` ref not found in repository   | 3     | `Ref not found: <ref>`                                                                                  |
-| `--rotate-lines` is not a positive integer  | 1     | `--rotate-lines must be a positive integer`                                                             |
-| `--rotate-size` has invalid format          | 1     | `--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)` |
-| `--rotate-size` value is out of range       | 1     | `--rotate-size must be between 1048576 and 68719476736 bytes`                                           |
-| Repository object format unsupported        | 3     | `Unsupported repository object format: <format>. Supported formats: <supported-list>.`                  |
-| State file `repositoryPath` mismatch        | 3     | `State file was created for a different repository: <recorded-path>`                                    |
+| Condition                                     | Phase | Error                                                                                                   |
+| --------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| `<repository-path>` does not exist            | 2     | `Repository not found: <path>`                                                                          |
+| `<repository-path>` is not a Git repository   | 5     | `Not a Git repository: <path>`                                                                          |
+| no effective refs after CLI/config merge      | 3     | `At least one --ref must be specified`                                                                  |
+| `--missing-state` value invalid               | 1     | `--missing-state must be "error" or "snapshot"`                                                         |
+| effective output directory does not exist     | 4     | `Output directory not found: <path>`                                                                    |
+| `--state` parent directory does not exist     | 4     | `Parent directory for state file not found: <dir>`                                                      |
+| `--since-date` is not valid ISO 8601          | 1     | `Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)`                   |
+| effective `since-ref` not found in repository | 5     | `Ref not found: <ref>`                                                                                  |
+| `--rotate-lines` is not a positive integer    | 1     | `--rotate-lines must be a positive integer`                                                             |
+| `--rotate-size` has invalid format            | 1     | `--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)` |
+| `--rotate-size` value is out of range         | 1     | `--rotate-size must be between 1048576 and 68719476736 bytes`                                           |
+| config `extraction.range` + `--incremental`   | 3     | `Config extraction.range cannot be used with --incremental`                                             |
+| Repository object format unsupported          | 5     | `Unsupported repository object format: <format>. Supported formats: <supported-list>.`                  |
+| State file `repositoryPath` mismatch          | 5     | `State file was created for a different repository: <recorded-path>`                                    |
 
 ---
 

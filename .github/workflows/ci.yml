@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check generated artifacts are up to date
+        run: npm run schema:check -w gitlode
+
       - name: Format check
         run: npm run format:check
 

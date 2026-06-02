@@ -358,7 +358,29 @@ gitlode [options] <repository-path>
 
 | Parameter         | Alias | Type   | Default | Description                                                                                                                        |
 | ----------------- | ----- | ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `--config <path>` | `-c`  | string | —       | Path to the gitlode configuration file. Enables the plugin enrichment pipeline. See [Plugin Enrichment](#plugin-enrichment) below. |
+| `--config <path>` | `-c`  | string | —       | Path to the gitlode configuration file. Provides defaults for refs/range/output/repository/profile and optional plugin enrichment. |
+
+The config file is explicit opt-in: gitlode reads it only when `--config` is passed.
+
+Supported top-level sections in `version: 1`:
+
+- `extraction`
+- `output`
+- `repository`
+- `runtime`
+- `extensions`
+
+Precedence rules:
+
+- `--ref` replaces `extraction.refs` (no merge)
+- `--since-ref` / `--since-date` replace `extraction.range`
+- Scalar/path defaults use `CLI explicit > config > built-in`
+- `--rotate-lines` and `--rotate-size` override their own thresholds independently
+- effective profile is `--profile OR runtime.profile`
+
+Conflict rule:
+
+- `extraction.range` in config cannot be used with `--incremental`.
 
 ### Profiling output
 
@@ -517,6 +539,20 @@ gitlode -r main --config ./gitlode.config.json ./my-repo
 ```json
 {
   "version": 1,
+  "extraction": {
+    "refs": ["main"],
+    "range": { "sinceRef": "v1.0" }
+  },
+  "output": {
+    "directory": "./out",
+    "prefix": "gitlode"
+  },
+  "repository": {
+    "name": "repo-override"
+  },
+  "runtime": {
+    "profile": true
+  },
   "extensions": {
     "my-plugin": {
       "entrypoint": "./my-plugin.js",
@@ -530,10 +566,16 @@ gitlode -r main --config ./gitlode.config.json ./my-repo
 | Field           | Required | Description                                                                               |
 | --------------- | -------- | ----------------------------------------------------------------------------------------- |
 | `version`       | ✅       | Must be `1`.                                                                              |
-| `extensions`    | ✅       | Map from namespace to plugin entry. Must have at least one entry.                         |
+| `extraction`    |          | Defaults for `--ref` and snapshot range.                                                  |
+| `output`        |          | Defaults for output directory/prefix and rotation thresholds.                             |
+| `repository`    |          | Defaults for `--repo-name` / `--repo-url`.                                                |
+| `runtime`       |          | Defaults for runtime flags (currently `profile` only).                                    |
+| `extensions`    |          | Map from namespace to plugin entry. When present, must have at least one entry.           |
 | `entrypoint`    | ✅       | Module path or specifier. Relative paths resolve from the config file directory.          |
 | `config`        |          | Passed to the plugin factory. Any JSON value.                                             |
 | `failurePolicy` |          | `"skip-fact"` (default) or `"fatal"`. Controls behavior when the plugin errors on a fact. |
+
+For complete schema and precedence details, see [Configuration File Design](design/configuration.md).
 
 ### Plugin output in records
 
@@ -545,12 +587,15 @@ Each output record gains an `extensions` object with one key per plugin:
   "subject": "Add caching layer",
   "extensions": {
     "my-plugin": { "score": 88 },
+    "label-plugin": "v1.0",
+    "flag-plugin": true,
     "other-plugin": null
   }
 }
 ```
 
-A value of `null` means the plugin skipped that fact.
+A non-null value is whatever the plugin returned as `success.data`: a plain object, a string, a
+number, or a boolean. A value of `null` means the plugin skipped that fact.
 
 ### Plugin failure policies
 

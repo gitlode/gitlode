@@ -64,7 +64,10 @@ const noopReporter: ProgressReporter = { emit: () => {} };
 function makePlugin(
   projectFn: (ctx: ProjectionContext) => Promise<PluginProjectionResult>,
 ): ProjectorPlugin {
-  return { project: projectFn };
+  return {
+    init: async () => ({ type: "ready" }),
+    project: projectFn,
+  };
 }
 
 function makeEntry(
@@ -396,9 +399,89 @@ describe("EnrichingFactProjector — zero plugins", () => {
   it("emits records with empty extensions object when constructed with empty plugin list", async () => {
     const projector = new EnrichingFactProjector([], noopReporter, "repo", null);
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
-    // extensions key exists but is empty; the invariant of extensions:{} not appearing
-    // in output is enforced by the config loader rejecting empty extensions sections
+    // extensions key exists but is empty; runtime entrypoint wiring avoids this
+    // path for config extensions:{} by using hasEffectiveExtensionsConfig().
     expect(record!.extensions).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Scalar success payloads (Phase 1 widening)
+// ---------------------------------------------------------------------------
+
+describe("EnrichingFactProjector — scalar success payloads", () => {
+  it("passes a string success value through unchanged", async () => {
+    const plugin = makePlugin(async () => ({ type: "success", data: "hello" }));
+    const projector = new EnrichingFactProjector(
+      [makeEntry("p", plugin)],
+      noopReporter,
+      "repo",
+      null,
+    );
+    const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
+    expect(record!.extensions?.["p"]).toBe("hello");
+  });
+
+  it("passes a number success value through unchanged", async () => {
+    const plugin = makePlugin(async () => ({ type: "success", data: 42 }));
+    const projector = new EnrichingFactProjector(
+      [makeEntry("p", plugin)],
+      noopReporter,
+      "repo",
+      null,
+    );
+    const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
+    expect(record!.extensions?.["p"]).toBe(42);
+  });
+
+  it("passes a boolean success value through unchanged", async () => {
+    const plugin = makePlugin(async () => ({ type: "success", data: true }));
+    const projector = new EnrichingFactProjector(
+      [makeEntry("p", plugin)],
+      noopReporter,
+      "repo",
+      null,
+    );
+    const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
+    expect(record!.extensions?.["p"]).toBe(true);
+  });
+
+  it("object success payloads continue to be written unchanged (regression)", async () => {
+    const plugin = makePlugin(async () => ({ type: "success", data: { score: 99, tag: "v1" } }));
+    const projector = new EnrichingFactProjector(
+      [makeEntry("p", plugin)],
+      noopReporter,
+      "repo",
+      null,
+    );
+    const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
+    expect(record!.extensions?.["p"]).toEqual({ score: 99, tag: "v1" });
+  });
+
+  it("scalar and object plugins can coexist in the same record", async () => {
+    const p1 = makePlugin(async () => ({ type: "success", data: "label" }));
+    const p2 = makePlugin(async () => ({ type: "success", data: { count: 3 } }));
+    const projector = new EnrichingFactProjector(
+      [makeEntry("scalar-ns", p1), makeEntry("object-ns", p2)],
+      noopReporter,
+      "repo",
+      null,
+    );
+    const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
+    expect(record!.extensions?.["scalar-ns"]).toBe("label");
+    expect(record!.extensions?.["object-ns"]).toEqual({ count: 3 });
+  });
+
+  it("skip and fatal-with-skip-fact still produce null, not the scalar value", async () => {
+    const skipPlugin = makePlugin(async () => ({ type: "skip", message: "no data" }));
+    const projector = new EnrichingFactProjector(
+      [makeEntry("p", skipPlugin, "skip-fact")],
+      noopReporter,
+      "repo",
+      null,
+    );
+    const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
+    expect(record!.extensions?.["p"]).toBeNull();
   });
 });
 

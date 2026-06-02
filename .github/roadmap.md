@@ -77,6 +77,8 @@ default while allowing explicit operator control when non-TTY color is desirable
 
 #### Architecture/CLI Runtime: `main` orchestration refactoring and unit-test expansion
 
+- **Release target**: `v0.8.0`
+
 The current CLI entrypoint has grown to include argument parsing, dependency wiring, runtime
 branching, error-to-exit-code mapping, and result reporting in a single `main` flow. This shape
 is workable, but it raises the maintenance cost of local changes and makes behavior-focused tests
@@ -113,7 +115,283 @@ units while preserving current CLI behavior.
 - no extraction semantic changes
 - no performance-optimization commitment beyond incidental improvements from refactoring
 
+#### Architecture/CLI Runtime: Run-scoped responsibility boundaries and runtime service injection consistency
+
+- **Release target**: `v0.8.0`
+
+Several current runtime inconsistencies appear to be separate local issues at first glance: some
+warnings flow through the progress reporter while others write directly to stderr; some runtime
+objects receive reporter/profiler dependencies via constructors while others receive them via
+method arguments or mutable post-construction setup; plugin runtime interaction mixes projection
+results with warning behavior; and helper modules such as CLI argument parsing and plugin config
+loading still own process exit behavior.
+
+These are better treated as one architectural concern rather than a collection of unrelated
+cleanup tasks. The underlying problem is that run-scoped responsibilities and authority boundaries
+are not yet expressed consistently across the pipeline.
+
+**Design intent**:
+
+- clarify which layer owns non-fatal reporting, fatal control flow, terminal rendering, and exit
+  code selection
+- narrow runtime capabilities so each component can emit only the class of signals it actually
+  owns
+- keep configuration-time concerns distinct from run-scoped services in the plugin contract
+- define explicit injection guidance for run-scoped services so constructor injection,
+  method-argument injection, and runtime-boundary factories are used intentionally rather than
+  interchangeably by convenience
+- make reporter and profiler injection shapes consistent enough that later refactors do not reopen
+  the same boundary questions
+- improve maintainability without changing extraction semantics for behavior outside the refactor
+  target
+
+**Problem framing**:
+
+- warning emission currently spans both semantic reporting paths and direct stderr writes, which
+  weakens the runtime/UI boundary and makes warning policy harder to reason about
+- process exit and fatal message rendering are still partially owned by lower-level helpers even
+  though they are entrypoint concerns
+- the current reporter surface is broader than many consumers should be allowed to use
+- plugin runtime APIs currently have no coherent host-service injection model for warnings and
+  profiling
+- profiler wiring follows multiple patterns today, including mutable post-construction setup,
+  which increases temporal coupling
+
+**Recommended implementation stages**:
+
+1. **Fatal control-flow centralization**
+   Replace helper-owned `process.exit(...)` and fatal stderr printing with typed fatal errors or
+   equivalent fatal result propagation so `main` becomes the single owner of final message
+   rendering and exit-code selection. This stage should cover CLI argument parsing, plugin config
+   loading, plugin initialization failure aggregation, and equivalent runtime-boundary helpers.
+2. **Warning-path unification**
+   Route all non-fatal runtime warnings through a single warning-reporting path, including plugin
+   compatibility warnings and other CLI-owned warning-only checks. Presentation details such as
+   `[WARN]` prefixes remain renderer concerns rather than payload concerns.
+3. **Capability-oriented reporter narrowing**
+   Replace broad event-emitter dependencies with narrower run-scoped reporter capabilities so
+   stages that only own warnings cannot emit phase/progress events. Keep the raw event-union model
+   only if it still earns its keep as an internal runtime representation after the narrower
+   interfaces exist.
+4. **Plugin runtime context introduction**
+   Introduce an explicit plugin runtime context for run-scoped host services such as warning
+  reporting and optional profiling. The recommended direction is to keep plugin factory arguments
+  config-oriented, make `ProjectorPlugin.init(...)` required, inject the run-scoped runtime
+  context exactly once during `init(...)`, and keep `project(...)` fact-scoped rather than
+  re-passing the same run-scoped object on every call. `init` is preferred over a separate
+  `start(...)` lifecycle term not because it is a smaller API change, but because the intended
+  plugin state after the call is "initialized and waiting for future `project(...)` calls",
+  not "actively running a continuous process".
+5. **Profiler injection consistency pass**
+   Align profiler injection with the clarified runtime-boundary model, favoring explicit
+  pre-scoped injection over mutable post-construction setup. Internal run-created components
+  should prefer constructor/options-based injection of already-scoped profilers; plugin `init`
+  should receive profiler access, if retained, through `PluginRuntimeContext`; and `GitAdapter`
+  should keep profiling setup out of its behavioral interface, with concrete-constructor/options
+  injection as the default direction and a separate factory abstraction introduced only if
+  creation-time interchangeability later becomes necessary. The goal is consistency and reduced
+  temporal coupling, not a second, independent profiler redesign.
+6. **CLI/runtime rendering corrections and cleanup**
+   After the boundary changes above are in place, clean up presentation-layer details that are
+   easier to reason about under the new model, including immediate redraw behavior for semantic
+   progress changes and removal of presentation text such as `"Warning:"` from semantic payloads.
+
+**Candidate interface sketches (recommended direction, not final API)**:
+
+Reporter capability split:
+
+```ts
+interface WarningReporter {
+  warn(message: string): void;
+}
+
+interface ExtractionPhaseReporter {
+  startPhase(phase: "preparing" | "extracting" | "finalizing"): void;
+  endPhase(phase: "preparing" | "extracting" | "finalizing"): void;
+}
+
+interface ExtractingProgressReporter {
+  reportExtractingProgress(data: {
+    refIndex: number;
+    refCount: number;
+    commitsTraversed: number;
+    recordsWritten: number;
+    bytesWritten: number;
+  }): void;
+}
+
+type ExtractionRunReporter =
+  & WarningReporter
+  & ExtractionPhaseReporter
+  & ExtractingProgressReporter;
+```
+
+Plugin runtime context:
+
+```ts
+interface PluginRuntimeContext {
+  warn(message: string): void;
+  profiler?: StageProfiler;
+}
+
+interface ProjectorPlugin {
+  init(runtime: PluginRuntimeContext): Promise<PluginInitResult>;
+  project(context: ProjectionContext): Promise<PluginProjectionResult>;
+}
+```
+
+Fatal control-flow direction:
+
+```ts
+class CliUserError extends Error {}
+class CliRuntimeError extends Error {}
+class PluginInitError extends Error {
+  constructor(readonly messages: readonly string[]) {
+    super("Plugin initialization failed");
+  }
+}
+```
+
+Run-scoped service injection guidance:
+
+```ts
+// Internal run-created components: prefer constructor/options injection.
+class DefaultTraversalPlanner {
+  constructor(
+    private readonly adapter: GitAdapter,
+    private readonly profiler?: StageProfiler,
+  ) {}
+}
+
+// Host/plugin boundary: inject run-scoped services once during init.
+interface PluginRuntimeContext {
+  warn(message: string): void;
+  profiler?: StageProfiler;
+}
+
+// Behavioral interface stays focused; implementation construction may vary.
+interface GitAdapter {
+  resolveRef(repoPath: string, ref: string): Promise<CommitOid>;
+  // ...behavioral methods only
+}
+
+interface IsomorphicGitAdapterOptions {
+  profiling?: {
+    resolveRef?: StageProfiler;
+    walkCommits?: StageProfiler;
+    mergeBase?: StageProfiler;
+  };
+}
+```
+
+**Invariants to preserve during implementation**:
+
+- extraction semantics, traversal behavior, output record shape, and checkpoint safety remain
+  unchanged unless a later design explicitly chooses otherwise
+- warning visibility policy remains stable for current user-facing cases, including warnings that
+  are expected to remain visible when `--quiet` suppresses progress and summary rendering
+- plugin failure-policy semantics (`skip-fact` vs `fatal`) remain unchanged unless a later design
+  explicitly revisits the contract
+- entrypoint-owned exit-code mapping remains behaviorally stable unless a later design explicitly
+  chooses to revise it
+- the roadmap item is implemented in safe stages so unaffected program behavior does not change as
+  a side effect of the refactor
+
+**Scope boundary (this entry)**:
+
+- include reporter-boundary cleanup, plugin runtime service delivery, fatal control-flow
+  centralization, and profiler injection consistency as one coordinated runtime-boundary effort
+- include small supporting documentation updates where needed to keep plugin/runtime design docs
+  accurate
+- allow extraction of small helper modules if that materially clarifies ownership boundaries
+- treat interface sketches in this entry as design-direction anchors for later detailed design,
+  not as binding final signatures
+
+**Non-goals for this item**:
+
+- no intentional extraction semantic changes
+- no opportunistic redesign of CLI option surfaces
+- no worker/runtime parallelization work; that belongs to separate runtime evolution items
+- no plugin feature expansion beyond what is necessary to establish a coherent runtime-service
+  injection model
+- no premature attempt to solve every future reporting use case in one abstraction pass
+
+**Open questions to confirm at design time**:
+
+- whether the raw event-union model should survive as an internal runtime representation after
+  capability-oriented interfaces are introduced
+- whether plugin-facing profiling should remain part of the public plugin contract or be treated as
+  an internal runtime concern with only aggregate plugin timing exposed
+- whether the mandatory-`init(...)` plugin lifecycle is sufficient long-term, or whether a more
+  explicit run-lifecycle abstraction is ever justified by future plugin capabilities
+- whether `GitAdapter` creation should remain concrete-constructor/options based or be lifted to a
+  dedicated factory interface if multiple adapter implementations need interchangeable runtime
+  construction semantics
+- whether any CLI-owned warnings should remain direct stderr output by explicit policy, or whether
+  all non-fatal warnings should route through the same warning-reporting path
+- exact typed-error taxonomy and exit-code mapping boundaries once helper-owned `process.exit(...)`
+  calls are removed
+- how much of the existing `main` orchestration refactor item should be coordinated with this work
+  versus implemented independently
+
+#### Architecture/CLI Bootstrap: Separate pure CLI parsing from repository-dependent run preparation
+
+The current CLI bootstrap path still mixes multiple responsibilities under `parseArgs(...)`.
+That helper now performs not only command-line parsing and local option validation, but also
+repository-dependent interpretation such as probing repository validity through `GitAdapter`,
+resolving `--since-ref`, and deriving the default output prefix from the remote URL.
+
+This shape is workable, but it weakens the meaning of "parse", forces `main` to construct a
+bootstrap-only `GitAdapter` before the run-scoped runtime is assembled, and leaves the profiling
+start boundary ambiguous whenever bootstrap Git work is later refactored.
+
+This roadmap item treats those concerns as one boundary-cleanup task rather than as an isolated
+complaint about constructing two adapter instances.
+
+**Design intent**:
+
+- restore a clear distinction between pure CLI parsing and repository-dependent bootstrap
+  preparation
+- keep repository-dependent interpretation in the CLI/runtime layer rather than leaking it into
+  Core
+- make it possible for `main` to construct one run-scoped adapter and reuse it across bootstrap
+  preparation and extraction, if that remains the preferred lifecycle after the split
+- force an explicit design decision about whether bootstrap Git work belongs inside or outside the
+  profiled run boundary
+- improve naming and test structure so future contributors can reason about parse-time vs
+  preparation-time failures without reading the entire entrypoint flow
+
+**Scope boundary (initial delivery)**:
+
+- split the current `parseArgs(...)` responsibilities into a pure parse/validation step and a
+  separate bootstrap preparation step
+- move repository-dependent interpretation out of the parse step, including `--since-ref`
+  resolution, repository probing, and default output-prefix derivation from Git metadata
+- keep bootstrap fatal handling and user-facing termination behavior consistent with the current
+  typed termination model
+- update tests so parsing behavior and preparation behavior are asserted independently
+
+**Questions to resolve at design time**:
+
+- whether repository probing should continue to piggyback on `resolveRef(...)` or gain a more
+  explicit bootstrap validation path
+- whether bootstrap preparation should return a normalized run-input object, a richer preparation
+  result, or a smaller set of resolved overlays applied to parsed args
+- whether bootstrap preparation should be counted inside `--profile` timing, and if so where the
+  profiling root should begin
+- whether any derived defaults currently produced during parsing should instead become explicit
+  runtime-preparation outputs
+
+**Non-goals for this item**:
+
+- no extraction semantic changes
+- no move of bootstrap interpretation logic into Core
+- no reopening of the Phase 2 plugin/runtime boundary decisions except where the parse/preparation
+  split directly touches their lifecycle
+
 #### Plugin Contract: Allow scalar values in `extensions.<namespace>`
+
+- **Release target**: `v0.8.0`
 
 `ProjectedExtensions` currently constrains each namespace value to `Record<string, unknown> | null`,
 which forces every plugin to wrap its output in an object even when the natural result is a single
@@ -284,6 +562,8 @@ later projection step.
   default extraction contract fully populated
 
 #### Configuration File: General-purpose configuration file beyond plugin loading
+
+- **Release target**: `v0.8.0`
 
 The `--config <path>` JSON file introduced for plugin loading is structured to be forward-compatible
 (top-level `version` field, namespaced sections). The initial release implements only the

@@ -14,6 +14,12 @@ import {
   type RepositoryObjectFormat,
 } from "./types.js";
 
+export interface IsomorphicGitAdapterDependencies {
+  readonly fs: FsClient;
+  readonly diffAdapter: DiffAdapter;
+  readonly profiler?: StageProfiler;
+}
+
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _diffAdapter: DiffAdapter;
@@ -29,16 +35,21 @@ export class IsomorphicGitAdapter implements GitAdapter {
   private _blobReadProfiler?: StageProfiler;
   private _diffProfiler?: StageProfiler;
 
-  constructor(fsImpl: FsClient, diffAdapterImpl: DiffAdapter) {
-    this._fs = fsImpl;
-    this._diffAdapter = diffAdapterImpl;
+  constructor(dependencies: IsomorphicGitAdapterDependencies) {
+    this._fs = dependencies.fs;
+    this._diffAdapter = dependencies.diffAdapter;
+    this._configureProfilers(dependencies.profiler);
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
     return ["sha1"];
   }
 
-  setProfiler(profiler: StageProfiler): void {
+  private _configureProfilers(profiler: StageProfiler | undefined): void {
+    if (profiler === undefined) {
+      return;
+    }
+
     this._resolveRefProfiler = profiler.createScopedProfiler("resolve-ref");
     this._repositoryObjectFormatProfiler = profiler.createScopedProfiler(
       "repository-object-format",

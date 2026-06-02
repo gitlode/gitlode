@@ -39,7 +39,7 @@ interface ProjectedCommit {
     url: string | null; // Remote origin URL, or null if not available
   };
   // Present only when --config is provided and plugins are active.
-  extensions?: Record<string, Record<string, unknown> | null>;
+  extensions?: Record<string, string | number | boolean | Readonly<Record<string, unknown>> | null>;
 }
 ```
 
@@ -150,12 +150,16 @@ When `--repo-name` or `--repo-url` is provided, the override value replaces the 
 Present only when `--config` is provided and at least one plugin is active.
 
 ```typescript
-type ProjectedExtensions = Record<string, Record<string, unknown> | null>;
+/** Value written under an extension namespace. null is core-reserved (skip/fatal-skip-fact). */
+type ProjectedExtensionValue = string | number | boolean | Readonly<Record<string, unknown>> | null;
+
+type ProjectedExtensions = Record<string, ProjectedExtensionValue>;
 ```
 
 Each key is a plugin namespace declared in the configuration file. A value of `null` means the
 plugin skipped that fact (due to a `skip` result or a `fatal` result with `failurePolicy:
-"skip-fact"`). Key order in the serialized object matches plugin declaration order. When no
+"skip-fact"`). Non-null values are whatever `success.data` returned: a plain object, a string, a
+number, or a boolean. Key order in the serialized object matches plugin declaration order. When no
 plugins are configured, the field is omitted from output records entirely.
 
 The `extensions` field is also present on `ProjectedFileChange` (via `ProjectedCommit` inheritance)

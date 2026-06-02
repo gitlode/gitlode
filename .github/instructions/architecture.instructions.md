@@ -67,19 +67,32 @@ details belong in `CHANGELOG.md`.
 
 ### Ownership and boundary rules
 
-- The runtime edge (`src/index.ts`) constructs `DefaultExtractionCoordinator`, stage instances,
-  optional `StateStore` (`--state`), `OutputSink`, and `ProgressReporter` directly.
-  When `--config` is provided, `EnrichingFactProjector` is used in place of `DefaultFactProjector`.
-  When `--config` is not provided, `DefaultFactProjector` is used directly.
+- The runtime edge (`src/index.ts`) is the process boundary only. It performs bootstrap,
+  delegates runtime setup and one-run orchestration to helpers under `src/cli/runtime/`, and
+  then performs the final fatal rendering / exit-code selection.
+- `src/cli/runtime/state-store.ts` owns `NodeStateStore`, repository object-format gating, and
+  prior-state loading / validation.
+- `src/cli/runtime/progress-runtime.ts` owns UI-mode selection and presenter wiring for quiet,
+  TTY, and non-TTY runs.
+- `src/cli/runtime/execution.ts` owns per-run orchestration, including state-store creation,
+  progress/reporting setup, plugin bootstrap, coordinator construction, and success payload
+  assembly.
+- `src/cli/runtime/success-report.ts` owns successful-run summary / profile rendering.
 - Core owns traversal/extraction orchestration, pipeline branching by granularity, write-loop
   progression, state commit timing, and structured progress events.
 - Core owns `EnrichingFactProjector` and the plugin contract types. `EnrichingFactProjector`
   calls the pure `projectCommit` / `projectFileChange` functions directly.
 - CLI owns rendering policy (TTY vs non-TTY, spinner/heartbeat, summary/profile layout, warning
   redraw behavior) and top-level process/error behavior.
-- CLI owns plugin config loading (`src/cli/plugins.ts`): reading and validating the config file,
-  resolving module entrypoints, invoking plugin factories, and running parallel `init()`. Plugin
-  `init()` is a CLI boundary responsibility; `EnrichingFactProjector` never calls it.
+- CLI runtime helpers under `src/cli/runtime/` own the run-scoped wiring that feeds that rendering
+  policy without changing its observable stderr contract.
+- CLI owns generic config loading (`src/cli/config/*`): reading/validating the strict versioned
+  config file, normalizing config-relative paths, resolving CLI/config precedence, and detecting
+  CLI/config conflicts before core execution.
+- `src/cli/plugins.ts` consumes the already validated `extensions` subsection only: resolving
+  module entrypoints, invoking plugin factories, compatibility checks, and running parallel
+  `init()`. Plugin `init()` is a CLI boundary responsibility; `EnrichingFactProjector` never
+  calls it.
 - Git adapter owns Git-native repository access and raw commit/file-change retrieval. Core must
   remain insulated from isomorphic-git details.
 - Output layer owns serialization and rotation mechanics. Core must not duplicate writer rotation
@@ -93,6 +106,8 @@ details belong in `CHANGELOG.md`.
   `Extracting history`, `Finalizing output`), then completion summary, then optional profile block.
 - `--quiet` suppresses progress-stage lines, completion summary, and profile block, but warnings
   and errors remain visible.
+- `src/cli/runtime/success-report.ts` is a rendering helper only; it must not change the summary
+  or profile text contract.
 - `ExtractionResult.profilingEntries` is hierarchical and rooted at `elapsed`.
 - Adapter-facing contracts must not be polluted with profiling metadata.
 
@@ -112,10 +127,17 @@ details belong in `CHANGELOG.md`.
 
 - Parse and validate CLI arguments (see `cli.instructions.md` for full parameter spec)
 - Enforce mutual-exclusion rules between parameters
-- Instantiate Core and pass resolved config (including `stateFilePath` as a string — state file I/O is performed by Core, not CLI)
+- Load and validate the generic config file when `--config` is passed, merge CLI/config defaults,
+  and pass effective settings to Core (including `stateFilePath` as a string — state file I/O is
+  performed by Core, not CLI)
 - Handle top-level errors and format user-facing error messages
 - Exit with appropriate codes: `0` = success, `1` = user error, `2` = runtime error
-- `src/cli/plugins.ts` — plugin config loading, module resolution, factory invocation, parallel `init()` orchestration, and plugin compatibility checking. **Plugin compatibility checking (version range validation against `peerDependencies.gitlode`) is a CLI-layer responsibility and must not be implemented in the core layer.**
+- `src/cli/config/*` — generic `version: 1` config schema validation, strict unknown-key handling,
+  config-relative path normalization, and effective settings merge.
+- `src/cli/plugins.ts` — plugin module resolution/factory invocation/init orchestration and
+  compatibility checking over the validated `extensions` subsection. **Plugin compatibility
+  checking (version range validation against `peerDependencies.gitlode`) is a CLI-layer
+  responsibility and must not be implemented in the core layer.**
 
 ### Core Logic Layer (`src/core/`)
 

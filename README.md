@@ -13,8 +13,8 @@ want commit history in it, gitlode brings the data over.
 _Named after the mining term lode (a vein of valuable ore), with a nod to load — gitlode (not gitload)._
 
 This repository is the gitlode monorepo. The flagship CLI is published as the
-[`gitlode`](https://www.npmjs.com/package/gitlode) package on npm. Official plugins will live
-alongside it under [`packages/`](packages/) as the ecosystem grows.
+[`gitlode`](https://www.npmjs.com/package/gitlode) package on npm. Official plugins live
+alongside it under [`packages/`](packages/).
 
 ## Use cases
 
@@ -66,6 +66,7 @@ This monorepo hosts the gitlode CLI and its official plugins.
 | Package                        | npm                                                | Description                                |
 | ------------------------------ | -------------------------------------------------- | ------------------------------------------ |
 | [`gitlode`](packages/gitlode/) | [`gitlode`](https://www.npmjs.com/package/gitlode) | The gitlode CLI — commit history extractor |
+| [`@gitlode/plugin-custom-fields`](packages/plugin-custom-fields/) | [`@gitlode/plugin-custom-fields`](https://www.npmjs.com/package/@gitlode/plugin-custom-fields) | Official plugin for static custom fields in `extensions` |
 
 Additional official plugins will appear here as the plugin ecosystem grows, published under the
 `@gitlode/*` scope.
@@ -87,14 +88,12 @@ Additional official plugins will appear here as the plugin ecosystem grows, publ
 ```
 .
 ├── packages/
-│   └── gitlode/        # gitlode CLI (published to npm as `gitlode`)
+│   ├── gitlode/        # gitlode CLI (published to npm as `gitlode`)
+│   └── plugin-custom-fields/  # official plugin (published as `@gitlode/plugin-custom-fields`)
 ├── CONTRIBUTING.md     # Contribution guide for the whole repository
 ├── LICENSE
 └── README.md           # You are here
 ```
-
-Future official plugins will live as additional packages under `packages/` (published as
-`@gitlode/*`).
 
 ## Development
 

@@ -4,28 +4,21 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { ParsedArgs } from "../../../src/cli/args.js";
 import {
   assertSupportedRepositoryObjectFormat,
   NodeStateStore,
   loadPriorState,
+  type PriorStateLoadOptions,
 } from "../../../src/cli/runtime/index.js";
 import type { ProgressReporter, ExtractionState, StateStore } from "../../../src/core/index.js";
 
-function makeParsedArgs(overrides: Partial<ParsedArgs> = {}): ParsedArgs {
+function makePriorStateLoadOptions(
+  overrides: Partial<PriorStateLoadOptions> = {},
+): PriorStateLoadOptions {
   return {
-    repositoryPath: process.cwd(),
-    refs: ["main"],
-    outputDir: "/tmp/out",
-    outputPrefix: "repo",
-    rotation: {},
     incremental: true,
     missingState: "error",
-    range: undefined,
     stateFilePath: "/tmp/state.json",
-    perFile: false,
-    quiet: false,
-    profile: false,
     ...overrides,
   };
 }
@@ -94,7 +87,7 @@ describe("loadPriorState", () => {
     const reporter = makeReporter();
     const state = await loadPriorState(
       makeStateStore(null),
-      makeParsedArgs({ incremental: false }),
+      makePriorStateLoadOptions({ incremental: false }),
       process.cwd(),
       "sha1",
       reporter,
@@ -108,7 +101,7 @@ describe("loadPriorState", () => {
     const reporter = makeReporter();
     const state = await loadPriorState(
       makeStateStore(null),
-      makeParsedArgs({
+      makePriorStateLoadOptions({
         stateFilePath: join(tmpdir(), "missing-state.json"),
         missingState: "snapshot",
       }),
@@ -131,7 +124,7 @@ describe("loadPriorState", () => {
     });
 
     await expect(
-      loadPriorState(store, makeParsedArgs(), process.cwd(), "sha1", reporter),
+      loadPriorState(store, makePriorStateLoadOptions(), process.cwd(), "sha1", reporter),
     ).rejects.toThrow("Unsupported state file version: 1. Supported version: 2.");
   });
 
@@ -152,7 +145,7 @@ describe("loadPriorState", () => {
     });
 
     await expect(
-      loadPriorState(store, makeParsedArgs(), process.cwd(), "sha1", reporter),
+      loadPriorState(store, makePriorStateLoadOptions(), process.cwd(), "sha1", reporter),
     ).rejects.toThrow('Invalid commit OID in state file for ref "main": not-an-oid');
   });
 });

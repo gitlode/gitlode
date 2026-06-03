@@ -8,9 +8,14 @@ import type {
   RefType,
   StateStore,
 } from "../../core/index.js";
-import { isCommitOidForProfile, REF_TYPES } from "../../core/index.js";
+import { isCommitOidForProfile, MISSING_STATES, REF_TYPES } from "../../core/index.js";
 import { GitAdapterError, type RepositoryObjectFormat } from "../../git/index.js";
-import type { ParsedArgs } from "../args.js";
+
+export interface PriorStateLoadOptions {
+  readonly incremental: boolean;
+  readonly missingState?: (typeof MISSING_STATES)[number];
+  readonly stateFilePath?: string;
+}
 
 export function assertSupportedRepositoryObjectFormat(
   format: RepositoryObjectFormat,
@@ -67,21 +72,21 @@ export class NodeStateStore implements StateStore {
 
 export async function loadPriorState(
   stateStore: StateStore | undefined,
-  parsed: ParsedArgs,
+  options: PriorStateLoadOptions,
   repoPath: string,
   oidProfile: OidProfile,
   reporter: ProgressReporter,
 ): Promise<ExtractionState> {
-  if (!stateStore || !parsed.incremental) {
+  if (!stateStore || !options.incremental) {
     return emptyState(repoPath);
   }
 
   const state = await stateStore.read();
   if (state === null) {
-    if (parsed.missingState === "snapshot") {
+    if (options.missingState === "snapshot") {
       reporter.emit({
         type: "warning",
-        message: `State file not found: ${parsed.stateFilePath}. Falling back to full snapshot extraction.`,
+        message: `State file not found: ${options.stateFilePath}. Falling back to full snapshot extraction.`,
       });
     }
     return emptyState(repoPath);

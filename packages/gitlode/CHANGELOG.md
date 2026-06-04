@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+
+### Patch Changes
+
+- b8705e1: Validate changesets shadow workflow with a non-functional patch release entry.
+
 ## 0.8.1
 
 ### Patch Changes

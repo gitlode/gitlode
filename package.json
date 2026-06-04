@@ -11,6 +11,7 @@
     "build": "npm run build --workspaces --if-present",
     "build:watch": "npm run build:watch -w packages/gitlode",
     "changeset": "changeset",
+    "changeset:status": "changeset status",
     "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",
     "format:check": "npm run format:check --workspaces --if-present",
     "format:write": "npm run format:write --workspaces --if-present",

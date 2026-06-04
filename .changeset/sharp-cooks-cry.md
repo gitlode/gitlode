@@ -2,4 +2,4 @@
 "gitlode": patch
 ---
 
-Refactor bootstrap/orchestration boundaries in CLI entrypoint
+Refactor CLI startup flow with no intended behavior change.

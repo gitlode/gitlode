@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+
+### Patch Changes
+
+- c4fbd68: Moved changelog-format guidance from project changelog content into the README, so the changelog remains release-entry focused and better aligned with changeset-based workflows. No functional/runtime behavior changes.
+- fb32f1c: Refactor CLI startup flow with no intended behavior change.
+
 ## [0.8.0] - 2026-06-02
 
 ### Added

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Patch Changes
+
+- c4fbd68: Moved changelog-format guidance from project changelog content into the README, so the changelog remains release-entry focused and better aligned with changeset-based workflows. No functional/runtime behavior changes.
+
 ## [0.3.0] - 2026-06-02
 
 ### Changed

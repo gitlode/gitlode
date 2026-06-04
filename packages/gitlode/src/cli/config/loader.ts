@@ -3,12 +3,9 @@ import { dirname, isAbsolute, resolve } from "node:path";
 
 import { z } from "zod";
 
-import type {
-  ConfigExtensionsSection,
-  ConfigFileV1,
-  LoadConfigResult,
-  LoadedConfigFile,
-} from "./types.js";
+import { byteSizeString, ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "../args.js";
+import { BootstrapResult, BootstrapTermination } from "../errors.js";
+import type { ConfigExtensionsSection } from "./types.js";
 
 const NAMESPACE_PATTERN = /^[a-z0-9-]+$/;
 
@@ -20,7 +17,7 @@ const ConfigRangeSchema = z.union([
     .strict(),
   z
     .object({
-      sinceDate: z.string().min(1),
+      sinceDate: z.iso.datetime({ offset: true }).transform((value) => new Date(value)),
     })
     .strict(),
 ]);
@@ -39,7 +36,7 @@ const ConfigOutputSchema = z
     rotation: z
       .object({
         lines: z.number().int().min(1).optional(),
-        size: z.string().min(1).optional(),
+        size: byteSizeString({ minBytes: ROTATE_SIZE_MIN, maxBytes: ROTATE_SIZE_MAX }).optional(),
       })
       .strict()
       .optional(),
@@ -72,7 +69,7 @@ const ConfigExtensionsSchema = z.record(
   ConfigExtensionEntrySchema,
 );
 
-export const ConfigFileSchema = z
+export const ProjectConfigSchema = z
   .object({
     version: z.literal(1),
     extraction: ConfigExtractionSchema.optional(),
@@ -83,13 +80,13 @@ export const ConfigFileSchema = z
   })
   .strict();
 
-function toUserError(message: string): LoadConfigResult {
+type ProjectConfig = z.Infer<typeof ProjectConfigSchema>;
+
+function toUserError(message: string): BootstrapTermination {
   return {
-    kind: "termination",
-    termination: {
-      kind: "user-error",
-      message,
-    },
+    kind: "user-error",
+    message,
+    exitCode: 1,
   };
 }
 
@@ -101,7 +98,7 @@ function formatZodIssues(error: z.ZodError, configPath: string): string {
   return `Invalid config file${messages.join(";")} (${configPath})`;
 }
 
-function rebaseConfigPaths(parsed: ConfigFileV1, configDirectory: string): ConfigFileV1 {
+function rebaseConfigPaths(parsed: ProjectConfig, configDirectory: string): ProjectConfig {
   const output =
     parsed.output?.directory === undefined
       ? parsed.output
@@ -128,8 +125,7 @@ function rebaseConfigPaths(parsed: ConfigFileV1, configDirectory: string): Confi
     extensions,
   };
 }
-
-export async function loadConfigFile(configPath: string): Promise<LoadConfigResult> {
+export async function loadConfigFile(configPath: string): Promise<BootstrapResult<ProjectConfig>> {
   let raw: string;
   try {
     raw = await readFile(configPath, "utf8");
@@ -149,17 +145,13 @@ export async function loadConfigFile(configPath: string): Promise<LoadConfigResu
     return toUserError(`Invalid config file: not valid JSON (${configPath})`);
   }
 
-  const parsed = ConfigFileSchema.safeParse(parsedJson);
+  const parsed = ProjectConfigSchema.safeParse(parsedJson);
   if (!parsed.success) {
     return toUserError(formatZodIssues(parsed.error, configPath));
   }
 
   const configDirectory = dirname(configPath);
-  const loaded: LoadedConfigFile = {
-    path: configPath,
-    directory: configDirectory,
-    config: rebaseConfigPaths(parsed.data, configDirectory),
-  };
+  const loaded = rebaseConfigPaths(parsed.data, configDirectory);
 
-  return { kind: "loaded", loaded };
+  return { kind: "success", value: loaded };
 }

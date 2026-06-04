@@ -5,6 +5,7 @@ export {
   NodeStateStore,
   loadPriorState,
 } from "./state-store.js";
+export type { PriorStateLoadOptions } from "./state-store.js";
 export { renderSuccessReport } from "./success-report.js";
 export type {
   CreateProgressRuntimeOptions,

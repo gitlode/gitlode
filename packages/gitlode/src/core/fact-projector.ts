@@ -65,37 +65,25 @@ export function projectFileChange(
 
 export class DefaultFactProjector implements FactProjector {
   private readonly repoName: string;
-  private readonly remoteUrl: string | null;
+  private readonly repoUrl: string | null;
   private readonly profiler?: StageProfiler;
-  private readonly repoNameOverride?: string;
-  private readonly repoUrlOverride?: string;
 
-  constructor(
-    repoName: string,
-    remoteUrl: string | null,
-    profiler?: StageProfiler,
-    repoNameOverride?: string,
-    repoUrlOverride?: string,
-  ) {
+  constructor(repoName: string, repoUrl: string | null, profiler?: StageProfiler) {
     this.repoName = repoName;
-    this.remoteUrl = remoteUrl;
+    this.repoUrl = repoUrl;
     this.profiler = profiler;
-    this.repoNameOverride = repoNameOverride;
-    this.repoUrlOverride = repoUrlOverride;
   }
 
   async *project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
     for await (const fact of facts) {
       switch (fact.type) {
         case "commit": {
-          yield withProfiler(this.profiler, () =>
-            projectCommit(fact, this.effectiveName(), this.effectiveUrl()),
-          );
+          yield withProfiler(this.profiler, () => projectCommit(fact, this.repoName, this.repoUrl));
           break;
         }
         case "file-change": {
           yield withProfiler(this.profiler, () =>
-            projectFileChange(fact, this.effectiveName(), this.effectiveUrl()),
+            projectFileChange(fact, this.repoName, this.repoUrl),
           );
           break;
         }
@@ -103,13 +91,5 @@ export class DefaultFactProjector implements FactProjector {
           assertNever(fact);
       }
     }
-  }
-
-  private effectiveName(): string {
-    return this.repoNameOverride ?? this.repoName;
-  }
-
-  private effectiveUrl(): string | null {
-    return this.repoUrlOverride !== undefined ? this.repoUrlOverride : this.remoteUrl;
   }
 }

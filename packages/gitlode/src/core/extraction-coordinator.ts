@@ -118,7 +118,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
           {
             repositoryPath: request.repositoryPath,
             repoName: request.repoName,
-            remoteUrl: request.remoteUrl,
+            repoUrl: request.repoUrl,
             plans: [plan],
             range: request.range,
           },

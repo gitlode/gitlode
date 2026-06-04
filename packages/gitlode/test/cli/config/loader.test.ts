@@ -30,13 +30,13 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result.kind).toBe("loaded");
-    if (result.kind !== "loaded") {
-      throw new Error("Expected loaded result");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      throw new Error("Expected success result");
     }
 
-    expect(result.loaded.config.version).toBe(1);
-    expect(result.loaded.config.output?.directory).toBe(resolve(tmpDir, "out"));
+    expect(result.value.version).toBe(1);
+    expect(result.value.output?.directory).toBe(resolve(tmpDir, "out"));
   });
 
   it("rejects unknown top-level keys", async () => {
@@ -50,10 +50,7 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result).toEqual({
-      kind: "termination",
-      termination: expect.objectContaining({ kind: "user-error" }),
-    });
+    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
   });
 
   it("rejects unknown nested keys", async () => {
@@ -70,10 +67,7 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result).toEqual({
-      kind: "termination",
-      termination: expect.objectContaining({ kind: "user-error" }),
-    });
+    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
   });
 
   it("rejects extraction.range with both sinceRef and sinceDate", async () => {
@@ -90,10 +84,7 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result).toEqual({
-      kind: "termination",
-      termination: expect.objectContaining({ kind: "user-error" }),
-    });
+    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
   });
 
   it("rebases relative output.directory and extensions entrypoint from config directory", async () => {
@@ -112,13 +103,13 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result.kind).toBe("loaded");
-    if (result.kind !== "loaded") {
-      throw new Error("Expected loaded result");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      throw new Error("Expected success result");
     }
 
-    expect(result.loaded.config.output?.directory).toBe(resolve(tmpDir, "out"));
-    expect(result.loaded.config.extensions?.["sample-plugin"]?.entrypoint).toBe(
+    expect(result.value.output?.directory).toBe(resolve(tmpDir, "out"));
+    expect(result.value.extensions?.["sample-plugin"]?.entrypoint).toBe(
       resolve(tmpDir, "plugins", "sample.mjs"),
     );
   });
@@ -138,12 +129,12 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result.kind).toBe("loaded");
-    if (result.kind !== "loaded") {
-      throw new Error("Expected loaded result");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      throw new Error("Expected success result");
     }
 
-    expect(result.loaded.config.extensions?.["sample-plugin"]?.entrypoint).toBe(
+    expect(result.value.extensions?.["sample-plugin"]?.entrypoint).toBe(
       "@gitlode/plugin-custom-field",
     );
   });
@@ -159,12 +150,12 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result.kind).toBe("loaded");
-    if (result.kind !== "loaded") {
-      throw new Error("Expected loaded result");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      throw new Error("Expected success result");
     }
 
-    expect(result.loaded.config.extensions).toBeUndefined();
+    expect(result.value.extensions).toBeUndefined();
   });
 
   it("allows config with an empty extensions object", async () => {
@@ -178,11 +169,11 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result.kind).toBe("loaded");
-    if (result.kind !== "loaded") {
-      throw new Error("Expected loaded result");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      throw new Error("Expected success result");
     }
 
-    expect(result.loaded.config.extensions).toEqual({});
+    expect(result.value.extensions).toEqual({});
   });
 });

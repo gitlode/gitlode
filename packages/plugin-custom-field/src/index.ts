@@ -1,19 +1,41 @@
 import type {
   PluginFactory,
   PluginInitResult,
+  PluginProjectionValue,
   PluginProjectionResult,
   PluginRuntimeContext,
 } from "gitlode/plugin-api";
 
 type FieldValue = string | number | boolean | null;
 type ParseResult =
-  | { type: "ok"; value: Readonly<Record<string, FieldValue>> }
+  | { type: "ok"; value: PluginProjectionValue }
   | { type: "error"; message: string };
 
 const FIELD_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseScalarValue(valueRaw: unknown): ParseResult {
+  switch (typeof valueRaw) {
+    case "string":
+    case "boolean":
+      return { type: "ok", value: valueRaw };
+    case "number":
+      if (!Number.isFinite(valueRaw)) {
+        return {
+          type: "error",
+          message: 'Invalid plugin config: "value" must be a finite number.',
+        };
+      }
+      return { type: "ok", value: valueRaw };
+    default:
+      return {
+        type: "error",
+        message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
+      };
+  }
 }
 
 function parseConfig(rawConfig: unknown): ParseResult {
@@ -26,10 +48,7 @@ function parseConfig(rawConfig: unknown): ParseResult {
 
   const valueRaw = rawConfig["value"];
   if (!isRecord(valueRaw)) {
-    return {
-      type: "error",
-      message: 'Invalid plugin config: "value" must be an object containing at least one entry.',
-    };
+    return parseScalarValue(valueRaw);
   }
 
   const entries = Object.entries(valueRaw);
@@ -64,6 +83,7 @@ function parseConfig(rawConfig: unknown): ParseResult {
         parsedValue[fieldName] = value;
         break;
       case "object":
+        // Top-level value does not allow null, but object field values may be null.
         if (value === null) {
           parsedValue[fieldName] = null;
           break;

@@ -1,9 +1,14 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## 0.4.0
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### Minor Changes
+
+- 6a56f48: Allow scalar top-level value.
+
+### Patch Changes
+
+- c4fbd68: Moved changelog-format guidance from project changelog content into the README, so the changelog remains release-entry focused and better aligned with changeset-based workflows. No functional/runtime behavior changes.
 
 ## [0.3.0] - 2026-06-02
 

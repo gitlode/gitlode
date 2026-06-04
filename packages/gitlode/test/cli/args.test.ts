@@ -7,10 +7,8 @@ import * as git from "isomorphic-git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 
-import { parseArgs, program, type ParseArgsResult } from "../../src/cli/args.js";
-import type { CommitOid } from "../../src/core/index.js";
-import { JsDiffAdapter, type GitAdapter } from "../../src/git/index.js";
-import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
+import { loadBootstrapInput, type BootstrapInput, program } from "../../src/cli/args.js";
+import type { BootstrapResult } from "../../src/cli/errors.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -19,55 +17,39 @@ const AUTHOR = {
   timezoneOffset: 0,
 };
 
-// A minimal mock adapter for tests that don't reach Git access
-const noopAdapter: GitAdapter = {
-  supportedObjectFormats: () => ["sha1"],
-  resolveRef: async () => "abc123def456abc123def456abc123def456abc123" as CommitOid,
-  getRepositoryObjectFormat: async () => "sha1",
-  classifyRefType: async () => "branch",
-  walkCommits: async function* () {},
-  getRemoteUrl: async () => null,
-  findMergeBase: async () => null,
-  getFileChanges: async () => [],
-};
-
 let exitSpy: MockInstance;
 let stderrSpy: MockInstance;
 const originalArgv = process.argv.slice();
-
-function makeRealAdapter(): IsomorphicGitAdapter {
-  return new IsomorphicGitAdapter({ fs: nodeFs, diffAdapter: new JsDiffAdapter() });
-}
 
 function setArgv(...args: string[]) {
   process.argv = ["node", "gitlode", ...args];
 }
 
-function expectParsed(result: ParseArgsResult) {
-  expect(result.kind).toBe("parsed");
-  if (result.kind !== "parsed") {
+function expectParsed(result: BootstrapResult<BootstrapInput>) {
+  expect(result.kind).toBe("success");
+  if (result.kind !== "success") {
     throw new Error(`Expected parsed result, got ${result.kind}`);
   }
-  return result.parsed;
+  return result.value;
 }
 
 async function expectUserErrorTermination(
-  promise: Promise<ParseArgsResult>,
+  promise: Promise<BootstrapResult<BootstrapInput>>,
   message: string,
 ): Promise<void> {
   await expect(promise).resolves.toEqual({
-    kind: "termination",
-    termination: { kind: "user-error", message, exitCode: 1 },
+    kind: "user-error",
+    message,
+    exitCode: 1,
   });
   expect(exitSpy).not.toHaveBeenCalled();
   expect(stderrSpy).not.toHaveBeenCalled();
 }
 
-async function expectSuccessTermination(promise: Promise<ParseArgsResult>): Promise<void> {
-  await expect(promise).resolves.toEqual({
-    kind: "termination",
-    termination: { kind: "success", exitCode: 0 },
-  });
+async function expectSuccessTermination(
+  promise: Promise<BootstrapResult<BootstrapInput>>,
+): Promise<void> {
+  await expect(promise).resolves.toEqual({ kind: "success-terminate", exitCode: 0 });
   expect(exitSpy).not.toHaveBeenCalled();
   expect(stderrSpy).not.toHaveBeenCalled();
 }
@@ -122,7 +104,7 @@ describe("parseArgs – mutual exclusion", () => {
   it("--since-ref + --since-date → returns user-error termination", async () => {
     setArgv("--ref", "main", "--since-ref", "v1.0", "--since-date", "2024-01-01T00:00:00Z", ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       "--since-ref and --since-date cannot be used together",
     );
   });
@@ -130,7 +112,7 @@ describe("parseArgs – mutual exclusion", () => {
   it("--incremental + --since-ref → returns user-error termination", async () => {
     setArgv("--incremental", "--ref", "main", "--state", "state.json", "--since-ref", "v1.0", ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       "--since-ref cannot be used with --incremental",
     );
   });
@@ -147,7 +129,7 @@ describe("parseArgs – mutual exclusion", () => {
       ".",
     );
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       "--since-date cannot be used with --incremental",
     );
   });
@@ -155,7 +137,7 @@ describe("parseArgs – mutual exclusion", () => {
   it("--missing-state without --incremental → returns user-error termination", async () => {
     setArgv("--ref", "main", "--missing-state", "snapshot", ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       "--missing-state is only valid with --incremental",
     );
   });
@@ -163,7 +145,7 @@ describe("parseArgs – mutual exclusion", () => {
   it("--incremental without --state → returns user-error termination", async () => {
     setArgv("--incremental", "--ref", "main", ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       "--state is required when using --incremental",
     );
   });
@@ -180,7 +162,7 @@ describe("parseArgs – mutual exclusion", () => {
       "v1.0",
       ".",
     );
-    expectParsed(await parseArgs(noopAdapter));
+    expectParsed(await loadBootstrapInput());
   });
 
   it("--state + --since-date is permitted in snapshot mode (no error)", async () => {
@@ -193,7 +175,7 @@ describe("parseArgs – mutual exclusion", () => {
       "2024-01-01T00:00:00Z",
       ".",
     );
-    expectParsed(await parseArgs(noopAdapter));
+    expectParsed(await loadBootstrapInput());
   });
 });
 
@@ -204,10 +186,7 @@ describe("parseArgs – mutual exclusion", () => {
 describe("parseArgs – missing --ref", () => {
   it("returns user-error termination when no --branch is provided", async () => {
     setArgv(".");
-    await expectUserErrorTermination(
-      parseArgs(noopAdapter),
-      "At least one --ref must be specified",
-    );
+    await expectUserErrorTermination(loadBootstrapInput(), "At least one --ref must be specified");
   });
 });
 
@@ -221,7 +200,7 @@ describe("parseArgs – --rotate-lines validation", () => {
     async (val) => {
       setArgv("--ref", "main", "--rotate-lines", val, ".");
       await expectUserErrorTermination(
-        parseArgs(noopAdapter),
+        loadBootstrapInput(),
         "--rotate-lines must be a positive integer",
       );
     },
@@ -238,7 +217,7 @@ describe("parseArgs – --rotate-size validation", () => {
     async (val) => {
       setArgv("--ref", "main", "--rotate-size", val, ".");
       await expectUserErrorTermination(
-        parseArgs(noopAdapter),
+        loadBootstrapInput(),
         "--rotate-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)",
       );
     },
@@ -249,7 +228,7 @@ describe("parseArgs – --rotate-size validation", () => {
     async (val) => {
       setArgv("--ref", "main", "--rotate-size", val, ".");
       await expectUserErrorTermination(
-        parseArgs(noopAdapter),
+        loadBootstrapInput(),
         "--rotate-size must be between 1048576 and 68719476736 bytes",
       );
     },
@@ -266,7 +245,7 @@ describe("parseArgs – --rotate-size validation", () => {
     [" 500M ", 524_288_000],
   ] as [string, number][])("accepts valid --rotate-size %s", async (val, expected) => {
     setArgv("--ref", "main", "--rotate-size", val, ".");
-    const parsed = expectParsed(await parseArgs(noopAdapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.rotation.maxBytes).toBe(expected);
   });
 });
@@ -281,7 +260,7 @@ describe("parseArgs – --max-diff-size validation", () => {
     async (val) => {
       setArgv("--ref", "main", "--max-diff-size", val, ".");
       await expectUserErrorTermination(
-        parseArgs(noopAdapter),
+        loadBootstrapInput(),
         "--max-diff-size must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)",
       );
     },
@@ -290,7 +269,7 @@ describe("parseArgs – --max-diff-size validation", () => {
   it("rejects zero", async () => {
     setArgv("--ref", "main", "--max-diff-size", "0", ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       "--max-diff-size must be at least 1 byte",
     );
   });
@@ -303,7 +282,7 @@ describe("parseArgs – --max-diff-size validation", () => {
     [" 500M ", 524_288_000],
   ] as [string, number][])("accepts valid --max-diff-size %s", async (val, expected) => {
     setArgv("--ref", "main", "--max-diff-size", val, ".");
-    const parsed = expectParsed(await parseArgs(noopAdapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.maxDiffSize).toBe(expected);
   });
 });
@@ -316,59 +295,53 @@ describe("parseArgs – --since-date validation", () => {
   it("rejects invalid ISO 8601 date", async () => {
     setArgv("--ref", "main", "--since-date", "not-a-date", ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
     );
   });
 
   it("accepts a valid ISO 8601 date (validation passes)", async () => {
     setArgv("--ref", "main", "--since-date", "2024-01-01T00:00:00Z", ".");
-    expectParsed(await parseArgs(noopAdapter));
+    expectParsed(await loadBootstrapInput());
   });
 });
 
 // ---------------------------------------------------------------------------
-// --output-prefix derivation (real on-disk repo)
+// --output-prefix handling
 // ---------------------------------------------------------------------------
 
-describe("parseArgs – --output-prefix derivation", () => {
+describe("parseArgs – --output-prefix handling", () => {
   let repoDir: string;
 
   afterEach(async () => {
     if (repoDir) await rm(repoDir, { recursive: true, force: true });
   });
 
-  it("derives prefix from remote origin URL when available", async () => {
+  it("leaves outputPrefix undefined when not provided", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
-    expect(parsed.outputPrefix).toBe("my-repo");
+    const parsed = expectParsed(await loadBootstrapInput());
+    expect(parsed.outputPrefix).toBeUndefined();
   });
 
-  it("derives prefix from SSH-style remote URL", async () => {
+  it("does not derive outputPrefix from SSH-style remotes at bootstrap", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "git@github.com:org/another-repo.git" });
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
-    expect(parsed.outputPrefix).toBe("another-repo");
+    const parsed = expectParsed(await loadBootstrapInput());
+    expect(parsed.outputPrefix).toBeUndefined();
   });
 
-  it("falls back to directory basename when no remote", async () => {
+  it("does not fall back to directory basename at bootstrap", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
-    // The prefix should be the basename of the temp dir
-    const expected = repoDir.split(/[/\\]/).pop()!;
-    expect(parsed.outputPrefix).toBe(expected);
+    const parsed = expectParsed(await loadBootstrapInput());
+    expect(parsed.outputPrefix).toBeUndefined();
   });
 
   it("uses explicit --output-prefix when provided", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, "--output-prefix", "custom-prefix", repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.outputPrefix).toBe("custom-prefix");
   });
 });
@@ -384,9 +357,8 @@ describe("parseArgs – valid args round-trip", () => {
     if (repoDir) await rm(repoDir, { recursive: true, force: true });
   });
 
-  it("returns correct ExtractorConfig for full extraction", async () => {
+  it("returns correct BootstrapInput for full extraction", async () => {
     repoDir = await makeRealRepo({ remoteUrl: "https://github.com/org/my-repo.git" });
-    const adapter = makeRealAdapter();
     setArgv(
       "--ref",
       "main",
@@ -399,7 +371,7 @@ describe("parseArgs – valid args round-trip", () => {
       repoDir,
     );
     // "develop" branch doesn't exist but that's OK — extractor handles it
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.repositoryPath).toBe(repoDir);
     expect(parsed.refs).toEqual(["main", "develop"]);
     expect(parsed.outputPrefix).toBe("test-prefix");
@@ -411,7 +383,6 @@ describe("parseArgs – valid args round-trip", () => {
 
   it("returns correct rotation config", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv(
       "--ref",
       "main",
@@ -423,13 +394,12 @@ describe("parseArgs – valid args round-trip", () => {
       repoDir,
       repoDir,
     );
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.rotation).toEqual({ maxLines: 1000, maxBytes: 1048576 });
   });
 
   it("returns correct range for --since-date", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv(
       "--ref",
       "main",
@@ -439,48 +409,43 @@ describe("parseArgs – valid args round-trip", () => {
       repoDir,
       repoDir,
     );
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.range).toEqual({ type: "date", since: new Date("2024-06-01T00:00:00Z") });
   });
 
   it("sets stateFilePath when --state is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     const stateFilePath = join(repoDir, "state.json");
     setArgv("--ref", "main", "--state", stateFilePath, "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.stateFilePath).toBe(stateFilePath);
   });
 
   it("sets quiet=true when --quiet is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--quiet", "--output-dir", repoDir, repoDir);
-    const { quiet } = expectParsed(await parseArgs(adapter));
+    const { quiet } = expectParsed(await loadBootstrapInput());
     expect(quiet).toBe(true);
   });
 
   it("sets quiet=false when --quiet is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const { quiet } = expectParsed(await parseArgs(adapter));
+    const { quiet } = expectParsed(await loadBootstrapInput());
     expect(quiet).toBe(false);
   });
 
   it("sets profile=true when --profile is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--profile", "--output-dir", repoDir, repoDir);
-    const { profile } = expectParsed(await parseArgs(adapter));
+    const { profile } = expectParsed(await loadBootstrapInput());
     expect(profile).toBe(true);
   });
 
   it("sets profile=false when --profile is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const { profile } = expectParsed(await parseArgs(adapter));
+    const { profile } = expectParsed(await loadBootstrapInput());
     expect(profile).toBe(false);
   });
 });
@@ -498,9 +463,8 @@ describe("parseArgs – --incremental", () => {
 
   it("incremental defaults to false when --incremental is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.incremental).toBe(false);
   });
 
@@ -511,7 +475,6 @@ describe("parseArgs – --incremental", () => {
     await import("node:fs/promises").then(({ writeFile: wf }) =>
       wf(stateFile, JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] })),
     );
-    const adapter = makeRealAdapter();
     setArgv(
       "--incremental",
       "--ref",
@@ -522,7 +485,7 @@ describe("parseArgs – --incremental", () => {
       repoDir,
       repoDir,
     );
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.incremental).toBe(true);
   });
 });
@@ -548,7 +511,6 @@ describe("parseArgs – incremental mode", () => {
       JSON.stringify({ version: 2, generatedAt: "", repositoryPath: "/", refs: [] }),
     );
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv(
       "--incremental",
       "--ref",
@@ -559,7 +521,7 @@ describe("parseArgs – incremental mode", () => {
       repoDir,
       repoDir,
     );
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.incremental).toBe(true);
     expect(parsed.stateFilePath).toBe(stateFile);
     expect(parsed.missingState).toBe("error");
@@ -570,7 +532,7 @@ describe("parseArgs – incremental mode", () => {
     const missingStatePath = join(stateDir, "nonexistent.json");
     setArgv("--incremental", "--ref", "main", "--state", missingStatePath, ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       `State file not found: ${missingStatePath}`,
     );
   });
@@ -579,7 +541,6 @@ describe("parseArgs – incremental mode", () => {
     stateDir = await mkdtemp(join(tmpdir(), "gitlode-args-state-"));
     const missingStatePath = join(stateDir, "nonexistent.json");
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv(
       "--incremental",
       "--ref",
@@ -592,7 +553,7 @@ describe("parseArgs – incremental mode", () => {
       repoDir,
       repoDir,
     );
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.incremental).toBe(true);
     expect(parsed.missingState).toBe("snapshot");
   });
@@ -609,8 +570,8 @@ describe("parseArgs – incremental mode", () => {
       ".",
     );
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
-      '--missing-state must be "error" or "snapshot"',
+      loadBootstrapInput(),
+      "--missing-states must be one of the following values: error, snapshot",
     );
   });
 });
@@ -623,7 +584,7 @@ describe("parseArgs – state parent directory validation", () => {
   it("exits 1 when state parent directory does not exist", async () => {
     setArgv("--ref", "main", "--state", "/nonexistent-dir-abc/state.json", ".");
     await expectUserErrorTermination(
-      parseArgs(noopAdapter),
+      loadBootstrapInput(),
       `Parent directory for state file not found: ${resolve("/nonexistent-dir-abc")}`,
     );
   });
@@ -642,35 +603,18 @@ describe("parseArgs – --since-ref", () => {
 
   it("returns range with type 'ref' when --since-ref is provided", async () => {
     repoDir = await makeRealRepo();
-    // The noopAdapter resolveRef always returns a hash, so since-ref validation passes
     setArgv("--ref", "main", "--since-ref", "v1.0", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(noopAdapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.range).toEqual({
       type: "ref",
-      ref: "abc123def456abc123def456abc123def456abc123",
+      sinceRef: "v1.0",
     });
   });
 
-  it("exits 1 when --since-ref is not found in repository", async () => {
+  it("does not resolve --since-ref existence during bootstrap", async () => {
     repoDir = await makeRealRepo();
-    const { GitAdapterError } = await import("../../src/git/index.js");
-    const failAdapter: GitAdapter = {
-      supportedObjectFormats: () => ["sha1"],
-      resolveRef: async (_repoPath, ref) => {
-        if (ref === "nonexistent-tag") {
-          throw new GitAdapterError("Ref not found", "REF_NOT_FOUND");
-        }
-        return "abc123def456abc123def456abc123def456abc123" as CommitOid;
-      },
-      getRepositoryObjectFormat: async () => "sha1",
-      classifyRefType: async () => "branch",
-      walkCommits: async function* () {},
-      getRemoteUrl: async () => null,
-      findMergeBase: async () => null,
-      getFileChanges: async () => [],
-    };
     setArgv("--ref", "main", "--since-ref", "nonexistent-tag", "--output-dir", repoDir, repoDir);
-    await expectUserErrorTermination(parseArgs(failAdapter), "Ref not found: nonexistent-tag");
+    expectParsed(await loadBootstrapInput());
   });
 });
 
@@ -687,43 +631,38 @@ describe("parseArgs – shorthand aliases", () => {
 
   it("-r collects ref values", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("-r", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.refs).toContain("main");
   });
 
   it("-r can be used multiple times (repeatable)", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("-r", "main", "-r", "develop", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.refs).toContain("main");
     expect(parsed.refs).toContain("develop");
   });
 
   it("-o is accepted as alias for --output-dir", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "-o", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.outputDir).toBe(repoDir);
   });
 
   it("-s is accepted as alias for --state", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     const stateFilePath = join(repoDir, "state.json");
     setArgv("--ref", "main", "-s", stateFilePath, "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.stateFilePath).toBe(stateFilePath);
   });
 
   it("-q is accepted as alias for --quiet", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "-q", "--output-dir", repoDir, repoDir);
-    const { quiet } = expectParsed(await parseArgs(adapter));
+    const { quiet } = expectParsed(await loadBootstrapInput());
     expect(quiet).toBe(true);
   });
 });
@@ -741,17 +680,15 @@ describe("parseArgs – --per-file", () => {
 
   it("defaults perFile to false when --per-file is not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.perFile).toBe(false);
   });
 
   it("sets perFile=true when --per-file is provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--per-file", "--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.perFile).toBe(true);
   });
 });
@@ -768,15 +705,13 @@ describe("parseArgs – --repo-name and --repo-url", () => {
   });
   it("returns repoName from --repo-name", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--repo-name", "my-override", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.repoName).toBe("my-override");
   });
 
   it("returns repoUrl from --repo-url", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv(
       "--ref",
       "main",
@@ -786,24 +721,22 @@ describe("parseArgs – --repo-name and --repo-url", () => {
       repoDir,
       repoDir,
     );
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.repoUrl).toBe("https://example.com/repo");
   });
 
   it("repoName and repoUrl default to undefined when not provided", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.repoName).toBeUndefined();
     expect(parsed.repoUrl).toBeUndefined();
   });
 
   it("repoName and repoUrl can be provided independently", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--repo-name", "only-name", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.repoName).toBe("only-name");
     expect(parsed.repoUrl).toBeUndefined();
   });
@@ -816,25 +749,25 @@ describe("parseArgs – --repo-name and --repo-url", () => {
 describe("parseArgs – unknown option rejection", () => {
   it("returns user-error termination for an unknown option", async () => {
     setArgv("--unknown-flag", "--ref", "main", ".");
-    await expectUserErrorTermination(parseArgs(noopAdapter), "Unknown option: --unknown-flag");
+    await expectUserErrorTermination(loadBootstrapInput(), "Unknown option: --unknown-flag");
   });
 
   it("returns user-error termination for a typo resembling a known option", async () => {
     setArgv("--rotaet-lines", "100", "--ref", "main", ".");
-    await expectUserErrorTermination(parseArgs(noopAdapter), "Unknown option: --rotaet-lines");
+    await expectUserErrorTermination(loadBootstrapInput(), "Unknown option: --rotaet-lines");
   });
 
   it("does not reject tokens after -- as unknown options", async () => {
     setArgv("--ref", "main", ".", "--", "--ignored");
-    const result = await parseArgs(noopAdapter);
-    if (result.kind === "termination" && result.termination.kind === "user-error") {
-      expect(result.termination.message).not.toContain("Unknown option: --ignored");
+    const result = await loadBootstrapInput();
+    if (result.kind === "user-error") {
+      expect(result.message).not.toContain("Unknown option: --ignored");
     }
   });
 
   it("returns success termination for --help", async () => {
     setArgv("--help");
-    await expectSuccessTermination(parseArgs(noopAdapter));
+    await expectSuccessTermination(loadBootstrapInput());
   });
 });
 
@@ -851,16 +784,15 @@ describe("parseArgs – schema validation boundary", () => {
 
   it("converts parsed option shape errors to user-error termination", async () => {
     repoDir = await makeRealRepo();
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
 
     vi.spyOn(program, "opts").mockReturnValueOnce({
-      ...program.opts(),
+      ...(program.opts() as Record<string, unknown>),
       ref: "main",
     } as never);
 
     await expectUserErrorTermination(
-      parseArgs(adapter),
+      loadBootstrapInput(),
       "Invalid input: expected array, received string",
     );
   });
@@ -888,28 +820,24 @@ describe("parseArgs – --config", () => {
   });
 
   it("defaults configPath to undefined when --config is not provided", async () => {
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.configPath).toBeUndefined();
   });
 
   it("resolves --config to an absolute path", async () => {
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, "-c", configFile, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.configPath).toBe(configFile);
   });
 
   it("accepts -c as alias for --config", async () => {
-    const adapter = makeRealAdapter();
     setArgv("--ref", "main", "--output-dir", repoDir, "-c", configFile, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.configPath).toBeDefined();
   });
 
   it("returns user-error termination when config file does not exist", async () => {
-    const adapter = makeRealAdapter();
     setArgv(
       "--ref",
       "main",
@@ -920,13 +848,12 @@ describe("parseArgs – --config", () => {
       repoDir,
     );
     await expectUserErrorTermination(
-      parseArgs(adapter),
+      loadBootstrapInput(),
       `Config file not found: ${join(repoDir, "nonexistent.json")}`,
     );
   });
 
   it("uses extraction.refs from config when CLI --ref is absent", async () => {
-    const adapter = makeRealAdapter();
     await writeFile(
       configFile,
       JSON.stringify({
@@ -936,12 +863,11 @@ describe("parseArgs – --config", () => {
     );
 
     setArgv("--output-dir", repoDir, "--config", configFile, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.refs).toEqual(["main"]);
   });
 
   it("replaces config extraction.refs with CLI --ref list when CLI refs are present", async () => {
-    const adapter = makeRealAdapter();
     await writeFile(
       configFile,
       JSON.stringify({
@@ -951,12 +877,11 @@ describe("parseArgs – --config", () => {
     );
 
     setArgv("--ref", "develop", "--output-dir", repoDir, "--config", configFile, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.refs).toEqual(["develop"]);
   });
 
   it("fails fast when config extraction.range is present with CLI --incremental", async () => {
-    const adapter = makeRealAdapter();
     await writeFile(
       configFile,
       JSON.stringify({
@@ -982,13 +907,12 @@ describe("parseArgs – --config", () => {
       repoDir,
     );
     await expectUserErrorTermination(
-      parseArgs(adapter),
+      loadBootstrapInput(),
       "Config extraction.range cannot be used with --incremental",
     );
   });
 
   it("combines CLI --rotate-lines with config output.rotation.size", async () => {
-    const adapter = makeRealAdapter();
     await writeFile(
       configFile,
       JSON.stringify({
@@ -1002,12 +926,11 @@ describe("parseArgs – --config", () => {
     );
 
     setArgv("--rotate-lines", "100", "--config", configFile, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.rotation).toEqual({ maxLines: 100, maxBytes: 1_048_576 });
   });
 
   it("enables profile when config runtime.profile=true without CLI --profile", async () => {
-    const adapter = makeRealAdapter();
     await writeFile(
       configFile,
       JSON.stringify({
@@ -1019,7 +942,7 @@ describe("parseArgs – --config", () => {
     );
 
     setArgv("--config", configFile, repoDir);
-    const parsed = expectParsed(await parseArgs(adapter));
+    const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.profile).toBe(true);
   });
 });

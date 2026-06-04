@@ -5,19 +5,22 @@
       "name": "gitlode: full extract",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/src/index.ts",
+      "program": "${workspaceFolder}/packages/gitlode/src/index.ts",
       "args": [
-        "--repo",
         "${workspaceFolder}",
-        "--branch",
+        "--ref",
         "develop",
         "--output-dir",
-        "${workspaceFolder}/out"
+        "${workspaceFolder}/packages/gitlode/out",
+        "--config",
+        "${workspaceFolder}/packages/gitlode/out/config.json"
       ],
       "preLaunchTask": "npm: build",
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "outFiles": ["${workspaceFolder}/packages/gitlode/dist/**/*.js"],
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
+      "console": "integratedTerminal",
+      "outputCapture": "std",
       "env": {
         // "NODE_ENV": "development",
         // "DEBUG": "isomorphic-git:*" // Enable debug logging for isomorphic-git

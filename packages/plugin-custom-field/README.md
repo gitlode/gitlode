@@ -62,6 +62,14 @@ Each emitted record will include:
 
 ```json
 {
+  "value": "<string|number|boolean>"
+}
+```
+
+or
+
+```json
+{
   "value": {
     "<fieldName>": "<string|number|boolean|null>"
   }
@@ -70,7 +78,9 @@ Each emitted record will include:
 
 Rules:
 
-- `value` is required and must be an object containing at least one entry.
+- `value` is required and must be either:
+  - a scalar: `string`, finite `number`, or `boolean`, or
+  - an object containing at least one entry.
 - Field names must match `^[A-Za-z_][A-Za-z0-9_-]*$`.
 - Field values must be scalar JSON values only: `string`, `number`, `boolean`, or `null`.
 - Number values must be finite (`NaN`, `Infinity`, and `-Infinity` are rejected).
@@ -98,3 +108,12 @@ If the running gitlode version does not satisfy this range, gitlode emits a warn
 ## License
 
 [MIT](LICENSE)
+
+## Changelog
+
+[Changelog](CHANGELOG.md)
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

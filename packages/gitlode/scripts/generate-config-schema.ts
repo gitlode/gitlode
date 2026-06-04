@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { toJSONSchema } from "zod";
 
-import { ConfigFileSchema } from "../src/cli/config/loader.js";
+import { ProjectConfigSchema } from "../src/cli/config/loader.js";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");
@@ -12,7 +12,7 @@ const defaultOutputPath = resolve(packageDir, "schemas", "config-v1.schema.json"
 const outputPath = process.argv[2] ? resolve(process.argv[2]) : defaultOutputPath;
 
 async function main() {
-  const generated = toJSONSchema(ConfigFileSchema, {
+  const generated = toJSONSchema(ProjectConfigSchema, {
     target: "draft-2020-12",
     io: "input",
     unrepresentable: "throw",

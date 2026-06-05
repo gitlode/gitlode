@@ -4,11 +4,12 @@ Official gitlode plugin package for identity normalization and profile enrichmen
 
 ## Status
 
-This package is currently bootstrapped but not yet implemented.
+This package implements the initial inline-config release of the identity-profile plugin.
 
-At the moment, the exported plugin returns a fatal init result to make the incomplete status explicit.
+The current version supports inline `profileMappings`, author and committer normalization, optional
+custom attributes, and optional debug metadata.
 
-Implementation details and usage documentation will be added when the runtime behavior is implemented.
+Usage documentation will be expanded as the package matures.
 
 ## Compatibility
 

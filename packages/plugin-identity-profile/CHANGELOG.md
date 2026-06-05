@@ -6,4 +6,7 @@
 
 - Bootstrap scaffold for `@gitlode/plugin-identity-profile`.
 - Initial workspace packaging, build, and test setup.
-- Placeholder plugin entrypoint that fails fast until the runtime implementation is added.
+- Initial inline-config runtime implementation for identity normalization and profile enrichment.
+- Init-time validation and diagnostics using gitlode plugin runtime `warn()` and `error()`.
+- Ordered email-first, then name-fallback resolution for author and committer identity mapping.
+- Optional custom `attributes` output and `_debug` metadata output.

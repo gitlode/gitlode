@@ -1,48 +1,201 @@
 import { existsSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import { Argument, Command, CommanderError, Option } from "commander";
 import { z } from "zod";
 
-import type { CommitOid, ExtractorConfig } from "../core/index.js";
-import { GitAdapterError } from "../git/index.js";
-import type { GitAdapter } from "../git/index.js";
+import type { RotationConfig } from "../core/index.js";
+import { MISSING_STATES } from "../core/index.js";
 import { loadConfigFile } from "./config/index.js";
-import type { LoadedConfigFile } from "./config/index.js";
-import { type BootstrapTermination } from "./errors.js";
+import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "./config/index.js";
+import type { BootstrapResult, BootstrapTermination } from "./errors.js";
 
-export interface ParsedArgs extends ExtractorConfig {
-  quiet: boolean;
-  profile: boolean;
+export type BootstrapInputRange =
+  | { readonly type: "ref"; readonly sinceRef: string }
+  | { readonly type: "date"; readonly since: Date };
+
+export interface BootstrapInput {
+  readonly repositoryPath: string;
+  readonly refs: readonly string[];
+  readonly outputDir: string;
+  readonly outputPrefix?: string;
+  readonly rotation: RotationConfig;
+  readonly incremental: boolean;
+  readonly missingState?: (typeof MISSING_STATES)[number];
+  readonly range?: BootstrapInputRange;
+  readonly stateFilePath?: string;
+  readonly perFile: boolean;
+  readonly maxDiffSize?: number;
+  readonly quiet: boolean;
+  readonly profile: boolean;
   repoName?: string;
   repoUrl?: string;
   configPath?: string;
-  loadedConfig?: LoadedConfigFile;
+  extensions?: ConfigExtensionsSection;
 }
 
-export type ParseArgsResult =
-  | { kind: "parsed"; parsed: ParsedArgs }
-  | { kind: "termination"; termination: BootstrapTermination };
+// #region Zod schemas and parsing logic
 
-const RawOptsSchema = z.object({
-  ref: z.array(z.string()).optional(),
+/**
+ * Parse a binary size string (e.g. "100K", "1M") to bytes.
+ * Supports suffixes K (1024), M (1048576), G (1073741824).
+
+ * - minBytes - Minimum allowed value in bytes; null for no minimum
+ * - maxBytes - Maximum allowed value in bytes; null for no maximum
+ * - optionName - name for error messages
+ */
+export function byteSizeString(options?: {
+  minBytes?: bigint;
+  maxBytes?: bigint;
+  optionName?: string;
+}) {
+  const optionName = options?.optionName ?? "value";
+  const defaultError = `${optionName} must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)`;
+  return z
+    .string(defaultError)
+    .min(1)
+    .transform((value, ctx) => {
+      const trimmed = value.trim();
+      const match = /^(\d+)([kKmMgG]?)$/.exec(trimmed);
+      if (!match) {
+        ctx.issues.push({
+          code: "custom",
+          message: defaultError,
+          input: value,
+        });
+
+        return z.NEVER;
+      }
+      const numPart = BigInt(match[1]!);
+      const suffix = match[2]!.toUpperCase();
+      const multipliers: Record<string, bigint> = {
+        "": 1n,
+        K: 1024n,
+        M: 1_048_576n,
+        G: 1_073_741_824n,
+      };
+
+      const bytes = numPart * multipliers[suffix]!;
+      if (options == null) {
+        return Number(bytes);
+      }
+
+      // range checks
+      const { minBytes, maxBytes } = options;
+      if (
+        minBytes !== undefined &&
+        maxBytes !== undefined &&
+        (bytes < minBytes || bytes > maxBytes)
+      ) {
+        ctx.issues.push({
+          code: "custom",
+          message: `${optionName} must be between ${Number(minBytes)} and ${Number(maxBytes)} bytes`,
+          input: value,
+        });
+
+        return z.NEVER;
+      }
+      if (minBytes !== undefined && maxBytes === undefined && bytes < minBytes) {
+        ctx.issues.push({
+          code: "custom",
+          message: `${optionName} must be at least ${Number(minBytes)} byte`,
+          input: value,
+        });
+
+        return z.NEVER;
+      }
+      if (minBytes === undefined && maxBytes !== undefined && bytes > maxBytes) {
+        ctx.issues.push({
+          code: "custom",
+          message: `${optionName} must be at most ${Number(maxBytes)} bytes`,
+          input: value,
+        });
+
+        return z.NEVER;
+      }
+
+      return Number(bytes);
+    });
+}
+
+export function positiveIntegerString(error?: string) {
+  return z
+    .string({
+      error,
+    })
+    .transform((value, ctx) => {
+      const trimmed = value.trim();
+
+      if (!/^[1-9]\d*$/.test(trimmed)) {
+        ctx.issues.push({
+          code: "custom",
+          message: error,
+          input: value,
+        });
+
+        return z.NEVER;
+      }
+
+      const parsed = Number(trimmed);
+
+      if (!Number.isSafeInteger(parsed)) {
+        ctx.issues.push({
+          code: "custom",
+          message: error,
+          input: value,
+        });
+
+        return z.NEVER;
+      }
+
+      return parsed;
+    });
+}
+
+export const ROTATE_SIZE_MIN = 1_048_576n; // 1 MiB
+export const ROTATE_SIZE_MAX = 68_719_476_736n; // 64 GiB
+
+const CommandArgsSchema = z.object({
+  ref: z
+    .array(z.string().min(1))
+    .min(1)
+    .optional()
+    .transform((val) => val ?? []),
   incremental: z.boolean(),
-  outputDir: z.string().optional(),
-  outputPrefix: z.string().optional(),
-  state: z.string().optional(),
-  missingState: z.string().optional(),
-  sinceRef: z.string().optional(),
-  sinceDate: z.string().optional(),
-  rotateLines: z.string().optional(),
-  rotateSize: z.string().optional(),
-  maxDiffSize: z.string().optional(),
+  outputDir: z.string().min(1).optional(),
+  outputPrefix: z.string().min(1).optional(),
+  state: z.string().min(1).optional(),
+  missingState: z
+    .enum(MISSING_STATES, {
+      error: `--missing-states must be one of the following values: ${MISSING_STATES.join(", ")}`,
+    })
+    .optional(),
+  sinceRef: z.string().min(1).optional(),
+  sinceDate: z.iso
+    .datetime({
+      offset: true,
+      error: "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
+    })
+    .transform((value) => new Date(value))
+    .optional(),
+  rotateLines: positiveIntegerString("--rotate-lines must be a positive integer").optional(),
+  rotateSize: byteSizeString({
+    minBytes: ROTATE_SIZE_MIN,
+    maxBytes: ROTATE_SIZE_MAX,
+    optionName: "--rotate-size",
+  }).optional(),
+  maxDiffSize: byteSizeString({ minBytes: 1n, optionName: "--max-diff-size" }).optional(),
   quiet: z.boolean(),
   profile: z.boolean(),
   perFile: z.boolean(),
-  repoName: z.string().optional(),
-  repoUrl: z.string().optional(),
-  config: z.string().optional(),
+  repoName: z.string().min(1).optional(),
+  repoUrl: z.string().min(1).optional(),
+  config: z.string().min(1).optional(),
 });
+
+// #endregion
+
+// #region Commander Command
 
 export const program = new Command()
   .name("gitlode")
@@ -50,7 +203,7 @@ export const program = new Command()
   .configureOutput({
     writeErr() {
       // Intentionally suppress Commander stderr output for bootstrap errors.
-      // `parseArgs()` uses `exitOverride()` and catches the resulting
+      // `loadBootstrapInput()` uses `exitOverride()` and catches the resulting
       // `CommanderError`, so gitlode owns bootstrap error rendering instead of
       // forwarding the raw Commander output from here.
     },
@@ -167,6 +320,10 @@ export const program = new Command()
     ).helpGroup("Configuration File"),
   );
 
+// #endregion
+
+// #region module local Error
+
 class TerminationSignal extends Error {
   readonly termination: BootstrapTermination;
 
@@ -189,68 +346,18 @@ function userError(msg: string): never {
 }
 
 function successTermination(): never {
-  throw new TerminationSignal({ kind: "success", exitCode: 0 });
+  throw new TerminationSignal({ kind: "success-terminate", exitCode: 0 });
 }
 
-const ROTATE_SIZE_MIN = 1_048_576n; // 1 MiB
-const ROTATE_SIZE_MAX = 68_719_476_736n; // 64 GiB
-
-/**
- * Parse a binary size string (e.g. "100K", "1M") to bytes.
- * Supports suffixes K (1024), M (1048576), G (1073741824).
- * @param raw - Raw input string
- * @param minBytes - Minimum allowed value in bytes; null for no minimum
- * @param maxBytes - Maximum allowed value in bytes; null for no maximum
- * @param optionName - CLI option name for error messages
- */
-function parseBinarySize(
-  raw: string,
-  minBytes: bigint | null,
-  maxBytes: bigint | null,
-  optionName: string,
-): number {
-  const trimmed = raw.trim();
-  const match = /^(\d+)([kKmMgG]?)$/.exec(trimmed);
-  if (!match) {
-    userError(
-      `${optionName} must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)`,
-    );
-  }
-  const numPart = BigInt(match[1]!);
-  const suffix = match[2]!.toUpperCase();
-  const multipliers: Record<string, bigint> = {
-    "": 1n,
-    K: 1024n,
-    M: 1_048_576n,
-    G: 1_073_741_824n,
-  };
-  const bytes = numPart * multipliers[suffix]!;
-  if (minBytes !== null && maxBytes !== null && (bytes < minBytes || bytes > maxBytes)) {
-    userError(`${optionName} must be between ${Number(minBytes)} and ${Number(maxBytes)} bytes`);
-  }
-  if (minBytes !== null && maxBytes === null && bytes < minBytes) {
-    userError(`${optionName} must be at least ${Number(minBytes)} byte`);
-  }
-  if (minBytes === null && maxBytes !== null && bytes > maxBytes) {
-    userError(`${optionName} must be at most ${Number(maxBytes)} bytes`);
-  }
-  return Number(bytes);
-}
-
-function parseRotateSizeBytes(raw: string): number {
-  return parseBinarySize(raw, ROTATE_SIZE_MIN, ROTATE_SIZE_MAX, "--rotate-size");
-}
-
-function parseMaxDiffSizeBytes(raw: string): number {
-  // Allow any value from 1 byte with no upper limit (users may set very high thresholds)
-  return parseBinarySize(raw, 1n, null, "--max-diff-size");
-}
+// #endregion
 
 function isCliValueProvided(name: string): boolean {
   return program.getOptionValueSource(name) === "cli";
 }
 
-export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
+type ParsedCliOptions = z.infer<typeof CommandArgsSchema>;
+
+async function parseCliOptions(): Promise<BootstrapResult<ParsedCliOptions>> {
   try {
     program.exitOverride();
     try {
@@ -269,9 +376,9 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
       throw err;
     }
 
-    let opts: z.infer<typeof RawOptsSchema>;
+    let parsedCliOptions: ParsedCliOptions;
     try {
-      opts = RawOptsSchema.parse(program.opts());
+      parsedCliOptions = CommandArgsSchema.parse(program.opts());
     } catch (err) {
       if (err instanceof z.ZodError) {
         userError(err.issues[0]?.message ?? "Invalid CLI options");
@@ -279,96 +386,103 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
       throw err;
     }
 
-    const refsFromCli: string[] = opts.ref ?? [];
-    const incremental = opts.incremental;
-    const sinceRefFromCli = opts.sinceRef;
-    const sinceDateFromCli = opts.sinceDate;
-    const state = opts.state;
-    const missingStateRaw = opts.missingState;
-    const outputDirFromCli = opts.outputDir;
-    const outputPrefixFromCli = opts.outputPrefix;
-    const rotateLinesRaw = opts.rotateLines;
-    const rotateSizeRaw = opts.rotateSize;
-    const maxDiffSizeRaw = opts.maxDiffSize;
+    return { kind: "success", value: parsedCliOptions };
+  } catch (err) {
+    if (err instanceof TerminationSignal) {
+      return err.termination;
+    }
+    throw err;
+  }
+}
+
+function validateOptionCombinations(args: ParsedCliOptions): BootstrapResult<true> {
+  if (args.sinceRef && args.sinceDate) {
+    return {
+      kind: "user-error",
+      message: "--since-ref and --since-date cannot be used together",
+      exitCode: 1,
+    };
+  }
+  if (args.incremental && args.sinceRef) {
+    return {
+      kind: "user-error",
+      message: "--since-ref cannot be used with --incremental",
+      exitCode: 1,
+    };
+  }
+  if (args.incremental && args.sinceDate) {
+    return {
+      kind: "user-error",
+      message: "--since-date cannot be used with --incremental",
+      exitCode: 1,
+    };
+  }
+  if (args.missingState !== undefined && !args.incremental) {
+    return {
+      kind: "user-error",
+      message: "--missing-state is only valid with --incremental",
+      exitCode: 1,
+    };
+  }
+  if (args.incremental && !args.state) {
+    return {
+      kind: "user-error",
+      message: "--state is required when using --incremental",
+      exitCode: 1,
+    };
+  }
+  return { kind: "success", value: true };
+}
+
+export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInput>> {
+  try {
+    const parsedCommandArgsResult = await parseCliOptions();
+    if (parsedCommandArgsResult.kind !== "success") {
+      return parsedCommandArgsResult;
+    }
+
+    const parsedCommandArgs = parsedCommandArgsResult.value;
+
+    const checkResult = validateOptionCombinations(parsedCommandArgs);
+    if (checkResult.kind !== "success") {
+      return checkResult;
+    }
+
+    const refsFromCli = parsedCommandArgs.ref;
+    const incremental = parsedCommandArgs.incremental;
+    const sinceRefFromCli = parsedCommandArgs.sinceRef;
+    const sinceDateFromCli = parsedCommandArgs.sinceDate;
+    const state = parsedCommandArgs.state;
+    const missingState = parsedCommandArgs.missingState;
+    const outputDirFromCli = parsedCommandArgs.outputDir;
+    const outputPrefixFromCli = parsedCommandArgs.outputPrefix;
+    const cliMaxLines = parsedCommandArgs.rotateLines;
+    const cliMaxBytes = parsedCommandArgs.rotateSize;
+    const maxDiffSize = parsedCommandArgs.maxDiffSize;
     const repoPath = program.args[0] as string | undefined;
-    const quiet = opts.quiet;
-    const profile = opts.profile;
-    const perFile = opts.perFile;
-    const repoNameFromCli = opts.repoName;
-    const repoUrlFromCli = opts.repoUrl;
-    const configRaw = opts.config;
-
-    // --- Phase 1: Format and mutual exclusion checks (no I/O) ---
-    if (
-      missingStateRaw !== undefined &&
-      missingStateRaw !== "error" &&
-      missingStateRaw !== "snapshot"
-    ) {
-      userError('--missing-state must be "error" or "snapshot"');
-    }
-
-    if (sinceRefFromCli && sinceDateFromCli) {
-      userError("--since-ref and --since-date cannot be used together");
-    }
-    if (incremental && sinceRefFromCli) {
-      userError("--since-ref cannot be used with --incremental");
-    }
-    if (incremental && sinceDateFromCli) {
-      userError("--since-date cannot be used with --incremental");
-    }
-    if (missingStateRaw !== undefined && !incremental) {
-      userError("--missing-state is only valid with --incremental");
-    }
-    if (incremental && !state) {
-      userError("--state is required when using --incremental");
-    }
-
-    let cliMaxLines: number | undefined;
-    if (rotateLinesRaw !== undefined) {
-      const n = Number(rotateLinesRaw);
-      if (!Number.isInteger(n) || n <= 0) {
-        userError("--rotate-lines must be a positive integer");
-      }
-      cliMaxLines = n;
-    }
-
-    let cliMaxBytes: number | undefined;
-    if (rotateSizeRaw !== undefined) {
-      cliMaxBytes = parseRotateSizeBytes(rotateSizeRaw);
-    }
-
-    let maxDiffSize: number | undefined;
-    if (maxDiffSizeRaw !== undefined) {
-      maxDiffSize = parseMaxDiffSizeBytes(maxDiffSizeRaw);
-    }
-
-    let sinceDateFromCliObj: Date | undefined;
-    if (sinceDateFromCli !== undefined) {
-      const d = new Date(sinceDateFromCli);
-      if (isNaN(d.getTime())) {
-        userError(
-          "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
-        );
-      }
-      sinceDateFromCliObj = d;
-    }
+    const quiet = parsedCommandArgs.quiet;
+    const profile = parsedCommandArgs.profile;
+    const perFile = parsedCommandArgs.perFile;
+    const repoNameFromCli = parsedCommandArgs.repoName;
+    const repoUrlFromCli = parsedCommandArgs.repoUrl;
+    const configRaw = parsedCommandArgs.config;
 
     // --- Phase 2: Config load/validation (when explicit --config is passed) ---
-    let loadedConfig: LoadedConfigFile | undefined;
+    let loadedConfig: ProjectConfigurationV1 | undefined;
     let resolvedConfigPath: string | undefined;
     if (configRaw !== undefined) {
       resolvedConfigPath = resolve(configRaw);
       const loadedResult = await loadConfigFile(resolvedConfigPath);
-      if (loadedResult.kind === "termination") {
-        userError(loadedResult.termination.message);
+      if (loadedResult.kind !== "success") {
+        return loadedResult;
       }
-      loadedConfig = loadedResult.loaded;
+      loadedConfig = loadedResult.value;
     }
 
-    const configExtraction = loadedConfig?.config.extraction;
-    const configOutput = loadedConfig?.config.output;
-    const configRepository = loadedConfig?.config.repository;
-    const configRuntime = loadedConfig?.config.runtime;
+    const configExtraction = loadedConfig?.extraction;
+    const configOutput = loadedConfig?.output;
+    const configRepository = loadedConfig?.repository;
+    const configRuntime = loadedConfig?.runtime;
 
     const effectiveRefs =
       refsFromCli.length > 0 ? refsFromCli : [...(configExtraction?.refs ?? [])];
@@ -376,7 +490,7 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
       userError("At least one --ref must be specified");
     }
 
-    const hasCliRange = sinceRefFromCli !== undefined || sinceDateFromCliObj !== undefined;
+    const hasCliRange = sinceRefFromCli !== undefined || sinceDateFromCli !== undefined;
     const hasConfigRange = configExtraction?.range !== undefined;
     if (incremental && hasConfigRange) {
       userError("Config extraction.range cannot be used with --incremental");
@@ -385,23 +499,12 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
     const effectiveRange = hasCliRange
       ? {
           sinceRef: sinceRefFromCli,
-          sinceDate: sinceDateFromCliObj,
+          sinceDate: sinceDateFromCli,
         }
       : {
           sinceRef: configExtraction?.range?.sinceRef,
           sinceDate: configExtraction?.range?.sinceDate,
         };
-
-    let sinceDateFromConfigObj: Date | undefined;
-    if (!hasCliRange && effectiveRange.sinceDate !== undefined) {
-      const d = new Date(effectiveRange.sinceDate);
-      if (isNaN(d.getTime())) {
-        userError(
-          "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
-        );
-      }
-      sinceDateFromConfigObj = d;
-    }
 
     const outputDir =
       (isCliValueProvided("outputDir") ? outputDirFromCli : configOutput?.directory) ?? "./";
@@ -411,18 +514,9 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
     const effectiveProfile = profile || configRuntime?.profile === true;
 
     const configMaxLines = configOutput?.rotation?.lines;
-    const configMaxBytesRaw = configOutput?.rotation?.size;
-    const configMaxBytes =
-      configMaxBytesRaw === undefined ? undefined : parseRotateSizeBytes(configMaxBytesRaw);
+    const configMaxBytes = configOutput?.rotation?.size;
     const maxLines = cliMaxLines ?? configMaxLines;
     const maxBytes = cliMaxBytes ?? configMaxBytes;
-
-    let effectiveSinceDateObj: Date | undefined;
-    if (hasCliRange) {
-      effectiveSinceDateObj = sinceDateFromCliObj;
-    } else {
-      effectiveSinceDateObj = sinceDateFromConfigObj;
-    }
 
     // --- Phase 3: File system validation ---
     if (!repoPath) {
@@ -445,71 +539,25 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
       if (!existsSync(stateParentDir)) {
         userError(`Parent directory for state file not found: ${stateParentDir}`);
       }
-      if (incremental && missingStateRaw !== "snapshot" && !existsSync(resolvedStatePath)) {
+      if (incremental && missingState !== "snapshot" && !existsSync(resolvedStatePath)) {
         userError(`State file not found: ${resolvedStatePath}`);
       }
     }
 
-    // --- Phase 4: Git validation ---
-    try {
-      await adapter.resolveRef(resolvedRepoPath, effectiveRefs[0]!);
-    } catch (e) {
-      if (e instanceof GitAdapterError) {
-        if (e.code === "NOT_A_REPOSITORY") {
-          userError(`Not a Git repository: ${repoPath}`);
-        }
-        if (e.code !== "REF_NOT_FOUND") {
-          throw e;
-        }
-        // REF_NOT_FOUND means valid repo but ref doesn't exist — extractor will surface this
-      } else {
-        throw e;
-      }
-    }
-
-    let resolvedSinceRef: CommitOid | undefined;
-    if (effectiveRange.sinceRef) {
-      try {
-        resolvedSinceRef = await adapter.resolveRef(resolvedRepoPath, effectiveRange.sinceRef);
-      } catch (e) {
-        if (e instanceof GitAdapterError && e.code === "REF_NOT_FOUND") {
-          userError(`Ref not found: ${effectiveRange.sinceRef}`);
-        }
-        throw e;
-      }
-    }
-
-    // --- Output prefix derivation ---
-    let prefix: string;
-    if (outputPrefix) {
-      prefix = outputPrefix;
-    } else {
-      const remoteUrl = await adapter.getRemoteUrl(resolvedRepoPath);
-      if (remoteUrl) {
-        const lastSegment = remoteUrl.split("/").pop() ?? "";
-        const stripped = lastSegment.replace(/\.git$/, "");
-        prefix = stripped || basename(resolvedRepoPath);
-      } else {
-        prefix = basename(resolvedRepoPath);
-      }
-    }
-
     return {
-      kind: "parsed",
-      parsed: {
+      kind: "success",
+      value: {
         repositoryPath: repoPath,
         refs: effectiveRefs,
         outputDir: resolvedOutputDir,
-        outputPrefix: prefix,
+        outputPrefix,
         rotation: { maxLines, maxBytes },
         incremental,
-        missingState: incremental
-          ? ((missingStateRaw ?? "error") as "error" | "snapshot")
-          : undefined,
-        range: resolvedSinceRef
-          ? { type: "ref", ref: resolvedSinceRef }
-          : effectiveSinceDateObj
-            ? { type: "date", since: effectiveSinceDateObj }
+        missingState: incremental ? ((missingState ?? "error") as "error" | "snapshot") : undefined,
+        range: effectiveRange.sinceRef
+          ? { type: "ref", sinceRef: effectiveRange.sinceRef }
+          : effectiveRange.sinceDate
+            ? { type: "date", since: effectiveRange.sinceDate }
             : undefined,
         stateFilePath: state,
         perFile,
@@ -519,12 +567,12 @@ export async function parseArgs(adapter: GitAdapter): Promise<ParseArgsResult> {
         repoName,
         repoUrl,
         configPath: resolvedConfigPath,
-        loadedConfig,
+        extensions: loadedConfig?.extensions,
       },
     };
   } catch (err) {
     if (err instanceof TerminationSignal) {
-      return { kind: "termination", termination: err.termination };
+      return err.termination;
     }
     throw err;
   }

@@ -14,18 +14,18 @@ export class EnrichingFactProjector implements FactProjector {
   private readonly pluginEntries: readonly PluginEntry[];
   private readonly reporter: ProgressReporter;
   private readonly repoName: string;
-  private readonly remoteUrl: string | null;
+  private readonly repoUrl: string | null;
 
   constructor(
     pluginEntries: readonly PluginEntry[],
     reporter: ProgressReporter,
     repoName: string,
-    remoteUrl: string | null,
+    repoUrl: string | null,
   ) {
     this.pluginEntries = pluginEntries;
     this.reporter = reporter;
     this.repoName = repoName;
-    this.remoteUrl = remoteUrl;
+    this.repoUrl = repoUrl;
   }
 
   async *project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
@@ -51,13 +51,13 @@ export class EnrichingFactProjector implements FactProjector {
     // without any type assertions.
     switch (fact.type) {
       case "commit": {
-        const baseRecord = Object.freeze(projectCommit(fact, this.repoName, this.remoteUrl));
+        const baseRecord = Object.freeze(projectCommit(fact, this.repoName, this.repoUrl));
         const ctx: ProjectionContext = { fact, baseRecord };
         const extensions = await this.runPlugins(fact, ctx);
         return { ...baseRecord, extensions };
       }
       case "file-change": {
-        const baseRecord = Object.freeze(projectFileChange(fact, this.repoName, this.remoteUrl));
+        const baseRecord = Object.freeze(projectFileChange(fact, this.repoName, this.repoUrl));
         const ctx: ProjectionContext = { fact, baseRecord };
         const extensions = await this.runPlugins(fact, ctx);
         return { ...baseRecord, extensions };

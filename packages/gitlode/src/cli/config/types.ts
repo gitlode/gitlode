@@ -2,7 +2,7 @@ import type { Namespace, PluginFailurePolicy } from "../../core/index.js";
 
 export interface ConfigExtractionRange {
   readonly sinceRef?: string;
-  readonly sinceDate?: string;
+  readonly sinceDate?: Date;
 }
 
 export interface ConfigExtractionSection {
@@ -12,7 +12,7 @@ export interface ConfigExtractionSection {
 
 export interface ConfigRotationSection {
   readonly lines?: number;
-  readonly size?: string;
+  readonly size?: number;
 }
 
 export interface ConfigOutputSection {
@@ -38,7 +38,7 @@ export interface ConfigExtensionEntry {
 
 export type ConfigExtensionsSection = Readonly<Record<Namespace, ConfigExtensionEntry>>;
 
-export interface ConfigFileV1 {
+export interface ProjectConfigurationV1 {
   readonly version: 1;
   readonly extraction?: ConfigExtractionSection;
   readonly output?: ConfigOutputSection;
@@ -46,13 +46,3 @@ export interface ConfigFileV1 {
   readonly runtime?: ConfigRuntimeSection;
   readonly extensions?: ConfigExtensionsSection;
 }
-
-export interface LoadedConfigFile {
-  readonly path: string;
-  readonly directory: string;
-  readonly config: ConfigFileV1;
-}
-
-export type LoadConfigResult =
-  | { kind: "loaded"; loaded: LoadedConfigFile }
-  | { kind: "termination"; termination: { kind: "user-error"; message: string } };

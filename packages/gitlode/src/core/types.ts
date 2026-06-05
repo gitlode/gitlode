@@ -1,3 +1,5 @@
+import { MISSING_STATES } from "./consts.js";
+
 declare const _commitOidBrand: unique symbol;
 export type CommitOid = string & { readonly [_commitOidBrand]: "CommitOid" };
 
@@ -149,7 +151,7 @@ export interface ExtractorConfig {
   readonly outputPrefix: string;
   readonly rotation: RotationConfig;
   readonly incremental: boolean;
-  readonly missingState?: "error" | "snapshot";
+  readonly missingState?: (typeof MISSING_STATES)[number];
   readonly range?: ExtractionRange;
   readonly stateFilePath?: string;
   readonly perFile: boolean;
@@ -329,7 +331,7 @@ export interface CommitTraversalRequest {
   /** Repository display name (derived from remote URL or directory name). */
   readonly repoName: string;
   /** Remote origin URL, or null if unavailable. */
-  readonly remoteUrl: string | null;
+  readonly repoUrl: string | null;
   /** Ordered list of per-branch traversal plans. */
   readonly plans: readonly TraversalPlan[];
   /** Optional extraction range; controls commit filtering within each branch. */
@@ -370,7 +372,7 @@ export interface OutputSink {
 export interface CoordinatorRequest {
   readonly repositoryPath: string;
   readonly repoName: string;
-  readonly remoteUrl: string | null;
+  readonly repoUrl: string | null;
   readonly refs: readonly string[];
   /** Renamed from `outputMode`. */
   readonly granularity: "commit" | "file";

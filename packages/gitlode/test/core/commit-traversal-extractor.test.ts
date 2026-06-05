@@ -134,7 +134,7 @@ describe("DefaultCommitTraversalExtractor", () => {
       traverser.extract(
         baseRequest({
           repoName: "my-repo",
-          remoteUrl: "https://github.com/org/my-repo",
+          repoUrl: "https://github.com/org/my-repo",
           plans: [makePlan("main", head)],
         }),
         makeReporter(),

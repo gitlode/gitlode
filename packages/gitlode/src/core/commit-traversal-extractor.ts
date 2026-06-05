@@ -11,11 +11,7 @@ import type {
   StageProfiler,
 } from "./types.js";
 
-function toCommitFact(
-  rawCommit: RawCommit,
-  repoName: string,
-  remoteUrl: string | null,
-): CommitFact {
+function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | null): CommitFact {
   return {
     type: "commit",
     oid: rawCommit.oid,
@@ -33,7 +29,7 @@ function toCommitFact(
       timezoneOffset: rawCommit.committer.timezoneOffset,
     },
     parents: rawCommit.parents,
-    repository: { name: repoName, url: remoteUrl },
+    repository: { name: repoName, url: repoUrl },
   };
 }
 
@@ -51,15 +47,15 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
   }
 
   extract(request: CommitTraversalRequest, reporter: ProgressReporter): AsyncIterable<CommitFact> {
-    const { repositoryPath, repoName, remoteUrl, plans, range } = request;
-    return this.iterateCommitFacts(plans, repositoryPath, repoName, remoteUrl, range, reporter);
+    const { repositoryPath, repoName, repoUrl, plans, range } = request;
+    return this.iterateCommitFacts(plans, repositoryPath, repoName, repoUrl, range, reporter);
   }
 
   private async *iterateCommitFacts(
     plans: readonly TraversalPlan[],
     repositoryPath: string,
     repoName: string,
-    remoteUrl: string | null,
+    repoUrl: string | null,
     range: ExtractionRange | undefined,
     reporter: ProgressReporter,
   ): AsyncIterable<CommitFact> {
@@ -67,15 +63,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
     const visited = new Set<string>();
 
     for (const plan of plans) {
-      yield* this.traverseBranch(
-        plan,
-        repositoryPath,
-        repoName,
-        remoteUrl,
-        range,
-        visited,
-        reporter,
-      );
+      yield* this.traverseBranch(plan, repositoryPath, repoName, repoUrl, range, visited, reporter);
     }
   }
 
@@ -83,7 +71,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
     plan: TraversalPlan,
     repositoryPath: string,
     repoName: string,
-    remoteUrl: string | null,
+    repoUrl: string | null,
     range: ExtractionRange | undefined,
     visited: Set<string>,
     reporter: ProgressReporter,
@@ -99,7 +87,7 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
           return null;
         }
       }
-      return toCommitFact(rawCommit, repoName, remoteUrl);
+      return toCommitFact(rawCommit, repoName, repoUrl);
     };
 
     try {

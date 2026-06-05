@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
+import { initializePlugins } from "../../src/cli/plugins.js";
 import { EnrichingFactProjector } from "../../src/core/enriching-fact-projector.js";
 import type {
   CommitFact,
@@ -132,6 +134,82 @@ describe("EnrichingFactProjector — basic enrichment", () => {
     expect(records).toHaveLength(2);
     expect(records[0]!.extensions?.["p"]).toEqual({ id: "aaaa" });
     expect(records[1]!.extensions?.["p"]).toEqual({ id: "bbbb" });
+  });
+
+  it("integrates with @gitlode/plugin-identity-profile through init and projection", async () => {
+    const warnings: string[] = [];
+    const errors: string[] = [];
+    const plugin = await identityProfileFactory({
+      attributeFields: ["team", "costCenter"],
+      profileMappings: [
+        {
+          matchEmail: "author@example.com",
+          name: "Author Canonical",
+          email: "author.canonical@example.com",
+          team: "platform",
+          costCenter: 42,
+        },
+        {
+          matchName: "Comm",
+          name: "Committer Canonical",
+          email: "committer.canonical@example.com",
+          team: "ops",
+        },
+      ],
+    });
+
+    const entries = [makeEntry("identity-profile", plugin)];
+    const initResults = await initializePlugins(entries, () => ({
+      warn(message) {
+        warnings.push(message);
+      },
+      error(message) {
+        errors.push(message);
+      },
+    }));
+
+    expect(initResults).toEqual([
+      {
+        entry: entries[0],
+        result: { type: "ready" },
+      },
+    ]);
+    expect(warnings).toEqual([]);
+    expect(errors).toEqual([]);
+
+    const projector = new EnrichingFactProjector(entries, noopReporter, "repo", null);
+    const [record] = await collect(
+      projector.project(
+        toAsyncIter([
+          makeCommitFact({
+            author: {
+              name: "Auth",
+              email: "author@example.com",
+              timestamp: 1_000_000,
+              timezoneOffset: 0,
+            },
+          }),
+        ]),
+      ),
+    );
+
+    expect(record!.extensions?.["identity-profile"]).toEqual({
+      author: {
+        name: "Author Canonical",
+        email: "author.canonical@example.com",
+        attributes: {
+          team: "platform",
+          costCenter: 42,
+        },
+      },
+      committer: {
+        name: "Committer Canonical",
+        email: "committer.canonical@example.com",
+        attributes: {
+          team: "ops",
+        },
+      },
+    });
   });
 });
 

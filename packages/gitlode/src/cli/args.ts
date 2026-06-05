@@ -8,6 +8,7 @@ import type { RotationConfig } from "../core/index.js";
 import { MISSING_STATES } from "../core/index.js";
 import { loadConfigFile } from "./config/index.js";
 import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "./config/index.js";
+import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./consts.js";
 import type { BootstrapResult, BootstrapTermination } from "./errors.js";
 
 export type BootstrapInputRange =
@@ -151,9 +152,6 @@ export function positiveIntegerString(error?: string) {
       return parsed;
     });
 }
-
-export const ROTATE_SIZE_MIN = 1_048_576n; // 1 MiB
-export const ROTATE_SIZE_MAX = 68_719_476_736n; // 64 GiB
 
 const CommandArgsSchema = z.object({
   ref: z

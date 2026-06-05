@@ -5,7 +5,8 @@
   "workspaces": [
     "packages/gitlode",
     "packages/plugin-conventional-commits",
-    "packages/plugin-custom-field"
+    "packages/plugin-custom-field",
+    "packages/plugin-identity-profile"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

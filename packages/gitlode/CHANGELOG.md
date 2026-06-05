@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+
+### Patch Changes
+
+- d1cfae3: Fix a runtime initialization bug where constants could be accessed too early due to import timing. Constants were moved into a dedicated module to stabilize evaluation order and prevent unexpected access during startup.
+
 ## 0.8.1
 
 ### Patch Changes

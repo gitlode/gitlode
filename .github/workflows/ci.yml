@@ -1,11 +1,16 @@
-# CI workflow: runs build, tests, and format check.
-# Triggered on every push and pull request across all branches.
+# CI workflow: runs generated artifact checks, format, lint, tests, and build.
 name: CI
 
 on:
   push:
     branches: ["**"]
   pull_request:
+    branches:
+      - main
+      - "integration/**"
+
+permissions:
+  contents: read # Required to checkout repository contents.
 
 jobs:
   test-and-build:
@@ -20,7 +25,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          # Enable npm cache to speed up dependency installation
           cache: "npm"
 
       - name: Install dependencies

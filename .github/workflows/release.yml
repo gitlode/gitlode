@@ -1,35 +1,59 @@
-# Release workflow: publishes to npm on GitHub Release publish.
-# Uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret required.
-# Trigger: when a GitHub Release is published (preferred path), or manually via workflow_dispatch.
+# Release workflow: creates/updates Changesets Version PRs and publishes packages to npm.
+# Uses npm Trusted Publishing (OIDC); no NPM_TOKEN secret is required.
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
+concurrency:
+  # Prevent concurrent Version PR updates or npm publish attempts for the same ref.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
-  contents: read
-  id-token: write # Required for npm Trusted Publishing (OIDC)
+  contents: write # Required to checkout, push Version PR commits, and create release tags.
+  pull-requests: write # Required to create/update the Changesets Version PR.
+  id-token: write # Required for npm Trusted Publishing (OIDC).
 
 jobs:
-  publish:
+  release:
+    name: Release
     runs-on: ubuntu-latest
+
     steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org/"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
-
-      - name: Publish to npm
-        run: npm publish --workspace gitlode --provenance --access public
+      - name: Create Version PR or publish to npm
+        uses: changesets/action@v1
+        with:
+          version: npm run version-packages
+          publish: npm run release
+          title: Version Packages
+          commit: Version Packages
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

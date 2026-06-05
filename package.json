@@ -11,17 +11,20 @@
     "build": "npm run build --workspaces --if-present",
     "build:watch": "npm run build:watch -w packages/gitlode",
     "changeset": "changeset",
+    "changeset:publish": "changeset publish",
     "changeset:status": "changeset status",
+    "changeset:version": "changeset version",
     "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",
     "format:check": "npm run format:check --workspaces --if-present",
     "format:write": "npm run format:write --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
-    "release": "changeset publish",
+    "lockfile:sync": "npm install --package-lock-only --ignore-scripts",
+    "release": "npm run build && npm run changeset:publish",
     "test": "npm test --workspaces --if-present",
     "test:watch": "npm run test:watch -w packages/gitlode",
     "test:coverage": "npm run test:coverage -w packages/gitlode",
-    "version-packages": "changeset version"
+    "version-packages": "npm run changeset:version && npm run lockfile:sync"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

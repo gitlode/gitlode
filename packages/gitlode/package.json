@@ -1,6 +1,6 @@
 {
   "name": "gitlode",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Extract Git commit history to JSON Lines (JSONL) for data warehouse ingestion",
   "keywords": [
     "cli",

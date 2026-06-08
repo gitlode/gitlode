@@ -286,7 +286,7 @@ namespaces with different configs, or when you prefer a shorter label in output 
 
 ```typescript
 // my-plugin.ts
-import type { PluginFactory } from "gitlode";
+import type { PluginFactory } from "gitlode/plugin-api";
 
 interface MyConfig {
   threshold: number;

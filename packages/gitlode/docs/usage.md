@@ -650,6 +650,40 @@ Then reference the package name in your config:
 }
 ```
 
+### Example: identity normalization and profile enrichment
+
+`@gitlode/plugin-identity-profile` rewrites emitted `author` and `committer` identities from an
+inline mapping table and can attach optional custom attributes.
+
+```bash
+npm install @gitlode/plugin-identity-profile
+```
+
+```json
+{
+  "version": 1,
+  "extensions": {
+    "identity-profile": {
+      "entrypoint": "@gitlode/plugin-identity-profile",
+      "config": {
+        "attributeFields": ["team"],
+        "profileMappings": [
+          {
+            "matchEmail": "dev@example.com",
+            "name": "Developer Canonical",
+            "email": "developer.canonical@example.com",
+            "team": "platform"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+This plugin performs raw exact matching, checks `matchEmail` first, falls back to `matchName`
+only when email does not match, and passes unmatched sides through unchanged.
+
 #### Compatibility warnings
 
 When gitlode starts, it compares the running core version against the

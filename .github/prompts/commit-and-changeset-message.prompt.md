@@ -3,6 +3,7 @@ name: commit-and-changeset-message
 description: Generate a Conventional Commit message and a changeset summary candidate from staged changes.
 argument-hint: "[optional changes intent, e.g. This internal-looking refactor improves plugin loading performance.]"
 agent: ask
+model: Auto
 ---
 
 Generate a commit message candidate and a changeset summary candidate for the current staged changes.

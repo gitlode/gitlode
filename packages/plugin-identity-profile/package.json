@@ -32,10 +32,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "gitlode": "^0.8.0"
+    "gitlode": "^0.8.2"
   },
   "peerDependencies": {
-    "gitlode": "^0.8.0"
+    "gitlode": "^0.8.2"
   },
   "engines": {
     "node": ">=22.0.0"

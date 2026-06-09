@@ -6,6 +6,7 @@
     "packages/gitlode",
     "packages/plugin-conventional-commits",
     "packages/plugin-custom-field",
+    "packages/plugin-file-type",
     "packages/plugin-identity-profile"
   ],
   "scripts": {

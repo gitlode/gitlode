@@ -38,12 +38,14 @@ export async function dispatchWorkerRunRequest(
     const worker = new Worker(new URL("./worker-entry.js", import.meta.url));
 
     let settled = false;
+    let resultReceived = false;
 
     const settle = (result: WorkerRunResult): void => {
       if (settled) {
         return;
       }
       settled = true;
+      void worker.terminate();
       resolve(result);
     };
 
@@ -63,6 +65,7 @@ export async function dispatchWorkerRunRequest(
         return;
       }
 
+      resultReceived = true;
       settle(value.result);
     });
 
@@ -73,6 +76,11 @@ export async function dispatchWorkerRunRequest(
     worker.on("exit", (code) => {
       if (!settled && code !== 0) {
         settle(runtimeErrorResult(`Worker exited unexpectedly with code ${String(code)}.`));
+        return;
+      }
+
+      if (!settled && code === 0 && !resultReceived) {
+        settle(runtimeErrorResult("Worker exited without returning a result message."));
       }
     });
 

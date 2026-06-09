@@ -8,6 +8,7 @@ import {
   assertSupportedRepositoryObjectFormat,
   NodeStateStore,
   loadPriorState,
+  validateLoadedState,
   type PriorStateLoadOptions,
 } from "../../../src/cli/runtime/index.js";
 import type { ProgressReporter, ExtractionState, StateStore } from "../../../src/core/index.js";
@@ -79,6 +80,39 @@ describe("NodeStateStore", () => {
 
     await store.write(state);
     await expect(store.read()).resolves.toEqual(state);
+  });
+});
+
+describe("validateLoadedState", () => {
+  it("returns the loaded state when the repository path and OID profile are valid", () => {
+    const state: ExtractionState = {
+      version: 2,
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      repositoryPath: process.cwd(),
+      refs: [
+        {
+          ref: "main",
+          refType: "branch",
+          tipOid: "1".padStart(40, "0"),
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    };
+
+    expect(validateLoadedState(state, process.cwd(), "sha1")).toBe(state);
+  });
+
+  it("rejects states from a different repository", () => {
+    const state: ExtractionState = {
+      version: 2,
+      generatedAt: "",
+      repositoryPath: "/different-repo",
+      refs: [],
+    };
+
+    expect(() => validateLoadedState(state, process.cwd(), "sha1")).toThrow(
+      "State file was created for a different repository: /different-repo",
+    );
   });
 });
 

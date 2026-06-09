@@ -40,6 +40,36 @@ function isRefType(value: unknown): value is RefType {
   return typeof value === "string" && REF_TYPES.includes(value as RefType);
 }
 
+export function validateLoadedState(
+  state: ExtractionState,
+  repoPath: string,
+  oidProfile: OidProfile,
+): ExtractionState {
+  if (state.version !== 2) {
+    throw new Error(
+      `Unsupported state file version: ${state.version}. Supported version: 2. Reinitialize the state file (for example, run without --incremental once with --state).`,
+    );
+  }
+
+  const recordedPath = resolve(state.repositoryPath);
+  if (recordedPath !== repoPath) {
+    throw new Error(`State file was created for a different repository: ${state.repositoryPath}`);
+  }
+
+  for (const entry of state.refs) {
+    if (!isRefType(entry.refType)) {
+      throw new Error(
+        `Invalid ref type in state file for ref "${entry.ref}": ${String(entry.refType)}`,
+      );
+    }
+    if (!isCommitOidForProfile(entry.tipOid, oidProfile)) {
+      throw new Error(`Invalid commit OID in state file for ref "${entry.ref}": ${entry.tipOid}`);
+    }
+  }
+
+  return state;
+}
+
 export class NodeStateStore implements StateStore {
   private readonly stateFilePath: string;
 
@@ -92,27 +122,5 @@ export async function loadPriorState(
     return emptyState(repoPath);
   }
 
-  if (state.version !== 2) {
-    throw new Error(
-      `Unsupported state file version: ${state.version}. Supported version: 2. Reinitialize the state file (for example, run without --incremental once with --state).`,
-    );
-  }
-
-  const recordedPath = resolve(state.repositoryPath);
-  if (recordedPath !== repoPath) {
-    throw new Error(`State file was created for a different repository: ${state.repositoryPath}`);
-  }
-
-  for (const entry of state.refs) {
-    if (!isRefType(entry.refType)) {
-      throw new Error(
-        `Invalid ref type in state file for ref "${entry.ref}": ${String(entry.refType)}`,
-      );
-    }
-    if (!isCommitOidForProfile(entry.tipOid, oidProfile)) {
-      throw new Error(`Invalid commit OID in state file for ref "${entry.ref}": ${entry.tipOid}`);
-    }
-  }
-
-  return state;
+  return validateLoadedState(state, repoPath, oidProfile);
 }

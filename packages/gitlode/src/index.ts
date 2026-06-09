@@ -1,14 +1,84 @@
 #!/usr/bin/env node
+import nodeFs from "node:fs";
+import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
 import type { BootstrapInput } from "./cli/args.js";
 import { createBootstrapRenderer, loadBootstrapInput } from "./cli/index.js";
 import { createStyling } from "./cli/progress/index.js";
-import { NodeStateStore, createProgressRuntime, renderSuccessReport } from "./cli/runtime/index.js";
+import {
+  NodeStateStore,
+  assertSupportedRepositoryObjectFormat,
+  createProgressRuntime,
+  loadPriorState,
+  renderSuccessReport,
+} from "./cli/runtime/index.js";
 import { stderrSink } from "./cli/runtime/progress-runtime.js";
-import { GitAdapterError } from "./git/index.js";
-import { executeRuntimeSession } from "./runtime/index.js";
+import type { ExtractionState, ProgressReporter } from "./core/index.js";
+import { GitAdapterError, IsomorphicGitAdapter, JsDiffAdapter } from "./git/index.js";
+import {
+  dispatchWorkerRunRequest,
+  type IsoDateTimeString,
+  type WorkerRunInput,
+} from "./runtime/index.js";
+
+function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
+  return {
+    repositoryPath: bootstrapInput.repositoryPath,
+    refs: bootstrapInput.refs,
+    outputDir: bootstrapInput.outputDir,
+    outputPrefix: bootstrapInput.outputPrefix,
+    rotation: bootstrapInput.rotation,
+    range:
+      bootstrapInput.range === undefined
+        ? undefined
+        : bootstrapInput.range.type === "ref"
+          ? { type: "ref", sinceRef: bootstrapInput.range.sinceRef }
+          : {
+              type: "date",
+              since: bootstrapInput.range.since.toISOString() as IsoDateTimeString,
+            },
+    perFile: bootstrapInput.perFile,
+    maxDiffSize: bootstrapInput.maxDiffSize,
+    profile: bootstrapInput.profile,
+    repoName: bootstrapInput.repoName,
+    repoUrl: bootstrapInput.repoUrl,
+    configPath: bootstrapInput.configPath,
+    extensions: bootstrapInput.extensions,
+  };
+}
+
+async function loadPriorStateForWorker(
+  bootstrapInput: BootstrapInput,
+  reporter: ProgressReporter,
+): Promise<ExtractionState> {
+  const resolvedRepoPath = resolve(bootstrapInput.repositoryPath);
+  const gitAdapter = new IsomorphicGitAdapter({
+    fs: nodeFs,
+    diffAdapter: new JsDiffAdapter(),
+  });
+
+  const supportedFormats = gitAdapter.supportedObjectFormats();
+  const repositoryObjectFormat = await gitAdapter.getRepositoryObjectFormat(resolvedRepoPath);
+  assertSupportedRepositoryObjectFormat(repositoryObjectFormat, supportedFormats);
+
+  const stateStore = bootstrapInput.stateFilePath
+    ? new NodeStateStore(bootstrapInput.stateFilePath)
+    : undefined;
+
+  return loadPriorState(
+    stateStore,
+    {
+      incremental: bootstrapInput.incremental,
+      missingState: bootstrapInput.missingState,
+      stateFilePath: bootstrapInput.stateFilePath,
+    },
+    resolvedRepoPath,
+    repositoryObjectFormat,
+    reporter,
+  );
+}
 
 async function main(): Promise<void> {
   const isTTY = process.stderr.isTTY === true;
@@ -49,10 +119,30 @@ async function main(): Promise<void> {
   });
 
   try {
-    const result = await executeRuntimeSession(bootstrapInput, {
-      reporter: progressRuntime.reporter,
-      renderDiagnostic: progressRuntime.presenter.renderDiagnostic.bind(progressRuntime.presenter),
-    });
+    const priorState = await loadPriorStateForWorker(bootstrapInput, progressRuntime.reporter);
+
+    const result = await dispatchWorkerRunRequest(
+      {
+        input: toWorkerRunInput(bootstrapInput),
+        priorState,
+      },
+      {
+        onProgress(event) {
+          progressRuntime.reporter.emit(event);
+        },
+        onDiagnostic(severity, message) {
+          progressRuntime.presenter.renderDiagnostic(severity, message);
+        },
+      },
+    );
+
+    if (result.kind === "runtime-error") {
+      progressRuntime.presenter.renderRuntimeError(
+        result.stack ? new Error(`${result.message}\n${result.stack}`) : new Error(result.message),
+      );
+      process.exitCode = 2;
+      return;
+    }
 
     if (result.kind === "user-error") {
       progressRuntime.presenter.renderUserError(result.message);

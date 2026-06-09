@@ -37,6 +37,8 @@ interface MockContext {
   readonly getOutputFileNameSample: () => string | undefined;
   readonly getDefaultFactProjectorConstructedCount: () => number;
   readonly getEnrichingFactProjectorConstructedCount: () => number;
+  readonly getStateStoreWrites: () => unknown[];
+  readonly getSideEffects: () => string[];
 }
 
 function makeBootstrapInput(overrides: Record<string, unknown> = {}) {
@@ -75,6 +77,12 @@ function mockEntrypointModules(
       recordsWritten: number;
       commitsTraversed: number;
       refs: string[];
+      state: {
+        version: 2;
+        generatedAt: string;
+        repositoryPath: string;
+        refs: unknown[];
+      };
       skippedDiffs: number;
     }>;
   } = {},
@@ -95,13 +103,17 @@ function mockEntrypointModules(
   const reporter = {
     emit: vi.fn(),
   };
+  const sideEffects: string[] = [];
   const createProgressRuntime = vi.fn(() => ({
     uiMode: "tty-interactive",
     presenter,
     reporter,
   }));
-  const renderSuccessReport = vi.fn();
+  const renderSuccessReport = vi.fn(() => {
+    sideEffects.push("success-report");
+  });
   const coordinatorConstructed = vi.fn();
+  const stateStoreWrites: unknown[] = [];
   let outputFileNameSample: string | undefined;
   let defaultFactProjectorConstructedCount = 0;
   let enrichingFactProjectorConstructedCount = 0;
@@ -155,7 +167,18 @@ function mockEntrypointModules(
 
     async run(): Promise<
       | never
-      | { recordsWritten: number; commitsTraversed: number; refs: string[]; skippedDiffs: number }
+      | {
+          recordsWritten: number;
+          commitsTraversed: number;
+          refs: string[];
+          state: {
+            version: 2;
+            generatedAt: string;
+            repositoryPath: string;
+            refs: unknown[];
+          };
+          skippedDiffs: number;
+        }
     > {
       if (options.coordinatorRunResult) {
         return options.coordinatorRunResult();
@@ -212,7 +235,12 @@ function mockEntrypointModules(
   vi.doMock("../../src/cli/runtime/index.js", () => ({
     createProgressRuntime,
     renderSuccessReport,
-    NodeStateStore: class {},
+    NodeStateStore: class {
+      async write(state: unknown): Promise<void> {
+        sideEffects.push("state-write");
+        stateStoreWrites.push(state);
+      }
+    },
     assertSupportedRepositoryObjectFormat: options.assertSupportedRepositoryObjectFormat ?? vi.fn(),
     deriveRepoName: vi.fn(() => "repo"),
     loadPriorState: vi.fn(async () => ({
@@ -278,6 +306,8 @@ function mockEntrypointModules(
     getOutputFileNameSample: () => outputFileNameSample,
     getDefaultFactProjectorConstructedCount: () => defaultFactProjectorConstructedCount,
     getEnrichingFactProjectorConstructedCount: () => enrichingFactProjectorConstructedCount,
+    getStateStoreWrites: () => stateStoreWrites,
+    getSideEffects: () => sideEffects,
   };
 }
 
@@ -495,6 +525,12 @@ describe("CLI entrypoint orchestration", () => {
         recordsWritten: 3,
         commitsTraversed: 2,
         refs: ["main"],
+        state: {
+          version: 2,
+          generatedAt: "2026-01-01T00:00:00.000Z",
+          repositoryPath: "/repo",
+          refs: [{ ref: "main", refType: "branch", tipOid: "abc123", updatedAt: "now" }],
+        },
         skippedDiffs: 0,
       })),
     });
@@ -507,5 +543,40 @@ describe("CLI entrypoint orchestration", () => {
     expect(context.getDefaultFactProjectorConstructedCount()).toBe(1);
     expect(context.getEnrichingFactProjectorConstructedCount()).toBe(0);
     expect(context.presenter.renderUserError).not.toHaveBeenCalled();
+  });
+
+  it("writes returned state before rendering success report when state file is configured", async () => {
+    const returnedState = {
+      version: 2 as const,
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      repositoryPath: "/repo",
+      refs: [{ ref: "main", refType: "branch", tipOid: "abc123", updatedAt: "now" }],
+    };
+    const context = mockEntrypointModules({
+      loadBootstrapInput: vi.fn(async () => ({
+        kind: "success",
+        value: makeBootstrapInput({
+          configPath: undefined,
+          extensions: undefined,
+          stateFilePath: "/tmp/gitlode-state.json",
+        }),
+      })),
+      coordinatorRunResult: vi.fn(async () => ({
+        recordsWritten: 1,
+        commitsTraversed: 1,
+        refs: ["main"],
+        state: returnedState,
+        skippedDiffs: 0,
+      })),
+    });
+
+    await importEntrypointAsCli();
+
+    await vi.waitFor(() => {
+      expect(context.renderSuccessReport).toHaveBeenCalledTimes(1);
+    });
+    expect(context.getStateStoreWrites()).toEqual([returnedState]);
+    expect(context.getSideEffects()).toEqual(["state-write", "success-report"]);
+    expect(process.exitCode).toBeUndefined();
   });
 });

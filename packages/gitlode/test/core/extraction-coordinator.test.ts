@@ -5,7 +5,6 @@ import type {
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-  StateStore,
   CommitFact,
   CommitOid,
   CommitTraversalExtractor,
@@ -153,22 +152,6 @@ function makeSink(): OutputSink & {
   };
 }
 
-/** In-memory StateStore. */
-function makeStateStore(): StateStore & { stored: ExtractionState | null } {
-  let stored: ExtractionState | null = null;
-  return {
-    get stored() {
-      return stored;
-    },
-    async read() {
-      return stored;
-    },
-    async write(s) {
-      stored = s;
-    },
-  };
-}
-
 function makeDeps(
   overrides: Partial<CoordinatorDependencies> & {
     plans?: readonly TraversalPlan[];
@@ -187,7 +170,6 @@ function makeDeps(
     fileChangeExpander: overrides.fileChangeExpander ?? fileChangeExpander,
     projector: overrides.projector ?? projector,
     sink,
-    stateStore: overrides.stateStore,
     reporter: overrides.reporter ?? makeProgressReporter(),
     profiler: overrides.profiler,
   };
@@ -387,8 +369,7 @@ describe("DefaultExtractionCoordinator", () => {
     expect(closeCalled).toBe(true);
   });
 
-  it("state written after sink.close() succeeds", async () => {
-    const stateStore = makeStateStore();
+  it("returns state only after sink.close() succeeds", async () => {
     const closeOrder: string[] = [];
 
     const trackingSink: OutputSink & { records: ProjectedRecord[] } = {
@@ -406,27 +387,18 @@ describe("DefaultExtractionCoordinator", () => {
         return 100;
       },
     };
-    // Patch stateStore.write to track call order
-    const origWrite = stateStore.write.bind(stateStore);
-    stateStore.write = async (s) => {
-      closeOrder.push("checkpoint");
-      return origWrite(s);
-    };
-
     const deps = makeDeps({
       sink: trackingSink as never,
-      stateStore,
       oids: ["1".padStart(12, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
-    await coord.run(baseRequest());
+    const result = await coord.run(baseRequest());
 
-    expect(closeOrder).toEqual(["close", "checkpoint"]);
-    expect(stateStore.stored).not.toBeNull();
+    expect(closeOrder).toEqual(["close"]);
+    expect(result.state.refs).toHaveLength(1);
   });
 
-  it("state NOT written when sink.close() throws", async () => {
-    const stateStore = makeStateStore();
+  it("state NOT returned when sink.close() throws", async () => {
     const closingFailSink: OutputSink = {
       async write() {},
       async close() {
@@ -441,17 +413,13 @@ describe("DefaultExtractionCoordinator", () => {
     };
     const deps = makeDeps({
       sink: closingFailSink as never,
-      stateStore,
       oids: ["1".padStart(12, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("close failure");
-
-    expect(stateStore.stored).toBeNull();
   });
 
-  it("state NOT written when sink.write() throws", async () => {
-    const stateStore = makeStateStore();
+  it("state NOT returned when sink.write() throws", async () => {
     const failSink: OutputSink = {
       async write() {
         throw new Error("write fail");
@@ -466,26 +434,22 @@ describe("DefaultExtractionCoordinator", () => {
     };
     const deps = makeDeps({
       sink: failSink as never,
-      stateStore,
       oids: ["1".padStart(12, "0")],
     });
     const coord = new DefaultExtractionCoordinator(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write fail");
-
-    expect(stateStore.stored).toBeNull();
   });
 
-  it("state NOT written when stateStore is undefined", async () => {
-    const deps = makeDeps({ stateStore: undefined, oids: ["1".padStart(12, "0")] });
+  it("returns state even when no state file persistence is active", async () => {
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest());
 
     expect(result.recordsWritten).toBe(1);
-    // No error — just not written
+    expect(result.state.refs).toHaveLength(1);
   });
 
-  it("boundary-equals-head: traverser yields 0 commits, close() called, state written", async () => {
-    const stateStore = makeStateStore();
+  it("boundary-equals-head: traverser yields 0 commits, close() called, state returned", async () => {
     const plans: readonly TraversalPlan[] = [
       {
         name: "main",
@@ -499,25 +463,21 @@ describe("DefaultExtractionCoordinator", () => {
         return (async function* () {})();
       },
     };
-    const deps = makeDeps({ plans, stateStore, traversalExtractor: emptyTraverser });
+    const deps = makeDeps({ plans, traversalExtractor: emptyTraverser });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest());
 
     expect(result.recordsWritten).toBe(0);
     expect(deps.sink.closeCalls).toBe(1);
-    // Plans had one resolved ref, so one state checkpoint entry is written.
-    expect(stateStore.stored).not.toBeNull();
-    expect(stateStore.stored?.refs).toHaveLength(1);
-    expect(stateStore.stored?.refs[0]?.ref).toBe("main");
+    expect(result.state.refs).toHaveLength(1);
+    expect(result.state.refs[0]?.ref).toBe("main");
   });
 
-  it("zero-record run: close() called; no state written when empty branches", async () => {
-    const stateStore = makeStateStore();
+  it("zero-record run: close() called; returns empty state when empty branches", async () => {
     const reporter = makeProgressReporter();
     const deps = makeDeps({
       plans: [], // no branches resolved
       oids: [],
-      stateStore,
       reporter,
     });
     const coord = new DefaultExtractionCoordinator(deps);
@@ -525,26 +485,22 @@ describe("DefaultExtractionCoordinator", () => {
 
     expect(result.recordsWritten).toBe(0);
     expect(result.refs).toEqual([]);
-    // refs.length === 0 -> state write skipped.
-    expect(stateStore.stored).toBeNull();
+    expect(result.state.refs).toEqual([]);
   });
 
-  it("no-branch-head case: planner returns empty plans, zero records, no state written", async () => {
-    const stateStore = makeStateStore();
+  it("no-branch-head case: planner returns empty plans, zero records, empty state", async () => {
     const deps = makeDeps({
       plans: [],
       oids: [],
-      stateStore,
     });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ refs: ["nonexistent"] }));
 
     expect(result.recordsWritten).toBe(0);
-    expect(stateStore.stored).toBeNull();
+    expect(result.state.refs).toEqual([]);
   });
 
   it("state refs contain only resolved ref names", async () => {
-    const stateStore = makeStateStore();
     const plans: readonly TraversalPlan[] = [
       { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
       {
@@ -566,18 +522,16 @@ describe("DefaultExtractionCoordinator", () => {
     };
     const deps = makeDeps({
       plans,
-      stateStore,
       traversalExtractor: traverser,
     });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ refs: ["main", "develop"] }));
 
     expect(result.refs).toEqual(["main", "develop"]);
-    expect(stateStore.stored?.refs.map((r) => r.ref)).toEqual(["main", "develop"]);
+    expect(result.state.refs.map((r) => r.ref)).toEqual(["main", "develop"]);
   });
 
   it("non-branch refs are recorded in state.refs with their refType", async () => {
-    const stateStore = makeStateStore();
     const plans: readonly TraversalPlan[] = [
       { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
       {
@@ -596,20 +550,19 @@ describe("DefaultExtractionCoordinator", () => {
         })();
       },
     };
-    const deps = makeDeps({ plans, stateStore, traversalExtractor: traverser });
+    const deps = makeDeps({ plans, traversalExtractor: traverser });
     const coord = new DefaultExtractionCoordinator(deps);
     const result = await coord.run(baseRequest({ refs: ["main", "v1.0"] }));
 
     // Both refs appear in the result (CoordinatorResult.refs)
     expect(result.refs).toEqual(["main", "v1.0"]);
-    expect(stateStore.stored?.refs.map((r) => [r.ref, r.refType])).toEqual([
+    expect(result.state.refs.map((r) => [r.ref, r.refType])).toEqual([
       ["main", "branch"],
       ["v1.0", "tag-lightweight"],
     ]);
   });
 
   it("emits static-ref warnings for all non-branch refs (commit-oid, tag-annotated, tag-lightweight)", async () => {
-    const stateStore = makeStateStore();
     const reporter = makeProgressReporter();
     const plans: readonly TraversalPlan[] = [
       { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
@@ -632,7 +585,7 @@ describe("DefaultExtractionCoordinator", () => {
         excludeHash: undefined,
       },
     ];
-    const deps = makeDeps({ plans, stateStore, reporter, oids: ["1".padStart(12, "0")] });
+    const deps = makeDeps({ plans, reporter, oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest({ refs: ["main", "v1.0-ann", "abc123", "v1.0"] }));
 
@@ -642,7 +595,7 @@ describe("DefaultExtractionCoordinator", () => {
     expect(reporter.warnings[2]).toContain("v1.0");
   });
 
-  it("does not emit static-ref warning when state tracking is not active", async () => {
+  it("emits static-ref warning for checkpoint state candidates", async () => {
     const reporter = makeProgressReporter();
     const plans: readonly TraversalPlan[] = [
       {
@@ -656,17 +609,17 @@ describe("DefaultExtractionCoordinator", () => {
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest({ refs: ["v1.0-ann"] }));
 
-    expect(reporter.warnings).toHaveLength(0);
+    expect(reporter.warnings).toHaveLength(1);
+    expect(reporter.warnings[0]).toContain("v1.0-ann");
   });
 
   it("state generatedAt uses request.sessionTimestamp", async () => {
-    const stateStore = makeStateStore();
     const ts = new Date("2025-06-15T12:00:00Z");
-    const deps = makeDeps({ stateStore, oids: ["1".padStart(12, "0")] });
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")] });
     const coord = new DefaultExtractionCoordinator(deps);
-    await coord.run(baseRequest({ sessionTimestamp: ts }));
+    const result = await coord.run(baseRequest({ sessionTimestamp: ts }));
 
-    expect(stateStore.stored?.generatedAt).toBe("2025-06-15T12:00:00.000Z");
+    expect(result.state.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
   it("profiler.resume/stop called for write and close but NOT checkpoint write", async () => {

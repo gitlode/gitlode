@@ -388,6 +388,8 @@ export interface CoordinatorResult {
   readonly commitsTraversed: number;
   /** Refs for which a head was successfully resolved (skipped refs are omitted). */
   readonly refs: readonly string[];
+  /** Checkpoint state produced after successful output completion and sink close. */
+  readonly state: ExtractionState;
   /** Number of file diffs skipped due to size threshold (--max-diff-size). */
   readonly skippedDiffs: number;
 }
@@ -468,7 +470,6 @@ export interface CoordinatorDependencies {
   /** Accepts any projector whose `project()` returns `AsyncIterable<ProjectedRecord>`. */
   readonly projector: FactProjector;
   readonly sink: OutputSink;
-  readonly stateStore: StateStore | undefined;
   readonly reporter: ProgressReporter;
   /** Optional profiler for accumulating writeMs across sink.write() and sink.close() calls. */
   readonly profiler?: StageProfiler;

@@ -399,7 +399,6 @@ async function main(): Promise<void> {
         fileChangeExpander,
         projector,
         sink,
-        stateStore,
         reporter: progressRuntime.reporter,
         profiler: writeProfiler,
       });
@@ -414,6 +413,10 @@ async function main(): Promise<void> {
         priorState,
         sessionTimestamp,
       });
+
+      if (stateStore !== undefined && result.state.refs.length > 0) {
+        await stateStore.write(result.state);
+      }
 
       const success: RunSuccessPayload = {
         recordsWritten: result.recordsWritten,

@@ -11,3 +11,5 @@ export type {
   WorkerRunSuccessPayload,
   WorkerRunUserError,
 } from "./types.js";
+export { executeRuntimeSession } from "./execution.js";
+export type { RuntimeExecutionProgress, RuntimeExecutionResult } from "./execution.js";

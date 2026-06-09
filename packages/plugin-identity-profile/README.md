@@ -8,7 +8,7 @@ table and can optionally attach additional profile attributes for downstream ana
 ## Installation
 
 ```bash
-npm install @gitlode/plugin-identity-profile
+npm install -g @gitlode/plugin-identity-profile
 ```
 
 ## Usage

@@ -634,7 +634,7 @@ For the full plugin contract specification, see [Plugin System Design](design/pl
 Install the plugin as a regular npm dependency in the repository where you run gitlode:
 
 ```bash
-npm install @gitlode/plugin-conventional-commits
+npm install -g @gitlode/plugin-conventional-commits
 ```
 
 Then reference the package name in your config:
@@ -656,7 +656,7 @@ Then reference the package name in your config:
 inline mapping table and can attach optional custom attributes.
 
 ```bash
-npm install @gitlode/plugin-identity-profile
+npm install -g @gitlode/plugin-identity-profile
 ```
 
 ```json

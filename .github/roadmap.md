@@ -110,51 +110,79 @@ fidelity, runtime cost, and determinism explicit and user-controllable.
 
 ---
 
-#### Architecture/Runtime: Worker-based extraction runtime baseline for resilience and supervision
+#### Architecture/Runtime: Worker-based extraction runtime boundary
 
 The current extraction pipeline runs in a single Node.js execution context. This keeps the
 implementation straightforward, but it also couples heavy extraction work with CLI lifecycle and
 interactive rendering. For long-running or computationally heavy workloads, this coupling makes
 stability and fault isolation harder than necessary.
 
-This entry introduces the Worker-based runtime boundary through the first two implementation
-phases: extraction executes in an isolated worker, while the main process remains responsible for
-CLI lifecycle, supervision, and user interaction.
+This entry introduces the Worker-based runtime boundary: extraction executes in one isolated
+worker, while the main process remains responsible for CLI lifecycle, user interaction, stderr
+presentation, and state file I/O.
 
 **Primary goals (core value)**:
 
 - improve long-run extraction stability via execution isolation
-- improve fault tolerance through clear failure boundaries and controlled shutdown semantics
-- formalize runtime and messaging boundaries as the baseline for later orchestration work
+- establish a clear process boundary between CLI presentation and extraction execution
+- formalize typed runtime messaging as the baseline for later supervision and orchestration work
 
 **Scope (this entry)**:
 
-- **Phase A: runtime boundary only**
-  - run the existing extraction pipeline in one worker
-  - define a typed message protocol for progress, warning, result, and error events
-  - keep extraction semantics and output behavior unchanged
-- **Phase B: operational hardening**
-  - add cancellation, timeout, and supervision semantics
-  - make failure reporting and exit behavior deterministic
+- run the existing extraction pipeline in one worker
+- define a typed message protocol for progress, diagnostics, result, and error events
+- keep extraction semantics and JSONL output behavior unchanged
+- keep state file I/O in the main process while the worker returns the checkpoint state produced by
+  a successful extraction
 
 **Non-goals for this entry**:
 
 - no guaranteed throughput improvement in the first delivery
 - no implicit data reduction or extraction-fidelity trade-off
+- no cancellation, timeout, or shutdown-supervision feature rollout
 - no immediate parallel extraction strategy rollout
 
 **Design constraints**:
 
 - preserve current extraction correctness and checkpoint safety guarantees
-- maintain deterministic behavior under equivalent inputs and configuration
-- keep CLI UX backward compatible unless explicitly documented otherwise
+- maintain deterministic extraction behavior under equivalent inputs and configuration
+- preserve JSONL output and state file contracts; stderr presentation may change where the worker
+  boundary makes that necessary
+
+#### Architecture/Runtime: Worker supervision and operational hardening
+
+- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime boundary`
+
+After the Worker-based runtime boundary exists, this entry adds the operational behavior needed to
+make worker execution resilient under cancellation, timeouts, and abnormal worker lifecycle events.
+
+**Primary goals (core value)**:
+
+- improve fault tolerance through clear failure boundaries and controlled shutdown semantics
+- make failure reporting and exit behavior deterministic across normal errors and worker lifecycle
+  failures
+- provide an explicit foundation for future long-running extraction supervision
+
+**Scope (this entry)**:
+
+- add cancellation semantics for in-flight worker extraction
+- add timeout policy and timeout reporting
+- define graceful shutdown and forced termination behavior
+- define deterministic handling for unexpected worker errors and exits
+
+**Non-goals for this entry**:
+
+- no changes to extraction semantics or output schemas
+- no parallel extraction strategy rollout
+- no weakening of checkpoint/state safety guarantees
 
 #### Architecture/Runtime: Orchestration-ready expansion of the extraction runtime foundation
 
-- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime baseline for resilience and supervision`
+- **Depends on**: `Architecture/Runtime: Worker supervision and operational hardening`
 
-After the worker-based runtime baseline is complete, this entry prepares the runtime interfaces for future orchestration
-strategies while keeping execution behavior conservative.
+After the worker runtime boundary and supervision hardening entries are complete, this entry
+prepares the runtime interfaces for future orchestration strategies while keeping execution
+behavior conservative.
 
 **Scope (this entry)**:
 

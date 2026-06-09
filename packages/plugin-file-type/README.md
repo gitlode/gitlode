@@ -13,7 +13,7 @@ other interpretation-heavy concerns.
 ## Installation
 
 ```bash
-npm install @gitlode/plugin-file-type
+npm install -g @gitlode/plugin-file-type
 ```
 
 ## Usage

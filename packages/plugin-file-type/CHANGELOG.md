@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0
+## 0.1.0 - 2026-06-09
 
 ### Added
 
@@ -15,9 +15,3 @@
   - `emit` -> outputs `{ "name": "Unknown" }`
   - `skip` -> plugin returns `skip`
 - Added optional debug metadata output (`_debug.source`, `_debug.matched`) when `debug: true`.
-- Added plugin unit tests for config validation, classifier semantics, built-in mappings, and
-  runtime behavior.
-
-### Notes
-
-- The plugin is intended for per-file extraction. Commit facts are skipped by design.

@@ -8,18 +8,38 @@ applyTo: "src/**"
 ## Layer Overview
 
 ```
-┌─────────────────────────────────┐
-│           CLI Layer             │  Argument parsing, validation, error display
-├─────────────────────────────────┤
-│         Core Logic Layer        │  Commit traversal orchestration, JSON mapping, checkpoint state production
-├─────────────────────────────────┤
-│      Git Adapter Interface      │  Abstract interface — isolates isomorphic-git dependency
-├─────────────────────────────────┤
-│    isomorphic-git (external)    │  Actual Git object access
-└─────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│ Process edge (`src/index.ts`)                                  │
+│ Bootstrap, worker dispatch, final rendering, exit code         │
+├───────────────────────────────────────────────────────────────┤
+│ CLI / Presentation / Config / Runtime / State / Plugins        │
+│ Input adaptation, terminal UI, execution wiring, Node I/O      │
+├───────────────────────────────────────────────────────────────┤
+│ Core Logic                                                     │
+│ Extraction pipeline, traversal orchestration, projection       │
+├───────────────────────────────────────────────────────────────┤
+│ Git Adapter Interface / Output Sink Contract                   │
+│ Ports consumed by Core                                         │
+├───────────────────────────────────────────────────────────────┤
+│ Git implementation / Output implementation                     │
+│ isomorphic-git access, JSONL serialization, file rotation      │
+├───────────────────────────────────────────────────────────────┤
+│ Model / Support                                                │
+│ Shared domain vocabulary and domain-free helper primitives     │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-Each layer must only depend on the layer directly below it. The Core Logic layer must never import from isomorphic-git directly.
+Dependency direction is a boundary rule, not a strict vertical stack. Higher-level domains may
+depend on lower-level contracts and shared primitives, but low-level domains must not import from
+runtime, CLI, presentation, or implementation-specific modules.
+
+The Core Logic layer must never import from isomorphic-git directly. Core must depend on the Git
+adapter interface and output sink contract, not on their concrete implementations.
+
+`src/model/` is the shared Git extraction model: value types, branded strings, small predicates,
+and vocabulary that is meaningful across multiple domains. `src/support/` is the shared
+domain-free helper layer: generic collection, assertion, and parsing helpers that know nothing
+about Git, extraction, CLI, output, plugins, or runtime execution.
 
 ---
 
@@ -67,40 +87,80 @@ details belong in `CHANGELOG.md`.
 
 ### Ownership and boundary rules
 
+The following rules describe the target architecture. Existing files may temporarily violate them
+while a migration is in progress, but new code should follow the target ownership unless a phase
+document explicitly says otherwise.
+
 - The runtime edge (`src/index.ts`) is the process boundary only. It performs bootstrap,
   main-process state preflight/loading, worker dispatch orchestration, and final fatal rendering /
   exit-code selection.
-- `src/cli/runtime/state-store.ts` owns `NodeStateStore`, repository object-format gating, and
+- State ownership belongs in `src/state/`: `NodeStateStore`, repository object-format gating, and
   prior-state loading / validation helpers used by the runtime edge.
-- `src/cli/runtime/progress-runtime.ts` owns UI-mode selection and presenter wiring for quiet,
-  TTY, and non-TTY runs.
+- Presentation ownership belongs in `src/presentation/`: UI-mode selection, terminal presenter
+  wiring, diagnostics, progress rendering, summary/profile rendering, styling, and quiet / TTY /
+  non-TTY behavior.
 - `src/runtime/client.ts` owns worker lifecycle wiring and typed message dispatch handling for
   progress, diagnostics, and terminal results.
 - `src/runtime/worker-entry.ts` owns worker-side message adaptation from `parentPort` to runtime
   execution and maps thrown errors to typed terminal results.
 - `src/runtime/execution.ts` owns per-run extraction orchestration, including repository access
-  validation, plugin bootstrap, coordinator construction, and success payload assembly.
-- `src/cli/runtime/success-report.ts` owns successful-run summary / profile rendering.
+  validation, prepared plugin entry consumption, coordinator construction, and success payload
+  assembly. It must not import from `src/cli/`.
 - Core owns traversal/extraction orchestration, pipeline branching by granularity, write-loop
   progression, state commit timing, and structured progress events.
 - Core owns `EnrichingFactProjector` and the plugin contract types. `EnrichingFactProjector`
   calls the pure `projectCommit` / `projectFileChange` functions directly.
-- CLI owns rendering policy (TTY vs non-TTY, spinner/heartbeat, summary/profile layout, warning
-  redraw behavior) and top-level process/error behavior.
-- CLI runtime helpers under `src/cli/runtime/` own the run-scoped wiring that feeds that rendering
-  policy without changing its observable stderr contract.
-- CLI owns generic config loading (`src/cli/config/*`): reading/validating the strict versioned
-  config file, normalizing config-relative paths, resolving CLI/config precedence, and detecting
-  CLI/config conflicts before core execution.
-- `src/cli/plugins.ts` consumes the already validated `extensions` subsection only: resolving
-  module entrypoints, invoking plugin factories, compatibility checks, and running parallel
-  `init()`. Plugin `init()` is a CLI boundary responsibility; `EnrichingFactProjector` never
-  calls it.
+- CLI owns argument parsing, CLI option validation, CLI/config precedence decisions, and producing
+  a runtime input. CLI must not own terminal rendering internals, state persistence, plugin module
+  loading, or extraction execution.
+- Config ownership belongs in `src/config/`: reading/validating the strict versioned config file,
+  normalizing config-relative paths, and exposing validated config data. CLI consumes config data
+  when applying CLI/config precedence.
+- Plugin setup ownership belongs in `src/plugins/`: consuming the already validated `extensions`
+  subsection, resolving module entrypoints, invoking plugin factories, compatibility checks, and
+  running parallel `init()`. Plugin `init()` is a runtime boundary responsibility;
+  `EnrichingFactProjector` never calls it.
+- Model ownership belongs in `src/model/`: shared Git extraction vocabulary such as commit OID
+  brands, OID profiles, ref types, and person identity types. Model must not import from any other
+  source domain.
+- Support ownership belongs in `src/support/`: generic helpers such as `assertNever`, indexed
+  array accessors, map lookups, and regex capture helpers. Support must not contain Git, CLI,
+  output, runtime, plugin, or config vocabulary.
 - Git adapter owns Git-native repository access and raw commit/file-change retrieval. Core must
   remain insulated from isomorphic-git details.
 - Output layer owns serialization and rotation mechanics. Core must not duplicate writer rotation
   policy.
 - Plugins must not be invoked from within the Git adapter or Output layer.
+
+### Dependency rules
+
+- `src/model/` must not import from any `src/*` domain. It may use TypeScript and JavaScript
+  built-ins only.
+- `src/support/` must not import from any `src/*` domain. It may use TypeScript and JavaScript
+  built-ins only.
+- `src/git/` may import from `src/model/` and `src/support/`, but must not import from `src/core/`,
+  `src/runtime/`, `src/cli/`, `src/presentation/`, `src/output/`, or `src/git-impl/`.
+- `src/git-impl/` may import from `src/git/`, `src/model/`, and `src/support/`. It must not import
+  from `src/core/` except for temporary migration shims; adapter-facing contracts must not be
+  polluted with profiling or extraction pipeline metadata.
+- `src/core/` may import from `src/model/`, `src/support/`, and `src/git/`. It must not import from
+  `src/cli/`, `src/presentation/`, `src/runtime/`, `src/git-impl/`, or concrete output writer
+  modules.
+- `src/output/` may import projected-record and sink contracts from `src/core/`, plus
+  `src/model/` and `src/support/` when needed. It must not import from `src/cli/`,
+  `src/presentation/`, `src/runtime/`, `src/git-impl/`, or `src/plugins/`.
+- `src/plugins/` may import plugin contracts from `src/core/`, validated config types from
+  `src/config/`, and shared primitives from `src/model/` / `src/support/`. It must not import from
+  `src/cli/`, `src/presentation/`, `src/git-impl/`, or `src/output/`.
+- `src/runtime/` may import from `src/core/`, `src/git/`, `src/git-impl/`, `src/output/`,
+  `src/state/`, `src/plugins/`, `src/config/`, `src/model/`, and `src/support/`. It must not import
+  from `src/cli/` or `src/presentation/`.
+- `src/cli/` may import from `src/config/`, `src/model/`, `src/support/`, and public runtime input
+  types when needed. CLI must not import from `src/git-impl/`, `src/output/`, or concrete runtime
+  execution modules.
+- `src/presentation/` may import progress/profile data contracts from `src/core/`, plus
+  `src/model/` and `src/support/`. It must not import from `src/runtime/`, `src/cli/`,
+  `src/git-impl/`, `src/output/`, or `src/plugins/`.
 
 ### Progress and profiling contracts
 
@@ -109,8 +169,8 @@ details belong in `CHANGELOG.md`.
   `Extracting history`, `Finalizing output`), then completion summary, then optional profile block.
 - `--quiet` suppresses progress-stage lines, completion summary, and profile block, but warnings
   and errors remain visible.
-- `src/cli/runtime/success-report.ts` is a rendering helper only; it must not change the summary
-  or profile text contract.
+- Success-report rendering is presentation-owned; it must not change the summary or profile text
+  contract while moving between files.
 - `ExtractionResult.profilingEntries` is hierarchical and rooted at `elapsed`.
 - Adapter-facing contracts must not be polluted with profiling metadata.
 
@@ -130,16 +190,92 @@ details belong in `CHANGELOG.md`.
 
 - Parse and validate CLI arguments (see `cli.instructions.md` for full parameter spec)
 - Enforce mutual-exclusion rules between parameters
-- Load and validate the generic config file when `--config` is passed, merge CLI/config defaults,
-  and pass effective settings to runtime execution
+- Request config loading when `--config` is passed, merge CLI/config defaults, and pass effective
+  settings to runtime execution
 - Handle top-level errors and format user-facing error messages
 - Exit with appropriate codes: `0` = success, `1` = user error, `2` = runtime error
-- `src/cli/config/*` — generic `version: 1` config schema validation, strict unknown-key handling,
-  config-relative path normalization, and effective settings merge.
-- `src/cli/plugins.ts` — plugin module resolution/factory invocation/init orchestration and
-  compatibility checking over the validated `extensions` subsection. **Plugin compatibility
-  checking (version range validation against `peerDependencies.gitlode`) is a CLI-layer
-  responsibility and must not be implemented in the core layer.**
+- CLI does not own terminal UI rendering, state persistence, plugin module loading, or extraction
+  execution internals.
+
+### Model Layer (`src/model/`)
+
+Responsibilities:
+
+- Define shared Git extraction vocabulary used across domains.
+- Own pure value types, branded string types, and domain predicates such as commit OID validation.
+- Remain side-effect free and independent from all other `src/*` domains.
+
+Examples of model-owned vocabulary:
+
+- `CommitOid`
+- `OidProfile`
+- `PersonIdentity`
+- `RefType`
+- `isCommitOid()` / `isCommitOidForProfile()`
+
+### Support Layer (`src/support/`)
+
+Responsibilities:
+
+- Define tiny, domain-free helpers shared across implementation modules.
+- Keep generic helpers out of Core so importing a helper does not imply importing extraction logic.
+
+Examples of support-owned helpers:
+
+- `assertNever()`
+- `atOrThrow()` / `firstOrThrow()` / `shiftOrThrow()` / `cyclicAtOrThrow()`
+- `getOrThrow()`
+- `captureGroupOrThrow()`
+
+Do not place Git, extraction, output, CLI, config, runtime, presentation, or plugin vocabulary in
+`src/support/`.
+
+### Config Layer (`src/config/`)
+
+Responsibilities:
+
+- Read and validate the generic `version: 1` config file.
+- Enforce strict unknown-key handling.
+- Normalize config-relative paths.
+- Expose validated config data to CLI/runtime/plugin setup without importing CLI implementation
+  modules.
+
+CLI remains responsible for CLI/config precedence and conflict rules because those rules depend on
+which values were explicitly provided by command-line flags.
+
+### Presentation Layer (`src/presentation/`)
+
+Responsibilities:
+
+- Render diagnostics, progress, summaries, and profile output.
+- Own TTY vs non-TTY behavior, spinner/heartbeat handling, warning redraw behavior, styling, and
+  quiet-mode output suppression.
+- Accept structured progress/profile data from Core/runtime-facing contracts; do not call runtime
+  execution or mutate extraction state.
+
+### Plugin Setup Layer (`src/plugins/`)
+
+Responsibilities:
+
+- Resolve configured plugin entrypoints.
+- Invoke plugin factories.
+- Check package compatibility against `peerDependencies.gitlode`.
+- Run plugin `init()` in parallel and normalize initialization failures.
+
+Plugin compatibility checking must not be implemented in Core. `EnrichingFactProjector` consumes
+prepared plugin entries and never resolves modules or calls `init()`.
+
+### State Layer (`src/state/`)
+
+Responsibilities:
+
+- Implement Node-backed state file persistence.
+- Validate loaded state against repository path, state schema version, ref type, and repository OID
+  profile.
+- Gate unsupported repository object formats before state boundaries are consumed.
+
+State production timing remains Core-owned: successful extraction produces the next state only
+after output completion. State file I/O remains a runtime/process-edge concern.
 
 ### Core Logic Layer (`src/core/`)
 
@@ -149,15 +285,17 @@ Responsibilities:
 - Map raw commit data to the output JSON schema
 - Apply differential filtering (`--since-ref` / `--since-date`); uses `continue` (not `break`) for `--since-date` because BFS order is not chronological
 - Produce checkpoint state only after all output files are fully flushed and closed
-- Instantiate `OutputWriter` with the rotation config — rotation thresholds are enforced inside `OutputWriter`, not in Core
+- Write projected records through the `OutputSink` contract. Runtime wires the concrete
+  `OutputWriterSink` / `OutputWriter`; rotation thresholds are enforced inside `OutputWriter`, not
+  in Core.
 - `src/core/enriching-fact-projector.ts` — `EnrichingFactProjector` decorator; wraps the default projector's pure functions and calls plugins in declaration order per fact
 
 After the Phase 7 cleanup, `ExtractionCoordinator` owns pipeline construction, granularity
 branching, the write loop, structured progress integration, sink lifecycle (`OutputSink.close()`),
 and checkpoint state production timing. Runtime execution (`src/runtime/execution.ts`) constructs
-the coordinator, stage instances, sink, and progress reporter wiring for one run.
+the coordinator, stage instances, concrete sink, and progress reporter wiring for one run.
 The runtime edge (`src/index.ts`) owns prior-state loading and final state-file writes in the main
-process; `Extractor` no longer exists.
+process until the state layer migration is completed; `Extractor` no longer exists.
 `CommitTraversalExtractor`, `FileChangeExpander`, and `FactProjector` own traversal, expansion,
 and projection respectively. `FactProjector` receives a unified `AsyncIterable<Fact>` stream and
 dispatches internally by `fact.type`. `OutputSink` (backed by `OutputWriterSink`) owns record
@@ -299,13 +437,25 @@ Violating this separation leads to circular imports, naming drift (interfaces ac
 - **`index.ts`** in each layer — re-export barrel only. No type definitions or logic.
 - The same dependency-direction principle applies: type files must not depend on implementation files within the same layer.
 
+### Rules for shared layers
+
+- **`src/model/index.ts`** and **`src/support/index.ts`** are re-export barrels only.
+- `src/model/` files may contain exported type aliases, interfaces, constants, and pure predicates
+  for shared Git extraction vocabulary. They must not contain Node I/O, runtime orchestration,
+  terminal rendering, JSONL writer mechanics, or plugin loading.
+- `src/support/` files may contain exported generic helper functions and type-level utilities only.
+  They must not import from `src/model/` or any other source domain.
+- When a helper needs domain vocabulary to be understood, it is not a support helper. Put it in the
+  owning domain or in `src/model/` if the vocabulary is shared.
+
 This separation keeps type definitions discoverable and helps prevent circular imports between layers.
 
 ---
 
 ## State File
 
-Managed by Core Logic. Written atomically (write to temp file, then rename).
+State production timing is managed by Core Logic. State file I/O is managed by the runtime/process
+edge through the State layer and must be written atomically (write to temp file, then rename).
 
 Schema:
 

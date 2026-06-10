@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { captureGroupOrThrow } from "../core/helpers.js";
+import { captureGroupOrThrow } from "../support/index.js";
 
 /**
  * Parse a binary size string (e.g. "100K", "1M") to bytes.

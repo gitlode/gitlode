@@ -1,15 +1,14 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { assertNever, getOrThrow } from "./helpers.js";
+import type { CommitOid, RefType } from "../model/index.js";
+import { assertNever, getOrThrow } from "../support/index.js";
 import { withProfilerAsync } from "./profile/index.js";
 import type {
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-  CommitOid,
   ExtractionRange,
   RefCheckpoint,
-  RefType,
   ProgressReporter,
   StageProfiler,
 } from "./types.js";

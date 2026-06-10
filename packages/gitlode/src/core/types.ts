@@ -1,27 +1,5 @@
+import type { CommitOid, PersonIdentity, RefType } from "../model/index.js";
 import type { MISSING_STATES } from "./consts.js";
-
-declare const _commitOidBrand: unique symbol;
-export type CommitOid = string & { readonly [_commitOidBrand]: "CommitOid" };
-
-export type OidProfile = "sha1" | "sha256";
-
-const OID_PATTERN_BY_PROFILE: Readonly<Record<OidProfile, RegExp>> = {
-  sha1: /^[0-9a-f]{40}$/,
-  sha256: /^[0-9a-f]{64}$/,
-};
-
-export function isCommitOidForProfile(v: unknown, profile: OidProfile): v is CommitOid {
-  return typeof v === "string" && OID_PATTERN_BY_PROFILE[profile].test(v);
-}
-
-export function isCommitOid(v: unknown): v is CommitOid {
-  return isCommitOidForProfile(v, "sha1") || isCommitOidForProfile(v, "sha256");
-}
-
-export interface PersonIdentity {
-  readonly name: string;
-  readonly email: string;
-}
 
 /** Core-owned intermediate representation of a single commit, output-format-agnostic. */
 export interface CommitFact {
@@ -181,10 +159,6 @@ export interface StateStore {
 
 export type WallClock = () => Date;
 export type MonotonicClock = () => number;
-
-export const REF_TYPES = ["branch", "tag-lightweight", "tag-annotated", "commit-oid"] as const;
-
-export type RefType = (typeof REF_TYPES)[number];
 
 export interface RefCheckpoint {
   readonly ref: string;

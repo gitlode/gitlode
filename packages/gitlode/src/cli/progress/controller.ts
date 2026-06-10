@@ -1,5 +1,5 @@
-import { cyclicAtOrThrow } from "../../core/helpers.js";
 import type { ProgressEvent, ProgressPhase } from "../../core/index.js";
+import { cyclicAtOrThrow } from "../../support/index.js";
 import { formatDiagnosticLines, type DiagnosticSeverity } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";
 import { HEARTBEAT_INTERVAL_MS, SPINNER_FRAMES } from "./constants.js";

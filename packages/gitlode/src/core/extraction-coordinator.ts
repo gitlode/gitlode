@@ -1,4 +1,4 @@
-import { atOrThrow } from "./helpers.js";
+import { atOrThrow } from "../support/index.js";
 import { withProfilerAsync } from "./profile/index.js";
 import type {
   CommitFact,

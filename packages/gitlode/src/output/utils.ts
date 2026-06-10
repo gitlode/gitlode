@@ -32,17 +32,3 @@ export function toISO8601(timestamp: number, timezoneOffset: number): string {
   const ss = String(d.getUTCSeconds()).padStart(2, "0");
   return `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}${offsetStr}`;
 }
-
-/**
- * Splits a Git commit message into subject and body.
- *
- * `subject` is the first line. `body` is the remainder of the lines joined
- * with `\n` and trimmed of surrounding whitespace. Returns `""` for `body`
- * when the message has no lines beyond the first.
- */
-export function splitMessage(message: string): { subject: string; body: string } {
-  const lines = message.split("\n");
-  const subject = lines[0] ?? "";
-  const body = lines.slice(1).join("\n").trim();
-  return { subject, body };
-}

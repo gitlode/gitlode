@@ -3,13 +3,12 @@ import { resolve } from "node:path";
 
 import type {
   ExtractionState,
-  OidProfile,
   ProgressReporter,
-  RefType,
   StateStore,
+  MISSING_STATES,
 } from "../../core/index.js";
-import { isCommitOidForProfile, type MISSING_STATES, REF_TYPES } from "../../core/index.js";
 import { GitAdapterError, type RepositoryObjectFormat } from "../../git/index.js";
+import { isCommitOidForProfile, isRefType, type OidProfile } from "../../model/index.js";
 
 export interface PriorStateLoadOptions {
   readonly incremental: boolean;
@@ -34,10 +33,6 @@ export function assertSupportedRepositoryObjectFormat(
 
 function emptyState(repositoryPath: string): ExtractionState {
   return { version: 2, generatedAt: "", repositoryPath, refs: [] };
-}
-
-function isRefType(value: unknown): value is RefType {
-  return typeof value === "string" && REF_TYPES.includes(value as RefType);
 }
 
 export function validateLoadedState(

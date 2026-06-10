@@ -1,4 +1,4 @@
-import type { CommitOid, OidProfile, PersonIdentity, RefType } from "../core/index.js";
+import type { CommitOid, OidProfile, PersonIdentity, RefType } from "../model/index.js";
 
 export type RepositoryObjectFormat = string;
 

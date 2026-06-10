@@ -9,7 +9,7 @@ import { MISSING_STATES } from "../core/index.js";
 import { byteSizeString } from "./common-schema.js";
 import { loadConfigFile } from "./config/index.js";
 import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "./config/index.js";
-import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./consts.js";
+import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./constants.js";
 import type { BootstrapResult, BootstrapTermination } from "./errors.js";
 
 export type BootstrapInputRange =

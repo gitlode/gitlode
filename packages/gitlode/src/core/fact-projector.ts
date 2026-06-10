@@ -1,5 +1,5 @@
-import { splitMessage, toISO8601 } from "../output/index.js";
-import { assertNever } from "./helpers.js";
+import { toISO8601 } from "../output/index.js";
+import { assertNever } from "../support/index.js";
 import { withProfiler } from "./profile/index.js";
 import type {
   CommitFact,
@@ -92,4 +92,18 @@ export class DefaultFactProjector implements FactProjector {
       }
     }
   }
+}
+
+/**
+ * Splits a Git commit message into subject and body.
+ *
+ * `subject` is the first line. `body` is the remainder of the lines joined
+ * with `\n` and trimmed of surrounding whitespace. Returns `""` for `body`
+ * when the message has no lines beyond the first.
+ */
+export function splitMessage(message: string): { subject: string; body: string } {
+  const lines = message.split("\n");
+  const subject = lines[0] ?? "";
+  const body = lines.slice(1).join("\n").trim();
+  return { subject, body };
 }

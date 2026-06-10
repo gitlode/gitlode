@@ -16,16 +16,16 @@ import {
   loadPriorState,
   type RunSuccessPayload,
 } from "../cli/runtime/index.js";
-import { firstOrThrow } from "../core/helpers.js";
+import type {
+  ExtractionState,
+  ExtractorConfig,
+  ExtractionRange,
+  FactProjector,
+  ProgressReporter,
+} from "../core/index.js";
 import {
   DefaultCommitTraversalExtractor,
   DefaultExtractionCoordinator,
-  type ExtractionState,
-  type ExtractorConfig,
-  type ExtractionRange,
-  type FactProjector,
-  type OidProfile,
-  type ProgressReporter,
   DefaultFactProjector,
   DefaultFileChangeExpander,
   DefaultTraversalPlanner,
@@ -34,7 +34,9 @@ import {
 import { DefaultStageProfiler } from "../core/profile/index.js";
 import { IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
 import { type GitAdapter, GitAdapterError } from "../git/index.js";
+import type { OidProfile } from "../model/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
+import { firstOrThrow } from "../support/index.js";
 import type { WorkerRunRange, WorkerRunRequest } from "./types.js";
 
 type BuildProjectorResult =

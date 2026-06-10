@@ -18,10 +18,6 @@ export function isCommitOid(v: unknown): v is CommitOid {
   return isCommitOidForProfile(v, "sha1") || isCommitOidForProfile(v, "sha256");
 }
 
-export function assertNever(x: never): never {
-  throw new Error(`Unexpected value: ${String(x)}`);
-}
-
 export interface PersonIdentity {
   readonly name: string;
   readonly email: string;

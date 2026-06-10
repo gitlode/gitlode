@@ -1,4 +1,5 @@
 import { splitMessage, toISO8601 } from "../output/index.js";
+import { assertNever } from "./helpers.js";
 import { withProfiler } from "./profile/index.js";
 import type {
   CommitFact,
@@ -10,7 +11,6 @@ import type {
   ProjectedRecord,
   StageProfiler,
 } from "./types.js";
-import { assertNever } from "./types.js";
 
 export function projectCommit(
   fact: CommitFact,

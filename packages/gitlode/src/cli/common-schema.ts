@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { atOrThrow, captureGroupOrThrow } from "../core/helpers.js";
+
 /**
  * Parse a binary size string (e.g. "100K", "1M") to bytes.
  * Supports suffixes K (1024), M (1048576), G (1073741824).
@@ -30,8 +32,8 @@ export function byteSizeString(options?: {
 
         return z.NEVER;
       }
-      const numPart = BigInt(match[1]!);
-      const suffix = match[2]!.toUpperCase();
+      const numPart = BigInt(captureGroupOrThrow(match, 1));
+      const suffix = captureGroupOrThrow(match, 2).toUpperCase();
       const multipliers: Record<string, bigint> = {
         "": 1n,
         K: 1024n,
@@ -39,7 +41,18 @@ export function byteSizeString(options?: {
         G: 1_073_741_824n,
       };
 
-      const bytes = numPart * multipliers[suffix]!;
+      const multiplier = multipliers[suffix];
+      if (multiplier === undefined) {
+        ctx.issues.push({
+          code: "custom",
+          message: defaultError,
+          input: value,
+        });
+
+        return z.NEVER;
+      }
+
+      const bytes = numPart * multiplier;
       if (options === undefined) {
         return Number(bytes);
       }

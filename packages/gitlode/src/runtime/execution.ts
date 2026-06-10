@@ -16,6 +16,7 @@ import {
   loadPriorState,
   type RunSuccessPayload,
 } from "../cli/runtime/index.js";
+import { firstOrThrow } from "../core/helpers.js";
 import {
   DefaultCommitTraversalExtractor,
   DefaultExtractionCoordinator,
@@ -97,7 +98,7 @@ async function validateRepositoryAccess(
   runAdapter: GitAdapter,
 ): Promise<void> {
   try {
-    await runAdapter.resolveRef(repoPath, input.refs[0]!);
+    await runAdapter.resolveRef(repoPath, firstOrThrow(input.refs));
   } catch (error) {
     if (error instanceof GitAdapterError && error.code === "NOT_A_REPOSITORY") {
       throw new GitAdapterError(

@@ -148,9 +148,42 @@
     // Keeps type-only imports explicit and consistent.
     "typescript/consistent-type-imports": "error",
 
+    // For ESM-first Node.js projects, prefer explicit node: imports for built-ins.
+    "unicorn/prefer-node-protocol": "error",
+
+    // Explicit any disables TypeScript's type system and should be exceptional.
+    "typescript/no-explicit-any": "error",
+
+    // Non-null assertions bypass null safety and should be exceptional.
+    "typescript/no-non-null-assertion": "error",
+
+    // Dynamic require makes module dependencies harder to analyze.
+    "import/no-dynamic-require": "error",
+
     // Cyclic imports often indicate architectural coupling.
-    "import/no-cycle": "error"
+    "import/no-cycle": "error",
+
+    // Side-effect-only imports should be explicit exceptions.
+    "import/no-unassigned-import": "error",
+
+    // Prevent accidental debug output leaking into CLI stdout.
+    "no-console": "error"
   },
+
+  "overrides": [
+    {
+      "files": ["**/scripts/**"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["**/test/**"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off"
+      }
+    }
+  ],
 
   "options": {
     // Keep disable comments honest.

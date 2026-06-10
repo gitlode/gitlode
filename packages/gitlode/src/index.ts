@@ -16,7 +16,8 @@ import {
 } from "./cli/runtime/index.js";
 import { stderrSink } from "./cli/runtime/progress-runtime.js";
 import type { ExtractionState, ProgressReporter } from "./core/index.js";
-import { GitAdapterError, IsomorphicGitAdapter, JsDiffAdapter } from "./git/index.js";
+import { IsomorphicGitAdapter, JsDiffAdapter } from "./git-impl/index.js";
+import { GitAdapterError } from "./git/index.js";
 import {
   dispatchWorkerRunRequest,
   type IsoDateTimeString,

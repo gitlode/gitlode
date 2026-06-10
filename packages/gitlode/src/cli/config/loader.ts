@@ -3,7 +3,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { byteSizeString } from "../args.js";
+import { byteSizeString } from "../common-schema.js";
 import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "../consts.js";
 import type { BootstrapResult, BootstrapTermination } from "../errors.js";
 import type { ConfigExtensionsSection } from "./types.js";

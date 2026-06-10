@@ -2,9 +2,10 @@ import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it, vi } from "vitest";
 
-import type { IsomorphicGitAdapterDependencies, RawCommit } from "../../src/git/index.js";
-import { IsomorphicGitAdapter } from "../../src/git/isomorphic-git-adapter.js";
-import { JsDiffAdapter } from "../../src/git/js-diff-adapter.js";
+import type { IsomorphicGitAdapterDependencies } from "../../src/git-impl/index.js";
+import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
+import type { RawCommit } from "../../src/git/index.js";
 
 const AUTHOR = {
   name: "Tester",

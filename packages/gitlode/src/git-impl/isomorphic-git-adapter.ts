@@ -4,7 +4,7 @@ import type { FsClient } from "isomorphic-git";
 import type { CommitOid, OidProfile, RefType, StageProfiler } from "../core/index.js";
 import { isCommitOid } from "../core/index.js";
 import { withProfilerAsync } from "../core/profile/index.js";
-import { GitAdapterError } from "./errors.js";
+import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
   type DiffAdapter,
@@ -12,7 +12,7 @@ import {
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
-} from "./types.js";
+} from "../git/types.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;

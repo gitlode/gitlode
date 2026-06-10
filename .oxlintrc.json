@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
 
-  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "promise", "node"],
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "promise"],
 
   "env": {
     "node": true,
@@ -19,68 +19,15 @@
   },
 
   "rules": {
+    // -------------------------------------------------------------------------
+    // JavaScript correctness
+    // -------------------------------------------------------------------------
+
     // Avoids confusing equality coercion.
     "eqeqeq": "error",
 
-    // Modern TypeScript should use let/const rather than var.
-    "no-var": "error",
-
-    // Prefer const when a binding is never reassigned.
-    "prefer-const": "error",
-
-    // Duplicate runtime imports make dependency usage harder to read and maintain.
-    // Type-only imports may remain separate to preserve clear type/value boundaries.
-    "no-duplicate-imports": [
-      "error",
-      {
-        "allowSeparateTypeImports": true
-      }
-    ],
-
-    // Async Promise executors are almost always a bug because thrown errors are not handled as expected.
-    "no-async-promise-executor": "error",
-
-    // Prevents Promise constructors from resolving or rejecting more than once.
-    "promise/no-multiple-resolved": "error",
-
-    // Prevents accidental CommonJS usage in an ESM-first project.
-    "import/no-commonjs": "error",
-
-    // Absolute-path imports are environment-dependent and should not appear in project source.
-    "import/no-absolute-path": "error",
-
-    // TypeScript namespaces are avoided in ESM-based modern TypeScript code.
-    "typescript/no-namespace": "error",
-
-    // CommonJS require is avoided in ESM-based TypeScript code.
-    "typescript/no-var-requires": "error",
-
     // Empty blocks often hide incomplete or accidentally removed logic.
     "no-empty": "error",
-
-    // debugger statements should not be committed.
-    "no-debugger": "error",
-
-    // Browser alert APIs should not appear in a Node.js CLI/tooling project.
-    "no-alert": "error",
-
-    // Self-assignment is almost always accidental.
-    "no-self-assign": "error",
-
-    // Self-comparison is almost always accidental.
-    "no-self-compare": "error",
-
-    // Constant binary expressions often indicate mistaken boolean or nullish logic.
-    "no-constant-binary-expression": "error",
-
-    // Returning values from Promise executors is misleading and has no effect.
-    "no-promise-executor-return": "error",
-
-    // NaN must be checked with Number.isNaN or isNaN, not direct comparison.
-    "use-isnan": "error",
-
-    // Ensures typeof comparisons use valid type strings.
-    "valid-typeof": "error",
 
     // Prevents accidental assignment in conditional expressions.
     "no-cond-assign": "error",
@@ -88,14 +35,8 @@
     // Prevents constant conditions that likely indicate broken logic.
     "no-constant-condition": "error",
 
-    // Prevents creating functions via string evaluation.
-    "no-implied-eval": "error",
-
-    // Prevents assignments to imported bindings.
-    "no-import-assign": "error",
-
-    // Prevents unsafe use of optional chaining where undefined may still be dereferenced.
-    "no-unsafe-optional-chaining": "error",
+    // Constant binary expressions often indicate mistaken boolean or nullish logic.
+    "no-constant-binary-expression": "error",
 
     // Prevents unreachable statements.
     "no-unreachable": "error",
@@ -112,6 +53,60 @@
     // Prevents useless constructors.
     "no-useless-constructor": "error",
 
+    // Prevents assignments to imported bindings.
+    "no-import-assign": "error",
+
+    // Prevents creating functions via string evaluation.
+    "no-implied-eval": "error",
+
+    // Prevents unsafe use of optional chaining where undefined may still be dereferenced.
+    "no-unsafe-optional-chaining": "error",
+
+    // Self-assignment is almost always accidental.
+    "no-self-assign": "error",
+
+    // Self-comparison is almost always accidental.
+    "no-self-compare": "error",
+
+    // NaN must be checked with Number.isNaN or isNaN, not direct comparison.
+    "use-isnan": "error",
+
+    // Ensures typeof comparisons use valid type strings.
+    "valid-typeof": "error",
+
+    // debugger statements should not be committed.
+    "no-debugger": "error",
+
+    // Browser alert APIs should not appear in a Node.js CLI/tooling project.
+    "no-alert": "error",
+
+    // -------------------------------------------------------------------------
+    // Modern JavaScript style with low semantic risk
+    // -------------------------------------------------------------------------
+
+    // Modern TypeScript should use let/const rather than var.
+    "no-var": "error",
+
+    // Prefer const when a binding is never reassigned.
+    "prefer-const": "error",
+
+    // -------------------------------------------------------------------------
+    // Promise / async correctness
+    // -------------------------------------------------------------------------
+
+    // Async Promise executors are almost always a bug because thrown errors are not handled as expected.
+    "no-async-promise-executor": "error",
+
+    // Returning values from Promise executors is misleading and has no effect.
+    "no-promise-executor-return": "error",
+
+    // Prevents Promise constructors from resolving or rejecting more than once.
+    "promise/no-multiple-resolved": "error",
+
+    // -------------------------------------------------------------------------
+    // RegExp correctness
+    // -------------------------------------------------------------------------
+
     // Prevents invalid or confusing regular expressions.
     "no-invalid-regexp": "error",
 
@@ -124,14 +119,64 @@
     // Prevents unnecessary escape sequences.
     "no-useless-escape": "error",
 
+    // -------------------------------------------------------------------------
+    // Import / module system
+    // -------------------------------------------------------------------------
+
+    // Duplicate runtime imports make dependency usage harder to read and maintain.
+    // Type-only imports may remain separate to preserve clear type/value boundaries.
+    "no-duplicate-imports": [
+      "error",
+      {
+        "allowSeparateTypeImports": true
+      }
+    ],
+
+    // Prevents accidental CommonJS usage in an ESM-first project.
+    "import/no-commonjs": "error",
+
+    // Dynamic require makes module dependencies harder to analyze.
+    "import/no-dynamic-require": "error",
+
+    // Absolute-path imports are environment-dependent and should not appear in project source.
+    "import/no-absolute-path": "error",
+
     // Prevents importing the current module from itself.
     "import/no-self-import": "error",
 
     // Prevents empty named import blocks.
     "import/no-empty-named-blocks": "error",
 
+    // Cyclic imports often indicate architectural coupling.
+    "import/no-cycle": "error",
+
+    // Side-effect-only imports should be explicit exceptions.
+    "import/no-unassigned-import": "error",
+
+    // For ESM-first Node.js projects, prefer explicit node: imports for built-ins.
+    "unicorn/prefer-node-protocol": "error",
+
+    // -------------------------------------------------------------------------
+    // TypeScript
+    // -------------------------------------------------------------------------
+
+    // Keeps type-only imports explicit and consistent.
+    "typescript/consistent-type-imports": "error",
+
+    // Explicit any disables TypeScript's type system and should be exceptional.
+    "typescript/no-explicit-any": "error",
+
+    // Non-null assertions bypass null safety and should be exceptional.
+    "typescript/no-non-null-assertion": "error",
+
     // Prevents confusing non-null assertions.
     "typescript/no-confusing-non-null-assertion": "error",
+
+    // TypeScript namespaces are avoided in ESM-based modern TypeScript code.
+    "typescript/no-namespace": "error",
+
+    // CommonJS require is avoided in ESM-based TypeScript code.
+    "typescript/no-var-requires": "error",
 
     // Prevents duplicate enum values.
     "typescript/no-duplicate-enum-values": "error",
@@ -145,26 +190,9 @@
     // Prevents unsafe declaration merging.
     "typescript/no-unsafe-declaration-merging": "error",
 
-    // Keeps type-only imports explicit and consistent.
-    "typescript/consistent-type-imports": "error",
-
-    // For ESM-first Node.js projects, prefer explicit node: imports for built-ins.
-    "unicorn/prefer-node-protocol": "error",
-
-    // Explicit any disables TypeScript's type system and should be exceptional.
-    "typescript/no-explicit-any": "error",
-
-    // Non-null assertions bypass null safety and should be exceptional.
-    "typescript/no-non-null-assertion": "error",
-
-    // Dynamic require makes module dependencies harder to analyze.
-    "import/no-dynamic-require": "error",
-
-    // Cyclic imports often indicate architectural coupling.
-    "import/no-cycle": "error",
-
-    // Side-effect-only imports should be explicit exceptions.
-    "import/no-unassigned-import": "error",
+    // -------------------------------------------------------------------------
+    // CLI / runtime output policy
+    // -------------------------------------------------------------------------
 
     // Prevent accidental debug output leaking into CLI stdout.
     "no-console": "error"
@@ -172,12 +200,14 @@
 
   "overrides": [
     {
+      // One-off maintenance scripts may use console for operational output.
       "files": ["**/scripts/**"],
       "rules": {
         "no-console": "off"
       }
     },
     {
+      // Tests may use compact fixtures and assertions where non-null assertions are acceptable.
       "files": ["**/test/**"],
       "rules": {
         "typescript/no-non-null-assertion": "off"

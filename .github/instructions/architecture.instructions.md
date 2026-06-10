@@ -11,7 +11,7 @@ applyTo: "src/**"
 ┌─────────────────────────────────┐
 │           CLI Layer             │  Argument parsing, validation, error display
 ├─────────────────────────────────┤
-│         Core Logic Layer        │  Commit traversal orchestration, JSON mapping, state file management
+│         Core Logic Layer        │  Commit traversal orchestration, JSON mapping, checkpoint state production
 ├─────────────────────────────────┤
 │      Git Adapter Interface      │  Abstract interface — isolates isomorphic-git dependency
 ├─────────────────────────────────┤
@@ -68,15 +68,18 @@ details belong in `CHANGELOG.md`.
 ### Ownership and boundary rules
 
 - The runtime edge (`src/index.ts`) is the process boundary only. It performs bootstrap,
-  delegates runtime setup and one-run orchestration to helpers under `src/cli/runtime/`, and
-  then performs the final fatal rendering / exit-code selection.
+  main-process state preflight/loading, worker dispatch orchestration, and final fatal rendering /
+  exit-code selection.
 - `src/cli/runtime/state-store.ts` owns `NodeStateStore`, repository object-format gating, and
-  prior-state loading / validation.
+  prior-state loading / validation helpers used by the runtime edge.
 - `src/cli/runtime/progress-runtime.ts` owns UI-mode selection and presenter wiring for quiet,
   TTY, and non-TTY runs.
-- `src/cli/runtime/execution.ts` owns per-run orchestration, including state-store creation,
-  progress/reporting setup, plugin bootstrap, coordinator construction, and success payload
-  assembly.
+- `src/runtime/client.ts` owns worker lifecycle wiring and typed message dispatch handling for
+  progress, diagnostics, and terminal results.
+- `src/runtime/worker-entry.ts` owns worker-side message adaptation from `parentPort` to runtime
+  execution and maps thrown errors to typed terminal results.
+- `src/runtime/execution.ts` owns per-run extraction orchestration, including repository access
+  validation, plugin bootstrap, coordinator construction, and success payload assembly.
 - `src/cli/runtime/success-report.ts` owns successful-run summary / profile rendering.
 - Core owns traversal/extraction orchestration, pipeline branching by granularity, write-loop
   progression, state commit timing, and structured progress events.
@@ -128,8 +131,7 @@ details belong in `CHANGELOG.md`.
 - Parse and validate CLI arguments (see `cli.instructions.md` for full parameter spec)
 - Enforce mutual-exclusion rules between parameters
 - Load and validate the generic config file when `--config` is passed, merge CLI/config defaults,
-  and pass effective settings to Core (including `stateFilePath` as a string — state file I/O is
-  performed by Core, not CLI)
+  and pass effective settings to runtime execution
 - Handle top-level errors and format user-facing error messages
 - Exit with appropriate codes: `0` = success, `1` = user error, `2` = runtime error
 - `src/cli/config/*` — generic `version: 1` config schema validation, strict unknown-key handling,
@@ -146,14 +148,16 @@ Responsibilities:
 - Orchestrate commit traversal by calling `GitAdapter`
 - Map raw commit data to the output JSON schema
 - Apply differential filtering (`--since-ref` / `--since-date`); uses `continue` (not `break`) for `--since-date` because BFS order is not chronological
-- Read the state file at startup; write it atomically (`.tmp` → rename) only after all output files are fully flushed and closed
+- Produce checkpoint state only after all output files are fully flushed and closed
 - Instantiate `OutputWriter` with the rotation config — rotation thresholds are enforced inside `OutputWriter`, not in Core
 - `src/core/enriching-fact-projector.ts` — `EnrichingFactProjector` decorator; wraps the default projector's pure functions and calls plugins in declaration order per fact
 
 After the Phase 7 cleanup, `ExtractionCoordinator` owns pipeline construction, granularity
 branching, the write loop, structured progress integration, sink lifecycle (`OutputSink.close()`),
-and state commit timing. The runtime edge constructs the coordinator, stage instances, state
-store, sink, and progress reporter directly; `Extractor` no longer exists.
+and checkpoint state production timing. Runtime execution (`src/runtime/execution.ts`) constructs
+the coordinator, stage instances, sink, and progress reporter wiring for one run.
+The runtime edge (`src/index.ts`) owns prior-state loading and final state-file writes in the main
+process; `Extractor` no longer exists.
 `CommitTraversalExtractor`, `FileChangeExpander`, and `FactProjector` own traversal, expansion,
 and projection respectively. `FactProjector` receives a unified `AsyncIterable<Fact>` stream and
 dispatches internally by `fact.type`. `OutputSink` (backed by `OutputWriterSink`) owns record

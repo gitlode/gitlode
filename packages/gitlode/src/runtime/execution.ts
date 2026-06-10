@@ -16,6 +16,7 @@ import {
   loadPriorState,
   type RunSuccessPayload,
 } from "../cli/runtime/index.js";
+import { firstOrThrow } from "../core/helpers.js";
 import {
   DefaultCommitTraversalExtractor,
   DefaultExtractionCoordinator,
@@ -31,12 +32,8 @@ import {
   EnrichingFactProjector,
 } from "../core/index.js";
 import { DefaultStageProfiler } from "../core/profile/index.js";
-import {
-  GitAdapterError,
-  type GitAdapter,
-  IsomorphicGitAdapter,
-  JsDiffAdapter,
-} from "../git/index.js";
+import { IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
+import { type GitAdapter, GitAdapterError } from "../git/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
 import type { WorkerRunRange, WorkerRunRequest } from "./types.js";
 
@@ -101,7 +98,7 @@ async function validateRepositoryAccess(
   runAdapter: GitAdapter,
 ): Promise<void> {
   try {
-    await runAdapter.resolveRef(repoPath, input.refs[0]!);
+    await runAdapter.resolveRef(repoPath, firstOrThrow(input.refs));
   } catch (error) {
     if (error instanceof GitAdapterError && error.code === "NOT_A_REPOSITORY") {
       throw new GitAdapterError(

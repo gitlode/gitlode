@@ -124,7 +124,9 @@ function parseRuleSets(
 }
 
 function resolveRuleSets(names: readonly RuleSetName[]): readonly PreparedRuleSet[] {
-  return names.map((name) => BUILT_IN_RULE_SETS.get(name)!);
+  return names
+    .map((name) => BUILT_IN_RULE_SETS.get(name))
+    .filter((ruleSet) => ruleSet !== undefined);
 }
 
 function parseMappings(

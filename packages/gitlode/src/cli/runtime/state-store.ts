@@ -8,7 +8,7 @@ import type {
   RefType,
   StateStore,
 } from "../../core/index.js";
-import { isCommitOidForProfile, MISSING_STATES, REF_TYPES } from "../../core/index.js";
+import { isCommitOidForProfile, type MISSING_STATES, REF_TYPES } from "../../core/index.js";
 import { GitAdapterError, type RepositoryObjectFormat } from "../../git/index.js";
 
 export interface PriorStateLoadOptions {

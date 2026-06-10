@@ -1,3 +1,4 @@
+import { cyclicAtOrThrow } from "../../core/helpers.js";
 import type { ProgressEvent, ProgressPhase } from "../../core/index.js";
 import { formatDiagnosticLines, type DiagnosticSeverity } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";
@@ -102,8 +103,12 @@ export class ProgressController {
   }
 
   private snapshot(nowMs: number): PhaseSnapshot {
+    const phase = this.currentPhase;
+    if (phase === null) {
+      throw new Error("No active phase for snapshot");
+    }
     return {
-      phase: this.currentPhase!,
+      phase,
       startMs: this.phaseStartMs,
       refIndex: this.refIndex,
       refCount: this.refCount,
@@ -115,7 +120,7 @@ export class ProgressController {
   }
 
   private currentSpinnerFrame(): string {
-    return SPINNER_FRAMES[this.spinnerIndex % SPINNER_FRAMES.length]!;
+    return cyclicAtOrThrow(SPINNER_FRAMES, this.spinnerIndex);
   }
 
   private onPhaseStart(phase: ProgressPhase): void {

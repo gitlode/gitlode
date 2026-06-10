@@ -17,13 +17,15 @@ export function resolveProfile(
   person: PersonInput,
 ): ResolvedProfile | null {
   const emailMatches = prepared.emailIndex.get(person.email);
-  if (emailMatches && emailMatches.length > 0) {
-    return { row: emailMatches[0]!, matchedBy: "email" };
+  const [firstEmailMatch] = emailMatches ?? [];
+  if (firstEmailMatch) {
+    return { row: firstEmailMatch, matchedBy: "email" };
   }
 
   const nameMatches = prepared.nameIndex.get(person.name);
-  if (nameMatches && nameMatches.length > 0) {
-    return { row: nameMatches[0]!, matchedBy: "name" };
+  const [firstNameMatch] = nameMatches ?? [];
+  if (firstNameMatch) {
+    return { row: firstNameMatch, matchedBy: "name" };
   }
 
   return null;

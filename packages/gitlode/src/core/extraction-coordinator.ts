@@ -1,3 +1,4 @@
+import { atOrThrow } from "./helpers.js";
 import { withProfilerAsync } from "./profile/index.js";
 import type {
   CommitFact,
@@ -108,7 +109,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
 
     try {
       for (let i = 0; i < plans.length; i++) {
-        const plan = plans[i]!;
+        const plan = atOrThrow(plans, i);
         const refIndex = i;
 
         const rawStream = traversalExtractor.extract(

@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { DefaultExtractionCoordinator } from "../../src/core/extraction-coordinator.js";
 import type {
-  TraversalPlan,
-  TraversalPlanner,
-  TraversalPlanningRequest,
   CommitFact,
   CommitOid,
   CommitTraversalExtractor,
@@ -15,11 +12,15 @@ import type {
   Fact,
   FileChangeExpander,
   FileChangeFact,
+  OutputSink,
   ProgressEvent,
   ProgressReporter,
+  ProjectedRecord,
+  StageProfiler,
+  TraversalPlan,
+  TraversalPlanner,
+  TraversalPlanningRequest,
 } from "../../src/core/types.js";
-import type { OutputSink } from "../../src/core/types.js";
-import type { ProjectedRecord } from "../../src/core/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -627,7 +628,7 @@ describe("DefaultExtractionCoordinator", () => {
     let resumeCount = 0;
     let stopCount = 0;
     let measureWorkCount = 0;
-    const profilerStub: import("../../src/core/types.js").StageProfiler = {
+    const profilerStub: StageProfiler = {
       name: "write",
       start() {},
       resume() {

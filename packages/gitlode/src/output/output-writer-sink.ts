@@ -1,5 +1,5 @@
 import type { OutputSink, ProjectedRecord } from "../core/index.js";
-import { OutputWriter } from "./writer.js";
+import type { OutputWriter } from "./writer.js";
 
 /** Thin adapter that makes `OutputWriter` satisfy the Core-owned `OutputSink` interface. */
 export class OutputWriterSink implements OutputSink {

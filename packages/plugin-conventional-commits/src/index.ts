@@ -9,9 +9,12 @@ const factory: PluginFactory = async () => {
       return { type: "ready" };
     },
     async project(context: ProjectionContext) {
+      if (parser === undefined) {
+        throw new Error("Plugin not initialized");
+      }
       const { fact } = context;
       const commit = fact.type === "commit" ? fact : fact.commit;
-      const parsedCommit = parser!.parse(commit.message);
+      const parsedCommit = parser.parse(commit.message);
 
       return { type: "success", data: parsedCommit };
     },

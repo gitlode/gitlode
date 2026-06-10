@@ -1,10 +1,11 @@
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
+import { shiftOrThrow } from "../core/helpers.js";
 import type { CommitOid, OidProfile, RefType, StageProfiler } from "../core/index.js";
 import { isCommitOid } from "../core/index.js";
 import { withProfilerAsync } from "../core/profile/index.js";
-import { GitAdapterError } from "./errors.js";
+import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
   type DiffAdapter,
@@ -12,7 +13,7 @@ import {
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
-} from "./types.js";
+} from "../git/types.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
@@ -228,7 +229,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
     while (queue.length > 0) {
       const next = await withProfilerAsync(this._walkCommitsProfiler, async () => {
-        const hash = queue.shift()!;
+        const hash = shiftOrThrow(queue);
         if (visited.has(hash) || excluded.has(hash)) return null;
         visited.add(hash);
 
@@ -307,23 +308,21 @@ export class IsomorphicGitAdapter implements GitAdapter {
           map: async (filepath, entries) => {
             if (filepath === ".") return;
 
-            const A = entries[0];
-            const B = entries[1];
-            const typeA = A ? await A.type() : null;
-            const typeB = B ? await B.type() : null;
+            const A = await classifyWalkerEntry(entries[0]);
+            const B = await classifyWalkerEntry(entries[1]);
 
             // Skip submodules
-            if (typeA === "commit" || typeB === "commit") return;
+            if (A.type === "commit" || B.type === "commit") return;
 
             // Both trees → walk() descends naturally; skip this entry from output
-            if (typeA === "tree" && typeB === "tree") return;
+            if (A.type === "tree" && B.type === "tree") return;
 
             // Both blobs
-            if (typeA === "blob" && typeB === "blob") {
-              const [oidA, oidB] = await Promise.all([A!.oid(), B!.oid()]);
+            if (A.type === "blob" && B.type === "blob") {
+              const [oidA, oidB] = await Promise.all([A.entry.oid(), B.entry.oid()]);
               if (oidA === oidB) return; // unchanged
               const [contentA, contentB] = await withProfilerAsync(this._blobReadProfiler, () =>
-                Promise.all([A!.content(), B!.content()]),
+                Promise.all([A.entry.content(), B.entry.content()]),
               );
               const change = await withProfilerAsync(this._diffProfiler, async () =>
                 this._buildFileChange(
@@ -338,8 +337,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
             }
 
             // Added (no parent blob at this path)
-            if (typeB === "blob") {
-              const contentB = await withProfilerAsync(this._blobReadProfiler, () => B!.content());
+            if (B.type === "blob") {
+              const contentB = await withProfilerAsync(this._blobReadProfiler, () =>
+                B.entry.content(),
+              );
               const change = await withProfilerAsync(this._diffProfiler, async () =>
                 this._buildFileChange(
                   filepath,
@@ -353,8 +354,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
             }
 
             // Deleted (no child blob at this path)
-            if (typeA === "blob") {
-              const contentA = await withProfilerAsync(this._blobReadProfiler, () => A!.content());
+            if (A.type === "blob") {
+              const contentA = await withProfilerAsync(this._blobReadProfiler, () =>
+                A.entry.content(),
+              );
               const change = await withProfilerAsync(this._diffProfiler, async () =>
                 this._buildFileChange(
                   filepath,
@@ -376,13 +379,14 @@ export class IsomorphicGitAdapter implements GitAdapter {
           map: async (filepath, entries) => {
             if (filepath === ".") return;
 
-            const A = entries[0];
-            if (!A) return;
+            const A = await classifyWalkerEntry(entries[0]);
+            if (A.type === null || A.type === undefined) return;
 
-            const typeA = await A.type();
-            if (typeA !== "blob") return;
+            if (A.type !== "blob") return;
 
-            const contentA = await withProfilerAsync(this._blobReadProfiler, () => A.content());
+            const contentA = await withProfilerAsync(this._blobReadProfiler, () =>
+              A.entry.content(),
+            );
             const change = await withProfilerAsync(this._diffProfiler, async () =>
               this._buildFileChange(
                 filepath,
@@ -444,7 +448,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
       const reachable = new Set<string>();
       const queue = [startHash];
       while (queue.length > 0) {
-        const hash = queue.shift()!;
+        const hash = shiftOrThrow(queue);
         if (reachable.has(hash)) continue;
         reachable.add(hash);
         let commitParents: string[];
@@ -474,4 +478,26 @@ export class IsomorphicGitAdapter implements GitAdapter {
       return reachable;
     });
   }
+}
+
+type ClassifiedWalkerEntry =
+  | {
+      type: null;
+      entry: null;
+    }
+  | {
+      type: "tree" | "blob" | "special" | "commit";
+      entry: git.WalkerEntry;
+    };
+
+async function classifyWalkerEntry(
+  entry: git.WalkerEntry | null | undefined,
+): Promise<ClassifiedWalkerEntry> {
+  if (entry === null || entry === undefined) {
+    return { type: null, entry: null };
+  }
+  return {
+    type: await entry.type(),
+    entry,
+  };
 }

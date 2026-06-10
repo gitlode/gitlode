@@ -9,8 +9,7 @@ import type {
   ProgressEvent,
   ProgressReporter,
 } from "../../src/core/index.js";
-import { GitAdapterError } from "../../src/git/index.js";
-import type { GitAdapter, RawCommit } from "../../src/git/index.js";
+import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
 
 function makeOid(n: number): CommitOid {
   return n.toString(16).padStart(12, "0") as CommitOid;

@@ -30,7 +30,7 @@ function makeSink(): TerminalSink & { records: SinkRecord[] } {
 }
 
 function makeClock(initialMs = 0): Clock {
-  let now = initialMs;
+  const now = initialMs;
   return {
     nowMs() {
       return now;

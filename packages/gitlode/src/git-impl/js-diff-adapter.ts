@@ -1,6 +1,6 @@
 import { diffLines } from "diff";
 
-import type { DiffAdapter } from "./types.js";
+import type { DiffAdapter } from "../git/index.js";
 
 /**
  * Default DiffAdapter backed by the `diff` package's diffLines, using UTF-8

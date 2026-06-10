@@ -12,8 +12,8 @@ import type {
   ProgressReporter,
   ProjectionContext,
   ProjectorPlugin,
+  ProjectedRecord,
 } from "../../src/core/types.js";
-import type { ProjectedRecord } from "../../src/core/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

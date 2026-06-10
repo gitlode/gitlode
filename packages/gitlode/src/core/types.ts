@@ -1,4 +1,4 @@
-import { MISSING_STATES } from "./consts.js";
+import type { MISSING_STATES } from "./consts.js";
 
 declare const _commitOidBrand: unique symbol;
 export type CommitOid = string & { readonly [_commitOidBrand]: "CommitOid" };
@@ -16,10 +16,6 @@ export function isCommitOidForProfile(v: unknown, profile: OidProfile): v is Com
 
 export function isCommitOid(v: unknown): v is CommitOid {
   return isCommitOidForProfile(v, "sha1") || isCommitOidForProfile(v, "sha256");
-}
-
-export function assertNever(x: never): never {
-  throw new Error(`Unexpected value: ${String(x)}`);
 }
 
 export interface PersonIdentity {

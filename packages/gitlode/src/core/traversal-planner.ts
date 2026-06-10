@@ -1,5 +1,6 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
+import { assertNever, getOrThrow } from "./helpers.js";
 import { withProfilerAsync } from "./profile/index.js";
 import type {
   TraversalPlan,
@@ -12,7 +13,6 @@ import type {
   ProgressReporter,
   StageProfiler,
 } from "./types.js";
-import { assertNever } from "./types.js";
 
 function buildCheckpointKey(ref: string, refType: RefType): string {
   return `${refType}:${ref}`;
@@ -86,7 +86,7 @@ export class DefaultTraversalPlanner implements TraversalPlanner {
       const plans: TraversalPlan[] = [];
       for (const ref of refs) {
         let head: CommitOid;
-        const refType = requestedRefTypeByName.get(ref)!;
+        const refType = getOrThrow(requestedRefTypeByName, ref);
         try {
           head = await this.adapter.resolveRef(repositoryPath, ref);
         } catch (err) {

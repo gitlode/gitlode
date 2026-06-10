@@ -1,7 +1,7 @@
 import { splitMessageLines } from "./diagnostics.js";
 import type { BootstrapTermination } from "./errors.js";
 import { normalizeUnknownError } from "./presenter.js";
-import { TerminalSink } from "./progress/index.js";
+import type { TerminalSink } from "./progress/index.js";
 
 export interface BootstrapRenderer {
   renderTermination(termination: BootstrapTermination): void;

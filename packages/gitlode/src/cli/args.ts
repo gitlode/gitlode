@@ -77,7 +77,7 @@ export function byteSizeString(options?: {
       };
 
       const bytes = numPart * multipliers[suffix]!;
-      if (options == null) {
+      if (options === undefined) {
         return Number(bytes);
       }
 

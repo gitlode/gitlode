@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { DefaultExtractionCoordinator } from "../../src/core/extraction-coordinator.js";
 import type {
-  TraversalPlan,
-  TraversalPlanner,
-  TraversalPlanningRequest,
   CommitFact,
   CommitOid,
   CommitTraversalExtractor,
@@ -15,11 +12,14 @@ import type {
   Fact,
   FileChangeExpander,
   FileChangeFact,
+  OutputSink,
   ProgressEvent,
   ProgressReporter,
+  ProjectedRecord,
+  TraversalPlan,
+  TraversalPlanner,
+  TraversalPlanningRequest,
 } from "../../src/core/types.js";
-import type { OutputSink } from "../../src/core/types.js";
-import type { ProjectedRecord } from "../../src/core/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

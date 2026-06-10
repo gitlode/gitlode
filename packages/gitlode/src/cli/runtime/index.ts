@@ -4,6 +4,7 @@ export {
   assertSupportedRepositoryObjectFormat,
   NodeStateStore,
   loadPriorState,
+  validateLoadedState,
 } from "./state-store.js";
 export type { PriorStateLoadOptions } from "./state-store.js";
 export { renderSuccessReport } from "./success-report.js";

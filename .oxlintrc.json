@@ -143,7 +143,10 @@
     "typescript/no-unnecessary-type-constraint": "error",
 
     // Prevents unsafe declaration merging.
-    "typescript/no-unsafe-declaration-merging": "error"
+    "typescript/no-unsafe-declaration-merging": "error",
+
+    // Keeps type-only imports explicit and consistent.
+    "typescript/consistent-type-imports": "error"
   },
 
   "options": {

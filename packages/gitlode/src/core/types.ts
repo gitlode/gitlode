@@ -1,4 +1,4 @@
-import { MISSING_STATES } from "./consts.js";
+import type { MISSING_STATES } from "./consts.js";
 
 declare const _commitOidBrand: unique symbol;
 export type CommitOid = string & { readonly [_commitOidBrand]: "CommitOid" };

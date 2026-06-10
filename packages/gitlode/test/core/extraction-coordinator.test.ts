@@ -16,6 +16,7 @@ import type {
   ProgressEvent,
   ProgressReporter,
   ProjectedRecord,
+  StageProfiler,
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
@@ -627,7 +628,7 @@ describe("DefaultExtractionCoordinator", () => {
     let resumeCount = 0;
     let stopCount = 0;
     let measureWorkCount = 0;
-    const profilerStub: import("../../src/core/types.js").StageProfiler = {
+    const profilerStub: StageProfiler = {
       name: "write",
       start() {},
       resume() {

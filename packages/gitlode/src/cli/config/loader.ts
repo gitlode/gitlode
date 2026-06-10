@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { byteSizeString } from "../args.js";
 import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "../consts.js";
-import { BootstrapResult, BootstrapTermination } from "../errors.js";
+import type { BootstrapResult, BootstrapTermination } from "../errors.js";
 import type { ConfigExtensionsSection } from "./types.js";
 
 const NAMESPACE_PATTERN = /^[a-z0-9-]+$/;

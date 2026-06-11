@@ -103,7 +103,7 @@ describe("DefaultFactProjector — commit mode", () => {
     const projector = new DefaultFactProjector("repo", null);
     // 1705276800 = 2024-01-15T00:00:00Z; with JST (UTC+9) → 2024-01-15T09:00:00+09:00
     const fact = makeCommitFact({
-      author: { name: "Author", email: "a@e.com", timestamp: 1705276800, timezoneOffset: -540 },
+      author: { name: "Author", email: "a@e.com", timestamp: 1705276800, timezoneOffset: 540 },
     });
     const [record] = await collect(projector.project(toAsyncIter([fact])));
     expect(record!.author.timestamp).toBe("2024-01-15T09:00:00+09:00");
@@ -233,7 +233,7 @@ describe("DefaultFactProjector — file-change mode", () => {
     const projector = new DefaultFactProjector("repo", null);
     const fact = makeFileChangeFact({
       commit: {
-        author: { name: "A", email: "a@e.com", timestamp: 1705276800, timezoneOffset: -540 },
+        author: { name: "A", email: "a@e.com", timestamp: 1705276800, timezoneOffset: 540 },
       },
     });
     const [record] = await collect(projector.project(toAsyncIter([fact])));

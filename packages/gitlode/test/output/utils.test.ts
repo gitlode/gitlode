@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatSessionTimestamp, toISO8601 } from "../../src/output/utils.js";
+import { formatSessionTimestamp } from "../../src/output/utils.js";
 
 describe("formatSessionTimestamp", () => {
   it("formats Unix epoch as 19700101T000000Z", () => {
@@ -22,27 +22,5 @@ describe("formatSessionTimestamp", () => {
     // 2024-06-01T00:00:00Z — UTC midnight
     const d = new Date("2024-06-01T00:00:00Z");
     expect(formatSessionTimestamp(d)).toBe("20240601T000000Z");
-  });
-});
-
-describe("toISO8601", () => {
-  it("converts JST timestamp (timezoneOffset: -540) to +09:00", () => {
-    // Unix 0 = 1970-01-01T00:00:00Z; in JST (UTC+9) = 1970-01-01T09:00:00+09:00
-    expect(toISO8601(0, -540)).toBe("1970-01-01T09:00:00+09:00");
-  });
-
-  it("converts UTC timestamp (timezoneOffset: 0) to +00:00", () => {
-    expect(toISO8601(0, 0)).toBe("1970-01-01T00:00:00+00:00");
-  });
-
-  it("converts negative UTC offset (timezoneOffset: 300) to -05:00", () => {
-    // timezoneOffset 300 → real offset = -300 min = -05:00
-    // Unix 0 in UTC-5 = 1969-12-31T19:00:00-05:00
-    expect(toISO8601(0, 300)).toBe("1969-12-31T19:00:00-05:00");
-  });
-
-  it("converts a known timestamp round-trip correctly", () => {
-    // 2024-01-15T09:00:00+09:00 == 2024-01-15T00:00:00Z == Unix 1705276800
-    expect(toISO8601(1705276800, -540)).toBe("2024-01-15T09:00:00+09:00");
   });
 });

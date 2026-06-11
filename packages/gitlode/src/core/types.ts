@@ -10,13 +10,13 @@ export interface CommitFact {
     readonly name: string;
     readonly email: string;
     readonly timestamp: number; // Unix seconds
-    readonly timezoneOffset: number; // minutes from UTC (isomorphic-git convention: negated)
+    readonly timezoneOffset: number; // standard UTC offset minutes: JST = +540, PST = -480
   };
   readonly committer: {
     readonly name: string;
     readonly email: string;
     readonly timestamp: number;
-    readonly timezoneOffset: number;
+    readonly timezoneOffset: number; // standard UTC offset minutes: JST = +540, PST = -480
   };
   readonly parents: readonly CommitOid[];
   readonly repository: {

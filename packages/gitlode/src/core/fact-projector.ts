@@ -1,5 +1,4 @@
-import { toISO8601 } from "../output/index.js";
-import { assertNever } from "../support/index.js";
+import { assertNever, formatUnixTimestampWithOffset } from "../support/index.js";
 import { withProfiler } from "./profile/index.js";
 import type {
   CommitFact,
@@ -25,12 +24,15 @@ export function projectCommit(
     author: {
       name: fact.author.name,
       email: fact.author.email,
-      timestamp: toISO8601(fact.author.timestamp, fact.author.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(fact.author.timestamp, fact.author.timezoneOffset),
     },
     committer: {
       name: fact.committer.name,
       email: fact.committer.email,
-      timestamp: toISO8601(fact.committer.timestamp, fact.committer.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(
+        fact.committer.timestamp,
+        fact.committer.timezoneOffset,
+      ),
     },
     parents: fact.parents,
     repository: { name: repoName, url: repoUrl },
@@ -50,12 +52,18 @@ export function projectFileChange(
     author: {
       name: fact.commit.author.name,
       email: fact.commit.author.email,
-      timestamp: toISO8601(fact.commit.author.timestamp, fact.commit.author.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(
+        fact.commit.author.timestamp,
+        fact.commit.author.timezoneOffset,
+      ),
     },
     committer: {
       name: fact.commit.committer.name,
       email: fact.commit.committer.email,
-      timestamp: toISO8601(fact.commit.committer.timestamp, fact.commit.committer.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(
+        fact.commit.committer.timestamp,
+        fact.commit.committer.timezoneOffset,
+      ),
     },
     parents: fact.commit.parents,
     repository: { name: repoName, url: repoUrl },

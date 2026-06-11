@@ -7,3 +7,4 @@ export {
   cyclicAtOrThrow,
   captureGroupOrThrow,
 } from "./helpers.js";
+export { formatUnixTimestampWithOffset } from "./date.js";

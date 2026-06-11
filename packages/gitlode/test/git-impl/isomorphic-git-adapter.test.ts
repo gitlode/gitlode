@@ -91,6 +91,34 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(oids).toHaveLength(3);
   });
 
+  it("returns timezoneOffset as received from isomorphic-git (negated convention, pre-migration)", async () => {
+    // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
+    const { fs, init } = makeRepo();
+    await init();
+
+    fs.mkdirSync("/", { recursive: true });
+    fs.writeFileSync("/a.txt", "content");
+    await git.add({ fs, dir: "/", filepath: "a.txt" });
+    const sha = await git.commit({
+      fs,
+      dir: "/",
+      message: "commit with JST timezone",
+      author: { ...AUTHOR, timezoneOffset: 540 },
+      committer: { ...AUTHOR, timezoneOffset: 330 },
+    });
+
+    const adapter = createAdapter(fs);
+    const commits: RawCommit[] = [];
+    for await (const c of adapter.walkCommits("/", sha)) {
+      commits.push(c);
+    }
+
+    expect(commits).toHaveLength(1);
+    // Pre-migration: adapter passes through isomorphic-git's negated values
+    expect(commits[0]!.author.timezoneOffset).toBe(-540);
+    expect(commits[0]!.committer.timezoneOffset).toBe(-330);
+  });
+
   it("traversal with excludeHash stops at the correct boundary", async () => {
     const { fs, init, addCommit, collectAll } = makeRepo();
     await init();

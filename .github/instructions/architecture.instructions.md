@@ -398,6 +398,14 @@ The concrete implementation of `GitAdapter` using isomorphic-git.
 - Accepts an optional internal `DiffAdapter` in its constructor for line-diff strategy injection (defaults to `JsDiffAdapter`)
 - Delegates line-diff computation to the injected `DiffAdapter`; binary detection (NUL-byte heuristic, first 8000 bytes) and the resulting `null/null` output for binary files remain owned by `IsomorphicGitAdapter` and bypass `DiffAdapter` entirely
 - `DiffAdapter` and `JsDiffAdapter` are defined in `src/git/diff-adapter.ts` and are internal to the git adapter layer — not exported through `src/git/index.ts` or referenced by Core
+- Must normalize `timezoneOffset` values when mapping isomorphic-git raw commit data to `RawPerson`:
+  isomorphic-git stores UTC offsets with inverted sign (e.g., JST `+09:00` is stored as `-540`).
+  This is because isomorphic-git follows JavaScript Date API semantics (`Date.getTimezoneOffset()`),
+  which defines the value as minutes from local time to UTC and therefore uses the opposite sign of
+  the common "UTC offset" representation.
+  `RawPerson.timezoneOffset` in the `GitAdapter` contract is standard UTC offset minutes (positive
+  east, negative west; JST = `+540`, PST = `-480`). Core must not compensate for this convention;
+  the normalization responsibility belongs entirely in the adapter implementation.
 
 ### Output Layer (`src/output/`)
 

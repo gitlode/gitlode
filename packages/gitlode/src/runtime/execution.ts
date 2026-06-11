@@ -14,7 +14,6 @@ import {
   assertSupportedRepositoryObjectFormat,
   deriveRepoName,
   loadPriorState,
-  type RunSuccessPayload,
 } from "../cli/runtime/index.js";
 import type {
   ExtractionState,
@@ -35,6 +34,7 @@ import { IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
 import { type GitAdapter, GitAdapterError } from "../git/index.js";
 import type { OidProfile } from "../model/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
+import type { RunSuccessPayload } from "../presentation/types.js";
 import { DefaultStageProfiler } from "../profile/index.js";
 import { firstOrThrow } from "../support/index.js";
 import type { WorkerRunRange, WorkerRunRequest } from "./types.js";

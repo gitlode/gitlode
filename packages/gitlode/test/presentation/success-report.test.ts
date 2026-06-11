@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { renderSuccessReport } from "../../../src/cli/runtime/index.js";
+import { renderSuccessReport } from "../../src/presentation/success-report.js";
 
 function makePresenter() {
   const calls: Array<{ method: string; args: unknown[] }> = [];

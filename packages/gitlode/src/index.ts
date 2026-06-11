@@ -5,8 +5,7 @@ import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
 import type { BootstrapInput } from "./cli/args.js";
-import { createBootstrapRenderer, loadBootstrapInput } from "./cli/index.js";
-import { createStyling } from "./cli/progress/index.js";
+import { loadBootstrapInput } from "./cli/index.js";
 import {
   NodeStateStore,
   assertSupportedRepositoryObjectFormat,
@@ -14,10 +13,12 @@ import {
   loadPriorState,
   renderSuccessReport,
 } from "./cli/runtime/index.js";
-import { stderrSink } from "./cli/runtime/progress-runtime.js";
 import type { ExtractionState, ProgressReporter } from "./core/index.js";
 import { IsomorphicGitAdapter, JsDiffAdapter } from "./git-impl/index.js";
 import { GitAdapterError } from "./git/index.js";
+import { createBootstrapRenderer } from "./presentation/index.js";
+import { stderrSink } from "./presentation/progress-runtime.js";
+import { createStyling } from "./presentation/progress/index.js";
 import {
   dispatchWorkerRunRequest,
   type IsoDateTimeString,

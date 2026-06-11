@@ -1,14 +1,20 @@
-import type { ProgressReporter } from "../../core/index.js";
-import type { ProfilingEntry } from "../../profile/index.js";
-import type { RunPresenter } from "../presenter.js";
-import type { Clock, Scheduler, Styling, TerminalSink, UiMode } from "../progress/index.js";
+import type { ProgressReporter } from "../core/types.js";
+import type { ProfilingEntry } from "../profile/type.js";
+import type { RunPresenter } from "./presenter.js";
+import type { Clock, Scheduler, TerminalSink, UiMode } from "./progress/types.js";
+import type { Styling } from "./styling.js";
 
+export interface RenderSuccessReportOptions {
+  readonly presenter: RunPresenter;
+  readonly quiet: boolean;
+  readonly profile: boolean;
+  readonly success: RunSuccessPayload;
+}
 export interface ProgressRuntime {
   readonly uiMode: UiMode;
   readonly presenter: RunPresenter;
   readonly reporter: ProgressReporter;
 }
-
 export interface CreateProgressRuntimeOptions {
   readonly sink: TerminalSink;
   readonly clock: Clock;
@@ -17,7 +23,6 @@ export interface CreateProgressRuntimeOptions {
   readonly isTTY: boolean;
   readonly styling: Styling;
 }
-
 export interface RunSuccessPayload {
   readonly recordsWritten: number;
   readonly commitsTraversed: number;
@@ -27,11 +32,4 @@ export interface RunSuccessPayload {
   readonly refs: readonly string[];
   readonly profileEntries: readonly ProfilingEntry[];
   readonly skippedDiffs: number;
-}
-
-export interface RenderSuccessReportOptions {
-  readonly presenter: RunPresenter;
-  readonly quiet: boolean;
-  readonly profile: boolean;
-  readonly success: RunSuccessPayload;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { formatProfileLines } from "../../../src/cli/reporting/formatters.js";
 import type { ProfilingEntry } from "../../../src/core/index.js";
+import { formatProfileLines } from "../../../src/presentation/reporting/formatters.js";
 
 describe("formatProfileLines", () => {
   it("formats profile lines with consistent padding", () => {

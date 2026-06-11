@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { formatActiveLine, formatDoneLine } from "../../../src/cli/progress/formatters.js";
-import type { PhaseSnapshot } from "../../../src/cli/progress/types.js";
+import { formatActiveLine, formatDoneLine } from "../../../src/presentation/progress/formatters.js";
+import type { PhaseSnapshot } from "../../../src/presentation/progress/types.js";
 
 describe("formatActiveLine", () => {
   it("formats active line for preparing phase", () => {

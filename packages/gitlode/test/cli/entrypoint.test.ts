@@ -126,7 +126,6 @@ function mockEntrypointModules(
     }));
 
   vi.doMock("../../src/cli/index.js", () => ({
-    createBootstrapRenderer: vi.fn(() => bootstrapRenderer),
     loadBootstrapInput:
       options.loadBootstrapInput ??
       vi.fn(async () => ({
@@ -135,7 +134,11 @@ function mockEntrypointModules(
       })),
   }));
 
-  vi.doMock("../../src/cli/progress/index.js", () => ({
+  vi.doMock("../../src/presentation/index.js", () => ({
+    createBootstrapRenderer: vi.fn(() => bootstrapRenderer),
+  }));
+
+  vi.doMock("../../src/presentation/progress/index.js", () => ({
     createStyling: vi.fn(() => ({ style: "plain" })),
   }));
 
@@ -162,6 +165,9 @@ function mockEntrypointModules(
 
   vi.doMock("../../src/git/index.js", () => ({
     GitAdapterError: MockGitAdapterError,
+  }));
+
+  vi.doMock("../../src/git-impl/index.js", () => ({
     IsomorphicGitAdapter: class {
       supportedObjectFormats(): readonly string[] {
         return ["sha1"];

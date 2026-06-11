@@ -5,7 +5,7 @@ import {
   type Clock,
   type Scheduler,
   type TerminalSink,
-} from "../../../src/cli/progress/index.js";
+} from "../../../src/presentation/progress/index.js";
 
 interface SinkRecord {
   type: "writeLine" | "rewriteLine" | "newline";

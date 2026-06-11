@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { createProgressRuntime } from "../../src/presentation/progress-runtime.js";
 import {
   createStyling,
   type Clock,
   type Scheduler,
   type TerminalSink,
-} from "../../../src/cli/progress/index.js";
-import { createProgressRuntime } from "../../../src/cli/runtime/index.js";
+} from "../../src/presentation/progress/index.js";
 
 interface SinkRecord {
   type: "writeLine" | "rewriteLine" | "newline";

@@ -1,4 +1,4 @@
-export { createProgressRuntime } from "./progress-runtime.js";
+export { createProgressRuntime } from "../../presentation/progress-runtime.js";
 export { deriveRepoName } from "./repository-metadata.js";
 export {
   assertSupportedRepositoryObjectFormat,
@@ -7,10 +7,4 @@ export {
   validateLoadedState,
 } from "./state-store.js";
 export type { PriorStateLoadOptions } from "./state-store.js";
-export { renderSuccessReport } from "./success-report.js";
-export type {
-  CreateProgressRuntimeOptions,
-  ProgressRuntime,
-  RenderSuccessReportOptions,
-  RunSuccessPayload,
-} from "./types.js";
+export { renderSuccessReport } from "../../presentation/success-report.js";

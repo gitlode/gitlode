@@ -16,3 +16,4 @@ export type { WorkerRunDispatchHandlers } from "./client.js";
 export { executeRuntimeSession } from "./execution.js";
 export { executeWorkerRunRequest } from "./execution.js";
 export type { RuntimeExecutionProgress, RuntimeExecutionResult } from "./execution.js";
+export { assertSupportedRepositoryObjectFormat } from "./utils.js";

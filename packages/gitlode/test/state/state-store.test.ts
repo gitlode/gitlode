@@ -4,14 +4,13 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { ProgressReporter, ExtractionState, StateStore } from "../../src/core/index.js";
 import {
-  assertSupportedRepositoryObjectFormat,
-  NodeStateStore,
   loadPriorState,
+  NodeStateStore,
   validateLoadedState,
   type PriorStateLoadOptions,
-} from "../../../src/cli/runtime/index.js";
-import type { ProgressReporter, ExtractionState, StateStore } from "../../../src/core/index.js";
+} from "../../src/state/index.js";
 
 function makePriorStateLoadOptions(
   overrides: Partial<PriorStateLoadOptions> = {},
@@ -44,18 +43,6 @@ function makeStateStore(state: ExtractionState | null): StateStore {
     async write() {},
   };
 }
-
-describe("assertSupportedRepositoryObjectFormat", () => {
-  it("accepts supported repository object formats", () => {
-    expect(() => assertSupportedRepositoryObjectFormat("sha1", ["sha1"])).not.toThrow();
-  });
-
-  it("rejects unsupported repository object formats", () => {
-    expect(() => assertSupportedRepositoryObjectFormat("sha256", ["sha1"])).toThrow(
-      "Unsupported repository object format: sha256. Supported formats: sha1.",
-    );
-  });
-});
 
 describe("NodeStateStore", () => {
   let tmpDir: string;

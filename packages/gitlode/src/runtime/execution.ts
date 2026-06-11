@@ -3,12 +3,6 @@ import { basename, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import type { BootstrapInput, BootstrapInputRange } from "../cli/args.js";
-import {
-  NodeStateStore,
-  assertSupportedRepositoryObjectFormat,
-  deriveRepoName,
-  loadPriorState,
-} from "../cli/runtime/index.js";
 import type { ConfigExtensionsSection } from "../config/index.js";
 import type {
   ExtractionState,
@@ -36,8 +30,10 @@ import {
 } from "../plugins/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
 import { DefaultStageProfiler } from "../profile/index.js";
+import { loadPriorState, NodeStateStore } from "../state/index.js";
 import { firstOrThrow } from "../support/index.js";
 import type { WorkerRunRange, WorkerRunRequest } from "./types.js";
+import { assertSupportedRepositoryObjectFormat, deriveRepoName } from "./utils.js";
 
 type BuildProjectorResult =
   | {

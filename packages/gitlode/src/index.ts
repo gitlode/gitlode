@@ -4,26 +4,25 @@ import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
-import type { BootstrapInput } from "./cli/args.js";
+import type { BootstrapInput } from "./cli/index.js";
 import { loadBootstrapInput } from "./cli/index.js";
-import {
-  NodeStateStore,
-  assertSupportedRepositoryObjectFormat,
-  createProgressRuntime,
-  loadPriorState,
-  renderSuccessReport,
-} from "./cli/runtime/index.js";
 import type { ExtractionState, ProgressReporter } from "./core/index.js";
 import { IsomorphicGitAdapter, JsDiffAdapter } from "./git-impl/index.js";
 import { GitAdapterError } from "./git/index.js";
-import { createBootstrapRenderer } from "./presentation/index.js";
-import { stderrSink } from "./presentation/progress-runtime.js";
+import {
+  createBootstrapRenderer,
+  createProgressRuntime,
+  renderSuccessReport,
+  stderrSink,
+} from "./presentation/index.js";
 import { createStyling } from "./presentation/progress/index.js";
 import {
+  assertSupportedRepositoryObjectFormat,
   dispatchWorkerRunRequest,
   type IsoDateTimeString,
   type WorkerRunInput,
 } from "./runtime/index.js";
+import { loadPriorState, NodeStateStore } from "./state/index.js";
 
 function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
   return {

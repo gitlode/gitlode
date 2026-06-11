@@ -136,30 +136,26 @@ function mockEntrypointModules(
 
   vi.doMock("../../src/presentation/index.js", () => ({
     createBootstrapRenderer: vi.fn(() => bootstrapRenderer),
+    createProgressRuntime,
+    renderSuccessReport,
+    stderrSink: {
+      writeLine() {},
+      rewriteLine() {},
+      newline() {},
+    },
   }));
 
   vi.doMock("../../src/presentation/progress/index.js", () => ({
     createStyling: vi.fn(() => ({ style: "plain" })),
   }));
 
-  vi.doMock("../../src/cli/runtime/index.js", () => ({
-    createProgressRuntime,
-    renderSuccessReport,
+  vi.doMock("../../src/state/index.js", () => ({
     loadPriorState,
     NodeStateStore: class {
       async write(state: unknown): Promise<void> {
         sideEffects.push("state-write");
         stateStoreWrites.push(state);
       }
-    },
-    assertSupportedRepositoryObjectFormat: vi.fn(),
-  }));
-
-  vi.doMock("../../src/cli/runtime/progress-runtime.js", () => ({
-    stderrSink: {
-      writeLine() {},
-      rewriteLine() {},
-      newline() {},
     },
   }));
 
@@ -180,6 +176,7 @@ function mockEntrypointModules(
   }));
 
   vi.doMock("../../src/runtime/index.js", () => ({
+    assertSupportedRepositoryObjectFormat: vi.fn(),
     dispatchWorkerRunRequest,
   }));
 

@@ -6,29 +6,13 @@ import type {
   ProgressReporter,
   StateStore,
   MISSING_STATES,
-} from "../../core/index.js";
-import { GitAdapterError, type RepositoryObjectFormat } from "../../git/index.js";
-import { isCommitOidForProfile, isRefType, type OidProfile } from "../../model/index.js";
+} from "../core/index.js";
+import { isCommitOidForProfile, isRefType, type OidProfile } from "../model/index.js";
 
 export interface PriorStateLoadOptions {
   readonly incremental: boolean;
   readonly missingState?: (typeof MISSING_STATES)[number];
   readonly stateFilePath?: string;
-}
-
-export function assertSupportedRepositoryObjectFormat(
-  format: RepositoryObjectFormat,
-  supportedFormats: readonly OidProfile[],
-): asserts format is OidProfile {
-  if (supportedFormats.includes(format as OidProfile)) {
-    return;
-  }
-
-  const supportedList = supportedFormats.join(", ");
-  throw new GitAdapterError(
-    `Unsupported repository object format: ${format}. Supported formats: ${supportedList}.`,
-    "UNSUPPORTED_OBJECT_FORMAT",
-  );
 }
 
 function emptyState(repositoryPath: string): ExtractionState {

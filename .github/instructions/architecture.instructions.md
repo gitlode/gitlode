@@ -18,6 +18,9 @@ applyTo: "src/**"
 │ Core Logic                                                     │
 │ Extraction pipeline, traversal orchestration, projection       │
 ├───────────────────────────────────────────────────────────────┤
+│ Profile                                                        │
+│ Cross-domain profiling contracts and instrumentation utilities │
+├───────────────────────────────────────────────────────────────┤
 │ Git Adapter Interface / Output Sink Contract                   │
 │ Ports consumed by Core                                         │
 ├───────────────────────────────────────────────────────────────┤
@@ -40,6 +43,9 @@ adapter interface and output sink contract, not on their concrete implementation
 and vocabulary that is meaningful across multiple domains. `src/support/` is the shared
 domain-free helper layer: generic collection, assertion, and parsing helpers that know nothing
 about Git, extraction, CLI, output, plugins, or runtime execution.
+
+`src/profile/` is the shared profiling layer: instrumentation contracts and helpers used by
+multiple domains (for example Core and Git implementation) without creating reverse dependencies.
 
 ---
 
@@ -126,6 +132,10 @@ document explicitly says otherwise.
 - Support ownership belongs in `src/support/`: generic helpers such as `assertNever`, indexed
   array accessors, map lookups, and regex capture helpers. Support must not contain Git, CLI,
   output, runtime, plugin, or config vocabulary.
+- Profile ownership belongs in `src/profile/`: profiling contracts and helpers such as
+  `ProfilingEntry`, `StageProfiler`, `DefaultStageProfiler`, `withProfiler()`, and
+  `withProfilerAsync()`. Profile must not depend on Core, Git adapter contracts, runtime wiring,
+  or CLI/presentation implementations.
 - Git adapter owns Git-native repository access and raw commit/file-change retrieval. Core must
   remain insulated from isomorphic-git details.
 - Output layer owns serialization and rotation mechanics. Core must not duplicate writer rotation
@@ -138,12 +148,16 @@ document explicitly says otherwise.
   built-ins only.
 - `src/support/` must not import from any `src/*` domain. It may use TypeScript and JavaScript
   built-ins only.
+- `src/profile/` may import from `src/support/` when needed. It must not import from
+  `src/core/`, `src/git/`, `src/git-impl/`, `src/runtime/`, `src/cli/`, `src/presentation/`,
+  `src/output/`, `src/config/`, `src/plugins/`, or `src/state/`.
 - `src/git/` may import from `src/model/` and `src/support/`, but must not import from `src/core/`,
   `src/runtime/`, `src/cli/`, `src/presentation/`, `src/output/`, or `src/git-impl/`.
-- `src/git-impl/` may import from `src/git/`, `src/model/`, and `src/support/`. It must not import
-  from `src/core/` except for temporary migration shims; adapter-facing contracts must not be
-  polluted with profiling or extraction pipeline metadata.
-- `src/core/` may import from `src/model/`, `src/support/`, and `src/git/`. It must not import from
+- `src/git-impl/` may import from `src/git/`, `src/model/`, `src/support/`, and `src/profile/`.
+  It must not import from `src/core/` except for temporary migration shims; adapter-facing
+  contracts must not be polluted with extraction pipeline metadata.
+- `src/core/` may import from `src/model/`, `src/support/`, `src/profile/`, and `src/git/`.
+  It must not import from
   `src/cli/`, `src/presentation/`, `src/runtime/`, `src/git-impl/`, or concrete output writer
   modules.
 - `src/output/` may import projected-record and sink contracts from `src/core/`, plus
@@ -153,14 +167,14 @@ document explicitly says otherwise.
   `src/config/`, and shared primitives from `src/model/` / `src/support/`. It must not import from
   `src/cli/`, `src/presentation/`, `src/git-impl/`, or `src/output/`.
 - `src/runtime/` may import from `src/core/`, `src/git/`, `src/git-impl/`, `src/output/`,
-  `src/state/`, `src/plugins/`, `src/config/`, `src/model/`, and `src/support/`. It must not import
-  from `src/cli/` or `src/presentation/`.
+  `src/state/`, `src/plugins/`, `src/config/`, `src/model/`, `src/support/`, and `src/profile/`.
+  It must not import from `src/cli/` or `src/presentation/`.
 - `src/cli/` may import from `src/config/`, `src/model/`, `src/support/`, and public runtime input
   types when needed. CLI must not import from `src/git-impl/`, `src/output/`, or concrete runtime
   execution modules.
-- `src/presentation/` may import progress/profile data contracts from `src/core/`, plus
-  `src/model/` and `src/support/`. It must not import from `src/runtime/`, `src/cli/`,
-  `src/git-impl/`, `src/output/`, or `src/plugins/`.
+- `src/presentation/` may import progress contracts from `src/core/`, profile contracts from
+  `src/profile/`, and shared primitives from `src/model/` / `src/support/`. It must not import
+  from `src/runtime/`, `src/cli/`, `src/git-impl/`, `src/output/`, or `src/plugins/`.
 
 ### Progress and profiling contracts
 
@@ -172,7 +186,8 @@ document explicitly says otherwise.
 - Success-report rendering is presentation-owned; it must not change the summary or profile text
   contract while moving between files.
 - `ExtractionResult.profilingEntries` is hierarchical and rooted at `elapsed`.
-- Adapter-facing contracts must not be polluted with profiling metadata.
+- Profiling contracts are profile-domain owned and may be consumed by Core, Git implementation,
+  runtime, and presentation without introducing reverse Core dependencies.
 
 ### Invariants
 
@@ -229,6 +244,24 @@ Examples of support-owned helpers:
 
 Do not place Git, extraction, output, CLI, config, runtime, presentation, or plugin vocabulary in
 `src/support/`.
+
+### Profile Layer (`src/profile/`)
+
+Responsibilities:
+
+- Define profiling contracts shared by multiple domains.
+- Provide instrumentation helpers for sync and async stage profiling.
+- Remain independent from Core extraction contracts and Git adapter contracts.
+
+Examples of profile-owned exports:
+
+- `ProfilingEntry`
+- `StageProfiler`
+- `DefaultStageProfiler`
+- `withProfiler()` / `withProfilerAsync()`
+
+`src/profile/` may depend on `src/support/` for generic helpers, but must not depend on any
+domain-specific source module.
 
 ### Config Layer (`src/config/`)
 

@@ -1,4 +1,4 @@
-import type { ProfilingEntry } from "../../core/index.js";
+import type { ProfilingEntry } from "../../profile/index.js";
 import { formatCount, formatElapsedRaw, formatMs, humanizeBytesRaw } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
 import type { SummaryData } from "./types.js";

@@ -747,7 +747,7 @@ describe("IsomorphicGitAdapter profiler injection", () => {
     let time = 0;
     const clock = () => ++time;
 
-    const { DefaultStageProfiler } = await import("../../src/core/profile/index.js");
+    const { DefaultStageProfiler } = await import("../../src/profile/index.js");
     const profiler = new DefaultStageProfiler("git", clock);
 
     const adapter = createAdapter(fs, { profiler });

@@ -1,4 +1,5 @@
-import type { ProfilingEntry, ProgressEvent } from "../core/index.js";
+import type { ProgressEvent } from "../core/index.js";
+import type { ProfilingEntry } from "../profile/index.js";
 import { writeDiagnosticLines, splitMessageLines, type DiagnosticSeverity } from "./diagnostics.js";
 import {
   ProgressController,

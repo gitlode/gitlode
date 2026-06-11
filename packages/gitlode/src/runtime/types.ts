@@ -1,10 +1,6 @@
 import type { ConfigExtensionsSection } from "../cli/config/index.js";
-import type {
-  ExtractionState,
-  ProgressEvent,
-  ProfilingEntry,
-  RotationConfig,
-} from "../core/index.js";
+import type { ExtractionState, ProgressEvent, RotationConfig } from "../core/index.js";
+import type { ProfilingEntry } from "../profile/index.js";
 
 export type IsoDateTimeString = string & { readonly __brand: "IsoDateTimeString" };
 

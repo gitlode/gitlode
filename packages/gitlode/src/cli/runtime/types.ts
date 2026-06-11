@@ -1,4 +1,5 @@
-import type { ProfilingEntry, ProgressReporter } from "../../core/index.js";
+import type { ProgressReporter } from "../../core/index.js";
+import type { ProfilingEntry } from "../../profile/index.js";
 import type { RunPresenter } from "../presenter.js";
 import type { Clock, Scheduler, Styling, TerminalSink, UiMode } from "../progress/index.js";
 

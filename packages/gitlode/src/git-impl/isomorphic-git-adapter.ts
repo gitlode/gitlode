@@ -1,8 +1,6 @@
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
-import type { StageProfiler } from "../core/index.js";
-import { withProfilerAsync } from "../core/profile/index.js";
 import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -14,6 +12,7 @@ import {
 } from "../git/types.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
+import { type StageProfiler, withProfilerAsync } from "../profile/index.js";
 import { shiftOrThrow } from "../support/index.js";
 
 export interface IsomorphicGitAdapterDependencies {

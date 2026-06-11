@@ -20,7 +20,6 @@ export type {
   FactType,
   FileChangeExpander,
   FileChangeFact,
-  MonotonicClock,
   Namespace,
   OutputSink,
   PluginEntry,
@@ -40,15 +39,12 @@ export type {
   ProjectedRepository,
   ProjectionContext,
   ProjectorPlugin,
-  ProfilingEntry,
   ProgressEvent,
   ProgressPhase,
   ProgressReporter,
   RefCheckpoint,
   RotationConfig,
-  StageProfiler,
   StateStore,
-  WallClock,
 } from "./types.js";
 export { DefaultTraversalPlanner } from "./traversal-planner.js";
 export { DefaultExtractionCoordinator } from "./extraction-coordinator.js";

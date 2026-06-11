@@ -1,5 +1,6 @@
+import { withProfiler } from "../profile/index.js";
+import type { StageProfiler } from "../profile/type.js";
 import { assertNever, formatUnixTimestampWithOffset } from "../support/index.js";
-import { withProfiler } from "./profile/index.js";
 import type {
   CommitFact,
   Fact,
@@ -8,7 +9,6 @@ import type {
   ProjectedCommit,
   ProjectedFileChange,
   ProjectedRecord,
-  StageProfiler,
 } from "./types.js";
 
 export function projectCommit(

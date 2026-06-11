@@ -1,8 +1,9 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { CommitOid, RefType } from "../model/index.js";
+import { withProfilerAsync } from "../profile/index.js";
+import type { StageProfiler } from "../profile/type.js";
 import { assertNever, getOrThrow } from "../support/index.js";
-import { withProfilerAsync } from "./profile/index.js";
 import type {
   TraversalPlan,
   TraversalPlanner,
@@ -10,7 +11,6 @@ import type {
   ExtractionRange,
   RefCheckpoint,
   ProgressReporter,
-  StageProfiler,
 } from "./types.js";
 
 function buildCheckpointKey(ref: string, refType: RefType): string {

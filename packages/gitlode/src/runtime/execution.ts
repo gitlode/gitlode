@@ -4,11 +4,6 @@ import { performance } from "node:perf_hooks";
 
 import type { BootstrapInput, BootstrapInputRange } from "../cli/args.js";
 import {
-  checkPluginCompatibility,
-  initializePlugins,
-  resolvePluginEntries,
-} from "../cli/plugins.js";
-import {
   NodeStateStore,
   assertSupportedRepositoryObjectFormat,
   deriveRepoName,
@@ -34,6 +29,11 @@ import { IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
 import { type GitAdapter, GitAdapterError } from "../git/index.js";
 import type { OidProfile } from "../model/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
+import {
+  checkPluginCompatibility,
+  initializePlugins,
+  resolvePluginEntries,
+} from "../plugins/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
 import { DefaultStageProfiler } from "../profile/index.js";
 import { firstOrThrow } from "../support/index.js";

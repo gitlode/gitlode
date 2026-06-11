@@ -4,13 +4,13 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { ConfigExtensionsSection } from "../../src/config/index.js";
+import type { PluginEntry, PluginInitResult, PluginRuntimeContext } from "../../src/core/types.js";
 import {
   checkPluginCompatibility,
   initializePlugins,
   resolvePluginEntries,
-} from "../../src/cli/plugins.js";
-import type { ConfigExtensionsSection } from "../../src/config/index.js";
-import type { PluginEntry, PluginInitResult, PluginRuntimeContext } from "../../src/core/types.js";
+} from "../../src/plugins/plugins.js";
 
 beforeEach(() => {
   vi.restoreAllMocks();

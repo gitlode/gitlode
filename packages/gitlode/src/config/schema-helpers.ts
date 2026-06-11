@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { captureGroupOrThrow } from "../support/index.js";
+import { captureGroupOrThrow } from "../support/helpers.js";
 
 /**
  * Parse a binary size string (e.g. "100K", "1M") to bytes.
@@ -10,6 +10,7 @@ import { captureGroupOrThrow } from "../support/index.js";
  * - maxBytes - Maximum allowed value in bytes; null for no maximum
  * - optionName - name for error messages
  */
+
 export function byteSizeString(options?: {
   minBytes?: bigint;
   maxBytes?: bigint;
@@ -37,8 +38,8 @@ export function byteSizeString(options?: {
       const multipliers: Record<string, bigint> = {
         "": 1n,
         K: 1024n,
-        M: 1_048_576n,
-        G: 1_073_741_824n,
+        M: 1048576n,
+        G: 1073741824n,
       };
 
       const multiplier = multipliers[suffix];

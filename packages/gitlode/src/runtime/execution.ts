@@ -3,7 +3,6 @@ import { basename, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import type { BootstrapInput, BootstrapInputRange } from "../cli/args.js";
-import type { ConfigExtensionsSection } from "../cli/config/index.js";
 import {
   checkPluginCompatibility,
   initializePlugins,
@@ -15,6 +14,7 @@ import {
   deriveRepoName,
   loadPriorState,
 } from "../cli/runtime/index.js";
+import type { ConfigExtensionsSection } from "../config/index.js";
 import type {
   ExtractionState,
   ExtractorConfig,

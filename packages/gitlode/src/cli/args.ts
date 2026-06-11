@@ -4,11 +4,11 @@ import { dirname, resolve } from "node:path";
 import { Argument, Command, CommanderError, Option } from "commander";
 import { z } from "zod";
 
+import { loadConfigFile } from "../config/index.js";
+import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "../config/index.js";
+import { byteSizeString } from "../config/index.js";
 import type { RotationConfig } from "../core/index.js";
 import { MISSING_STATES } from "../core/index.js";
-import { byteSizeString } from "./common-schema.js";
-import { loadConfigFile } from "./config/index.js";
-import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "./config/index.js";
 import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./constants.js";
 import type { BootstrapResult, BootstrapTermination } from "./errors.js";
 

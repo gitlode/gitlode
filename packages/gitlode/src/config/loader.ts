@@ -3,9 +3,9 @@ import { dirname, isAbsolute, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { byteSizeString } from "../common-schema.js";
-import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "../constants.js";
-import type { BootstrapResult, BootstrapTermination } from "../errors.js";
+import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "../cli/constants.js";
+import type { BootstrapResult, BootstrapTermination } from "../cli/errors.js";
+import { byteSizeString } from "./schema-helpers.js";
 import type { ConfigExtensionsSection } from "./types.js";
 
 const NAMESPACE_PATTERN = /^[a-z0-9-]+$/;

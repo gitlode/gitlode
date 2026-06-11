@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { satisfies, validRange } from "semver";
 
+import type { ConfigExtensionsSection } from "../config/index.js";
 import type {
   DiagnosticReporter,
   Namespace,
@@ -13,7 +14,6 @@ import type {
   PluginRuntimeContext,
   ProjectorPlugin,
 } from "../core/index.js";
-import type { ConfigExtensionsSection } from "./config/index.js";
 
 export type PluginSetupTermination = { kind: "user-error"; message: string };
 

@@ -1,4 +1,4 @@
-import type { Namespace, PluginFailurePolicy } from "../../core/index.js";
+import type { Namespace, PluginFailurePolicy } from "../core/index.js";
 
 export interface ConfigExtractionRange {
   readonly sinceRef?: string;

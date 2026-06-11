@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { loadConfigFile } from "../../../src/cli/config/index.js";
+import { loadConfigFile } from "../../src/config/index.js";
 
 describe("loadConfigFile", () => {
   let tmpDir: string;

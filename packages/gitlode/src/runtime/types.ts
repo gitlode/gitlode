@@ -1,4 +1,4 @@
-import type { ConfigExtensionsSection } from "../cli/config/index.js";
+import type { ConfigExtensionsSection } from "../config/index.js";
 import type { ExtractionState, ProgressEvent, RotationConfig } from "../core/index.js";
 import type { ProfilingEntry } from "../profile/index.js";
 

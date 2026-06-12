@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createBootstrapRenderer } from "../../src/cli/bootstrap-renderer.js";
+import { createBootstrapRenderer } from "../../src/presentation/bootstrap-renderer.js";
 
 describe("createBootstrapRenderer", () => {
   it("renders user-error termination as plain message lines", () => {

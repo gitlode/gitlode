@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { createRunPresenter, normalizeUnknownError } from "../../src/cli/presenter.js";
-import type { Clock, Scheduler, Styling, TerminalSink } from "../../src/cli/progress/index.js";
+import { createRunPresenter, normalizeUnknownError } from "../../src/presentation/presenter.js";
+import type {
+  Clock,
+  Scheduler,
+  Styling,
+  TerminalSink,
+} from "../../src/presentation/progress/index.js";
 
 interface SinkRecord {
   type: "writeLine" | "rewriteLine" | "newline";
@@ -25,7 +30,7 @@ function makeSink(): TerminalSink & { records: SinkRecord[] } {
 }
 
 function makeClock(initialMs = 0): Clock {
-  let now = initialMs;
+  const now = initialMs;
   return {
     nowMs() {
       return now;

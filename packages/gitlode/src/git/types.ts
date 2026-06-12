@@ -1,4 +1,4 @@
-import type { CommitOid, OidProfile, PersonIdentity, RefType } from "../core/index.js";
+import type { CommitOid, OidProfile, PersonIdentity, RefType } from "../model/index.js";
 
 export type RepositoryObjectFormat = string;
 
@@ -7,6 +7,13 @@ export const DEFAULT_REPOSITORY_OBJECT_FORMAT: OidProfile = "sha1";
 
 export interface RawPerson extends PersonIdentity {
   readonly timestamp: number;
+  /**
+   * UTC offset in minutes, using the standard sign convention:
+   * positive = east of UTC (JST +09:00 → +540), negative = west (PST -08:00 → -480).
+   *
+   * GitAdapter implementations are responsible for normalizing any library-specific
+   * convention to this standard before returning RawPerson.
+   */
   readonly timezoneOffset: number;
 }
 

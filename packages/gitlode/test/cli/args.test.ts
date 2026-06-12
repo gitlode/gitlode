@@ -1,7 +1,7 @@
 import nodeFs from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import * as git from "isomorphic-git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -410,7 +410,7 @@ describe("parseArgs – valid args round-trip", () => {
       repoDir,
     );
     const parsed = expectParsed(await loadBootstrapInput());
-    expect(parsed.range).toEqual({ type: "date", since: new Date("2024-06-01T00:00:00Z") });
+    expect(parsed.range).toEqual({ type: "date", since: "2024-06-01T00:00:00Z" });
   });
 
   it("sets stateFilePath when --state is provided", async () => {
@@ -607,7 +607,7 @@ describe("parseArgs – --since-ref", () => {
     const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.range).toEqual({
       type: "ref",
-      sinceRef: "v1.0",
+      since: "v1.0",
     });
   });
 
@@ -822,19 +822,19 @@ describe("parseArgs – --config", () => {
   it("defaults configPath to undefined when --config is not provided", async () => {
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = expectParsed(await loadBootstrapInput());
-    expect(parsed.configPath).toBeUndefined();
+    expect(parsed.configBaseDir).toBeUndefined();
   });
 
   it("resolves --config to an absolute path", async () => {
     setArgv("--ref", "main", "--output-dir", repoDir, "-c", configFile, repoDir);
     const parsed = expectParsed(await loadBootstrapInput());
-    expect(parsed.configPath).toBe(configFile);
+    expect(parsed.configBaseDir).toBe(dirname(configFile));
   });
 
   it("accepts -c as alias for --config", async () => {
     setArgv("--ref", "main", "--output-dir", repoDir, "-c", configFile, repoDir);
     const parsed = expectParsed(await loadBootstrapInput());
-    expect(parsed.configPath).toBeDefined();
+    expect(parsed.configBaseDir).toBeDefined();
   });
 
   it("returns user-error termination when config file does not exist", async () => {

@@ -1,123 +1,48 @@
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 
 import { Argument, Command, CommanderError, Option } from "commander";
 import { z } from "zod";
 
+import { loadConfigFile } from "../config/index.js";
+import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "../config/index.js";
+import { byteSizeString } from "../config/index.js";
 import type { RotationConfig } from "../core/index.js";
 import { MISSING_STATES } from "../core/index.js";
-import { loadConfigFile } from "./config/index.js";
-import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "./config/index.js";
-import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./consts.js";
+import {
+  type AbsoluteDirectoryPath,
+  type AbsolutePath,
+  dirnameOfFilePath,
+  type IsoDateTimeString,
+  resolveFilePath,
+} from "../support/index.js";
+import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./constants.js";
 import type { BootstrapResult, BootstrapTermination } from "./errors.js";
 
 export type BootstrapInputRange =
-  | { readonly type: "ref"; readonly sinceRef: string }
-  | { readonly type: "date"; readonly since: Date };
+  | { readonly type: "ref"; readonly since: string }
+  | { readonly type: "date"; readonly since: IsoDateTimeString };
 
 export interface BootstrapInput {
-  readonly repositoryPath: string;
+  readonly repositoryPath: AbsolutePath;
   readonly refs: readonly string[];
-  readonly outputDir: string;
+  readonly outputDir: AbsolutePath;
   readonly outputPrefix?: string;
   readonly rotation: RotationConfig;
   readonly incremental: boolean;
   readonly missingState?: (typeof MISSING_STATES)[number];
   readonly range?: BootstrapInputRange;
-  readonly stateFilePath?: string;
+  readonly stateFilePath?: AbsolutePath;
   readonly perFile: boolean;
   readonly maxDiffSize?: number;
   readonly quiet: boolean;
   readonly profile: boolean;
-  repoName?: string;
-  repoUrl?: string;
-  configPath?: string;
-  extensions?: ConfigExtensionsSection;
+  readonly repoName?: string;
+  readonly repoUrl?: string;
+  readonly configBaseDir?: AbsoluteDirectoryPath;
+  readonly extensions?: ConfigExtensionsSection;
 }
 
 // #region Zod schemas and parsing logic
-
-/**
- * Parse a binary size string (e.g. "100K", "1M") to bytes.
- * Supports suffixes K (1024), M (1048576), G (1073741824).
-
- * - minBytes - Minimum allowed value in bytes; null for no minimum
- * - maxBytes - Maximum allowed value in bytes; null for no maximum
- * - optionName - name for error messages
- */
-export function byteSizeString(options?: {
-  minBytes?: bigint;
-  maxBytes?: bigint;
-  optionName?: string;
-}) {
-  const optionName = options?.optionName ?? "value";
-  const defaultError = `${optionName} must be a positive integer (bytes) or an integer with suffix K, M, or G (e.g. 500M, 1G)`;
-  return z
-    .string(defaultError)
-    .min(1)
-    .transform((value, ctx) => {
-      const trimmed = value.trim();
-      const match = /^(\d+)([kKmMgG]?)$/.exec(trimmed);
-      if (!match) {
-        ctx.issues.push({
-          code: "custom",
-          message: defaultError,
-          input: value,
-        });
-
-        return z.NEVER;
-      }
-      const numPart = BigInt(match[1]!);
-      const suffix = match[2]!.toUpperCase();
-      const multipliers: Record<string, bigint> = {
-        "": 1n,
-        K: 1024n,
-        M: 1_048_576n,
-        G: 1_073_741_824n,
-      };
-
-      const bytes = numPart * multipliers[suffix]!;
-      if (options == null) {
-        return Number(bytes);
-      }
-
-      // range checks
-      const { minBytes, maxBytes } = options;
-      if (
-        minBytes !== undefined &&
-        maxBytes !== undefined &&
-        (bytes < minBytes || bytes > maxBytes)
-      ) {
-        ctx.issues.push({
-          code: "custom",
-          message: `${optionName} must be between ${Number(minBytes)} and ${Number(maxBytes)} bytes`,
-          input: value,
-        });
-
-        return z.NEVER;
-      }
-      if (minBytes !== undefined && maxBytes === undefined && bytes < minBytes) {
-        ctx.issues.push({
-          code: "custom",
-          message: `${optionName} must be at least ${Number(minBytes)} byte`,
-          input: value,
-        });
-
-        return z.NEVER;
-      }
-      if (minBytes === undefined && maxBytes !== undefined && bytes > maxBytes) {
-        ctx.issues.push({
-          code: "custom",
-          message: `${optionName} must be at most ${Number(maxBytes)} bytes`,
-          input: value,
-        });
-
-        return z.NEVER;
-      }
-
-      return Number(bytes);
-    });
-}
 
 export function positiveIntegerString(error?: string) {
   return z
@@ -174,7 +99,7 @@ const CommandArgsSchema = z.object({
       offset: true,
       error: "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
     })
-    .transform((value) => new Date(value))
+    .transform((value) => value as IsoDateTimeString)
     .optional(),
   rotateLines: positiveIntegerString("--rotate-lines must be a positive integer").optional(),
   rotateSize: byteSizeString({
@@ -467,9 +392,10 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
 
     // --- Phase 2: Config load/validation (when explicit --config is passed) ---
     let loadedConfig: ProjectConfigurationV1 | undefined;
-    let resolvedConfigPath: string | undefined;
+    let configBaseDir: AbsoluteDirectoryPath | undefined;
     if (configRaw !== undefined) {
-      resolvedConfigPath = resolve(configRaw);
+      const resolvedConfigPath = resolveFilePath(configRaw);
+      configBaseDir = dirnameOfFilePath(resolvedConfigPath);
       const loadedResult = await loadConfigFile(resolvedConfigPath);
       if (loadedResult.kind !== "success") {
         return loadedResult;
@@ -521,19 +447,20 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
       userError("Repository path is required");
     }
 
-    const resolvedRepoPath = resolve(repoPath);
+    const resolvedRepoPath = resolveFilePath(repoPath);
     if (!existsSync(resolvedRepoPath)) {
       userError(`Repository not found: ${repoPath}`);
     }
 
-    const resolvedOutputDir = resolve(outputDir);
+    const resolvedOutputDir = resolveFilePath(outputDir);
     if (!existsSync(resolvedOutputDir)) {
       userError(`Output directory not found: ${outputDir}`);
     }
 
+    let resolvedStatePath: AbsolutePath | undefined;
     if (state) {
-      const resolvedStatePath = resolve(state);
-      const stateParentDir = dirname(resolvedStatePath);
+      resolvedStatePath = resolveFilePath(state);
+      const stateParentDir = dirnameOfFilePath(resolvedStatePath);
       if (!existsSync(stateParentDir)) {
         userError(`Parent directory for state file not found: ${stateParentDir}`);
       }
@@ -545,26 +472,26 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
     return {
       kind: "success",
       value: {
-        repositoryPath: repoPath,
+        repositoryPath: resolvedRepoPath,
         refs: effectiveRefs,
         outputDir: resolvedOutputDir,
         outputPrefix,
         rotation: { maxLines, maxBytes },
         incremental,
-        missingState: incremental ? ((missingState ?? "error") as "error" | "snapshot") : undefined,
+        missingState: incremental ? (missingState ?? "error") : undefined,
         range: effectiveRange.sinceRef
-          ? { type: "ref", sinceRef: effectiveRange.sinceRef }
+          ? { type: "ref", since: effectiveRange.sinceRef }
           : effectiveRange.sinceDate
             ? { type: "date", since: effectiveRange.sinceDate }
             : undefined,
-        stateFilePath: state,
+        stateFilePath: resolvedStatePath,
         perFile,
         maxDiffSize,
         quiet,
         profile: effectiveProfile,
         repoName,
         repoUrl,
-        configPath: resolvedConfigPath,
+        configBaseDir,
         extensions: loadedConfig?.extensions,
       },
     };

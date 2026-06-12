@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { toJSONSchema } from "zod";
 
-import { ProjectConfigSchema } from "../src/cli/config/loader.js";
+import { ProjectConfigSchema } from "../src/config/loader.js";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");

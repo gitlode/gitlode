@@ -1,4 +1,5 @@
-import { withProfilerAsync } from "./profile/index.js";
+import { withProfilerAsync } from "../profile/index.js";
+import { atOrThrow } from "../support/index.js";
 import type {
   CommitFact,
   CoordinatorDependencies,
@@ -46,7 +47,6 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
       fileChangeExpander,
       projector,
       sink,
-      stateStore,
       reporter,
       profiler,
     } = this.deps;
@@ -73,14 +73,12 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
 
     // Static refs (non-branch) are tracked in v2 state, but they usually produce no
     // incremental delta unless the ref target itself changes between runs.
-    if (stateStore !== undefined) {
-      for (const plan of plans) {
-        if (plan.refType !== "branch") {
-          reporter.emit({
-            type: "warning",
-            message: `Warning: Ref "${plan.name}" (${plan.refType}) is tracked in state, but future incremental runs usually produce no new records unless the ref target changes.`,
-          });
-        }
+    for (const plan of plans) {
+      if (plan.refType !== "branch") {
+        reporter.emit({
+          type: "warning",
+          message: `Warning: Ref "${plan.name}" (${plan.refType}) is included in checkpoint state, but future incremental runs usually produce no new records unless the ref target changes.`,
+        });
       }
     }
 
@@ -111,7 +109,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
 
     try {
       for (let i = 0; i < plans.length; i++) {
-        const plan = plans[i]!;
+        const plan = atOrThrow(plans, i);
         const refIndex = i;
 
         const rawStream = traversalExtractor.extract(
@@ -160,16 +158,13 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "finalizing" });
 
-    if (stateStore !== undefined && candidateState.refs.length > 0) {
-      await stateStore.write(candidateState);
-    }
-
     reporter.emit({ type: "phase-end", phase: "finalizing" });
 
     return {
       recordsWritten,
       commitsTraversed,
       refs: plans.map((p) => p.name),
+      state: candidateState,
       skippedDiffs: request.granularity === "file" ? fileChangeExpander.skippedDiffCount : 0,
     };
   }

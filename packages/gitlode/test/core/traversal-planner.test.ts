@@ -7,8 +7,7 @@ import type {
   TraversalPlanningRequest,
 } from "../../src/core/index.js";
 import { DefaultTraversalPlanner } from "../../src/core/traversal-planner.js";
-import { GitAdapterError } from "../../src/git/index.js";
-import type { GitAdapter } from "../../src/git/index.js";
+import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
 
 function makeHash(n: number): CommitOid {
   return n.toString(16).padStart(40, "0") as CommitOid;
@@ -215,7 +214,7 @@ describe("DefaultTraversalPlanner", () => {
     const planner = new DefaultTraversalPlanner(makeAdapter({ refs: { main: head } }));
 
     const plans = await planner.plan(
-      baseRequest({ range: { type: "ref", ref: sinceRef } }),
+      baseRequest({ range: { type: "ref", since: sinceRef } }),
       makeReporter(),
     );
 

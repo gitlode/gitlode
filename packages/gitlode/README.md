@@ -153,7 +153,6 @@ the same timestamp and will not overwrite files produced by earlier runs. Use
 - [Output Schema](docs/design/schema.md) — JSONL format, field definitions, timestamp conversion, and file rotation
 - [Configuration File](docs/design/configuration.md) — config schema, precedence model, path resolution, and conflict rules
 - [Plugin System](docs/design/plugins.md) — plugin contract, configuration file format, lifecycle, and official plugin package policy
-- [Changelog](CHANGELOG.md) — release history and notable changes by version
 
 ## Project
 
@@ -168,8 +167,3 @@ guidelines, see the repository homepage.
 ## Changelog
 
 [Changelog](CHANGELOG.md)
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

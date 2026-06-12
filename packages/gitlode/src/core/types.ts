@@ -1,31 +1,7 @@
-import { MISSING_STATES } from "./consts.js";
-
-declare const _commitOidBrand: unique symbol;
-export type CommitOid = string & { readonly [_commitOidBrand]: "CommitOid" };
-
-export type OidProfile = "sha1" | "sha256";
-
-const OID_PATTERN_BY_PROFILE: Readonly<Record<OidProfile, RegExp>> = {
-  sha1: /^[0-9a-f]{40}$/,
-  sha256: /^[0-9a-f]{64}$/,
-};
-
-export function isCommitOidForProfile(v: unknown, profile: OidProfile): v is CommitOid {
-  return typeof v === "string" && OID_PATTERN_BY_PROFILE[profile].test(v);
-}
-
-export function isCommitOid(v: unknown): v is CommitOid {
-  return isCommitOidForProfile(v, "sha1") || isCommitOidForProfile(v, "sha256");
-}
-
-export function assertNever(x: never): never {
-  throw new Error(`Unexpected value: ${String(x)}`);
-}
-
-export interface PersonIdentity {
-  readonly name: string;
-  readonly email: string;
-}
+import type { CommitOid, PersonIdentity, RefType } from "../model/index.js";
+import type { ProfilingEntry, StageProfiler } from "../profile/type.js";
+import type { AbsolutePath } from "../support/index.js";
+import type { Brand } from "../type-utils/index.js";
 
 /** Core-owned intermediate representation of a single commit, output-format-agnostic. */
 export interface CommitFact {
@@ -36,13 +12,13 @@ export interface CommitFact {
     readonly name: string;
     readonly email: string;
     readonly timestamp: number; // Unix seconds
-    readonly timezoneOffset: number; // minutes from UTC (isomorphic-git convention: negated)
+    readonly timezoneOffset: number; // standard UTC offset minutes: JST = +540, PST = -480
   };
   readonly committer: {
     readonly name: string;
     readonly email: string;
     readonly timestamp: number;
-    readonly timezoneOffset: number;
+    readonly timezoneOffset: number; // standard UTC offset minutes: JST = +540, PST = -480
   };
   readonly parents: readonly CommitOid[];
   readonly repository: {
@@ -141,20 +117,16 @@ export interface RotationConfig {
 }
 
 export type ExtractionRange =
-  | { readonly type: "ref"; readonly ref: CommitOid }
+  | { readonly type: "ref"; readonly since: CommitOid }
   | { readonly type: "date"; readonly since: Date };
 
 export interface ExtractorConfig {
-  readonly repositoryPath: string;
   readonly refs: readonly string[];
-  readonly outputDir: string;
+  readonly outputDir: AbsolutePath;
   readonly outputPrefix: string;
   readonly rotation: RotationConfig;
-  readonly incremental: boolean;
-  readonly missingState?: (typeof MISSING_STATES)[number];
   readonly range?: ExtractionRange;
-  readonly stateFilePath?: string;
-  readonly perFile: boolean;
+  readonly granularity: "commit" | "file";
   readonly maxDiffSize?: number;
 }
 
@@ -183,13 +155,6 @@ export interface StateStore {
   write(state: ExtractionState): Promise<void>;
 }
 
-export type WallClock = () => Date;
-export type MonotonicClock = () => number;
-
-export const REF_TYPES = ["branch", "tag-lightweight", "tag-annotated", "commit-oid"] as const;
-
-export type RefType = (typeof REF_TYPES)[number];
-
 export interface RefCheckpoint {
   readonly ref: string;
   readonly refType: RefType;
@@ -200,78 +165,8 @@ export interface RefCheckpoint {
 export interface ExtractionState {
   readonly version: 2;
   readonly generatedAt: string;
-  readonly repositoryPath: string;
+  readonly repositoryPath: AbsolutePath;
   readonly refs: readonly RefCheckpoint[];
-}
-
-// Compatibility aliases removed in Phase 7 cleanup
-
-/** A single timing measurement produced by a {@link StageProfiler}. */
-export interface ProfilingEntry {
-  /** Full slash-separated path from the root, e.g. `"elapsed/traversal"`. */
-  readonly name: string;
-  /** Wall-clock duration in milliseconds (parallel overlap counted once). */
-  readonly wallMs: number;
-  /** Additive work duration in milliseconds (parallel overlap counted per interval). */
-  readonly workMs: number;
-}
-
-/**
- * A named, accumulating timer that supports hierarchical scoping.
- *
- * ## Lifecycle
- * - `start()`: Resets wall/work durations to 0 and begins wall timing. No-op if already running.
- * - `resume()`: Begins accumulating without resetting. No-op if already running.
- * - `stop()`: Pauses accumulation. No-op if not running.
- * - `measureWork(fn)`: Measures one work interval and adds it to additive work time.
- * - `entries()`: Returns a snapshot of this profiler and all descendants in preorder.
- *   If called while running, includes elapsed time up to the current moment.
- *
- * ## Tree structure
- * Each profiler may have child profilers created via `createScopedProfiler()`.
- * Parent and child durations are completely independent: a parent's times are
- * determined solely by its own `start/resume/stop` calls, not by its children.
- * Siblings are ordered by creation order.
- *
- * ## Concurrency
- * Sharing a single profiler instance across concurrent async operations is not
- * recommended. Unexpected interleaving of `resume/stop` calls may produce inaccurate
- * measurements, but will not throw exceptions or affect the main extraction process.
- * Wall-clock timing is reference-count based so overlapping intervals are counted once.
- * Additive work timing should be recorded via `measureWork(...)`.
- *
- * ## Error tolerance
- * All methods are designed to be safe to call in any order. Unexpected call sequences
- * (e.g., `stop()` when not running) are silently treated as no-ops.
- */
-export interface StageProfiler {
-  /** The local name segment of this profiler (not the full path). */
-  readonly name: string;
-  /** Resets accumulated duration to 0 and begins timing. No-op if already running. */
-  start(): void;
-  /** Resumes timing without resetting accumulated duration. No-op if already running. */
-  resume(): void;
-  /** Pauses timing and adds elapsed duration to the accumulator. No-op if not running. */
-  stop(): void;
-  /**
-   * Measures execution time of `fn` and adds it to additive work duration.
-   * Works with both sync and async functions.
-   */
-  measureWork<T>(fn: () => T): T;
-  /**
-   * Creates and registers a new child profiler with the given name.
-   * The child's full path in `entries()` is `parent_path/child_name`.
-   * Children are listed in creation order in `entries()`.
-   * If `name` contains `/`, it is escaped as `//` in the full path.
-   */
-  createScopedProfiler(name: string): StageProfiler;
-  /**
-   * Returns profiling entries for this profiler and all descendants in preorder
-   * (self first, then each child's subtree in creation order).
-   * Each entry's `name` is the full slash-separated path from the root.
-   * If this profiler is currently running, `wallMs` includes time up to now.
-   */
-  entries(): readonly ProfilingEntry[];
 }
 
 export interface ExtractionResult {
@@ -370,16 +265,14 @@ export interface OutputSink {
  *  Core-vocabulary terms, not CLI-facing names. `Extractor` translates
  *  `ExtractorConfig` into `CoordinatorRequest` before calling the coordinator. */
 export interface CoordinatorRequest {
-  readonly repositoryPath: string;
+  readonly repositoryPath: AbsolutePath;
   readonly repoName: string;
   readonly repoUrl: string | null;
   readonly refs: readonly string[];
-  /** Renamed from `outputMode`. */
   readonly granularity: "commit" | "file";
   readonly range?: ExtractionRange;
-  /** Loaded and validated by `Extractor.loadPriorState()`. */
   readonly priorState: ExtractionState;
-  /** Wall-clock time at which the extraction session started. Used for checkpoint `generatedAt`. */
+  /** Wall-clock time at which the extraction session started.*/
   readonly sessionTimestamp: Date;
 }
 
@@ -388,6 +281,8 @@ export interface CoordinatorResult {
   readonly commitsTraversed: number;
   /** Refs for which a head was successfully resolved (skipped refs are omitted). */
   readonly refs: readonly string[];
+  /** Checkpoint state produced after successful output completion and sink close. */
+  readonly state: ExtractionState;
   /** Number of file diffs skipped due to size threshold (--max-diff-size). */
   readonly skippedDiffs: number;
 }
@@ -451,7 +346,7 @@ export interface ProjectorPlugin {
 export type PluginFactory = (config: unknown) => ProjectorPlugin | Promise<ProjectorPlugin>;
 
 /** Validated plugin namespace string — must match /^[a-z0-9-]+$/. */
-export type Namespace = string & { readonly __brand: "Namespace" };
+export type Namespace = Brand<string, "Namespace">;
 
 /** Runtime registry record for a loaded, initialized plugin. */
 export interface PluginEntry {
@@ -468,7 +363,6 @@ export interface CoordinatorDependencies {
   /** Accepts any projector whose `project()` returns `AsyncIterable<ProjectedRecord>`. */
   readonly projector: FactProjector;
   readonly sink: OutputSink;
-  readonly stateStore: StateStore | undefined;
   readonly reporter: ProgressReporter;
   /** Optional profiler for accumulating writeMs across sink.write() and sink.close() calls. */
   readonly profiler?: StageProfiler;

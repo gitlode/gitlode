@@ -1,3 +1,4 @@
+import { assertNever } from "../support/index.js";
 import { projectCommit, projectFileChange } from "./fact-projector.js";
 import type {
   Fact,
@@ -8,7 +9,6 @@ import type {
   ProjectedRecord,
   ProjectionContext,
 } from "./types.js";
-import { assertNever } from "./types.js";
 
 export class EnrichingFactProjector implements FactProjector {
   private readonly pluginEntries: readonly PluginEntry[];

@@ -1,5 +1,6 @@
-import { splitMessage, toISO8601 } from "../output/index.js";
-import { withProfiler } from "./profile/index.js";
+import { withProfiler } from "../profile/index.js";
+import type { StageProfiler } from "../profile/type.js";
+import { assertNever, formatUnixTimestampWithOffset } from "../support/index.js";
 import type {
   CommitFact,
   Fact,
@@ -8,9 +9,7 @@ import type {
   ProjectedCommit,
   ProjectedFileChange,
   ProjectedRecord,
-  StageProfiler,
 } from "./types.js";
-import { assertNever } from "./types.js";
 
 export function projectCommit(
   fact: CommitFact,
@@ -25,12 +24,15 @@ export function projectCommit(
     author: {
       name: fact.author.name,
       email: fact.author.email,
-      timestamp: toISO8601(fact.author.timestamp, fact.author.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(fact.author.timestamp, fact.author.timezoneOffset),
     },
     committer: {
       name: fact.committer.name,
       email: fact.committer.email,
-      timestamp: toISO8601(fact.committer.timestamp, fact.committer.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(
+        fact.committer.timestamp,
+        fact.committer.timezoneOffset,
+      ),
     },
     parents: fact.parents,
     repository: { name: repoName, url: repoUrl },
@@ -50,12 +52,18 @@ export function projectFileChange(
     author: {
       name: fact.commit.author.name,
       email: fact.commit.author.email,
-      timestamp: toISO8601(fact.commit.author.timestamp, fact.commit.author.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(
+        fact.commit.author.timestamp,
+        fact.commit.author.timezoneOffset,
+      ),
     },
     committer: {
       name: fact.commit.committer.name,
       email: fact.commit.committer.email,
-      timestamp: toISO8601(fact.commit.committer.timestamp, fact.commit.committer.timezoneOffset),
+      timestamp: formatUnixTimestampWithOffset(
+        fact.commit.committer.timestamp,
+        fact.commit.committer.timezoneOffset,
+      ),
     },
     parents: fact.commit.parents,
     repository: { name: repoName, url: repoUrl },
@@ -92,4 +100,18 @@ export class DefaultFactProjector implements FactProjector {
       }
     }
   }
+}
+
+/**
+ * Splits a Git commit message into subject and body.
+ *
+ * `subject` is the first line. `body` is the remainder of the lines joined
+ * with `\n` and trimmed of surrounding whitespace. Returns `""` for `body`
+ * when the message has no lines beyond the first.
+ */
+export function splitMessage(message: string): { subject: string; body: string } {
+  const lines = message.split("\n");
+  const subject = lines[0] ?? "";
+  const body = lines.slice(1).join("\n").trim();
+  return { subject, body };
 }

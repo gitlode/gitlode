@@ -4,6 +4,7 @@ import {
   DefaultFactProjector,
   projectCommit,
   projectFileChange,
+  splitMessage,
 } from "../../src/core/fact-projector.js";
 import type { CommitFact, Fact, FileChangeFact } from "../../src/core/types.js";
 
@@ -102,7 +103,7 @@ describe("DefaultFactProjector — commit mode", () => {
     const projector = new DefaultFactProjector("repo", null);
     // 1705276800 = 2024-01-15T00:00:00Z; with JST (UTC+9) → 2024-01-15T09:00:00+09:00
     const fact = makeCommitFact({
-      author: { name: "Author", email: "a@e.com", timestamp: 1705276800, timezoneOffset: -540 },
+      author: { name: "Author", email: "a@e.com", timestamp: 1705276800, timezoneOffset: 540 },
     });
     const [record] = await collect(projector.project(toAsyncIter([fact])));
     expect(record!.author.timestamp).toBe("2024-01-15T09:00:00+09:00");
@@ -232,7 +233,7 @@ describe("DefaultFactProjector — file-change mode", () => {
     const projector = new DefaultFactProjector("repo", null);
     const fact = makeFileChangeFact({
       commit: {
-        author: { name: "A", email: "a@e.com", timestamp: 1705276800, timezoneOffset: -540 },
+        author: { name: "A", email: "a@e.com", timestamp: 1705276800, timezoneOffset: 540 },
       },
     });
     const [record] = await collect(projector.project(toAsyncIter([fact])));
@@ -341,5 +342,42 @@ describe("projectFileChange — pure function", () => {
     const fact = makeFileChangeFact();
     const record = projectFileChange(fact, "repo", null);
     expect(record.repository.url).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// helper function tests
+// ---------------------------------------------------------------------------
+describe("splitMessage", () => {
+  it("handles message with no body", () => {
+    const { subject, body } = splitMessage("fix typo");
+    expect(subject).toBe("fix typo");
+    expect(body).toBe("");
+  });
+
+  it("handles message with a single-line body", () => {
+    const { subject, body } = splitMessage("fix typo\n\nThis fixes a typo.");
+    expect(subject).toBe("fix typo");
+    expect(body).toBe("This fixes a typo.");
+  });
+
+  it("handles multi-paragraph body", () => {
+    const { subject, body } = splitMessage(
+      "feat: add feature\n\nFirst paragraph.\n\nSecond paragraph.",
+    );
+    expect(subject).toBe("feat: add feature");
+    expect(body).toBe("First paragraph.\n\nSecond paragraph.");
+  });
+
+  it("trims trailing newlines from body", () => {
+    const { subject, body } = splitMessage("commit msg\n\nbody line\n\n");
+    expect(subject).toBe("commit msg");
+    expect(body).toBe("body line");
+  });
+
+  it("handles empty message", () => {
+    const { subject, body } = splitMessage("");
+    expect(subject).toBe("");
+    expect(body).toBe("");
   });
 });

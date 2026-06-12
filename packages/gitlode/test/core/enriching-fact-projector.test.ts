@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
-import { initializePlugins } from "../../src/cli/plugins.js";
 import { EnrichingFactProjector } from "../../src/core/enriching-fact-projector.js";
 import type {
   CommitFact,
@@ -12,8 +11,9 @@ import type {
   ProgressReporter,
   ProjectionContext,
   ProjectorPlugin,
+  ProjectedRecord,
 } from "../../src/core/types.js";
-import type { ProjectedRecord } from "../../src/core/types.js";
+import { initializePlugins } from "../../src/plugins/plugins.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

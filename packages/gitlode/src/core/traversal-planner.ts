@@ -1,18 +1,17 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { withProfilerAsync } from "./profile/index.js";
+import type { CommitOid, RefType } from "../model/index.js";
+import { withProfilerAsync } from "../profile/index.js";
+import type { StageProfiler } from "../profile/type.js";
+import { assertNever, getOrThrow } from "../support/index.js";
 import type {
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-  CommitOid,
   ExtractionRange,
   RefCheckpoint,
-  RefType,
   ProgressReporter,
-  StageProfiler,
 } from "./types.js";
-import { assertNever } from "./types.js";
 
 function buildCheckpointKey(ref: string, refType: RefType): string {
   return `${refType}:${ref}`;
@@ -27,7 +26,7 @@ function resolveExcludeHash(
     return checkpointTipOid ?? mergeBaseExclude;
   }
   if (range.type === "ref") {
-    return range.ref;
+    return range.since;
   } else if (range.type === "date") {
     return undefined;
   } else {
@@ -86,7 +85,7 @@ export class DefaultTraversalPlanner implements TraversalPlanner {
       const plans: TraversalPlan[] = [];
       for (const ref of refs) {
         let head: CommitOid;
-        const refType = requestedRefTypeByName.get(ref)!;
+        const refType = getOrThrow(requestedRefTypeByName, ref);
         try {
           head = await this.adapter.resolveRef(repositoryPath, ref);
         } catch (err) {

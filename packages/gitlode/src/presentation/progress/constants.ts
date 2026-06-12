@@ -1,2 +1,2 @@
 export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-export const HEARTBEAT_INTERVAL_MS = 500;
+export const HEARTBEAT_INTERVAL_MS = 200;

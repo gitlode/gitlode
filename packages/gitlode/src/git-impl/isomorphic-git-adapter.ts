@@ -1,10 +1,6 @@
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
-import { shiftOrThrow } from "../core/helpers.js";
-import type { CommitOid, OidProfile, RefType, StageProfiler } from "../core/index.js";
-import { isCommitOid } from "../core/index.js";
-import { withProfilerAsync } from "../core/profile/index.js";
 import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -14,6 +10,10 @@ import {
   type RawCommit,
   type RepositoryObjectFormat,
 } from "../git/types.js";
+import type { RefType, CommitOid, OidProfile } from "../model/index.js";
+import { isCommitOid } from "../model/index.js";
+import { type StageProfiler, withProfilerAsync } from "../profile/index.js";
+import { shiftOrThrow } from "../support/index.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
@@ -253,13 +253,19 @@ export class IsomorphicGitAdapter implements GitAdapter {
           name: next.commit.author.name,
           email: next.commit.author.email,
           timestamp: next.commit.author.timestamp,
-          timezoneOffset: next.commit.author.timezoneOffset,
+          // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
+          // this behavior is based on JavaScript Date.getTimezoneOffset().
+          // the adapter negates that value before populating this field.
+          timezoneOffset: -next.commit.author.timezoneOffset,
         },
         committer: {
           name: next.commit.committer.name,
           email: next.commit.committer.email,
           timestamp: next.commit.committer.timestamp,
-          timezoneOffset: next.commit.committer.timezoneOffset,
+          // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
+          // this behavior is based on JavaScript Date.getTimezoneOffset().
+          // the adapter negates that value before populating this field.
+          timezoneOffset: -next.commit.committer.timezoneOffset,
         },
         parents: next.commit.parent as CommitOid[],
       };

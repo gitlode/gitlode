@@ -1,28 +1,21 @@
 #!/usr/bin/env node
-import nodeFs from "node:fs";
-import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
-import type { BootstrapInput } from "./cli/args.js";
-import { createBootstrapRenderer, loadBootstrapInput } from "./cli/index.js";
-import { createStyling } from "./cli/progress/index.js";
-import {
-  NodeStateStore,
-  assertSupportedRepositoryObjectFormat,
-  createProgressRuntime,
-  loadPriorState,
-  renderSuccessReport,
-} from "./cli/runtime/index.js";
-import { stderrSink } from "./cli/runtime/progress-runtime.js";
-import type { ExtractionState, ProgressReporter } from "./core/index.js";
-import { IsomorphicGitAdapter, JsDiffAdapter } from "./git-impl/index.js";
+import type { BootstrapInput } from "./cli/index.js";
+import { loadBootstrapInput } from "./cli/index.js";
+import type { ExtractionState } from "./core/index.js";
 import { GitAdapterError } from "./git/index.js";
 import {
-  dispatchWorkerRunRequest,
-  type IsoDateTimeString,
-  type WorkerRunInput,
-} from "./runtime/index.js";
+  createBootstrapRenderer,
+  createProgressRuntime,
+  renderSuccessReport,
+  stderrSink,
+} from "./presentation/index.js";
+import { createStyling } from "./presentation/progress/index.js";
+import { dispatchWorkerRunRequest, type WorkerRunInput } from "./runtime/index.js";
+import { loadExtractionState, NodeStateStore } from "./state/index.js";
+import { createEmptyState } from "./state/state-store.js";
 
 function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
   return {
@@ -31,54 +24,15 @@ function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
     outputDir: bootstrapInput.outputDir,
     outputPrefix: bootstrapInput.outputPrefix,
     rotation: bootstrapInput.rotation,
-    range:
-      bootstrapInput.range === undefined
-        ? undefined
-        : bootstrapInput.range.type === "ref"
-          ? { type: "ref", sinceRef: bootstrapInput.range.sinceRef }
-          : {
-              type: "date",
-              since: bootstrapInput.range.since.toISOString() as IsoDateTimeString,
-            },
-    perFile: bootstrapInput.perFile,
+    range: bootstrapInput.range,
+    granularity: bootstrapInput.perFile ? "file" : "commit",
     maxDiffSize: bootstrapInput.maxDiffSize,
     profile: bootstrapInput.profile,
     repoName: bootstrapInput.repoName,
     repoUrl: bootstrapInput.repoUrl,
-    configPath: bootstrapInput.configPath,
+    configBaseDir: bootstrapInput.configBaseDir,
     extensions: bootstrapInput.extensions,
   };
-}
-
-async function loadPriorStateForWorker(
-  bootstrapInput: BootstrapInput,
-  reporter: ProgressReporter,
-): Promise<ExtractionState> {
-  const resolvedRepoPath = resolve(bootstrapInput.repositoryPath);
-  const gitAdapter = new IsomorphicGitAdapter({
-    fs: nodeFs,
-    diffAdapter: new JsDiffAdapter(),
-  });
-
-  const supportedFormats = gitAdapter.supportedObjectFormats();
-  const repositoryObjectFormat = await gitAdapter.getRepositoryObjectFormat(resolvedRepoPath);
-  assertSupportedRepositoryObjectFormat(repositoryObjectFormat, supportedFormats);
-
-  const stateStore = bootstrapInput.stateFilePath
-    ? new NodeStateStore(bootstrapInput.stateFilePath)
-    : undefined;
-
-  return loadPriorState(
-    stateStore,
-    {
-      incremental: bootstrapInput.incremental,
-      missingState: bootstrapInput.missingState,
-      stateFilePath: bootstrapInput.stateFilePath,
-    },
-    resolvedRepoPath,
-    repositoryObjectFormat,
-    reporter,
-  );
 }
 
 async function main(): Promise<void> {
@@ -120,7 +74,28 @@ async function main(): Promise<void> {
   });
 
   try {
-    const priorState = await loadPriorStateForWorker(bootstrapInput, progressRuntime.reporter);
+    const stateStore = bootstrapInput.stateFilePath
+      ? new NodeStateStore(bootstrapInput.stateFilePath)
+      : undefined;
+
+    let priorState: ExtractionState;
+    if (!stateStore || !bootstrapInput.incremental) {
+      priorState = createEmptyState(bootstrapInput.repositoryPath);
+    } else {
+      const loadedState = await loadExtractionState(stateStore);
+      if (loadedState === undefined) {
+        if (bootstrapInput.missingState === "error") {
+          throw new Error(`State file not found: ${bootstrapInput.stateFilePath}`);
+        }
+        progressRuntime.reporter.emit({
+          type: "warning",
+          message: `State file not found: ${bootstrapInput.stateFilePath}. Falling back to full snapshot extraction.`,
+        });
+        priorState = createEmptyState(bootstrapInput.repositoryPath);
+      } else {
+        priorState = loadedState;
+      }
+    }
 
     const result = await dispatchWorkerRunRequest(
       {
@@ -151,8 +126,7 @@ async function main(): Promise<void> {
       return;
     }
 
-    if (bootstrapInput.stateFilePath && result.state.refs.length > 0) {
-      const stateStore = new NodeStateStore(bootstrapInput.stateFilePath);
+    if (stateStore !== undefined && result.state.refs.length > 0) {
       await stateStore.write(result.state);
     }
 

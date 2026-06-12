@@ -214,7 +214,7 @@ describe("DefaultTraversalPlanner", () => {
     const planner = new DefaultTraversalPlanner(makeAdapter({ refs: { main: head } }));
 
     const plans = await planner.plan(
-      baseRequest({ range: { type: "ref", ref: sinceRef } }),
+      baseRequest({ range: { type: "ref", since: sinceRef } }),
       makeReporter(),
     );
 

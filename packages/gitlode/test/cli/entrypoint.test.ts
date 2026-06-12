@@ -30,7 +30,7 @@ interface MockContext {
   readonly createProgressRuntime: ReturnType<typeof vi.fn>;
   readonly renderSuccessReport: ReturnType<typeof vi.fn>;
   readonly dispatchWorkerRunRequest: ReturnType<typeof vi.fn>;
-  readonly loadPriorState: ReturnType<typeof vi.fn>;
+  readonly loadExtractionState: ReturnType<typeof vi.fn>;
   readonly getStateStoreWrites: () => unknown[];
   readonly getSideEffects: () => string[];
 }
@@ -61,7 +61,7 @@ function makeBootstrapInput(overrides: Record<string, unknown> = {}) {
 function mockEntrypointModules(
   options: {
     readonly loadBootstrapInput?: () => Promise<unknown>;
-    readonly loadPriorState?: () => Promise<unknown>;
+    readonly loadExtractionState?: () => Promise<unknown>;
     readonly workerResult?: () => Promise<unknown>;
     readonly objectFormat?: string;
   } = {},
@@ -94,8 +94,8 @@ function mockEntrypointModules(
     sideEffects.push("success-report");
   });
 
-  const loadPriorState =
-    options.loadPriorState ??
+  const loadExtractionState =
+    options.loadExtractionState ??
     vi.fn(async () => ({
       version: 2,
       generatedAt: "",
@@ -126,7 +126,6 @@ function mockEntrypointModules(
     }));
 
   vi.doMock("../../src/cli/index.js", () => ({
-    createBootstrapRenderer: vi.fn(() => bootstrapRenderer),
     loadBootstrapInput:
       options.loadBootstrapInput ??
       vi.fn(async () => ({
@@ -135,24 +134,10 @@ function mockEntrypointModules(
       })),
   }));
 
-  vi.doMock("../../src/cli/progress/index.js", () => ({
-    createStyling: vi.fn(() => ({ style: "plain" })),
-  }));
-
-  vi.doMock("../../src/cli/runtime/index.js", () => ({
+  vi.doMock("../../src/presentation/index.js", () => ({
+    createBootstrapRenderer: vi.fn(() => bootstrapRenderer),
     createProgressRuntime,
     renderSuccessReport,
-    loadPriorState,
-    NodeStateStore: class {
-      async write(state: unknown): Promise<void> {
-        sideEffects.push("state-write");
-        stateStoreWrites.push(state);
-      }
-    },
-    assertSupportedRepositoryObjectFormat: vi.fn(),
-  }));
-
-  vi.doMock("../../src/cli/runtime/progress-runtime.js", () => ({
     stderrSink: {
       writeLine() {},
       rewriteLine() {},
@@ -160,8 +145,25 @@ function mockEntrypointModules(
     },
   }));
 
+  vi.doMock("../../src/presentation/progress/index.js", () => ({
+    createStyling: vi.fn(() => ({ style: "plain" })),
+  }));
+
+  vi.doMock("../../src/state/index.js", () => ({
+    loadExtractionState,
+    NodeStateStore: class {
+      async write(state: unknown): Promise<void> {
+        sideEffects.push("state-write");
+        stateStoreWrites.push(state);
+      }
+    },
+  }));
+
   vi.doMock("../../src/git/index.js", () => ({
     GitAdapterError: MockGitAdapterError,
+  }));
+
+  vi.doMock("../../src/git-impl/index.js", () => ({
     IsomorphicGitAdapter: class {
       supportedObjectFormats(): readonly string[] {
         return ["sha1"];
@@ -174,6 +176,7 @@ function mockEntrypointModules(
   }));
 
   vi.doMock("../../src/runtime/index.js", () => ({
+    assertSupportedRepositoryObjectFormat: vi.fn(),
     dispatchWorkerRunRequest,
   }));
 
@@ -184,7 +187,7 @@ function mockEntrypointModules(
     createProgressRuntime,
     renderSuccessReport,
     dispatchWorkerRunRequest,
-    loadPriorState,
+    loadExtractionState,
     getStateStoreWrites: () => stateStoreWrites,
     getSideEffects: () => sideEffects,
   };
@@ -310,7 +313,7 @@ describe("CLI entrypoint orchestration", () => {
     await vi.waitFor(() => {
       expect(context.renderSuccessReport).toHaveBeenCalledTimes(1);
     });
-    expect(context.loadPriorState).toHaveBeenCalledTimes(1);
+    expect(context.loadExtractionState).toHaveBeenCalledTimes(1);
     expect(context.getStateStoreWrites()).toEqual([returnedState]);
     expect(context.getSideEffects()).toEqual(["state-write", "success-report"]);
     expect(process.exitCode).toBeUndefined();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDiagnosticLines, splitMessageLines } from "../../src/cli/diagnostics.js";
-import type { Styling } from "../../src/cli/progress/index.js";
+import { formatDiagnosticLines, splitMessageLines } from "../../src/presentation/diagnostics.js";
+import type { Styling } from "../../src/presentation/progress/index.js";
 
 const styled: Styling = {
   spinnerGlyph: (text) => text,

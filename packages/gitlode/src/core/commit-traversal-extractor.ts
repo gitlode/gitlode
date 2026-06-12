@@ -1,6 +1,6 @@
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { withProfiler } from "./profile/index.js";
+import { type StageProfiler, withProfiler } from "../profile/index.js";
 import type {
   TraversalPlan,
   CommitFact,
@@ -8,7 +8,6 @@ import type {
   CommitTraversalRequest,
   ExtractionRange,
   ProgressReporter,
-  StageProfiler,
 } from "./types.js";
 
 function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | null): CommitFact {

@@ -1,5 +1,5 @@
+import { assertNever } from "../support/index.js";
 import { projectCommit, projectFileChange } from "./fact-projector.js";
-import { assertNever } from "./helpers.js";
 import type {
   Fact,
   FactProjector,

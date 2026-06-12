@@ -1,17 +1,16 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { assertNever, getOrThrow } from "./helpers.js";
-import { withProfilerAsync } from "./profile/index.js";
+import type { CommitOid, RefType } from "../model/index.js";
+import { withProfilerAsync } from "../profile/index.js";
+import type { StageProfiler } from "../profile/type.js";
+import { assertNever, getOrThrow } from "../support/index.js";
 import type {
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-  CommitOid,
   ExtractionRange,
   RefCheckpoint,
-  RefType,
   ProgressReporter,
-  StageProfiler,
 } from "./types.js";
 
 function buildCheckpointKey(ref: string, refType: RefType): string {
@@ -27,7 +26,7 @@ function resolveExcludeHash(
     return checkpointTipOid ?? mergeBaseExclude;
   }
   if (range.type === "ref") {
-    return range.ref;
+    return range.since;
   } else if (range.type === "date") {
     return undefined;
   } else {

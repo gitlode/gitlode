@@ -80,53 +80,9 @@ Derived by splitting `commit.message`:
 - `subject`: first line of the message
 - `body`: remaining lines after the first, joined with `\n`. Empty string `""` if no body exists.
 
-```typescript
-function splitMessage(message: string): { subject: string; body: string } {
-  const lines = message.split("\n");
-  const subject = lines[0] ?? "";
-  const body = lines.slice(1).join("\n").trim();
-  return { subject, body };
-}
-```
-
 ### `author.timestamp` / `committer.timestamp`
 
-Convert from isomorphic-git's raw values using the **offset embedded in the commit object itself** — do not use the system timezone.
-
-isomorphic-git returns:
-
-```typescript
-{
-  timestamp: number; // Unix seconds (e.g. 1705312800)
-  timezoneOffset: number; // Minutes offset from UTC (e.g. -540 for JST = UTC+9)
-}
-```
-
-Note: isomorphic-git's `timezoneOffset` is **negated** relative to convention (JST = `-540`, not `+540`). Account for this during conversion.
-
-Conversion algorithm:
-
-```typescript
-function toISO8601(timestamp: number, timezoneOffset: number): string {
-  // timezoneOffset from isomorphic-git is negated: JST = -540
-  const offsetMinutes = -timezoneOffset;
-  const offsetSign = offsetMinutes >= 0 ? "+" : "-";
-  const absOffset = Math.abs(offsetMinutes);
-  const offsetHH = String(Math.floor(absOffset / 60)).padStart(2, "0");
-  const offsetMM = String(absOffset % 60).padStart(2, "0");
-  const offsetStr = `${offsetSign}${offsetHH}:${offsetMM}`;
-
-  const localMs = (timestamp + offsetMinutes * 60) * 1000;
-  const d = new Date(localMs);
-  const YYYY = d.getUTCFullYear();
-  const MM = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const DD = String(d.getUTCDate()).padStart(2, "0");
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  const ss = String(d.getUTCSeconds()).padStart(2, "0");
-  return `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}${offsetStr}`;
-}
-```
+ISO 8601 formatted timestamp with the commit's own timezone offset preserved. Example: `2024-01-15T09:00:00+09:00`.
 
 ### `parents`
 

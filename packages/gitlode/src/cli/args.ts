@@ -1,39 +1,45 @@
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 
 import { Argument, Command, CommanderError, Option } from "commander";
 import { z } from "zod";
 
+import { loadConfigFile } from "../config/index.js";
+import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "../config/index.js";
+import { byteSizeString } from "../config/index.js";
 import type { RotationConfig } from "../core/index.js";
 import { MISSING_STATES } from "../core/index.js";
-import { byteSizeString } from "./common-schema.js";
-import { loadConfigFile } from "./config/index.js";
-import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "./config/index.js";
-import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./consts.js";
+import {
+  type AbsoluteDirectoryPath,
+  type AbsolutePath,
+  dirnameOfFilePath,
+  type IsoDateTimeString,
+  resolveFilePath,
+} from "../support/index.js";
+import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "./constants.js";
 import type { BootstrapResult, BootstrapTermination } from "./errors.js";
 
 export type BootstrapInputRange =
-  | { readonly type: "ref"; readonly sinceRef: string }
-  | { readonly type: "date"; readonly since: Date };
+  | { readonly type: "ref"; readonly since: string }
+  | { readonly type: "date"; readonly since: IsoDateTimeString };
 
 export interface BootstrapInput {
-  readonly repositoryPath: string;
+  readonly repositoryPath: AbsolutePath;
   readonly refs: readonly string[];
-  readonly outputDir: string;
+  readonly outputDir: AbsolutePath;
   readonly outputPrefix?: string;
   readonly rotation: RotationConfig;
   readonly incremental: boolean;
   readonly missingState?: (typeof MISSING_STATES)[number];
   readonly range?: BootstrapInputRange;
-  readonly stateFilePath?: string;
+  readonly stateFilePath?: AbsolutePath;
   readonly perFile: boolean;
   readonly maxDiffSize?: number;
   readonly quiet: boolean;
   readonly profile: boolean;
-  repoName?: string;
-  repoUrl?: string;
-  configPath?: string;
-  extensions?: ConfigExtensionsSection;
+  readonly repoName?: string;
+  readonly repoUrl?: string;
+  readonly configBaseDir?: AbsoluteDirectoryPath;
+  readonly extensions?: ConfigExtensionsSection;
 }
 
 // #region Zod schemas and parsing logic
@@ -93,7 +99,7 @@ const CommandArgsSchema = z.object({
       offset: true,
       error: "Invalid date format for --since-date. Expected ISO 8601 (e.g. 2024-01-01T00:00:00Z)",
     })
-    .transform((value) => new Date(value))
+    .transform((value) => value as IsoDateTimeString)
     .optional(),
   rotateLines: positiveIntegerString("--rotate-lines must be a positive integer").optional(),
   rotateSize: byteSizeString({
@@ -386,9 +392,10 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
 
     // --- Phase 2: Config load/validation (when explicit --config is passed) ---
     let loadedConfig: ProjectConfigurationV1 | undefined;
-    let resolvedConfigPath: string | undefined;
+    let configBaseDir: AbsoluteDirectoryPath | undefined;
     if (configRaw !== undefined) {
-      resolvedConfigPath = resolve(configRaw);
+      const resolvedConfigPath = resolveFilePath(configRaw);
+      configBaseDir = dirnameOfFilePath(resolvedConfigPath);
       const loadedResult = await loadConfigFile(resolvedConfigPath);
       if (loadedResult.kind !== "success") {
         return loadedResult;
@@ -440,19 +447,20 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
       userError("Repository path is required");
     }
 
-    const resolvedRepoPath = resolve(repoPath);
+    const resolvedRepoPath = resolveFilePath(repoPath);
     if (!existsSync(resolvedRepoPath)) {
       userError(`Repository not found: ${repoPath}`);
     }
 
-    const resolvedOutputDir = resolve(outputDir);
+    const resolvedOutputDir = resolveFilePath(outputDir);
     if (!existsSync(resolvedOutputDir)) {
       userError(`Output directory not found: ${outputDir}`);
     }
 
+    let resolvedStatePath: AbsolutePath | undefined;
     if (state) {
-      const resolvedStatePath = resolve(state);
-      const stateParentDir = dirname(resolvedStatePath);
+      resolvedStatePath = resolveFilePath(state);
+      const stateParentDir = dirnameOfFilePath(resolvedStatePath);
       if (!existsSync(stateParentDir)) {
         userError(`Parent directory for state file not found: ${stateParentDir}`);
       }
@@ -464,26 +472,26 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
     return {
       kind: "success",
       value: {
-        repositoryPath: repoPath,
+        repositoryPath: resolvedRepoPath,
         refs: effectiveRefs,
         outputDir: resolvedOutputDir,
         outputPrefix,
         rotation: { maxLines, maxBytes },
         incremental,
-        missingState: incremental ? ((missingState ?? "error") as "error" | "snapshot") : undefined,
+        missingState: incremental ? (missingState ?? "error") : undefined,
         range: effectiveRange.sinceRef
-          ? { type: "ref", sinceRef: effectiveRange.sinceRef }
+          ? { type: "ref", since: effectiveRange.sinceRef }
           : effectiveRange.sinceDate
             ? { type: "date", since: effectiveRange.sinceDate }
             : undefined,
-        stateFilePath: state,
+        stateFilePath: resolvedStatePath,
         perFile,
         maxDiffSize,
         quiet,
         profile: effectiveProfile,
         repoName,
         repoUrl,
-        configPath: resolvedConfigPath,
+        configBaseDir,
         extensions: loadedConfig?.extensions,
       },
     };

@@ -21,12 +21,26 @@ describe("built-in rule sets", () => {
     expect(classifyPath(".gitignore", config).name).toBe("Git ignore file");
   });
 
+  it("includes accepted Java development entries", () => {
+    const config = expectConfig();
+
+    expect(classifyPath("src/main/webapp/index.jsp", config).name).toBe("JSP");
+    expect(classifyPath("src/main/webapp/WEB-INF/tags/menu.tagx", config).name).toBe(
+      "JSP tag file",
+    );
+    expect(classifyPath("pom.xml", config).name).toBe("Maven POM");
+    expect(classifyPath("build.gradle", config).name).toBe("Gradle script");
+    expect(classifyPath("conventions.java.gradle.kts", config).name).toBe("Gradle script");
+    expect(classifyPath("target/app.jar", config).name).toBe("Java archive");
+  });
+
   it("omits ambiguous V1 signatures", () => {
     const config = expectConfig();
 
     expect(classifyPath("source.m", config).name).toBe("Unknown");
     expect(classifyPath("include/header.h", config).name).toBe("Unknown");
     expect(classifyPath("script.pl", config).name).toBe("Unknown");
+    expect(classifyPath("src/main/webapp/WEB-INF/tags/menu.tag", config).name).toBe("Unknown");
   });
 });
 

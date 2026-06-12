@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0
+
+### Minor Changes
+
+- cb4fbe1: Runtime execution now uses a worker-thread boundary: extraction runs in an isolated worker while the main process owns bootstrap, state preflight/load, final state persistence, and process-level rendering/exit handling. Extracted JSONL data semantics and output schema remain unchanged.
+
+### Patch Changes
+
+- 17769d4: shorten progress update interval to 200ms
+
 ## 0.8.2
 
 ### Patch Changes

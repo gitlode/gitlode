@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assertSupportedRepositoryObjectFormat } from "../../src/runtime/index.js";
-import { deriveRepoName } from "../../src/runtime/utils.js";
+import { deriveRepoName, assertSupportedRepositoryObjectFormat } from "../../src/runtime/utils.js";
 
 describe("assertSupportedRepositoryObjectFormat", () => {
   it("accepts supported repository object formats", () => {

@@ -1,10 +1,16 @@
 import { readFile } from "node:fs/promises";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
 import { z } from "zod";
 
 import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "../cli/constants.js";
 import type { BootstrapResult, BootstrapTermination } from "../cli/errors.js";
+import {
+  dirnameOfFilePath,
+  type IsoDateTimeString,
+  type AbsoluteDirectoryPath,
+  type AbsolutePath,
+} from "../support/index.js";
 import { byteSizeString } from "./schema-helpers.js";
 import type { ConfigExtensionsSection } from "./types.js";
 
@@ -18,7 +24,7 @@ const ConfigRangeSchema = z.union([
     .strict(),
   z
     .object({
-      sinceDate: z.iso.datetime({ offset: true }).transform((value) => new Date(value)),
+      sinceDate: z.iso.datetime({ offset: true }).transform((value) => value as IsoDateTimeString),
     })
     .strict(),
 ]);
@@ -99,7 +105,10 @@ function formatZodIssues(error: z.ZodError, configPath: string): string {
   return `Invalid config file${messages.join(";")} (${configPath})`;
 }
 
-function rebaseConfigPaths(parsed: ProjectConfig, configDirectory: string): ProjectConfig {
+function rebaseConfigPaths(
+  parsed: ProjectConfig,
+  configDirectory: AbsoluteDirectoryPath,
+): ProjectConfig {
   const output =
     parsed.output?.directory === undefined
       ? parsed.output
@@ -126,7 +135,9 @@ function rebaseConfigPaths(parsed: ProjectConfig, configDirectory: string): Proj
     extensions,
   };
 }
-export async function loadConfigFile(configPath: string): Promise<BootstrapResult<ProjectConfig>> {
+export async function loadConfigFile(
+  configPath: AbsolutePath,
+): Promise<BootstrapResult<ProjectConfig>> {
   let raw: string;
   try {
     raw = await readFile(configPath, "utf8");
@@ -151,7 +162,7 @@ export async function loadConfigFile(configPath: string): Promise<BootstrapResul
     return toUserError(formatZodIssues(parsed.error, configPath));
   }
 
-  const configDirectory = dirname(configPath);
+  const configDirectory: AbsoluteDirectoryPath = dirnameOfFilePath(configPath);
   const loaded = rebaseConfigPaths(parsed.data, configDirectory);
 
   return { kind: "success", value: loaded };

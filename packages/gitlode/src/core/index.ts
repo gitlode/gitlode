@@ -52,4 +52,4 @@ export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js
 export { DefaultFileChangeExpander } from "./file-change-expander.js";
 export { DefaultFactProjector, projectCommit, projectFileChange } from "./fact-projector.js";
 export { EnrichingFactProjector } from "./enriching-fact-projector.js";
-export { MISSING_STATES } from "./consts.js";
+export { MISSING_STATES } from "./constants.js";

@@ -27,8 +27,8 @@ applyTo: "src/**"
 │ Git implementation / Output implementation                     │
 │ isomorphic-git access, JSONL serialization, file rotation      │
 ├───────────────────────────────────────────────────────────────┤
-│ Model / Support                                                │
-│ Shared domain vocabulary and domain-free helper primitives     │
+│ Type-utils / Model / Support                                   │
+│ Type-only utilities, shared vocabulary, and helper primitives  │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -43,6 +43,10 @@ adapter interface and output sink contract, not on their concrete implementation
 and vocabulary that is meaningful across multiple domains. `src/support/` is the shared
 domain-free helper layer: generic collection, assertion, and parsing helpers that know nothing
 about Git, extraction, CLI, output, plugins, or runtime execution.
+
+`src/type-utils/` is the shared type-only utility layer: TypeScript utility types (for example
+branding helpers) that may be imported across domains. `src/type-utils/` must not contain runtime
+code.
 
 `src/profile/` is the shared profiling layer: instrumentation contracts and helpers used by
 multiple domains (for example Core and Git implementation) without creating reverse dependencies.
@@ -132,6 +136,9 @@ document explicitly says otherwise.
 - Support ownership belongs in `src/support/`: generic helpers such as `assertNever`, indexed
   array accessors, map lookups, and regex capture helpers. Support must not contain Git, CLI,
   output, runtime, plugin, or config vocabulary.
+- Type-utils ownership belongs in `src/type-utils/`: reusable TypeScript type utilities such as
+  `Brand<T, Name>`. This domain is special: it is type-only and must not contain runtime code,
+  side effects, I/O, or executable helper functions.
 - Profile ownership belongs in `src/profile/`: profiling contracts and helpers such as
   `ProfilingEntry`, `StageProfiler`, `DefaultStageProfiler`, `withProfiler()`, and
   `withProfilerAsync()`. Profile must not depend on Core, Git adapter contracts, runtime wiring,
@@ -144,37 +151,43 @@ document explicitly says otherwise.
 
 ### Dependency rules
 
-- `src/model/` must not import from any `src/*` domain. It may use TypeScript and JavaScript
-  built-ins only.
-- `src/support/` must not import from any `src/*` domain. It may use TypeScript and JavaScript
-  built-ins only.
-- `src/profile/` may import from `src/support/` when needed. It must not import from
-  `src/core/`, `src/git/`, `src/git-impl/`, `src/runtime/`, `src/cli/`, `src/presentation/`,
-  `src/output/`, `src/config/`, `src/plugins/`, or `src/state/`.
-- `src/git/` may import from `src/model/` and `src/support/`, but must not import from `src/core/`,
-  `src/runtime/`, `src/cli/`, `src/presentation/`, `src/output/`, or `src/git-impl/`.
-- `src/git-impl/` may import from `src/git/`, `src/model/`, `src/support/`, and `src/profile/`.
-  It must not import from `src/core/` except for temporary migration shims; adapter-facing
-  contracts must not be polluted with extraction pipeline metadata.
-- `src/core/` may import from `src/model/`, `src/support/`, `src/profile/`, and `src/git/`.
-  It must not import from
-  `src/cli/`, `src/presentation/`, `src/runtime/`, `src/git-impl/`, or concrete output writer
+Only the imports listed below are allowed between `src/*` domains. Any `src/*` import not listed
+is forbidden.
+
+- Shared foundational domains:
+  - `src/type-utils/`: imports from no `src/*` domains. Type-only domain; runtime code is
+    forbidden.
+  - `src/model/`: imports from `src/type-utils/` only.
+  - `src/support/`: imports from `src/type-utils/` only.
+  - `src/profile/`: imports from `src/type-utils/` and `src/support/` only.
+- Runtime domains:
+  - `src/git/`: imports from `src/type-utils/`, `src/model/`, and `src/support/`.
+  - `src/git-impl/`: imports from `src/type-utils/`, `src/model/`, `src/support/`, `src/profile/`,
+    and `src/git/`.
+  - `src/core/`: imports from `src/type-utils/`, `src/model/`, `src/support/`, `src/profile/`,
+    and `src/git/`.
+  - `src/output/`: imports from `src/type-utils/`, `src/model/`, `src/support/`, and `src/core/`.
+  - `src/config/`: imports from `src/type-utils/`, `src/model/`, and `src/support/`.
+  - `src/plugins/`: imports from `src/type-utils/`, `src/model/`, `src/support/`, `src/config/`,
+    and `src/core/`.
+  - `src/state/`: imports from `src/type-utils/`, `src/model/`, `src/support/`, `src/profile/`,
+    `src/git/`, and `src/core/`.
+  - `src/runtime/`: imports from `src/type-utils/`, `src/model/`, `src/support/`, `src/profile/`,
+    `src/config/`, `src/plugins/`, `src/state/`, `src/core/`, `src/git/`, `src/git-impl/`, and
+    `src/output/`.
+  - `src/cli/`: imports from `src/type-utils/`, `src/model/`, `src/support/`, and `src/config/`,
+    plus public runtime input types.
+  - `src/presentation/`: imports from `src/type-utils/`, `src/model/`, `src/support/`,
+    progress contracts from `src/core/`, and profile contracts from `src/profile/`.
+
+Additional constraints:
+
+- `src/git-impl/` must not import from `src/core/` except for temporary migration shims.
+- `src/core/` must not import from `src/cli/`, `src/presentation/`, `src/runtime/`,
+  `src/git-impl/`, or concrete output writer modules.
+- `src/runtime/` must not import from `src/cli/` or `src/presentation/`.
+- `src/cli/` must not import from `src/git-impl/`, `src/output/`, or concrete runtime execution
   modules.
-- `src/output/` may import projected-record and sink contracts from `src/core/`, plus
-  `src/model/` and `src/support/` when needed. It must not import from `src/cli/`,
-  `src/presentation/`, `src/runtime/`, `src/git-impl/`, or `src/plugins/`.
-- `src/plugins/` may import plugin contracts from `src/core/`, validated config types from
-  `src/config/`, and shared primitives from `src/model/` / `src/support/`. It must not import from
-  `src/cli/`, `src/presentation/`, `src/git-impl/`, or `src/output/`.
-- `src/runtime/` may import from `src/core/`, `src/git/`, `src/git-impl/`, `src/output/`,
-  `src/state/`, `src/plugins/`, `src/config/`, `src/model/`, `src/support/`, and `src/profile/`.
-  It must not import from `src/cli/` or `src/presentation/`.
-- `src/cli/` may import from `src/config/`, `src/model/`, `src/support/`, and public runtime input
-  types when needed. CLI must not import from `src/git-impl/`, `src/output/`, or concrete runtime
-  execution modules.
-- `src/presentation/` may import progress contracts from `src/core/`, profile contracts from
-  `src/profile/`, and shared primitives from `src/model/` / `src/support/`. It must not import
-  from `src/runtime/`, `src/cli/`, `src/git-impl/`, `src/output/`, or `src/plugins/`.
 
 ### Progress and profiling contracts
 
@@ -228,11 +241,26 @@ Examples of model-owned vocabulary:
 - `RefType`
 - `isCommitOid()` / `isCommitOidForProfile()`
 
+Model may import shared type-only utilities from `src/type-utils/`.
+
+### Type Utilities Layer (`src/type-utils/`)
+
+Responsibilities:
+
+- Define reusable type-level utilities consumed across multiple domains.
+- Provide shared branded-type helpers such as `Brand<T, Name>`.
+- Remain type-only: no runtime values, no executable functions, no side effects.
+
+Examples of type-utils-owned exports:
+
+- `Brand<T, Name>`
+- (optional) `Opaque<T, Name>` aliases when equivalent branding semantics are desired
+
 ### Support Layer (`src/support/`)
 
 Responsibilities:
 
-- Define tiny, domain-free helpers shared across implementation modules.
+- Define tiny runtime helper functions shared across implementation modules.
 - Keep generic helpers out of Core so importing a helper does not imply importing extraction logic.
 
 Examples of support-owned helpers:
@@ -260,8 +288,8 @@ Examples of profile-owned exports:
 - `DefaultStageProfiler`
 - `withProfiler()` / `withProfilerAsync()`
 
-`src/profile/` may depend on `src/support/` for generic helpers, but must not depend on any
-domain-specific source module.
+`src/profile/` may depend on `src/type-utils/` and `src/support/` for shared helpers, but must not
+depend on any domain-specific source module.
 
 ### Config Layer (`src/config/`)
 
@@ -480,14 +508,17 @@ Violating this separation leads to circular imports, naming drift (interfaces ac
 
 ### Rules for shared layers
 
-- **`src/model/index.ts`** and **`src/support/index.ts`** are re-export barrels only.
+- **`src/type-utils/index.ts`**, **`src/model/index.ts`**, and **`src/support/index.ts`** are
+  re-export barrels only.
+- `src/type-utils/` files are type-only modules. Runtime code is forbidden.
 - `src/model/` files may contain exported type aliases, interfaces, constants, and pure predicates
   for shared Git extraction vocabulary. They must not contain Node I/O, runtime orchestration,
   terminal rendering, JSONL writer mechanics, or plugin loading.
-- `src/support/` files may contain exported generic helper functions and type-level utilities only.
-  They must not import from `src/model/` or any other source domain.
+- `src/support/` files may contain exported runtime helper functions only. They must not import
+  from any source domain.
 - When a helper needs domain vocabulary to be understood, it is not a support helper. Put it in the
   owning domain or in `src/model/` if the vocabulary is shared.
+- When a helper is purely type-level and reusable across domains, place it in `src/type-utils/`.
 
 This separation keeps type definitions discoverable and helps prevent circular imports between layers.
 

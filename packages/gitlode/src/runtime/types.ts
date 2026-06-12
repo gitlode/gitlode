@@ -1,26 +1,25 @@
 import type { ConfigExtensionsSection } from "../config/index.js";
 import type { ExtractionState, ProgressEvent, RotationConfig } from "../core/index.js";
 import type { ProfilingEntry } from "../profile/index.js";
-
-export type IsoDateTimeString = string & { readonly __brand: "IsoDateTimeString" };
+import type { AbsoluteDirectoryPath, AbsolutePath, IsoDateTimeString } from "../support/index.js";
 
 export type WorkerRunRange =
-  | { readonly type: "ref"; readonly sinceRef: string }
+  | { readonly type: "ref"; readonly since: string }
   | { readonly type: "date"; readonly since: IsoDateTimeString };
 
 export interface WorkerRunInput {
-  readonly repositoryPath: string;
+  readonly repositoryPath: AbsolutePath;
   readonly refs: readonly string[];
-  readonly outputDir: string;
+  readonly outputDir: AbsolutePath;
   readonly outputPrefix?: string;
   readonly rotation: RotationConfig;
   readonly range?: WorkerRunRange;
-  readonly perFile: boolean;
+  readonly granularity: "commit" | "file";
   readonly maxDiffSize?: number;
   readonly profile: boolean;
   readonly repoName?: string;
   readonly repoUrl?: string;
-  readonly configPath?: string;
+  readonly configBaseDir?: AbsoluteDirectoryPath;
   readonly extensions?: ConfigExtensionsSection;
 }
 

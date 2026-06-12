@@ -1,8 +1,9 @@
 import type { Namespace, PluginFailurePolicy } from "../core/index.js";
+import type { IsoDateTimeString } from "../support/index.js";
 
 export interface ConfigExtractionRange {
   readonly sinceRef?: string;
-  readonly sinceDate?: Date;
+  readonly sinceDate?: IsoDateTimeString;
 }
 
 export interface ConfigExtractionSection {

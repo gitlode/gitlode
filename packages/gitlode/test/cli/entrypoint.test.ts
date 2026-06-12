@@ -30,7 +30,7 @@ interface MockContext {
   readonly createProgressRuntime: ReturnType<typeof vi.fn>;
   readonly renderSuccessReport: ReturnType<typeof vi.fn>;
   readonly dispatchWorkerRunRequest: ReturnType<typeof vi.fn>;
-  readonly loadPriorState: ReturnType<typeof vi.fn>;
+  readonly loadExtractionState: ReturnType<typeof vi.fn>;
   readonly getStateStoreWrites: () => unknown[];
   readonly getSideEffects: () => string[];
 }
@@ -61,7 +61,7 @@ function makeBootstrapInput(overrides: Record<string, unknown> = {}) {
 function mockEntrypointModules(
   options: {
     readonly loadBootstrapInput?: () => Promise<unknown>;
-    readonly loadPriorState?: () => Promise<unknown>;
+    readonly loadExtractionState?: () => Promise<unknown>;
     readonly workerResult?: () => Promise<unknown>;
     readonly objectFormat?: string;
   } = {},
@@ -94,8 +94,8 @@ function mockEntrypointModules(
     sideEffects.push("success-report");
   });
 
-  const loadPriorState =
-    options.loadPriorState ??
+  const loadExtractionState =
+    options.loadExtractionState ??
     vi.fn(async () => ({
       version: 2,
       generatedAt: "",
@@ -150,7 +150,7 @@ function mockEntrypointModules(
   }));
 
   vi.doMock("../../src/state/index.js", () => ({
-    loadPriorState,
+    loadExtractionState,
     NodeStateStore: class {
       async write(state: unknown): Promise<void> {
         sideEffects.push("state-write");
@@ -187,7 +187,7 @@ function mockEntrypointModules(
     createProgressRuntime,
     renderSuccessReport,
     dispatchWorkerRunRequest,
-    loadPriorState,
+    loadExtractionState,
     getStateStoreWrites: () => stateStoreWrites,
     getSideEffects: () => sideEffects,
   };
@@ -313,7 +313,7 @@ describe("CLI entrypoint orchestration", () => {
     await vi.waitFor(() => {
       expect(context.renderSuccessReport).toHaveBeenCalledTimes(1);
     });
-    expect(context.loadPriorState).toHaveBeenCalledTimes(1);
+    expect(context.loadExtractionState).toHaveBeenCalledTimes(1);
     expect(context.getStateStoreWrites()).toEqual([returnedState]);
     expect(context.getSideEffects()).toEqual(["state-write", "success-report"]);
     expect(process.exitCode).toBeUndefined();

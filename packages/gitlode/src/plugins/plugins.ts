@@ -14,6 +14,7 @@ import type {
   PluginRuntimeContext,
   ProjectorPlugin,
 } from "../core/index.js";
+import type { AbsoluteDirectoryPath } from "../support/index.js";
 
 export type PluginSetupTermination = { kind: "user-error"; message: string };
 
@@ -42,10 +43,9 @@ function configError(msg: string): never {
  */
 export async function resolvePluginEntries(
   extensions: ConfigExtensionsSection,
-  configPath: string,
+  baseDir: AbsoluteDirectoryPath,
 ): Promise<ResolvePluginEntriesResult> {
   try {
-    const configDir = dirname(configPath);
     const entries: PluginEntry[] = [];
 
     for (const [namespace, extEntry] of Object.entries(extensions)) {
@@ -53,11 +53,11 @@ export async function resolvePluginEntries(
 
       let resolvedSpecifier: string;
       if (entrypoint.startsWith(".") || isAbsolute(entrypoint)) {
-        resolvedSpecifier = pathToFileURL(resolve(configDir, entrypoint)).href;
+        resolvedSpecifier = pathToFileURL(resolve(baseDir, entrypoint)).href;
       } else {
         // Bare specifier: resolve from config file's directory using require.resolve
         try {
-          const req = createRequire(pathToFileURL(configDir + "/").href);
+          const req = createRequire(pathToFileURL(baseDir + "/").href);
           resolvedSpecifier = pathToFileURL(req.resolve(entrypoint)).href;
         } catch {
           configError(
@@ -188,12 +188,12 @@ async function findNearestPackageJson(
   return null;
 }
 
-function resolveEntrypointToUrl(entrypoint: string, configDir: string): string | null {
+function resolveEntrypointToUrl(entrypoint: string, baseDir: AbsoluteDirectoryPath): string | null {
   try {
     if (entrypoint.startsWith(".") || isAbsolute(entrypoint)) {
-      return pathToFileURL(resolve(configDir, entrypoint)).href;
+      return pathToFileURL(resolve(baseDir, entrypoint)).href;
     }
-    const req = createRequire(pathToFileURL(configDir + "/").href);
+    const req = createRequire(pathToFileURL(baseDir + "/").href);
     return pathToFileURL(req.resolve(entrypoint)).href;
   } catch {
     return null;
@@ -211,7 +211,7 @@ function resolveEntrypointToUrl(entrypoint: string, configDir: string): string |
 export async function checkPluginCompatibility(
   entries: PluginEntry[],
   extensions: ConfigExtensionsSection,
-  configPath: string,
+  baseDir: AbsoluteDirectoryPath,
   reporter: Pick<DiagnosticReporter, "warn">,
 ): Promise<void> {
   const coreVersion = await readCoreVersion();
@@ -219,13 +219,11 @@ export async function checkPluginCompatibility(
     return; // Cannot determine core version; skip all checks silently
   }
 
-  const configDir = dirname(configPath);
-
   for (const entry of entries) {
     const extEntry = extensions[entry.namespace];
     if (!extEntry) continue;
 
-    const entrypointUrl = resolveEntrypointToUrl(extEntry.entrypoint, configDir);
+    const entrypointUrl = resolveEntrypointToUrl(extEntry.entrypoint, baseDir);
     if (entrypointUrl === null) {
       reporter.warn(
         `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${extEntry.entrypoint}.`,

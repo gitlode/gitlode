@@ -11,6 +11,7 @@ import {
   initializePlugins,
   resolvePluginEntries,
 } from "../../src/plugins/plugins.js";
+import type { AbsoluteDirectoryPath } from "../../src/support/index.js";
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -56,10 +57,7 @@ describe("resolvePluginEntries", () => {
       }`,
     );
 
-    const result = await resolvePluginEntries(
-      makeExtensions(),
-      join(tmpDir, "gitlode.config.json"),
-    );
+    const result = await resolvePluginEntries(makeExtensions(), tmpDir as AbsoluteDirectoryPath);
     expect(result.kind).toBe("resolved");
     if (result.kind !== "resolved") {
       throw new Error("Expected resolved plugin entries");

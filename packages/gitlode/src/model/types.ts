@@ -1,7 +1,6 @@
+import type { Brand } from "../type-utils/index.js";
 import type { REF_TYPES } from "./constants.js";
-
-declare const _commitOidBrand: unique symbol;
-export type CommitOid = string & { readonly [_commitOidBrand]: "CommitOid" };
+export type CommitOid = Brand<string, "CommitOid">;
 
 export type OidProfile = "sha1" | "sha256";
 

@@ -6,11 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ProgressReporter, ExtractionState, StateStore } from "../../src/core/index.js";
 import {
-  loadPriorState,
+  loadExtractionState,
   NodeStateStore,
   validateLoadedState,
   type PriorStateLoadOptions,
 } from "../../src/state/index.js";
+import type { AbsolutePath } from "../../src/support/index.js";
 
 function makePriorStateLoadOptions(
   overrides: Partial<PriorStateLoadOptions> = {},
@@ -61,7 +62,7 @@ describe("NodeStateStore", () => {
     const state: ExtractionState = {
       version: 2,
       generatedAt: "2026-01-01T00:00:00.000Z",
-      repositoryPath: process.cwd(),
+      repositoryPath: process.cwd() as AbsolutePath,
       refs: [],
     };
 
@@ -75,7 +76,7 @@ describe("validateLoadedState", () => {
     const state: ExtractionState = {
       version: 2,
       generatedAt: "2026-01-01T00:00:00.000Z",
-      repositoryPath: process.cwd(),
+      repositoryPath: process.cwd() as AbsolutePath,
       refs: [
         {
           ref: "main",
@@ -93,7 +94,7 @@ describe("validateLoadedState", () => {
     const state: ExtractionState = {
       version: 2,
       generatedAt: "",
-      repositoryPath: "/different-repo",
+      repositoryPath: "/different-repo" as AbsolutePath,
       refs: [],
     };
 
@@ -101,57 +102,9 @@ describe("validateLoadedState", () => {
       "State file was created for a different repository: /different-repo",
     );
   });
-});
-
-describe("loadPriorState", () => {
-  it("returns an empty state when incremental mode is disabled", async () => {
-    const reporter = makeReporter();
-    const state = await loadPriorState(
-      makeStateStore(null),
-      makePriorStateLoadOptions({ incremental: false }),
-      process.cwd(),
-      "sha1",
-      reporter,
-    );
-
-    expect(state).toEqual({ version: 2, generatedAt: "", repositoryPath: process.cwd(), refs: [] });
-    expect(reporter.warnings).toEqual([]);
-  });
-
-  it("warns and falls back to a full snapshot when the incremental state file is missing", async () => {
-    const reporter = makeReporter();
-    const state = await loadPriorState(
-      makeStateStore(null),
-      makePriorStateLoadOptions({
-        stateFilePath: join(tmpdir(), "missing-state.json"),
-        missingState: "snapshot",
-      }),
-      process.cwd(),
-      "sha1",
-      reporter,
-    );
-
-    expect(state.refs).toEqual([]);
-    expect(reporter.warnings).toEqual([expect.stringContaining("State file not found:")]);
-  });
-
-  it("rejects incompatible state versions", async () => {
-    const reporter = makeReporter();
-    const store = makeStateStore({
-      version: 1,
-      generatedAt: "",
-      repositoryPath: process.cwd(),
-      refs: [],
-    });
-
-    await expect(
-      loadPriorState(store, makePriorStateLoadOptions(), process.cwd(), "sha1", reporter),
-    ).rejects.toThrow("Unsupported state file version: 1. Supported version: 2.");
-  });
 
   it("validates repository object format specific commit OIDs", async () => {
-    const reporter = makeReporter();
-    const store = makeStateStore({
+    const state = {
       version: 2,
       generatedAt: "",
       repositoryPath: process.cwd(),
@@ -163,10 +116,51 @@ describe("loadPriorState", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
+    };
+
+    expect(() => validateLoadedState(state, process.cwd(), "sha1")).toThrow(
+      'Invalid commit OID in state file for ref "main": not-an-oid',
+    );
+  });
+});
+
+describe("loadExtractionState", () => {
+  it("returns an empty state when state file is missing", async () => {
+    const state = await loadExtractionState(makeStateStore(null));
+
+    expect(state).toBeUndefined();
+  });
+
+  it("rejects incompatible state versions", async () => {
+    const store = makeStateStore({
+      version: 1,
+      generatedAt: "",
+      repositoryPath: process.cwd() as AbsolutePath,
+      refs: [],
     });
 
-    await expect(
-      loadPriorState(store, makePriorStateLoadOptions(), process.cwd(), "sha1", reporter),
-    ).rejects.toThrow('Invalid commit OID in state file for ref "main": not-an-oid');
+    await expect(loadExtractionState(store)).rejects.toThrow(
+      "Unsupported state file version: 1. Supported version: 2.",
+    );
+  });
+
+  it("rejects invalid ref type", async () => {
+    const store = makeStateStore({
+      version: 2,
+      generatedAt: "",
+      repositoryPath: process.cwd() as AbsolutePath,
+      refs: [
+        {
+          ref: "main",
+          refType: "invalid-type",
+          tipOid: "845f01ac537d34adaae8ee77e83e1cceb73fdce7",
+          updatedAt: "2026-06-11T02:15:23.125Z",
+        },
+      ],
+    });
+
+    await expect(loadExtractionState(store)).rejects.toThrow(
+      'Invalid ref type in state file for ref "main": invalid-type',
+    );
   });
 });

@@ -1,6 +1,7 @@
 import type { CommitOid, PersonIdentity, RefType } from "../model/index.js";
 import type { ProfilingEntry, StageProfiler } from "../profile/type.js";
-import type { MISSING_STATES } from "./consts.js";
+import type { AbsolutePath } from "../support/index.js";
+import type { Brand } from "../type-utils/index.js";
 
 /** Core-owned intermediate representation of a single commit, output-format-agnostic. */
 export interface CommitFact {
@@ -116,20 +117,16 @@ export interface RotationConfig {
 }
 
 export type ExtractionRange =
-  | { readonly type: "ref"; readonly ref: CommitOid }
+  | { readonly type: "ref"; readonly since: CommitOid }
   | { readonly type: "date"; readonly since: Date };
 
 export interface ExtractorConfig {
-  readonly repositoryPath: string;
   readonly refs: readonly string[];
-  readonly outputDir: string;
+  readonly outputDir: AbsolutePath;
   readonly outputPrefix: string;
   readonly rotation: RotationConfig;
-  readonly incremental: boolean;
-  readonly missingState?: (typeof MISSING_STATES)[number];
   readonly range?: ExtractionRange;
-  readonly stateFilePath?: string;
-  readonly perFile: boolean;
+  readonly granularity: "commit" | "file";
   readonly maxDiffSize?: number;
 }
 
@@ -168,7 +165,7 @@ export interface RefCheckpoint {
 export interface ExtractionState {
   readonly version: 2;
   readonly generatedAt: string;
-  readonly repositoryPath: string;
+  readonly repositoryPath: AbsolutePath;
   readonly refs: readonly RefCheckpoint[];
 }
 
@@ -268,16 +265,14 @@ export interface OutputSink {
  *  Core-vocabulary terms, not CLI-facing names. `Extractor` translates
  *  `ExtractorConfig` into `CoordinatorRequest` before calling the coordinator. */
 export interface CoordinatorRequest {
-  readonly repositoryPath: string;
+  readonly repositoryPath: AbsolutePath;
   readonly repoName: string;
   readonly repoUrl: string | null;
   readonly refs: readonly string[];
-  /** Renamed from `outputMode`. */
   readonly granularity: "commit" | "file";
   readonly range?: ExtractionRange;
-  /** Loaded and validated by `Extractor.loadPriorState()`. */
   readonly priorState: ExtractionState;
-  /** Wall-clock time at which the extraction session started. Used for checkpoint `generatedAt`. */
+  /** Wall-clock time at which the extraction session started.*/
   readonly sessionTimestamp: Date;
 }
 
@@ -351,7 +346,7 @@ export interface ProjectorPlugin {
 export type PluginFactory = (config: unknown) => ProjectorPlugin | Promise<ProjectorPlugin>;
 
 /** Validated plugin namespace string — must match /^[a-z0-9-]+$/. */
-export type Namespace = string & { readonly __brand: "Namespace" };
+export type Namespace = Brand<string, "Namespace">;
 
 /** Runtime registry record for a loaded, initialized plugin. */
 export interface PluginEntry {

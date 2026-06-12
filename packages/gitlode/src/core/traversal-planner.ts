@@ -26,7 +26,7 @@ function resolveExcludeHash(
     return checkpointTipOid ?? mergeBaseExclude;
   }
   if (range.type === "ref") {
-    return range.ref;
+    return range.since;
   } else if (range.type === "date") {
     return undefined;
   } else {

@@ -1,8 +1,7 @@
 import nodeFs from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import type { BootstrapInput, BootstrapInputRange } from "../cli/args.js";
 import type { ConfigExtensionsSection } from "../config/index.js";
 import type {
   ExtractionState,
@@ -21,7 +20,6 @@ import {
 } from "../core/index.js";
 import { IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
 import { type GitAdapter, GitAdapterError } from "../git/index.js";
-import type { OidProfile } from "../model/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
 import {
   checkPluginCompatibility,
@@ -30,10 +28,10 @@ import {
 } from "../plugins/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
 import { DefaultStageProfiler } from "../profile/index.js";
-import { loadPriorState, NodeStateStore } from "../state/index.js";
-import { firstOrThrow } from "../support/index.js";
-import type { WorkerRunRange, WorkerRunRequest } from "./types.js";
-import { assertSupportedRepositoryObjectFormat, deriveRepoName } from "./utils.js";
+import { validateExtractionState } from "../state/state-store.js";
+import { type AbsoluteDirectoryPath, type AbsolutePath, firstOrThrow } from "../support/index.js";
+import type { WorkerRunInput, WorkerRunRange, WorkerRunRequest } from "./types.js";
+import { deriveRepoName, resolveRepositoryObjectFormat } from "./utils.js";
 
 type BuildProjectorResult =
   | {
@@ -61,22 +59,6 @@ export type RuntimeExecutionResult =
       readonly message: string;
     };
 
-interface RuntimeExecutionInput {
-  readonly repositoryPath: string;
-  readonly refs: readonly string[];
-  readonly outputDir: string;
-  readonly outputPrefix?: string;
-  readonly rotation: ExtractorConfig["rotation"];
-  readonly range?: BootstrapInputRange | WorkerRunRange | ExtractionRange;
-  readonly perFile: boolean;
-  readonly maxDiffSize?: number;
-  readonly profile: boolean;
-  readonly repoName?: string;
-  readonly repoUrl?: string;
-  readonly configPath?: string;
-  readonly extensions?: ConfigExtensionsSection;
-}
-
 function formatPluginInitializationFailure(entry: {
   entry: { namespace: string };
   result: { type: "fatal"; message: string };
@@ -91,12 +73,12 @@ function hasEffectiveExtensionsConfig(
 }
 
 async function validateRepositoryAccess(
-  input: Pick<RuntimeExecutionInput, "repositoryPath" | "refs">,
-  repoPath: string,
-  runAdapter: GitAdapter,
+  input: Pick<WorkerRunInput, "repositoryPath" | "refs">,
+  repoPath: AbsolutePath,
+  gitAdapter: GitAdapter,
 ): Promise<void> {
   try {
-    await runAdapter.resolveRef(repoPath, firstOrThrow(input.refs));
+    await gitAdapter.resolveRef(repoPath, firstOrThrow(input.refs));
   } catch (error) {
     if (error instanceof GitAdapterError && error.code === "NOT_A_REPOSITORY") {
       throw new GitAdapterError(
@@ -128,28 +110,15 @@ async function resolveRepositoryBasics(
   };
 }
 
-async function resolveRepositoryObjectFormat(
-  repoPath: string,
-  runAdapter: GitAdapter,
-): Promise<OidProfile> {
-  const supportedObjectFormats = runAdapter.supportedObjectFormats();
-  const repositoryObjectFormat = await runAdapter.getRepositoryObjectFormat(repoPath);
-  assertSupportedRepositoryObjectFormat(repositoryObjectFormat, supportedObjectFormats);
-  return repositoryObjectFormat;
-}
-
 async function resolveExtractionRange(
-  range: BootstrapInputRange | WorkerRunRange | ExtractionRange | undefined,
-  repoPath: string,
+  range: WorkerRunRange | undefined,
+  repoPath: AbsolutePath,
   runAdapter: GitAdapter,
 ): Promise<ExtractionRange | undefined> {
   if (range === undefined) {
     return undefined;
   }
   if (range.type === "date") {
-    if (range.since instanceof Date) {
-      return { type: "date", since: range.since };
-    }
     const since = new Date(range.since);
     if (Number.isNaN(since.getTime())) {
       throw new Error(`Invalid date format in worker request: ${range.since}`);
@@ -157,16 +126,12 @@ async function resolveExtractionRange(
     return { type: "date", since };
   }
 
-  if ("ref" in range) {
-    return range;
-  }
-
   try {
-    const resolvedSinceRef = await runAdapter.resolveRef(repoPath, range.sinceRef);
-    return { type: "ref", ref: resolvedSinceRef };
+    const resolvedSinceRef = await runAdapter.resolveRef(repoPath, range.since);
+    return { type: "ref", since: resolvedSinceRef };
   } catch (error) {
     if (error instanceof GitAdapterError && error.code === "REF_NOT_FOUND") {
-      throw new GitAdapterError(`Ref not found: ${range.sinceRef}`, "REF_NOT_FOUND");
+      throw new GitAdapterError(`Ref not found: ${range.since}`, "REF_NOT_FOUND");
     }
     throw error;
   }
@@ -192,7 +157,7 @@ async function buildCustomProjector(
   config: {
     repoName: string;
     repoUrl: string | null;
-    configPath: string;
+    baseDir: AbsoluteDirectoryPath;
     extensions: ConfigExtensionsSection;
   },
   progress: RuntimeExecutionProgress,
@@ -200,7 +165,7 @@ async function buildCustomProjector(
 ): Promise<BuildProjectorResult> {
   progress.reporter.emit({ type: "phase-start", phase: "initializing-plugins" });
 
-  const pluginEntriesResult = await resolvePluginEntries(config.extensions, config.configPath);
+  const pluginEntriesResult = await resolvePluginEntries(config.extensions, config.baseDir);
   if (pluginEntriesResult.kind === "termination") {
     return {
       kind: "termination",
@@ -210,7 +175,7 @@ async function buildCustomProjector(
 
   const pluginEntries = pluginEntriesResult.entries;
 
-  await checkPluginCompatibility(pluginEntries, config.extensions, config.configPath, {
+  await checkPluginCompatibility(pluginEntries, config.extensions, config.baseDir, {
     warn(message) {
       progress.renderDiagnostic("warn", message);
     },
@@ -253,11 +218,11 @@ async function buildCustomProjector(
   };
 }
 
-async function executePreparedRuntimeSession(
-  input: RuntimeExecutionInput,
-  priorState: ExtractionState,
+export async function executeWorkerRunRequest(
+  request: WorkerRunRequest,
   progress: RuntimeExecutionProgress,
 ): Promise<RuntimeExecutionResult> {
+  const { input, priorState } = request;
   const rootProfiler = new DefaultStageProfiler("elapsed", () => performance.now());
   const profilingRootProfiler = input.profile ? rootProfiler : undefined;
 
@@ -265,7 +230,7 @@ async function executePreparedRuntimeSession(
   const startMs = performance.now();
   rootProfiler.start();
 
-  const resolvedRepoPath = resolve(input.repositoryPath);
+  const resolvedRepoPath: AbsolutePath = input.repositoryPath;
 
   try {
     const gitAdapter = new IsomorphicGitAdapter({
@@ -275,6 +240,13 @@ async function executePreparedRuntimeSession(
     });
 
     await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter);
+
+    const repositoryObjectFormat = await resolveRepositoryObjectFormat(
+      resolvedRepoPath,
+      gitAdapter,
+    );
+
+    validateExtractionState(priorState, resolvedRepoPath, repositoryObjectFormat);
 
     const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await resolveRepositoryBasics(
       resolvedRepoPath,
@@ -290,16 +262,12 @@ async function executePreparedRuntimeSession(
       resolvedRepoPath,
     );
     const extractorConfig: ExtractorConfig = {
-      repositoryPath: input.repositoryPath,
       refs: input.refs,
       outputDir: input.outputDir,
       outputPrefix: resolvedOutputPrefix,
       rotation: input.rotation,
-      incremental: false,
-      missingState: undefined,
       range: resolvedRange,
-      stateFilePath: undefined,
-      perFile: input.perFile,
+      granularity: input.granularity,
       maxDiffSize: input.maxDiffSize,
     };
 
@@ -316,7 +284,7 @@ async function executePreparedRuntimeSession(
     );
 
     let projector: FactProjector;
-    const { configPath, extensions } = input;
+    const { configBaseDir: configPath, extensions } = input;
     if (!configPath || !hasEffectiveExtensionsConfig(extensions)) {
       projector = new DefaultFactProjector(resolvedRepoName, resolvedRepoUrl, projectionProfiler);
     } else {
@@ -324,7 +292,7 @@ async function executePreparedRuntimeSession(
         {
           repoName: resolvedRepoName,
           repoUrl: resolvedRepoUrl,
-          configPath,
+          baseDir: configPath,
           extensions,
         },
         progress,
@@ -363,7 +331,7 @@ async function executePreparedRuntimeSession(
       repoName: resolvedRepoName,
       repoUrl: resolvedRepoUrl,
       refs: [...extractorConfig.refs],
-      granularity: extractorConfig.perFile ? "file" : "commit",
+      granularity: extractorConfig.granularity,
       range: extractorConfig.range,
       priorState,
       sessionTimestamp,
@@ -388,76 +356,4 @@ async function executePreparedRuntimeSession(
   } finally {
     rootProfiler.stop();
   }
-}
-
-export async function executeRuntimeSession(
-  bootstrapInput: BootstrapInput,
-  progress: RuntimeExecutionProgress,
-): Promise<RuntimeExecutionResult> {
-  const resolvedRepoPath = resolve(bootstrapInput.repositoryPath);
-  const gitAdapter = new IsomorphicGitAdapter({
-    fs: nodeFs,
-    diffAdapter: new JsDiffAdapter(),
-  });
-
-  const repositoryObjectFormat = await resolveRepositoryObjectFormat(resolvedRepoPath, gitAdapter);
-  const stateStore = bootstrapInput.stateFilePath
-    ? new NodeStateStore(bootstrapInput.stateFilePath)
-    : undefined;
-  const priorState = await loadPriorState(
-    stateStore,
-    {
-      incremental: bootstrapInput.incremental,
-      missingState: bootstrapInput.missingState,
-      stateFilePath: bootstrapInput.stateFilePath,
-    },
-    resolvedRepoPath,
-    repositoryObjectFormat,
-    progress.reporter,
-  );
-
-  return executePreparedRuntimeSession(
-    {
-      repositoryPath: bootstrapInput.repositoryPath,
-      refs: bootstrapInput.refs,
-      outputDir: bootstrapInput.outputDir,
-      outputPrefix: bootstrapInput.outputPrefix,
-      rotation: bootstrapInput.rotation,
-      range: bootstrapInput.range,
-      perFile: bootstrapInput.perFile,
-      maxDiffSize: bootstrapInput.maxDiffSize,
-      profile: bootstrapInput.profile,
-      repoName: bootstrapInput.repoName,
-      repoUrl: bootstrapInput.repoUrl,
-      configPath: bootstrapInput.configPath,
-      extensions: bootstrapInput.extensions,
-    },
-    priorState,
-    progress,
-  );
-}
-
-export async function executeWorkerRunRequest(
-  request: WorkerRunRequest,
-  progress: RuntimeExecutionProgress,
-): Promise<RuntimeExecutionResult> {
-  return executePreparedRuntimeSession(
-    {
-      repositoryPath: request.input.repositoryPath,
-      refs: request.input.refs,
-      outputDir: request.input.outputDir,
-      outputPrefix: request.input.outputPrefix,
-      rotation: request.input.rotation,
-      range: request.input.range,
-      perFile: request.input.perFile,
-      maxDiffSize: request.input.maxDiffSize,
-      profile: request.input.profile,
-      repoName: request.input.repoName,
-      repoUrl: request.input.repoUrl,
-      configPath: request.input.configPath,
-      extensions: request.input.extensions,
-    },
-    request.priorState,
-    progress,
-  );
 }

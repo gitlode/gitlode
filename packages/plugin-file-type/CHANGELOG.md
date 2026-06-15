@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+### Patch Changes
+
+- c19baaa: Update peerDependencies to require gitlode version ^0.9.0
+- 98f9ec6: [Added] Expanded built-in file type detection to recognize more Java ecosystem files, including Gradle/Groovy scripts, JSP-related files, Maven descriptors, and Java archive artifacts.
+
 ## 0.1.0 - 2026-06-09
 
 ### Added

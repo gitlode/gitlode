@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+### Patch Changes
+
+- c19baaa: Update peerDependencies to require gitlode version ^0.9.0
+
 ## 0.3.1
 
 ### Patch Changes

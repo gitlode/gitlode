@@ -35,7 +35,7 @@
     "gitlode": "^0.8.2"
   },
   "peerDependencies": {
-    "gitlode": "^0.8.2"
+    "gitlode": "^0.9.0"
   },
   "engines": {
     "node": ">=22.0.0"

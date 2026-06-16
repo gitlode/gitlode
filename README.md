@@ -65,11 +65,14 @@ For the full CLI reference, output schema, and workflow patterns, see the
 
 This monorepo hosts the gitlode CLI and its official plugins.
 
-| Package                                                                         | npm                                                                                                          | Description                                                        |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| [`gitlode`](packages/gitlode/)                                                  | [`gitlode`](https://www.npmjs.com/package/gitlode)                                                           | The gitlode CLI — commit history extractor                         |
-| [`@gitlode/plugin-conventional-commits`](packages/plugin-conventional-commits/) | [`@gitlode/plugin-conventional-commits`](https://www.npmjs.com/package/@gitlode/plugin-conventional-commits) | Official plugin for parsing conventional commits into `extensions` |
-| [`@gitlode/plugin-custom-field`](packages/plugin-custom-field/)                 | [`@gitlode/plugin-custom-field`](https://www.npmjs.com/package/@gitlode/plugin-custom-field)                 | Official plugin for static custom fields in `extensions`           |
+| Package                                                                         | npm                                                                                                          | Description                                                               |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| [`gitlode`](packages/gitlode/)                                                  | [`gitlode`](https://www.npmjs.com/package/gitlode)                                                           | The gitlode CLI — commit history extractor                                |
+| [`@gitlode/plugin-assay-metrics`](packages/plugin-assay-metrics/)               | [`@gitlode/plugin-assay-metrics`](https://www.npmjs.com/package/@gitlode/plugin-assay-metrics)               | Official plugin for heuristic development activity metrics                |
+| [`@gitlode/plugin-conventional-commits`](packages/plugin-conventional-commits/) | [`@gitlode/plugin-conventional-commits`](https://www.npmjs.com/package/@gitlode/plugin-conventional-commits) | Official plugin for parsing conventional commits into `extensions`        |
+| [`@gitlode/plugin-custom-field`](packages/plugin-custom-field/)                 | [`@gitlode/plugin-custom-field`](https://www.npmjs.com/package/@gitlode/plugin-custom-field)                 | Official plugin for static custom fields in `extensions`                  |
+| [`@gitlode/plugin-file-type`](packages/plugin-file-type/)                       | [`@gitlode/plugin-file-type`](https://www.npmjs.com/package/@gitlode/plugin-file-type)                       | Official plugin for inferring file type classification                    |
+| [`@gitlode/plugin-identity-profile`](packages/plugin-identity-profile/)         | [`@gitlode/plugin-identity-profile`](https://www.npmjs.com/package/@gitlode/plugin-identity-profile)         | Official gitlode plugin for identity normalization and profile enrichment |
 
 Additional official plugins will appear here as the plugin ecosystem grows, published under the
 `@gitlode/*` scope.
@@ -84,7 +87,6 @@ Additional official plugins will appear here as the plugin ecosystem grows, publ
   extraction modes, and deduplication strategy
 - [Output Schema](packages/gitlode/docs/design/schema.md) — JSONL format, field definitions,
   timestamp conversion, and file rotation
-- [Changelog](packages/gitlode/CHANGELOG.md) — release history of the `gitlode` package
 
 ## Repository structure
 
@@ -92,8 +94,11 @@ Additional official plugins will appear here as the plugin ecosystem grows, publ
 .
 ├── packages/
 │   ├── gitlode/        # gitlode CLI (published to npm as `gitlode`)
+│   ├── plugin-assay-metrics/          # official plugin (published as `@gitlode/plugin-assay-metrics`)
 │   ├── plugin-conventional-commits/   # official plugin (published as `@gitlode/plugin-conventional-commits`)
-│   └── plugin-custom-field/           # official plugin (published as `@gitlode/plugin-custom-field`)
+│   ├── plugin-custom-field/           # official plugin (published as `@gitlode/plugin-custom-field`)
+|   ├── plugin-file-type/              # official plugin (published as `@gitlode/plugin-file-type`)
+|   └── plugin-identity-profile/       # official plugin (published as `@gitlode/plugin-identity-profile`)
 ├── CONTRIBUTING.md     # Contribution guide for the whole repository
 ├── LICENSE
 └── README.md           # You are here

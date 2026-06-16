@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": [
     "packages/gitlode",
+    "packages/plugin-assay-metrics",
     "packages/plugin-conventional-commits",
     "packages/plugin-custom-field",
     "packages/plugin-file-type",

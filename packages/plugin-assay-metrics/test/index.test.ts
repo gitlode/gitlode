@@ -52,7 +52,7 @@ describe("@gitlode/plugin-assay-metrics", () => {
       data: {
         delta: -5,
         churn: 25,
-        max: 15,
+        "net-change": 15,
       },
     });
   });

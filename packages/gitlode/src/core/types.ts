@@ -308,7 +308,11 @@ export interface DiagnosticReporter {
 
 export type PluginFailurePolicy = "skip-fact" | "fatal";
 
-export type PluginInitResult = { type: "ready" } | { type: "fatal"; message: string };
+export type PluginInitSuccess = { type: "ready" };
+
+export type PluginInitFatal = { type: "fatal" };
+
+export type PluginInitResult = PluginInitSuccess | PluginInitFatal;
 
 /**
  * The value a plugin may return as `success.data`. Scalars (`string`, `number`,
@@ -319,8 +323,8 @@ export type PluginProjectionValue = string | number | boolean | Readonly<Record<
 
 export type PluginProjectionResult =
   | { type: "success"; data: PluginProjectionValue }
-  | { type: "skip"; message: string }
-  | { type: "fatal"; message: string };
+  | { type: "skip" }
+  | { type: "fatal" };
 
 type ProjectionContextFor<Type extends FactType> = {
   readonly fact: FactFor<Type>;

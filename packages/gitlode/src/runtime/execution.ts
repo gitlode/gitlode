@@ -24,6 +24,7 @@ import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../outpu
 import {
   checkPluginCompatibility,
   initializePlugins,
+  type PluginInitializationFailure,
   resolvePluginEntries,
 } from "../plugins/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
@@ -59,11 +60,8 @@ export type RuntimeExecutionResult =
       readonly message: string;
     };
 
-function formatPluginInitializationFailure(entry: {
-  entry: { namespace: string };
-  result: { type: "fatal"; message: string };
-}): string {
-  return `Plugin "${entry.entry.namespace}" init failed: ${entry.result.message}`;
+function formatPluginInitializationFailure(result: PluginInitializationFailure): string {
+  return `Plugin "${result.entry.namespace}" init failed.`;
 }
 
 function hasEffectiveExtensionsConfig(
@@ -193,15 +191,12 @@ async function buildCustomProjector(
     profiler: pluginsProfiler?.createScopedProfiler(entry.namespace),
   }));
 
-  const pluginInitFailures = pluginInitResults.filter(
-    (entry): entry is typeof entry & { result: { type: "fatal"; message: string } } =>
-      entry.result.type === "fatal",
-  );
+  const pluginInitFailures = pluginInitResults.filter((result) => result.type === "fatal");
   if (pluginInitFailures.length > 0) {
     return {
       kind: "termination",
       message: pluginInitFailures
-        .map((entry) => formatPluginInitializationFailure(entry))
+        .map((result) => formatPluginInitializationFailure(result))
         .join("\n"),
     };
   }

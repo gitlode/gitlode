@@ -12,7 +12,9 @@ import type {
   ProjectionContext,
   ProjectorPlugin,
   ProjectedRecord,
+  Namespace,
 } from "../../src/core/types.js";
+import type { CommitOid } from "../../src/model/types.js";
 import { initializePlugins } from "../../src/plugins/plugins.js";
 
 // ---------------------------------------------------------------------------
@@ -22,7 +24,7 @@ import { initializePlugins } from "../../src/plugins/plugins.js";
 function makeCommitFact(overrides: Partial<Omit<CommitFact, "type">> = {}): CommitFact {
   return {
     type: "commit",
-    oid: "a".repeat(40),
+    oid: "a".repeat(40) as CommitOid,
     message: "fix: bug",
     author: { name: "Auth", email: "a@e.com", timestamp: 1_000_000, timezoneOffset: 0 },
     committer: { name: "Comm", email: "c@e.com", timestamp: 1_000_001, timezoneOffset: 0 },
@@ -77,7 +79,7 @@ function makeEntry(
   plugin: ProjectorPlugin,
   failurePolicy: "skip-fact" | "fatal" = "skip-fact",
 ): PluginEntry {
-  return { namespace, plugin, failurePolicy };
+  return { namespace: namespace as Namespace, plugin, failurePolicy };
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +173,7 @@ describe("EnrichingFactProjector — basic enrichment", () => {
     expect(initResults).toEqual([
       {
         entry: entries[0],
-        result: { type: "ready" },
+        type: "ready",
       },
     ]);
     expect(warnings).toEqual([]);
@@ -257,20 +259,36 @@ describe("EnrichingFactProjector — declaration order", () => {
 // ---------------------------------------------------------------------------
 
 describe("EnrichingFactProjector — skip result", () => {
-  it("sets namespace to null and emits warning on skip", async () => {
+  it("sets namespace to null", async () => {
     const warnedMessages: string[] = [];
     const reporter: ProgressReporter = {
       emit: (e) => {
         if (e.type === "warning") warnedMessages.push(e.message);
       },
     };
-    const plugin = makePlugin(async () => ({ type: "skip", message: "no data" }));
+    const plugin = makePlugin(async () => ({ type: "skip" }));
     const projector = new EnrichingFactProjector([makeEntry("p", plugin)], reporter, "repo", null);
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
-    expect(warnedMessages).toHaveLength(1);
-    expect(warnedMessages[0]).toContain("p");
-    expect(warnedMessages[0]).toContain("no data");
+    expect(warnedMessages).toHaveLength(0);
+  });
+
+  it("sets namespace to null and emits warning when plugin throws Error", async () => {
+    const warnedMessages: string[] = [];
+    const reporter: ProgressReporter = {
+      emit: (e) => {
+        if (e.type === "warning") warnedMessages.push(e.message);
+      },
+    };
+    const plugin = makePlugin(async () => {
+      throw new Error("something went wrong");
+    });
+    const projector = new EnrichingFactProjector([makeEntry("p", plugin)], reporter, "repo", null);
+    const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
+    expect(record!.extensions?.["p"]).toBeNull();
+    expect(warnedMessages).toHaveLength(2);
+    expect(warnedMessages[0]).toContain("something went wrong");
+    expect(warnedMessages[1]).toContain("skipped fact");
   });
 
   it("continues to next plugin after skip", async () => {
@@ -300,7 +318,7 @@ describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
         if (e.type === "warning") warnedMessages.push(e.message);
       },
     };
-    const plugin = makePlugin(async () => ({ type: "fatal", message: "something broke" }));
+    const plugin = makePlugin(async () => ({ type: "fatal" }));
     const projector = new EnrichingFactProjector(
       [makeEntry("p", plugin, "skip-fact")],
       reporter,
@@ -310,7 +328,7 @@ describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
     expect(warnedMessages).toHaveLength(1);
-    expect(warnedMessages[0]).toContain("something broke");
+    expect(warnedMessages[0]).toContain("skipped fact");
   });
 
   it("does not throw when plugin returns fatal with skip-fact policy", async () => {
@@ -333,7 +351,7 @@ describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
 
 describe("EnrichingFactProjector — fatal + fatal policy", () => {
   it("throws when policy is fatal and plugin returns fatal result", async () => {
-    const plugin = makePlugin(async () => ({ type: "fatal", message: "hard fail" }));
+    const plugin = makePlugin(async () => ({ type: "fatal" }));
     const projector = new EnrichingFactProjector(
       [makeEntry("p", plugin, "fatal")],
       noopReporter,
@@ -341,7 +359,7 @@ describe("EnrichingFactProjector — fatal + fatal policy", () => {
       null,
     );
     await expect(collect(projector.project(toAsyncIter([makeCommitFact()])))).rejects.toThrow(
-      "hard fail",
+      "fatal error",
     );
   });
 });
@@ -383,7 +401,7 @@ describe("EnrichingFactProjector — throw handling", () => {
       null,
     );
     await expect(collect(projector.project(toAsyncIter([makeCommitFact()])))).rejects.toThrow(
-      "kaboom",
+      "fatal error",
     );
   });
 });
@@ -435,36 +453,57 @@ describe("EnrichingFactProjector — ProjectionContext", () => {
 
 describe("EnrichingFactProjector — warning format", () => {
   it('formats warning as Plugin "<ns>" skipped fact <oid>: <message> for commit', async () => {
-    const warnings: string[] = [];
+    const warnedMessages: string[] = [];
     const reporter: ProgressReporter = {
       emit: (e) => {
-        if (e.type === "warning") warnings.push(e.message);
+        if (e.type === "warning") warnedMessages.push(e.message);
       },
     };
-    const plugin = makePlugin(async () => ({ type: "skip", message: "no enrichment" }));
+    const plugin = makePlugin(async () => {
+      throw new Error("something broke");
+    });
     const fact = makeCommitFact({ oid: "d".repeat(40) });
     const projector = new EnrichingFactProjector(
-      [makeEntry("my-ns", plugin)],
+      [makeEntry("my-ns", plugin, "fatal")],
       reporter,
       "repo",
       null,
     );
-    await collect(projector.project(toAsyncIter([fact])));
-    expect(warnings[0]).toBe(`Plugin "my-ns" skipped fact ${"d".repeat(40)}: no enrichment`);
+
+    await expect(collect(projector.project(toAsyncIter([fact])))).rejects.toThrow(
+      `Plugin "my-ns" fatal error on fact ${"d".repeat(40)}`,
+    );
+    expect(warnedMessages).toHaveLength(1);
+    expect(warnedMessages[0]).toContain(`Plugin "my-ns" threw an error on fact ${"d".repeat(40)}`);
+    expect(warnedMessages[0]).toContain("something broke");
   });
 
   it("formats warning with <oid>/<path> for file-change facts", async () => {
-    const warnings: string[] = [];
+    const warnedMessages: string[] = [];
     const reporter: ProgressReporter = {
       emit: (e) => {
-        if (e.type === "warning") warnings.push(e.message);
+        if (e.type === "warning") warnedMessages.push(e.message);
       },
     };
-    const plugin = makePlugin(async () => ({ type: "skip", message: "skipped" }));
+    const plugin = makePlugin(async () => {
+      throw new Error("something broke");
+    });
     const fact = makeFileChangeFact({ commit: { oid: "e".repeat(40) }, file: { path: "a/b.ts" } });
-    const projector = new EnrichingFactProjector([makeEntry("ns", plugin)], reporter, "repo", null);
-    await collect(projector.project(toAsyncIter([fact as Fact])));
-    expect(warnings[0]).toBe(`Plugin "ns" skipped fact ${"e".repeat(40)}/a/b.ts: skipped`);
+    const projector = new EnrichingFactProjector(
+      [makeEntry("my-ns", plugin, "fatal")],
+      reporter,
+      "repo",
+      null,
+    );
+
+    await expect(collect(projector.project(toAsyncIter([fact])))).rejects.toThrow(
+      `Plugin "my-ns" fatal error on fact ${"e".repeat(40)}/a/b.ts`,
+    );
+    expect(warnedMessages).toHaveLength(1);
+    expect(warnedMessages[0]).toContain(
+      `Plugin "my-ns" threw an error on fact ${"e".repeat(40)}/a/b.ts`,
+    );
+    expect(warnedMessages[0]).toContain("something broke");
   });
 });
 

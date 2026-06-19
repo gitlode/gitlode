@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.0
+
+### Minor Changes
+
+- 0435c9d: [Changed] gitlode now outputs commit text as a single `message` field in JSONL records instead of separate `subject` and `body`; use `@gitlode/plugin-conventional-commits` if you need split commit-message fields.
+- 5ece811: [Changed] Updated the plugin interface so `skip`/`fatal` results no longer include message fields, and plugins must emit their own warnings/errors via runtime diagnostics; plugin packages need compatible updates when upgrading gitlode.
+
+### Patch Changes
+
+- 66088bb: Update dependencies
+
 ## 0.9.0
 
 ### Minor Changes

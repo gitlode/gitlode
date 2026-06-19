@@ -1,6 +1,6 @@
 {
   "name": "@gitlode/plugin-identity-profile",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Official gitlode plugin for identity normalization and profile enrichment",
   "keywords": [
     "gitlode",
@@ -32,10 +32,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "gitlode": "^0.9.0"
+    "gitlode": "^0.10.0"
   },
   "peerDependencies": {
-    "gitlode": "^0.9.0"
+    "gitlode": "^0.10.0"
   },
   "engines": {
     "node": ">=22.0.0"

@@ -1,4 +1,4 @@
-import type { ProjectionContext } from "gitlode/plugin-api";
+import type { CommitFact, CommitOid, ProjectedCommit, ProjectionContext } from "gitlode/plugin-api";
 import { describe, expect, it } from "vitest";
 
 import factory from "../src/index.js";
@@ -24,7 +24,6 @@ describe("plugin factory", () => {
 
     await expect(plugin.project(createCommitContext())).resolves.toEqual({
       type: "skip",
-      message: "commit facts are not supported",
     });
   });
 
@@ -54,7 +53,6 @@ describe("plugin factory", () => {
 
     await expect(plugin.project(createFileChangeContext("src/file.unmapped"))).resolves.toEqual({
       type: "skip",
-      message: "file type could not be determined",
     });
   });
 
@@ -92,7 +90,6 @@ describe("plugin factory", () => {
 
     await expect(plugin.init(createRuntime(errors))).resolves.toEqual({
       type: "fatal",
-      message: "Plugin configuration is invalid.",
     });
     expect(errors).toEqual(['Invalid plugin config: unknown field "unknown".']);
   });
@@ -142,10 +139,10 @@ function createFileChangeContext(
   } as ProjectionContext;
 }
 
-function createCommitFact() {
+function createCommitFact(): CommitFact {
   return {
     type: "commit" as const,
-    oid: "0123456789abcdef0123456789abcdef01234567",
+    oid: "0123456789abcdef0123456789abcdef01234567" as CommitOid,
     message: "feat: add file\n",
     author: {
       name: "Author",
@@ -167,9 +164,9 @@ function createCommitFact() {
   };
 }
 
-function createBaseRecord() {
+function createBaseRecord(): ProjectedCommit {
   return {
-    oid: "0123456789abcdef0123456789abcdef01234567",
+    oid: "0123456789abcdef0123456789abcdef01234567" as CommitOid,
     subject: "feat: add file",
     body: "",
     author: {

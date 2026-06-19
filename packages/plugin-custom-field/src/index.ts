@@ -1,9 +1,10 @@
 import type {
   PluginFactory,
   PluginInitResult,
-  PluginProjectionValue,
   PluginProjectionResult,
+  PluginProjectionValue,
   PluginRuntimeContext,
+  ProjectorPlugin,
 } from "gitlode/plugin-api";
 
 type FieldValue = string | number | boolean | null;
@@ -38,7 +39,7 @@ function parseScalarValue(valueRaw: unknown): ParseResult {
   }
 }
 
-function parseConfig(rawConfig: unknown): ParseResult {
+export function parseConfig(rawConfig: unknown): ParseResult {
   if (!isRecord(rawConfig)) {
     return {
       type: "error",
@@ -104,24 +105,28 @@ function parseConfig(rawConfig: unknown): ParseResult {
 }
 
 const factory: PluginFactory = async (rawConfig: unknown) => {
-  const parsedConfig = parseConfig(rawConfig);
-  const initResult: PluginInitResult =
-    parsedConfig.type === "ok"
-      ? { type: "ready" }
-      : { type: "fatal", message: parsedConfig.message };
-  const projectResult: PluginProjectionResult =
-    parsedConfig.type === "ok"
-      ? { type: "success", data: parsedConfig.value }
-      : { type: "success", data: {} };
+  let runtime: PluginRuntimeContext | undefined;
+  let projectionValue: PluginProjectionValue | undefined;
 
   return {
-    async init(_runtime: PluginRuntimeContext) {
-      return initResult;
+    async init(runtimeContext: PluginRuntimeContext): Promise<PluginInitResult> {
+      runtime = runtimeContext;
+      const parseResult = parseConfig(rawConfig);
+      if (parseResult.type !== "ok") {
+        runtimeContext.error(parseResult.message);
+        return { type: "fatal" };
+      }
+      projectionValue = parseResult.value;
+      return { type: "ready" };
     },
-    async project() {
-      return projectResult;
+    async project(): Promise<PluginProjectionResult> {
+      if (projectionValue === undefined) {
+        runtime?.error("Plugin used before successful initialization.");
+        return { type: "fatal" };
+      }
+      return { type: "success", data: projectionValue };
     },
-  };
+  } satisfies ProjectorPlugin;
 };
 
 export default factory;

@@ -1,16 +1,26 @@
 import { CommitParser } from "conventional-commits-parser";
-import type { PluginFactory, PluginRuntimeContext, ProjectionContext } from "gitlode/plugin-api";
+import type {
+  PluginFactory,
+  PluginInitResult,
+  PluginProjectionResult,
+  PluginRuntimeContext,
+  ProjectionContext,
+  ProjectorPlugin,
+} from "gitlode/plugin-api";
 
 const factory: PluginFactory = async () => {
+  let runtime: PluginRuntimeContext | undefined;
   let parser: CommitParser | undefined;
   return {
-    async init(_runtime: PluginRuntimeContext) {
+    async init(_runtimeContext: PluginRuntimeContext): Promise<PluginInitResult> {
+      runtime = _runtimeContext;
       parser = new CommitParser();
       return { type: "ready" };
     },
-    async project(context: ProjectionContext) {
+    async project(context: ProjectionContext): Promise<PluginProjectionResult> {
       if (parser === undefined) {
-        throw new Error("Plugin not initialized");
+        runtime?.error("Plugin used before successful initialization.");
+        return { type: "fatal" };
       }
       const { fact } = context;
       const commit = fact.type === "commit" ? fact : fact.commit;
@@ -18,7 +28,7 @@ const factory: PluginFactory = async () => {
 
       return { type: "success", data: parsedCommit };
     },
-  };
+  } satisfies ProjectorPlugin;
 };
 
 export default factory;

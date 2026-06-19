@@ -4,6 +4,7 @@ import type {
   Fact,
   FactProjector,
   PluginEntry,
+  PluginProjectionResult,
   ProgressReporter,
   ProjectedExtensions,
   ProjectedRecord,
@@ -72,15 +73,16 @@ export class EnrichingFactProjector implements FactProjector {
 
     for (const entry of this.pluginEntries) {
       const { namespace, plugin, failurePolicy } = entry;
-      let result;
+      let result: PluginProjectionResult;
 
       try {
         result = await plugin.project(ctx);
       } catch (err) {
-        result = {
-          type: "fatal" as const,
-          message: err instanceof Error ? err.message : String(err),
-        };
+        this.reporter.emit({
+          type: "warning",
+          message: `Plugin "${namespace}" threw an error on fact ${this.factId(fact)}: ${err instanceof Error ? err.message : String(err)}`,
+        });
+        result = { type: "fatal" };
       }
 
       switch (result.type) {
@@ -89,21 +91,15 @@ export class EnrichingFactProjector implements FactProjector {
           break;
         case "skip":
           extensions[namespace] = null;
-          this.reporter.emit({
-            type: "warning",
-            message: `Plugin "${namespace}" skipped fact ${this.factId(fact)}: ${result.message}`,
-          });
           break;
         case "fatal":
           if (failurePolicy === "fatal") {
-            throw new Error(
-              `Plugin "${namespace}" fatal error on fact ${this.factId(fact)}: ${result.message}`,
-            );
+            throw new Error(`Plugin "${namespace}" fatal error on fact ${this.factId(fact)}`);
           }
           extensions[namespace] = null;
           this.reporter.emit({
             type: "warning",
-            message: `Plugin "${namespace}" skipped fact ${this.factId(fact)}: ${result.message}`,
+            message: `Plugin "${namespace}" skipped fact ${this.factId(fact)}`,
           });
           break;
       }

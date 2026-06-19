@@ -30,7 +30,6 @@ describe("@gitlode/plugin-assay-metrics", () => {
       } as never),
     ).resolves.toEqual({
       type: "skip",
-      message: "commit facts are not supported",
     });
   });
 

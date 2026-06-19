@@ -25,6 +25,8 @@ export type {
   PluginEntry,
   PluginFactory,
   PluginFailurePolicy,
+  PluginInitSuccess,
+  PluginInitFatal,
   PluginInitResult,
   PluginProjectionResult,
   PluginProjectionValue,

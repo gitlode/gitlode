@@ -44,8 +44,7 @@ function makeCommitFact(oid: string): CommitFact {
 function makeOutputRecord(oid: string): ProjectedRecord {
   return {
     oid,
-    subject: `commit ${oid.slice(0, 7)}`,
-    body: "",
+    message: `commit ${oid.slice(0, 7)}`,
     author: { name: "Test", email: "t@t.com", timestamp: "2024-01-01T00:00:00+00:00" },
     committer: { name: "Test", email: "t@t.com", timestamp: "2024-01-01T00:00:00+00:00" },
     parents: [],

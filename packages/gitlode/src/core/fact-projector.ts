@@ -16,11 +16,9 @@ export function projectCommit(
   repoName: string,
   repoUrl: string | null,
 ): ProjectedCommit {
-  const { subject, body } = splitMessage(fact.message);
   return {
     oid: fact.oid,
-    subject,
-    body,
+    message: fact.message,
     author: {
       name: fact.author.name,
       email: fact.author.email,
@@ -44,11 +42,9 @@ export function projectFileChange(
   repoName: string,
   repoUrl: string | null,
 ): ProjectedFileChange {
-  const { subject, body } = splitMessage(fact.commit.message);
   return {
     oid: fact.commit.oid,
-    subject,
-    body,
+    message: fact.commit.message,
     author: {
       name: fact.commit.author.name,
       email: fact.commit.author.email,
@@ -100,18 +96,4 @@ export class DefaultFactProjector implements FactProjector {
       }
     }
   }
-}
-
-/**
- * Splits a Git commit message into subject and body.
- *
- * `subject` is the first line. `body` is the remainder of the lines joined
- * with `\n` and trimmed of surrounding whitespace. Returns `""` for `body`
- * when the message has no lines beyond the first.
- */
-export function splitMessage(message: string): { subject: string; body: string } {
-  const lines = message.split("\n");
-  const subject = lines[0] ?? "";
-  const body = lines.slice(1).join("\n").trim();
-  return { subject, body };
 }

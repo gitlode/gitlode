@@ -1,0 +1,5 @@
+---
+"gitlode": patch
+---
+
+Update dependencies

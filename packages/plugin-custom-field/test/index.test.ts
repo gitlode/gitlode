@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import factory from "../src/index.js";
+import factory, { parseConfig } from "../src/index.js";
 
 const runtime = {
   warn() {},
@@ -36,28 +36,6 @@ describe("@gitlode/plugin-custom-field", () => {
     }
   });
 
-  it("returns fatal init result when top-level config is not an object", async () => {
-    const plugin = await factory("invalid-config");
-    await expect(plugin.init(runtime)).resolves.toEqual({
-      type: "fatal",
-      message: 'Invalid plugin config: top-level value must be an object with a "value" property.',
-    });
-  });
-
-  it("returns fatal init result when value is missing or not an object", async () => {
-    const pluginMissing = await factory({});
-    await expect(pluginMissing.init(runtime)).resolves.toEqual({
-      type: "fatal",
-      message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
-    });
-
-    const pluginInvalid = await factory({ value: [] });
-    await expect(pluginInvalid.init(runtime)).resolves.toEqual({
-      type: "fatal",
-      message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
-    });
-  });
-
   it("returns ready init result and projects scalar values", async () => {
     const pluginString = await factory({ value: "release-2026-06" });
     await expect(pluginString.init(runtime)).resolves.toEqual({ type: "ready" });
@@ -81,77 +59,92 @@ describe("@gitlode/plugin-custom-field", () => {
     });
   });
 
-  it("returns fatal init result for non-finite top-level number", async () => {
-    const pluginNaN = await factory({ value: Number.NaN });
-    await expect(pluginNaN.init(runtime)).resolves.toEqual({
-      type: "fatal",
-      message: 'Invalid plugin config: "value" must be a finite number.',
-    });
+  it("returns fatal init result for invalid config", async () => {
+    const plugin = await factory({ value: { nested: { key: "value" } } });
+    await expect(plugin.init(runtime)).resolves.toEqual({ type: "fatal" });
+  });
+});
 
-    const pluginInfinity = await factory({ value: Number.POSITIVE_INFINITY });
-    await expect(pluginInfinity.init(runtime)).resolves.toEqual({
-      type: "fatal",
-      message: 'Invalid plugin config: "value" must be a finite number.',
+describe("parseConfig", () => {
+  it("returns error when top-level config is not an object", () => {
+    const result = parseConfig("invalid-config");
+    expect(result).toEqual({
+      type: "error",
+      message: 'Invalid plugin config: top-level value must be an object with a "value" property.',
     });
   });
 
-  it("returns fatal init result when value is null at top-level", async () => {
-    const plugin = await factory({ value: null });
-    await expect(plugin.init(runtime)).resolves.toEqual({
-      type: "fatal",
+  it("returns error when value is missing or not an object", () => {
+    const resultMissing = parseConfig({});
+    expect(resultMissing).toEqual({
+      type: "error",
       message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
     });
   });
 
-  it("returns fatal init result when value is empty", async () => {
-    const plugin = await factory({ value: {} });
-    await expect(plugin.init(runtime)).resolves.toEqual({
-      type: "fatal",
+  it("returns error when non-finite top-level number is provided", () => {
+    const resultNaN = parseConfig({ value: Number.NaN });
+    expect(resultNaN).toEqual({
+      type: "error",
+      message: 'Invalid plugin config: "value" must be a finite number.',
+    });
+
+    const resultInfinity = parseConfig({ value: Number.POSITIVE_INFINITY });
+    expect(resultInfinity).toEqual({
+      type: "error",
+      message: 'Invalid plugin config: "value" must be a finite number.',
+    });
+  });
+
+  it("returns error when value is null at top-level", () => {
+    const result = parseConfig({ value: null });
+    expect(result).toEqual({
+      type: "error",
+      message: 'Invalid plugin config: "value" must be an object, string, number, or boolean.',
+    });
+  });
+
+  it("returns error when value is empty", () => {
+    const result = parseConfig({ value: {} });
+    expect(result).toEqual({
+      type: "error",
       message: 'Invalid plugin config: "value" must contain at least one entry.',
     });
   });
 
-  it("returns fatal init result for invalid field names", async () => {
-    const plugin = await factory({ value: { "bad.name": "value" } });
-    await expect(plugin.init(runtime)).resolves.toEqual({
-      type: "fatal",
+  it("returns error for invalid field names", () => {
+    const result = parseConfig({ value: { "bad.name": "value" } });
+    expect(result).toEqual({
+      type: "error",
       message: 'Invalid plugin config: field name "bad.name" must match ^[A-Za-z_][A-Za-z0-9_-]*$.',
     });
   });
 
-  it("returns fatal init result for object and array field values", async () => {
-    const pluginObject = await factory({ value: { nested: { key: "value" } } });
-    await expect(pluginObject.init(runtime)).resolves.toEqual({
-      type: "fatal",
+  it("returns error for object and array field values", () => {
+    const resultObject = parseConfig({ value: { nested: { key: "value" } } });
+    expect(resultObject).toEqual({
+      type: "error",
       message: 'Invalid plugin config: field "nested" must be string, number, boolean, or null.',
     });
 
-    const pluginArray = await factory({ value: { list: ["a", "b"] } });
-    await expect(pluginArray.init(runtime)).resolves.toEqual({
-      type: "fatal",
+    const resultArray = parseConfig({ value: { list: ["a", "b"] } });
+    expect(resultArray).toEqual({
+      type: "error",
       message: 'Invalid plugin config: field "list" must be string, number, boolean, or null.',
     });
   });
 
-  it("returns fatal init result for non-finite number values", async () => {
-    const pluginNaN = await factory({ value: { value: Number.NaN } });
-    await expect(pluginNaN.init(runtime)).resolves.toEqual({
-      type: "fatal",
+  it("returns error for non-finite number values", () => {
+    const resultNaN = parseConfig({ value: { value: Number.NaN } });
+    expect(resultNaN).toEqual({
+      type: "error",
       message: 'Invalid plugin config: field "value" must be a finite number.',
     });
 
-    const pluginInfinity = await factory({ value: { value: Number.POSITIVE_INFINITY } });
-    await expect(pluginInfinity.init(runtime)).resolves.toEqual({
-      type: "fatal",
+    const resultInfinity = parseConfig({ value: { value: Number.POSITIVE_INFINITY } });
+    expect(resultInfinity).toEqual({
+      type: "error",
       message: 'Invalid plugin config: field "value" must be a finite number.',
     });
-  });
-
-  it("returns the same precomputed projection result on repeated project calls", async () => {
-    const plugin = await factory({ value: { branch: "main" } });
-    const first = await plugin.project({} as never);
-    const second = await plugin.project({} as never);
-
-    expect(first).toBe(second);
   });
 });

@@ -1,8 +1,11 @@
 import type {
   PluginFactory,
+  PluginInitResult,
+  PluginProjectionResult,
   PluginProjectionValue,
   PluginRuntimeContext,
   ProjectionContext,
+  ProjectorPlugin,
 } from "gitlode/plugin-api";
 
 import { classifyPath } from "./classifier.js";
@@ -15,31 +18,35 @@ const factory: PluginFactory = async (rawConfig: unknown) => {
   let config: PreparedConfig | undefined;
 
   return {
-    async init(runtimeContext: PluginRuntimeContext) {
+    async init(runtimeContext: PluginRuntimeContext): Promise<PluginInitResult> {
       runtime = runtimeContext;
       const parsedConfig = parseConfig(rawConfig);
       if (!parsedConfig.ok) {
         runtimeContext.error(parsedConfig.message);
-        return { type: "fatal", message: "Plugin configuration is invalid." };
+        return { type: "fatal" };
       }
 
       config = parsedConfig.value;
       return { type: "ready" };
     },
 
-    async project(context: ProjectionContext) {
+    async project(context: ProjectionContext): Promise<PluginProjectionResult> {
       if (!config) {
         runtime?.error("Plugin used before successful initialization.");
-        return { type: "fatal", message: "Plugin has not been initialized." };
+        return { type: "fatal" };
       }
 
       if (context.fact.type !== "file-change") {
-        return { type: "skip", message: "commit facts are not supported" };
+        // fact types other than file-change are not supported
+        return { type: "skip" };
       }
 
       const classification = classifyPath(context.fact.file.path, config);
       if (classification.source === "unknown" && config.unknownPolicy === "skip") {
-        return { type: "skip", message: "file type could not be determined" };
+        if (config.debug) {
+          runtime?.warn(`File type could not be determined for path: ${context.fact.file.path}`);
+        }
+        return { type: "skip" };
       }
 
       return {
@@ -47,7 +54,7 @@ const factory: PluginFactory = async (rawConfig: unknown) => {
         data: buildProjection(classification, config.debug),
       };
     },
-  };
+  } satisfies ProjectorPlugin;
 };
 
 export default factory;

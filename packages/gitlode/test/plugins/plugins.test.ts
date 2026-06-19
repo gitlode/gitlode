@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigExtensionsSection } from "../../src/config/index.js";
-import type { PluginEntry, PluginInitResult, PluginRuntimeContext } from "../../src/core/types.js";
+import type {
+  Namespace,
+  PluginEntry,
+  PluginInitResult,
+  PluginRuntimeContext,
+} from "../../src/core/types.js";
 import {
   checkPluginCompatibility,
   initializePlugins,
@@ -98,7 +103,7 @@ describe("initializePlugins", () => {
   it("returns ready outcomes when all init() calls are ready", async () => {
     const entries: PluginEntry[] = [
       {
-        namespace: "a",
+        namespace: "a" as Namespace,
         plugin: {
           init: async (): Promise<PluginInitResult> => ({ type: "ready" }),
           project: async () => ({ type: "success", data: {} }),
@@ -110,7 +115,7 @@ describe("initializePlugins", () => {
     await expect(initializePlugins(entries, () => makeRuntimeContext())).resolves.toEqual([
       {
         entry: entries[0],
-        result: { type: "ready" },
+        type: "ready",
       },
     ]);
   });
@@ -120,7 +125,7 @@ describe("initializePlugins", () => {
     const errors: string[] = [];
     const entries: PluginEntry[] = [
       {
-        namespace: "runtime-test",
+        namespace: "runtime-test" as Namespace,
         plugin: {
           init: async (runtime) => {
             runtime.warn("warn message");
@@ -147,7 +152,7 @@ describe("initializePlugins", () => {
     expect(results).toEqual([
       {
         entry: entries[0],
-        result: { type: "ready" },
+        type: "ready",
       },
     ]);
     expect(warnings).toEqual(["warn message"]);
@@ -157,9 +162,9 @@ describe("initializePlugins", () => {
   it("returns fatal outcome when init returns fatal", async () => {
     const entries: PluginEntry[] = [
       {
-        namespace: "bad",
+        namespace: "bad" as Namespace,
         plugin: {
-          init: async (): Promise<PluginInitResult> => ({ type: "fatal", message: "init failed" }),
+          init: async (): Promise<PluginInitResult> => ({ type: "fatal" }),
           project: async () => ({ type: "success", data: {} }),
         },
         failurePolicy: "skip-fact",
@@ -169,7 +174,7 @@ describe("initializePlugins", () => {
     await expect(initializePlugins(entries, () => makeRuntimeContext())).resolves.toEqual([
       {
         entry: entries[0],
-        result: { type: "fatal", message: "init failed" },
+        type: "fatal",
       },
     ]);
   });
@@ -177,7 +182,7 @@ describe("initializePlugins", () => {
   it("returns fatal outcome when init throws", async () => {
     const entries: PluginEntry[] = [
       {
-        namespace: "thrower",
+        namespace: "thrower" as Namespace,
         plugin: {
           init: async () => {
             throw new Error("boom");
@@ -191,7 +196,7 @@ describe("initializePlugins", () => {
     await expect(initializePlugins(entries, () => makeRuntimeContext())).resolves.toEqual([
       {
         entry: entries[0],
-        result: { type: "fatal", message: "boom" },
+        type: "fatal",
       },
     ]);
   });

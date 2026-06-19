@@ -21,8 +21,7 @@ Each line is a single JSON object representing one Git commit.
 ```typescript
 interface ProjectedCommit {
   oid: string;
-  subject: string;
-  body: string;
+  message: string;
   author: {
     name: string;
     email: string;
@@ -48,8 +47,7 @@ interface ProjectedCommit {
 ```json
 {
   "oid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "subject": "Fix null pointer in auth module",
-  "body": "Detailed explanation of the fix.\n\nCloses #123",
+  "message": "Fix null pointer in auth module\n\nDetailed explanation of the fix.\n\nCloses #123",
   "author": {
     "name": "Jane Doe",
     "email": "jane@example.com",
@@ -73,12 +71,9 @@ interface ProjectedCommit {
 
 The full commit object ID (OID) string for the repository object format.
 
-### `subject` and `body`
+### `message`
 
-Derived by splitting `commit.message`:
-
-- `subject`: first line of the message
-- `body`: remaining lines after the first, joined with `\n`. Empty string `""` if no body exists.
+The full commit message.
 
 ### `author.timestamp` / `committer.timestamp`
 
@@ -210,8 +205,7 @@ For merge commits (commits with multiple parents), file changes are computed aga
 ```json
 {
   "oid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "subject": "Fix null pointer in auth module",
-  "body": "",
+  "message": "Fix null pointer in auth module\n\nDetailed explanation of the fix.\n\nCloses #123",
   "author": {
     "name": "Jane Doe",
     "email": "jane@example.com",

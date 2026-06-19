@@ -460,8 +460,7 @@ Every record extends the commit-mode schema with a `file` object:
 ```json
 {
   "oid": "a1b2c3d4...",
-  "subject": "Fix null pointer in auth module",
-  "body": "",
+  "message": "Fix null pointer in auth module",
   "author": {
     "name": "Jane Doe",
     "email": "jane@example.com",
@@ -584,7 +583,7 @@ Each output record gains an `extensions` object with one key per plugin:
 ```json
 {
   "oid": "a1b2c3d4...",
-  "subject": "Add caching layer",
+  "message": "Add caching layer",
   "extensions": {
     "my-plugin": { "score": 88 },
     "label-plugin": "v1.0",

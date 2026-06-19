@@ -4,7 +4,6 @@ import {
   DefaultFactProjector,
   projectCommit,
   projectFileChange,
-  splitMessage,
 } from "../../src/core/fact-projector.js";
 import type { CommitFact, Fact, FileChangeFact } from "../../src/core/types.js";
 
@@ -72,8 +71,7 @@ describe("DefaultFactProjector — commit mode", () => {
 
     expect(record).toBeDefined();
     expect(record!.oid).toBe("a".repeat(40));
-    expect(record!.subject).toBe("fix: correct bug");
-    expect(record!.body).toBe("Detailed explanation.\n\nCloses #42");
+    expect(record!.message).toBe("fix: correct bug\n\nDetailed explanation.\n\nCloses #42");
     expect(record!.author.name).toBe("Author Name");
     expect(record!.author.email).toBe("author@example.com");
     expect(record!.committer.name).toBe("Committer Name");
@@ -119,24 +117,6 @@ describe("DefaultFactProjector — commit mode", () => {
     expect(record!.committer.timestamp).toBe("2024-01-15T10:00:00+00:00");
   });
 
-  it("splits message subject and body correctly", async () => {
-    const projector = new DefaultFactProjector("repo", null);
-    const fact = makeCommitFact({ message: "subject line\n\nbody content" });
-    const [record] = await collect(projector.project(toAsyncIter([fact])));
-
-    expect(record!.subject).toBe("subject line");
-    expect(record!.body).toBe("body content");
-  });
-
-  it("sets body to empty string when commit message has no body", async () => {
-    const projector = new DefaultFactProjector("repo", null);
-    const fact = makeCommitFact({ message: "only subject" });
-    const [record] = await collect(projector.project(toAsyncIter([fact])));
-
-    expect(record!.subject).toBe("only subject");
-    expect(record!.body).toBe("");
-  });
-
   it("yields empty array for root commit parents field", async () => {
     const projector = new DefaultFactProjector("repo", null);
     const fact = makeCommitFact({ parents: [] });
@@ -165,9 +145,9 @@ describe("DefaultFactProjector — commit mode", () => {
 
     expect(records).toHaveLength(2);
     expect(records[0]!.oid).toBe("a".repeat(40));
-    expect(records[0]!.subject).toBe("first");
+    expect(records[0]!.message).toBe("first");
     expect(records[1]!.oid).toBe("b".repeat(40));
-    expect(records[1]!.subject).toBe("second");
+    expect(records[1]!.message).toBe("second");
   });
 
   it("yields no output for empty input", async () => {
@@ -189,8 +169,7 @@ describe("DefaultFactProjector — file-change mode", () => {
 
     expect(record).toBeDefined();
     expect(record!.oid).toBe("a".repeat(40));
-    expect(record!.subject).toBe("fix: correct bug");
-    expect(record!.body).toBe("Detailed explanation.\n\nCloses #42");
+    expect(record!.message).toBe("fix: correct bug\n\nDetailed explanation.\n\nCloses #42");
     expect(record!.author.name).toBe("Author Name");
     expect(record!.author.email).toBe("author@example.com");
     expect(record!.committer.name).toBe("Committer Name");
@@ -293,7 +272,7 @@ describe("DefaultFactProjector — exhaustive dispatch", () => {
     const commitRecords = await collect(projector.project(toAsyncIter<Fact>([commitFact])));
     expect(commitRecords).toHaveLength(1);
     expect(commitRecords[0]!.oid).toBe("c".repeat(40));
-    expect(commitRecords[0]!.subject).toBe("commit msg");
+    expect(commitRecords[0]!.message).toBe("commit msg");
 
     // File-change-mode call
     const fileFact = makeFileChangeFact({
@@ -318,7 +297,7 @@ describe("projectCommit — pure function", () => {
     expect(record.oid).toBe(fact.oid);
     expect(record.repository.name).toBe("my-repo");
     expect(record.repository.url).toBe("https://github.com/org/my-repo");
-    expect(record.subject).toBe("fix: correct bug");
+    expect(record.message).toBe("fix: correct bug\n\nDetailed explanation.\n\nCloses #42");
     expect(record.parents).toEqual(fact.parents);
   });
 
@@ -342,42 +321,5 @@ describe("projectFileChange — pure function", () => {
     const fact = makeFileChangeFact();
     const record = projectFileChange(fact, "repo", null);
     expect(record.repository.url).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// helper function tests
-// ---------------------------------------------------------------------------
-describe("splitMessage", () => {
-  it("handles message with no body", () => {
-    const { subject, body } = splitMessage("fix typo");
-    expect(subject).toBe("fix typo");
-    expect(body).toBe("");
-  });
-
-  it("handles message with a single-line body", () => {
-    const { subject, body } = splitMessage("fix typo\n\nThis fixes a typo.");
-    expect(subject).toBe("fix typo");
-    expect(body).toBe("This fixes a typo.");
-  });
-
-  it("handles multi-paragraph body", () => {
-    const { subject, body } = splitMessage(
-      "feat: add feature\n\nFirst paragraph.\n\nSecond paragraph.",
-    );
-    expect(subject).toBe("feat: add feature");
-    expect(body).toBe("First paragraph.\n\nSecond paragraph.");
-  });
-
-  it("trims trailing newlines from body", () => {
-    const { subject, body } = splitMessage("commit msg\n\nbody line\n\n");
-    expect(subject).toBe("commit msg");
-    expect(body).toBe("body line");
-  });
-
-  it("handles empty message", () => {
-    const { subject, body } = splitMessage("");
-    expect(subject).toBe("");
-    expect(body).toBe("");
   });
 });

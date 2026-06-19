@@ -70,8 +70,7 @@ export interface ProjectedExtensions {
 
 export interface ProjectedCommit {
   readonly oid: string;
-  readonly subject: string;
-  readonly body: string;
+  readonly message: string;
   readonly author: ProjectedPerson;
   readonly committer: ProjectedPerson;
   readonly parents: readonly string[];

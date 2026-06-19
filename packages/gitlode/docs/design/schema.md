@@ -44,8 +44,7 @@ Each line is a serialized `ProjectedCommit` object:
 ```typescript
 interface ProjectedCommit {
   oid: string;
-  subject: string;
-  body: string;
+  message: string;
   author: {
     name: string;
     email: string;
@@ -72,42 +71,9 @@ interface ProjectedCommit {
 
 Full commit object ID (OID). Sourced directly from the Git object database.
 
-### `subject` and `body`
+### `message`
 
-Split from the raw commit message:
-
-- `subject`: first line of the message
-- `body`: remaining lines after the first, joined with `\n` and trimmed. Empty string `""` if no body exists.
-
-Example with subject and body:
-
-```
-Fix null pointer in auth module\n\nDetailed explanation.\n\nCloses #123
-```
-
-Produces:
-
-```json
-{
-  "subject": "Fix null pointer in auth module",
-  "body": "Detailed explanation.\n\nCloses #123"
-}
-```
-
-Example with subject only:
-
-```
-Bump version to 1.2.0
-```
-
-Produces:
-
-```json
-{
-  "subject": "Bump version to 1.2.0",
-  "body": ""
-}
-```
+Full commit message.
 
 ### `author` and `committer`
 
@@ -192,8 +158,7 @@ namespace/config pairing.
 ```json
 {
   "oid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "subject": "Fix null pointer in auth module",
-  "body": "Detailed explanation of the fix.\n\nCloses #123",
+  "message": "Fix null pointer in auth module\n\nDetailed explanation of the fix.\n\nCloses #123",
   "author": {
     "name": "Jane Doe",
     "email": "jane@example.com",
@@ -220,8 +185,7 @@ skipped the fact:
 ```json
 {
   "oid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "subject": "Fix null pointer in auth module",
-  "body": "Detailed explanation of the fix.\n\nCloses #123",
+  "message": "Fix null pointer in auth module\n\nDetailed explanation of the fix.\n\nCloses #123",
   "author": {
     "name": "Jane Doe",
     "email": "jane@example.com",
@@ -317,8 +281,7 @@ Changes are computed against the **first parent only**.
 ```json
 {
   "oid": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "subject": "Fix null pointer in auth module",
-  "body": "",
+  "message": "Fix null pointer in auth module",
   "author": {
     "name": "Jane Doe",
     "email": "jane@example.com",

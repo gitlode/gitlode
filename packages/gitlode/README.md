@@ -102,8 +102,7 @@ Commit-mode record example:
 ```json
 {
   "oid": "a1b2c3d4...",
-  "subject": "Fix null pointer in auth module",
-  "body": "",
+  "message": "Fix null pointer in auth module",
   "author": {
     "name": "Jane Doe",
     "email": "jane@example.com",
@@ -122,8 +121,7 @@ Commit-mode record example:
 | Field                                      | Description                                                                               |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | `oid`                                      | Full commit object ID (OID)                                                               |
-| `subject`                                  | First line of the commit message                                                          |
-| `body`                                     | Remainder of the commit message (empty string if none)                                    |
+| `message`                                  | Full commit message                                                                       |
 | `author`                                   | Person who originally authored the changes                                                |
 | `committer`                                | Person who committed (may differ from author after rebase/cherry-pick)                    |
 | `author.timestamp` / `committer.timestamp` | ISO 8601 datetime using the offset embedded in the commit object                          |

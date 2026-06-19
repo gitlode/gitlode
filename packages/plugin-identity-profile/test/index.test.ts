@@ -1,3 +1,4 @@
+import type { ProjectionContext } from "gitlode/plugin-api";
 import { describe, expect, it, vi } from "vitest";
 
 import factory from "../src/index.js";
@@ -235,12 +236,11 @@ function createRuntime() {
   };
 }
 
-function createProjectionContext() {
+function createProjectionContext(): ProjectionContext {
   return {
     baseRecord: {
       oid: "abc123",
-      subject: "subject",
-      body: "body",
+      message: "subject\n\nbody",
       author: {
         name: "Author Alias",
         email: "author@example.com",

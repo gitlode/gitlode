@@ -140,7 +140,7 @@ When at least one plugin is active, each output record gains an `extensions` obj
 ```json
 {
   "oid": "...",
-  "subject": "...",
+  "message": "...",
   "extensions": {
     "my-plugin": { "score": 42 },
     "label-plugin": "v1.0",

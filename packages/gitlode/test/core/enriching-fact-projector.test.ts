@@ -113,7 +113,7 @@ describe("EnrichingFactProjector — basic enrichment", () => {
     const fact = makeCommitFact({ oid: "b".repeat(40), message: "msg" });
     const [record] = await collect(projector.project(toAsyncIter([fact])));
     expect(record!.oid).toBe("b".repeat(40));
-    expect(record!.subject).toBe("msg");
+    expect(record!.message).toBe("msg");
     expect(record!.extensions).toEqual({ p: { x: 1 } });
   });
 

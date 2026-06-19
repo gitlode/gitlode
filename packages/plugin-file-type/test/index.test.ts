@@ -167,8 +167,7 @@ function createCommitFact(): CommitFact {
 function createBaseRecord(): ProjectedCommit {
   return {
     oid: "0123456789abcdef0123456789abcdef01234567" as CommitOid,
-    subject: "feat: add file",
-    body: "",
+    message: "feat: add file",
     author: {
       name: "Author",
       email: "author@example.com",

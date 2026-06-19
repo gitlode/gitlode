@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0
+## 0.2.0
 
 ### Minor Changes
 
@@ -9,10 +9,6 @@
 ### Patch Changes
 
 - 3489a70: Update peerDependencies to require gitlode version ^0.10.0
-- Updated dependencies [0435c9d]
-- Updated dependencies [5ece811]
-- Updated dependencies [66088bb]
-  - gitlode@0.10.0
 
 ## 0.1.1
 

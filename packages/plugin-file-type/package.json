@@ -1,6 +1,6 @@
 {
   "name": "@gitlode/plugin-file-type",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "Official gitlode plugin for file type classification",
   "keywords": [
     "gitlode",

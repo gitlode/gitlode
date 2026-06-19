@@ -1,6 +1,6 @@
 {
   "name": "@gitlode/plugin-custom-field",
-  "version": "1.0.0",
+  "version": "0.5.0",
   "description": "Official gitlode plugin for injecting static custom field into extensions",
   "keywords": [
     "gitlode",

@@ -116,7 +116,7 @@ This package declares:
 
 ```json
 "peerDependencies": {
-	"gitlode": "^0.9.0"
+	"gitlode": "^0.10.0"
 }
 ```
 

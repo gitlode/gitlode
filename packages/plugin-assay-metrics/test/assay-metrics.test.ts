@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeChurn, computeDelta, computeMax } from "../src/assay-metrics.js";
+import { computeChurn, computeDelta, computeNetChange } from "../src/assay-metrics.js";
 
 describe("computeDelta", () => {
   it("returns correct delta when additions and deletions are present", () => {
@@ -46,24 +46,24 @@ describe("computeChurn", () => {
   });
 });
 
-describe("computeMax", () => {
-  it("returns correct max when additions and deletions are present", () => {
-    const result = computeMax({ additions: 10, deletions: 4 });
+describe("computeNetChange", () => {
+  it("returns correct net change when additions and deletions are present", () => {
+    const result = computeNetChange({ additions: 10, deletions: 4 });
     expect(result).toBe(10);
   });
 
-  it("returns correct max when deletions are greater than additions", () => {
-    const result = computeMax({ additions: 3, deletions: 5 });
+  it("returns correct net change when deletions are greater than additions", () => {
+    const result = computeNetChange({ additions: 3, deletions: 5 });
     expect(result).toBe(5);
   });
 
   it("returns null when additions is null", () => {
-    const result = computeMax({ additions: null, deletions: 4 });
+    const result = computeNetChange({ additions: null, deletions: 4 });
     expect(result).toBeNull();
   });
 
   it("returns null when deletions is null", () => {
-    const result = computeMax({ additions: 10, deletions: null });
+    const result = computeNetChange({ additions: 10, deletions: null });
     expect(result).toBeNull();
   });
 });

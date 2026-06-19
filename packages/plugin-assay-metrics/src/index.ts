@@ -7,7 +7,7 @@ import type {
   ProjectorPlugin,
 } from "gitlode/plugin-api";
 
-import { computeChurn, computeDelta, computeMax } from "./assay-metrics.js";
+import { computeChurn, computeDelta, computeNetChange } from "./assay-metrics.js";
 
 const factory: PluginFactory = async (_rawConfig: unknown) => {
   return {
@@ -24,14 +24,14 @@ const factory: PluginFactory = async (_rawConfig: unknown) => {
 
       const delta = computeDelta(fact.file);
       const churn = computeChurn(fact.file);
-      const max = computeMax(fact.file);
+      const netChange = computeNetChange(fact.file);
 
       return {
         type: "success",
         data: {
           delta,
           churn,
-          max,
+          "net-change": netChange,
         },
       };
     },

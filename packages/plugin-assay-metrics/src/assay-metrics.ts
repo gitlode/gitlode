@@ -16,7 +16,7 @@ export function computeChurn(base: BaseMetrics): number | null {
   }
   return additions + deletions;
 }
-export function computeMax(base: BaseMetrics): number | null {
+export function computeNetChange(base: BaseMetrics): number | null {
   const { additions, deletions } = base;
   if (additions === null || deletions === null) {
     return null;

@@ -11,6 +11,8 @@ import type {
   Namespace,
   PluginEntry,
   PluginFactory,
+  PluginInitFatal,
+  PluginInitSuccess,
   PluginRuntimeContext,
   ProjectorPlugin,
 } from "../core/index.js";
@@ -109,11 +111,15 @@ export async function resolvePluginEntries(
   }
 }
 
-/** Invoke init() on each entry in parallel. Collects all fatal results and throws a typed user error if any. */
-export interface PluginInitializationOutcome {
+export interface PluginInitializationSuccess extends PluginInitSuccess {
   readonly entry: PluginEntry;
-  readonly result: { type: "ready" } | { type: "fatal"; message: string };
 }
+
+export interface PluginInitializationFailure extends PluginInitFatal {
+  readonly entry: PluginEntry;
+}
+
+export type PluginInitializationOutcome = PluginInitializationSuccess | PluginInitializationFailure;
 
 /** Invoke init() on each entry in parallel and return each plugin's normalized outcome. */
 export async function initializePlugins(
@@ -121,16 +127,19 @@ export async function initializePlugins(
   createRuntimeContext: (entry: PluginEntry) => PluginRuntimeContext,
 ): Promise<PluginInitializationOutcome[]> {
   return Promise.all(
-    entries.map(async (entry) => {
+    entries.map<Promise<PluginInitializationOutcome>>(async (entry) => {
+      let runtimeContext: PluginRuntimeContext | undefined;
       try {
-        return { entry, result: await entry.plugin.init(createRuntimeContext(entry)) };
-      } catch (err) {
+        runtimeContext = createRuntimeContext(entry);
         return {
           entry,
-          result: {
-            type: "fatal" as const,
-            message: err instanceof Error ? err.message : String(err),
-          },
+          ...(await entry.plugin.init(runtimeContext)),
+        };
+      } catch (err) {
+        runtimeContext?.error(err instanceof Error ? err.message : String(err));
+        return {
+          entry,
+          type: "fatal",
         };
       }
     }),

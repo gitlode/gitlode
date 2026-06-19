@@ -1,4 +1,11 @@
-import type { PluginFactory, PluginRuntimeContext, ProjectionContext } from "gitlode/plugin-api";
+import type {
+  PluginFactory,
+  PluginInitResult,
+  PluginProjectionResult,
+  PluginRuntimeContext,
+  ProjectionContext,
+  ProjectorPlugin,
+} from "gitlode/plugin-api";
 
 import { prepareConfig } from "./config.js";
 import type { PreparedConfig } from "./config.js";
@@ -10,23 +17,21 @@ const factory: PluginFactory = async (rawConfig: unknown) => {
   let preparedConfig: PreparedConfig | undefined;
 
   return {
-    async init(runtimeContext: PluginRuntimeContext) {
+    async init(runtimeContext: PluginRuntimeContext): Promise<PluginInitResult> {
       runtime = runtimeContext;
       const parsed = prepareConfig(rawConfig, runtimeContext);
       if (!parsed.ok) {
-        return { type: "fatal", message: "Plugin configuration is invalid." };
+        runtimeContext.error("Plugin configuration is invalid.");
+        return { type: "fatal" };
       }
 
       preparedConfig = parsed.value;
       return { type: "ready" };
     },
-    async project(context: ProjectionContext) {
+    async project(context: ProjectionContext): Promise<PluginProjectionResult> {
       if (!preparedConfig) {
         runtime?.error?.("Plugin used before successful initialization.");
-        return {
-          type: "fatal",
-          message: "Plugin has not been initialized.",
-        };
+        return { type: "fatal" };
       }
 
       const { author, committer } = context.baseRecord;
@@ -41,7 +46,7 @@ const factory: PluginFactory = async (rawConfig: unknown) => {
         },
       };
     },
-  };
+  } satisfies ProjectorPlugin;
 };
 
 export default factory;

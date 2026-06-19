@@ -1,15 +1,23 @@
-import type { PluginFactory, PluginRuntimeContext, ProjectionContext } from "gitlode/plugin-api";
+import type {
+  PluginFactory,
+  PluginInitResult,
+  PluginProjectionResult,
+  PluginRuntimeContext,
+  ProjectionContext,
+  ProjectorPlugin,
+} from "gitlode/plugin-api";
 
 import { computeChurn, computeDelta, computeMax } from "./assay-metrics.js";
 
 const factory: PluginFactory = async (_rawConfig: unknown) => {
   return {
-    async init(_runtime: PluginRuntimeContext) {
+    async init(_runtimeContext: PluginRuntimeContext): Promise<PluginInitResult> {
       return { type: "ready" };
     },
-    async project(context: ProjectionContext) {
+    async project(context: ProjectionContext): Promise<PluginProjectionResult> {
       if (context.fact.type !== "file-change") {
-        return { type: "skip", message: "commit facts are not supported" };
+        // fact types other than file-change are not supported
+        return { type: "skip" };
       }
 
       const fact = context.fact;
@@ -27,7 +35,7 @@ const factory: PluginFactory = async (_rawConfig: unknown) => {
         },
       };
     },
-  };
+  } satisfies ProjectorPlugin;
 };
 
 export default factory;

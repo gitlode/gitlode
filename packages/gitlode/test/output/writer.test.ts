@@ -11,8 +11,7 @@ import { OutputWriter } from "../../src/output/writer.js";
 function makeCommit(oid: string): ProjectedCommit {
   return {
     oid,
-    subject: `commit ${oid.slice(0, 7)}`,
-    body: "",
+    message: `commit ${oid.slice(0, 7)}`,
     author: {
       name: "Test User",
       email: "test@example.com",
@@ -126,7 +125,7 @@ describe("OutputWriter", () => {
     expect(lines).toHaveLength(1);
     const parsed = JSON.parse(lines[0]!) as ProjectedCommit;
     expect(parsed.oid).toBe("a".repeat(40));
-    expect(parsed.subject).toBe(commit.subject);
+    expect(parsed.message).toBe(commit.message);
     expect(parsed.repository.url).toBeNull();
   });
 

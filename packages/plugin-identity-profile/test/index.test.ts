@@ -1,3 +1,4 @@
+import type { ProjectionContext } from "gitlode/plugin-api";
 import { describe, expect, it, vi } from "vitest";
 
 import factory from "../src/index.js";
@@ -193,10 +194,7 @@ describe("@gitlode/plugin-identity-profile", () => {
     });
     const runtime = createRuntime();
 
-    await expect(plugin.init(runtime)).resolves.toEqual({
-      type: "fatal",
-      message: "Plugin configuration is invalid.",
-    });
+    await expect(plugin.init(runtime)).resolves.toEqual({ type: "fatal" });
 
     expect(runtime.warn).not.toHaveBeenCalled();
     expect(runtime.error).toHaveBeenCalledWith(
@@ -227,10 +225,7 @@ describe("@gitlode/plugin-identity-profile", () => {
       ],
     });
 
-    await expect(plugin.project(createProjectionContext())).resolves.toEqual({
-      type: "fatal",
-      message: "Plugin has not been initialized.",
-    });
+    await expect(plugin.project(createProjectionContext())).resolves.toEqual({ type: "fatal" });
   });
 });
 
@@ -241,12 +236,11 @@ function createRuntime() {
   };
 }
 
-function createProjectionContext() {
+function createProjectionContext(): ProjectionContext {
   return {
     baseRecord: {
       oid: "abc123",
-      subject: "subject",
-      body: "body",
+      message: "subject\n\nbody",
       author: {
         name: "Author Alias",
         email: "author@example.com",

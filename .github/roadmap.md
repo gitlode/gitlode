@@ -13,8 +13,6 @@ Roadmap entries use the following standardized metadata labels, placed immediate
 - **Release target**: `vX.Y.Z` — added when an item is selected for a release during planning
 - **Depends on**: Entry title(s) — indicates dependencies on other roadmap items
 
----
-
 ## Product Improvements
 
 ### Near-term
@@ -77,8 +75,6 @@ default while allowing explicit operator control when non-TTY color is desirable
 
 ### Medium-term
 
----
-
 #### Extraction/File Mode: Similarity-based rename detection for edited moves
 
 Exact-content pairing alone is insufficient for common real-world moves where files are renamed and
@@ -108,50 +104,7 @@ fidelity, runtime cost, and determinism explicit and user-controllable.
 - how explicitly the CLI/docs should label outputs as inferred relationships rather than stored Git
   facts
 
----
-
-#### Architecture/Runtime: Worker-based extraction runtime boundary
-
-The current extraction pipeline runs in a single Node.js execution context. This keeps the
-implementation straightforward, but it also couples heavy extraction work with CLI lifecycle and
-interactive rendering. For long-running or computationally heavy workloads, this coupling makes
-stability and fault isolation harder than necessary.
-
-This entry introduces the Worker-based runtime boundary: extraction executes in one isolated
-worker, while the main process remains responsible for CLI lifecycle, user interaction, stderr
-presentation, and state file I/O.
-
-**Primary goals (core value)**:
-
-- improve long-run extraction stability via execution isolation
-- establish a clear process boundary between CLI presentation and extraction execution
-- formalize typed runtime messaging as the baseline for later supervision and orchestration work
-
-**Scope (this entry)**:
-
-- run the existing extraction pipeline in one worker
-- define a typed message protocol for progress, diagnostics, result, and error events
-- keep extraction semantics and JSONL output behavior unchanged
-- keep state file I/O in the main process while the worker returns the checkpoint state produced by
-  a successful extraction
-
-**Non-goals for this entry**:
-
-- no guaranteed throughput improvement in the first delivery
-- no implicit data reduction or extraction-fidelity trade-off
-- no cancellation, timeout, or shutdown-supervision feature rollout
-- no immediate parallel extraction strategy rollout
-
-**Design constraints**:
-
-- preserve current extraction correctness and checkpoint safety guarantees
-- maintain deterministic extraction behavior under equivalent inputs and configuration
-- preserve JSONL output and state file contracts; stderr presentation may change where the worker
-  boundary makes that necessary
-
 #### Architecture/Runtime: Worker supervision and operational hardening
-
-- **Depends on**: `Architecture/Runtime: Worker-based extraction runtime boundary`
 
 After the Worker-based runtime boundary exists, this entry adds the operational behavior needed to
 make worker execution resilient under cancellation, timeouts, and abnormal worker lifecycle events.
@@ -209,11 +162,7 @@ later projection step.
 - Enables trimming output size for use cases that do not need all fields, while keeping the
   default extraction contract fully populated
 
----
-
 ### Long-term
-
----
 
 #### Development: Profiling interpretation model and usability
 
@@ -268,8 +217,6 @@ Record which branch(es) each commit was reachable from at extraction time (e.g. 
 - Limit to a configurable set of branches (e.g. `--annotate-branches main,develop`) to bound the cost.
 - Consider recording only the "most specific" branch (closest tip ancestor) as a heuristic.
 
----
-
 #### Output: Execution metadata line
 
 - Optionally prepend a metadata line as the first record in each output file:
@@ -277,8 +224,6 @@ Record which branch(es) each commit was reachable from at extraction time (e.g. 
   { "_meta": { "extractedAt": "2024-01-15T00:00:00Z", "extractorVersion": "1.2.0" } }
   ```
 - Controlled by a `--meta` flag (off by default)
-
----
 
 #### Output: stdout support and stream-based OutputWriter
 
@@ -294,15 +239,11 @@ At this point, `OutputWriter` should be redesigned around Node.js `Writable` str
 
 **Why deferred**: No current user need for stdout output. Refactoring `OutputWriter` solely for stream architecture hygiene would be over-engineering without a concrete requirement.
 
----
-
 #### Other future considerations
 
 - **Additional rotation strategies**: by commit date (one file per month/year), by branch (one file per branch)
 - **Ref pattern matching**: `--branch 'feature/*'` glob support (note: temporary branches introduce risk of capturing transient data — document trade-offs)
 - **Windows line endings**: `--line-ending crlf` flag (LF-only today; architecturally trivial to add)
-
----
 
 ## Development Environment Improvements
 

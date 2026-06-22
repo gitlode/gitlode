@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { IsomorphicGitAdapterDependencies } from "../../src/git-impl/index.js";
 import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
 import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
-import type { RawCommit } from "../../src/git/index.js";
+import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -71,6 +71,26 @@ function makeRepo() {
   }
 
   return { fs, init, addCommit, collectAll };
+}
+
+async function writeCommit(
+  fs: IsomorphicGitAdapterDependencies["fs"],
+  tree: string,
+  parents: string[],
+  message: string,
+  timestamp: number,
+): Promise<string> {
+  return git.writeCommit({
+    fs,
+    dir: "/",
+    commit: {
+      tree,
+      parent: parents,
+      message: `${message}\n`,
+      author: { ...AUTHOR, timestamp },
+      committer: { ...AUTHOR, timestamp },
+    },
+  });
 }
 
 describe("IsomorphicGitAdapter.walkCommits", () => {
@@ -270,6 +290,80 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(oids.has(sha2)).toBe(false);
     expect(oids.has(sha1)).toBe(false);
     expect(results).toHaveLength(5);
+  });
+
+  it("includes a branch forked before the excluded release and merged afterward", async () => {
+    // root -- fork -- release -- mainAfter -- merge (head)
+    //           \-- sideA -- sideB --------/
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const fork = await writeCommit(fs, tree, [root], "fork", 2000);
+    const release = await writeCommit(fs, tree, [fork], "release", 3000);
+    const mainAfter = await writeCommit(fs, tree, [release], "main after release", 4000);
+    const sideA = await writeCommit(fs, tree, [fork], "side A", 2500);
+    const sideB = await writeCommit(fs, tree, [sideA], "side B", 3500);
+    const head = await writeCommit(fs, tree, [mainAfter, sideB], "merge", 5000);
+
+    const commits = await collectAll(createAdapter(fs), head, release);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(
+      new Set([head, mainAfter, sideB, sideA]),
+    );
+  });
+
+  it("subtracts ancestors of an unreachable excludeHash that shares an ancestor with head", async () => {
+    // root -- common -- headA -- headB (head)
+    //                \-- excludedTip (excludeHash)
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const common = await writeCommit(fs, tree, [root], "common", 2000);
+    const headA = await writeCommit(fs, tree, [common], "head A", 3000);
+    const head = await writeCommit(fs, tree, [headA], "head B", 4000);
+    const excludedTip = await writeCommit(fs, tree, [common], "excluded tip", 3500);
+
+    const commits = await collectAll(createAdapter(fs), head, excludedTip);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, headA]));
+  });
+
+  it("walks the reachable set when commit timestamps run backward", async () => {
+    // root(3000) -- child(1000) -- head(2000)
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 3000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const child = await writeCommit(fs, tree, [root], "child", 1000);
+    const head = await writeCommit(fs, tree, [child], "head", 2000);
+
+    const commits = await collectAll(createAdapter(fs), head);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, child, root]));
+  });
+
+  it("preserves the isomorphic-git error for a missing head commit", async () => {
+    const { fs, init, collectAll } = makeRepo();
+    await init();
+
+    await expect(collectAll(createAdapter(fs), "0".repeat(40))).rejects.toMatchObject({
+      name: "NotFoundError",
+    });
+  });
+
+  it("maps a missing excludeHash to COMMIT_NOT_FOUND", async () => {
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const head = await addCommit("a.txt", "head", "head", 1000);
+
+    const error = await collectAll(createAdapter(fs), head, "0".repeat(40)).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(GitAdapterError);
+    expect((error as GitAdapterError).code).toBe("COMMIT_NOT_FOUND");
   });
 });
 

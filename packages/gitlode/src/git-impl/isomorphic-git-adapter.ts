@@ -13,7 +13,7 @@ import {
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import { type StageProfiler, withProfilerAsync } from "../profile/index.js";
-import { shiftOrThrow } from "../support/index.js";
+import { type DagNodePort, walkDagWithConfiguredStrategy } from "./walk-commits-strategy.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
@@ -217,65 +217,39 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async *walkCommits(
     repoPath: string,
-    head: CommitOid,
-    excludeHash?: CommitOid,
+    oid: CommitOid,
+    excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    const excluded = excludeHash
-      ? await this._collectReachable(repoPath, excludeHash)
-      : new Set<string>();
-
-    const queue: string[] = [head];
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-      const next = await withProfilerAsync(this._walkCommitsProfiler, async () => {
-        const hash = shiftOrThrow(queue);
-        if (visited.has(hash) || excluded.has(hash)) return null;
-        visited.add(hash);
-
-        const { commit } = await withProfilerAsync(this._walkReadCommitProfiler, async () =>
-          git.readCommit({
-            fs: this._fs,
-            dir: repoPath,
-            oid: hash,
-          }),
-        );
-
-        return { hash, commit };
-      });
-
-      if (next === null) continue;
-
-      yield {
-        oid: next.hash as CommitOid,
-        message: next.commit.message,
-        author: {
-          name: next.commit.author.name,
-          email: next.commit.author.email,
-          timestamp: next.commit.author.timestamp,
-          // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
-          // this behavior is based on JavaScript Date.getTimezoneOffset().
-          // the adapter negates that value before populating this field.
-          timezoneOffset: -next.commit.author.timezoneOffset,
-        },
-        committer: {
-          name: next.commit.committer.name,
-          email: next.commit.committer.email,
-          timestamp: next.commit.committer.timestamp,
-          // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
-          // this behavior is based on JavaScript Date.getTimezoneOffset().
-          // the adapter negates that value before populating this field.
-          timezoneOffset: -next.commit.committer.timezoneOffset,
-        },
-        parents: next.commit.parent as CommitOid[],
-      };
-
-      for (const parent of next.commit.parent) {
-        if (!visited.has(parent) && !excluded.has(parent)) {
-          queue.push(parent);
+    const nodes: DagNodePort<CommitOid, RawCommit> = {
+      readNode: async (oid, side) => {
+        try {
+          const { commit } = await withProfilerAsync(
+            side === "include" ? this._walkReadCommitProfiler : this._excludeReadCommitProfiler,
+            async () => git.readCommit({ fs: this._fs, dir: repoPath, oid }),
+          );
+          return toRawCommit(oid, commit);
+        } catch (err) {
+          if (err instanceof Error && err.name === "NotFoundError") {
+            throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
+          }
+          throw new GitAdapterError(
+            `Unexpected error reading commit ${oid}: ${String(err)}`,
+            "UNKNOWN",
+            err,
+          );
         }
-      }
-    }
+      },
+      getParents: (node) => node.parents,
+    };
+    yield* walkDagWithConfiguredStrategy<CommitOid, RawCommit>(
+      {
+        nodes,
+        walkProfiler: this._walkCommitsProfiler,
+        excludeCollectProfiler: this._excludeCollectProfiler,
+      },
+      oid,
+      excludeOid,
+    );
   }
 
   async findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null> {
@@ -448,42 +422,6 @@ export class IsomorphicGitAdapter implements GitAdapter {
     }
     return false;
   }
-
-  private async _collectReachable(repoPath: string, startHash: string): Promise<Set<string>> {
-    return withProfilerAsync(this._excludeCollectProfiler, async () => {
-      const reachable = new Set<string>();
-      const queue = [startHash];
-      while (queue.length > 0) {
-        const hash = shiftOrThrow(queue);
-        if (reachable.has(hash)) continue;
-        reachable.add(hash);
-        let commitParents: string[];
-        try {
-          const { commit } = await withProfilerAsync(this._excludeReadCommitProfiler, async () =>
-            git.readCommit({
-              fs: this._fs,
-              dir: repoPath,
-              oid: hash,
-            }),
-          );
-          commitParents = commit.parent;
-        } catch (err) {
-          if (err instanceof Error && err.name === "NotFoundError") {
-            throw new GitAdapterError(`Commit not found: ${hash}`, "COMMIT_NOT_FOUND", err);
-          }
-          throw new GitAdapterError(
-            `Unexpected error reading commit ${hash}: ${String(err)}`,
-            "UNKNOWN",
-            err,
-          );
-        }
-        for (const parent of commitParents) {
-          queue.push(parent);
-        }
-      }
-      return reachable;
-    });
-  }
 }
 
 type ClassifiedWalkerEntry =
@@ -505,5 +443,31 @@ async function classifyWalkerEntry(
   return {
     type: await entry.type(),
     entry,
+  };
+}
+
+function toRawCommit(oid: CommitOid, commit: git.CommitObject): RawCommit {
+  return {
+    oid,
+    message: commit.message,
+    author: {
+      name: commit.author.name,
+      email: commit.author.email,
+      timestamp: commit.author.timestamp,
+      // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
+      // this behavior is based on JavaScript Date.getTimezoneOffset().
+      // the adapter negates that value before populating this field.
+      timezoneOffset: -commit.author.timezoneOffset,
+    },
+    committer: {
+      name: commit.committer.name,
+      email: commit.committer.email,
+      timestamp: commit.committer.timestamp,
+      // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
+      // this behavior is based on JavaScript Date.getTimezoneOffset().
+      // the adapter negates that value before populating this field.
+      timezoneOffset: -commit.committer.timezoneOffset,
+    },
+    parents: commit.parent as CommitOid[],
   };
 }

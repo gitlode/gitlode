@@ -74,8 +74,8 @@ export interface GitAdapter {
   /** Classify a ref by runtime semantics for traversal/state handling. */
   classifyRefType(repoPath: string, ref: string): Promise<RefType>;
 
-  /** Walk commits reachable from `head`, stopping before `excludeHash` if provided */
-  walkCommits(repoPath: string, head: CommitOid, excludeHash?: CommitOid): AsyncIterable<RawCommit>;
+  /** Walk commits reachable from `oid`, stopping before `excludeOid` if provided */
+  walkCommits(repoPath: string, oid: CommitOid, excludeOid?: CommitOid): AsyncIterable<RawCommit>;
 
   /** Return the remote URL for `origin`, or null if not set */
   getRemoteUrl(repoPath: string): Promise<string | null>;

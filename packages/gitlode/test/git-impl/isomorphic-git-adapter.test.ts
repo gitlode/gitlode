@@ -157,6 +157,22 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(oids).toHaveLength(2);
   });
 
+  it("uses the certified-lazy default through the adapter for a certified single-anchor walk", async () => {
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const old = await addCommit("a.txt", "old", "old", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: old })).commit.tree;
+    const release = await writeCommit(fs, tree, [old], "release", 2000);
+    const after = await writeCommit(fs, tree, [release], "after", 3000);
+    const head = await writeCommit(fs, tree, [after], "head", 4000);
+
+    fs.unlinkSync(`/.git/objects/${old.slice(0, 2)}/${old.slice(2)}`);
+
+    const commits = await collectAll(createAdapter(fs), head, release);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, after]));
+  });
+
   it("merge commit handling: exclusion stops at correct ancestors in a 2-parent DAG", async () => {
     // Build the DAG using writeCommit directly (no branch switching needed):
     //
@@ -344,13 +360,16 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, child, root]));
   });
 
-  it("preserves the isomorphic-git error for a missing head commit", async () => {
+  it("maps a missing include-side start commit to COMMIT_NOT_FOUND", async () => {
     const { fs, init, collectAll } = makeRepo();
     await init();
 
-    await expect(collectAll(createAdapter(fs), "0".repeat(40))).rejects.toMatchObject({
-      name: "NotFoundError",
-    });
+    const error = await collectAll(createAdapter(fs), "0".repeat(40)).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(GitAdapterError);
+    expect((error as GitAdapterError).code).toBe("COMMIT_NOT_FOUND");
   });
 
   it("maps a missing excludeHash to COMMIT_NOT_FOUND", async () => {

@@ -10,67 +10,36 @@ import {
   type RawCommit,
   type RepositoryObjectFormat,
 } from "../git/types.js";
+import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
-import { type StageProfiler, withProfilerAsync } from "../profile/index.js";
 import { type DagNodePort, walkDagWithConfiguredStrategy } from "./walk-commits-strategy.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
   readonly diffAdapter: DiffAdapter;
-  readonly profiler?: StageProfiler;
+  readonly instrumentation: Instrumentation;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _diffAdapter: DiffAdapter;
-  private _resolveRefProfiler?: StageProfiler;
-  private _repositoryObjectFormatProfiler?: StageProfiler;
-  private _getRemoteUrlProfiler?: StageProfiler;
-  private _walkCommitsProfiler?: StageProfiler;
-  private _walkReadCommitProfiler?: StageProfiler;
-  private _excludeCollectProfiler?: StageProfiler;
-  private _excludeReadCommitProfiler?: StageProfiler;
-  private _mergeBaseProfiler?: StageProfiler;
-  private _fileChangesProfiler?: StageProfiler;
-  private _blobReadProfiler?: StageProfiler;
-  private _diffProfiler?: StageProfiler;
+  private readonly _instrumentation: Instrumentation;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
     this._diffAdapter = dependencies.diffAdapter;
-    this._configureProfilers(dependencies.profiler);
+    this._instrumentation = dependencies.instrumentation;
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
     return ["sha1"];
   }
 
-  private _configureProfilers(profiler: StageProfiler | undefined): void {
-    if (profiler === undefined) {
-      return;
-    }
-
-    this._resolveRefProfiler = profiler.createScopedProfiler("resolve-ref");
-    this._repositoryObjectFormatProfiler = profiler.createScopedProfiler(
-      "repository-object-format",
-    );
-    this._getRemoteUrlProfiler = profiler.createScopedProfiler("get-remote-url");
-    this._walkCommitsProfiler = profiler.createScopedProfiler("walk-commits");
-    this._walkReadCommitProfiler = this._walkCommitsProfiler.createScopedProfiler("read-commit");
-    this._excludeCollectProfiler = profiler.createScopedProfiler("exclude-collect");
-    this._excludeReadCommitProfiler =
-      this._excludeCollectProfiler.createScopedProfiler("read-commit");
-    this._mergeBaseProfiler = profiler.createScopedProfiler("merge-base");
-    this._fileChangesProfiler = profiler.createScopedProfiler("file-changes");
-    this._blobReadProfiler = profiler.createScopedProfiler("blob-read");
-    this._diffProfiler = profiler.createScopedProfiler("diff");
-  }
-
   async resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
     let oid: string;
     try {
-      oid = (await withProfilerAsync(this._resolveRefProfiler, async () =>
+      oid = (await this._instrumentation.runAsync("git.resolve_ref", async () =>
         git.resolveRef({ fs: this._fs, dir: repoPath, ref }),
       )) as string;
     } catch (err) {
@@ -109,7 +78,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat> {
     try {
-      const raw = await withProfilerAsync(this._repositoryObjectFormatProfiler, async () =>
+      const raw = await this._instrumentation.runAsync("git.repository_object_format", async () =>
         git.getConfig({
           fs: this._fs,
           dir: repoPath,
@@ -195,7 +164,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async getRemoteUrl(repoPath: string): Promise<string | null> {
     try {
-      const url = await withProfilerAsync(this._getRemoteUrlProfiler, async () =>
+      const url = await this._instrumentation.runAsync("git.get_remote_url", async () =>
         git.getConfig({
           fs: this._fs,
           dir: repoPath,
@@ -220,41 +189,46 @@ export class IsomorphicGitAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    const nodes: DagNodePort<CommitOid, RawCommit> = {
-      readNode: async (oid, side) => {
-        try {
-          const { commit } = await withProfilerAsync(
-            side === "include" ? this._walkReadCommitProfiler : this._excludeReadCommitProfiler,
-            async () => git.readCommit({ fs: this._fs, dir: repoPath, oid }),
-          );
-          return toRawCommit(oid, commit);
-        } catch (err) {
-          if (err instanceof Error && err.name === "NotFoundError") {
-            throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
+    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
+      const nodes: DagNodePort<CommitOid, RawCommit> = {
+        readNode: async (oid, side) => {
+          try {
+            const spanName =
+              side === "include"
+                ? "git.walk_commits.read_commit"
+                : "git.walk_commits.exclude_collect.read_commit";
+            const { commit } = await this._instrumentation.runAsync(spanName, async () =>
+              git.readCommit({ fs: this._fs, dir: repoPath, oid }),
+            );
+            return toRawCommit(oid, commit);
+          } catch (err) {
+            if (err instanceof Error && err.name === "NotFoundError") {
+              throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
+            }
+            throw new GitAdapterError(
+              `Unexpected error reading commit ${oid}: ${String(err)}`,
+              "UNKNOWN",
+              err,
+            );
           }
-          throw new GitAdapterError(
-            `Unexpected error reading commit ${oid}: ${String(err)}`,
-            "UNKNOWN",
-            err,
-          );
-        }
-      },
-      getParents: (node) => node.parents,
-    };
-    yield* walkDagWithConfiguredStrategy<CommitOid, RawCommit>(
-      {
-        nodes,
-        walkProfiler: this._walkCommitsProfiler,
-        excludeCollectProfiler: this._excludeCollectProfiler,
-      },
-      oid,
-      excludeOid,
-    );
+        },
+        getParents: (node) => node.parents,
+      };
+      return walkDagWithConfiguredStrategy<CommitOid, RawCommit>(
+        {
+          nodes,
+          instrumentation: this._instrumentation,
+          span,
+        },
+        oid,
+        excludeOid,
+      );
+    });
   }
 
   async findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null> {
     try {
-      const result = await withProfilerAsync(this._mergeBaseProfiler, async () =>
+      const result = await this._instrumentation.runAsync("git.merge_base", async () =>
         git.findMergeBase({
           fs: this._fs,
           dir: repoPath,
@@ -277,7 +251,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
     commitOid: CommitOid,
     parentOid?: CommitOid,
   ): Promise<readonly FileChange[]> {
-    return withProfilerAsync(this._fileChangesProfiler, async () => {
+    return await this._instrumentation.runAsync("git.file_changes", async () => {
       const changes: FileChange[] = [];
 
       if (parentOid !== undefined) {
@@ -301,10 +275,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
             if (A.type === "blob" && B.type === "blob") {
               const [oidA, oidB] = await Promise.all([A.entry.oid(), B.entry.oid()]);
               if (oidA === oidB) return; // unchanged
-              const [contentA, contentB] = await withProfilerAsync(this._blobReadProfiler, () =>
-                Promise.all([A.entry.content(), B.entry.content()]),
+              const [contentA, contentB] = await this._instrumentation.runAsync(
+                "git.blob_read",
+                async () => Promise.all([A.entry.content(), B.entry.content()]),
               );
-              const change = await withProfilerAsync(this._diffProfiler, async () =>
+              const change = await this._instrumentation.runAsync("git.diff", async () =>
                 this._buildFileChange(
                   filepath,
                   "modified",
@@ -318,10 +293,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
             // Added (no parent blob at this path)
             if (B.type === "blob") {
-              const contentB = await withProfilerAsync(this._blobReadProfiler, () =>
+              const contentB = await this._instrumentation.runAsync("git.blob_read", async () =>
                 B.entry.content(),
               );
-              const change = await withProfilerAsync(this._diffProfiler, async () =>
+              const change = await this._instrumentation.runAsync("git.diff", async () =>
                 this._buildFileChange(
                   filepath,
                   "added",
@@ -335,10 +310,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
             // Deleted (no child blob at this path)
             if (A.type === "blob") {
-              const contentA = await withProfilerAsync(this._blobReadProfiler, () =>
+              const contentA = await this._instrumentation.runAsync("git.blob_read", async () =>
                 A.entry.content(),
               );
-              const change = await withProfilerAsync(this._diffProfiler, async () =>
+              const change = await this._instrumentation.runAsync("git.diff", async () =>
                 this._buildFileChange(
                   filepath,
                   "deleted",
@@ -364,10 +339,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
             if (A.type !== "blob") return;
 
-            const contentA = await withProfilerAsync(this._blobReadProfiler, () =>
+            const contentA = await this._instrumentation.runAsync("git.blob_read", async () =>
               A.entry.content(),
             );
-            const change = await withProfilerAsync(this._diffProfiler, async () =>
+            const change = await this._instrumentation.runAsync("git.diff", async () =>
               this._buildFileChange(
                 filepath,
                 "added",

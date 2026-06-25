@@ -1,5 +1,5 @@
 import type { ProgressReporter } from "../core/types.js";
-import type { ProfilingEntry } from "../profile/type.js";
+import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { RunPresenter } from "./presenter.js";
 import type { Clock, Scheduler, TerminalSink, UiMode } from "./progress/types.js";
 import type { Styling } from "./styling.js";
@@ -30,6 +30,6 @@ export interface RunSuccessPayload {
   readonly bytesWritten: number;
   readonly elapsedMs: number;
   readonly refs: readonly string[];
-  readonly profileEntries: readonly ProfilingEntry[];
+  readonly profileEntries: readonly ProfileSummaryEntry[];
   readonly skippedDiffs: number;
 }

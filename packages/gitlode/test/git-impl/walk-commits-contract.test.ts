@@ -8,6 +8,11 @@ import {
   walkDagEagerExclude,
 } from "../../src/git-impl/walk-commits-strategy.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+} from "../../src/instrumentation/index.js";
+import type { ProfileSummaryEntry } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
 import {
   assertOidSet,
@@ -28,6 +33,7 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of walkDagEagerExclude(
         {
           nodes: rawCommitNodePort(dag),
+          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -44,6 +50,7 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of walkDagCertifiedLazy(
         {
           nodes: rawCommitNodePort(dag),
+          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -474,6 +481,7 @@ describe("walkCommits eagerExclude read trace", () => {
     const commits = walkDagEagerExclude(
       {
         nodes: rawCommitNodePort(dag, requests),
+        instrumentation: noopInstrumentation,
       },
       head,
       exclude,
@@ -581,6 +589,7 @@ describe("walkCommits certifiedLazy read trace", () => {
     const commits = walkDagCertifiedLazy(
       {
         nodes: rawCommitNodePort(dag, requests),
+        instrumentation: noopInstrumentation,
       },
       head,
       exclude,
@@ -698,7 +707,7 @@ describe("walkCommits certifiedLazy read trace", () => {
     expect(new Set(requests.map(({ oid }) => oid)).size).toBe(requests.length);
   });
 
-  it("profiles certifiedLazy include-side exploration and exclude-side work", async () => {
+  it("instruments certifiedLazy include-side exploration and exclude-side work", async () => {
     const dag = await buildDag({
       name: "certifiedLazy profiler",
       nodes: {
@@ -715,31 +724,150 @@ describe("walkCommits certifiedLazy read trace", () => {
       exclude: "release",
     });
 
-    let time = 0;
-    const { DefaultStageProfiler } = await import("../../src/profile/index.js");
-    const rootProfiler = new DefaultStageProfiler("walk-test", () => ++time);
-    const walkProfiler = rootProfiler.createScopedProfiler("walk-commits");
-    const excludeCollectProfiler = rootProfiler.createScopedProfiler("exclude-collect");
+    const { entries } = await profileCertifiedLazy(dag, dag.oid("head"), dag.oid("release"));
 
+    expect(
+      entries.find((entry) => entry.name === "git.walk_commits.step")?.totalMs,
+    ).toBeGreaterThan(0);
+    expect(
+      entries.find((entry) => entry.name === "git.walk_commits.exclude_collect")?.totalMs,
+    ).toBeGreaterThan(0);
+  });
+
+  it("records a successful single-anchor certificate without fallback work", async () => {
+    const definition = cases.find((item) => item.name === "single-anchor certificate candidate")!;
+    const dag = await buildDag(definition);
+    const { walkEntry } = await profileCertifiedLazy(
+      dag,
+      dag.oid(definition.head),
+      dag.oid(definition.exclude!),
+    );
+
+    expect(walkEntry?.attributes?.strategy).toEqual(["certifiedLazy"]);
+    expect(walkEntry?.attributes?.result).toEqual(["certified"]);
+    expect(walkEntry?.counters?.include_reads).toBe(2);
+    expect(walkEntry?.counters?.exclude_reads).toBe(1);
+    expect(walkEntry?.counters?.yielded).toBe(2);
+    expect(walkEntry?.counters?.fallback_reads ?? 0).toBe(0);
+  });
+
+  it("records fallback reason and additional reads for disconnected histories", async () => {
+    const definition = cases.find((item) => item.name === "fully disconnected head and exclude")!;
+    const dag = await buildDag(definition);
+    const { walkEntry } = await profileCertifiedLazy(
+      dag,
+      dag.oid(definition.head),
+      dag.oid(definition.exclude!),
+    );
+
+    expect(walkEntry?.attributes?.result).toEqual(["fallback"]);
+    expect(walkEntry?.attributes?.fallback_reason).toEqual(["open_include_path"]);
+    expect(walkEntry?.counters?.fallback_reads).toBe(1);
+    expect(walkEntry?.counters?.fallback_removed ?? 0).toBe(0);
+  });
+
+  it("records cache hits when fallback reuses nodes read during exploration", async () => {
+    const dag = await buildDag({
+      name: "cached fallback instrumentation",
+      nodes: {
+        root: {},
+        leftAnchor: { parents: ["root"] },
+        rightAnchor: { parents: ["root"] },
+        release: { parents: ["leftAnchor", "rightAnchor"] },
+        head: { parents: ["release"] },
+      },
+      head: "head",
+      exclude: "release",
+    });
+
+    const { walkEntry } = await profileCertifiedLazy(dag, dag.oid("head"), dag.oid("release"));
+
+    expect(walkEntry?.attributes?.result).toEqual(["fallback"]);
+    expect(walkEntry?.attributes?.fallback_reason).toEqual(["exclude_merge"]);
+    expect(walkEntry?.counters?.cache_hits).toBeGreaterThan(0);
+    expect(walkEntry?.counters?.fallback_reads).toBe(3);
+    expect(walkEntry?.counters?.fallback_removed ?? 0).toBe(0);
+  });
+});
+
+describe("walkCommits eagerExclude instrumentation", () => {
+  it("records strategy, side reads, and yielded count", async () => {
+    const dag = await buildDag({
+      name: "eager instrumentation",
+      nodes: {
+        root: {},
+        release: { parents: ["root"] },
+        main: { parents: ["release"] },
+        side: { parents: ["root"] },
+        head: { parents: ["main", "side"] },
+      },
+      head: "head",
+      exclude: "release",
+    });
+
+    let time = 0;
+    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+    const span = instrumentation.startSpan("git.walk_commits");
+    try {
+      const commits = walkDagEagerExclude(
+        {
+          nodes: rawCommitNodePort(dag),
+          instrumentation,
+          span,
+        },
+        dag.oid("head"),
+        dag.oid("release"),
+      );
+      for await (const _commit of commits) {
+        // Drain iterator so instrumentation spans close.
+      }
+      span.end();
+    } catch (error) {
+      span.end(error);
+      throw error;
+    }
+
+    const walkEntry = instrumentation.summary().find((entry) => entry.name === "git.walk_commits");
+    expect(walkEntry?.attributes?.strategy).toEqual(["eagerExclude"]);
+    expect(walkEntry?.counters?.exclude_reads).toBe(2);
+    expect(walkEntry?.counters?.include_reads).toBe(3);
+    expect(walkEntry?.counters?.yielded).toBe(3);
+  });
+});
+
+async function profileCertifiedLazy(
+  dag: BuiltDag,
+  head: CommitOid,
+  exclude: CommitOid,
+): Promise<{
+  readonly entries: readonly ProfileSummaryEntry[];
+  readonly walkEntry: ProfileSummaryEntry | undefined;
+}> {
+  let time = 0;
+  const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+  const span = instrumentation.startSpan("git.walk_commits");
+  try {
     const commits = walkDagCertifiedLazy(
       {
         nodes: rawCommitNodePort(dag),
-        walkProfiler,
-        excludeCollectProfiler,
+        instrumentation,
+        span,
       },
-      dag.oid("head"),
-      dag.oid("release"),
+      head,
+      exclude,
     );
     for await (const _commit of commits) {
-      // Drain iterator so profiler scopes close.
+      // Drain iterator so instrumentation spans close.
     }
+    span.end();
+  } catch (error) {
+    span.end(error);
+    throw error;
+  }
 
-    const entries = rootProfiler.entries();
-    expect(entries.find((entry) => entry.name.endsWith("/walk-commits"))?.workMs).toBeGreaterThan(
-      0,
-    );
-    expect(
-      entries.find((entry) => entry.name.endsWith("/exclude-collect"))?.workMs,
-    ).toBeGreaterThan(0);
-  });
-});
+  const entries = instrumentation.summary();
+  return {
+    entries,
+    walkEntry: entries.find((entry) => entry.name === "git.walk_commits"),
+  };
+}

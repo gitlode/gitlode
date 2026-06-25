@@ -120,17 +120,9 @@ Example shape:
 
 ```ts
 export interface Instrumentation {
-  run<T>(
-    name: string,
-    fn: () => T,
-    options?: InstrumentationOptions,
-  ): T;
+  run<T>(name: string, fn: () => T, options?: InstrumentationOptions): T;
 
-  runAsync<T>(
-    name: string,
-    fn: () => Promise<T>,
-    options?: InstrumentationOptions,
-  ): Promise<T>;
+  runAsync<T>(name: string, fn: () => Promise<T>, options?: InstrumentationOptions): Promise<T>;
 }
 
 export interface InstrumentationOptions {
@@ -165,11 +157,7 @@ export interface InstrumentationSpan {
 }
 
 export interface Instrumentation {
-  run<T>(
-    name: string,
-    fn: (span: InstrumentationSpan) => T,
-    options?: InstrumentationOptions,
-  ): T;
+  run<T>(name: string, fn: (span: InstrumentationSpan) => T, options?: InstrumentationOptions): T;
 
   runAsync<T>(
     name: string,
@@ -360,14 +348,14 @@ OpenTelemetry export should not be required for `--profile`.
 
 Suggested mapping:
 
-| gitlode instrumentation concept | OpenTelemetry concept |
-| --- | --- |
-| `run` / `runAsync` operation | span |
-| `InstrumentationOptions.attributes` | initial span attributes |
-| `span.setAttribute()` | span attributes |
-| `span.addEvent()` | span events |
-| `span.incrementCounter()` | local summary counter and, later, OTel counter/metric or span event depending on cardinality and exporter strategy |
-| thrown error from instrumented operation | span status/error recording |
+| gitlode instrumentation concept          | OpenTelemetry concept                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `run` / `runAsync` operation             | span                                                                                                               |
+| `InstrumentationOptions.attributes`      | initial span attributes                                                                                            |
+| `span.setAttribute()`                    | span attributes                                                                                                    |
+| `span.addEvent()`                        | span events                                                                                                        |
+| `span.incrementCounter()`                | local summary counter and, later, OTel counter/metric or span event depending on cardinality and exporter strategy |
+| thrown error from instrumented operation | span status/error recording                                                                                        |
 
 This mapping may evolve, but future sessions should avoid inventing concepts that cannot be expressed
 reasonably through OpenTelemetry.
@@ -430,8 +418,8 @@ git.repository_object_format
 git.get_remote_url
 git.walk_commits
 git.walk_commits.read_commit
-git.exclude_collect
-git.exclude_collect.read_commit
+git.walk_commits.exclude_collect
+git.walk_commits.exclude_collect.read_commit
 git.merge_base
 git.file_changes
 git.blob_read
@@ -588,6 +576,20 @@ Because gitlode is prerelease, prefer a clean migration over compatibility layer
 
 Recommended phased sequence:
 
+Current implementation status:
+
+- Phase 1 is complete: `src/instrumentation` exists with noop and local recorder
+  implementations, attributes, events, counters, async helpers, and tests.
+- Phase 2 is complete: runtime/core/git implementation call sites use `Instrumentation`, and
+  `--profile` renders local span summaries rather than `ProfilingEntry.wallMs/workMs`.
+- Phase 3 cleanup is complete in code: `StageProfiler` is no longer plugin-facing, official
+  plugins receive `PluginRuntimeContext.instrumentation`, and the old `src/profile` implementation
+  has been removed.
+- Before starting walkCommits Feature C, run a profile sufficiency check against realistic
+  repositories/ranges. The profile output must make strategy, certificate/fallback reason,
+  include/exclude reads, cache hits, fallback additional work, candidate removal, and yielded count
+  clear enough to compare strategies.
+
 ### Phase 1: New instrumentation foundation
 
 1. Introduce `src/instrumentation` or `src/telemetry`.
@@ -620,6 +622,13 @@ Recommended phased sequence:
 15. Remove or archive old `src/profile`.
 16. Remove old `ProfilingEntry`, `wallMs`, and `workMs` concepts from intended stable surfaces.
 
+Implementation note: the plugin-facing API now exposes `Instrumentation` / `InstrumentationSpan`
+from `gitlode/plugin-api`. `PluginRuntimeContext` includes `instrumentation` as a required field.
+The local `--profile` formatter keeps a compact table with a single `details` column so rows remain
+easy to compare horizontally. That details column includes selected attributes, counters, and
+errors so walkCommits strategy diagnostics are visible without relying on an external OpenTelemetry
+backend.
+
 ### Phase 4: OpenTelemetry export
 
 17. Add an OpenTelemetry-backed implementation after local behavior is stable.
@@ -648,6 +657,8 @@ Avoid:
 - Adding many high-cardinality attributes by default.
 - Measuring async iterables incorrectly by wrapping only their factory functions.
 - Creating excessive per-file/per-commit spans without aggregation/sampling considerations.
+- Using legacy TypeScript `experimentalDecorators`. If decorators are adopted, use only the standard
+  TC39/TypeScript decorators model.
 
 ---
 
@@ -688,6 +699,19 @@ runAsync(name, fn, options?)
 This is simple and close to current helper usage. However, the final API should provide a way for
 the instrumented operation to record selected attributes, events, and counter-like values while it
 runs.
+
+Decorator-like method instrumentation may be added later as a thin layer over this API. It should
+not be part of the initial implementation. This keeps the core instrumentation model usable from
+plain functions, async iterables, and future OpenTelemetry adapters without depending on decorator
+syntax or TypeScript emit behavior.
+
+If decorators are introduced later:
+
+- use only the standard TC39/TypeScript decorators model;
+- do not enable or rely on legacy `experimentalDecorators`;
+- treat decorators as convenience wrappers around `run` / `runAsync`;
+- use them mainly for whole-method spans, not fine-grained counters or async iterator consumption;
+- check compatibility with `erasableSyntaxOnly` and the package build target before adoption.
 
 ### 3. Local summary data model
 

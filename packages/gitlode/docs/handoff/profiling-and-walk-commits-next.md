@@ -56,9 +56,43 @@ Work should proceed in this order:
 2. **Feature B: instrument walkCommits using Feature A**
 3. **Feature C: prototype bidirectional traversal using Feature B data**
 
-Do not start Feature C before A and B provide enough evidence to compare traversal paths.
+Feature A and B have been implemented through the newer span-first instrumentation migration. Do
+not start Feature C merely because counters exist in code. First verify that real `--profile`
+output is sufficient to compare traversal strategies without reading source or raw test fixtures.
+At minimum, profile output should clearly expose:
+
+- selected strategy;
+- certified/fallback result and fallback reason;
+- include-side reads;
+- exclude-side reads;
+- cache hits when present;
+- fallback additional reads when present;
+- fallback removed candidates when present;
+- yielded commits.
 
 ## Feature A: generic profiling improvements
+
+### Updated direction
+
+Feature A has been superseded by the span-first migration direction recorded in
+`docs/handoff/instrumentation-opentelemetry-migration.md`.
+
+The original API sketch below proposed adding metrics directly to `StageProfiler`. That remains
+useful historical context, but the agreed implementation direction is now:
+
+- introduce a new internal `src/instrumentation` domain;
+- align the model with OpenTelemetry spans, attributes, events, and future metrics;
+- keep local `--profile` output deterministic and independent of external OTel export;
+- include counter-like operational measurements early so gitlode's profiling needs are not reduced
+  to timing-only spans;
+- do not carry `workMs` into the new stable instrumentation output;
+- keep the old `src/profile` implementation during the transition, then remove it after call sites
+  and plugin APIs have moved to instrumentation.
+
+Decorator-like metaprogramming remains a future option for method-level instrumentation, but the
+current implementation should use explicit helpers. If decorators are adopted later, gitlode should
+use only the standard TC39/TypeScript decorators model, not legacy TypeScript
+`experimentalDecorators`.
 
 ### Goal
 
@@ -136,14 +170,14 @@ or metrics are emitted through an external observability API.
 Profile rendering should remain readable in CLI output. Candidate formats:
 
 ```text
-elapsed/git/walk-commits : wall=... work=... reads=123 cacheHits=45 fallback=true
+elapsed/git/walk-commits : wall=... work=... include_reads=123 cache_hits=45 result=fallback
 ```
 
 or a separate indented metric block:
 
 ```text
 elapsed/git/walk-commits : wall=... work=...
-  metrics: includeReads=123, fallback=true
+  metrics: include_reads=123, result=fallback
 ```
 
 Prefer deterministic ordering:
@@ -200,11 +234,11 @@ This should answer:
 
 - which strategy ran?
 - did certified-lazy use a certificate or fallback?
-- why did certificate fail?
+- why did fallback happen?
 - how many nodes were read from include/exclude side?
 - how many reads were served from cache?
 - how much fallback work was additional versus already cached?
-- how many result candidates were buffered and later removed?
+- how many buffered result candidates were removed during fallback?
 - how many nodes were yielded?
 
 ### Suggested metrics
@@ -212,26 +246,21 @@ This should answer:
 Candidate metrics for `walk-commits` or child scopes:
 
 - `strategy`: `"eagerExclude"` or `"certifiedLazy"`
-- `includeReads`
-- `excludeReads`
-- `uniqueReads`
-- `cacheHits`
-- `resultCandidates`
+- `include_reads`
+- `exclude_reads`
+- `cache_hits`
 - `yielded`
 
 Candidate certified-lazy metrics:
 
-- `certificate`: `"success"` or `"fallback"`
-- `certificateFailureReason`
-- `stopPoints`
-- `openIncludePathToRoot`
-- `excludeEncounteredMerge`
-- `singleExcludeAnchorPresent`
-- `fallbackAdditionalReads`
-- `fallbackExcludedCount`
-- `fallbackRemovedCandidates`
+- `result`: `"certified"` or `"fallback"`
+- `fallback_reason`: `"open_include_path"`, `"exclude_merge"`, `"no_stop_points"`, or
+  `"uncertified_stop_point"`
+- `fallback_reads`
+- `fallback_removed`
 
-The exact names can change, but prefer stable, concise names that fit CLI output.
+These names are intentionally summary-oriented rather than local-variable-oriented. Avoid adding
+internal booleans or derived counts unless they materially improve strategy comparison.
 
 ### Implementation notes
 
@@ -271,6 +300,11 @@ Avoid over-specifying ordering unless the metric intentionally captures ordering
 - Metrics are stable enough for regression tests.
 - Full package tests pass.
 
+Implementation status: complete in code. The current implementation records these diagnostics on
+the `git.walk_commits` span and renders attributes/counters as separate profile detail lines.
+Before Feature C, validate the output on at least one realistic repository/range and improve the
+profile if the strategy comparison is still unclear.
+
 ### Suggested starting prompt
 
 ```text
@@ -278,7 +312,7 @@ We are continuing gitlode walkCommits profiling work. Feature A has added generi
 Implement Feature B from packages/gitlode/docs/handoff/profiling-and-walk-commits-next.md.
 
 Goal: instrument walkDagEagerExclude and walkDagCertifiedLazy so profile output reveals strategy,
-read counts, cache behavior, certificate/fallback result, fallback reason, candidate removal, and
+read counts, cache behavior, certified/fallback result, fallback reason, candidate removal, and
 yield counts. Keep the DAG strategy generic and avoid Git-specific assumptions where possible.
 
 Update contract/adapter tests and verify build/test/format.
@@ -343,7 +377,7 @@ Use Feature B metrics to compare:
 - exclude reads;
 - cache hits;
 - fallback additional reads;
-- candidates buffered and removed;
+- candidates removed during fallback;
 - final yielded count;
 - certificate/fallback reasons;
 - wall/work time.

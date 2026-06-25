@@ -1,5 +1,5 @@
+import type { Instrumentation, ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { CommitOid, PersonIdentity, RefType } from "../model/index.js";
-import type { ProfilingEntry, StageProfiler } from "../profile/type.js";
 import type { AbsolutePath } from "../support/index.js";
 import type { Brand } from "../type-utils/index.js";
 
@@ -174,11 +174,11 @@ export interface ExtractionResult {
   readonly bytesWritten: number;
   readonly refs: readonly string[];
   /**
-   * Profiling entries from the root profiler, in preorder.
-   * The first entry is always the root (e.g. `"elapsed"`) and represents total run duration.
+   * Profiling summary entries from local instrumentation.
+   * The first entry is usually the root span (e.g. `"gitlode.run"`) when profiling is active.
    * Populated on every successful run.
    */
-  readonly profilingEntries: readonly ProfilingEntry[];
+  readonly profilingEntries: readonly ProfileSummaryEntry[];
   /** Number of file diffs skipped due to size threshold (--max-diff-size). */
   readonly skippedDiffs: number;
 }
@@ -336,7 +336,7 @@ export type ProjectionContext = {
 }[FactType];
 
 export interface PluginRuntimeContext extends DiagnosticReporter {
-  readonly profiler?: StageProfiler;
+  readonly instrumentation: Instrumentation;
 }
 
 /** Contract that every projector plugin must satisfy. */
@@ -367,6 +367,6 @@ export interface CoordinatorDependencies {
   readonly projector: FactProjector;
   readonly sink: OutputSink;
   readonly reporter: ProgressReporter;
-  /** Optional profiler for accumulating writeMs across sink.write() and sink.close() calls. */
-  readonly profiler?: StageProfiler;
+  /** Instrumentation for accumulating write spans across sink.write() and sink.close(). */
+  readonly instrumentation: Instrumentation;
 }

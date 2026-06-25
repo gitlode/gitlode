@@ -11,6 +11,7 @@ import type {
   PluginInitResult,
   PluginRuntimeContext,
 } from "../../src/core/types.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import {
   checkPluginCompatibility,
   initializePlugins,
@@ -30,6 +31,7 @@ function makeRuntimeContext(overrides: Partial<PluginRuntimeContext> = {}): Plug
   return {
     warn() {},
     error() {},
+    instrumentation: noopInstrumentation,
     ...overrides,
   };
 }

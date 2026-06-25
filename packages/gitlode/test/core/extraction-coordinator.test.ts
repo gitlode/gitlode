@@ -16,11 +16,14 @@ import type {
   ProgressEvent,
   ProgressReporter,
   ProjectedRecord,
-  StageProfiler,
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
 } from "../../src/core/types.js";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+} from "../../src/instrumentation/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -171,7 +174,7 @@ function makeDeps(
     projector: overrides.projector ?? projector,
     sink,
     reporter: overrides.reporter ?? makeProgressReporter(),
-    profiler: overrides.profiler,
+    instrumentation: overrides.instrumentation ?? noopInstrumentation,
   };
 }
 
@@ -622,40 +625,17 @@ describe("DefaultExtractionCoordinator", () => {
     expect(result.state.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
-  it("profiler.resume/stop called for write and close but NOT checkpoint write", async () => {
+  it("instruments write and close spans", async () => {
     let time = 0;
-    let resumeCount = 0;
-    let stopCount = 0;
-    let measureWorkCount = 0;
-    const profilerStub: StageProfiler = {
-      name: "write",
-      start() {},
-      resume() {
-        resumeCount++;
-      },
-      stop() {
-        stopCount++;
-      },
-      measureWork<T>(fn: () => T): T {
-        measureWorkCount++;
-        time++;
-        return fn();
-      },
-      createScopedProfiler(_name: string) {
-        return profilerStub;
-      },
-      entries() {
-        return [{ name: "write", wallMs: time, workMs: measureWorkCount }];
-      },
-    };
+    const instrumentation = new LocalInstrumentationRecorder(() => time++);
 
-    const deps = makeDeps({ oids: ["1".padStart(12, "0")], profiler: profilerStub });
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")], instrumentation });
     const coord = new DefaultExtractionCoordinator(deps);
     await coord.run(baseRequest());
 
-    // resume/stop called once for write, once for close (2 pairs total)
-    expect(resumeCount).toBe(2);
-    expect(stopCount).toBe(2);
-    expect(measureWorkCount).toBe(2);
+    expect(instrumentation.summary()).toEqual([
+      { name: "gitlode.output.write", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 },
+      { name: "gitlode.output.close", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 },
+    ]);
   });
 });

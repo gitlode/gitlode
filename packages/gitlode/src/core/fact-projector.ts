@@ -1,5 +1,4 @@
-import { withProfiler } from "../profile/index.js";
-import type { StageProfiler } from "../profile/type.js";
+import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
 import { assertNever, formatUnixTimestampWithOffset } from "../support/index.js";
 import type {
   CommitFact,
@@ -70,23 +69,31 @@ export function projectFileChange(
 export class DefaultFactProjector implements FactProjector {
   private readonly repoName: string;
   private readonly repoUrl: string | null;
-  private readonly profiler?: StageProfiler;
+  private readonly instrumentation: Instrumentation;
 
-  constructor(repoName: string, repoUrl: string | null, profiler?: StageProfiler) {
+  constructor(repoName: string, repoUrl: string | null, instrumentation: Instrumentation) {
     this.repoName = repoName;
     this.repoUrl = repoUrl;
-    this.profiler = profiler;
+    this.instrumentation = instrumentation;
   }
 
-  async *project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
+  project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
+    return instrumentAsyncIterable(this.instrumentation, "gitlode.projection", () =>
+      this.projectRecords(facts),
+    );
+  }
+
+  private async *projectRecords(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
     for await (const fact of facts) {
       switch (fact.type) {
         case "commit": {
-          yield withProfiler(this.profiler, () => projectCommit(fact, this.repoName, this.repoUrl));
+          yield this.instrumentation.run("gitlode.projection.project", () =>
+            projectCommit(fact, this.repoName, this.repoUrl),
+          );
           break;
         }
         case "file-change": {
-          yield withProfiler(this.profiler, () =>
+          yield this.instrumentation.run("gitlode.projection.project", () =>
             projectFileChange(fact, this.repoName, this.repoUrl),
           );
           break;

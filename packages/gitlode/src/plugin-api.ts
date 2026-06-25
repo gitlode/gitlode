@@ -7,7 +7,7 @@ export type {
   ProjectionContext,
   ProjectorPlugin,
 } from "./core/index.js";
-export type { StageProfiler } from "./profile/index.js";
+export type { Instrumentation, InstrumentationSpan } from "./instrumentation/index.js";
 export type {
   CommitFact,
   FileChangeFact,

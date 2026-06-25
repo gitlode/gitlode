@@ -6,6 +6,7 @@ import type { IsomorphicGitAdapterDependencies } from "../../src/git-impl/index.
 import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
 import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -21,7 +22,7 @@ function createAdapter(
   return new IsomorphicGitAdapter({
     fs,
     diffAdapter: overrides.diffAdapter ?? new JsDiffAdapter(),
-    profiler: overrides.profiler,
+    instrumentation: overrides.instrumentation ?? noopInstrumentation,
   });
 }
 
@@ -850,8 +851,8 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
   });
 });
 
-describe("IsomorphicGitAdapter profiler injection", () => {
-  it("adapter-level and file-change sub-stage entries accumulate when a profiler is passed to the constructor", async () => {
+describe("IsomorphicGitAdapter instrumentation injection", () => {
+  it("adapter-level and file-change spans accumulate when instrumentation is passed to the constructor", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha1 = await addCommit("a.txt", "hello\nworld\n", "root commit");
@@ -860,10 +861,10 @@ describe("IsomorphicGitAdapter profiler injection", () => {
     let time = 0;
     const clock = () => ++time;
 
-    const { DefaultStageProfiler } = await import("../../src/profile/index.js");
-    const profiler = new DefaultStageProfiler("git", clock);
+    const { LocalInstrumentationRecorder } = await import("../../src/instrumentation/index.js");
+    const instrumentation = new LocalInstrumentationRecorder(clock);
 
-    const adapter = createAdapter(fs, { profiler });
+    const adapter = createAdapter(fs, { instrumentation });
 
     await adapter.getFileChanges("/", sha2 as never, sha1 as never);
     // Also exercise resolve and merge-base paths so adapter-level buckets are populated.
@@ -873,35 +874,26 @@ describe("IsomorphicGitAdapter profiler injection", () => {
       // Drain iterator
     }
 
-    const entries = profiler.entries();
-    const resolveRefEntry = entries.find((e) => e.name.endsWith("/resolve-ref"));
-    const mergeBaseEntry = entries.find((e) => e.name.endsWith("/merge-base"));
-    const walkEntry = entries.find((e) => e.name.endsWith("/walk-commits"));
-    const walkReadCommitEntry = entries.find((e) => e.name.endsWith("/walk-commits/read-commit"));
-    const excludeCollectEntry = entries.find((e) => e.name.endsWith("/exclude-collect"));
-    const excludeReadCommitEntry = entries.find((e) =>
-      e.name.endsWith("/exclude-collect/read-commit"),
+    const entries = instrumentation.summary();
+    const resolveRefEntry = entries.find((e) => e.name === "git.resolve_ref");
+    const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
+    const walkEntry = entries.find((e) => e.name === "git.walk_commits");
+    const walkReadCommitEntry = entries.find((e) => e.name === "git.walk_commits.read_commit");
+    const excludeCollectEntry = entries.find((e) => e.name === "git.walk_commits.exclude_collect");
+    const excludeReadCommitEntry = entries.find(
+      (e) => e.name === "git.walk_commits.exclude_collect.read_commit",
     );
-    const fileChangesEntry = entries.find((e) => e.name.endsWith("/file-changes"));
-    const blobEntry = entries.find((e) => e.name.endsWith("/blob-read"));
-    const diffEntry = entries.find((e) => e.name.endsWith("/diff"));
-    expect(resolveRefEntry?.wallMs).toBeGreaterThan(0);
-    expect(resolveRefEntry?.workMs).toBeGreaterThan(0);
-    expect(mergeBaseEntry?.wallMs).toBeGreaterThan(0);
-    expect(mergeBaseEntry?.workMs).toBeGreaterThan(0);
-    expect(walkEntry?.wallMs).toBeGreaterThan(0);
-    expect(walkEntry?.workMs).toBeGreaterThan(0);
-    expect(walkReadCommitEntry?.wallMs).toBeGreaterThan(0);
-    expect(walkReadCommitEntry?.workMs).toBeGreaterThan(0);
-    expect(excludeCollectEntry?.wallMs).toBeGreaterThan(0);
-    expect(excludeCollectEntry?.workMs).toBeGreaterThan(0);
-    expect(excludeReadCommitEntry?.wallMs).toBeGreaterThan(0);
-    expect(excludeReadCommitEntry?.workMs).toBeGreaterThan(0);
-    expect(fileChangesEntry?.wallMs).toBeGreaterThan(0);
-    expect(fileChangesEntry?.workMs).toBeGreaterThan(0);
-    expect(blobEntry?.wallMs).toBeGreaterThan(0);
-    expect(blobEntry?.workMs).toBeGreaterThan(0);
-    expect(diffEntry?.wallMs).toBeGreaterThan(0);
-    expect(diffEntry?.workMs).toBeGreaterThan(0);
+    const fileChangesEntry = entries.find((e) => e.name === "git.file_changes");
+    const blobEntry = entries.find((e) => e.name === "git.blob_read");
+    const diffEntry = entries.find((e) => e.name === "git.diff");
+    expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
+    expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
+    expect(walkEntry?.totalMs).toBeGreaterThan(0);
+    expect(walkReadCommitEntry?.totalMs).toBeGreaterThan(0);
+    expect(excludeCollectEntry?.totalMs).toBeGreaterThan(0);
+    expect(excludeReadCommitEntry?.totalMs).toBeGreaterThan(0);
+    expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
+    expect(blobEntry?.totalMs).toBeGreaterThan(0);
+    expect(diffEntry?.totalMs).toBeGreaterThan(0);
   });
 });

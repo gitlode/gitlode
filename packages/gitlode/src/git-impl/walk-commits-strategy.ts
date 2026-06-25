@@ -1,4 +1,4 @@
-import { type StageProfiler, withProfilerAsync } from "../profile/index.js";
+import type { Instrumentation, InstrumentationSpan } from "../instrumentation/index.js";
 import { firstOrThrow, shiftOrThrow } from "../support/index.js";
 
 export type ReadSide = "include" | "exclude";
@@ -19,8 +19,8 @@ export interface DagNodePort<NodeId extends PropertyKey, Node> {
 
 export interface WalkDagContext<NodeId extends PropertyKey, Node> {
   readonly nodes: DagNodePort<NodeId, Node>;
-  readonly walkProfiler?: StageProfiler;
-  readonly excludeCollectProfiler?: StageProfiler;
+  readonly instrumentation: Instrumentation;
+  readonly span?: InstrumentationSpan;
 }
 
 type WalkDagStrategy = "eagerExclude" | "certifiedLazy";
@@ -53,6 +53,8 @@ export async function* walkDagEagerExclude<NodeId extends PropertyKey, Node>(
   nodeId: NodeId,
   excludeNodeId?: NodeId,
 ): AsyncIterable<Node> {
+  const { instrumentation } = context;
+  context.span?.setAttribute("strategy", "eagerExclude");
   const excluded =
     excludeNodeId !== undefined
       ? await collectReachable(context, excludeNodeId)
@@ -62,16 +64,18 @@ export async function* walkDagEagerExclude<NodeId extends PropertyKey, Node>(
   const visited = new Set<NodeId>();
 
   while (queue.length > 0) {
-    const next = await withProfilerAsync(context.walkProfiler, async () => {
+    const next = await instrumentation.runAsync("git.walk_commits.step", async () => {
       const nodeId = shiftOrThrow(queue);
       if (visited.has(nodeId) || excluded.has(nodeId)) return null;
       visited.add(nodeId);
 
+      context.span?.incrementCounter("include_reads");
       return context.nodes.readNode(nodeId, "include");
     });
 
     if (next === null) continue;
 
+    context.span?.incrementCounter("yielded");
     yield next;
 
     for (const parent of context.nodes.getParents(next)) {
@@ -114,6 +118,8 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   nodeId: NodeId,
   excludeNodeId?: NodeId,
 ): AsyncIterable<Node> {
+  const { instrumentation } = context;
+  context.span?.setAttribute("strategy", "certifiedLazy");
   if (excludeNodeId === undefined) {
     yield* walkDagEagerExclude(context, nodeId);
     return;
@@ -125,6 +131,8 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   let openIncludePathToRoot = false;
   let singleExcludeAnchor: NodeId | null = null;
   let excludeEncounteredMerge = false;
+  let includeReads = 0;
+  let excludeReads = 0;
 
   const stateFor = (nodeId: NodeId): CertifiedLazyNodeState<NodeId, Node> => {
     let state = states.get(nodeId);
@@ -154,7 +162,12 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
 
   const readIncludeNode = async (nodeId: NodeId): Promise<Node> => {
     const state = stateFor(nodeId);
-    if (state.read) return state.node;
+    if (state.read) {
+      context.span?.incrementCounter("cache_hits");
+      return state.node;
+    }
+    includeReads++;
+    context.span?.incrementCounter("include_reads");
     const node = await context.nodes.readNode(nodeId, "include");
     markRead(nodeId, node);
     return node;
@@ -162,13 +175,18 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
 
   const readExcludeNode = async (nodeId: NodeId): Promise<Node> => {
     const state = stateFor(nodeId);
-    if (state.read) return state.node;
+    if (state.read) {
+      context.span?.incrementCounter("cache_hits");
+      return state.node;
+    }
+    excludeReads++;
+    context.span?.incrementCounter("exclude_reads");
     const node = await context.nodes.readNode(nodeId, "exclude");
     markRead(nodeId, node);
     return node;
   };
 
-  await withProfilerAsync(context.excludeCollectProfiler, async () => {
+  await instrumentation.runAsync("git.walk_commits.exclude_collect", async () => {
     markExcludeReached(excludeNodeId);
     const excludeStartNode = await readExcludeNode(excludeNodeId);
     const excludeStartParents = context.nodes.getParents(excludeStartNode);
@@ -181,7 +199,7 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   const includeFrontier: NodeId[] = [nodeId];
   const includeExpanded = new Set<NodeId>();
   while (includeFrontier.length > 0) {
-    await withProfilerAsync(context.walkProfiler, async () => {
+    await instrumentation.runAsync("git.walk_commits.step", async () => {
       const nodeId = shiftOrThrow(includeFrontier);
       const state = stateFor(nodeId);
       if (includeExpanded.has(nodeId)) return;
@@ -214,28 +232,50 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
     });
   }
 
-  if (!hasSingleAnchorCertificate()) {
+  const certificateFailureReason = getCertificateFailureReason();
+
+  if (certificateFailureReason !== undefined) {
+    context.span?.setAttribute("result", "fallback");
+    context.span?.setAttribute("fallback_reason", certificateFailureReason);
+    const excludeReadsBeforeFallback = excludeReads;
+    const candidatesBeforeFallback = resultCandidates.size;
     const excluded = await collectReachableFromCache(excludeNodeId);
-    for (const nodeId of excluded) resultCandidates.delete(nodeId);
+    let removedCandidates = 0;
+    for (const nodeId of excluded) {
+      if (resultCandidates.delete(nodeId)) removedCandidates++;
+    }
+    const fallbackReads = excludeReads - excludeReadsBeforeFallback;
+    if (fallbackReads > 0) context.span?.incrementCounter("fallback_reads", fallbackReads);
+    const boundedRemovedCandidates = Math.min(removedCandidates, candidatesBeforeFallback);
+    if (boundedRemovedCandidates > 0) {
+      context.span?.incrementCounter("fallback_removed", boundedRemovedCandidates);
+    }
+  } else {
+    context.span?.setAttribute("result", "certified");
   }
 
   for (const node of resultCandidates.values()) {
+    context.span?.incrementCounter("yielded");
     yield node;
   }
 
-  function hasSingleAnchorCertificate(): boolean {
+  function getCertificateFailureReason(): string | undefined {
     if (openIncludePathToRoot || excludeEncounteredMerge || stopPoints.size === 0) {
-      return false;
+      if (openIncludePathToRoot) return "open_include_path";
+      if (excludeEncounteredMerge) return "exclude_merge";
+      return "no_stop_points";
     }
 
     for (const stopPoint of stopPoints) {
-      if (stopPoint !== excludeNodeId && stopPoint !== singleExcludeAnchor) return false;
+      if (stopPoint !== excludeNodeId && stopPoint !== singleExcludeAnchor) {
+        return "uncertified_stop_point";
+      }
     }
-    return true;
+    return undefined;
   }
 
   async function markExcludeParents(nodeId: NodeId): Promise<void> {
-    await withProfilerAsync(context.excludeCollectProfiler, async () => {
+    await instrumentation.runAsync("git.walk_commits.exclude_collect", async () => {
       const node = await readExcludeNode(nodeId);
       const parents = context.nodes.getParents(node);
       for (const parent of parents) markExcludeReached(parent);
@@ -244,7 +284,7 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   }
 
   async function collectReachableFromCache(startNodeId: NodeId): Promise<Set<NodeId>> {
-    return withProfilerAsync(context.excludeCollectProfiler, async () => {
+    return await instrumentation.runAsync("git.walk_commits.exclude_collect", async () => {
       const reachable = new Set<NodeId>();
       const queue = [startNodeId];
       while (queue.length > 0) {
@@ -269,13 +309,15 @@ async function collectReachable<NodeId extends PropertyKey, Node>(
   context: WalkDagContext<NodeId, Node>,
   startNodeId: NodeId,
 ): Promise<Set<NodeId>> {
-  return withProfilerAsync(context.excludeCollectProfiler, async () => {
+  const { instrumentation } = context;
+  return await instrumentation.runAsync("git.walk_commits.exclude_collect", async () => {
     const reachable = new Set<NodeId>();
     const queue: NodeId[] = [startNodeId];
     while (queue.length > 0) {
       const nodeId = shiftOrThrow(queue);
       if (reachable.has(nodeId)) continue;
       reachable.add(nodeId);
+      context.span?.incrementCounter("exclude_reads");
       const node = await context.nodes.readNode(nodeId, "exclude");
       for (const parent of context.nodes.getParents(node)) queue.push(parent);
     }

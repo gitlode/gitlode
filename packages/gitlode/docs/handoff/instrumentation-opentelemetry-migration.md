@@ -2,19 +2,35 @@
 
 ## Status
 
-This document records the agreed direction for replacing gitlode's current custom `profile` implementation with a span-oriented instrumentation design aligned with OpenTelemetry concepts.
+This document records the agreed direction and current handoff state for replacing gitlode's
+custom `profile` implementation with a span-oriented instrumentation design aligned with
+OpenTelemetry concepts.
 
-This is an instruction document for future implementation sessions.
+Current implementation state:
 
-No code change is made by this document itself.
+- **Phase 1 is complete.** `packages/gitlode/src/instrumentation` now contains the internal
+  span-first instrumentation abstraction, noop implementation, local recorder, helper utilities,
+  attributes, events, counters, and tests.
+- **Phase 2 is complete.** Runtime, core extraction, Git adapter, traversal, projection, plugin
+  runtime wiring, presentation output, and tests now use instrumentation and local profile summary
+  entries instead of the old profile model.
+- **Phase 3 cleanup is complete.** The old `packages/gitlode/src/profile` implementation has been
+  removed from active code, `StageProfiler` / `ProfilingEntry` / `wallMs` / `workMs` are no longer
+  part of the intended stable surface, and plugin runtime context now exposes instrumentation.
+- **Phase 4 remains future work.** OpenTelemetry SDK/exporter integration has not been implemented
+  yet.
+
+This is now a continuation handoff for future implementation sessions, especially for optional
+OpenTelemetry export and any further refinement of instrumentation policy.
 
 ---
 
 ## Background
 
-gitlode currently has a custom profiling implementation under `packages/gitlode/src/profile`.
+Historical context: gitlode previously had a custom profiling implementation under
+`packages/gitlode/src/profile`.
 
-The current implementation is based on the following concepts:
+That removed implementation was based on the following concepts:
 
 - `StageProfiler`
 - `DefaultStageProfiler`
@@ -24,7 +40,8 @@ The current implementation is based on the following concepts:
 - hierarchical scoped profilers via `createScopedProfiler()`
 - helper functions such as `withProfiler()` and `withProfilerAsync()`
 
-The current runtime creates a root profiler named `elapsed`, then creates scoped profilers for stages such as:
+The old runtime created a root profiler named `elapsed`, then created scoped profilers for stages
+such as:
 
 - `git`
 - `planning`
@@ -32,7 +49,7 @@ The current runtime creates a root profiler named `elapsed`, then creates scoped
 - `projection`
 - `write`
 
-The git adapter also creates more detailed scoped profilers such as:
+The old git adapter also created more detailed scoped profilers such as:
 
 - `resolve-ref`
 - `repository-object-format`
@@ -46,7 +63,11 @@ The git adapter also creates more detailed scoped profilers such as:
 - `blob-read`
 - `diff`
 
-The current `--profile` output is rendered from `ProfilingEntry[]` as a local text summary with both `wall` and `work` values.
+The old `--profile` output was rendered from `ProfilingEntry[]` as a local text summary with both
+`wall` and `work` values.
+
+Current code no longer uses this model. The local `--profile` output is now generated from
+instrumentation span summaries.
 
 ---
 
@@ -406,16 +427,23 @@ Open question:
 
 ## Naming Direction
 
-Recommended span names should be stable and dot-separated.
+Span names should be stable, compact, and dot-separated.
 
-Possible names:
+Current representative names:
 
 ```text
 gitlode.run
+gitlode.extract
+gitlode.planning
+gitlode.traversal
+gitlode.projection
+gitlode.output.write
+gitlode.output.close
 
 git.resolve_ref
 git.repository_object_format
 git.get_remote_url
+git.repository_basics
 git.walk_commits
 git.walk_commits.read_commit
 git.walk_commits.exclude_collect
@@ -425,24 +453,13 @@ git.file_changes
 git.blob_read
 git.diff
 
-planning
-traversal
-projection
-write
-
 plugin.<namespace>.init
 plugin.<namespace>.project
 ```
 
-This is not final, but future sessions should avoid ad-hoc names that make profile output hard to compare between runs.
-
-Open question:
-
-- Use dot-separated names such as `git.walk_commits`.
-- Or use slash-separated names such as `git/walk-commits`.
-- Prefer OpenTelemetry-style span names if an OTel convention becomes clear.
-
-Current code uses slash-separated profiler paths. The new design does not need to preserve that.
+Future sessions should avoid ad-hoc names that make profile output hard to compare between runs.
+When adding a deeper name, check that it represents a true local sub-operation of the parent span
+rather than an unrelated reusable function that merely happens to be called by it.
 
 ---
 
@@ -585,12 +602,10 @@ Current implementation status:
 - Phase 3 cleanup is complete in code: `StageProfiler` is no longer plugin-facing, official
   plugins receive `PluginRuntimeContext.instrumentation`, and the old `src/profile` implementation
   has been removed.
-- Before starting walkCommits Feature C, run a profile sufficiency check against realistic
-  repositories/ranges. The profile output must make strategy, certificate/fallback reason,
-  include/exclude reads, cache hits, fallback additional work, candidate removal, and yielded count
-  clear enough to compare strategies.
+- The local profile output has been reviewed after the walkCommits diagnostic cleanup and is
+  considered sufficient preparation for the next traversal-strategy work.
 
-### Phase 1: New instrumentation foundation
+### Phase 1: New instrumentation foundation - complete
 
 1. Introduce `src/instrumentation` or `src/telemetry`.
 2. Define the new span-first abstraction with attributes, events, and minimal counter-like support.
@@ -605,7 +620,7 @@ Current implementation status:
    - attributes and counters
    - async iteration behavior
 
-### Phase 2: Replace old profiler usage
+### Phase 2: Replace old profiler usage - complete
 
 6. Replace runtime root `DefaultStageProfiler` usage.
 7. Replace `withProfiler` / `withProfilerAsync` usage with instrumentation helpers.
@@ -615,7 +630,7 @@ Current implementation status:
 11. Update presentation formatting.
 12. Preserve or improve the useful existing profile scopes as span names.
 
-### Phase 3: Plugin API and cleanup
+### Phase 3: Plugin API and cleanup - complete
 
 13. Remove `StageProfiler` from plugin API.
 14. Update official plugins if needed.
@@ -629,12 +644,22 @@ easy to compare horizontally. That details column includes selected attributes, 
 errors so walkCommits strategy diagnostics are visible without relying on an external OpenTelemetry
 backend.
 
-### Phase 4: OpenTelemetry export
+### Phase 4: OpenTelemetry export - future work
 
 17. Add an OpenTelemetry-backed implementation after local behavior is stable.
 18. Decide dependency boundary for `@opentelemetry/api`, SDK, and exporters.
 19. Add opt-in CLI/env configuration for OTel export.
 20. Verify local `--profile` and OTel export can run independently or together.
+
+Recommended next-session starting point for Phase 4:
+
+1. Inspect `packages/gitlode/src/instrumentation` and the local recorder tests.
+2. Decide whether the first OTel step should add only `@opentelemetry/api` or also an SDK/exporter
+   package.
+3. Define a minimal adapter that maps current spans, attributes, events, counters, and errors to OTel
+   concepts without changing local `--profile` behavior.
+4. Keep export opt-in and experimental. Do not make `--profile` require an OTel collector.
+5. Add tests that prove local recording and OTel export can be enabled independently.
 
 These phases are meant to reduce migration risk, not to preserve the old API as a long-term
 compatibility layer. A single PR/session may complete multiple phases if the diff remains small and
@@ -664,41 +689,21 @@ Avoid:
 
 ## Open Decisions for Future Sessions
 
-The following decisions are intentionally left open and should be resolved during implementation design.
+The following list separates decisions already resolved by Phase 1-3 from decisions still open for
+future work.
 
-### 1. Directory and naming
+### 1. Directory and naming - resolved
 
-Choose one:
+The implemented directory is `packages/gitlode/src/instrumentation`.
 
-- `src/instrumentation`
-- `src/telemetry`
-- another name
+Rationale: the feature is primarily internal/developer instrumentation and not necessarily external
+telemetry.
 
-Current preference:
+### 2. Exact abstraction API - resolved for local instrumentation
 
-> `src/instrumentation`, because the feature is primarily internal/developer instrumentation and not necessarily external telemetry.
-
-### 2. Exact abstraction API
-
-Open:
-
-- Should methods be named `run` / `runAsync`?
-- Or `span` / `spanAsync`?
-- Should sync and async be separate?
-- Should the function argument order be `(name, fn, options)` or `(name, options, fn)`?
-- Should span interaction be passed as a callback argument, accessed from context, or both?
-- What is the minimal API for attributes, events, and counters?
-
-Current preference:
-
-```ts
-run(name, fn, options?)
-runAsync(name, fn, options?)
-```
-
-This is simple and close to current helper usage. However, the final API should provide a way for
-the instrumented operation to record selected attributes, events, and counter-like values while it
-runs.
+The implemented API uses explicit span-oriented helpers such as `run`, `runAsync`, direct span
+creation, attributes, events, and counters. Future OTel work should adapt this API rather than
+reintroducing `StageProfiler`.
 
 Decorator-like method instrumentation may be added later as a thin layer over this API. It should
 not be part of the initial implementation. This keeps the core instrumentation model usable from
@@ -713,34 +718,24 @@ If decorators are introduced later:
 - use them mainly for whole-method spans, not fine-grained counters or async iterator consumption;
 - check compatibility with `erasableSyntaxOnly` and the package build target before adoption.
 
-### 3. Local summary data model
+### 3. Local summary data model - resolved
 
-Open:
+The local recorder stores span data internally and exposes aggregated profile summary entries for
+presentation. Summary entries include duration aggregation, selected attributes, counters, and error
+counts.
 
-- What type replaces `ProfilingEntry`?
-- Should raw span records be returned?
-- Should aggregated summary entries be returned?
-- Should presentation aggregate raw records, or should instrumentation aggregate?
+### 4. Span naming convention - resolved for local profile output
 
-Current preference:
+Current code uses compact dot-separated names such as `git.walk_commits.read_commit`. The naming
+policy is:
 
-> Local recorder stores raw span records internally and exposes aggregated summary entries for
-> presentation. Summary entries should include duration aggregation plus selected attributes and
-> counters.
+- use stable dot-separated names;
+- let deeper names represent local sub-operations of their parent operation;
+- avoid encoding a caller/callee dependency in a span name unless the callee is local to that parent
+  operation or the caller explicitly passes the span identity;
+- keep the hierarchy shallow unless profiling needs justify more detail.
 
-### 4. Span naming convention
-
-Open:
-
-- dot-separated: `git.walk_commits.read_commit`
-- slash-separated: `git/walk-commits/read-commit`
-- OTel-style human-readable names: `git walk commits read commit`
-
-Current preference:
-
-> Dot-separated names are easier to aggregate and align with attribute-like naming.
-
-### 5. OpenTelemetry dependency boundary
+### 5. OpenTelemetry dependency boundary - open
 
 Open:
 
@@ -755,7 +750,7 @@ Current preference:
 > improves correctness of the abstraction or when implementing the OTel adapter. In either case,
 > keep an explicit mapping table from internal concepts to OTel concepts.
 
-### 6. Async iterator instrumentation
+### 6. Async iterator instrumentation - partially resolved
 
 Open:
 
@@ -763,21 +758,22 @@ Open:
 - Should each yielded commit/file get a span?
 - Or should loops aggregate manually to avoid huge trace volume?
 
-Current preference:
+Current status:
 
-> Be conservative. Use phase-level spans first, then add repeated operation aggregation where useful. Avoid high-volume exported spans by default.
+> Be conservative. The current local profile uses phase-level spans plus repeated operation
+> aggregation where useful. Future OTel export must still avoid high-volume exported spans by
+> default.
 
-### 7. Exclusive duration
+### 7. Exclusive duration - resolved for now
 
 Open:
 
 - Should local profile summary show inclusive or exclusive time?
 
-Current preference:
+Current implementation uses inclusive duration only. Exclusive time remains a possible future
+enhancement, but it should not block Feature C or Phase 4.
 
-> Inclusive only at first. Exclusive time is useful but easy to get wrong and can be added later.
-
-### 8. Plugin instrumentation granularity
+### 8. Plugin instrumentation granularity - open
 
 Open:
 
@@ -789,7 +785,7 @@ Current preference:
 
 > Provide instrumentation to plugins, but official plugins should initially instrument only meaningful top-level operations.
 
-### 9. CLI flags and environment variables
+### 9. CLI flags and environment variables - open for OTel export
 
 Open:
 
@@ -801,38 +797,35 @@ Current preference:
 
 > Keep `--profile` for local developer summary. Use env vars or experimental flags for OTel export later.
 
-### 10. Metrics/counters
+### 10. Metrics/counters - resolved for local instrumentation, open for OTel mapping
 
-Open:
-
-- Should counters be included in initial instrumentation?
-- Or should this wait?
-
-Current preference:
-
-> Include minimal local counter support early. Do not block on full OTel metrics SDK/exporter
-> integration.
+Minimal local counter support is implemented and used by profile diagnostics. Future OTel work must
+decide whether each counter maps to OTel metrics, span attributes, span events, or local-only
+summary data.
 
 ---
 
 ## Implementation Guidance for Future LLM Sessions
 
-When implementing this direction, future agents should:
+When continuing from the current implementation, future agents should:
 
-1. Read current `packages/gitlode/src/profile` implementation.
-2. Read all current usages of `StageProfiler`, `ProfilingEntry`, `withProfiler`, and `withProfilerAsync`.
-3. Do not preserve the old API unless a concrete reason is found.
-4. Prefer replacing old concepts with span-first instrumentation.
-5. Remove `workMs` from the new main output.
-6. Preserve counters, decisions, and low-cardinality operational details needed for profiling work.
-7. Add tests specifically for async, nested, attribute, counter, and aggregation behavior.
-8. Verify that `--profile` still works as a local developer feature.
-9. Avoid adding OpenTelemetry SDK/exporter until local instrumentation is stable, unless the current
-   implementation task explicitly includes OTel export.
-10. Keep OpenTelemetry compatibility in mind when designing names, attributes, events, counters, and
-    context handling.
-11. Update official plugins if plugin context changes.
-12. Ensure final design is suitable for stable release, not just minimal migration.
+1. Read `packages/gitlode/src/instrumentation`, especially the type definitions, noop
+   implementation, local recorder, helper utilities, and tests.
+2. Read the current `--profile` formatter in `packages/gitlode/src/presentation/reporting` and the
+   user-facing profiling guide in `packages/gitlode/docs/profiling.md`.
+3. Read current call sites in runtime, core, git implementation, and plugin runtime before changing
+   the instrumentation API.
+4. Do not reintroduce `StageProfiler`, `ProfilingEntry`, `wallMs`, or `workMs`.
+5. Preserve counters, decisions, and low-cardinality operational details needed for profiling work.
+6. Keep local `--profile` deterministic and independent of OpenTelemetry export.
+7. If implementing Phase 4, keep export opt-in and test local-only, export-only, and combined
+   behavior.
+8. Avoid high-cardinality attributes by default. Add an explicit debug or export policy before
+   recording commit OIDs, file paths, author identities, or similar data.
+9. Keep OpenTelemetry compatibility in mind when designing names, attributes, events, counters, and
+   context handling.
+10. Update official plugins if plugin context changes.
+11. Verify build, tests, and formatting after changes.
 
 ---
 

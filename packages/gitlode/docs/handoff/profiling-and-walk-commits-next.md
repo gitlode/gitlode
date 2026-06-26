@@ -2,18 +2,30 @@
 
 ## Purpose
 
-This handoff prepares three follow-up features for future sessions:
+This handoff tracks the profiling and walkCommits optimization sequence:
 
 - **A. Generic profiling improvements**
 - **B. walkCommits instrumentation using the improved profiling API**
 - **C. Bidirectional walkCommits traversal prototype, guided by profiling**
 
-The immediate motivation is to understand and improve `walkCommits` strategy performance. However,
-profiling is a cross-cutting runtime capability, so Feature A should be designed as a generic
-extension rather than a Git-specific feature.
+Current status:
 
-This document is not a finalized design. It is a working handoff for human developers and LLM
-sessions that will pick up the next sequence of work.
+- **Feature A is complete.** It was implemented as the span-first instrumentation migration rather
+  than as an extension of the old `StageProfiler` API.
+- **Feature B is complete.** `walk_commits` now reports strategy, result, fallback reason, read
+  counters, cache hits, fallback work, candidate removal, and yielded counts through profile
+  details.
+- **The profile sufficiency review is complete.** The current profile output is considered good
+  enough to support the next internal traversal-strategy work.
+- **Feature C remains future work.** The next optimization step is a bidirectional traversal
+  prototype and evidence-based comparison against the existing strategies.
+
+The immediate motivation remains to understand and improve `walkCommits` strategy performance.
+Profiling is now a cross-cutting runtime capability documented in
+`docs/handoff/instrumentation-opentelemetry-migration.md` and `docs/profiling.md`.
+
+This document is a continuation handoff for human developers and LLM sessions that will pick up
+Feature C or later traversal work.
 
 ## Background
 
@@ -56,10 +68,9 @@ Work should proceed in this order:
 2. **Feature B: instrument walkCommits using Feature A**
 3. **Feature C: prototype bidirectional traversal using Feature B data**
 
-Feature A and B have been implemented through the newer span-first instrumentation migration. Do
-not start Feature C merely because counters exist in code. First verify that real `--profile`
-output is sufficient to compare traversal strategies without reading source or raw test fixtures.
-At minimum, profile output should clearly expose:
+Feature A and B have been implemented through the newer span-first instrumentation migration. Real
+`--profile` output has been reviewed and is considered sufficient to compare traversal strategies
+without reading source or raw test fixtures. The output exposes:
 
 - selected strategy;
 - certified/fallback result and fallback reason;
@@ -70,7 +81,28 @@ At minimum, profile output should clearly expose:
 - fallback removed candidates when present;
 - yielded commits.
 
+Therefore the next planned work is Feature C.
+
 ## Feature A: generic profiling improvements
+
+### Status
+
+Complete.
+
+Feature A was not implemented by adding metrics to the old `StageProfiler`. Instead, the old profile
+system was replaced by the span-first instrumentation design described in
+`instrumentation-opentelemetry-migration.md`.
+
+Completed outcomes:
+
+- `src/instrumentation` provides the generic instrumentation API, noop implementation, local span
+  recorder, attributes, events, counters, helpers, and tests.
+- local `--profile` output is generated from span summaries rather than `wallMs` / `workMs`;
+- profile details can render low-cardinality attributes, counters, and errors;
+- true boolean attributes render compactly as bare keys;
+- detailed profile usage has been moved to `docs/profiling.md`.
+
+Do not resume the old StageProfiler-based plan below. It is retained only as historical context.
 
 ### Updated direction
 
@@ -211,7 +243,7 @@ Existing timing-only tests should continue to pass.
 - Presentation tests cover the new metric rendering.
 - Full package tests pass.
 
-### Suggested starting prompt
+### Historical starting prompt
 
 ```text
 We are continuing gitlode profiling work. Implement Feature A from
@@ -225,6 +257,26 @@ API, implement it, update formatting/tests, and verify build/test/format.
 ```
 
 ## Feature B: walkCommits instrumentation
+
+### Status
+
+Complete.
+
+`git.walk_commits` now records a compact diagnostic set that is suitable for strategy comparison:
+
+- `strategy`
+- `result=certified|fallback`
+- `fallback_reason` when fallback occurs
+- `include_reads`
+- `exclude_reads`
+- `cache_hits`
+- `fallback_reads`
+- `fallback_removed`
+- `yielded`
+
+The profile details were intentionally trimmed to avoid local-variable-oriented names, derived
+values, and low-value boolean flags. The current output was reviewed after cleanup and judged
+sufficient for the next optimization phase.
 
 ### Goal
 
@@ -241,9 +293,9 @@ This should answer:
 - how many buffered result candidates were removed during fallback?
 - how many nodes were yielded?
 
-### Suggested metrics
+### Implemented diagnostics
 
-Candidate metrics for `walk-commits` or child scopes:
+Diagnostics for `git.walk_commits` or child scopes:
 
 - `strategy`: `"eagerExclude"` or `"certifiedLazy"`
 - `include_reads`
@@ -251,7 +303,7 @@ Candidate metrics for `walk-commits` or child scopes:
 - `cache_hits`
 - `yielded`
 
-Candidate certified-lazy metrics:
+Certified-lazy diagnostics:
 
 - `result`: `"certified"` or `"fallback"`
 - `fallback_reason`: `"open_include_path"`, `"exclude_merge"`, `"no_stop_points"`, or
@@ -302,10 +354,10 @@ Avoid over-specifying ordering unless the metric intentionally captures ordering
 
 Implementation status: complete in code. The current implementation records these diagnostics on
 the `git.walk_commits` span and renders attributes/counters as separate profile detail lines.
-Before Feature C, validate the output on at least one realistic repository/range and improve the
-profile if the strategy comparison is still unclear.
+The output has been reviewed after naming and detail cleanup and is considered clear enough to
+support Feature C.
 
-### Suggested starting prompt
+### Historical starting prompt
 
 ```text
 We are continuing gitlode walkCommits profiling work. Feature A has added generic profiler metrics.
@@ -380,7 +432,9 @@ Use Feature B metrics to compare:
 - candidates removed during fallback;
 - final yielded count;
 - certificate/fallback reasons;
-- wall/work time.
+- `git.walk_commits` total time;
+- child span time for `git.walk_commits.read_commit`, `git.walk_commits.step`, and
+  `git.walk_commits.exclude_collect` where relevant.
 
 Run against:
 
@@ -411,22 +465,34 @@ Tests should assert:
 
 ```text
 We are continuing gitlode walkCommits optimization work. Features A and B are complete, so profile
-metrics now expose read counts, cache behavior, and fallback/certificate decisions.
+details now expose read counts, cache behavior, and fallback/certificate decisions.
 
 Implement Feature C from packages/gitlode/docs/handoff/profiling-and-walk-commits-next.md.
 
 Goal: prototype a bidirectional walkCommits strategy using the existing DagNodePort boundary and
-generic profiling metrics. Preserve reachable(start)-reachable(exclude) correctness. Use timestamp
+span-first instrumentation. Preserve reachable(start)-reachable(exclude) correctness. Use timestamp
 or similar hints only as traversal-order heuristics, never as proof. Add it to contract tests as an
-internal strategy and compare metrics with eagerExclude/certifiedLazy before proposing any production
-default change.
+internal strategy and compare profile output with eagerExclude/certifiedLazy before proposing any
+production default change.
 ```
 
 ## Notes for future sessions
 
+- For Feature C, start by reading:
+  - `src/git-impl/walk-commits-strategy.ts`
+  - `src/git-impl/isomorphic-git-adapter.ts`
+  - `test/git-impl/walk-commits-contract.test.ts`
+  - `test/git-impl/isomorphic-git-adapter.test.ts`
+  - `docs/profiling.md`
+- Treat the current `git.walk_commits` profile details as the baseline diagnostic contract for
+  comparing strategies.
+- Prototype the bidirectional strategy as an internal strategy first. Do not replace the production
+  default until tests and real profile output show a clear advantage.
+- Preserve the `reachable(start) - reachable(exclude)` result-set contract. Timestamp or generation
+  heuristics may guide ordering, but must not become correctness assumptions.
 - Keep `git-traversal.md` focused on externally visible traversal/output behavior.
 - Keep `walk-commits-strategies.md` focused on the durable internal strategy design.
 - Use this file as a planning handoff; once a feature is completed, migrate stable decisions into
   durable design docs and remove obsolete planning details.
-- The most valuable next diagnostic is not another timing scope; it is structured metrics that show
-  why time was spent.
+- The most valuable next evidence is a side-by-side profile comparison that shows why one strategy
+  wins, ties, or loses on realistic ranges.

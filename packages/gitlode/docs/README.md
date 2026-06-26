@@ -29,17 +29,12 @@ canonical documentation home.
 Audience-oriented summaries are allowed when they improve readability, but summaries should link
 back to the canonical document instead of becoming independent specifications.
 
-| Information type                                              | Canonical location                                                       |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| End-user workflows and user-visible behavior                  | [`usage.md`](usage.md)                                                   |
-| Architecture, module ownership, and implementation boundaries | [`design/architecture.md`](design/architecture.md)                       |
-| Configuration file contract and precedence                    | [`design/configuration.md`](design/configuration.md)                     |
-| Git traversal behavior and differential extraction            | [`design/git-traversal.md`](design/git-traversal.md)                     |
-| Internal `walkCommits` strategy design                        | [`design/walk-commits-strategies.md`](design/walk-commits-strategies.md) |
-| Output schema and JSON Lines file format                      | [`design/schema.md`](design/schema.md)                                   |
-| Plugin runtime contract and package policy                    | [`design/plugins.md`](design/plugins.md)                                 |
-| Profiling output interpretation                               | [`profiling.md`](profiling.md)                                           |
-| Continuation context for unfinished work                      | [`handoff/`](handoff/)                                                   |
+| Information type                         | Canonical location             |
+| ---------------------------------------- | ------------------------------ |
+| End-user workflows and visible behavior  | [`usage.md`](usage.md)         |
+| Durable implementation design contracts  | [`design/`](design/)           |
+| Profiling output interpretation          | [`profiling.md`](profiling.md) |
+| Continuation context for unfinished work | [`handoff/`](handoff/)         |
 
 ## Documentation map
 

@@ -6,14 +6,6 @@ investigations that may be resumed by human developers or coding agents.
 Handoff documents are useful working context, but they are not durable source-of-truth design
 documents.
 
-## Current handoff documents
-
-- [`instrumentation-opentelemetry-migration.md`](instrumentation-opentelemetry-migration.md):
-  planning notes for moving profiling and instrumentation toward a span-oriented design aligned with
-  OpenTelemetry concepts.
-- [`profiling-and-walk-commits-next.md`](profiling-and-walk-commits-next.md): continuation context
-  for future `walkCommits` strategy and profiling work.
-
 ## Lifecycle
 
 Use handoff documents for:

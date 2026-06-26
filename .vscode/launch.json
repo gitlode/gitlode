@@ -7,9 +7,9 @@
       "request": "launch",
       "program": "${workspaceFolder}/packages/gitlode/src/index.ts",
       "args": [
-        "${workspaceFolder}",
+        "${input:repo}",
         "--ref",
-        "develop",
+        "${input:ref}",
         "--output-dir",
         "${workspaceFolder}/packages/gitlode/out",
         "--config",
@@ -33,12 +33,13 @@
       "request": "launch",
       "program": "${workspaceFolder}/src/index.ts",
       "args": [
-        "--repo",
-        "${workspaceFolder}",
-        "--branch",
-        "develop",
+        "${input:repo}",
+        "--ref",
+        "${input:ref}",
         "--output-dir",
-        "${workspaceFolder}/out",
+        "${workspaceFolder}/packages/gitlode/out",
+        "--config",
+        "${workspaceFolder}/packages/gitlode/out/config.json",
         "--state",
         "${workspaceFolder}/out/state.json"
       ],
@@ -50,6 +51,20 @@
         // "NODE_ENV": "development",
         // "DEBUG": "isomorphic-git:*" // Enable debug logging for isomorphic-git
       }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "repo",
+      "type": "promptString",
+      "description": "Path to the Git repository",
+      "default": "${workspaceFolder}"
+    },
+    {
+      "id": "ref",
+      "type": "promptString",
+      "description": "Git ref/branch",
+      "default": "main"
     }
   ]
 }

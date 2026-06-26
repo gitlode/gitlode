@@ -10,11 +10,11 @@ here.
 
 gitlode documentation is organized for three primary audiences.
 
-| Audience      | Needs                                                                                         | Start here                                                                          |
-| ------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| End users     | Run gitlode, configure extraction, understand output, and troubleshoot user-visible behavior. | [`usage.md`](usage.md)                                                              |
-| Developers    | Understand implementation design, behavior contracts, trade-offs, and maintenance policy.     | [`design/`](design/)                                                                |
-| Coding agents | Find task-specific canonical docs and avoid duplicating or drifting design rules.             | Repository-level `AGENTS.md` when present, then this index and [`design/`](design/) |
+| Audience      | Needs                                                                                         | Start here                                                             |
+| ------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| End users     | Run gitlode, configure extraction, understand output, and troubleshoot user-visible behavior. | [`usage.md`](usage.md)                                                 |
+| Developers    | Understand implementation design, behavior contracts, trade-offs, and maintenance policy.     | [`design/`](design/)                                                   |
+| Coding agents | Find task-specific canonical docs and avoid duplicating or drifting design rules.             | Repository-level `AGENTS.md`, then this index and [`design/`](design/) |
 
 These audiences overlap. For example, plugin authors and advanced users may need both the user guide
 and design documentation. Coding agents should use the same durable design docs as human developers,

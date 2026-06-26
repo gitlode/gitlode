@@ -1,8 +1,7 @@
 import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
+import type { Instrumentation } from "../instrumentation/index.js";
 import type { CommitOid, RefType } from "../model/index.js";
-import { withProfilerAsync } from "../profile/index.js";
-import type { StageProfiler } from "../profile/type.js";
 import { assertNever, getOrThrow } from "../support/index.js";
 import type {
   TraversalPlan,
@@ -36,19 +35,22 @@ function resolveExcludeHash(
 
 export class DefaultTraversalPlanner implements TraversalPlanner {
   private readonly adapter: GitAdapter;
-  private readonly profiler?: StageProfiler;
+  private readonly instrumentation: Instrumentation;
 
-  constructor(adapter: GitAdapter, profiler?: StageProfiler) {
+  constructor(adapter: GitAdapter, instrumentation: Instrumentation) {
     this.adapter = adapter;
-    this.profiler = profiler;
+    this.instrumentation = instrumentation;
   }
 
   async plan(
     request: TraversalPlanningRequest,
     reporter: ProgressReporter,
   ): Promise<readonly TraversalPlan[]> {
-    return withProfilerAsync(this.profiler, async () => {
+    return await this.instrumentation.runAsync("gitlode.planning", async (span) => {
       const { repositoryPath, refs, mode, priorRefs, range } = request;
+      span.setAttribute("gitlode.refs", refs.length);
+      span.setAttribute("gitlode.mode", mode);
+      span.setAttribute("gitlode.range.kind", range?.type ?? "none");
 
       const priorCheckpointByIdentity = new Map<string, RefCheckpoint>(
         priorRefs.map((entry) => [buildCheckpointKey(entry.ref, entry.refType), entry]),

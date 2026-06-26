@@ -1,4 +1,4 @@
-import { withProfilerAsync } from "../profile/index.js";
+import type { Instrumentation } from "../instrumentation/index.js";
 import { atOrThrow } from "../support/index.js";
 import type {
   CommitFact,
@@ -41,15 +41,9 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
   }
 
   async run(request: CoordinatorRequest): Promise<CoordinatorResult> {
-    const {
-      traversalPlanner,
-      traversalExtractor,
-      fileChangeExpander,
-      projector,
-      sink,
-      reporter,
-      profiler,
-    } = this.deps;
+    const { traversalPlanner, traversalExtractor, fileChangeExpander, projector, sink, reporter } =
+      this.deps;
+    const instrumentation: Instrumentation = this.deps.instrumentation;
 
     // -----------------------------------------------------------------------
     // 1. Preparing phase: plan branch traversal boundaries.
@@ -134,7 +128,10 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
             : countedStream;
 
         for await (const record of projector.project(factStream)) {
-          await withProfilerAsync(profiler, () => sink.write(record));
+          await instrumentation.runAsync(
+            "gitlode.output.write",
+            async () => await sink.write(record),
+          );
           recordsWritten++;
           reporter.emit({
             type: "extracting-progress",
@@ -148,7 +145,7 @@ export class DefaultExtractionCoordinator implements ExtractionCoordinator {
         }
       }
     } finally {
-      await withProfilerAsync(profiler, () => sink.close());
+      await instrumentation.runAsync("gitlode.output.close", async () => await sink.close());
     }
 
     reporter.emit({ type: "phase-end", phase: "extracting" });

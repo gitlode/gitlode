@@ -8,6 +8,7 @@ import type {
 } from "../../src/core/index.js";
 import { DefaultTraversalPlanner } from "../../src/core/traversal-planner.js";
 import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 function makeHash(n: number): CommitOid {
   return n.toString(16).padStart(40, "0") as CommitOid;
@@ -60,6 +61,10 @@ function makeAdapter(options: {
   };
 }
 
+function makePlanner(adapter: GitAdapter): DefaultTraversalPlanner {
+  return new DefaultTraversalPlanner(adapter, noopInstrumentation);
+}
+
 function baseRequest(overrides: Partial<TraversalPlanningRequest> = {}): TraversalPlanningRequest {
   return {
     repositoryPath: "/repo",
@@ -74,9 +79,7 @@ describe("DefaultTraversalPlanner", () => {
   it("resolves heads in declaration order", async () => {
     const headMain = makeHash(5);
     const headDevelop = makeHash(10);
-    const planner = new DefaultTraversalPlanner(
-      makeAdapter({ refs: { main: headMain, develop: headDevelop } }),
-    );
+    const planner = makePlanner(makeAdapter({ refs: { main: headMain, develop: headDevelop } }));
 
     const plans = await planner.plan(baseRequest({ refs: ["main", "develop"] }), makeReporter());
 
@@ -88,7 +91,7 @@ describe("DefaultTraversalPlanner", () => {
 
   it("warns and skips missing refs", async () => {
     const head = makeHash(1);
-    const planner = new DefaultTraversalPlanner(
+    const planner = makePlanner(
       makeAdapter({
         refs: { main: head },
         resolveRefError: { ref: "gone", code: "REF_NOT_FOUND" },
@@ -106,7 +109,7 @@ describe("DefaultTraversalPlanner", () => {
   it("matches checkpoints by exact (ref, refType)", async () => {
     const head = makeHash(5);
     const checkpointTip = makeHash(2);
-    const planner = new DefaultTraversalPlanner(
+    const planner = makePlanner(
       makeAdapter({ refs: { v1: head }, refTypes: { v1: "tag-annotated" } }),
     );
 
@@ -143,7 +146,7 @@ describe("DefaultTraversalPlanner", () => {
     const headDevelop = makeHash(20);
     const existingMain = makeHash(3);
     const mergeBaseHash = makeHash(2);
-    const planner = new DefaultTraversalPlanner(
+    const planner = makePlanner(
       makeAdapter({
         refs: { main: headMain, v1: headTag, develop: headDevelop },
         refTypes: { main: "branch", v1: "tag-lightweight", develop: "branch" },
@@ -178,7 +181,7 @@ describe("DefaultTraversalPlanner", () => {
     const headMain = makeHash(5);
     const headOrphan = makeHash(99);
     const existingHead = makeHash(3);
-    const planner = new DefaultTraversalPlanner(
+    const planner = makePlanner(
       makeAdapter({
         refs: { main: headMain, orphan: headOrphan },
         refTypes: { main: "branch", orphan: "branch" },
@@ -211,7 +214,7 @@ describe("DefaultTraversalPlanner", () => {
   it("uses explicit since-ref range boundary", async () => {
     const head = makeHash(5);
     const sinceRef = makeHash(2);
-    const planner = new DefaultTraversalPlanner(makeAdapter({ refs: { main: head } }));
+    const planner = makePlanner(makeAdapter({ refs: { main: head } }));
 
     const plans = await planner.plan(
       baseRequest({ range: { type: "ref", since: sinceRef } }),
@@ -223,7 +226,7 @@ describe("DefaultTraversalPlanner", () => {
 
   it("since-date does not set excludeHash", async () => {
     const head = makeHash(5);
-    const planner = new DefaultTraversalPlanner(makeAdapter({ refs: { main: head } }));
+    const planner = makePlanner(makeAdapter({ refs: { main: head } }));
 
     const plans = await planner.plan(
       baseRequest({ range: { type: "date", since: new Date("2024-01-15T00:00:00Z") } }),

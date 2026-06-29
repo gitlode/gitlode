@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This document explains how gitlode traverses Git history and applies differential extraction in the current implementation.
-
-Normative rules remain in `.github/instructions/git-traversal.instructions.md`.
+This document is the canonical design contract for how gitlode traverses Git history and applies
+differential extraction in the current implementation. Agent-specific entrypoints may summarize or
+route to this document, but they must not replace it as the durable traversal source of truth.
 
 ## Why traversal is graph-based
 
@@ -289,6 +289,7 @@ This approach prioritizes successful extraction with explicit warnings in recove
 
 ## References
 
-- `.github/instructions/git-traversal.instructions.md`
+- `packages/gitlode/docs/design/architecture.md`
+- `packages/gitlode/docs/design/walk-commits-strategies.md`
 - `src/core/extractor.ts`
 - `src/git/isomorphic-git-adapter.ts`

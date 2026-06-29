@@ -8,8 +8,9 @@ command shape, options, validation, stderr behavior, exit codes, and implementat
 End-user workflows and examples belong in [`../usage.md`](../usage.md). Configuration-file shape and
 precedence details that are not specific to CLI adaptation belong in [`configuration.md`](configuration.md).
 
-During the documentation migration, `.github/instructions/cli.instructions.md` may temporarily carry
-a Copilot-oriented copy of some rules. Prefer this document for durable CLI design updates.
+CLI behavior rules belong in this document. Agent-specific entrypoints such as
+`.github/instructions/cli.instructions.md` may summarize or route to this document, but they must not
+replace it as the durable CLI source of truth.
 
 ## Command Signature
 

@@ -2,16 +2,12 @@
 
 ## Purpose
 
-This document explains the implemented architecture in human-oriented terms.
+This document is the canonical architecture design for gitlode. Use it to understand durable
+implementation boundaries, design intent, and trade-offs.
 
-Normative implementation rules remain in:
-
-- `.github/instructions/architecture.instructions.md`
-- `.github/instructions/cli.instructions.md`
-- `.github/instructions/git-traversal.instructions.md`
-- `.github/instructions/schema.instructions.md`
-
-Use this document to understand design intent, boundaries, and trade-offs.
+Agent-specific entrypoints such as `AGENTS.md` and `.github/instructions/*.instructions.md` may
+summarize or route to this document, but they must not replace it as the durable architecture source
+of truth.
 
 ## Product Context
 
@@ -391,7 +387,7 @@ For the full plugin contract and example, see [docs/design/plugins.md](plugins.m
 ## References
 
 - `README.md`
-- `.github/instructions/architecture.instructions.md`
-- `.github/instructions/cli.instructions.md`
-- `.github/instructions/git-traversal.instructions.md`
-- `.github/instructions/schema.instructions.md`
+- `packages/gitlode/docs/design/cli.md`
+- `packages/gitlode/docs/design/git-traversal.md`
+- `packages/gitlode/docs/design/schema.md`
+- `packages/gitlode/docs/design/plugins.md`

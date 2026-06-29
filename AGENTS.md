@@ -25,6 +25,7 @@ Use these documentation homes when changing behavior:
 
 - User-facing workflows and visible behavior: `packages/gitlode/docs/usage.md`
 - Durable implementation design contracts: `packages/gitlode/docs/design/`
+- Contributor and repository policies: `packages/gitlode/docs/contributing/`
 - Profiling output interpretation: `packages/gitlode/docs/profiling.md`
 - Temporary continuation notes: `packages/gitlode/docs/handoff/`
 
@@ -48,8 +49,6 @@ Read:
 Read:
 
 1. `packages/gitlode/docs/design/architecture.md`
-2. `.github/instructions/architecture.instructions.md` until its remaining normative details are
-   migrated into `packages/gitlode/docs/design/architecture.md`
 
 ### Git traversal or incremental extraction changes
 
@@ -57,8 +56,6 @@ Read:
 
 1. `packages/gitlode/docs/design/git-traversal.md`
 2. `packages/gitlode/docs/design/walk-commits-strategies.md` for internal `walkCommits` strategy work
-3. `.github/instructions/git-traversal.instructions.md` until its remaining normative details are
-   migrated into `packages/gitlode/docs/design/git-traversal.md`
 
 ### Output schema or file-format changes
 
@@ -66,8 +63,6 @@ Read:
 
 1. `packages/gitlode/docs/design/schema.md`
 2. `packages/gitlode/docs/usage.md` for user-facing examples and behavior
-3. `.github/instructions/schema.instructions.md` until its remaining normative details are migrated
-   into `packages/gitlode/docs/design/schema.md`
 
 ### Plugin changes
 
@@ -76,6 +71,12 @@ Read:
 1. `packages/gitlode/docs/design/plugins.md`
 2. `packages/gitlode/docs/design/configuration.md` when plugin configuration is affected
 3. `packages/gitlode/docs/usage.md` when user-facing plugin behavior changes
+
+### Lint or repository maintenance policy changes
+
+Read:
+
+1. `packages/gitlode/docs/contributing/lint-policy.md` when oxlint rule adoption policy is affected
 
 ### Profiling or diagnostics changes
 

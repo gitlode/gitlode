@@ -2,8 +2,10 @@
 
 ## Purpose
 
-This document describes the plugin runtime introduced in v0.7.0: the contract between gitlode and
-external plugins, the configuration file format, the lifecycle model, and the enrichment pipeline.
+This document is the canonical design contract for the gitlode plugin runtime and official plugin
+package policy. It covers the contract between gitlode and external plugins, the configuration file
+format, the lifecycle model, the enrichment pipeline, and first-party `@gitlode/plugin-*` package
+requirements.
 
 ---
 
@@ -279,6 +281,14 @@ If you have no specific preference, using the plugin's short name (the portion a
 `@gitlode/plugin-`) works well — for example, `@gitlode/plugin-conventional-commits` →
 `conventional-commits`. Choose a different name when you register the same plugin under multiple
 namespaces with different configs, or when you prefer a shorter label in output records.
+
+### Documentation Requirement
+
+Each official plugin package must include:
+
+- A `README.md` with a short description, installation instructions, configuration options, and a
+  compatibility note referencing the `peerDependencies.gitlode` range.
+- A `CHANGELOG.md` following the project's release-history convention.
 
 ---
 

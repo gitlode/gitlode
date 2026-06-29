@@ -2,9 +2,13 @@
 
 ## Purpose
 
-This document explains the output format, field semantics, and serialization logic in the current implementation.
+This document is the canonical design contract for gitlode output format, field semantics, and
+serialization logic in the current implementation. It is the durable source of truth for human
+developers and coding agents.
 
-Normative rules remain in `.github/instructions/schema.instructions.md`.
+Agent-specific files such as `AGENTS.md` and `.github/instructions/schema.instructions.md` may
+summarize, route to, or add guardrails around this document, but they do not replace it and must not
+be treated as independent sources of truth for output schema or file-format rules.
 
 ## File format overview
 
@@ -303,7 +307,6 @@ Changes are computed against the **first parent only**.
 
 ## References
 
-- `.github/instructions/schema.instructions.md`
 - `src/output/utils.ts`
 - `src/output/writer.ts`
 - `src/core/types.ts`

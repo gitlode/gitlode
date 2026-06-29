@@ -48,8 +48,6 @@ Read:
 Read:
 
 1. `packages/gitlode/docs/design/architecture.md`
-2. `.github/instructions/architecture.instructions.md` until its remaining normative details are
-   migrated into `packages/gitlode/docs/design/architecture.md`
 
 ### Git traversal or incremental extraction changes
 
@@ -57,8 +55,6 @@ Read:
 
 1. `packages/gitlode/docs/design/git-traversal.md`
 2. `packages/gitlode/docs/design/walk-commits-strategies.md` for internal `walkCommits` strategy work
-3. `.github/instructions/git-traversal.instructions.md` until its remaining normative details are
-   migrated into `packages/gitlode/docs/design/git-traversal.md`
 
 ### Output schema or file-format changes
 
@@ -66,8 +62,6 @@ Read:
 
 1. `packages/gitlode/docs/design/schema.md`
 2. `packages/gitlode/docs/usage.md` for user-facing examples and behavior
-3. `.github/instructions/schema.instructions.md` until its remaining normative details are migrated
-   into `packages/gitlode/docs/design/schema.md`
 
 ### Plugin changes
 

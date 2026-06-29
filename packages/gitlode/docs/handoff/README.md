@@ -23,3 +23,12 @@ design decision becomes durable, migrate the stable content to the appropriate c
 
 After migration, remove or shorten obsolete handoff details so future readers do not confuse
 planning context with current design.
+
+## Current handoff notes
+
+- [`instrumentation-opentelemetry-migration.md`](instrumentation-opentelemetry-migration.md):
+  historical continuation context for the span-first instrumentation migration.
+- [`profiling-and-walk-commits-next.md`](profiling-and-walk-commits-next.md): walkCommits
+  profiling and bidirectional traversal prototype sequencing.
+- [`walk-commits-timestamp-frontier.md`](walk-commits-timestamp-frontier.md): current notes for
+  timestamp-priority frontier design in a future bidirectional traversal prototype.

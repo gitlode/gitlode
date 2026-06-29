@@ -29,12 +29,13 @@ canonical documentation home.
 Audience-oriented summaries are allowed when they improve readability, but summaries should link
 back to the canonical document instead of becoming independent specifications.
 
-| Information type                         | Canonical location             |
-| ---------------------------------------- | ------------------------------ |
-| End-user workflows and visible behavior  | [`usage.md`](usage.md)         |
-| Durable implementation design contracts  | [`design/`](design/)           |
-| Profiling output interpretation          | [`profiling.md`](profiling.md) |
-| Continuation context for unfinished work | [`handoff/`](handoff/)         |
+| Information type                         | Canonical location               |
+| ---------------------------------------- | -------------------------------- |
+| End-user workflows and visible behavior  | [`usage.md`](usage.md)           |
+| Durable implementation design contracts  | [`design/`](design/)             |
+| Contributor and repository policies      | [`contributing/`](contributing/) |
+| Profiling output interpretation          | [`profiling.md`](profiling.md)   |
+| Continuation context for unfinished work | [`handoff/`](handoff/)           |
 
 ## Documentation map
 
@@ -43,6 +44,8 @@ back to the canonical document instead of becoming independent specifications.
 - [`profiling.md`](profiling.md): guide to the developer-oriented `--profile` diagnostics output.
 - [`design/`](design/): durable implementation design documents for human developers and coding
   agents.
+- [`contributing/`](contributing/): contributor-facing repository maintenance policies, such as
+  lint rule adoption.
 - [`handoff/`](handoff/): continuation notes for in-progress or future work. Handoff documents are
   not durable source-of-truth design documents.
 
@@ -53,6 +56,7 @@ When changing behavior, update the documentation for every affected audience:
 - User-visible behavior changes should update [`usage.md`](usage.md) and, when relevant,
   [`profiling.md`](profiling.md).
 - Implementation contract changes should update the appropriate document in [`design/`](design/).
+- Contributor policy changes should update the appropriate document in [`contributing/`](contributing/).
 - Temporary planning or continuation notes should live in [`handoff/`](handoff/) until stable
   decisions are migrated into durable docs.
 - Agent-specific entrypoints, such as GitHub Copilot instruction files, should route to these docs

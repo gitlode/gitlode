@@ -25,6 +25,7 @@ Use these documentation homes when changing behavior:
 
 - User-facing workflows and visible behavior: `packages/gitlode/docs/usage.md`
 - Durable implementation design contracts: `packages/gitlode/docs/design/`
+- Contributor and repository policies: `packages/gitlode/docs/contributing/`
 - Profiling output interpretation: `packages/gitlode/docs/profiling.md`
 - Temporary continuation notes: `packages/gitlode/docs/handoff/`
 
@@ -70,6 +71,12 @@ Read:
 1. `packages/gitlode/docs/design/plugins.md`
 2. `packages/gitlode/docs/design/configuration.md` when plugin configuration is affected
 3. `packages/gitlode/docs/usage.md` when user-facing plugin behavior changes
+
+### Lint or repository maintenance policy changes
+
+Read:
+
+1. `packages/gitlode/docs/contributing/lint-policy.md` when oxlint rule adoption policy is affected
 
 ### Profiling or diagnostics changes
 

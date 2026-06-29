@@ -303,6 +303,9 @@ earlier runs.
 
 ## CLI Reference
 
+This section summarizes user-facing CLI options. For the developer-facing CLI contract, validation
+rules, stderr behavior, and implementation notes, see [CLI Interface Design](design/cli.md).
+
 ```
 gitlode [options] <repository-path>
 ```

@@ -38,11 +38,10 @@ allowed when they link back to the canonical document.
 
 Read:
 
-1. `packages/gitlode/docs/usage.md`
-2. `packages/gitlode/docs/design/configuration.md` when config shape, path resolution, or precedence
+1. `packages/gitlode/docs/design/cli.md`
+2. `packages/gitlode/docs/usage.md` when user-facing workflows, examples, or help text are affected
+3. `packages/gitlode/docs/design/configuration.md` when config shape, path resolution, or precedence
    is affected
-3. `.github/instructions/cli.instructions.md` until the CLI contract is migrated into
-   `packages/gitlode/docs/design/`
 
 ### Architecture or module-boundary changes
 

@@ -12,6 +12,7 @@ behavioral detail is useful.
 | Area                     | Document                                                   | Owns                                                                                              |
 | ------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Architecture             | [`architecture.md`](architecture.md)                       | Layering, module ownership, dependency boundaries, runtime flow, and major trade-offs.            |
+| CLI                      | [`cli.md`](cli.md)                                         | Command shape, options, validation, stderr behavior, exit codes, and CLI implementation notes.    |
 | Configuration            | [`configuration.md`](configuration.md)                     | Versioned configuration shape, path resolution, precedence, and validation pipeline.              |
 | Git traversal            | [`git-traversal.md`](git-traversal.md)                     | User-visible traversal behavior, differential extraction, state lifecycle, and deduplication.     |
 | Plugins                  | [`plugins.md`](plugins.md)                                 | Plugin configuration, runtime contract, `extensions` output field, lifecycle, and package policy. |

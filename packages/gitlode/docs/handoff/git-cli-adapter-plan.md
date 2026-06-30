@@ -2,9 +2,11 @@
 
 ## Status
 
-Planning artifact. This document records the agreed direction for introducing a second Git adapter
-implementation backed by the `git` command-line executable. It is not yet a durable design contract.
-As decisions stabilize or implementation lands, migrate stable facts into the canonical docs:
+Planning artifact. This document records decisions and open items for introducing a second Git
+adapter implementation backed by the `git` command-line executable. It is not a discussion channel
+and is not yet a durable design contract. Design discussion should happen in the chat/review thread;
+this handoff document should be updated afterward to summarize settled decisions or explicit open
+items. As decisions stabilize or implementation lands, migrate stable facts into the canonical docs:
 
 - user-facing configuration and behavior: `packages/gitlode/docs/usage.md`;
 - durable implementation contracts: `packages/gitlode/docs/design/`;
@@ -51,7 +53,7 @@ parsing.
 
 Add a config-only setting under `runtime` for selecting the Git implementation. Keeping this under
 `runtime` is decided because the choice affects execution dependencies, profiling, and
-troubleshooting rather than repository metadata. The exact field name remains open.
+troubleshooting rather than repository metadata. The field name is `runtime.gitAdapter`.
 
 Preferred values:
 
@@ -61,36 +63,17 @@ Preferred values:
 The values should stay explicit rather than being shortened to `"isomorphic"` or `"cli"`, because
 those shorter names are too abstract for a user-facing config file.
 
-Field-name candidates:
+The selected field name is `runtime.gitAdapter`. More user-facing names were considered, including
+`runtime.gitBackend`, `runtime.gitProvider`, `runtime.gitEngine`, and
+`runtime.gitImplementation`, but none was clearly better than `gitAdapter`.
 
-- `runtime.gitAdapter`
-  - Pros: precise for maintainers; directly maps to the internal architecture.
-  - Cons: `adapter` is a design-pattern term and may feel implementation-oriented for users.
-- `runtime.gitBackend`
-  - Pros: common phrasing for choosing an implementation behind a stable feature.
-  - Cons: still somewhat technical; `backend` can imply a service or storage component.
-- `runtime.gitProvider`
-  - Pros: user-facing enough to mean "which implementation provides Git operations".
-  - Cons: can be confused with hosting providers such as GitHub/GitLab.
-- `runtime.gitEngine`
-  - Pros: concise and user-facing; suggests the execution engine used for Git operations.
-  - Cons: less common in current gitlode terminology.
-- `runtime.gitImplementation`
-  - Pros: explicit and avoids design-pattern vocabulary.
-  - Cons: long for a config key.
-
-Current recommendation: `runtime.gitEngine`. It is shorter and more user-facing than
-`runtime.gitAdapter`, while still describing a runtime implementation choice. If consistency with
-internal terminology is valued more than user-facing phrasing, `runtime.gitAdapter` remains a safe
-choice.
-
-Example using the current recommendation:
+Example:
 
 ```json
 {
   "version": 1,
   "runtime": {
-    "gitEngine": "isomorphic-git"
+    "gitAdapter": "isomorphic-git"
   }
 }
 ```
@@ -98,7 +81,7 @@ Example using the current recommendation:
 Precedence:
 
 - There is no CLI override in this plan.
-- Effective adapter is `config runtime.<field> ?? "isomorphic-git"`.
+- Effective adapter is `config runtime.gitAdapter ?? "isomorphic-git"`.
 
 Validation:
 
@@ -316,10 +299,9 @@ Evaluation:
 - Worth revisiting if the current `GitAdapter` becomes awkward during implementation, but not the
   preferred first move.
 
-Current recommendation:
+Decision:
 
-- Start with Option A, the hybrid adapter, unless Phase 1 design review decides the naming or
-  abstraction cost is unacceptable.
+- Start with Option A, the hybrid adapter.
 - Keep Option B as the target for a later full CLI backend if file-change performance or
   installation simplification becomes important.
 - Defer Option C until there is concrete evidence that the current interface prevents a clean first
@@ -389,10 +371,11 @@ Each phase must stop for human review before proceeding to the next phase.
 
 Deliverables:
 
-- finalize the config field name under `runtime`;
-- keep accepted values as `"isomorphic-git"` and `"git-cli"` unless a new concern appears;
+- use `runtime.gitAdapter` as the config field name;
+- keep accepted values as `"isomorphic-git"` and `"git-cli"`;
 - decide whether to keep or adjust `GitAdapter` for the first implementation;
-- decide between the documented hybrid/full/split file-change strategies;
+- implement the documented hybrid file-change strategy unless a concrete implementation blocker is
+  found;
 - update this handoff artifact or migrate stable decisions into design docs.
 
 Review gate:
@@ -459,20 +442,20 @@ Review gate:
 ## Resolved Maintainer Decisions
 
 - The adapter selection setting belongs under `runtime`.
-- Adapter values should be `"isomorphic-git"` and `"git-cli"`.
+- The config field name is `runtime.gitAdapter`.
+- Adapter values are `"isomorphic-git"` and `"git-cli"`.
+- The first implementation should use the hybrid adapter pattern: Git CLI for traversal-oriented
+  operations and existing isomorphic-git behavior for file-change expansion.
 - Adapter-invariant output correctness is based on the final commit or file-change set, not output
   ordering.
 - When `"git-cli"` is selected, gitlode should validate Git command execution before traversal.
 - Use `git --version` for early Git CLI validation and diagnostic version capture.
 - Validation failures that can be classified, such as a missing Git command, should be reported as
   user errors rather than avoidable runtime errors.
+- Do not set or validate a minimum Git version in this plan. Minimum-version policy can be revisited
+  later if implementation discovers specific Git feature requirements.
 
 ## Remaining Questions for Maintainer Review
 
-1. Which runtime field name should be used? Current recommendation: `runtime.gitEngine`. Other
-   candidates: `runtime.gitAdapter`, `runtime.gitBackend`, `runtime.gitProvider`, and
-   `runtime.gitImplementation`.
-2. Which first implementation pattern should be approved? Current recommendation: hybrid adapter
-   with Git CLI traversal and existing isomorphic-git file-change expansion.
-3. Is the proposed early validation model sufficient, or should implementation also validate a
-   minimum Git version once supported-version requirements are known?
+No remaining design questions are currently open for this planning phase. New questions should be
+raised in chat/review first, then summarized here after a decision is made or explicitly deferred.

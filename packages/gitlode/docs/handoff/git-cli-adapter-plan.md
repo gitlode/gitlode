@@ -49,39 +49,64 @@ parsing.
 
 ## Configuration Direction
 
-Add a config-only runtime setting for adapter selection. The exact field name is still open, but the
-preferred shape is:
+Add a config-only setting under `runtime` for selecting the Git implementation. Keeping this under
+`runtime` is decided because the choice affects execution dependencies, profiling, and
+troubleshooting rather than repository metadata. The exact field name remains open.
+
+Preferred values:
+
+- `"isomorphic-git"` — existing adapter and default;
+- `"git-cli"` — new adapter backed by the `git` executable.
+
+The values should stay explicit rather than being shortened to `"isomorphic"` or `"cli"`, because
+those shorter names are too abstract for a user-facing config file.
+
+Field-name candidates:
+
+- `runtime.gitAdapter`
+  - Pros: precise for maintainers; directly maps to the internal architecture.
+  - Cons: `adapter` is a design-pattern term and may feel implementation-oriented for users.
+- `runtime.gitBackend`
+  - Pros: common phrasing for choosing an implementation behind a stable feature.
+  - Cons: still somewhat technical; `backend` can imply a service or storage component.
+- `runtime.gitProvider`
+  - Pros: user-facing enough to mean "which implementation provides Git operations".
+  - Cons: can be confused with hosting providers such as GitHub/GitLab.
+- `runtime.gitEngine`
+  - Pros: concise and user-facing; suggests the execution engine used for Git operations.
+  - Cons: less common in current gitlode terminology.
+- `runtime.gitImplementation`
+  - Pros: explicit and avoids design-pattern vocabulary.
+  - Cons: long for a config key.
+
+Current recommendation: `runtime.gitEngine`. It is shorter and more user-facing than
+`runtime.gitAdapter`, while still describing a runtime implementation choice. If consistency with
+internal terminology is valued more than user-facing phrasing, `runtime.gitAdapter` remains a safe
+choice.
+
+Example using the current recommendation:
 
 ```json
 {
   "version": 1,
   "runtime": {
-    "gitAdapter": "isomorphic-git"
+    "gitEngine": "isomorphic-git"
   }
 }
 ```
 
-Candidate values:
-
-- `"isomorphic-git"` — existing adapter and default;
-- `"git-cli"` — new adapter backed by the `git` executable.
-
-Open naming decision:
-
-- `runtime.gitAdapter` is explicit and keeps backend choice near other execution controls.
-- `repository.gitAdapter` is possible, but adapter choice affects runtime dependencies and
-  diagnostics more than repository metadata.
-
 Precedence:
 
 - There is no CLI override in this plan.
-- Effective adapter is `config runtime.gitAdapter ?? "isomorphic-git"`.
+- Effective adapter is `config runtime.<field> ?? "isomorphic-git"`.
 
 Validation:
 
 - Unknown adapter values are config validation errors.
-- If `"git-cli"` is selected and `git` cannot be executed, fail fast with a user-facing error before
-  traversal begins.
+- If `"git-cli"` is selected, validate that the Git command can be executed before traversal begins.
+- Use `git --version` for this early validation and for capturing diagnostic version information.
+- If Git command validation fails, report a user error rather than deferring to an avoidable runtime
+  failure.
 
 Documentation updates when implemented:
 
@@ -129,6 +154,8 @@ Recommended helper responsibilities:
 - collect stdout/stderr when outputs are bounded;
 - support streaming stdout for `rev-list` and batch metadata paths;
 - map non-zero exits to `GitAdapterError` or user-facing configuration/runtime errors;
+- run `git --version` during Git CLI adapter validation;
+- report missing or non-executable Git as an early user error when `"git-cli"` is selected;
 - expose the detected Git version for profiling.
 
 ### Ref Resolution
@@ -173,9 +200,9 @@ with exclude.
 Notes:
 
 - Use argv entries, not shell strings.
-- Output ordering should be treated carefully. The current durable contract emphasizes membership,
-  while downstream users may still notice ordering changes. Add tests and documentation for the
-  chosen behavior.
+- The adapter-invariant contract is set equality, not traversal order: adapters must produce the
+  same final commit set, and file-level extraction must produce the same final file-change set, but
+  line/order differences between adapters are allowed.
 - Start with `--topo-order` unless implementation tests show a stronger reason to choose Git's
   default order.
 
@@ -216,17 +243,87 @@ Treat missing config as `null`, not as a fatal error.
 
 ### File Changes
 
-Two viable implementation paths:
+The first implementation must choose how far the Git CLI adapter goes beyond optimized traversal.
+The options are below.
 
-1. Full CLI implementation using commands such as `diff-tree`, `cat-file -s`, and blob reads.
-2. Hybrid implementation where the CLI adapter delegates file changes to existing isomorphic-git
-   logic while using Git CLI for traversal/ref/range operations.
+#### Option A: Hybrid adapter
 
-Initial recommendation:
+Use Git CLI for operations that directly benefit from Git's optimized revision machinery, while
+delegating file-change expansion to the existing isomorphic-git implementation.
 
-- Prefer the hybrid path if it keeps the first Git CLI adapter small and focused on the traversal
-  bottleneck.
-- Revisit full CLI file-change support after traversal performance and adapter selection are stable.
+Pros:
+
+- Smallest first implementation.
+- Directly addresses the `v9..v10` traversal bottleneck.
+- Reuses existing binary detection, blob reading, and line-diff behavior.
+- Reduces parity risk for file-granularity output in the first phase.
+
+Cons:
+
+- The `git-cli` value would not mean every Git operation is CLI-backed.
+- Runtime would still depend on isomorphic-git code paths for file-level extraction.
+- Troubleshooting must make the hybrid boundary clear.
+
+Evaluation:
+
+- Best first step if the priority is reducing traversal risk quickly while preserving current
+  file-change behavior.
+- Requires clear documentation and profiling so users understand which operations are CLI-backed.
+
+#### Option B: Full CLI adapter
+
+Implement traversal, commit metadata, ref operations, merge-base, and file-change expansion with Git
+CLI commands such as `rev-list`, `cat-file`, `diff-tree`, and related plumbing.
+
+Pros:
+
+- Cleanest mental model for `"git-cli"`: all Git operations use the Git executable.
+- Avoids mixing two Git implementations in one adapter.
+- May unlock additional Git-native diff optimizations later.
+
+Cons:
+
+- Larger implementation surface.
+- Higher parity risk for binary handling, byte sizes, rename/status interpretation, root commits, and
+  line additions/deletions.
+- More process orchestration and batch parsing work before the traversal improvement can ship.
+
+Evaluation:
+
+- Desirable long-term if Git CLI becomes a primary backend, but too broad for the first performance
+  milestone unless file-level parity is prioritized over delivery speed.
+
+#### Option C: Split adapter interfaces
+
+Refactor the abstraction so traversal/commit metadata and file-change expansion are separate
+capabilities. The runtime could then compose a Git CLI traversal provider with an isomorphic-git
+file-change provider explicitly instead of hiding the hybrid inside one `GitAdapter`.
+
+Pros:
+
+- Most honest abstraction if different implementations are best for different Git operations.
+- Avoids naming confusion in a hybrid adapter.
+- Could make future adapters easier to compose and test.
+
+Cons:
+
+- Largest Core and runtime design change.
+- Increases scope before proving the Git CLI traversal path.
+- Requires broader documentation updates and more migration risk.
+
+Evaluation:
+
+- Worth revisiting if the current `GitAdapter` becomes awkward during implementation, but not the
+  preferred first move.
+
+Current recommendation:
+
+- Start with Option A, the hybrid adapter, unless Phase 1 design review decides the naming or
+  abstraction cost is unacceptable.
+- Keep Option B as the target for a later full CLI backend if file-change performance or
+  installation simplification becomes important.
+- Defer Option C until there is concrete evidence that the current interface prevents a clean first
+  implementation.
 
 ## Profiling and Troubleshooting Design
 
@@ -235,8 +332,8 @@ Add low-cardinality adapter information to profiling output.
 Recommended profile details:
 
 - on the run-level span, record `git.adapter=<adapter-name>`;
-- on Git CLI adapter initialization or traversal spans, record `git.cli.version=<version>` when
-  available;
+- on Git CLI adapter validation or traversal spans, record `git.cli.version=<version>` from
+  `git --version`;
 - for Git CLI commands, use stable span names such as:
   - `git.cli.version`;
   - `git.cli.resolve_ref`;
@@ -266,7 +363,7 @@ Documentation updates when implemented:
   - `walkCommits()` without exclude;
   - `walkCommits()` with exclude, including merge cases;
   - merge-base null behavior;
-  - missing `git` executable / command failure mapping;
+  - missing or non-executable `git` reports an early user error when `"git-cli"` is selected;
   - profile attributes when profiling is enabled.
 
 ### Integration/Performance Tests
@@ -292,9 +389,10 @@ Each phase must stop for human review before proceeding to the next phase.
 
 Deliverables:
 
-- finalize config field name and accepted values;
+- finalize the config field name under `runtime`;
+- keep accepted values as `"isomorphic-git"` and `"git-cli"` unless a new concern appears;
 - decide whether to keep or adjust `GitAdapter` for the first implementation;
-- decide full CLI vs hybrid file-change strategy for the first implementation;
+- decide between the documented hybrid/full/split file-change strategies;
 - update this handoff artifact or migrate stable decisions into design docs.
 
 Review gate:
@@ -321,7 +419,7 @@ Review gate:
 Deliverables:
 
 - process helper;
-- Git version detection;
+- Git version detection via `git --version`;
 - ref resolution;
 - object format detection;
 - `walkCommits()` via `rev-list` plus batch metadata;
@@ -358,17 +456,23 @@ Review gate:
 
 - Maintainer confirms the adapter is ready for normal development use or remains experimental.
 
-## Open Questions for Maintainer Review
+## Resolved Maintainer Decisions
 
-1. Config field name: is `runtime.gitAdapter` acceptable, or would you prefer another name such as
-   `runtime.gitBackend`?
-2. Config value names: should the values be `"isomorphic-git"` and `"git-cli"`, or shorter names
-   such as `"isomorphic"` and `"cli"`?
-3. For the first implementation, do you prefer a hybrid adapter that uses Git CLI for traversal but
-   keeps existing isomorphic-git file-change logic, or should the new adapter be fully CLI-backed
-   from the start?
-4. Is it acceptable for the Git CLI adapter's output ordering to differ from the current adapter as
-   long as the yielded commit set is correct, or should the first implementation attempt to preserve
-   a specific order?
-5. Should Git CLI adapter selection fail immediately if `git --version` cannot be collected, or only
-   when the first required Git operation fails?
+- The adapter selection setting belongs under `runtime`.
+- Adapter values should be `"isomorphic-git"` and `"git-cli"`.
+- Adapter-invariant output correctness is based on the final commit or file-change set, not output
+  ordering.
+- When `"git-cli"` is selected, gitlode should validate Git command execution before traversal.
+- Use `git --version` for early Git CLI validation and diagnostic version capture.
+- Validation failures that can be classified, such as a missing Git command, should be reported as
+  user errors rather than avoidable runtime errors.
+
+## Remaining Questions for Maintainer Review
+
+1. Which runtime field name should be used? Current recommendation: `runtime.gitEngine`. Other
+   candidates: `runtime.gitAdapter`, `runtime.gitBackend`, `runtime.gitProvider`, and
+   `runtime.gitImplementation`.
+2. Which first implementation pattern should be approved? Current recommendation: hybrid adapter
+   with Git CLI traversal and existing isomorphic-git file-change expansion.
+3. Is the proposed early validation model sufficient, or should implementation also validate a
+   minimum Git version once supported-version requirements are known?

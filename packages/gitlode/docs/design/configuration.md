@@ -43,7 +43,8 @@ Included sections are also strict.
     "url": "https://example.com/org/my-repo.git"
   },
   "runtime": {
-    "profile": true
+    "profile": true,
+    "gitAdapter": "isomorphic-git"
   },
   "extensions": {
     "my-plugin": {
@@ -80,6 +81,9 @@ Included sections are also strict.
 ### runtime
 
 - `profile`: optional default for `--profile`
+- `gitAdapter`: optional Git implementation selector. Supported values are `isomorphic-git` and
+  `git-cli`; default is `isomorphic-git`. The `git-cli` value is reserved for the in-progress Git
+  CLI adapter and returns a user error until that adapter implementation lands.
 
 ### extensions
 
@@ -130,6 +134,14 @@ Applies to:
 Effective profiling is:
 
 `CLI --profile OR config runtime.profile OR false`
+
+### git adapter
+
+Effective Git adapter is:
+
+`config runtime.gitAdapter OR "isomorphic-git"`
+
+There is intentionally no CLI override for this setting.
 
 ## Conflict Rule
 

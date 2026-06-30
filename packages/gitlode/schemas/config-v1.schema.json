@@ -102,6 +102,13 @@
       "properties": {
         "profile": {
           "type": "boolean"
+        },
+        "gitAdapter": {
+          "type": "string",
+          "enum": [
+            "isomorphic-git",
+            "git-cli"
+          ]
         }
       },
       "additionalProperties": false

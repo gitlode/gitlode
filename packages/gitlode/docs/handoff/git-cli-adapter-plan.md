@@ -455,6 +455,13 @@ Review gate:
 - Do not set or validate a minimum Git version in this plan. Minimum-version policy can be revisited
   later if implementation discovers specific Git feature requirements.
 
+## Phase 2 Status
+
+Phase 2 wires `runtime.gitAdapter` through config parsing and worker input. The default remains
+`isomorphic-git`, and `gitlode.run` profiling records the selected adapter. Until Phase 3 implements
+the Git CLI adapter, selecting `"git-cli"` returns an explicit user error instead of silently falling
+back to another implementation.
+
 ## Remaining Questions for Maintainer Review
 
 No remaining design questions are currently open for this planning phase. New questions should be

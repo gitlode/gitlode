@@ -28,6 +28,7 @@ function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
     granularity: bootstrapInput.perFile ? "file" : "commit",
     maxDiffSize: bootstrapInput.maxDiffSize,
     profile: bootstrapInput.profile,
+    gitAdapter: bootstrapInput.gitAdapter,
     repoName: bootstrapInput.repoName,
     repoUrl: bootstrapInput.repoUrl,
     configBaseDir: bootstrapInput.configBaseDir,

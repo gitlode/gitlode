@@ -4,7 +4,11 @@ import { Argument, Command, CommanderError, Option } from "commander";
 import { z } from "zod";
 
 import { loadConfigFile } from "../config/index.js";
-import type { ConfigExtensionsSection, ProjectConfigurationV1 } from "../config/index.js";
+import type {
+  ConfigExtensionsSection,
+  GitAdapterName,
+  ProjectConfigurationV1,
+} from "../config/index.js";
 import { byteSizeString } from "../config/index.js";
 import type { RotationConfig } from "../core/index.js";
 import { MISSING_STATES } from "../core/index.js";
@@ -36,6 +40,7 @@ export interface BootstrapInput {
   readonly maxDiffSize?: number;
   readonly quiet: boolean;
   readonly profile: boolean;
+  readonly gitAdapter: GitAdapterName;
   readonly repoName?: string;
   readonly repoUrl?: string;
   readonly configBaseDir?: AbsoluteDirectoryPath;
@@ -436,6 +441,7 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
     const repoName = repoNameFromCli ?? configRepository?.name;
     const repoUrl = repoUrlFromCli ?? configRepository?.url;
     const effectiveProfile = profile || configRuntime?.profile === true;
+    const effectiveGitAdapter = configRuntime?.gitAdapter ?? "isomorphic-git";
 
     const configMaxLines = configOutput?.rotation?.lines;
     const configMaxBytes = configOutput?.rotation?.size;
@@ -489,6 +495,7 @@ export async function loadBootstrapInput(): Promise<BootstrapResult<BootstrapInp
         maxDiffSize,
         quiet,
         profile: effectiveProfile,
+        gitAdapter: effectiveGitAdapter,
         repoName,
         repoUrl,
         configBaseDir,

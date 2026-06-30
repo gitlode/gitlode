@@ -36,6 +36,7 @@ function makeRequest(): WorkerRunRequest {
       rotation: {},
       perFile: false,
       profile: false,
+      gitAdapter: "isomorphic-git",
     },
     priorState: {
       version: 2,

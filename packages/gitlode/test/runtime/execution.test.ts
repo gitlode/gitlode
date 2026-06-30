@@ -58,6 +58,7 @@ describe("executeWorkerRunRequest profiling", () => {
         rotation: {},
         granularity: "commit",
         profile: true,
+        gitAdapter: "isomorphic-git",
       },
       priorState: {
         version: 2,
@@ -80,5 +81,41 @@ describe("executeWorkerRunRequest profiling", () => {
     );
     expect(walkEntry?.attributes?.strategy).toEqual(["eagerExclude"]);
     expect(walkEntry?.counters?.include_reads).toBeGreaterThan(0);
+
+    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
+  });
+
+  it("returns user-error when the git-cli adapter is selected before implementation", async () => {
+    const repoDir = await makeTempDir("gitlode-execution-repo-");
+    const outputDir = await makeTempDir("gitlode-execution-output-");
+
+    const request: WorkerRunRequest = {
+      input: {
+        repositoryPath: repoDir as AbsolutePath,
+        refs: ["main"],
+        outputDir: outputDir as AbsolutePath,
+        rotation: {},
+        granularity: "commit",
+        profile: false,
+        gitAdapter: "git-cli",
+      },
+      priorState: {
+        version: 2,
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        repositoryPath: repoDir as AbsolutePath,
+        refs: [],
+      },
+    };
+
+    const result = await executeWorkerRunRequest(request, {
+      reporter: { emit(_event: ProgressEvent) {} },
+      renderDiagnostic() {},
+    });
+
+    expect(result).toEqual({
+      kind: "user-error",
+      message: 'Git adapter "git-cli" is not implemented yet.',
+    });
   });
 });

@@ -139,6 +139,32 @@ async function resolveExtractionRange(
   }
 }
 
+type BuildGitAdapterResult =
+  | { readonly kind: "success"; readonly adapter: GitAdapter }
+  | { readonly kind: "user-error"; readonly message: string };
+
+function buildGitAdapter(
+  input: WorkerRunInput,
+  instrumentation: Instrumentation,
+): BuildGitAdapterResult {
+  switch (input.gitAdapter) {
+    case "isomorphic-git":
+      return {
+        kind: "success",
+        adapter: new IsomorphicGitAdapter({
+          fs: nodeFs,
+          diffAdapter: new JsDiffAdapter(),
+          instrumentation,
+        }),
+      };
+    case "git-cli":
+      return {
+        kind: "user-error",
+        message: 'Git adapter "git-cli" is not implemented yet.',
+      };
+  }
+}
+
 function resolveOutputPrefix(
   outputPrefix: string | undefined,
   repoUrl: string | null,
@@ -255,15 +281,16 @@ export async function executeWorkerRunRequest(
     attributes: {
       "gitlode.granularity": input.granularity,
       "gitlode.profile": input.profile,
+      "git.adapter": input.gitAdapter,
     },
   });
 
   try {
-    const gitAdapter = new IsomorphicGitAdapter({
-      fs: nodeFs,
-      diffAdapter: new JsDiffAdapter(),
-      instrumentation,
-    });
+    const gitAdapterResult = buildGitAdapter(input, instrumentation);
+    if (gitAdapterResult.kind === "user-error") {
+      return await finishUserError(runSpan, gitAdapterResult.message);
+    }
+    const gitAdapter = gitAdapterResult.adapter;
 
     await instrumentation.runAsync(
       "gitlode.validate_repository_access",

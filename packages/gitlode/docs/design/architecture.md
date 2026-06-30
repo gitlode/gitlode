@@ -120,6 +120,7 @@ Responsibilities:
 - Parse and validate command arguments.
 - Enforce mutual exclusion rules for differential options.
 - Resolve effective settings from CLI/config precedence and derived defaults (for example output prefix).
+- Resolve config-only Git adapter selection from `runtime.gitAdapter`.
 - Convert validated args into worker-safe runtime extraction inputs.
 - Own the runtime helpers that wire main-process prior-state loading, progress presentation,
   worker dispatch, plugin bootstrap, and successful-run rendering without widening
@@ -173,7 +174,10 @@ Responsibilities:
 - Compute per-file line-level diff statistics via an internal `DiffAdapter` strategy.
 - Translate library/runtime failures into `GitAdapterError` codes.
 
-The adapter uses isomorphic-git internally and keeps those details from leaking upward.
+The default adapter uses isomorphic-git internally and keeps those details from leaking upward. The
+config-only `runtime.gitAdapter` setting selects the Git implementation. The default value is
+`isomorphic-git`; `git-cli` is reserved for the in-progress Git CLI adapter and returns a user error
+until that implementation lands.
 
 Line-diff computation is delegated to an internal `DiffAdapter` strategy interface defined in
 `diff-adapter.ts`. The default implementation (`JsDiffAdapter`) reproduces the original behavior

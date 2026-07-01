@@ -104,6 +104,7 @@
           "type": "boolean"
         },
         "gitAdapter": {
+          "default": "isomorphic-git",
           "type": "string",
           "enum": [
             "isomorphic-git",

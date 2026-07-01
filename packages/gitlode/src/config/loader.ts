@@ -60,7 +60,7 @@ const ConfigRepositorySchema = z
 const ConfigRuntimeSchema = z
   .object({
     profile: z.boolean().optional(),
-    gitAdapter: z.enum(["isomorphic-git", "git-cli"]).optional(),
+    gitAdapter: z.enum(["isomorphic-git", "git-cli"]).default("isomorphic-git"),
   })
   .strict();
 

@@ -823,6 +823,7 @@ describe("parseArgs – --config", () => {
     setArgv("--ref", "main", "--output-dir", repoDir, repoDir);
     const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.configBaseDir).toBeUndefined();
+    expect(parsed.gitAdapter).toBe("isomorphic-git");
   });
 
   it("resolves --config to an absolute path", async () => {
@@ -928,6 +929,22 @@ describe("parseArgs – --config", () => {
     setArgv("--rotate-lines", "100", "--config", configFile, repoDir);
     const parsed = expectParsed(await loadBootstrapInput());
     expect(parsed.rotation).toEqual({ maxLines: 100, maxBytes: 1_048_576 });
+  });
+
+  it("uses runtime.gitAdapter from config", async () => {
+    await writeFile(
+      configFile,
+      JSON.stringify({
+        version: 1,
+        extraction: { refs: ["main"] },
+        output: { directory: repoDir },
+        runtime: { gitAdapter: "git-cli" },
+      }),
+    );
+
+    setArgv("--config", configFile, repoDir);
+    const parsed = expectParsed(await loadBootstrapInput());
+    expect(parsed.gitAdapter).toBe("git-cli");
   });
 
   it("enables profile when config runtime.profile=true without CLI --profile", async () => {

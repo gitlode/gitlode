@@ -380,6 +380,7 @@ Precedence rules:
 - Scalar/path defaults use `CLI explicit > config > built-in`
 - `--rotate-lines` and `--rotate-size` override their own thresholds independently
 - effective profile is `--profile OR runtime.profile`
+- effective Git adapter is `runtime.gitAdapter OR "isomorphic-git"`; there is no CLI override
 
 Conflict rule:
 
@@ -527,7 +528,8 @@ gitlode -r main --config ./gitlode.config.json ./my-repo
     "name": "repo-override"
   },
   "runtime": {
-    "profile": true
+    "profile": true,
+    "gitAdapter": "isomorphic-git"
   },
   "extensions": {
     "my-plugin": {
@@ -545,11 +547,16 @@ gitlode -r main --config ./gitlode.config.json ./my-repo
 | `extraction`    |          | Defaults for `--ref` and snapshot range.                                                  |
 | `output`        |          | Defaults for output directory/prefix and rotation thresholds.                             |
 | `repository`    |          | Defaults for `--repo-name` / `--repo-url`.                                                |
-| `runtime`       |          | Defaults for runtime flags (currently `profile` only).                                    |
+| `runtime`       |          | Defaults for runtime behavior such as `profile` and `gitAdapter`.                         |
 | `extensions`    |          | Map from namespace to plugin entry. When present, must have at least one entry.           |
 | `entrypoint`    | ✅       | Module path or specifier. Relative paths resolve from the config file directory.          |
 | `config`        |          | Passed to the plugin factory. Any JSON value.                                             |
 | `failurePolicy` |          | `"skip-fact"` (default) or `"fatal"`. Controls behavior when the plugin errors on a fact. |
+
+`runtime.gitAdapter` defaults to `"isomorphic-git"`. Use `"git-cli"` to delegate
+traversal-oriented operations to the Git executable while retaining the existing isomorphic-git
+file-change expansion path. The `git-cli` adapter requires `git` to be available on `PATH`; gitlode
+validates this with `git --version` before traversal.
 
 For complete schema and precedence details, see [Configuration File Design](design/configuration.md).
 

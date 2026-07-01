@@ -25,7 +25,7 @@ describe("loadConfigFile", () => {
         version: 1,
         extraction: { refs: ["main"] },
         output: { directory: "./out", prefix: "custom" },
-        runtime: { profile: true },
+        runtime: { profile: true, gitAdapter: "isomorphic-git" },
       }),
     );
 
@@ -37,6 +37,40 @@ describe("loadConfigFile", () => {
 
     expect(result.value.version).toBe(1);
     expect(result.value.output?.directory).toBe(resolve(tmpDir, "out"));
+    expect(result.value.runtime?.gitAdapter).toBe("isomorphic-git");
+  });
+
+  it("accepts git-cli as a runtime gitAdapter value", async () => {
+    const configPath = join(tmpDir, "gitlode.config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        version: 1,
+        runtime: { gitAdapter: "git-cli" },
+      }),
+    );
+
+    const result = await loadConfigFile(configPath);
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      throw new Error("Expected success result");
+    }
+
+    expect(result.value.runtime?.gitAdapter).toBe("git-cli");
+  });
+
+  it("rejects unknown runtime gitAdapter values", async () => {
+    const configPath = join(tmpDir, "gitlode.config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        version: 1,
+        runtime: { gitAdapter: "cli" },
+      }),
+    );
+
+    const result = await loadConfigFile(configPath);
+    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
   });
 
   it("rejects unknown top-level keys", async () => {

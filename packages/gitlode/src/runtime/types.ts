@@ -1,4 +1,4 @@
-import type { ConfigExtensionsSection } from "../config/index.js";
+import type { ConfigExtensionsSection, GitAdapterName } from "../config/index.js";
 import type { ExtractionState, ProgressEvent, RotationConfig } from "../core/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { AbsoluteDirectoryPath, AbsolutePath, IsoDateTimeString } from "../support/index.js";
@@ -17,6 +17,7 @@ export interface WorkerRunInput {
   readonly granularity: "commit" | "file";
   readonly maxDiffSize?: number;
   readonly profile: boolean;
+  readonly gitAdapter: GitAdapterName;
   readonly repoName?: string;
   readonly repoUrl?: string;
   readonly configBaseDir?: AbsoluteDirectoryPath;

@@ -18,7 +18,7 @@ import {
   DefaultTraversalPlanner,
   EnrichingFactProjector,
 } from "../core/index.js";
-import { IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
+import { GitCliAdapter, IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
 import { type GitAdapter, GitAdapterError } from "../git/index.js";
 import {
   LocalInstrumentationRecorder,
@@ -139,6 +139,49 @@ async function resolveExtractionRange(
   }
 }
 
+type BuildGitAdapterResult =
+  | { readonly kind: "success"; readonly adapter: GitAdapter; readonly gitVersion?: string }
+  | { readonly kind: "user-error"; readonly message: string };
+
+async function buildGitAdapter(
+  input: WorkerRunInput,
+  instrumentation: Instrumentation,
+): Promise<BuildGitAdapterResult> {
+  const isomorphicAdapter = new IsomorphicGitAdapter({
+    fs: nodeFs,
+    diffAdapter: new JsDiffAdapter(),
+    instrumentation,
+  });
+
+  switch (input.gitAdapter) {
+    case "isomorphic-git":
+      return {
+        kind: "success",
+        adapter: isomorphicAdapter,
+      };
+    case "git-cli": {
+      const adapter = new GitCliAdapter({
+        instrumentation,
+        fileChangeAdapter: isomorphicAdapter,
+      });
+      try {
+        const gitVersion = await adapter.validateGitExecutable();
+        return {
+          kind: "success",
+          adapter,
+          gitVersion,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          kind: "user-error",
+          message,
+        };
+      }
+    }
+  }
+}
+
 function resolveOutputPrefix(
   outputPrefix: string | undefined,
   repoUrl: string | null,
@@ -255,15 +298,19 @@ export async function executeWorkerRunRequest(
     attributes: {
       "gitlode.granularity": input.granularity,
       "gitlode.profile": input.profile,
+      "git.adapter": input.gitAdapter,
     },
   });
 
   try {
-    const gitAdapter = new IsomorphicGitAdapter({
-      fs: nodeFs,
-      diffAdapter: new JsDiffAdapter(),
-      instrumentation,
-    });
+    const gitAdapterResult = await buildGitAdapter(input, instrumentation);
+    if (gitAdapterResult.kind === "user-error") {
+      return await finishUserError(runSpan, gitAdapterResult.message);
+    }
+    if (gitAdapterResult.gitVersion !== undefined) {
+      runSpan.setAttribute("git.cli.version", gitAdapterResult.gitVersion);
+    }
+    const gitAdapter = gitAdapterResult.adapter;
 
     await instrumentation.runAsync(
       "gitlode.validate_repository_access",

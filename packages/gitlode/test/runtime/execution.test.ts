@@ -58,6 +58,7 @@ describe("executeWorkerRunRequest profiling", () => {
         rotation: {},
         granularity: "commit",
         profile: true,
+        gitAdapter: "isomorphic-git",
       },
       priorState: {
         version: 2,
@@ -80,5 +81,66 @@ describe("executeWorkerRunRequest profiling", () => {
     );
     expect(walkEntry?.attributes?.strategy).toEqual(["eagerExclude"]);
     expect(walkEntry?.counters?.include_reads).toBeGreaterThan(0);
+
+    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
+  });
+
+  it("runs successfully with the git-cli adapter selected", async () => {
+    const repoDir = await makeTempDir("gitlode-execution-repo-");
+    const outputDir = await makeTempDir("gitlode-execution-output-");
+
+    await git.init({ fs: nodeFs, dir: repoDir, defaultBranch: "main" });
+    await git.setConfig({ fs: nodeFs, dir: repoDir, path: "user.name", value: "Tester" });
+    await git.setConfig({
+      fs: nodeFs,
+      dir: repoDir,
+      path: "user.email",
+      value: "test@example.com",
+    });
+    await writeFile(join(repoDir, "file.txt"), "hello\n");
+    await git.add({ fs: nodeFs, dir: repoDir, filepath: "file.txt" });
+    await git.commit({
+      fs: nodeFs,
+      dir: repoDir,
+      message: "initial",
+      author: {
+        name: "Tester",
+        email: "test@example.com",
+        timestamp: 1_000,
+        timezoneOffset: 0,
+      },
+    });
+
+    const request: WorkerRunRequest = {
+      input: {
+        repositoryPath: repoDir as AbsolutePath,
+        refs: ["main"],
+        outputDir: outputDir as AbsolutePath,
+        rotation: {},
+        granularity: "commit",
+        profile: true,
+        gitAdapter: "git-cli",
+      },
+      priorState: {
+        version: 2,
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        repositoryPath: repoDir as AbsolutePath,
+        refs: [],
+      },
+    };
+
+    const result = await executeWorkerRunRequest(request, {
+      reporter: { emit(_event: ProgressEvent) {} },
+      renderDiagnostic() {},
+    });
+
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
+    expect(result.success.commitsTraversed).toBe(1);
+
+    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    expect(runEntry?.attributes?.["git.cli.version"]?.[0]).toMatch(/^git version /);
   });
 });

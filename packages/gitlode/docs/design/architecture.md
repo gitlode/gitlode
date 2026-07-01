@@ -177,7 +177,8 @@ Responsibilities:
 The default adapter uses isomorphic-git internally and keeps those details from leaking upward. The
 config-only `runtime.gitAdapter` setting selects the Git implementation. The default value is
 `isomorphic-git`; `git-cli` uses the Git executable for traversal-oriented operations and delegates
-file-change expansion to the existing isomorphic-git implementation.
+file-change expansion to the existing isomorphic-git implementation. Durable adapter-selection and
+implementation-boundary details live in `docs/design/git-adapters.md`.
 
 Line-diff computation is delegated to an internal `DiffAdapter` strategy interface defined in
 `diff-adapter.ts`. The default implementation (`JsDiffAdapter`) reproduces the original behavior

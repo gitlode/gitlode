@@ -113,10 +113,15 @@ Common details include:
 | `fallback_removed` | Candidate commits removed during fallback filtering                      |
 | `yielded`          | Commits yielded by the traversal                                         |
 
-When comparing traversal changes, start with the `total` time for `git.walk_commits`, `result`,
-`fallback_reason`, read counters, and `yielded`. Child spans such as `git.walk_commits.read_commit`
-and `git.walk_commits.step` help identify whether time is dominated by Git object reads or by
-strategy overhead.
+When comparing traversal changes for the isomorphic-git adapter, start with the `total` time for
+`git.walk_commits`, `result`, `fallback_reason`, read counters, and `yielded`. Child spans such as
+`git.walk_commits.read_commit` and `git.walk_commits.step` help identify whether time is dominated
+by Git object reads or by strategy overhead.
+
+For `runtime.gitAdapter: "git-cli"`, compare `git.cli.rev_list` and `git.cli.cat_file_batch`
+instead. For cross-adapter benchmarks, keep the repository snapshot and extraction request identical
+and compare final counts rather than JSONL line ordering. See
+[`design/git-adapters.md`](design/git-adapters.md) for adapter-specific benchmarking guidance.
 
 ## File-Level Extraction
 

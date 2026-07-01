@@ -467,6 +467,13 @@ uses Git CLI commands for ref resolution, object-format lookup, range traversal,
 remote URL lookup, and merge-base computation, and delegates file-change expansion to the existing
 isomorphic-git adapter.
 
+## Phase 4 Status
+
+Phase 4 confirms the hybrid file-change strategy. `GitCliAdapter.getFileChanges()` delegates to the
+configured file-change adapter, and runtime coverage verifies that `runtime.gitAdapter: "git-cli"`
+works in file granularity mode and emits file-level records through the existing isomorphic-git
+file-change path.
+
 ## Remaining Questions for Maintainer Review
 
 No remaining design questions are currently open for this planning phase. New questions should be

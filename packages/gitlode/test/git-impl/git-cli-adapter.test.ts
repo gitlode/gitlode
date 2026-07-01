@@ -107,6 +107,23 @@ describe("GitCliAdapter", () => {
     expect(commits[0]?.parents.length).toBeGreaterThan(0);
   });
 
+  it("delegates file changes to the configured file-change adapter", async () => {
+    const repoPath = await makeTempRepo();
+    const first = await addCommit(repoPath, "file.txt", "one\n", "first");
+    const second = await addCommit(repoPath, "file.txt", "one\ntwo\n", "second");
+
+    const cliAdapter = createAdapter();
+    const isomorphicAdapter = new IsomorphicGitAdapter({
+      fs: nodeFs,
+      diffAdapter: new JsDiffAdapter(),
+      instrumentation: noopInstrumentation,
+    });
+
+    await expect(cliAdapter.getFileChanges(repoPath, second, first)).resolves.toEqual(
+      await isomorphicAdapter.getFileChanges(repoPath, second, first),
+    );
+  });
+
   it("finds merge bases and returns null for disconnected histories", async () => {
     const repoPath = await makeTempRepo();
     const root = await addCommit(repoPath, "file.txt", "1", "root");

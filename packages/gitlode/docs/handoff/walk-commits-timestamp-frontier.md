@@ -41,9 +41,12 @@ shelling out to `git log`, or building a generation-number cache inside gitlode.
 
 ## Current Direction
 
-Status: discussion is still active. Do not start implementing the prototype from this document yet.
-Several correctness and state-management questions remain open, especially around exclude-cover
-closure and phase-local pending propagation.
+Status: discussion is still active. A temporary TypeScript sketch now exists at
+`src/git-impl/explore-dag-strategy.ts`, but it is intentionally not wired into production
+traversal. Use it as executable design notation, not as the accepted implementation.
+
+Several correctness and state-management questions remain open, especially around include-side
+pending/yield propagation and how much of the exclude-side sketch should survive into production.
 
 Prototype a bidirectional traversal strategy that:
 
@@ -89,10 +92,44 @@ unconfirmed include node -> excluded node
 Once a node is yielded, the traversal must never later discover that it is exclude-reachable.
 Therefore immediate yield is allowed only when the current proof makes result membership final.
 
+## Exclude Phase Result
+
+`exploreExcludeClosurePhase` currently models two successful proof outcomes. The include side can
+use both outcomes through the shared `certifiedNodes` field, but the exclude phase still returns
+the reason it stopped.
+
+Candidate result shape:
+
+```ts
+type ExcludeClosurePhaseResult<NodeId> =
+  | {
+      kind: "closed-boundary";
+      certifiedNodes: ReadonlySet<NodeId>;
+      closedBoundary: NodeId;
+    }
+  | {
+      kind: "complete-exclude";
+      certifiedNodes: ReadonlySet<NodeId>;
+      rootTerminals: readonly NodeId[];
+    };
+```
+
+Meanings:
+
+- `closed-boundary`: the phase found a closed exclude boundary before reading all exclude
+  ancestors. `certifiedNodes` are the closed-cover nodes up to that boundary.
+- `complete-exclude`: the phase did not find a close boundary, but every frontier reached root and
+  no further exclude-side traversal remains. `certifiedNodes` are the exclude-reachable nodes read
+  by the phase, and `rootTerminals` records the terminal roots.
+
+From include traversal's perspective, both variants provide exclude nodes that are safe to use for
+stopping and confirmation. The `kind` is still useful for profiling, diagnostics, and future
+strategy selection.
+
 ## Closed Cover Model
 
 This document uses "closed cover" for an exclude-side proof stronger than simple exclude
-reachability.
+reachability, but weaker than a full exclude-reachable collection.
 
 Working meanings:
 
@@ -108,10 +145,22 @@ The exclusion start itself has a closed cover. A non-merge child with a closed c
 closed cover to its single parent. A merge opens the cover because multiple exclude branches may
 later intersect include-side nodes before they reconverge.
 
-The open question is how much reconvergence to recognize. A conservative first model may only
-recognize simple reconvergence where every branch opened by a split reaches the same node and all
-branches are accounted for. More complex criss-cross or nested reconvergence can initially fall
-back rather than attempting an incomplete proof.
+The current sketch recognizes branch joins within a split using branch groups:
+
+- each split creates branch states;
+- branches that meet at the same node are joined into the same branch group;
+- when all branches in a split belong to one branch group, the split can search its trigger nodes
+  for a single close boundary;
+- the close boundary is the trigger not dominated by another trigger when walking children back
+  toward the split's `openedAt` node.
+
+Nested split handling is modeled by recording which branch opened each split. A frontier item only
+needs to know its immediate branch. If a child split closes first, its `closeBoundary` is handed back
+to the branch that opened it. If the parent split closes first, child splits beyond that boundary
+are treated as overshoot rather than parent obligations.
+
+This avoids deciding at split-open time whether a later split is truly nested or merely an
+overshoot artifact. That distinction is made after a boundary is known.
 
 ## Include-Side State
 

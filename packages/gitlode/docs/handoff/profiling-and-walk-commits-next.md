@@ -35,7 +35,7 @@ The current `walkCommits` implementation has two internal strategies:
 - `certifiedLazy`: starts with a lazy include/exclude view, attempts a conservative certificate, and
   falls back to cached full exclusion when the certificate does not hold.
 
-See `docs/design/walk-commits-strategies.md` for the persistent strategy design.
+See `docs/design/commit-traversal-internals.md` for the persistent strategy design.
 
 A real repository profiling run showed that the two strategies take very different paths even when
 total runtime is similar:
@@ -306,7 +306,7 @@ Diagnostics for `git.walk_commits` or child scopes:
 Certified-lazy diagnostics:
 
 - `result`: `"certified"` or `"fallback"`
-- `fallback_reason`: `"open_include_path"`, `"exclude_merge"`, `"no_stop_points"`, or
+- `fallback_reason`: `"open_include_path"`, `"exclude_path_split"`, `"no_stop_points"`, or
   `"uncertified_stop_point"`
 - `fallback_reads`
 - `fallback_removed`
@@ -318,7 +318,7 @@ internal booleans or derived counts unless they materially improve strategy comp
 
 Relevant files:
 
-- `src/git-impl/walk-commits-strategy.ts`
+- `src/git-impl/dag-traversal-strategy.ts`
 - `src/git-impl/isomorphic-git-adapter.ts`
 - `test/git-impl/walk-commits-contract.test.ts`
 - `test/git-impl/isomorphic-git-adapter.test.ts`
@@ -434,7 +434,7 @@ Use Feature B metrics to compare:
 - certificate/fallback reasons;
 - `git.walk_commits` total time;
 - child span time for `git.walk_commits.read_commit`, `git.walk_commits.step`, and
-  `git.walk_commits.exclude_collect` where relevant.
+  `dag.traversal.collect_reachable` where relevant.
 
 Run against:
 
@@ -479,7 +479,7 @@ production default change.
 ## Notes for future sessions
 
 - For Feature C, start by reading:
-  - `src/git-impl/walk-commits-strategy.ts`
+  - `src/git-impl/dag-traversal-strategy.ts`
   - `src/git-impl/isomorphic-git-adapter.ts`
   - `test/git-impl/walk-commits-contract.test.ts`
   - `test/git-impl/isomorphic-git-adapter.test.ts`
@@ -491,7 +491,7 @@ production default change.
 - Preserve the `reachable(start) - reachable(exclude)` result-set contract. Timestamp or generation
   heuristics may guide ordering, but must not become correctness assumptions.
 - Keep `git-traversal.md` focused on externally visible traversal/output behavior.
-- Keep `walk-commits-strategies.md` focused on the durable internal strategy design.
+- Keep `commit-traversal-internals.md` focused on the durable internal strategy design.
 - Use this file as a planning handoff; once a feature is completed, migrate stable decisions into
   durable design docs and remove obsolete planning details.
 - The most valuable next evidence is a side-by-side profile comparison that shows why one strategy

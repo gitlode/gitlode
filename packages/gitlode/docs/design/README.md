@@ -9,16 +9,16 @@ behavioral detail is useful.
 
 ## Canonical design documents
 
-| Area                     | Document                                                   | Owns                                                                                              |
-| ------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Architecture             | [`architecture.md`](architecture.md)                       | Layering, module ownership, dependency boundaries, runtime flow, and major trade-offs.            |
-| CLI                      | [`cli.md`](cli.md)                                         | Command shape, options, validation, stderr behavior, exit codes, and CLI implementation notes.    |
-| Configuration            | [`configuration.md`](configuration.md)                     | Versioned configuration shape, path resolution, precedence, and validation pipeline.              |
-| Git adapters             | [`git-adapters.md`](git-adapters.md)                       | Git adapter selection, implementation boundaries, hybrid `git-cli` behavior, and benchmarking.    |
-| Git traversal            | [`git-traversal.md`](git-traversal.md)                     | User-visible traversal behavior, differential extraction, state lifecycle, and deduplication.     |
-| Plugins                  | [`plugins.md`](plugins.md)                                 | Plugin configuration, runtime contract, `extensions` output field, lifecycle, and package policy. |
-| Output schema            | [`schema.md`](schema.md)                                   | JSON Lines format, record fields, file rotation, and file-level output schema.                    |
-| `walkCommits` strategies | [`walk-commits-strategies.md`](walk-commits-strategies.md) | Internal adapter traversal strategies, certificates, fallback behavior, and strategy tests.       |
+| Area                       | Document                                                         | Owns                                                                                              |
+| -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Architecture               | [`architecture.md`](architecture.md)                             | Layering, module ownership, dependency boundaries, runtime flow, and major trade-offs.            |
+| CLI                        | [`cli.md`](cli.md)                                               | Command shape, options, validation, stderr behavior, exit codes, and CLI implementation notes.    |
+| Configuration              | [`configuration.md`](configuration.md)                           | Versioned configuration shape, path resolution, precedence, and validation pipeline.              |
+| Git adapters               | [`git-adapters.md`](git-adapters.md)                             | Git adapter selection, implementation boundaries, hybrid `git-cli` behavior, and benchmarking.    |
+| Git traversal              | [`git-traversal.md`](git-traversal.md)                           | User-visible traversal behavior, differential extraction, state lifecycle, and deduplication.     |
+| Plugins                    | [`plugins.md`](plugins.md)                                       | Plugin configuration, runtime contract, `extensions` output field, lifecycle, and package policy. |
+| Output schema              | [`schema.md`](schema.md)                                         | JSON Lines format, record fields, file rotation, and file-level output schema.                    |
+| Commit traversal internals | [`commit-traversal-internals.md`](commit-traversal-internals.md) | Internal traversal strategies, certificates, fallback behavior, and strategy tests.               |
 
 ## Audience policy
 

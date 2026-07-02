@@ -446,8 +446,8 @@ git.get_remote_url
 git.repository_basics
 git.walk_commits
 git.walk_commits.read_commit
-git.walk_commits.exclude_collect
-git.walk_commits.exclude_collect.read_commit
+dag.traversal.collect_reachable
+dag.traversal.read_node.exclude
 git.merge_base
 git.file_changes
 git.blob_read

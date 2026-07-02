@@ -290,6 +290,6 @@ This approach prioritizes successful extraction with explicit warnings in recove
 ## References
 
 - `packages/gitlode/docs/design/architecture.md`
-- `packages/gitlode/docs/design/walk-commits-strategies.md`
+- `packages/gitlode/docs/design/commit-traversal-internals.md`
 - `src/core/extractor.ts`
 - `src/git/isomorphic-git-adapter.ts`

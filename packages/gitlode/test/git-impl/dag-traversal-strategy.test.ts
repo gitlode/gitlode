@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   type DagNodePort,
-  type ReadSide,
+  type WalkDagStrategyOptions,
   walkDagCertifiedLazy,
   walkDagEagerExclude,
-} from "../../src/git-impl/walk-commits-strategy.js";
+} from "../../src/git-impl/dag-traversal-strategy.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,
@@ -14,6 +14,7 @@ import {
 } from "../../src/instrumentation/index.js";
 import type { ProfileSummaryEntry } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
+import { OrderedQueue } from "../../src/support/index.js";
 import {
   assertOidSet,
   buildDag,
@@ -37,6 +38,7 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
         },
         head,
         exclude,
+        certifiedLazyOptions(),
       )) {
         commits.push(commit);
       }
@@ -62,16 +64,23 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
   },
 ];
 
-function rawCommitNodePort(
-  dag: BuiltDag,
-  requests?: { oid: string; side: ReadSide }[],
-): DagNodePort<CommitOid, RawCommit> {
+function rawCommitNodePort(dag: BuiltDag, requests?: string[]): DagNodePort<CommitOid, RawCommit> {
   return {
-    async readNode(oid, side) {
-      requests?.push({ oid, side });
+    async readNode(oid) {
+      requests?.push(oid);
       return readCommitForPort(dag, oid);
     },
-    getParents: (node) => node.parents,
+    getSuccessors: (node) => node.parents,
+  };
+}
+
+function certifiedLazyOptions(): WalkDagStrategyOptions<CommitOid> {
+  return {
+    createIncludeQueue: () =>
+      new OrderedQueue<CommitOid>({
+        dequeueOrder: "lifo",
+        blockOrder: "preserve",
+      }),
   };
 }
 
@@ -360,7 +369,7 @@ const cases: readonly DagDefinition[] = [
   },
 ];
 
-describe.each(walkers)("walkCommits $name contract", ({ walk }) => {
+describe.each(walkers)("DAG traversal $name contract", ({ walk }) => {
   it.each(cases)("returns the oracle OID set: $name", async (definition) => {
     const dag = await buildDag(definition);
     const commits = await walk(
@@ -394,7 +403,7 @@ describe.each(walkers)("walkCommits $name contract", ({ walk }) => {
   });
 });
 
-describe("walkCommits fixture and oracle", () => {
+describe("DAG traversal fixture and oracle", () => {
   it("computes subtraction from declared parents without Git object reads", () => {
     const definition = cases.find((item) => item.name.includes("forked before release"))!;
     expect(expectedLabels(definition)).toEqual(new Set(["head", "main", "side2", "side1"]));
@@ -419,7 +428,7 @@ describe("walkCommits fixture and oracle", () => {
   });
 });
 
-describe.each(walkers)("walkCommits $name error contract", ({ walk }) => {
+describe.each(walkers)("DAG traversal $name error contract", ({ walk }) => {
   const missing = "0".repeat(40) as CommitOid;
 
   it("maps a missing exclude only to COMMIT_NOT_FOUND", async () => {
@@ -453,7 +462,7 @@ describe.each(walkers)("walkCommits $name error contract", ({ walk }) => {
   });
 });
 
-describe("walkCommits eagerExclude missing-ancestor characterization", () => {
+describe("DAG traversal eagerExclude missing-ancestor characterization", () => {
   it("reports COMMIT_NOT_FOUND for a missing ancestor of excludeHash", async () => {
     const dag = await buildDag({
       name: "missing exclude ancestor",
@@ -471,13 +480,13 @@ describe("walkCommits eagerExclude missing-ancestor characterization", () => {
   });
 });
 
-describe("walkCommits eagerExclude read trace", () => {
+describe("DAG traversal eagerExclude read trace", () => {
   async function trace(
     dag: BuiltDag,
     head: CommitOid,
     exclude?: CommitOid,
-    requests: { oid: string; side: ReadSide }[] = [],
-  ): Promise<readonly { readonly oid: string; readonly side: ReadSide }[]> {
+    requests: string[] = [],
+  ): Promise<readonly string[]> {
     const commits = walkDagEagerExclude(
       {
         nodes: rawCommitNodePort(dag, requests),
@@ -485,6 +494,7 @@ describe("walkCommits eagerExclude read trace", () => {
       },
       head,
       exclude,
+      certifiedLazyOptions(),
     );
     for await (const _commit of commits) {
       // Consume the generator so reads and yields retain their production timing.
@@ -492,7 +502,7 @@ describe("walkCommits eagerExclude read trace", () => {
     return requests;
   }
 
-  it("reads the complete exclude side before the include side", async () => {
+  it("reads the complete exclude-reachable side before the include side", async () => {
     const dag = await buildDag({
       name: "side order",
       nodes: {
@@ -505,9 +515,9 @@ describe("walkCommits eagerExclude read trace", () => {
     });
 
     expect(await trace(dag, dag.oid("head"), dag.oid("release"))).toEqual([
-      { oid: dag.oid("release"), side: "exclude" },
-      { oid: dag.oid("root"), side: "exclude" },
-      { oid: dag.oid("head"), side: "include" },
+      dag.oid("release"),
+      dag.oid("root"),
+      dag.oid("head"),
     ]);
   });
 
@@ -524,13 +534,10 @@ describe("walkCommits eagerExclude read trace", () => {
     });
 
     const requests = await trace(dag, dag.oid("head"));
-    expect(requests.map(({ oid }) => oid)).toEqual([
-      dag.oid("head"),
-      dag.oid("left"),
-      dag.oid("right"),
-      dag.oid("common"),
-    ]);
-    expect(new Set(requests.map(({ oid }) => oid)).size).toBe(requests.length);
+    expect(new Set(requests)).toEqual(
+      new Set([dag.oid("head"), dag.oid("left"), dag.oid("right"), dag.oid("common")]),
+    );
+    expect(new Set(requests).size).toBe(requests.length);
   });
 
   it("reads the expected OIDs for an ordinary reachable-set subtraction", async () => {
@@ -548,13 +555,16 @@ describe("walkCommits eagerExclude read trace", () => {
     });
 
     const requests = await trace(dag, dag.oid("head"), dag.oid("release"));
-    expect(requests).toEqual([
-      { oid: dag.oid("release"), side: "exclude" },
-      { oid: dag.oid("root"), side: "exclude" },
-      { oid: dag.oid("head"), side: "include" },
-      { oid: dag.oid("main"), side: "include" },
-      { oid: dag.oid("side"), side: "include" },
-    ]);
+    expect(new Set(requests)).toEqual(
+      new Set([
+        dag.oid("release"),
+        dag.oid("root"),
+        dag.oid("head"),
+        dag.oid("main"),
+        dag.oid("side"),
+      ]),
+    );
+    expect(new Set(requests).size).toBe(requests.length);
   });
 
   it("fails on a missing exclude ancestor without requesting the include side", async () => {
@@ -566,26 +576,23 @@ describe("walkCommits eagerExclude read trace", () => {
     });
     dag.removeObject("ancestor");
 
-    const requests: { oid: string; side: ReadSide }[] = [];
+    const requests: string[] = [];
     const error = await trace(dag, dag.oid("head"), dag.oid("exclude"), requests).catch(
       (caught: unknown) => caught,
     );
     expect(error).toBeInstanceOf(GitAdapterError);
     expect((error as GitAdapterError).code).toBe("COMMIT_NOT_FOUND");
-    expect(requests).toEqual([
-      { oid: dag.oid("exclude"), side: "exclude" },
-      { oid: dag.oid("ancestor"), side: "exclude" },
-    ]);
+    expect(requests).toEqual([dag.oid("exclude"), dag.oid("ancestor")]);
   });
 });
 
-describe("walkCommits certifiedLazy read trace", () => {
+describe("DAG traversal certifiedLazy read trace", () => {
   async function trace(
     dag: BuiltDag,
     head: CommitOid,
     exclude?: CommitOid,
-    requests: { oid: string; side: ReadSide }[] = [],
-  ): Promise<readonly { readonly oid: string; readonly side: ReadSide }[]> {
+    requests: string[] = [],
+  ): Promise<readonly string[]> {
     const commits = walkDagCertifiedLazy(
       {
         nodes: rawCommitNodePort(dag, requests),
@@ -593,6 +600,7 @@ describe("walkCommits certifiedLazy read trace", () => {
       },
       head,
       exclude,
+      certifiedLazyOptions(),
     );
     for await (const _commit of commits) {
       // Consume the buffered certifiedLazy result.
@@ -600,12 +608,9 @@ describe("walkCommits certifiedLazy read trace", () => {
     return requests;
   }
 
-  function labelsReadByCertifiedLazy(
-    dag: BuiltDag,
-    requests: readonly { readonly oid: string; readonly side: ReadSide }[],
-  ): Set<string> {
+  function labelsReadByCertifiedLazy(dag: BuiltDag, requests: readonly string[]): Set<string> {
     const labelsByOid = new Map([...dag.oids].map(([label, oid]) => [oid, label]));
-    return new Set(requests.map(({ oid }) => labelsByOid.get(oid)!));
+    return new Set(requests.map((oid) => labelsByOid.get(oid)!));
   }
 
   it.each(cases.filter((item) => item.expectedRead !== undefined))(
@@ -633,7 +638,7 @@ describe("walkCommits certifiedLazy read trace", () => {
     expect(labelsRead).toEqual(new Set(Object.keys(definition.nodes)));
   });
 
-  it("falls back when an include path opens all the way to root", async () => {
+  it("falls back when an include path reaches a terminal node", async () => {
     const definition = cases.find((item) => item.name.includes("fully disconnected"))!;
     const dag = await buildDag(definition);
     const requests = await trace(dag, dag.oid(definition.head), dag.oid(definition.exclude!));
@@ -642,9 +647,9 @@ describe("walkCommits certifiedLazy read trace", () => {
     expect(labelsRead).toEqual(new Set(Object.keys(definition.nodes)));
   });
 
-  it("falls back when anchor advance reaches an exclude-side merge commit", async () => {
+  it("falls back when anchor advance reaches an exclude-side path split", async () => {
     const definition: DagDefinition = {
-      name: "exclude-side merge anchor",
+      name: "exclude-side path split anchor",
       nodes: {
         root: {},
         left: { parents: ["root"] },
@@ -704,7 +709,7 @@ describe("walkCommits certifiedLazy read trace", () => {
     });
 
     const requests = await trace(dag, dag.oid("head"), dag.oid("release"));
-    expect(new Set(requests.map(({ oid }) => oid)).size).toBe(requests.length);
+    expect(new Set(requests).size).toBe(requests.length);
   });
 
   it("instruments certifiedLazy include-side exploration and exclude-side work", async () => {
@@ -726,11 +731,11 @@ describe("walkCommits certifiedLazy read trace", () => {
 
     const { entries } = await profileCertifiedLazy(dag, dag.oid("head"), dag.oid("release"));
 
+    expect(entries.find((entry) => entry.name === "dag.traversal.step")?.totalMs).toBeGreaterThan(
+      0,
+    );
     expect(
-      entries.find((entry) => entry.name === "git.walk_commits.step")?.totalMs,
-    ).toBeGreaterThan(0);
-    expect(
-      entries.find((entry) => entry.name === "git.walk_commits.exclude_collect")?.totalMs,
+      entries.find((entry) => entry.name === "dag.traversal.collect_reachable")?.totalMs,
     ).toBeGreaterThan(0);
   });
 
@@ -783,15 +788,15 @@ describe("walkCommits certifiedLazy read trace", () => {
     const { walkEntry } = await profileCertifiedLazy(dag, dag.oid("head"), dag.oid("release"));
 
     expect(walkEntry?.attributes?.result).toEqual(["fallback"]);
-    expect(walkEntry?.attributes?.fallback_reason).toEqual(["exclude_merge"]);
+    expect(walkEntry?.attributes?.fallback_reason).toEqual(["exclude_path_split"]);
     expect(walkEntry?.counters?.cache_hits).toBeGreaterThan(0);
     expect(walkEntry?.counters?.fallback_reads).toBe(3);
     expect(walkEntry?.counters?.fallback_removed ?? 0).toBe(0);
   });
 });
 
-describe("walkCommits eagerExclude instrumentation", () => {
-  it("records strategy, side reads, and yielded count", async () => {
+describe("DAG traversal eagerExclude instrumentation", () => {
+  it("records strategy, read counters, and yielded count", async () => {
     const dag = await buildDag({
       name: "eager instrumentation",
       nodes: {

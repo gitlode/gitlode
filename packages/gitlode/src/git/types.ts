@@ -2,9 +2,6 @@ import type { CommitOid, OidProfile, PersonIdentity, RefType } from "../model/in
 
 export type RepositoryObjectFormat = string;
 
-/** Git's default object format when `extensions.objectformat` is unset. */
-export const DEFAULT_REPOSITORY_OBJECT_FORMAT: OidProfile = "sha1";
-
 export interface RawPerson extends PersonIdentity {
   readonly timestamp: number;
   /**

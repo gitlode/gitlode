@@ -35,7 +35,7 @@ Example:
 ```text
 Profile
   span                       :   total  calls     avg     max  details
-  gitlode.run                :  18.40ms      1  18.40ms  18.40ms  gitlode.granularity=commit gitlode.profile gitlode.result=success commits=120 records=120
+  gitlode.run                :  18.40ms      1  18.40ms  18.40ms  git.adapter=isomorphic-git gitlode.granularity=commit gitlode.profile gitlode.result=success commits=120 records=120
   git.walk_commits           :   8.25ms      1   8.25ms   8.25ms  fallback_reason=open_include_path result=fallback strategy=certifiedLazy exclude_reads=20 fallback_reads=12 include_reads=100 yielded=95
   gitlode.projection         :   3.75ms    120   0.03ms   0.20ms
   gitlode.output.write       :   2.10ms    120   0.02ms   0.10ms
@@ -79,14 +79,21 @@ sub-operation that only exists as part of the parent operation, such as
 
 The `details` column can contain three kinds of diagnostic data:
 
-- attributes: low-cardinality decisions or execution modes, such as `strategy=certifiedLazy`,
-  `result=fallback`, or `fallback_reason=open_include_path`.
+- attributes: low-cardinality decisions or execution modes, such as `git.adapter=isomorphic-git`,
+  `strategy=certifiedLazy`, `result=fallback`, or `fallback_reason=open_include_path`.
 - counters: accumulated operational counts, such as `include_reads=100`, `cache_hits=4`,
   `yielded=95`, `records=120`, or `skipped_diffs=2`.
 - errors: `errors=<n>` reports how many spans with that name ended with an error.
 
 Boolean attributes are printed as a bare key when `true`, for example `gitlode.profile`. A boolean
 `false` value is printed only when the code intentionally records it as meaningful.
+
+## Adapter Diagnostics
+
+The run-level `gitlode.run` span records `git.adapter` so profiling output shows which Git
+implementation was selected. The current default is `isomorphic-git`. When `runtime.gitAdapter` is
+set to `git-cli`, the same run-level span also records `git.cli.version` after validating the Git
+executable with `git --version`.
 
 ## walk_commits Diagnostics
 
@@ -106,10 +113,15 @@ Common details include:
 | `fallback_removed` | Candidate commits removed during fallback filtering                      |
 | `yielded`          | Commits yielded by the traversal                                         |
 
-When comparing traversal changes, start with the `total` time for `git.walk_commits`, `result`,
-`fallback_reason`, read counters, and `yielded`. Child spans such as `git.walk_commits.read_commit`
-and `git.walk_commits.step` help identify whether time is dominated by Git object reads or by
-strategy overhead.
+When comparing traversal changes for the isomorphic-git adapter, start with the `total` time for
+`git.walk_commits`, `result`, `fallback_reason`, read counters, and `yielded`. Child spans such as
+`git.walk_commits.read_commit` and `git.walk_commits.step` help identify whether time is dominated
+by Git object reads or by strategy overhead.
+
+For `runtime.gitAdapter: "git-cli"`, compare `git.cli.rev_list` and `git.cli.cat_file_batch`
+instead. For cross-adapter benchmarks, keep the repository snapshot and extraction request identical
+and compare final counts rather than JSONL line ordering. See
+[`design/git-adapters.md`](design/git-adapters.md) for adapter-specific benchmarking guidance.
 
 ## File-Level Extraction
 

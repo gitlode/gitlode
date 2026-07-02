@@ -5,5 +5,7 @@ export type {
   ProjectConfigurationV1,
   ConfigOutputSection,
   ConfigExtractionSection,
+  GitAdapterName,
+  ConfigRuntimeSection,
 } from "./types.js";
 export { byteSizeString } from "./schema-helpers.js";

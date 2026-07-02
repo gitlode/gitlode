@@ -73,7 +73,7 @@ Useful span names include:
 
 Span names are intentionally compact and dot-separated. A deeper name usually represents a local
 sub-operation that only exists as part of the parent operation, such as
-`git.walk_commits.exclude_collect.read_commit`.
+`dag.traversal.read_node.exclude`.
 
 ## Details
 
@@ -115,8 +115,8 @@ Common details include:
 
 When comparing traversal changes for the isomorphic-git adapter, start with the `total` time for
 `git.walk_commits`, `result`, `fallback_reason`, read counters, and `yielded`. Child spans such as
-`git.walk_commits.read_commit` and `git.walk_commits.step` help identify whether time is dominated
-by Git object reads or by strategy overhead.
+`dag.traversal.read_node.include`, `dag.traversal.read_node.exclude`, and `dag.traversal.step` help
+identify whether time is dominated by node reads or by strategy overhead.
 
 For `runtime.gitAdapter: "git-cli"`, compare `git.cli.rev_list` and `git.cli.cat_file_batch`
 instead. For cross-adapter benchmarks, keep the repository snapshot and extraction request identical

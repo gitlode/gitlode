@@ -13,7 +13,8 @@ import {
 import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
-import { type DagNodePort, walkDagWithConfiguredStrategy } from "./walk-commits-strategy.js";
+import { OrderedQueue } from "../support/index.js";
+import { type DagNodePort, walkDagWithConfiguredStrategy } from "./dag-traversal-strategy.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
@@ -191,15 +192,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
   ): AsyncIterable<RawCommit> {
     yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
       const nodes: DagNodePort<CommitOid, RawCommit> = {
-        readNode: async (oid, side) => {
+        readNode: async (oid) => {
           try {
-            const spanName =
-              side === "include"
-                ? "git.walk_commits.read_commit"
-                : "git.walk_commits.exclude_collect.read_commit";
-            const { commit } = await this._instrumentation.runAsync(spanName, async () =>
-              git.readCommit({ fs: this._fs, dir: repoPath, oid }),
-            );
+            const { commit } = await git.readCommit({ fs: this._fs, dir: repoPath, oid });
             return toRawCommit(oid, commit);
           } catch (err) {
             if (err instanceof Error && err.name === "NotFoundError") {
@@ -212,7 +207,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
             );
           }
         },
-        getParents: (node) => node.parents,
+        getSuccessors: (node) => node.parents,
       };
       return walkDagWithConfiguredStrategy<CommitOid, RawCommit>(
         {
@@ -222,6 +217,15 @@ export class IsomorphicGitAdapter implements GitAdapter {
         },
         oid,
         excludeOid,
+        {
+          certifiedLazy: {
+            createIncludeQueue: () =>
+              new OrderedQueue<CommitOid>({
+                dequeueOrder: "lifo",
+                blockOrder: "preserve",
+              }),
+          },
+        },
       );
     });
   }

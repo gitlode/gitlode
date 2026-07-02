@@ -55,7 +55,7 @@ Read:
 Read:
 
 1. `packages/gitlode/docs/design/git-traversal.md`
-2. `packages/gitlode/docs/design/walk-commits-strategies.md` for internal `walkCommits` strategy work
+2. `packages/gitlode/docs/design/commit-traversal-internals.md` for internal commit traversal strategy work
 
 ### Output schema or file-format changes
 

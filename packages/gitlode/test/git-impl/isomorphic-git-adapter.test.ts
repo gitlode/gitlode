@@ -878,20 +878,18 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
     const resolveRefEntry = entries.find((e) => e.name === "git.resolve_ref");
     const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
     const walkEntry = entries.find((e) => e.name === "git.walk_commits");
-    const walkReadCommitEntry = entries.find((e) => e.name === "git.walk_commits.read_commit");
-    const excludeCollectEntry = entries.find((e) => e.name === "git.walk_commits.exclude_collect");
-    const excludeReadCommitEntry = entries.find(
-      (e) => e.name === "git.walk_commits.exclude_collect.read_commit",
-    );
+    const traversalReadEntry = entries.find((e) => e.name === "dag.traversal.read_node.include");
+    const collectReachableEntry = entries.find((e) => e.name === "dag.traversal.collect_reachable");
+    const excludeReadEntry = entries.find((e) => e.name === "dag.traversal.read_node.exclude");
     const fileChangesEntry = entries.find((e) => e.name === "git.file_changes");
     const blobEntry = entries.find((e) => e.name === "git.blob_read");
     const diffEntry = entries.find((e) => e.name === "git.diff");
     expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
     expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
     expect(walkEntry?.totalMs).toBeGreaterThan(0);
-    expect(walkReadCommitEntry?.totalMs).toBeGreaterThan(0);
-    expect(excludeCollectEntry?.totalMs).toBeGreaterThan(0);
-    expect(excludeReadCommitEntry?.totalMs).toBeGreaterThan(0);
+    expect(traversalReadEntry?.totalMs).toBeGreaterThan(0);
+    expect(collectReachableEntry?.totalMs).toBeGreaterThan(0);
+    expect(excludeReadEntry?.totalMs).toBeGreaterThan(0);
     expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
     expect(blobEntry?.totalMs).toBeGreaterThan(0);
     expect(diffEntry?.totalMs).toBeGreaterThan(0);

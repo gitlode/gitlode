@@ -4,7 +4,7 @@
 
 This document is the durable design contract for gitlode's Git adapter implementations and adapter
 selection behavior. It complements `git-traversal.md`, which defines the user-visible traversal
-semantics, and `walk-commits-strategies.md`, which documents the isomorphic-git adapter's internal
+semantics, and `commit-traversal-internals.md`, which documents the isomorphic-git adapter's internal
 DAG traversal strategies.
 
 ## Adapter selection
@@ -55,7 +55,7 @@ environments where invoking `git` is undesirable or unavailable.
 
 The adapter performs commit traversal by reading commit objects and parent links through
 isomorphic-git, then delegating to the internal DAG walker. With an exclusion boundary, the current
-production strategy is the certified-lazy walker documented in `walk-commits-strategies.md`. That
+production strategy is the certified-lazy walker documented in `commit-traversal-internals.md`. That
 strategy can avoid reading older excluded ancestors in certified cases, but it falls back to full
 reachable-set subtraction when its conservative certificate does not hold.
 

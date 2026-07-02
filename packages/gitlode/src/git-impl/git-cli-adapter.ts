@@ -1,13 +1,14 @@
 import { spawn } from "node:child_process";
 
-import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
+  GitAdapterError,
+  type RawPerson,
   type FileChange,
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
-} from "../git/types.js";
+} from "../git/index.js";
 import type { Instrumentation } from "../instrumentation/index.js";
 import type { CommitOid, OidProfile, RefType } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
@@ -347,8 +348,8 @@ function parseRawCommit(oid: CommitOid, content: Buffer): RawCommit {
   const headerText = separator >= 0 ? raw.slice(0, separator) : raw;
   const message = separator >= 0 ? raw.slice(separator + 2) : "";
   const parents: CommitOid[] = [];
-  let author: ReturnType<typeof parsePersonLine> | undefined;
-  let committer: ReturnType<typeof parsePersonLine> | undefined;
+  let author: RawPerson | undefined;
+  let committer: RawPerson | undefined;
 
   for (const line of headerText.split("\n")) {
     if (line.startsWith("parent ")) parents.push(line.slice("parent ".length) as CommitOid);
@@ -369,7 +370,7 @@ function parseRawCommit(oid: CommitOid, content: Buffer): RawCommit {
   };
 }
 
-function parsePersonLine(line: string): RawCommit["author"] {
+function parsePersonLine(line: string): RawPerson {
   const match = /^(.*) <([^<>]*)> (\d+) ([+-]\d{4})$/.exec(line);
   if (!match) {
     throw new GitAdapterError(`Unexpected commit identity line: ${line}`, "UNKNOWN");

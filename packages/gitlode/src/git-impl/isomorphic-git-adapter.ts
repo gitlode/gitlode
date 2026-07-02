@@ -9,7 +9,7 @@ import {
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
-} from "../git/types.js";
+} from "../git/index.js";
 import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";

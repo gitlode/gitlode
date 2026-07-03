@@ -190,7 +190,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
+    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", () => {
       const nodes: DagNodePort<CommitOid, RawCommit> = {
         readNode: async (oid) => {
           try {
@@ -213,7 +213,6 @@ export class IsomorphicGitAdapter implements GitAdapter {
         {
           nodes,
           instrumentation: this._instrumentation,
-          span,
         },
         oid,
         excludeOid,

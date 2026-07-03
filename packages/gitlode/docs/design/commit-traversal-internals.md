@@ -183,12 +183,15 @@ reported. Eager-exclude remains the characterization path for missing older excl
 
 DAG strategy internals use `dag.*` profiling spans such as:
 
+- `dag.traversal`
 - `dag.traversal.step`
 - `dag.traversal.collect_reachable`
 - `dag.traversal.read_node.include`
 - `dag.traversal.read_node.exclude`
 
-The outer Git adapter operation remains `git.walk_commits`.
+The outer Git adapter operation remains `git.walk_commits`. Strategy attributes and counters such
+as `strategy`, `result`, `fallback_reason`, `include_reads`, and `yielded` belong to
+`dag.traversal`, not the adapter-level Git span.
 
 The DAG node read seam is internal, not public API. Contract tests inject it directly so they can
 assert read sets without patching the imported `isomorphic-git` ESM module.

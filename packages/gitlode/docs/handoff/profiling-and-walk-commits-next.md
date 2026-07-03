@@ -262,7 +262,7 @@ API, implement it, update formatting/tests, and verify build/test/format.
 
 Complete.
 
-`git.walk_commits` now records a compact diagnostic set that is suitable for strategy comparison:
+`dag.traversal` now records a compact diagnostic set that is suitable for strategy comparison:
 
 - `strategy`
 - `result=certified|fallback`
@@ -295,7 +295,7 @@ This should answer:
 
 ### Implemented diagnostics
 
-Diagnostics for `git.walk_commits` or child scopes:
+Diagnostics for `dag.traversal` or child scopes:
 
 - `strategy`: `"eagerExclude"` or `"certifiedLazy"`
 - `include_reads`
@@ -353,7 +353,7 @@ Avoid over-specifying ordering unless the metric intentionally captures ordering
 - Full package tests pass.
 
 Implementation status: complete in code. The current implementation records these diagnostics on
-the `git.walk_commits` span and renders attributes/counters as separate profile detail lines.
+the `dag.traversal` span and renders attributes/counters as separate profile detail lines.
 The output has been reviewed after naming and detail cleanup and is considered clear enough to
 support Feature C.
 
@@ -432,8 +432,9 @@ Use Feature B metrics to compare:
 - candidates removed during fallback;
 - final yielded count;
 - certificate/fallback reasons;
-- `git.walk_commits` total time;
-- child span time for `git.walk_commits.read_commit`, `git.walk_commits.step`, and
+- `git.walk_commits` adapter-level total time;
+- `dag.traversal` strategy total time and details;
+- child span time for `dag.traversal.read_node.include`, `dag.traversal.step`, and
   `dag.traversal.collect_reachable` where relevant.
 
 Run against:
@@ -484,7 +485,7 @@ production default change.
   - `test/git-impl/walk-commits-contract.test.ts`
   - `test/git-impl/isomorphic-git-adapter.test.ts`
   - `docs/profiling.md`
-- Treat the current `git.walk_commits` profile details as the baseline diagnostic contract for
+- Treat the current `dag.traversal` profile details as the baseline diagnostic contract for
   comparing strategies.
 - Prototype the bidirectional strategy as an internal strategy first. Do not replace the production
   default until tests and real profile output show a clear advantage.

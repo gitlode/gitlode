@@ -1,6 +1,11 @@
-import type { Instrumentation, InstrumentationSpan } from "../instrumentation/index.js";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+  type InstrumentationSpan,
+} from "../instrumentation/index.js";
 import { firstOrThrow, OrderedQueue, type WorkQueue } from "../support/index.js";
 
+const DAG_TRAVERSAL_SPAN = "dag.traversal";
 const DAG_TRAVERSAL_STEP_SPAN = "dag.traversal.step";
 const DAG_COLLECT_REACHABLE_SPAN = "dag.traversal.collect_reachable";
 const DAG_INCLUDE_READ_SPAN = "dag.traversal.read_node.include";
@@ -23,7 +28,13 @@ export interface DagNodePort<NodeId extends PropertyKey, Node> {
 export interface WalkDagContext<NodeId extends PropertyKey, Node> {
   readonly nodes: DagNodePort<NodeId, Node>;
   readonly instrumentation: Instrumentation;
-  readonly span?: InstrumentationSpan;
+}
+
+interface InternalWalkDagContext<NodeId extends PropertyKey, Node> extends WalkDagContext<
+  NodeId,
+  Node
+> {
+  readonly span: InstrumentationSpan;
 }
 
 type WalkDagStrategy = "eagerExclude" | "certifiedLazy";
@@ -67,8 +78,19 @@ export async function* walkDagEagerExclude<NodeId extends PropertyKey, Node>(
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId> = {},
 ): AsyncIterable<Node> {
-  const { instrumentation } = context;
-  context.span?.setAttribute("strategy", "eagerExclude");
+  yield* instrumentDagTraversal(context, (internalContext) =>
+    walkDagEagerExcludeCore(internalContext, nodeId, excludeNodeId, options),
+  );
+}
+
+async function* walkDagEagerExcludeCore<NodeId extends PropertyKey, Node>(
+  context: InternalWalkDagContext<NodeId, Node>,
+  nodeId: NodeId,
+  excludeNodeId: NodeId | undefined,
+  options: WalkDagStrategyOptions<NodeId>,
+): AsyncIterable<Node> {
+  const { instrumentation, span } = context;
+  span.setAttribute("strategy", "eagerExclude");
   const excluded =
     excludeNodeId !== undefined
       ? await collectReachable(context, excludeNodeId, options)
@@ -84,7 +106,7 @@ export async function* walkDagEagerExclude<NodeId extends PropertyKey, Node>(
       if (visited.has(nodeId) || excluded.has(nodeId)) return null;
       visited.add(nodeId);
 
-      context.span?.incrementCounter("include_reads");
+      span.incrementCounter("include_reads");
       return await instrumentation.runAsync(DAG_INCLUDE_READ_SPAN, async () =>
         context.nodes.readNode(nodeId),
       );
@@ -92,7 +114,7 @@ export async function* walkDagEagerExclude<NodeId extends PropertyKey, Node>(
 
     if (next === null) continue;
 
-    context.span?.incrementCounter("yielded");
+    span.incrementCounter("yielded");
     yield next;
 
     for (const successor of context.nodes.getSuccessors(next)) {
@@ -135,10 +157,21 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId> = {},
 ): AsyncIterable<Node> {
-  const { instrumentation } = context;
-  context.span?.setAttribute("strategy", "certifiedLazy");
+  yield* instrumentDagTraversal(context, (internalContext) =>
+    walkDagCertifiedLazyCore(internalContext, nodeId, excludeNodeId, options),
+  );
+}
+
+async function* walkDagCertifiedLazyCore<NodeId extends PropertyKey, Node>(
+  context: InternalWalkDagContext<NodeId, Node>,
+  nodeId: NodeId,
+  excludeNodeId: NodeId | undefined,
+  options: WalkDagStrategyOptions<NodeId>,
+): AsyncIterable<Node> {
+  const { instrumentation, span } = context;
+  span.setAttribute("strategy", "certifiedLazy");
   if (excludeNodeId === undefined) {
-    yield* walkDagEagerExclude(context, nodeId, undefined, options);
+    yield* walkDagEagerExcludeCore(context, nodeId, undefined, options);
     return;
   }
 
@@ -180,11 +213,11 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   const readIncludeNode = async (nodeId: NodeId): Promise<Node> => {
     const state = stateFor(nodeId);
     if (state.read) {
-      context.span?.incrementCounter("cache_hits");
+      span.incrementCounter("cache_hits");
       return state.node;
     }
     includeReads++;
-    context.span?.incrementCounter("include_reads");
+    span.incrementCounter("include_reads");
     const node = await instrumentation.runAsync(DAG_INCLUDE_READ_SPAN, async () =>
       context.nodes.readNode(nodeId),
     );
@@ -195,11 +228,11 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   const readExcludeNode = async (nodeId: NodeId): Promise<Node> => {
     const state = stateFor(nodeId);
     if (state.read) {
-      context.span?.incrementCounter("cache_hits");
+      span.incrementCounter("cache_hits");
       return state.node;
     }
     excludeReads++;
-    context.span?.incrementCounter("exclude_reads");
+    span.incrementCounter("exclude_reads");
     const node = await instrumentation.runAsync(DAG_EXCLUDE_READ_SPAN, async () =>
       context.nodes.readNode(nodeId),
     );
@@ -252,8 +285,8 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
   const certificateFailureReason = getCertificateFailureReason();
 
   if (certificateFailureReason !== undefined) {
-    context.span?.setAttribute("result", "fallback");
-    context.span?.setAttribute("fallback_reason", certificateFailureReason);
+    span.setAttribute("result", "fallback");
+    span.setAttribute("fallback_reason", certificateFailureReason);
     const excludeReadsBeforeFallback = excludeReads;
     const candidatesBeforeFallback = resultCandidates.size;
     const excluded = await collectReachableFromCache(excludeNodeId);
@@ -262,17 +295,17 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
       if (resultCandidates.delete(nodeId)) removedCandidates++;
     }
     const fallbackReads = excludeReads - excludeReadsBeforeFallback;
-    if (fallbackReads > 0) context.span?.incrementCounter("fallback_reads", fallbackReads);
+    if (fallbackReads > 0) span.incrementCounter("fallback_reads", fallbackReads);
     const boundedRemovedCandidates = Math.min(removedCandidates, candidatesBeforeFallback);
     if (boundedRemovedCandidates > 0) {
-      context.span?.incrementCounter("fallback_removed", boundedRemovedCandidates);
+      span.incrementCounter("fallback_removed", boundedRemovedCandidates);
     }
   } else {
-    context.span?.setAttribute("result", "certified");
+    span.setAttribute("result", "certified");
   }
 
   for (const node of resultCandidates.values()) {
-    context.span?.incrementCounter("yielded");
+    span.incrementCounter("yielded");
     yield node;
   }
 
@@ -324,11 +357,11 @@ export async function* walkDagCertifiedLazy<NodeId extends PropertyKey, Node>(
 }
 
 async function collectReachable<NodeId extends PropertyKey, Node>(
-  context: WalkDagContext<NodeId, Node>,
+  context: InternalWalkDagContext<NodeId, Node>,
   startNodeId: NodeId,
   options: WalkDagStrategyOptions<NodeId>,
 ): Promise<Set<NodeId>> {
-  const { instrumentation } = context;
+  const { instrumentation, span } = context;
   return await instrumentation.runAsync(DAG_COLLECT_REACHABLE_SPAN, async () => {
     const reachable = new Set<NodeId>();
     const queue = createExcludeQueue(options);
@@ -337,7 +370,7 @@ async function collectReachable<NodeId extends PropertyKey, Node>(
       const nodeId = queue.dequeueOrThrow();
       if (reachable.has(nodeId)) continue;
       reachable.add(nodeId);
-      context.span?.incrementCounter("exclude_reads");
+      span.incrementCounter("exclude_reads");
       const node = await instrumentation.runAsync(DAG_EXCLUDE_READ_SPAN, async () =>
         context.nodes.readNode(nodeId),
       );
@@ -345,6 +378,15 @@ async function collectReachable<NodeId extends PropertyKey, Node>(
     }
     return reachable;
   });
+}
+
+function instrumentDagTraversal<NodeId extends PropertyKey, Node>(
+  context: WalkDagContext<NodeId, Node>,
+  factory: (context: InternalWalkDagContext<NodeId, Node>) => AsyncIterable<Node>,
+): AsyncIterable<Node> {
+  return instrumentAsyncIterable(context.instrumentation, DAG_TRAVERSAL_SPAN, (span) =>
+    factory({ ...context, span }),
+  );
 }
 
 function createIncludeQueue<NodeId extends PropertyKey>(

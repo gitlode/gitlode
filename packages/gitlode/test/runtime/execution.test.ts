@@ -76,11 +76,11 @@ describe("executeWorkerRunRequest profiling", () => {
     expect(result.kind).toBe("success");
     if (result.kind !== "success") return;
 
-    const walkEntry = result.success.profileEntries.find(
-      (entry) => entry.name === "git.walk_commits",
+    const traversalEntry = result.success.profileEntries.find(
+      (entry) => entry.name === "dag.traversal",
     );
-    expect(walkEntry?.attributes?.strategy).toEqual(["eagerExclude"]);
-    expect(walkEntry?.counters?.include_reads).toBeGreaterThan(0);
+    expect(traversalEntry?.attributes?.strategy).toEqual(["eagerExclude"]);
+    expect(traversalEntry?.counters?.include_reads).toBeGreaterThan(0);
 
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);

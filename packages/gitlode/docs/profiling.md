@@ -36,7 +36,8 @@ Example:
 Profile
   span                       :   total  calls     avg     max  details
   gitlode.run                :  18.40ms      1  18.40ms  18.40ms  git.adapter=isomorphic-git gitlode.granularity=commit gitlode.profile gitlode.result=success commits=120 records=120
-  git.walk_commits           :   8.25ms      1   8.25ms   8.25ms  fallback_reason=open_include_path result=fallback strategy=certifiedLazy exclude_reads=20 fallback_reads=12 include_reads=100 yielded=95
+  git.walk_commits           :   8.25ms      1   8.25ms   8.25ms
+  dag.traversal              :   8.10ms      1   8.10ms   8.10ms  fallback_reason=open_include_path result=fallback strategy=certifiedLazy exclude_reads=20 fallback_reads=12 include_reads=100 yielded=95
   gitlode.projection         :   3.75ms    120   0.03ms   0.20ms
   gitlode.output.write       :   2.10ms    120   0.02ms   0.10ms
 ```
@@ -66,7 +67,8 @@ Useful span names include:
 | `gitlode.traversal`                             | Commit traversal and commit-fact materialization                         |
 | `gitlode.projection`                            | Fact-to-output-record mapping in the active projector                    |
 | `gitlode.output.write` / `gitlode.output.close` | `OutputSink.write()` and `OutputSink.close()`                            |
-| `git.walk_commits`                              | Commit DAG traversal, including strategy, result, and read counters      |
+| `git.walk_commits`                              | Adapter-level commit walk operation                                      |
+| `dag.traversal`                                 | Internal DAG traversal strategy, result, and read counters               |
 | `git.blob_read`                                 | Blob reads inside `IsomorphicGitAdapter.getFileChanges()`                |
 | `git.diff`                                      | Diff-stat computation inside `IsomorphicGitAdapter.getFileChanges()`     |
 | `git.*` children                                | Additional Git-internal operations such as ref resolution and merge-base |
@@ -97,7 +99,8 @@ executable with `git --version`.
 
 ## walk_commits Diagnostics
 
-`git.walk_commits` is the most important span when evaluating commit traversal behavior.
+`git.walk_commits` is the adapter-level span for commit traversal. For the isomorphic-git adapter,
+the internal strategy details are recorded on `dag.traversal`.
 
 Common details include:
 
@@ -114,9 +117,10 @@ Common details include:
 | `yielded`          | Commits yielded by the traversal                                         |
 
 When comparing traversal changes for the isomorphic-git adapter, start with the `total` time for
-`git.walk_commits`, `result`, `fallback_reason`, read counters, and `yielded`. Child spans such as
-`dag.traversal.read_node.include`, `dag.traversal.read_node.exclude`, and `dag.traversal.step` help
-identify whether time is dominated by node reads or by strategy overhead.
+`git.walk_commits`, then inspect `dag.traversal` for `result`, `fallback_reason`, read counters,
+and `yielded`. Child spans such as `dag.traversal.read_node.include`,
+`dag.traversal.read_node.exclude`, and `dag.traversal.step` help identify whether time is dominated
+by node reads or by strategy overhead.
 
 For `runtime.gitAdapter: "git-cli"`, compare `git.cli.rev_list` and `git.cli.cat_file_batch`
 instead. For cross-adapter benchmarks, keep the repository snapshot and extraction request identical

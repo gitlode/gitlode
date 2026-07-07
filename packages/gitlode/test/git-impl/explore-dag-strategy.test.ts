@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { DagNodePort, WalkDagContext } from "../../src/git-impl/dag-traversal-strategy.js";
+import {
+  type DagNodePort,
+  type WalkDagContext,
+  walkDagEagerExclude,
+} from "../../src/git-impl/dag-traversal-strategy.js";
 import {
   type CertifiedClosurePhaseResult,
   IntegratedDifferenceState,
@@ -227,6 +231,67 @@ describe("walkDagPhaseCertifiedDifference", () => {
       new Set(["HEAD", "MERGE", "LEFT", "RIGHT"]),
     );
   });
+
+  it("matches eager exclude when the exclude phase closes at a rejoined split", async () => {
+    await expectPhaseDifferenceToMatchEager(
+      {
+        HEAD: ["NEW"],
+        NEW: ["EXCLUDE_MERGE"],
+        EXCLUDE_MERGE: ["LEFT", "RIGHT"],
+        LEFT: ["JOIN"],
+        RIGHT: ["JOIN"],
+        JOIN: ["OLD"],
+        OLD: [],
+      },
+      "HEAD",
+      "EXCLUDE_MERGE",
+    );
+  });
+
+  it("matches eager exclude when the exclude phase completes without a closed boundary", async () => {
+    await expectPhaseDifferenceToMatchEager(
+      {
+        HEAD: ["NEW"],
+        NEW: ["EXCLUDE_MERGE"],
+        EXCLUDE_MERGE: ["LEFT", "RIGHT"],
+        LEFT: ["LEFT_ROOT"],
+        LEFT_ROOT: [],
+        RIGHT: ["RIGHT_ROOT"],
+        RIGHT_ROOT: [],
+      },
+      "HEAD",
+      "EXCLUDE_MERGE",
+    );
+  });
+
+  it("matches eager exclude when include paths hit the same exclude boundary", async () => {
+    await expectPhaseDifferenceToMatchEager(
+      {
+        HEAD: ["LEFT", "RIGHT"],
+        LEFT: ["EXCLUDE"],
+        RIGHT: ["NEW"],
+        NEW: ["EXCLUDE"],
+        EXCLUDE: ["OLD"],
+        OLD: [],
+      },
+      "HEAD",
+      "EXCLUDE",
+    );
+  });
+
+  it("matches eager exclude when the exclude side is disconnected from include", async () => {
+    await expectPhaseDifferenceToMatchEager(
+      {
+        HEAD: ["NEW"],
+        NEW: ["ROOT"],
+        ROOT: [],
+        EXCLUDE: ["OLD"],
+        OLD: [],
+      },
+      "HEAD",
+      "EXCLUDE",
+    );
+  });
 });
 
 function createState(
@@ -289,6 +354,29 @@ async function collect<T>(items: AsyncIterable<T>): Promise<T[]> {
   const result: T[] = [];
   for await (const item of items) result.push(item);
   return result;
+}
+
+async function expectPhaseDifferenceToMatchEager(
+  successorsByNode: Record<string, readonly string[]>,
+  startId: string,
+  excludeStartId: string,
+): Promise<void> {
+  const phaseResult = await collectNodeIds(
+    walkDagPhaseCertifiedDifference(
+      createContext(createDagPort(successorsByNode)),
+      startId,
+      excludeStartId,
+    ),
+  );
+  const eagerResult = await collectNodeIds(
+    walkDagEagerExclude(createContext(createDagPort(successorsByNode)), startId, excludeStartId),
+  );
+
+  expect(new Set(phaseResult)).toEqual(new Set(eagerResult));
+}
+
+async function collectNodeIds(items: AsyncIterable<TestNode>): Promise<string[]> {
+  return (await collect(items)).map((node) => node.id);
 }
 
 async function resolveAndDrain(

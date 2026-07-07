@@ -25,6 +25,33 @@ export interface DagNodePort<NodeId extends PropertyKey, Node> {
   getSuccessors(node: Node): readonly NodeId[];
 }
 
+/**
+ * Collects every node ID reachable from the supplied start IDs by following the traversal
+ * direction exposed by `nodes.getSuccessors()`.
+ */
+export async function collectReachableNodes<NodeId extends PropertyKey, Node>(
+  startIds: Iterable<NodeId>,
+  nodes: DagNodePort<NodeId, Node>,
+  options: WalkDagStrategyOptions<NodeId> = {},
+): Promise<Set<NodeId>> {
+  const reachable = new Set<NodeId>();
+  const frontier = options.createFrontier?.() ?? createDefaultDagQueue<NodeId>();
+  for (const startId of startIds) frontier.enqueue(startId);
+
+  while (!frontier.isEmpty()) {
+    const nodeId = frontier.dequeueOrThrow();
+    if (reachable.has(nodeId)) continue;
+    reachable.add(nodeId);
+
+    const node = await nodes.readNode(nodeId);
+    for (const successor of nodes.getSuccessors(node)) {
+      if (!reachable.has(successor)) frontier.enqueue(successor);
+    }
+  }
+
+  return reachable;
+}
+
 export interface WalkDagContext<NodeId extends PropertyKey, Node> {
   readonly nodes: DagNodePort<NodeId, Node>;
   readonly instrumentation: Instrumentation;
@@ -40,8 +67,7 @@ interface InternalWalkDagContext<NodeId extends PropertyKey, Node> extends WalkD
 type WalkDagStrategy = "eagerExclude" | "certifiedLazy";
 
 export interface WalkDagStrategyOptions<NodeId extends PropertyKey> {
-  readonly createIncludeQueue?: () => WorkQueue<NodeId>;
-  readonly createExcludeQueue?: () => WorkQueue<NodeId>;
+  readonly createFrontier?: () => WorkQueue<NodeId>;
 }
 
 export interface WalkDagConfiguredStrategyOptions<NodeId extends PropertyKey> {
@@ -93,16 +119,16 @@ async function* walkDagEagerExcludeCore<NodeId extends PropertyKey, Node>(
   span.setAttribute("strategy", "eagerExclude");
   const excluded =
     excludeNodeId !== undefined
-      ? await collectReachable(context, excludeNodeId, options)
+      ? await collectReachable(context, excludeNodeId)
       : new Set<NodeId>();
 
-  const queue = createIncludeQueue(options);
-  queue.enqueue(nodeId);
+  const frontier = options.createFrontier?.() ?? createDefaultDagQueue<NodeId>();
+  frontier.enqueue(nodeId);
   const visited = new Set<NodeId>();
 
-  while (!queue.isEmpty()) {
+  while (!frontier.isEmpty()) {
     const next = await instrumentation.runAsync(DAG_TRAVERSAL_STEP_SPAN, async () => {
-      const nodeId = queue.dequeueOrThrow();
+      const nodeId = frontier.dequeueOrThrow();
       if (visited.has(nodeId) || excluded.has(nodeId)) return null;
       visited.add(nodeId);
 
@@ -118,7 +144,7 @@ async function* walkDagEagerExcludeCore<NodeId extends PropertyKey, Node>(
     yield next;
 
     for (const successor of context.nodes.getSuccessors(next)) {
-      if (!visited.has(successor) && !excluded.has(successor)) queue.enqueue(successor);
+      if (!visited.has(successor) && !excluded.has(successor)) frontier.enqueue(successor);
     }
   }
 }
@@ -250,7 +276,7 @@ async function* walkDagCertifiedLazyCore<NodeId extends PropertyKey, Node>(
       excludeStartSuccessors.length === 1 ? firstOrThrow(excludeStartSuccessors) : null;
   });
 
-  const includeFrontier = createIncludeQueue(options);
+  const includeFrontier = options.createFrontier?.() ?? createDefaultDagQueue<NodeId>();
   includeFrontier.enqueue(nodeId);
   const includeExpanded = new Set<NodeId>();
   while (!includeFrontier.isEmpty()) {
@@ -289,7 +315,7 @@ async function* walkDagCertifiedLazyCore<NodeId extends PropertyKey, Node>(
     span.setAttribute("fallback_reason", certificateFailureReason);
     const excludeReadsBeforeFallback = excludeReads;
     const candidatesBeforeFallback = resultCandidates.size;
-    const excluded = await collectReachableFromCache(excludeNodeId);
+    const excluded = await collectReachableUsingCachedReads(excludeNodeId);
     let removedCandidates = 0;
     for (const nodeId of excluded) {
       if (resultCandidates.delete(nodeId)) removedCandidates++;
@@ -333,25 +359,19 @@ async function* walkDagCertifiedLazyCore<NodeId extends PropertyKey, Node>(
     });
   }
 
-  async function collectReachableFromCache(startNodeId: NodeId): Promise<Set<NodeId>> {
+  async function collectReachableUsingCachedReads(startNodeId: NodeId): Promise<Set<NodeId>> {
     return await instrumentation.runAsync(DAG_COLLECT_REACHABLE_SPAN, async () => {
-      const reachable = new Set<NodeId>();
-      const queue = createExcludeQueue(options);
-      queue.enqueue(startNodeId);
-      while (!queue.isEmpty()) {
-        const nodeId = queue.dequeueOrThrow();
-        if (reachable.has(nodeId)) continue;
-        reachable.add(nodeId);
-        const state = stateFor(nodeId);
-        const successors = state.read
-          ? state.successors
-          : context.nodes.getSuccessors(await readExcludeNode(nodeId));
-        for (const successor of successors) {
-          markExcludeReached(successor);
-          queue.enqueue(successor);
-        }
-      }
-      return reachable;
+      return await collectReachableNodes([startNodeId], {
+        async readNode(nodeId) {
+          const state = stateFor(nodeId);
+          return state.read ? state.node : await readExcludeNode(nodeId);
+        },
+        getSuccessors(node) {
+          const successors = context.nodes.getSuccessors(node);
+          for (const successor of successors) markExcludeReached(successor);
+          return successors;
+        },
+      });
     });
   }
 }
@@ -359,24 +379,18 @@ async function* walkDagCertifiedLazyCore<NodeId extends PropertyKey, Node>(
 async function collectReachable<NodeId extends PropertyKey, Node>(
   context: InternalWalkDagContext<NodeId, Node>,
   startNodeId: NodeId,
-  options: WalkDagStrategyOptions<NodeId>,
 ): Promise<Set<NodeId>> {
   const { instrumentation, span } = context;
   return await instrumentation.runAsync(DAG_COLLECT_REACHABLE_SPAN, async () => {
-    const reachable = new Set<NodeId>();
-    const queue = createExcludeQueue(options);
-    queue.enqueue(startNodeId);
-    while (!queue.isEmpty()) {
-      const nodeId = queue.dequeueOrThrow();
-      if (reachable.has(nodeId)) continue;
-      reachable.add(nodeId);
-      span.incrementCounter("exclude_reads");
-      const node = await instrumentation.runAsync(DAG_EXCLUDE_READ_SPAN, async () =>
-        context.nodes.readNode(nodeId),
-      );
-      for (const successor of context.nodes.getSuccessors(node)) queue.enqueue(successor);
-    }
-    return reachable;
+    return await collectReachableNodes([startNodeId], {
+      async readNode(nodeId) {
+        span.incrementCounter("exclude_reads");
+        return await instrumentation.runAsync(DAG_EXCLUDE_READ_SPAN, async () =>
+          context.nodes.readNode(nodeId),
+        );
+      },
+      getSuccessors: (node) => context.nodes.getSuccessors(node),
+    });
   });
 }
 
@@ -387,18 +401,6 @@ function instrumentDagTraversal<NodeId extends PropertyKey, Node>(
   return instrumentAsyncIterable(context.instrumentation, DAG_TRAVERSAL_SPAN, (span) =>
     factory({ ...context, span }),
   );
-}
-
-function createIncludeQueue<NodeId extends PropertyKey>(
-  options: WalkDagStrategyOptions<NodeId>,
-): WorkQueue<NodeId> {
-  return options.createIncludeQueue?.() ?? createDefaultDagQueue();
-}
-
-function createExcludeQueue<NodeId extends PropertyKey>(
-  options: WalkDagStrategyOptions<NodeId>,
-): WorkQueue<NodeId> {
-  return options.createExcludeQueue?.() ?? createDefaultDagQueue();
 }
 
 function createDefaultDagQueue<NodeId extends PropertyKey>(): WorkQueue<NodeId> {

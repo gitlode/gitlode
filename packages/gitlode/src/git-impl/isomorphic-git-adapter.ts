@@ -218,7 +218,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
         excludeOid,
         {
           certifiedLazy: {
-            createIncludeQueue: () =>
+            createFrontier: () =>
               new OrderedQueue<CommitOid>({
                 dequeueOrder: "lifo",
                 blockOrder: "preserve",

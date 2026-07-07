@@ -1,4 +1,11 @@
 import type { Brand } from "../type-utils/index.js";
+import {
+  collectReachableNodes,
+  type DagNodePort,
+  type WalkDagContext,
+} from "./dag-traversal-strategy.js";
+
+export type { DagNodePort, WalkDagContext } from "./dag-traversal-strategy.js";
 
 /**
  * Temporary design sketch for certified closure traversal.
@@ -11,11 +18,6 @@ import type { Brand } from "../type-utils/index.js";
 export type SplitId = Brand<number, "SplitId">;
 export type BranchId = Brand<number, "BranchId">;
 export type BranchGroupId = Brand<number, "BranchGroupId">;
-
-export interface DagNodePort<NodeId extends PropertyKey, Node> {
-  readNode(nodeId: NodeId): Promise<Node>;
-  getSuccessors(node: Node): readonly NodeId[];
-}
 
 export interface CertifiedClosureNodeState<NodeId extends PropertyKey, Node> {
   readonly nodeId: NodeId;
@@ -97,36 +99,16 @@ interface TriggerHit<NodeId> {
   readonly joinedBranchId: BranchId;
 }
 
-export async function reachable<NodeId extends PropertyKey, Node>(
-  startIds: Iterable<NodeId>,
-  nodes: DagNodePort<NodeId, Node>,
-): Promise<Set<NodeId>> {
-  const reached = new Set<NodeId>();
-  const frontier = [...startIds];
-
-  while (frontier.length > 0) {
-    const nodeId = frontier.shift();
-    if (nodeId === undefined || reached.has(nodeId)) continue;
-    reached.add(nodeId);
-
-    const node = await nodes.readNode(nodeId);
-    for (const successor of nodes.getSuccessors(node)) {
-      if (!reached.has(successor)) frontier.push(successor);
-    }
-  }
-
-  return reached;
-}
-
 /**
  * Explores one closure phase until the current sketch can prove a closed boundary, or until
  * there is no frontier left. The function is deliberately small-scope: it models only certified
  * closure and does not attempt include-side yielding.
  */
 export async function exploreCertifiedClosurePhase<NodeId extends PropertyKey, Node>(
+  context: WalkDagContext<NodeId, Node>,
   startId: NodeId,
-  nodes: DagNodePort<NodeId, Node>,
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
+  const { nodes } = context;
   const phase = new CertifiedClosurePhase<NodeId, Node>(startId);
   const frontier: FrontierItem<NodeId>[] = [{ nodeId: startId, branchId: phase.rootBranchId }];
 
@@ -186,10 +168,11 @@ export async function exploreCertifiedClosurePhase<NodeId extends PropertyKey, N
  * production strategy.
  */
 export async function* exploreDagDifferenceSketch<NodeId extends PropertyKey, Node>(
+  context: WalkDagContext<NodeId, Node>,
   startId: NodeId,
   excludeStartId: NodeId,
-  nodes: DagNodePort<NodeId, Node>,
 ): AsyncIterable<Node> {
+  const { nodes } = context;
   const state = new IntegratedDifferenceState<NodeId, Node>(nodes);
   state.initializeInclude(startId);
 
@@ -207,7 +190,7 @@ export async function* exploreDagDifferenceSketch<NodeId extends PropertyKey, No
       continue;
     }
 
-    const closure = await exploreCertifiedClosurePhase(item.nodeId, nodes);
+    const closure = await exploreCertifiedClosurePhase(context, item.nodeId);
     yield* state.applyCertification(closure);
     if (closure.kind === "closed-boundary") {
       frontier.push({ side: "exclude", nodeId: closure.closedBoundary });
@@ -602,8 +585,8 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
   private async classifyFromHits(
     hits: ReadonlySet<NodeId>,
   ): Promise<IncludePathClassification<NodeId>> {
-    const newerSide = await reachable(hits, this.includeChildrenPort());
-    const olderSide = await reachable(hits, this.includeParentsPort());
+    const newerSide = await collectReachableNodes(hits, this.includeChildrenPort());
+    const olderSide = await collectReachableNodes(hits, this.includeParentsPort());
     const excluded = new Set(olderSide);
     const yieldable = difference(newerSide, excluded);
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import type { DagNodePort, WalkDagContext } from "../../src/git-impl/dag-traversal-strategy.js";
 import {
   type CertifiedClosurePhaseResult,
-  type DagNodePort,
   IntegratedDifferenceState,
   exploreDagDifferenceSketch,
-  type IncludeNodeState,
 } from "../../src/git-impl/explore-dag-strategy.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 interface TestNode {
   readonly id: string;
@@ -113,7 +113,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
       reads,
     );
 
-    const yielded = await collect(exploreDagDifferenceSketch("HEAD", "C", port));
+    const yielded = await collect(exploreDagDifferenceSketch(createContext(port), "HEAD", "C"));
 
     expect(yielded).toEqual([{ id: "HEAD" }]);
     expect(reads).toEqual(["HEAD", "C"]);
@@ -164,6 +164,15 @@ function createDagPort(
       return { id: nodeId };
     },
     getSuccessors: (node) => successorsByNode[node.id] ?? [],
+  };
+}
+
+function createContext<NodeId extends PropertyKey, Node>(
+  nodes: DagNodePort<NodeId, Node>,
+): WalkDagContext<NodeId, Node> {
+  return {
+    nodes,
+    instrumentation: noopInstrumentation,
   };
 }
 

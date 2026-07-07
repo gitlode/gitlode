@@ -17,7 +17,7 @@ contract. If the prototype is implemented and accepted, migrate the stable decis
 
 ## Background
 
-`walkCommits` currently has two internal strategies in `src/git-impl/walk-commits-strategy.ts`:
+`walkCommits` currently has two internal strategies in `src/git-impl/dag-traversal-strategy.ts`:
 
 - `eagerExclude`: eagerly builds the full `reachable(exclude)` set, then walks include-side
   commits.
@@ -356,14 +356,13 @@ only an expansion-order hint.
 
 ## Suggested Interface Shape
 
-Keep `walk-commits-strategy.ts` free of Git-specific concepts by exposing a generic priority hook
+Keep `dag-traversal-strategy.ts` free of Git-specific concepts by exposing a generic priority hook
 on the DAG node port:
 
 ```ts
 export interface DagNodePort<NodeId extends PropertyKey, Node> {
   readNode(nodeId: NodeId): Promise<Node>;
   getSuccessors(node: Node): readonly NodeId[];
-  getPriorityHint?(node: Node): number;
 }
 ```
 

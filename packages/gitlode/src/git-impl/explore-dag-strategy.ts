@@ -25,11 +25,12 @@ export type { DagNodePort, WalkDagContext } from "./dag-traversal-strategy.js";
  * - Certified exclude bookkeeping should live in an exclude-side state object. It should own the
  *   certified exclude set, absorb closure phase results, report include-side hits, and decide
  *   whether another exclude phase should start from a closed boundary.
- * - Certified hit classification should live in a resolver. It should classify include-side nodes
- *   into yieldable and excluded regions without mutating the traversal frontier.
- * - Closure phase traversal should be separated from closure phase state. The runner should read
- *   DAG nodes and drive frontier items; `CertifiedClosurePhase` should model split, branch, trigger,
- *   and close-boundary state transitions.
+ * - Certified hit classification should live in a focused helper. It should classify include-side
+ *   nodes into yieldable and excluded regions without mutating the traversal frontier.
+ * - Closure phase traversal should keep its main loop visible in
+ *   `resolveDagCertifiedClosurePhase()`. The loop should drive frontier items; `CertifiedClosurePhase`
+ *   should own split, branch, trigger, and close-boundary transitions while `ClosureGraphState`
+ *   owns closure-side node reads, expansion cache, and graph links.
  *
  * The prototype output contract remains the same as `walkDagEagerExclude()`:
  * `reachable(start) - reachable(exclude)`. Yield order is not part of that contract.
@@ -92,6 +93,16 @@ export interface IncludeFrontierItem<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
 }
 
+export type IncludeExpansionResult<NodeId extends PropertyKey> =
+  | {
+      readonly kind: "expanded";
+      readonly enqueue: readonly NodeId[];
+    }
+  | {
+      readonly kind: "skipped";
+      readonly reason: "stale" | "certified-hit" | "already-expanded" | "already-cached";
+    };
+
 export type IntegratedFrontierItem<NodeId extends PropertyKey> =
   | {
       readonly side: "include";
@@ -129,54 +140,14 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
   startId: NodeId,
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
   const { nodes } = context;
-  const phase = new CertifiedClosurePhase<NodeId, Node>(startId);
+  const phase = new CertifiedClosurePhase<NodeId, Node>(nodes, startId);
   const frontier: FrontierItem<NodeId>[] = [{ nodeId: startId, branchId: phase.rootBranchId }];
 
   while (frontier.length > 0 && !phase.hasClosedBoundary()) {
     const item = frontier.shift();
     if (item === undefined) break;
 
-    const state = phase.stateFor(item.nodeId);
-    if (state.traversedBranches.has(item.branchId)) continue;
-
-    if (state.expanded) {
-      frontier.push(...phase.resolveBranchByKnownNode(item.branchId, item.nodeId));
-    }
-
-    const successors = state.expanded
-      ? state.successors
-      : nodes.getSuccessors(await nodes.readNode(item.nodeId));
-    if (successors === undefined) throw new Error("Expected successors for expanded node.");
-    if (!state.expanded) phase.markExpanded(item.nodeId, successors);
-    phase.markTraversed(item.nodeId, item.branchId);
-
-    if (successors.length === 0) {
-      phase.markRootEscape(item.nodeId);
-      continue;
-    }
-
-    if (successors.length === 1) {
-      const successor = successors[0];
-      if (successor === undefined) throw new Error("Expected single successor.");
-      phase.recordEdge(item.nodeId, successor);
-      const hit = phase.reachSuccessorFromBranch(item.branchId, successor);
-      if (hit !== undefined) frontier.push(...phase.resolveBranchByTrigger(hit));
-      if (!phase.stateFor(successor).expanded) {
-        frontier.push({ nodeId: successor, branchId: item.branchId });
-      }
-      continue;
-    }
-
-    const childSplit = phase.openSplit(item.nodeId, item.branchId, successors);
-    for (const branchId of childSplit.branchIds) {
-      const branch = phase.getBranchStateOrThrow(branchId);
-      phase.recordEdge(item.nodeId, branch.startedAt);
-      const hit = phase.reachSuccessorFromBranch(branch.id, branch.startedAt);
-      if (hit !== undefined) frontier.push(...phase.resolveBranchByTrigger(hit));
-      if (!phase.stateFor(branch.startedAt).expanded) {
-        frontier.push({ nodeId: branch.startedAt, branchId: branch.id });
-      }
-    }
+    frontier.push(...(await phase.advance(item)));
   }
 
   return phase.toResult();
@@ -205,14 +176,24 @@ export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKe
     if (item === undefined) break;
 
     if (item.side === "include") {
-      yield* state.expandInclude(item, frontier);
+      const expansion = await state.expandInclude(item);
+      if (expansion.kind === "skipped" && expansion.reason === "certified-hit") {
+        yield* state.applyCertifiedHits(new Set([item.nodeId]));
+        continue;
+      }
+      if (expansion.kind === "expanded") {
+        for (const nodeId of expansion.enqueue) {
+          frontier.push({ side: "include", nodeId });
+        }
+      }
       continue;
     }
 
     const closure = await resolveDagCertifiedClosurePhase(context, item.nodeId);
     yield* state.applyCertification(closure);
-    if (closure.kind === "closed-boundary") {
-      frontier.push({ side: "exclude", nodeId: closure.closedBoundary });
+    const nextExcludeStart = state.nextExcludePhaseStart(closure);
+    if (nextExcludeStart !== undefined) {
+      frontier.push({ side: "exclude", nodeId: nextExcludeStart });
     }
   }
 
@@ -222,17 +203,18 @@ export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKe
 export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   readonly rootBranchId: BranchId;
 
+  private readonly graph: ClosureGraphState<NodeId, Node>;
   private nextSplitId: SplitId = 1 as SplitId;
   private nextBranchId: BranchId = 1 as BranchId;
   private nextBranchGroupId: BranchGroupId = 1 as BranchGroupId;
   private closedBoundary?: NodeId;
-  private readonly states = new Map<NodeId, CertifiedClosureNodeState<NodeId, Node>>();
   private readonly branches = new Map<BranchId, BranchState<NodeId>>();
   private readonly splits = new Map<SplitId, SplitState<NodeId>>();
   private readonly reachedByBranch = new Map<NodeId, Set<BranchId>>();
   private readonly rootEscapes = new Set<NodeId>();
 
-  constructor(startId: NodeId) {
+  constructor(nodes: DagNodePort<NodeId, Node>, startId: NodeId) {
+    this.graph = new ClosureGraphState(nodes);
     this.rootBranchId = 0 as BranchId;
     this.stateFor(startId).closedCover = true;
     this.branches.set(this.rootBranchId, {
@@ -245,24 +227,39 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     this.reachNode(startId, this.rootBranchId);
   }
 
+  async advance(item: FrontierItem<NodeId>): Promise<FrontierItem<NodeId>[]> {
+    const state = this.stateFor(item.nodeId);
+    if (state.traversedBranches.has(item.branchId)) return [];
+
+    const frontier = state.expanded
+      ? this.resolveBranchByKnownNode(item.branchId, item.nodeId)
+      : [];
+
+    const successors = await this.graph.successorsFor(item.nodeId);
+    this.markTraversed(item.nodeId, item.branchId);
+
+    if (successors.length === 0) {
+      this.markRootEscape(item.nodeId);
+      return frontier;
+    }
+
+    if (successors.length === 1) {
+      const successor = successors[0];
+      if (successor === undefined) throw new Error("Expected single successor.");
+      frontier.push(...this.advanceSingleSuccessor(item, successor));
+      return frontier;
+    }
+
+    frontier.push(...this.advanceSplitSuccessors(item, successors));
+    return frontier;
+  }
+
   hasClosedBoundary(): boolean {
     return this.closedBoundary !== undefined;
   }
 
   stateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId, Node> {
-    let state = this.states.get(nodeId);
-    if (state === undefined) {
-      state = {
-        nodeId,
-        children: new Set<NodeId>(),
-        traversedBranches: new Set<BranchId>(),
-        reached: false,
-        expanded: false,
-        closedCover: false,
-      };
-      this.states.set(nodeId, state);
-    }
-    return state;
+    return this.graph.stateFor(nodeId);
   }
 
   getBranchStateOrThrow(branchId: BranchId): BranchState<NodeId> {
@@ -272,10 +269,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   markExpanded(nodeId: NodeId, successors: readonly NodeId[]): void {
-    const state = this.stateFor(nodeId);
-    state.successors = successors;
-    state.reached = true;
-    state.expanded = true;
+    this.graph.markExpanded(nodeId, successors);
   }
 
   markTraversed(nodeId: NodeId, branchId: BranchId): void {
@@ -287,7 +281,35 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   recordEdge(childId: NodeId, parentId: NodeId): void {
-    this.stateFor(parentId).children.add(childId);
+    this.graph.recordEdge(childId, parentId);
+  }
+
+  advanceSingleSuccessor(item: FrontierItem<NodeId>, successor: NodeId): FrontierItem<NodeId>[] {
+    this.recordEdge(item.nodeId, successor);
+    const hit = this.reachSuccessorFromBranch(item.branchId, successor);
+    const frontier = hit === undefined ? [] : this.resolveBranchByTrigger(hit);
+    if (!this.stateFor(successor).expanded) {
+      frontier.push({ nodeId: successor, branchId: item.branchId });
+    }
+    return frontier;
+  }
+
+  advanceSplitSuccessors(
+    item: FrontierItem<NodeId>,
+    successors: readonly NodeId[],
+  ): FrontierItem<NodeId>[] {
+    const frontier: FrontierItem<NodeId>[] = [];
+    const childSplit = this.openSplit(item.nodeId, item.branchId, successors);
+    for (const branchId of childSplit.branchIds) {
+      const branch = this.getBranchStateOrThrow(branchId);
+      this.recordEdge(item.nodeId, branch.startedAt);
+      const hit = this.reachSuccessorFromBranch(branch.id, branch.startedAt);
+      if (hit !== undefined) frontier.push(...this.resolveBranchByTrigger(hit));
+      if (!this.stateFor(branch.startedAt).expanded) {
+        frontier.push({ nodeId: branch.startedAt, branchId: branch.id });
+      }
+    }
+    return frontier;
   }
 
   openSplit(
@@ -391,7 +413,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
       return {
         kind: "closed-boundary",
         certifiedNodes: new Set(
-          [...this.states.values()]
+          [...this.graph.states()]
             .filter((state) => state.closedCover)
             .map((state) => state.nodeId),
         ),
@@ -402,7 +424,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     return {
       kind: "complete-exclude",
       certifiedNodes: new Set(
-        [...this.states.values()].filter((state) => state.reached).map((state) => state.nodeId),
+        [...this.graph.states()].filter((state) => state.reached).map((state) => state.nodeId),
       ),
       rootTerminals: [...this.rootEscapes],
     };
@@ -485,17 +507,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   private *walkChildrenUntil(from: NodeId, stop: NodeId): Iterable<NodeId> {
-    const stack = [from];
-    const seen = new Set<NodeId>();
-
-    while (stack.length > 0) {
-      const nodeId = stack.pop();
-      if (nodeId === undefined || seen.has(nodeId)) continue;
-      seen.add(nodeId);
-      yield nodeId;
-      if (nodeId === stop) continue;
-      for (const child of this.stateFor(nodeId).children) stack.push(child);
-    }
+    yield* this.graph.walkChildrenUntil(from, stop);
   }
 
   private markClosedRegion(openedAt: NodeId, boundary: NodeId): void {
@@ -511,26 +523,232 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 }
 
-export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknown> {
-  // CertifiedExcludeState responsibility: track nodes proven to be on the exclude side.
+class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
   private readonly nodes: DagNodePort<NodeId, Node>;
-  private readonly certifiedExclude = new Set<NodeId>();
-
-  // IncludeGraphState responsibility: cache include-side nodes and maintain the local graph used
-  // to classify certified hits.
-  private readonly includeVisited = new Map<NodeId, IncludeNodeState<NodeId, Node>>();
+  private readonly visited = new Map<NodeId, CertifiedClosureNodeState<NodeId, Node>>();
 
   constructor(nodes: DagNodePort<NodeId, Node>) {
     this.nodes = nodes;
   }
 
+  stateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId, Node> {
+    let state = this.visited.get(nodeId);
+    if (state === undefined) {
+      state = {
+        nodeId,
+        children: new Set<NodeId>(),
+        traversedBranches: new Set<BranchId>(),
+        reached: false,
+        expanded: false,
+        closedCover: false,
+      };
+      this.visited.set(nodeId, state);
+    }
+    return state;
+  }
+
+  async successorsFor(nodeId: NodeId): Promise<readonly NodeId[]> {
+    const state = this.stateFor(nodeId);
+    if (state.expanded) {
+      if (state.successors === undefined) throw new Error("Expected successors for expanded node.");
+      return state.successors;
+    }
+
+    const node = await this.nodes.readNode(nodeId);
+    const successors = this.nodes.getSuccessors(node);
+    state.node = node;
+    this.markExpanded(nodeId, successors);
+    return successors;
+  }
+
+  markExpanded(nodeId: NodeId, successors: readonly NodeId[]): void {
+    const state = this.stateFor(nodeId);
+    state.successors = successors;
+    state.reached = true;
+    state.expanded = true;
+  }
+
+  recordEdge(childId: NodeId, parentId: NodeId): void {
+    this.stateFor(parentId).children.add(childId);
+  }
+
+  states(): Iterable<CertifiedClosureNodeState<NodeId, Node>> {
+    return this.visited.values();
+  }
+
+  *walkChildrenUntil(from: NodeId, stop: NodeId): Iterable<NodeId> {
+    const stack = [from];
+    const seen = new Set<NodeId>();
+
+    while (stack.length > 0) {
+      const nodeId = stack.pop();
+      if (nodeId === undefined || seen.has(nodeId)) continue;
+      seen.add(nodeId);
+      yield nodeId;
+      if (nodeId === stop) continue;
+      for (const child of this.stateFor(nodeId).children) stack.push(child);
+    }
+  }
+}
+
+export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknown> {
+  private readonly includeGraph: IncludeGraphState<NodeId, Node>;
+  private readonly certifiedExclude = new CertifiedExcludeState<NodeId>();
+
+  constructor(nodes: DagNodePort<NodeId, Node>) {
+    this.includeGraph = new IncludeGraphState(nodes);
+  }
+
   initializeInclude(startId: NodeId): void {
+    this.includeGraph.initialize(startId);
+  }
+
+  stateFor(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
+    return this.includeGraph.stateFor(nodeId);
+  }
+
+  // IncludeGraphState responsibility plus include-side read orchestration. The returned result
+  // tells the coordinator whether to enqueue more include work or resolve a certified hit.
+  async expandInclude(item: IncludeFrontierItem<NodeId>): Promise<IncludeExpansionResult<NodeId>> {
+    const state = this.includeGraph.get(item.nodeId);
+    if (state === undefined) return { kind: "skipped", reason: "stale" };
+
+    if (this.certifiedExclude.has(item.nodeId)) {
+      return { kind: "skipped", reason: "certified-hit" };
+    }
+
+    if (state.expanded) return { kind: "skipped", reason: "already-expanded" };
+    if (state.children.size === 0 && state.node !== undefined) {
+      return { kind: "skipped", reason: "already-cached" };
+    }
+
+    const parents = await this.includeGraph.expand(item.nodeId);
+
+    return { kind: "expanded", enqueue: parents };
+  }
+
+  // Coordinator + certified-hit application responsibility. Exclude state absorbs the closure;
+  // this method applies the resulting include-side hits to the include graph.
+  async *applyCertification(closure: CertifiedClosurePhaseResult<NodeId>): AsyncIterable<Node> {
+    const hits = this.certifiedExclude.absorbClosure(closure, this.includeGraph);
+    yield* this.applyCertifiedHits(hits);
+  }
+
+  async *applyCertifiedHits(hits: ReadonlySet<NodeId>): AsyncIterable<Node> {
+    yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits);
+  }
+
+  nextExcludePhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
+    return this.certifiedExclude.nextPhaseStart(closure);
+  }
+
+  // Coordinator + IncludeGraphState responsibility. The final drain is a coordinator decision; the
+  // graph deletion and node cache access belong to include-side state.
+  *drainRemainingInclude(): Iterable<Node> {
+    yield* drainUncertifiedInclude(this.includeGraph, this.certifiedExclude);
+  }
+}
+
+class CertifiedExcludeState<NodeId extends PropertyKey> {
+  private readonly certified = new Set<NodeId>();
+
+  has(nodeId: NodeId): boolean {
+    return this.certified.has(nodeId);
+  }
+
+  absorbClosure<Node>(
+    closure: CertifiedClosurePhaseResult<NodeId>,
+    includeGraph: IncludeGraphState<NodeId, Node>,
+  ): Set<NodeId> {
+    const hits = new Set<NodeId>();
+    for (const nodeId of closure.certifiedNodes) {
+      this.certified.add(nodeId);
+      if (includeGraph.has(nodeId)) hits.add(nodeId);
+    }
+
+    return hits;
+  }
+
+  nextPhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
+    return closure.kind === "closed-boundary" ? closure.closedBoundary : undefined;
+  }
+}
+
+async function* resolveCertifiedHits<NodeId extends PropertyKey, Node>(
+  includeGraph: IncludeGraphState<NodeId, Node>,
+  certifiedExclude: CertifiedExcludeState<NodeId>,
+  hits: ReadonlySet<NodeId>,
+): AsyncIterable<Node> {
+  if (hits.size === 0) return;
+
+  const classification = await classifyCertifiedHits(includeGraph, hits);
+  for (const nodeId of hits) classification.excluded.add(nodeId);
+
+  for (const nodeId of classification.excluded) {
+    includeGraph.delete(nodeId);
+  }
+
+  for (const nodeId of classification.yieldable) {
+    if (classification.excluded.has(nodeId)) continue;
+    const state = includeGraph.get(nodeId);
+    if (state?.node === undefined || certifiedExclude.has(nodeId)) continue;
+    includeGraph.delete(nodeId);
+    yield state.node;
+  }
+}
+
+async function classifyCertifiedHits<NodeId extends PropertyKey, Node>(
+  includeGraph: IncludeGraphState<NodeId, Node>,
+  hits: ReadonlySet<NodeId>,
+): Promise<IncludePathClassification<NodeId>> {
+  const newerSide = await collectReachableNodes(hits, includeGraph.childrenPort());
+  const olderSide = await collectReachableNodes(hits, includeGraph.parentsPort());
+  const excluded = new Set(olderSide);
+  const yieldable = difference(newerSide, excluded);
+
+  for (const hit of hits) {
+    yieldable.delete(hit);
+    excluded.add(hit);
+  }
+
+  return { yieldable, excluded };
+}
+
+function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
+  includeGraph: IncludeGraphState<NodeId, Node>,
+  certifiedExclude: CertifiedExcludeState<NodeId>,
+): Iterable<Node> {
+  const nodeIds = includeGraph.nodeIds();
+  for (const nodeId of nodeIds) {
+    const state = includeGraph.get(nodeId);
+    if (state?.node === undefined || certifiedExclude.has(nodeId)) continue;
+    includeGraph.delete(nodeId);
+    yield state.node;
+  }
+}
+
+class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
+  private readonly nodes: DagNodePort<NodeId, Node>;
+  private readonly visited = new Map<NodeId, IncludeNodeState<NodeId, Node>>();
+
+  constructor(nodes: DagNodePort<NodeId, Node>) {
+    this.nodes = nodes;
+  }
+
+  initialize(startId: NodeId): void {
     this.stateFor(startId);
   }
 
-  // IncludeGraphState responsibility.
+  has(nodeId: NodeId): boolean {
+    return this.visited.has(nodeId);
+  }
+
+  get(nodeId: NodeId): IncludeNodeState<NodeId, Node> | undefined {
+    return this.visited.get(nodeId);
+  }
+
   stateFor(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
-    let state = this.includeVisited.get(nodeId);
+    let state = this.visited.get(nodeId);
     if (state === undefined) {
       state = {
         nodeId,
@@ -538,41 +756,12 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
         parents: new Set<NodeId>(),
         expanded: false,
       };
-      this.includeVisited.set(nodeId, state);
+      this.visited.set(nodeId, state);
     }
     return state;
   }
 
-  // Coordinator + IncludeGraphState responsibility. This currently reads include nodes, mutates
-  // the shared frontier, and can yield nodes indirectly through certified-hit resolution.
-  async *expandInclude(
-    item: IncludeFrontierItem<NodeId>,
-    frontier: IntegratedFrontierItem<NodeId>[],
-  ): AsyncIterable<Node> {
-    const state = this.includeVisited.get(item.nodeId);
-    if (state === undefined) return;
-
-    if (this.certifiedExclude.has(item.nodeId)) {
-      yield* this.resolveCertifiedHits(new Set([item.nodeId]));
-      return;
-    }
-
-    if (state.expanded) return;
-    if (state.children.size === 0 && state.node !== undefined) return;
-
-    const node = await this.nodes.readNode(item.nodeId);
-    const parents = this.nodes.getSuccessors(node);
-    this.markExpanded(item.nodeId, node, parents);
-    for (const parent of parents) {
-      const parentState = this.stateFor(parent);
-      parentState.children.add(item.nodeId);
-      state.parents.add(parent);
-      frontier.push({ side: "include", nodeId: parent });
-    }
-  }
-
-  // IncludeGraphState responsibility.
-  private markExpanded(nodeId: NodeId, node: Node, parents: readonly NodeId[]): void {
+  markExpanded(nodeId: NodeId, node: Node, parents: readonly NodeId[]): void {
     const state = this.stateFor(nodeId);
     state.node = node;
     state.expanded = true;
@@ -581,100 +770,56 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     }
   }
 
-  // CertifiedExcludeState + CertifiedHitResolver responsibility. This currently absorbs closure
-  // results, finds include-side hits, classifies the affected include graph, deletes excluded
-  // nodes, and yields newly safe nodes.
-  async *applyCertification(closure: CertifiedClosurePhaseResult<NodeId>): AsyncIterable<Node> {
-    const hits = new Set<NodeId>();
-    for (const nodeId of closure.certifiedNodes) {
-      this.certifiedExclude.add(nodeId);
-      if (this.includeVisited.has(nodeId)) hits.add(nodeId);
+  async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
+    const node = await this.nodes.readNode(nodeId);
+    const parents = this.nodes.getSuccessors(node);
+    this.markExpanded(nodeId, node, parents);
+    for (const parent of parents) {
+      this.recordEdge(nodeId, parent);
     }
-    yield* this.resolveCertifiedHits(hits);
+    return parents;
   }
 
-  // CertifiedHitResolver responsibility.
-  private async *resolveCertifiedHits(hits: ReadonlySet<NodeId>): AsyncIterable<Node> {
-    if (hits.size === 0) return;
-
-    const classification = await this.classifyFromHits(hits);
-    for (const nodeId of hits) classification.excluded.add(nodeId);
-
-    for (const nodeId of classification.excluded) {
-      this.deleteIncludeVisited(nodeId);
-    }
-
-    for (const nodeId of classification.yieldable) {
-      if (classification.excluded.has(nodeId)) continue;
-      const state = this.includeVisited.get(nodeId);
-      if (state?.node === undefined || this.certifiedExclude.has(nodeId)) continue;
-      this.deleteIncludeVisited(nodeId);
-      yield state.node;
-    }
+  recordEdge(childId: NodeId, parentId: NodeId): void {
+    const child = this.stateFor(childId);
+    const parent = this.stateFor(parentId);
+    parent.children.add(childId);
+    child.parents.add(parentId);
   }
 
-  // CertifiedHitResolver responsibility.
-  private async classifyFromHits(
-    hits: ReadonlySet<NodeId>,
-  ): Promise<IncludePathClassification<NodeId>> {
-    const newerSide = await collectReachableNodes(hits, this.includeChildrenPort());
-    const olderSide = await collectReachableNodes(hits, this.includeParentsPort());
-    const excluded = new Set(olderSide);
-    const yieldable = difference(newerSide, excluded);
-
-    for (const hit of hits) {
-      yieldable.delete(hit);
-      excluded.add(hit);
-    }
-
-    return { yieldable, excluded };
-  }
-
-  // Coordinator + IncludeGraphState responsibility. The final drain is a coordinator decision; the
-  // graph deletion and node cache access belong to include-side state.
-  *drainRemainingInclude(): Iterable<Node> {
-    const nodeIds = [...this.includeVisited.keys()];
-    for (const nodeId of nodeIds) {
-      const state = this.includeVisited.get(nodeId);
-      if (state?.node === undefined || this.certifiedExclude.has(nodeId)) continue;
-      this.deleteIncludeVisited(nodeId);
-      yield state.node;
-    }
-  }
-
-  // IncludeGraphState responsibility.
-  private deleteIncludeVisited(nodeId: NodeId): void {
-    const state = this.includeVisited.get(nodeId);
+  delete(nodeId: NodeId): void {
+    const state = this.visited.get(nodeId);
     if (state === undefined) return;
 
     for (const parent of state.parents) {
-      this.includeVisited.get(parent)?.children.delete(nodeId);
+      this.visited.get(parent)?.children.delete(nodeId);
     }
     for (const child of state.children) {
-      this.includeVisited.get(child)?.parents.delete(nodeId);
+      this.visited.get(child)?.parents.delete(nodeId);
     }
-    this.includeVisited.delete(nodeId);
+    this.visited.delete(nodeId);
   }
 
-  // IncludeGraphState responsibility.
-  private includeChildrenPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
+  nodeIds(): NodeId[] {
+    return [...this.visited.keys()];
+  }
+
+  childrenPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
     return {
-      readNode: async (nodeId) => this.readIncludeVisitedNode(nodeId),
+      readNode: async (nodeId) => this.readNode(nodeId),
       getSuccessors: (node) => [...node.children],
     };
   }
 
-  // IncludeGraphState responsibility.
-  private includeParentsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
+  parentsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
     return {
-      readNode: async (nodeId) => this.readIncludeVisitedNode(nodeId),
+      readNode: async (nodeId) => this.readNode(nodeId),
       getSuccessors: (node) => [...node.parents],
     };
   }
 
-  // IncludeGraphState responsibility.
-  private readIncludeVisitedNode(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
-    const state = this.includeVisited.get(nodeId);
+  private readNode(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
+    const state = this.visited.get(nodeId);
     if (state === undefined) throw new Error("Expected include visited node.");
     return state;
   }

@@ -4,6 +4,7 @@ import type { DagNodePort, WalkDagContext } from "../../src/git-impl/dag-travers
 import {
   type CertifiedClosurePhaseResult,
   IntegratedDifferenceState,
+  exploreCertifiedClosurePhase,
   exploreDagDifferenceSketch,
 } from "../../src/git-impl/explore-dag-strategy.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
@@ -18,6 +19,76 @@ const unusedPort: DagNodePort<string, TestNode> = {
   },
   getSuccessors: () => [],
 };
+
+describe("exploreCertifiedClosurePhase", () => {
+  it("records a complete exclude path when no split closes", async () => {
+    const result = await exploreCertifiedClosurePhase(
+      createContext(
+        createDagPort({
+          EXCLUDE: ["PARENT"],
+          PARENT: ["ROOT"],
+          ROOT: [],
+        }),
+      ),
+      "EXCLUDE",
+    );
+
+    expect(result.kind).toBe("complete-exclude");
+    expect(result.certifiedNodes).toEqual(new Set(["EXCLUDE", "PARENT", "ROOT"]));
+    if (result.kind === "complete-exclude") {
+      expect(result.rootTerminals).toEqual(["ROOT"]);
+    }
+  });
+
+  it("certifies a closed boundary when split branches rejoin", async () => {
+    const reads: string[] = [];
+    const result = await exploreCertifiedClosurePhase(
+      createContext(
+        createDagPort(
+          {
+            MERGE: ["LEFT", "RIGHT"],
+            LEFT: ["JOIN"],
+            RIGHT: ["JOIN"],
+            JOIN: ["ROOT"],
+            ROOT: [],
+          },
+          reads,
+        ),
+      ),
+      "MERGE",
+    );
+
+    expect(result.kind).toBe("closed-boundary");
+    expect(result.certifiedNodes).toEqual(new Set(["MERGE", "LEFT", "RIGHT", "JOIN"]));
+    if (result.kind === "closed-boundary") {
+      expect(result.closedBoundary).toBe("JOIN");
+    }
+    expect(reads).toEqual(["MERGE", "LEFT", "RIGHT"]);
+  });
+
+  it("keeps an unclosed split as complete exclude with both root terminals", async () => {
+    const result = await exploreCertifiedClosurePhase(
+      createContext(
+        createDagPort({
+          MERGE: ["LEFT", "RIGHT"],
+          LEFT: ["LEFT_ROOT"],
+          LEFT_ROOT: [],
+          RIGHT: ["RIGHT_ROOT"],
+          RIGHT_ROOT: [],
+        }),
+      ),
+      "MERGE",
+    );
+
+    expect(result.kind).toBe("complete-exclude");
+    expect(result.certifiedNodes).toEqual(
+      new Set(["MERGE", "LEFT", "RIGHT", "LEFT_ROOT", "RIGHT_ROOT"]),
+    );
+    if (result.kind === "complete-exclude") {
+      expect(new Set(result.rootTerminals)).toEqual(new Set(["LEFT_ROOT", "RIGHT_ROOT"]));
+    }
+  });
+});
 
 describe("IntegratedDifferenceState certified hit resolution", () => {
   it("yields the visited newer side of a single certified hit", async () => {
@@ -117,6 +188,42 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
 
     expect(yielded).toEqual([{ id: "HEAD" }]);
     expect(reads).toEqual(["HEAD", "C"]);
+  });
+});
+
+describe("exploreDagDifferenceSketch", () => {
+  it("returns the include side before a certified single-path exclude boundary", async () => {
+    const port = createDagPort({
+      HEAD: ["NEW"],
+      NEW: ["EXCLUDE"],
+      EXCLUDE: ["OLD"],
+      OLD: [],
+    });
+
+    const yielded = await collect(
+      exploreDagDifferenceSketch(createContext(port), "HEAD", "EXCLUDE"),
+    );
+
+    expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["HEAD", "NEW"]));
+  });
+
+  it("returns both include merge sides before the exclude boundary", async () => {
+    const port = createDagPort({
+      HEAD: ["MERGE"],
+      MERGE: ["LEFT", "RIGHT"],
+      LEFT: ["EXCLUDE"],
+      RIGHT: ["EXCLUDE"],
+      EXCLUDE: ["OLD"],
+      OLD: [],
+    });
+
+    const yielded = await collect(
+      exploreDagDifferenceSketch(createContext(port), "HEAD", "EXCLUDE"),
+    );
+
+    expect(new Set(yielded.map((node) => node.id))).toEqual(
+      new Set(["HEAD", "MERGE", "LEFT", "RIGHT"]),
+    );
   });
 });
 

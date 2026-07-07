@@ -13,6 +13,26 @@ export type { DagNodePort, WalkDagContext } from "./dag-traversal-strategy.js";
  * This file is intentionally not wired into production traversal yet. It keeps the
  * split/branch/trigger/close-boundary rules executable while they mature toward a production
  * strategy.
+ *
+ * Refactoring target:
+ *
+ * - `walkDagPhaseCertifiedDifference()` should act as the coordinator. It owns the interleaving of
+ *   include expansion and exclude certification phases, and it should make frontier additions and
+ *   yield points visible from the main loop.
+ * - Include graph bookkeeping should live in an include-side state object. It should own visited
+ *   include nodes, cached node objects, expanded flags, and the derived parent/child links used for
+ *   local classification.
+ * - Certified exclude bookkeeping should live in an exclude-side state object. It should own the
+ *   certified exclude set, absorb closure phase results, report include-side hits, and decide
+ *   whether another exclude phase should start from a closed boundary.
+ * - Certified hit classification should live in a resolver. It should classify include-side nodes
+ *   into yieldable and excluded regions without mutating the traversal frontier.
+ * - Closure phase traversal should be separated from closure phase state. The runner should read
+ *   DAG nodes and drive frontier items; `CertifiedClosurePhase` should model split, branch, trigger,
+ *   and close-boundary state transitions.
+ *
+ * The prototype output contract remains the same as `walkDagEagerExclude()`:
+ * `reachable(start) - reachable(exclude)`. Yield order is not part of that contract.
  */
 
 export type SplitId = Brand<number, "SplitId">;
@@ -492,8 +512,12 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
 }
 
 export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknown> {
+  // CertifiedExcludeState responsibility: track nodes proven to be on the exclude side.
   private readonly nodes: DagNodePort<NodeId, Node>;
   private readonly certifiedExclude = new Set<NodeId>();
+
+  // IncludeGraphState responsibility: cache include-side nodes and maintain the local graph used
+  // to classify certified hits.
   private readonly includeVisited = new Map<NodeId, IncludeNodeState<NodeId, Node>>();
 
   constructor(nodes: DagNodePort<NodeId, Node>) {
@@ -504,6 +528,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     this.stateFor(startId);
   }
 
+  // IncludeGraphState responsibility.
   stateFor(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
     let state = this.includeVisited.get(nodeId);
     if (state === undefined) {
@@ -518,6 +543,8 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     return state;
   }
 
+  // Coordinator + IncludeGraphState responsibility. This currently reads include nodes, mutates
+  // the shared frontier, and can yield nodes indirectly through certified-hit resolution.
   async *expandInclude(
     item: IncludeFrontierItem<NodeId>,
     frontier: IntegratedFrontierItem<NodeId>[],
@@ -544,6 +571,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     }
   }
 
+  // IncludeGraphState responsibility.
   private markExpanded(nodeId: NodeId, node: Node, parents: readonly NodeId[]): void {
     const state = this.stateFor(nodeId);
     state.node = node;
@@ -553,6 +581,9 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     }
   }
 
+  // CertifiedExcludeState + CertifiedHitResolver responsibility. This currently absorbs closure
+  // results, finds include-side hits, classifies the affected include graph, deletes excluded
+  // nodes, and yields newly safe nodes.
   async *applyCertification(closure: CertifiedClosurePhaseResult<NodeId>): AsyncIterable<Node> {
     const hits = new Set<NodeId>();
     for (const nodeId of closure.certifiedNodes) {
@@ -562,6 +593,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     yield* this.resolveCertifiedHits(hits);
   }
 
+  // CertifiedHitResolver responsibility.
   private async *resolveCertifiedHits(hits: ReadonlySet<NodeId>): AsyncIterable<Node> {
     if (hits.size === 0) return;
 
@@ -581,6 +613,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     }
   }
 
+  // CertifiedHitResolver responsibility.
   private async classifyFromHits(
     hits: ReadonlySet<NodeId>,
   ): Promise<IncludePathClassification<NodeId>> {
@@ -597,6 +630,8 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     return { yieldable, excluded };
   }
 
+  // Coordinator + IncludeGraphState responsibility. The final drain is a coordinator decision; the
+  // graph deletion and node cache access belong to include-side state.
   *drainRemainingInclude(): Iterable<Node> {
     const nodeIds = [...this.includeVisited.keys()];
     for (const nodeId of nodeIds) {
@@ -607,6 +642,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     }
   }
 
+  // IncludeGraphState responsibility.
   private deleteIncludeVisited(nodeId: NodeId): void {
     const state = this.includeVisited.get(nodeId);
     if (state === undefined) return;
@@ -620,6 +656,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     this.includeVisited.delete(nodeId);
   }
 
+  // IncludeGraphState responsibility.
   private includeChildrenPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
     return {
       readNode: async (nodeId) => this.readIncludeVisitedNode(nodeId),
@@ -627,6 +664,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     };
   }
 
+  // IncludeGraphState responsibility.
   private includeParentsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
     return {
       readNode: async (nodeId) => this.readIncludeVisitedNode(nodeId),
@@ -634,6 +672,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     };
   }
 
+  // IncludeGraphState responsibility.
   private readIncludeVisitedNode(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
     const state = this.includeVisited.get(nodeId);
     if (state === undefined) throw new Error("Expected include visited node.");

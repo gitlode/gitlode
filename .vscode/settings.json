@@ -26,7 +26,8 @@
     "oxfmt",
     "oxlint",
     "touchpoint",
-    "Touchpoints"
+    "Touchpoints",
+    "yieldable"
   ],
 
   // Formatter

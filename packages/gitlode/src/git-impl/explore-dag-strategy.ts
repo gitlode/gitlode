@@ -8,11 +8,11 @@ import {
 export type { DagNodePort, WalkDagContext } from "./dag-traversal-strategy.js";
 
 /**
- * Temporary design sketch for certified closure traversal.
+ * Prototype DAG traversal strategy using certified closure phases.
  *
- * This file is intentionally not wired into production traversal. It translates the current
- * discussion into TypeScript shapes so the split/branch/trigger/close-boundary rules can be
- * reviewed with compiler help.
+ * This file is intentionally not wired into production traversal yet. It keeps the
+ * split/branch/trigger/close-boundary rules executable while they mature toward a production
+ * strategy.
  */
 
 export type SplitId = Brand<number, "SplitId">;
@@ -100,11 +100,11 @@ interface TriggerHit<NodeId> {
 }
 
 /**
- * Explores one closure phase until the current sketch can prove a closed boundary, or until
- * there is no frontier left. The function is deliberately small-scope: it models only certified
- * closure and does not attempt include-side yielding.
+ * Resolves one closure phase until it can prove a closed boundary, or until there is no frontier
+ * left. The function is deliberately small-scope: it models only certified closure and does not
+ * attempt include-side yielding.
  */
-export async function exploreCertifiedClosurePhase<NodeId extends PropertyKey, Node>(
+export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey, Node>(
   context: WalkDagContext<NodeId, Node>,
   startId: NodeId,
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
@@ -163,11 +163,10 @@ export async function exploreCertifiedClosurePhase<NodeId extends PropertyKey, N
 }
 
 /**
- * Temporary whole-difference sketch. It models one integrated traversal loop that alternates
- * include expansion with exclude certification phases. This is still design notation, not the
- * production strategy.
+ * Walks the DAG difference by alternating include expansion with exclude certification phases.
+ * This is still a prototype strategy and is not wired into production traversal yet.
  */
-export async function* exploreDagDifferenceSketch<NodeId extends PropertyKey, Node>(
+export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKey, Node>(
   context: WalkDagContext<NodeId, Node>,
   startId: NodeId,
   excludeStartId: NodeId,
@@ -190,7 +189,7 @@ export async function* exploreDagDifferenceSketch<NodeId extends PropertyKey, No
       continue;
     }
 
-    const closure = await exploreCertifiedClosurePhase(context, item.nodeId);
+    const closure = await resolveDagCertifiedClosurePhase(context, item.nodeId);
     yield* state.applyCertification(closure);
     if (closure.kind === "closed-boundary") {
       frontier.push({ side: "exclude", nodeId: closure.closedBoundary });

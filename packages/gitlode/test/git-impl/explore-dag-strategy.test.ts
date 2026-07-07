@@ -4,8 +4,8 @@ import type { DagNodePort, WalkDagContext } from "../../src/git-impl/dag-travers
 import {
   type CertifiedClosurePhaseResult,
   IntegratedDifferenceState,
-  exploreCertifiedClosurePhase,
-  exploreDagDifferenceSketch,
+  resolveDagCertifiedClosurePhase,
+  walkDagPhaseCertifiedDifference,
 } from "../../src/git-impl/explore-dag-strategy.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
@@ -20,9 +20,9 @@ const unusedPort: DagNodePort<string, TestNode> = {
   getSuccessors: () => [],
 };
 
-describe("exploreCertifiedClosurePhase", () => {
+describe("resolveDagCertifiedClosurePhase", () => {
   it("records a complete exclude path when no split closes", async () => {
-    const result = await exploreCertifiedClosurePhase(
+    const result = await resolveDagCertifiedClosurePhase(
       createContext(
         createDagPort({
           EXCLUDE: ["PARENT"],
@@ -42,7 +42,7 @@ describe("exploreCertifiedClosurePhase", () => {
 
   it("certifies a closed boundary when split branches rejoin", async () => {
     const reads: string[] = [];
-    const result = await exploreCertifiedClosurePhase(
+    const result = await resolveDagCertifiedClosurePhase(
       createContext(
         createDagPort(
           {
@@ -67,7 +67,7 @@ describe("exploreCertifiedClosurePhase", () => {
   });
 
   it("keeps an unclosed split as complete exclude with both root terminals", async () => {
-    const result = await exploreCertifiedClosurePhase(
+    const result = await resolveDagCertifiedClosurePhase(
       createContext(
         createDagPort({
           MERGE: ["LEFT", "RIGHT"],
@@ -184,14 +184,16 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
       reads,
     );
 
-    const yielded = await collect(exploreDagDifferenceSketch(createContext(port), "HEAD", "C"));
+    const yielded = await collect(
+      walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "C"),
+    );
 
     expect(yielded).toEqual([{ id: "HEAD" }]);
     expect(reads).toEqual(["HEAD", "C"]);
   });
 });
 
-describe("exploreDagDifferenceSketch", () => {
+describe("walkDagPhaseCertifiedDifference", () => {
   it("returns the include side before a certified single-path exclude boundary", async () => {
     const port = createDagPort({
       HEAD: ["NEW"],
@@ -201,7 +203,7 @@ describe("exploreDagDifferenceSketch", () => {
     });
 
     const yielded = await collect(
-      exploreDagDifferenceSketch(createContext(port), "HEAD", "EXCLUDE"),
+      walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
     );
 
     expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["HEAD", "NEW"]));
@@ -218,7 +220,7 @@ describe("exploreDagDifferenceSketch", () => {
     });
 
     const yielded = await collect(
-      exploreDagDifferenceSketch(createContext(port), "HEAD", "EXCLUDE"),
+      walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
     );
 
     expect(new Set(yielded.map((node) => node.id))).toEqual(

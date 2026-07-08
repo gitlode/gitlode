@@ -128,6 +128,25 @@ interface IncludePathClassification<NodeId extends PropertyKey> {
   readonly excluded: Set<NodeId>;
 }
 
+interface ReadonlyIncludeGraphState<NodeId extends PropertyKey, Node> {
+  has(nodeId: NodeId): boolean;
+  get(nodeId: NodeId): IncludeNodeState<NodeId, Node> | undefined;
+  predecessorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>>;
+  successorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>>;
+}
+
+interface MutableIncludeGraphState<
+  NodeId extends PropertyKey,
+  Node,
+> extends ReadonlyIncludeGraphState<NodeId, Node> {
+  delete(nodeId: NodeId): void;
+  nodeIds(): NodeId[];
+}
+
+interface ReadonlyCertifiedExcludeState<NodeId extends PropertyKey> {
+  has(nodeId: NodeId): boolean;
+}
+
 interface ClosureFrontierItem<NodeId> {
   readonly nodeId: NodeId;
   readonly branchId: BranchId;
@@ -662,7 +681,9 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
   }
 }
 
-class CertifiedExcludeState<NodeId extends PropertyKey> {
+class CertifiedExcludeState<
+  NodeId extends PropertyKey,
+> implements ReadonlyCertifiedExcludeState<NodeId> {
   private readonly certified = new Set<NodeId>();
 
   has(nodeId: NodeId): boolean {
@@ -671,7 +692,7 @@ class CertifiedExcludeState<NodeId extends PropertyKey> {
 
   absorbClosure<Node>(
     closure: CertifiedClosurePhaseResult<NodeId>,
-    includeGraph: IncludeGraphState<NodeId, Node>,
+    includeGraph: ReadonlyIncludeGraphState<NodeId, Node>,
   ): Set<NodeId> {
     const hits = new Set<NodeId>();
     for (const nodeId of closure.certifiedNodes) {
@@ -688,8 +709,8 @@ class CertifiedExcludeState<NodeId extends PropertyKey> {
 }
 
 async function* resolveCertifiedHits<NodeId extends PropertyKey, Node>(
-  includeGraph: IncludeGraphState<NodeId, Node>,
-  certifiedExclude: CertifiedExcludeState<NodeId>,
+  includeGraph: MutableIncludeGraphState<NodeId, Node>,
+  certifiedExclude: ReadonlyCertifiedExcludeState<NodeId>,
   hits: ReadonlySet<NodeId>,
 ): AsyncIterable<Node> {
   if (hits.size === 0) return;
@@ -711,7 +732,7 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey, Node>(
 }
 
 async function classifyCertifiedHits<NodeId extends PropertyKey, Node>(
-  includeGraph: IncludeGraphState<NodeId, Node>,
+  includeGraph: ReadonlyIncludeGraphState<NodeId, Node>,
   hits: ReadonlySet<NodeId>,
 ): Promise<IncludePathClassification<NodeId>> {
   const newerSide = await collectReachableNodes(hits, includeGraph.predecessorsPort());
@@ -728,8 +749,8 @@ async function classifyCertifiedHits<NodeId extends PropertyKey, Node>(
 }
 
 function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
-  includeGraph: IncludeGraphState<NodeId, Node>,
-  certifiedExclude: CertifiedExcludeState<NodeId>,
+  includeGraph: MutableIncludeGraphState<NodeId, Node>,
+  certifiedExclude: ReadonlyCertifiedExcludeState<NodeId>,
 ): Iterable<Node> {
   const nodeIds = includeGraph.nodeIds();
   for (const nodeId of nodeIds) {
@@ -747,7 +768,10 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
  * at the same time. Expanded nodes are cached, but their links remain mutable because certified-hit
  * deletion detaches nodes from their neighbors.
  */
-class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
+class IncludeGraphState<
+  NodeId extends PropertyKey,
+  Node = unknown,
+> implements MutableIncludeGraphState<NodeId, Node> {
   private readonly nodes: DagNodePort<NodeId, Node>;
   private readonly visited = new Map<NodeId, IncludeNodeState<NodeId, Node>>();
 

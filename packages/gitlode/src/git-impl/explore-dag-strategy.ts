@@ -40,16 +40,23 @@ export type SplitId = Brand<number, "SplitId">;
 export type BranchId = Brand<number, "BranchId">;
 export type BranchGroupId = Brand<number, "BranchGroupId">;
 
-export interface CertifiedClosureNodeState<NodeId extends PropertyKey, Node> {
+interface CertifiedClosureNodeStateBase<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
   readonly predecessors: Set<NodeId>;
   readonly traversedBranches: Set<BranchId>;
-  successors?: readonly NodeId[];
-  node?: Node;
   reached: boolean;
-  expanded: boolean;
   closedCover: boolean;
 }
+
+export type CertifiedClosureNodeState<NodeId extends PropertyKey, Node> =
+  | (CertifiedClosureNodeStateBase<NodeId> & {
+      readonly expanded: false;
+    })
+  | (CertifiedClosureNodeStateBase<NodeId> & {
+      readonly expanded: true;
+      readonly node: Node;
+      readonly successors: readonly NodeId[];
+    });
 
 export interface SplitState<NodeId extends PropertyKey> {
   readonly id: SplitId;
@@ -81,13 +88,20 @@ export type CertifiedClosurePhaseResult<NodeId extends PropertyKey> =
       readonly terminalNodes: readonly NodeId[];
     };
 
-export interface IncludeNodeState<NodeId extends PropertyKey, Node> {
+interface IncludeNodeStateBase<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
   readonly predecessors: Set<NodeId>;
   readonly successors: Set<NodeId>;
-  node?: Node;
-  expanded: boolean;
 }
+
+export type IncludeNodeState<NodeId extends PropertyKey, Node> =
+  | (IncludeNodeStateBase<NodeId> & {
+      readonly expanded: false;
+    })
+  | (IncludeNodeStateBase<NodeId> & {
+      readonly expanded: true;
+      readonly node: Node;
+    });
 
 export interface IncludeFrontierItem<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
@@ -100,7 +114,7 @@ export type IncludeExpansionResult<NodeId extends PropertyKey> =
     }
   | {
       readonly kind: "skipped";
-      readonly reason: "stale" | "certified-hit" | "already-expanded" | "cached-unexpanded";
+      readonly reason: "stale" | "certified-hit" | "already-expanded";
     };
 
 export type DifferenceFrontierItem<NodeId extends PropertyKey> =
@@ -268,10 +282,6 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     const branch = this.branches.get(branchId);
     if (branch === undefined) throw new Error(`Unknown branch: ${branchId}`);
     return branch;
-  }
-
-  markExpanded(nodeId: NodeId, successors: readonly NodeId[]): void {
-    this.graph.markExpanded(nodeId, successors);
   }
 
   markTraversed(nodeId: NodeId, branchId: BranchId): void {
@@ -555,22 +565,24 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
   async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
     const state = this.stateFor(nodeId);
     if (state.expanded) {
-      if (state.successors === undefined) throw new Error("Expected successors for expanded node.");
       return state.successors;
     }
 
     const node = await this.nodes.readNode(nodeId);
     const successors = this.nodes.getSuccessors(node);
-    state.node = node;
-    this.markExpanded(nodeId, successors);
+    this.markExpanded(nodeId, node, successors);
     return successors;
   }
 
-  markExpanded(nodeId: NodeId, successors: readonly NodeId[]): void {
+  markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
     const state = this.stateFor(nodeId);
-    state.successors = successors;
-    state.reached = true;
-    state.expanded = true;
+    this.visited.set(nodeId, {
+      ...state,
+      expanded: true,
+      node,
+      reached: true,
+      successors,
+    });
   }
 
   recordEdge(nodeId: NodeId, successorId: NodeId): void {
@@ -623,9 +635,6 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     }
 
     if (state.expanded) return { kind: "skipped", reason: "already-expanded" };
-    if (state.predecessors.size === 0 && state.node !== undefined) {
-      return { kind: "skipped", reason: "cached-unexpanded" };
-    }
 
     const successors = await this.includeGraph.expand(item.nodeId);
 
@@ -696,7 +705,7 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey, Node>(
   for (const nodeId of classification.yieldable) {
     if (classification.excluded.has(nodeId)) continue;
     const state = includeGraph.get(nodeId);
-    if (state?.node === undefined || certifiedExclude.has(nodeId)) continue;
+    if (state === undefined || !state.expanded || certifiedExclude.has(nodeId)) continue;
     includeGraph.delete(nodeId);
     yield state.node;
   }
@@ -726,7 +735,7 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
   const nodeIds = includeGraph.nodeIds();
   for (const nodeId of nodeIds) {
     const state = includeGraph.get(nodeId);
-    if (state?.node === undefined || certifiedExclude.has(nodeId)) continue;
+    if (state === undefined || !state.expanded || certifiedExclude.has(nodeId)) continue;
     includeGraph.delete(nodeId);
     yield state.node;
   }
@@ -768,10 +777,14 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
 
   markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
     const state = this.stateFor(nodeId);
-    state.node = node;
-    state.expanded = true;
+    const expandedState: IncludeNodeState<NodeId, Node> = {
+      ...state,
+      expanded: true,
+      node,
+    };
+    this.visited.set(nodeId, expandedState);
     for (const successor of successors) {
-      state.successors.add(successor);
+      expandedState.successors.add(successor);
     }
   }
 

@@ -17,13 +17,6 @@ interface TestNode {
   readonly id: string;
 }
 
-const unusedPort: DagNodePort<string, TestNode> = {
-  async readNode(nodeId) {
-    return { id: nodeId };
-  },
-  getSuccessors: () => [],
-};
-
 describe("resolveDagCertifiedClosurePhase", () => {
   it("records a complete exclude path when no split closes", async () => {
     const result = await resolveDagCertifiedClosurePhase(
@@ -96,7 +89,7 @@ describe("resolveDagCertifiedClosurePhase", () => {
 
 describe("IntegratedDifferenceState certified hit resolution", () => {
   it("yields the visited newer side of a single certified hit", async () => {
-    const state = createState({
+    const state = await createState({
       A: ["C"],
       C: ["HEAD"],
       HEAD: [],
@@ -108,7 +101,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
   });
 
   it("excludes the path between simultaneous certified hits", async () => {
-    const state = createState({
+    const state = await createState({
       A: ["N"],
       N: ["B"],
       B: ["HEAD"],
@@ -121,7 +114,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
   });
 
   it("keeps sibling certified-hit regions independent", async () => {
-    const state = createState({
+    const state = await createState({
       A: ["A_CHILD"],
       A_CHILD: ["HEAD"],
       B: ["B_CHILD"],
@@ -137,7 +130,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
   });
 
   it("prunes the successor side of a certified hit before draining remaining nodes", async () => {
-    const state = createState({
+    const state = await createState({
       ROOT: ["A"],
       A: ["C"],
       C: [],
@@ -149,7 +142,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
   });
 
   it("excludes an include merge side that is an ancestor of another certified hit", async () => {
-    const state = createState({
+    const state = await createState({
       A: ["X"],
       X: ["M"],
       Y: ["M"],
@@ -164,7 +157,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
   });
 
   it("lets descendants of an excluded path yield when they are not ancestors of a hit", async () => {
-    const state = createState({
+    const state = await createState({
       A: ["X"],
       X: ["B", "Z"],
       B: ["Y"],
@@ -294,24 +287,25 @@ describe("walkDagPhaseCertifiedDifference", () => {
   });
 });
 
-function createState(
+async function createState(
   predecessorsByNode: Record<string, readonly string[]>,
-  port: DagNodePort<string, TestNode> = unusedPort,
-): IntegratedDifferenceState<string, TestNode> {
-  const state = new IntegratedDifferenceState<string, TestNode>(port);
-  for (const nodeId of Object.keys(predecessorsByNode)) {
-    const node = state.stateFor(nodeId);
-    node.node = { id: nodeId };
-    node.expanded = true;
-  }
+): Promise<IntegratedDifferenceState<string, TestNode>> {
+  const successorsByNode: Record<string, string[]> = {};
 
   for (const [successorId, predecessorIds] of Object.entries(predecessorsByNode)) {
-    const successor = state.stateFor(successorId);
+    successorsByNode[successorId] ??= [];
     for (const predecessorId of predecessorIds) {
-      const predecessor = state.stateFor(predecessorId);
-      successor.predecessors.add(predecessorId);
-      predecessor.successors.add(successorId);
+      successorsByNode[predecessorId] ??= [];
+      successorsByNode[predecessorId].push(successorId);
     }
+  }
+
+  const state = new IntegratedDifferenceState<string, TestNode>(createDagPort(successorsByNode));
+  for (const nodeId of Object.keys(successorsByNode)) {
+    state.stateFor(nodeId);
+  }
+  for (const nodeId of Object.keys(successorsByNode)) {
+    await state.expandInclude({ nodeId });
   }
 
   return state;

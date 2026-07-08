@@ -274,7 +274,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     item: ClosureFrontierItem<NodeId>,
     successor: NodeId,
   ): ClosureFrontierItem<NodeId>[] {
-    this.recordEdge(item.nodeId, successor);
+    this.recordTraversedEdge(item.nodeId, successor);
     const hit = this.reachSuccessorFromBranch(item.branchId, successor);
     const frontier = hit === undefined ? [] : this.resolveBranchByTrigger(hit);
     if (!this.graph.stateFor(successor).expanded) {
@@ -291,7 +291,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     const childSplit = this.openSplit(item.nodeId, item.branchId, successors);
     for (const branchId of childSplit.branchIds) {
       const branch = this.getBranchStateOrThrow(branchId);
-      this.recordEdge(item.nodeId, branch.startedAt);
+      this.recordTraversedEdge(item.nodeId, branch.startedAt);
       const hit = this.reachSuccessorFromBranch(branch.id, branch.startedAt);
       if (hit !== undefined) frontier.push(...this.resolveBranchByTrigger(hit));
       if (!this.graph.stateFor(branch.startedAt).expanded) {
@@ -388,8 +388,8 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     this.terminalNodes.add(nodeId);
   }
 
-  private recordEdge(nodeId: NodeId, successorId: NodeId): void {
-    this.graph.recordEdge(nodeId, successorId);
+  private recordTraversedEdge(nodeId: NodeId, successorId: NodeId): void {
+    this.graph.recordTraversedEdge(nodeId, successorId);
   }
 
   private closeSplit(split: SplitState<NodeId>, boundary: NodeId): ClosureFrontierItem<NodeId>[] {
@@ -533,6 +533,14 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 }
 
+/**
+ * Stores the closure phase's explored DAG view.
+ *
+ * Unlike `IncludeGraphState`, this graph does not record every edge immediately when a node is
+ * expanded. The closure phase decides when an edge has become part of a branch traversal, then calls
+ * `recordTraversedEdge()`. The graph only needs predecessor links for walking back through the
+ * certified closed region.
+ */
 class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
   private readonly nodes: DagNodePort<NodeId, Node>;
   private readonly visited = new Map<NodeId, CertifiedClosureNodeState<NodeId, Node>>();
@@ -580,7 +588,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     });
   }
 
-  recordEdge(nodeId: NodeId, successorId: NodeId): void {
+  recordTraversedEdge(nodeId: NodeId, successorId: NodeId): void {
     this.stateFor(successorId).predecessors.add(nodeId);
   }
 
@@ -736,6 +744,13 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
   }
 }
 
+/**
+ * Stores the include-side local DAG used for certified-hit classification and deletion.
+ *
+ * Include expansion owns edge discovery, so `expand()` records both successor and predecessor links
+ * at the same time. The bidirectional links let classification walk both sides of a certified hit
+ * and let deletion detach a node from its neighbors.
+ */
 class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
   private readonly nodes: DagNodePort<NodeId, Node>;
   private readonly visited = new Map<NodeId, IncludeNodeState<NodeId, Node>>();
@@ -788,12 +803,12 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
     const successors = this.nodes.getSuccessors(node);
     this.markExpanded(nodeId, node, successors);
     for (const successor of successors) {
-      this.recordEdge(nodeId, successor);
+      this.recordExpandedEdge(nodeId, successor);
     }
     return successors;
   }
 
-  private recordEdge(nodeId: NodeId, successorId: NodeId): void {
+  private recordExpandedEdge(nodeId: NodeId, successorId: NodeId): void {
     const node = this.stateFor(nodeId);
     const successor = this.stateFor(successorId);
     successor.predecessors.add(nodeId);

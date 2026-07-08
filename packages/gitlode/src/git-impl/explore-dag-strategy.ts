@@ -228,7 +228,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   constructor(nodes: DagNodePort<NodeId, Node>, startId: NodeId) {
     this.graph = new ClosureGraphState(nodes);
     this.rootBranchId = 0 as BranchId;
-    this.stateFor(startId).closedCover = true;
+    this.graph.stateFor(startId).closedCover = true;
     this.branches.set(this.rootBranchId, {
       id: this.rootBranchId,
       splitId: 0 as SplitId,
@@ -240,7 +240,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   async advance(item: ClosureFrontierItem<NodeId>): Promise<ClosureFrontierItem<NodeId>[]> {
-    const state = this.stateFor(item.nodeId);
+    const state = this.graph.stateFor(item.nodeId);
     if (state.traversedBranches.has(item.branchId)) return [];
 
     const frontier = state.expanded
@@ -270,42 +270,20 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     return this.closedBoundary !== undefined;
   }
 
-  stateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId, Node> {
-    return this.graph.stateFor(nodeId);
-  }
-
-  getBranchStateOrThrow(branchId: BranchId): BranchState<NodeId> {
-    const branch = this.branches.get(branchId);
-    if (branch === undefined) throw new Error(`Unknown branch: ${branchId}`);
-    return branch;
-  }
-
-  markTraversed(nodeId: NodeId, branchId: BranchId): void {
-    this.stateFor(nodeId).traversedBranches.add(branchId);
-  }
-
-  markTerminal(nodeId: NodeId): void {
-    this.terminalNodes.add(nodeId);
-  }
-
-  recordEdge(nodeId: NodeId, successorId: NodeId): void {
-    this.graph.recordEdge(nodeId, successorId);
-  }
-
-  advanceSingleSuccessor(
+  private advanceSingleSuccessor(
     item: ClosureFrontierItem<NodeId>,
     successor: NodeId,
   ): ClosureFrontierItem<NodeId>[] {
     this.recordEdge(item.nodeId, successor);
     const hit = this.reachSuccessorFromBranch(item.branchId, successor);
     const frontier = hit === undefined ? [] : this.resolveBranchByTrigger(hit);
-    if (!this.stateFor(successor).expanded) {
+    if (!this.graph.stateFor(successor).expanded) {
       frontier.push({ nodeId: successor, branchId: item.branchId });
     }
     return frontier;
   }
 
-  advanceSplitSuccessors(
+  private advanceSplitSuccessors(
     item: ClosureFrontierItem<NodeId>,
     successors: readonly NodeId[],
   ): ClosureFrontierItem<NodeId>[] {
@@ -316,14 +294,14 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
       this.recordEdge(item.nodeId, branch.startedAt);
       const hit = this.reachSuccessorFromBranch(branch.id, branch.startedAt);
       if (hit !== undefined) frontier.push(...this.resolveBranchByTrigger(hit));
-      if (!this.stateFor(branch.startedAt).expanded) {
+      if (!this.graph.stateFor(branch.startedAt).expanded) {
         frontier.push({ nodeId: branch.startedAt, branchId: branch.id });
       }
     }
     return frontier;
   }
 
-  openSplit(
+  private openSplit(
     openedAt: NodeId,
     openedFromBranchId: BranchId,
     successors: readonly NodeId[],
@@ -353,7 +331,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     return split;
   }
 
-  reachSuccessorFromBranch(
+  private reachSuccessorFromBranch(
     branchId: BranchId,
     successorId: NodeId,
   ): TriggerHit<NodeId> | undefined {
@@ -369,7 +347,10 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     };
   }
 
-  resolveBranchByKnownNode(branchId: BranchId, knownNodeId: NodeId): ClosureFrontierItem<NodeId>[] {
+  private resolveBranchByKnownNode(
+    branchId: BranchId,
+    knownNodeId: NodeId,
+  ): ClosureFrontierItem<NodeId>[] {
     const branch = this.getBranchStateOrThrow(branchId);
     const joinedBranchId = this.findJoinedBranchAtNode(branch.splitId, branchId, knownNodeId);
     if (joinedBranchId === undefined) return [];
@@ -381,7 +362,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     });
   }
 
-  resolveBranchByTrigger(hit: TriggerHit<NodeId>): ClosureFrontierItem<NodeId>[] {
+  private resolveBranchByTrigger(hit: TriggerHit<NodeId>): ClosureFrontierItem<NodeId>[] {
     const split = this.getSplitStateOrThrow(hit.splitId);
     if (split.resolved) return [];
     split.triggers.add(hit.trigger);
@@ -391,6 +372,24 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     if (boundary === undefined) return [];
 
     return this.closeSplit(split, boundary);
+  }
+
+  private getBranchStateOrThrow(branchId: BranchId): BranchState<NodeId> {
+    const branch = this.branches.get(branchId);
+    if (branch === undefined) throw new Error(`Unknown branch: ${branchId}`);
+    return branch;
+  }
+
+  private markTraversed(nodeId: NodeId, branchId: BranchId): void {
+    this.graph.stateFor(nodeId).traversedBranches.add(branchId);
+  }
+
+  private markTerminal(nodeId: NodeId): void {
+    this.terminalNodes.add(nodeId);
+  }
+
+  private recordEdge(nodeId: NodeId, successorId: NodeId): void {
+    this.graph.recordEdge(nodeId, successorId);
   }
 
   private closeSplit(split: SplitState<NodeId>, boundary: NodeId): ClosureFrontierItem<NodeId>[] {
@@ -442,7 +441,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   private reachNode(nodeId: NodeId, branchId: BranchId, splitId?: SplitId): BranchId | undefined {
-    const state = this.stateFor(nodeId);
+    const state = this.graph.stateFor(nodeId);
     state.reached = true;
 
     let reached = this.reachedByBranch.get(nodeId);
@@ -523,7 +522,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
 
   private markClosedRegion(openedAt: NodeId, boundary: NodeId): void {
     for (const nodeId of this.walkPredecessorsUntil(boundary, openedAt)) {
-      this.stateFor(nodeId).closedCover = true;
+      this.graph.stateFor(nodeId).closedCover = true;
     }
   }
 

@@ -302,7 +302,7 @@ async function createState(
 
   const state = new IntegratedDifferenceState<string, TestNode>(createDagPort(successorsByNode));
   for (const nodeId of Object.keys(successorsByNode)) {
-    state.stateFor(nodeId);
+    state.initializeInclude(nodeId);
   }
   for (const nodeId of Object.keys(successorsByNode)) {
     await state.expandInclude(nodeId);

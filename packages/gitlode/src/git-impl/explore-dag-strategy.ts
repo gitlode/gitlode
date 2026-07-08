@@ -623,10 +623,6 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     this.includeGraph.initialize(startId);
   }
 
-  stateFor(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
-    return this.includeGraph.stateFor(nodeId);
-  }
-
   // Difference-state policy plus include-side graph expansion. The returned result tells the
   // coordinator whether to enqueue more include work or resolve a certified hit.
   async expandInclude(nodeId: NodeId): Promise<IncludeExpansionResult<NodeId>> {

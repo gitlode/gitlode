@@ -748,8 +748,8 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
  * Stores the include-side local DAG used for certified-hit classification and deletion.
  *
  * Include expansion owns edge discovery, so `expand()` records both successor and predecessor links
- * at the same time. The bidirectional links let classification walk both sides of a certified hit
- * and let deletion detach a node from its neighbors.
+ * at the same time. Expanded nodes are cached, but their links remain mutable because certified-hit
+ * deletion detaches nodes from their neighbors.
  */
 class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
   private readonly nodes: DagNodePort<NodeId, Node>;
@@ -796,6 +796,11 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
   }
 
   async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
+    const state = this.stateFor(nodeId);
+    if (state.expanded) {
+      return [...state.successors];
+    }
+
     const node = await this.nodes.readNode(nodeId);
     const successors = this.nodes.getSuccessors(node);
     this.markNodeExpanded(nodeId, node);

@@ -37,10 +37,10 @@ describe("resolveDagCertifiedClosurePhase", () => {
       "EXCLUDE",
     );
 
-    expect(result.kind).toBe("complete-exclude");
+    expect(result.kind).toBe("exhausted");
     expect(result.certifiedNodes).toEqual(new Set(["EXCLUDE", "PARENT", "ROOT"]));
-    if (result.kind === "complete-exclude") {
-      expect(result.rootTerminals).toEqual(["ROOT"]);
+    if (result.kind === "exhausted") {
+      expect(result.terminalNodes).toEqual(["ROOT"]);
     }
   });
 
@@ -84,12 +84,12 @@ describe("resolveDagCertifiedClosurePhase", () => {
       "MERGE",
     );
 
-    expect(result.kind).toBe("complete-exclude");
+    expect(result.kind).toBe("exhausted");
     expect(result.certifiedNodes).toEqual(
       new Set(["MERGE", "LEFT", "RIGHT", "LEFT_ROOT", "RIGHT_ROOT"]),
     );
-    if (result.kind === "complete-exclude") {
-      expect(new Set(result.rootTerminals)).toEqual(new Set(["LEFT_ROOT", "RIGHT_ROOT"]));
+    if (result.kind === "exhausted") {
+      expect(new Set(result.terminalNodes)).toEqual(new Set(["LEFT_ROOT", "RIGHT_ROOT"]));
     }
   });
 });
@@ -136,7 +136,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
     );
   });
 
-  it("prunes the parent side of a certified hit before draining remaining nodes", async () => {
+  it("prunes the successor side of a certified hit before draining remaining nodes", async () => {
     const state = createState({
       ROOT: ["A"],
       A: ["C"],
@@ -295,22 +295,22 @@ describe("walkDagPhaseCertifiedDifference", () => {
 });
 
 function createState(
-  childrenByNode: Record<string, readonly string[]>,
+  predecessorsByNode: Record<string, readonly string[]>,
   port: DagNodePort<string, TestNode> = unusedPort,
 ): IntegratedDifferenceState<string, TestNode> {
   const state = new IntegratedDifferenceState<string, TestNode>(port);
-  for (const nodeId of Object.keys(childrenByNode)) {
+  for (const nodeId of Object.keys(predecessorsByNode)) {
     const node = state.stateFor(nodeId);
     node.node = { id: nodeId };
     node.expanded = true;
   }
 
-  for (const [parentId, childIds] of Object.entries(childrenByNode)) {
-    const parent = state.stateFor(parentId);
-    for (const childId of childIds) {
-      const child = state.stateFor(childId);
-      parent.children.add(childId);
-      child.parents.add(parentId);
+  for (const [successorId, predecessorIds] of Object.entries(predecessorsByNode)) {
+    const successor = state.stateFor(successorId);
+    for (const predecessorId of predecessorIds) {
+      const predecessor = state.stateFor(predecessorId);
+      successor.predecessors.add(predecessorId);
+      predecessor.successors.add(successorId);
     }
   }
 

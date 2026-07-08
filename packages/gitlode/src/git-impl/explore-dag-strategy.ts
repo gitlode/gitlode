@@ -20,8 +20,8 @@ export type { DagNodePort, WalkDagContext } from "./dag-traversal-strategy.js";
  *   include expansion and exclude certification phases, and it should make frontier additions and
  *   yield points visible from the main loop.
  * - Include graph bookkeeping should live in an include-side state object. It should own visited
- *   include nodes, cached node objects, expanded flags, and the derived parent/child links used for
- *   local classification.
+ *   include nodes, cached node objects, expanded flags, and the derived successor/predecessor links
+ *   used for local classification.
  * - Certified exclude bookkeeping should live in an exclude-side state object. It should own the
  *   certified exclude set, absorb closure phase results, report include-side hits, and decide
  *   whether another exclude phase should start from a closed boundary.
@@ -42,7 +42,7 @@ export type BranchGroupId = Brand<number, "BranchGroupId">;
 
 export interface CertifiedClosureNodeState<NodeId extends PropertyKey, Node> {
   readonly nodeId: NodeId;
-  readonly children: Set<NodeId>;
+  readonly predecessors: Set<NodeId>;
   readonly traversedBranches: Set<BranchId>;
   successors?: readonly NodeId[];
   node?: Node;
@@ -76,15 +76,15 @@ export type CertifiedClosurePhaseResult<NodeId extends PropertyKey> =
       readonly closedBoundary: NodeId;
     }
   | {
-      readonly kind: "complete-exclude";
+      readonly kind: "exhausted";
       readonly certifiedNodes: ReadonlySet<NodeId>;
-      readonly rootTerminals: readonly NodeId[];
+      readonly terminalNodes: readonly NodeId[];
     };
 
 export interface IncludeNodeState<NodeId extends PropertyKey, Node> {
   readonly nodeId: NodeId;
-  readonly children: Set<NodeId>;
-  readonly parents: Set<NodeId>;
+  readonly predecessors: Set<NodeId>;
+  readonly successors: Set<NodeId>;
   node?: Node;
   expanded: boolean;
 }
@@ -100,10 +100,10 @@ export type IncludeExpansionResult<NodeId extends PropertyKey> =
     }
   | {
       readonly kind: "skipped";
-      readonly reason: "stale" | "certified-hit" | "already-expanded" | "already-cached";
+      readonly reason: "stale" | "certified-hit" | "already-expanded" | "cached-unexpanded";
     };
 
-export type IntegratedFrontierItem<NodeId extends PropertyKey> =
+export type DifferenceFrontierItem<NodeId extends PropertyKey> =
   | {
       readonly side: "include";
       readonly nodeId: NodeId;
@@ -118,7 +118,7 @@ interface IncludePathClassification<NodeId extends PropertyKey> {
   readonly excluded: Set<NodeId>;
 }
 
-interface FrontierItem<NodeId> {
+interface ClosureFrontierItem<NodeId> {
   readonly nodeId: NodeId;
   readonly branchId: BranchId;
 }
@@ -141,7 +141,9 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
   const { nodes } = context;
   const phase = new CertifiedClosurePhase<NodeId, Node>(nodes, startId);
-  const frontier: FrontierItem<NodeId>[] = [{ nodeId: startId, branchId: phase.rootBranchId }];
+  const frontier: ClosureFrontierItem<NodeId>[] = [
+    { nodeId: startId, branchId: phase.rootBranchId },
+  ];
 
   while (frontier.length > 0 && !phase.hasClosedBoundary()) {
     const item = frontier.shift();
@@ -166,7 +168,7 @@ export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKe
   const state = new IntegratedDifferenceState<NodeId, Node>(nodes);
   state.initializeInclude(startId);
 
-  const frontier: IntegratedFrontierItem<NodeId>[] = [
+  const frontier: DifferenceFrontierItem<NodeId>[] = [
     { side: "include", nodeId: startId },
     { side: "exclude", nodeId: excludeStartId },
   ];
@@ -211,7 +213,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   private readonly branches = new Map<BranchId, BranchState<NodeId>>();
   private readonly splits = new Map<SplitId, SplitState<NodeId>>();
   private readonly reachedByBranch = new Map<NodeId, Set<BranchId>>();
-  private readonly rootEscapes = new Set<NodeId>();
+  private readonly terminalNodes = new Set<NodeId>();
 
   constructor(nodes: DagNodePort<NodeId, Node>, startId: NodeId) {
     this.graph = new ClosureGraphState(nodes);
@@ -227,7 +229,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     this.reachNode(startId, this.rootBranchId);
   }
 
-  async advance(item: FrontierItem<NodeId>): Promise<FrontierItem<NodeId>[]> {
+  async advance(item: ClosureFrontierItem<NodeId>): Promise<ClosureFrontierItem<NodeId>[]> {
     const state = this.stateFor(item.nodeId);
     if (state.traversedBranches.has(item.branchId)) return [];
 
@@ -235,11 +237,11 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
       ? this.resolveBranchByKnownNode(item.branchId, item.nodeId)
       : [];
 
-    const successors = await this.graph.successorsFor(item.nodeId);
+    const successors = await this.graph.expand(item.nodeId);
     this.markTraversed(item.nodeId, item.branchId);
 
     if (successors.length === 0) {
-      this.markRootEscape(item.nodeId);
+      this.markTerminal(item.nodeId);
       return frontier;
     }
 
@@ -276,15 +278,18 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     this.stateFor(nodeId).traversedBranches.add(branchId);
   }
 
-  markRootEscape(nodeId: NodeId): void {
-    this.rootEscapes.add(nodeId);
+  markTerminal(nodeId: NodeId): void {
+    this.terminalNodes.add(nodeId);
   }
 
-  recordEdge(childId: NodeId, parentId: NodeId): void {
-    this.graph.recordEdge(childId, parentId);
+  recordEdge(nodeId: NodeId, successorId: NodeId): void {
+    this.graph.recordEdge(nodeId, successorId);
   }
 
-  advanceSingleSuccessor(item: FrontierItem<NodeId>, successor: NodeId): FrontierItem<NodeId>[] {
+  advanceSingleSuccessor(
+    item: ClosureFrontierItem<NodeId>,
+    successor: NodeId,
+  ): ClosureFrontierItem<NodeId>[] {
     this.recordEdge(item.nodeId, successor);
     const hit = this.reachSuccessorFromBranch(item.branchId, successor);
     const frontier = hit === undefined ? [] : this.resolveBranchByTrigger(hit);
@@ -295,10 +300,10 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   advanceSplitSuccessors(
-    item: FrontierItem<NodeId>,
+    item: ClosureFrontierItem<NodeId>,
     successors: readonly NodeId[],
-  ): FrontierItem<NodeId>[] {
-    const frontier: FrontierItem<NodeId>[] = [];
+  ): ClosureFrontierItem<NodeId>[] {
+    const frontier: ClosureFrontierItem<NodeId>[] = [];
     const childSplit = this.openSplit(item.nodeId, item.branchId, successors);
     for (const branchId of childSplit.branchIds) {
       const branch = this.getBranchStateOrThrow(branchId);
@@ -358,7 +363,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     };
   }
 
-  resolveBranchByKnownNode(branchId: BranchId, knownNodeId: NodeId): FrontierItem<NodeId>[] {
+  resolveBranchByKnownNode(branchId: BranchId, knownNodeId: NodeId): ClosureFrontierItem<NodeId>[] {
     const branch = this.getBranchStateOrThrow(branchId);
     const joinedBranchId = this.findJoinedBranchAtNode(branch.splitId, branchId, knownNodeId);
     if (joinedBranchId === undefined) return [];
@@ -370,7 +375,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     });
   }
 
-  resolveBranchByTrigger(hit: TriggerHit<NodeId>): FrontierItem<NodeId>[] {
+  resolveBranchByTrigger(hit: TriggerHit<NodeId>): ClosureFrontierItem<NodeId>[] {
     const split = this.getSplitStateOrThrow(hit.splitId);
     if (split.resolved) return [];
     split.triggers.add(hit.trigger);
@@ -382,7 +387,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     return this.closeSplit(split, boundary);
   }
 
-  private closeSplit(split: SplitState<NodeId>, boundary: NodeId): FrontierItem<NodeId>[] {
+  private closeSplit(split: SplitState<NodeId>, boundary: NodeId): ClosureFrontierItem<NodeId>[] {
     split.resolved = true;
     split.closeBoundary = boundary;
     this.markClosedRegion(split.openedAt, boundary);
@@ -422,11 +427,11 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     }
 
     return {
-      kind: "complete-exclude",
+      kind: "exhausted",
       certifiedNodes: new Set(
         [...this.graph.states()].filter((state) => state.reached).map((state) => state.nodeId),
       ),
-      rootTerminals: [...this.rootEscapes],
+      terminalNodes: [...this.terminalNodes],
     };
   }
 
@@ -497,7 +502,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
 
     const dominated = new Set<NodeId>();
     for (const trigger of split.triggers) {
-      for (const seen of this.walkChildrenUntil(trigger, split.openedAt)) {
+      for (const seen of this.walkPredecessorsUntil(trigger, split.openedAt)) {
         if (seen !== trigger && split.triggers.has(seen)) dominated.add(seen);
       }
     }
@@ -506,12 +511,12 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     return candidates.length === 1 ? candidates[0] : undefined;
   }
 
-  private *walkChildrenUntil(from: NodeId, stop: NodeId): Iterable<NodeId> {
-    yield* this.graph.walkChildrenUntil(from, stop);
+  private *walkPredecessorsUntil(from: NodeId, stop: NodeId): Iterable<NodeId> {
+    yield* this.graph.walkPredecessorsUntil(from, stop);
   }
 
   private markClosedRegion(openedAt: NodeId, boundary: NodeId): void {
-    for (const nodeId of this.walkChildrenUntil(boundary, openedAt)) {
+    for (const nodeId of this.walkPredecessorsUntil(boundary, openedAt)) {
       this.stateFor(nodeId).closedCover = true;
     }
   }
@@ -536,7 +541,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     if (state === undefined) {
       state = {
         nodeId,
-        children: new Set<NodeId>(),
+        predecessors: new Set<NodeId>(),
         traversedBranches: new Set<BranchId>(),
         reached: false,
         expanded: false,
@@ -547,7 +552,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     return state;
   }
 
-  async successorsFor(nodeId: NodeId): Promise<readonly NodeId[]> {
+  async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
     const state = this.stateFor(nodeId);
     if (state.expanded) {
       if (state.successors === undefined) throw new Error("Expected successors for expanded node.");
@@ -568,15 +573,15 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     state.expanded = true;
   }
 
-  recordEdge(childId: NodeId, parentId: NodeId): void {
-    this.stateFor(parentId).children.add(childId);
+  recordEdge(nodeId: NodeId, successorId: NodeId): void {
+    this.stateFor(successorId).predecessors.add(nodeId);
   }
 
   states(): Iterable<CertifiedClosureNodeState<NodeId, Node>> {
     return this.visited.values();
   }
 
-  *walkChildrenUntil(from: NodeId, stop: NodeId): Iterable<NodeId> {
+  *walkPredecessorsUntil(from: NodeId, stop: NodeId): Iterable<NodeId> {
     const stack = [from];
     const seen = new Set<NodeId>();
 
@@ -586,7 +591,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
       seen.add(nodeId);
       yield nodeId;
       if (nodeId === stop) continue;
-      for (const child of this.stateFor(nodeId).children) stack.push(child);
+      for (const predecessor of this.stateFor(nodeId).predecessors) stack.push(predecessor);
     }
   }
 }
@@ -607,8 +612,8 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     return this.includeGraph.stateFor(nodeId);
   }
 
-  // IncludeGraphState responsibility plus include-side read orchestration. The returned result
-  // tells the coordinator whether to enqueue more include work or resolve a certified hit.
+  // Difference-state policy plus include-side graph expansion. The returned result tells the
+  // coordinator whether to enqueue more include work or resolve a certified hit.
   async expandInclude(item: IncludeFrontierItem<NodeId>): Promise<IncludeExpansionResult<NodeId>> {
     const state = this.includeGraph.get(item.nodeId);
     if (state === undefined) return { kind: "skipped", reason: "stale" };
@@ -618,13 +623,13 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
     }
 
     if (state.expanded) return { kind: "skipped", reason: "already-expanded" };
-    if (state.children.size === 0 && state.node !== undefined) {
-      return { kind: "skipped", reason: "already-cached" };
+    if (state.predecessors.size === 0 && state.node !== undefined) {
+      return { kind: "skipped", reason: "cached-unexpanded" };
     }
 
-    const parents = await this.includeGraph.expand(item.nodeId);
+    const successors = await this.includeGraph.expand(item.nodeId);
 
-    return { kind: "expanded", enqueue: parents };
+    return { kind: "expanded", enqueue: successors };
   }
 
   // Coordinator + certified-hit application responsibility. Exclude state absorbs the closure;
@@ -701,8 +706,8 @@ async function classifyCertifiedHits<NodeId extends PropertyKey, Node>(
   includeGraph: IncludeGraphState<NodeId, Node>,
   hits: ReadonlySet<NodeId>,
 ): Promise<IncludePathClassification<NodeId>> {
-  const newerSide = await collectReachableNodes(hits, includeGraph.childrenPort());
-  const olderSide = await collectReachableNodes(hits, includeGraph.parentsPort());
+  const newerSide = await collectReachableNodes(hits, includeGraph.predecessorsPort());
+  const olderSide = await collectReachableNodes(hits, includeGraph.successorsPort());
   const excluded = new Set(olderSide);
   const yieldable = difference(newerSide, excluded);
 
@@ -752,8 +757,8 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
     if (state === undefined) {
       state = {
         nodeId,
-        children: new Set<NodeId>(),
-        parents: new Set<NodeId>(),
+        predecessors: new Set<NodeId>(),
+        successors: new Set<NodeId>(),
         expanded: false,
       };
       this.visited.set(nodeId, state);
@@ -761,41 +766,41 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
     return state;
   }
 
-  markExpanded(nodeId: NodeId, node: Node, parents: readonly NodeId[]): void {
+  markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
     const state = this.stateFor(nodeId);
     state.node = node;
     state.expanded = true;
-    for (const parent of parents) {
-      state.parents.add(parent);
+    for (const successor of successors) {
+      state.successors.add(successor);
     }
   }
 
   async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
     const node = await this.nodes.readNode(nodeId);
-    const parents = this.nodes.getSuccessors(node);
-    this.markExpanded(nodeId, node, parents);
-    for (const parent of parents) {
-      this.recordEdge(nodeId, parent);
+    const successors = this.nodes.getSuccessors(node);
+    this.markExpanded(nodeId, node, successors);
+    for (const successor of successors) {
+      this.recordEdge(nodeId, successor);
     }
-    return parents;
+    return successors;
   }
 
-  recordEdge(childId: NodeId, parentId: NodeId): void {
-    const child = this.stateFor(childId);
-    const parent = this.stateFor(parentId);
-    parent.children.add(childId);
-    child.parents.add(parentId);
+  recordEdge(nodeId: NodeId, successorId: NodeId): void {
+    const node = this.stateFor(nodeId);
+    const successor = this.stateFor(successorId);
+    successor.predecessors.add(nodeId);
+    node.successors.add(successorId);
   }
 
   delete(nodeId: NodeId): void {
     const state = this.visited.get(nodeId);
     if (state === undefined) return;
 
-    for (const parent of state.parents) {
-      this.visited.get(parent)?.children.delete(nodeId);
+    for (const successor of state.successors) {
+      this.visited.get(successor)?.predecessors.delete(nodeId);
     }
-    for (const child of state.children) {
-      this.visited.get(child)?.parents.delete(nodeId);
+    for (const predecessor of state.predecessors) {
+      this.visited.get(predecessor)?.successors.delete(nodeId);
     }
     this.visited.delete(nodeId);
   }
@@ -804,17 +809,17 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
     return [...this.visited.keys()];
   }
 
-  childrenPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
+  predecessorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
     return {
       readNode: async (nodeId) => this.readNode(nodeId),
-      getSuccessors: (node) => [...node.children],
+      getSuccessors: (node) => [...node.predecessors],
     };
   }
 
-  parentsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
+  successorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
     return {
       readNode: async (nodeId) => this.readNode(nodeId),
-      getSuccessors: (node) => [...node.parents],
+      getSuccessors: (node) => [...node.successors],
     };
   }
 

@@ -716,7 +716,6 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey, Node>(
   if (hits.size === 0) return;
 
   const classification = await classifyCertifiedHits(includeGraph, hits);
-  for (const nodeId of hits) classification.excluded.add(nodeId);
 
   for (const nodeId of classification.excluded) {
     includeGraph.delete(nodeId);

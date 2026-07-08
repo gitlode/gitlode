@@ -58,6 +58,26 @@ export type CertifiedClosureNodeState<NodeId extends PropertyKey, Node> =
       readonly successors: readonly NodeId[];
     });
 
+type ReadonlyCertifiedClosureNodeState<NodeId extends PropertyKey, Node> =
+  | {
+      readonly nodeId: NodeId;
+      readonly predecessors: ReadonlySet<NodeId>;
+      readonly traversedBranches: ReadonlySet<BranchId>;
+      readonly reached: boolean;
+      readonly closedCover: boolean;
+      readonly expanded: false;
+    }
+  | {
+      readonly nodeId: NodeId;
+      readonly predecessors: ReadonlySet<NodeId>;
+      readonly traversedBranches: ReadonlySet<BranchId>;
+      readonly reached: boolean;
+      readonly closedCover: boolean;
+      readonly expanded: true;
+      readonly node: Node;
+      readonly successors: readonly NodeId[];
+    };
+
 export interface SplitState<NodeId extends PropertyKey> {
   readonly id: SplitId;
   readonly openedAt: NodeId;
@@ -103,6 +123,21 @@ export type IncludeNodeState<NodeId extends PropertyKey, Node> =
       readonly node: Node;
     });
 
+type ReadonlyIncludeNodeState<NodeId extends PropertyKey, Node> =
+  | {
+      readonly nodeId: NodeId;
+      readonly predecessors: ReadonlySet<NodeId>;
+      readonly successors: ReadonlySet<NodeId>;
+      readonly expanded: false;
+    }
+  | {
+      readonly nodeId: NodeId;
+      readonly predecessors: ReadonlySet<NodeId>;
+      readonly successors: ReadonlySet<NodeId>;
+      readonly expanded: true;
+      readonly node: Node;
+    };
+
 export type IncludeExpansionResult<NodeId extends PropertyKey> =
   | {
       readonly kind: "expanded";
@@ -130,9 +165,9 @@ interface IncludePathClassification<NodeId extends PropertyKey> {
 
 interface ReadonlyIncludeGraphState<NodeId extends PropertyKey, Node> {
   has(nodeId: NodeId): boolean;
-  get(nodeId: NodeId): IncludeNodeState<NodeId, Node> | undefined;
-  predecessorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>>;
-  successorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>>;
+  get(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId, Node> | undefined;
+  predecessorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>>;
+  successorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>>;
 }
 
 interface MutableIncludeGraphState<
@@ -247,7 +282,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   constructor(nodes: DagNodePort<NodeId, Node>, startId: NodeId) {
     this.graph = new ClosureGraphState(nodes);
     this.rootBranchId = 0 as BranchId;
-    this.graph.stateFor(startId).closedCover = true;
+    this.graph.markClosedCover(startId);
     this.branches.set(this.rootBranchId, {
       id: this.rootBranchId,
       splitId: 0 as SplitId,
@@ -400,7 +435,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   private markTraversed(nodeId: NodeId, branchId: BranchId): void {
-    this.graph.stateFor(nodeId).traversedBranches.add(branchId);
+    this.graph.markTraversed(nodeId, branchId);
   }
 
   private markTerminal(nodeId: NodeId): void {
@@ -460,8 +495,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   }
 
   private reachNode(nodeId: NodeId, branchId: BranchId, splitId?: SplitId): BranchId | undefined {
-    const state = this.graph.stateFor(nodeId);
-    state.reached = true;
+    this.graph.markReached(nodeId);
 
     let reached = this.reachedByBranch.get(nodeId);
     if (reached === undefined) {
@@ -541,7 +575,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
 
   private markClosedRegion(openedAt: NodeId, boundary: NodeId): void {
     for (const nodeId of this.walkPredecessorsUntil(boundary, openedAt)) {
-      this.graph.stateFor(nodeId).closedCover = true;
+      this.graph.markClosedCover(nodeId);
     }
   }
 
@@ -568,7 +602,11 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     this.nodes = nodes;
   }
 
-  stateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId, Node> {
+  stateFor(nodeId: NodeId): ReadonlyCertifiedClosureNodeState<NodeId, Node> {
+    return this.mutableStateFor(nodeId);
+  }
+
+  private mutableStateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId, Node> {
     let state = this.visited.get(nodeId);
     if (state === undefined) {
       state = {
@@ -585,7 +623,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
   }
 
   async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
-    const state = this.stateFor(nodeId);
+    const state = this.mutableStateFor(nodeId);
     if (state.expanded) {
       return state.successors;
     }
@@ -597,7 +635,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
   }
 
   private markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
-    const state = this.stateFor(nodeId);
+    const state = this.mutableStateFor(nodeId);
     this.visited.set(nodeId, {
       ...state,
       expanded: true,
@@ -607,11 +645,23 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     });
   }
 
-  recordTraversedEdge(nodeId: NodeId, successorId: NodeId): void {
-    this.stateFor(successorId).predecessors.add(nodeId);
+  markReached(nodeId: NodeId): void {
+    this.mutableStateFor(nodeId).reached = true;
   }
 
-  states(): Iterable<CertifiedClosureNodeState<NodeId, Node>> {
+  markClosedCover(nodeId: NodeId): void {
+    this.mutableStateFor(nodeId).closedCover = true;
+  }
+
+  markTraversed(nodeId: NodeId, branchId: BranchId): void {
+    this.mutableStateFor(nodeId).traversedBranches.add(branchId);
+  }
+
+  recordTraversedEdge(nodeId: NodeId, successorId: NodeId): void {
+    this.mutableStateFor(successorId).predecessors.add(nodeId);
+  }
+
+  states(): Iterable<ReadonlyCertifiedClosureNodeState<NodeId, Node>> {
     return this.visited.values();
   }
 
@@ -779,7 +829,7 @@ class IncludeGraphState<
   }
 
   initialize(startId: NodeId): void {
-    this.stateFor(startId);
+    this.mutableStateFor(startId);
   }
 
   has(nodeId: NodeId): boolean {
@@ -790,7 +840,11 @@ class IncludeGraphState<
     return this.visited.get(nodeId);
   }
 
-  stateFor(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
+  stateFor(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId, Node> {
+    return this.mutableStateFor(nodeId);
+  }
+
+  private mutableStateFor(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
     let state = this.visited.get(nodeId);
     if (state === undefined) {
       state = {
@@ -805,7 +859,7 @@ class IncludeGraphState<
   }
 
   private markNodeExpanded(nodeId: NodeId, node: Node): void {
-    const state = this.stateFor(nodeId);
+    const state = this.mutableStateFor(nodeId);
     const expandedState: IncludeNodeState<NodeId, Node> = {
       ...state,
       expanded: true,
@@ -815,7 +869,7 @@ class IncludeGraphState<
   }
 
   async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
-    const state = this.stateFor(nodeId);
+    const state = this.mutableStateFor(nodeId);
     if (state.expanded) {
       return [...state.successors];
     }
@@ -830,8 +884,8 @@ class IncludeGraphState<
   }
 
   private recordExpandedEdge(nodeId: NodeId, successorId: NodeId): void {
-    const node = this.stateFor(nodeId);
-    const successor = this.stateFor(successorId);
+    const node = this.mutableStateFor(nodeId);
+    const successor = this.mutableStateFor(successorId);
     successor.predecessors.add(nodeId);
     node.successors.add(successorId);
   }
@@ -853,14 +907,14 @@ class IncludeGraphState<
     return [...this.visited.keys()];
   }
 
-  predecessorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
+  predecessorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>> {
     return {
       readNode: async (nodeId) => this.readNode(nodeId),
       getSuccessors: (node) => [...node.predecessors],
     };
   }
 
-  successorsPort(): DagNodePort<NodeId, IncludeNodeState<NodeId, Node>> {
+  successorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>> {
     return {
       readNode: async (nodeId) => this.readNode(nodeId),
       getSuccessors: (node) => [...node.successors],

@@ -48,37 +48,35 @@ interface CertifiedClosureNodeStateBase<NodeId extends PropertyKey> {
   closedCover: boolean;
 }
 
+interface UnexpandedCertifiedClosureNodeState<
+  NodeId extends PropertyKey,
+> extends CertifiedClosureNodeStateBase<NodeId> {
+  readonly expanded: false;
+}
+
+interface ExpandedCertifiedClosureNodeStateBase<
+  NodeId extends PropertyKey,
+  Node,
+> extends CertifiedClosureNodeStateBase<NodeId> {
+  readonly expanded: true;
+  readonly node: Node;
+  readonly successors: readonly NodeId[];
+}
+
 export type CertifiedClosureNodeState<NodeId extends PropertyKey, Node> =
-  | (CertifiedClosureNodeStateBase<NodeId> & {
-      readonly expanded: false;
-    })
-  | (CertifiedClosureNodeStateBase<NodeId> & {
-      readonly expanded: true;
-      readonly node: Node;
-      readonly successors: readonly NodeId[];
-    });
+  | UnexpandedCertifiedClosureNodeState<NodeId>
+  | ExpandedCertifiedClosureNodeStateBase<NodeId, Node>;
 
-type ReadonlyCertifiedClosureNodeState<NodeId extends PropertyKey, Node> =
-  | {
-      readonly nodeId: NodeId;
-      readonly predecessors: ReadonlySet<NodeId>;
-      readonly traversedBranches: ReadonlySet<BranchId>;
-      readonly reached: boolean;
-      readonly closedCover: boolean;
-      readonly expanded: false;
-    }
-  | {
-      readonly nodeId: NodeId;
-      readonly predecessors: ReadonlySet<NodeId>;
-      readonly traversedBranches: ReadonlySet<BranchId>;
-      readonly reached: boolean;
-      readonly closedCover: boolean;
-      readonly expanded: true;
-      readonly node: Node;
-      readonly successors: readonly NodeId[];
-    };
+interface ReadonlyCertifiedClosureNodeState<NodeId extends PropertyKey> {
+  readonly nodeId: NodeId;
+  readonly predecessors: ReadonlySet<NodeId>;
+  readonly traversedBranches: ReadonlySet<BranchId>;
+  readonly reached: boolean;
+  readonly closedCover: boolean;
+  readonly expanded: boolean;
+}
 
-export interface SplitState<NodeId extends PropertyKey> {
+interface SplitState<NodeId extends PropertyKey> {
   readonly id: SplitId;
   readonly openedAt: NodeId;
   readonly openedFromBranchId: BranchId;
@@ -88,7 +86,7 @@ export interface SplitState<NodeId extends PropertyKey> {
   closeBoundary?: NodeId;
 }
 
-export interface BranchState<NodeId extends PropertyKey> {
+interface BranchState<NodeId extends PropertyKey> {
   readonly id: BranchId;
   readonly splitId: SplitId;
   readonly startedAt: NodeId;
@@ -159,8 +157,8 @@ export type DifferenceFrontierItem<NodeId extends PropertyKey> =
     };
 
 interface IncludePathClassification<NodeId extends PropertyKey> {
-  readonly yieldable: Set<NodeId>;
-  readonly excluded: Set<NodeId>;
+  readonly yieldable: ReadonlySet<NodeId>;
+  readonly excluded: ReadonlySet<NodeId>;
 }
 
 interface ReadonlyIncludeGraphState<NodeId extends PropertyKey, Node> {
@@ -168,6 +166,7 @@ interface ReadonlyIncludeGraphState<NodeId extends PropertyKey, Node> {
   get(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId, Node> | undefined;
   predecessorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>>;
   successorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>>;
+  nodeIds(): NodeId[];
 }
 
 interface MutableIncludeGraphState<
@@ -175,7 +174,6 @@ interface MutableIncludeGraphState<
   Node,
 > extends ReadonlyIncludeGraphState<NodeId, Node> {
   delete(nodeId: NodeId): void;
-  nodeIds(): NodeId[];
 }
 
 interface ReadonlyCertifiedExcludeState<NodeId extends PropertyKey> {
@@ -189,7 +187,7 @@ interface ClosureFrontierItem<NodeId> {
 
 interface TriggerHit<NodeId> {
   readonly splitId: SplitId;
-  readonly trigger: NodeId;
+  readonly triggerId: NodeId;
   readonly branchId: BranchId;
   readonly joinedBranchId: BranchId;
 }
@@ -266,7 +264,7 @@ export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKe
   yield* state.drainRemainingInclude();
 }
 
-export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
+class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   readonly rootBranchId: BranchId;
 
   private readonly graph: ClosureGraphState<NodeId, Node>;
@@ -395,7 +393,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     if (joinedBranchId === undefined) return undefined;
     return {
       splitId: branch.splitId,
-      trigger: successorId,
+      triggerId: successorId,
       branchId,
       joinedBranchId,
     };
@@ -410,7 +408,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     if (joinedBranchId === undefined) return [];
     return this.resolveBranchByTrigger({
       splitId: branch.splitId,
-      trigger: knownNodeId,
+      triggerId: knownNodeId,
       branchId,
       joinedBranchId,
     });
@@ -419,7 +417,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   private resolveBranchByTrigger(hit: TriggerHit<NodeId>): ClosureFrontierItem<NodeId>[] {
     const split = this.getSplitStateOrThrow(hit.splitId);
     if (split.resolved) return [];
-    split.triggers.add(hit.trigger);
+    split.triggers.add(hit.triggerId);
     this.joinBranchGroups(hit.branchId, hit.joinedBranchId);
 
     const boundary = this.findCloseBoundary(split);
@@ -462,7 +460,7 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
     if (joinedBranchId !== undefined) {
       const parentFrontier = this.resolveBranchByTrigger({
         splitId: parentBranch.splitId,
-        trigger: boundary,
+        triggerId: boundary,
         branchId: parentBranch.id,
         joinedBranchId,
       });
@@ -602,7 +600,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     this.nodes = nodes;
   }
 
-  stateFor(nodeId: NodeId): ReadonlyCertifiedClosureNodeState<NodeId, Node> {
+  stateFor(nodeId: NodeId): ReadonlyCertifiedClosureNodeState<NodeId> {
     return this.mutableStateFor(nodeId);
   }
 
@@ -661,7 +659,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     this.mutableStateFor(successorId).predecessors.add(nodeId);
   }
 
-  states(): Iterable<ReadonlyCertifiedClosureNodeState<NodeId, Node>> {
+  states(): Iterable<ReadonlyCertifiedClosureNodeState<NodeId>> {
     return this.visited.values();
   }
 

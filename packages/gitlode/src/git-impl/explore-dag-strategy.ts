@@ -569,7 +569,7 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
     return successors;
   }
 
-  markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
+  private markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
     const state = this.stateFor(nodeId);
     this.visited.set(nodeId, {
       ...state,
@@ -770,7 +770,7 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
     return state;
   }
 
-  markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
+  private markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
     const state = this.stateFor(nodeId);
     const expandedState: IncludeNodeState<NodeId, Node> = {
       ...state,
@@ -793,7 +793,7 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
     return successors;
   }
 
-  recordEdge(nodeId: NodeId, successorId: NodeId): void {
+  private recordEdge(nodeId: NodeId, successorId: NodeId): void {
     const node = this.stateFor(nodeId);
     const successor = this.stateFor(successorId);
     successor.predecessors.add(nodeId);

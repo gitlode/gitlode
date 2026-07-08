@@ -103,10 +103,6 @@ export type IncludeNodeState<NodeId extends PropertyKey, Node> =
       readonly node: Node;
     });
 
-export interface IncludeFrontierItem<NodeId extends PropertyKey> {
-  readonly nodeId: NodeId;
-}
-
 export type IncludeExpansionResult<NodeId extends PropertyKey> =
   | {
       readonly kind: "expanded";
@@ -192,7 +188,7 @@ export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKe
     if (item === undefined) break;
 
     if (item.side === "include") {
-      const expansion = await state.expandInclude(item);
+      const expansion = await state.expandInclude(item.nodeId);
       if (expansion.kind === "skipped" && expansion.reason === "certified-hit") {
         yield* state.applyCertifiedHits(new Set([item.nodeId]));
         continue;
@@ -626,17 +622,17 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
 
   // Difference-state policy plus include-side graph expansion. The returned result tells the
   // coordinator whether to enqueue more include work or resolve a certified hit.
-  async expandInclude(item: IncludeFrontierItem<NodeId>): Promise<IncludeExpansionResult<NodeId>> {
-    const state = this.includeGraph.get(item.nodeId);
+  async expandInclude(nodeId: NodeId): Promise<IncludeExpansionResult<NodeId>> {
+    const state = this.includeGraph.get(nodeId);
     if (state === undefined) return { kind: "skipped", reason: "stale" };
 
-    if (this.certifiedExclude.has(item.nodeId)) {
+    if (this.certifiedExclude.has(nodeId)) {
       return { kind: "skipped", reason: "certified-hit" };
     }
 
     if (state.expanded) return { kind: "skipped", reason: "already-expanded" };
 
-    const successors = await this.includeGraph.expand(item.nodeId);
+    const successors = await this.includeGraph.expand(nodeId);
 
     return { kind: "expanded", enqueue: successors };
   }

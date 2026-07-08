@@ -305,7 +305,7 @@ async function createState(
     state.stateFor(nodeId);
   }
   for (const nodeId of Object.keys(successorsByNode)) {
-    await state.expandInclude({ nodeId });
+    await state.expandInclude(nodeId);
   }
 
   return state;

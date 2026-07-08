@@ -785,7 +785,7 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
     return state;
   }
 
-  private markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
+  private markNodeExpanded(nodeId: NodeId, node: Node): void {
     const state = this.stateFor(nodeId);
     const expandedState: IncludeNodeState<NodeId, Node> = {
       ...state,
@@ -793,15 +793,12 @@ class IncludeGraphState<NodeId extends PropertyKey, Node = unknown> {
       node,
     };
     this.visited.set(nodeId, expandedState);
-    for (const successor of successors) {
-      expandedState.successors.add(successor);
-    }
   }
 
   async expand(nodeId: NodeId): Promise<readonly NodeId[]> {
     const node = await this.nodes.readNode(nodeId);
     const successors = this.nodes.getSuccessors(node);
-    this.markExpanded(nodeId, node, successors);
+    this.markNodeExpanded(nodeId, node);
     for (const successor of successors) {
       this.recordExpandedEdge(nodeId, successor);
     }

@@ -166,10 +166,7 @@ export interface WalkDagContext<NodeId extends PropertyKey, DomainHint = undefin
 
 export type WalkDagStrategy = "eagerExclude" | "certifiedLazy";
 
-export interface WalkDagStrategyOptions<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
-> {
+export interface WalkDagStrategyOptions<NodeId extends PropertyKey, DomainHint = undefined> {
   readonly createFrontier?: () => DagFrontier<DagFrontierItem<NodeId, DomainHint>>;
 }
 
@@ -184,10 +181,7 @@ export interface WalkDagConfiguredStrategyOptions<
 ```
 
 ```ts
-export function collectReachableNodeIds<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
+export function collectReachableNodeIds<NodeId extends PropertyKey, DomainHint = undefined>(
   startNodeIds: Iterable<NodeId>,
   graph: DagTopologyPort<NodeId, DomainHint>,
   options?: WalkDagStrategyOptions<NodeId, DomainHint>,
@@ -203,20 +197,14 @@ export function walkDagNodeIdsWithConfiguredStrategy<
   options?: WalkDagConfiguredStrategyOptions<NodeId, DomainHint>,
 ): AsyncIterable<NodeId>;
 
-export function walkDagNodeIdsEagerExclude<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
+export function walkDagNodeIdsEagerExclude<NodeId extends PropertyKey, DomainHint = undefined>(
   context: WalkDagContext<NodeId, DomainHint>,
   nodeId: NodeId,
   excludeNodeId?: NodeId,
   options?: WalkDagStrategyOptions<NodeId, DomainHint>,
 ): AsyncIterable<NodeId>;
 
-export function walkDagNodeIdsCertifiedLazy<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
+export function walkDagNodeIdsCertifiedLazy<NodeId extends PropertyKey, DomainHint = undefined>(
   context: WalkDagContext<NodeId, DomainHint>,
   nodeId: NodeId,
   excludeNodeId?: NodeId,
@@ -324,17 +312,12 @@ function createDagFrontierItemFactory() {
     nodeIds: Iterable<NodeId>,
     role: DagTraversalRole,
   ): DagFrontierItem<NodeId, DomainHint>[] => {
-    return Array.from(nodeIds, (nodeId) =>
-      createStartItem<NodeId, DomainHint>(nodeId, role),
-    );
+    return Array.from(nodeIds, (nodeId) => createStartItem<NodeId, DomainHint>(nodeId, role));
   };
 
-  const createSuccessorItems = <
-    NodeId extends PropertyKey,
-    DomainHint = undefined,
-  >(
+  const createSuccessorItems = <NodeId extends PropertyKey, DomainHint = undefined>(
     parent: DagFrontierItem<NodeId, DomainHint>,
-    successors: readonly DagSuccessor<NodeId, DomainHint>[]
+    successors: readonly DagSuccessor<NodeId, DomainHint>[],
   ): DagFrontierItem<NodeId, DomainHint>[] => {
     const items: DagFrontierItem<NodeId, DomainHint>[] = [];
 
@@ -406,10 +389,7 @@ Public `collectReachableNodeIds` should use role `"include"`.
 Use a private role-aware helper internally:
 
 ```ts
-async function collectReachableNodeIdsWithRole<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
+async function collectReachableNodeIdsWithRole<NodeId extends PropertyKey, DomainHint = undefined>(
   startNodeIds: Iterable<NodeId>,
   graph: DagTopologyPort<NodeId, DomainHint>,
   role: DagTraversalRole,
@@ -499,10 +479,7 @@ dag-topology-cache.ts
 ### Helper
 
 ```ts
-export function withSuccessorCache<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
+export function withSuccessorCache<NodeId extends PropertyKey, DomainHint = undefined>(
   graph: DagTopologyPort<NodeId, DomainHint>,
 ): DagTopologyPort<NodeId, DomainHint> {
   const cache = new Map<NodeId, readonly DagSuccessor<NodeId, DomainHint>[]>();
@@ -736,7 +713,8 @@ Follow this order to reduce risk:
 11. Update tests according to the testing plan.
 
 12. Remove obsolete code:
-   - `DagNodePort` if no longer needed.
-   - Node-yielding traversal functions.
-   - Node read telemetry constants.
-   - CertifiedLazy read/cache state types.
+
+- `DagNodePort` if no longer needed.
+- Node-yielding traversal functions.
+- Node read telemetry constants.
+- CertifiedLazy read/cache state types.

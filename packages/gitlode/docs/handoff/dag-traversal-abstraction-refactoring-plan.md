@@ -299,6 +299,42 @@ the same commit object when the DAG core later yields that OID. This cache is ou
 and therefore does not weaken the rule that traversal correctness and traversal state are
 NodeId-based.
 
+### Accepted Stage 1-B Git Adapter Internal Shape
+
+Use an explicit Git-adapter-internal helper object or class for topology expansion and commit-object
+resolution. The helper should be private to the adapter implementation unless later reuse makes an
+exported test seam necessary.
+
+The helper should have this responsibility shape:
+
+```ts
+class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
+  async getSuccessors(oid: CommitOid): Promise<readonly DagSuccessor<CommitOid>[]>;
+  async readCommit(oid: CommitOid): Promise<RawCommit>;
+}
+```
+
+Implementation rules:
+
+- `getSuccessors(oid)` reads the commit through `readCommit(oid)` and projects parent OIDs into
+  `DagSuccessor` items.
+- `readCommit(oid)` owns the invocation-scoped `CommitOid -> RawCommit` cache.
+- The Git adapter passes the helper itself to the DAG core as `DagTopologyPort<CommitOid>`.
+- The Git adapter also uses the same helper's `readCommit(oid)` when turning DAG-core-yielded OIDs
+  into commit objects for the existing adapter-facing traversal contract.
+- Backend-specific read errors should still be translated inside the Git adapter boundary before
+  crossing into the DAG traversal core or the rest of gitlode.
+- The helper should not make commit-object cache contents part of DAG correctness; the cache is only
+  a performance optimization and read-sharing mechanism.
+
+Rationale:
+
+- A local closure-based cache would work, but it makes the shared cache contract less visible.
+- A separate reader/topology interface split is clean, but it would broaden Stage 2 into a larger
+  Git adapter architecture refactor.
+- A small explicit helper object keeps the Stage 2 implementation focused while making cache sharing,
+  error mapping, and future tests easier to reason about.
+
 ---
 
 ## 7. Queue / Frontier Policy
@@ -665,18 +701,22 @@ High-level implementation sequence:
 6. Refactor `certifiedLazy` to use NodeId-only state and no cache state.
 7. Update telemetry constants and instrumentation events.
 8. Add `withSuccessorCache` in a separate module.
-9. Update Git adapter call sites so they consume DAG-core `NodeId` output internally, resolve
-   commit objects inside the adapter, and continue yielding commit objects to the rest of gitlode.
-10. Update tests from Node-based assertions to NodeId-based assertions.
-11. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
+9. Add a Git-adapter-internal commit topology helper object/class that implements
+   `DagTopologyPort<CommitOid>`, owns the invocation-scoped commit-object cache, and exposes
+   `readCommit(oid)` for final commit-object yielding.
+10. Update Git adapter call sites so they consume DAG-core `NodeId` output internally, resolve
+    commit objects through the topology helper, and continue yielding commit objects to the rest of
+    gitlode.
+11. Update tests from Node-based assertions to NodeId-based assertions.
+12. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
     prototype status and difference-set contract.
-12. Update Git adapter integration so the DAG core yields `NodeId`, the adapter resolves those OIDs
-    through an invocation-scoped commit-object cache, and gitlode still emits the same commit object
-    set.
-13. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
+13. Update Git adapter integration so the DAG core yields `NodeId`, the adapter resolves those OIDs
+    through the topology helper's invocation-scoped commit-object cache, and gitlode still emits the
+    same commit object set.
+14. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
     core, and keep adapter-level tests focused on commit object output sets.
-14. Update durable documentation according to the checklist below.
-15. Remove obsolete types, read-node helpers, and old telemetry names.
+15. Update durable documentation according to the checklist below.
+16. Remove obsolete types, read-node helpers, and old telemetry names.
 
 ### Stage 2 Durable Documentation Checklist
 
@@ -685,7 +725,7 @@ Update these durable documents during Stage 2 alongside the implementation chang
 - `packages/gitlode/docs/design/commit-traversal-internals.md`
   - Replace the `DagNodePort<NodeId, Node>` seam with the new topology-based seam.
   - Explain that the DAG core yields `NodeId`, while the Git adapter continues to yield commit
-    objects to the rest of gitlode by resolving OIDs inside the adapter.
+    objects to the rest of gitlode by resolving OIDs through an adapter-internal topology helper.
   - Update queue/frontier policy from `WorkQueue<NodeId>` to `DagFrontier<DagFrontierItem<...>>`.
   - Update certified-lazy cache and fallback descriptions to match the topology/cache-helper design.
   - Update telemetry descriptions to remove node-read metric stability assumptions.

@@ -262,7 +262,8 @@ export function walkDagNodeIdsCertifiedLazy<NodeId extends PropertyKey, DomainHi
 
 ### Compatibility
 
-No Node-yielding compatibility wrapper is required.
+No Node-yielding compatibility wrapper is required inside the generic DAG traversal module. The DAG
+core APIs should be NodeId-yielding only.
 
 Call sites must resolve `NodeId` to domain `Node` outside the DAG core if they need domain objects:
 
@@ -277,6 +278,26 @@ for await (const nodeId of walkDagNodeIdsWithConfiguredStrategy(
   // caller-specific processing
 }
 ```
+
+### Accepted Stage 1-B Git Adapter Contract
+
+The Git adapter must continue to yield commit objects to the rest of gitlode. Code outside the Git
+adapter cannot resolve commit OIDs into commit objects, so exposing `NodeId` values beyond the
+adapter boundary would move Git-object responsibility to the wrong layer.
+
+The adapter integration should therefore use this shape:
+
+1. The Git adapter builds a topology adapter for the DAG core.
+2. That topology adapter reads commit objects by OID as needed to answer `getSuccessors(nodeId)`.
+3. The DAG core yields commit OIDs (`NodeId`).
+4. The Git adapter resolves each yielded OID back to the corresponding commit object and yields that
+   commit object through the existing adapter-facing traversal contract.
+
+The topology adapter should own an invocation-scoped commit-object cache. The cache lets
+`getSuccessors(nodeId)` reuse a commit object when resolving parent OIDs, and lets the adapter reuse
+the same commit object when the DAG core later yields that OID. This cache is outside the DAG core
+and therefore does not weaken the rule that traversal correctness and traversal state are
+NodeId-based.
 
 ---
 
@@ -547,6 +568,18 @@ export function withSuccessorCache<NodeId extends PropertyKey, DomainHint = unde
 
 `withSuccessorCache` is not part of traversal correctness. The traversal core must not call it internally.
 
+### Git Adapter Commit Object Cache
+
+Git adapter integration may also use an invocation-scoped commit-object cache outside the DAG core.
+This cache is distinct from `withSuccessorCache`:
+
+- `withSuccessorCache` caches topology results, meaning `NodeId -> DagSuccessor[]`.
+- The Git adapter commit-object cache caches domain reads, meaning `CommitOid -> RawCommit`.
+
+The Git adapter commit-object cache should serve both topology expansion and final commit-object
+yielding. This keeps the DAG core NodeId-only while avoiding duplicate commit reads when a commit was
+already read to compute its successors before being yielded as part of the result set.
+
 ### Topology Stability Contract
 
 `DagTopologyPort.getSuccessors(nodeId)` must be semantically stable for the same `NodeId` during one traversal invocation.
@@ -616,7 +649,8 @@ This migration is gitlode-scoped, not limited to `dag-traversal-strategy.ts`. It
 - `packages/gitlode/src/git-impl/dag-traversal-strategy.ts` as the production DAG traversal core.
 - `packages/gitlode/src/git-impl/explore-dag-strategy.ts` as a prototype traversal implementation
   with the same difference-set contract.
-- Git adapter call sites that currently consume Node-yielding traversal APIs.
+- Git adapter call sites that currently consume Node-yielding traversal APIs and must keep
+  yielding commit objects to the rest of gitlode.
 - Tests that assert traversal correctness, queue behavior, read behavior, or telemetry behavior.
 - Durable documentation that describes traversal internals, user-visible traversal behavior, and
   adapter boundaries.
@@ -631,12 +665,14 @@ High-level implementation sequence:
 6. Refactor `certifiedLazy` to use NodeId-only state and no cache state.
 7. Update telemetry constants and instrumentation events.
 8. Add `withSuccessorCache` in a separate module.
-9. Update call sites to consume `NodeId` and resolve domain nodes outside the DAG core if needed.
+9. Update Git adapter call sites so they consume DAG-core `NodeId` output internally, resolve
+   commit objects inside the adapter, and continue yielding commit objects to the rest of gitlode.
 10. Update tests from Node-based assertions to NodeId-based assertions.
 11. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
     prototype status and difference-set contract.
-12. Update Git adapter integration so the DAG core yields `NodeId` while gitlode still emits the
-    same commit object set.
+12. Update Git adapter integration so the DAG core yields `NodeId`, the adapter resolves those OIDs
+    through an invocation-scoped commit-object cache, and gitlode still emits the same commit object
+    set.
 13. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
     core, and keep adapter-level tests focused on commit object output sets.
 14. Update durable documentation according to the checklist below.
@@ -648,8 +684,8 @@ Update these durable documents during Stage 2 alongside the implementation chang
 
 - `packages/gitlode/docs/design/commit-traversal-internals.md`
   - Replace the `DagNodePort<NodeId, Node>` seam with the new topology-based seam.
-  - Explain that the DAG core yields `NodeId` and that Git adapter code resolves commit objects
-    outside the DAG core when needed.
+  - Explain that the DAG core yields `NodeId`, while the Git adapter continues to yield commit
+    objects to the rest of gitlode by resolving OIDs inside the adapter.
   - Update queue/frontier policy from `WorkQueue<NodeId>` to `DagFrontier<DagFrontierItem<...>>`.
   - Update certified-lazy cache and fallback descriptions to match the topology/cache-helper design.
   - Update telemetry descriptions to remove node-read metric stability assumptions.

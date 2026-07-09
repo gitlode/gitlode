@@ -25,6 +25,54 @@ Primary goals:
 
 ---
 
+## 1.1 Stage 1 Planning Workflow
+
+This document is the primary Stage 1 artifact. Stage 1 should revise this handoff plan until the
+Stage 2 implementation can proceed mostly mechanically. Source code must not be changed during
+Stage 1.
+
+Stage 1 uses the following decision workflow:
+
+1. Review and decide one design point at a time.
+2. Prefer asking for an explicit maintainer decision when a point affects public behavior, module
+   boundaries, migration order, or long-term design contracts.
+3. Record accepted decisions in this document before moving to dependent design points.
+4. Keep durable design documents as descriptions of the current implementation during Stage 1.
+5. Record required durable documentation updates in this plan, then apply those documentation
+   updates during Stage 2 alongside the corresponding implementation changes.
+
+Stage 1 is divided into these sub-stages:
+
+- **Stage 1-A: Scope and artifacts.** Confirm the refactoring scope and the documents that Stage 2
+  must update.
+- **Stage 1-B: External contracts and module boundaries.** Confirm the invariant output contract,
+  adapter-facing contracts, and where `NodeId -> Node` resolution belongs.
+- **Stage 1-C: Shared DAG abstraction.** Finalize `DagTopologyPort`, frontier items, scheduling
+  context, domain hints, and cache helper responsibilities.
+- **Stage 1-D: `dag-traversal-strategy.ts` migration.** Detail the eager-exclude and certified-lazy
+  NodeId-based migration.
+- **Stage 1-E: `explore-dag-strategy.ts` migration.** Bring the prototype traversal file into the
+  same topology-based abstraction plan.
+- **Stage 1-F: Telemetry/profiling migration.** Treat telemetry as a developer diagnostic, not as a
+  stable output contract, while preserving useful performance observability.
+- **Stage 1-G: Tests, docs, and implementation staging.** Convert decisions into a Stage 2 checklist
+  covering implementation order, tests, and durable documentation updates.
+
+### Accepted Stage 1-A documentation policy
+
+Stage 1 updates this handoff plan directly. Durable design documents should not be rewritten to
+describe future-state behavior before implementation. Instead, this plan must carry a concrete
+checklist of durable documentation updates for Stage 2.
+
+Rationale:
+
+- It keeps durable design documents aligned with the currently implemented behavior until the code
+  changes land.
+- It avoids repeated durable documentation churn while Stage 1 decisions are still being made.
+- It still prevents documentation-update omissions by making Stage 2 documentation work explicit.
+
+---
+
 ## 2. Current Problems
 
 The current abstraction uses both `NodeId` and `Node`:
@@ -563,6 +611,18 @@ Domain read/cache telemetry belongs to caller-side adapters.
 
 ## 12. Migration Plan
 
+This migration is gitlode-scoped, not limited to `dag-traversal-strategy.ts`. It must cover:
+
+- `packages/gitlode/src/git-impl/dag-traversal-strategy.ts` as the production DAG traversal core.
+- `packages/gitlode/src/git-impl/explore-dag-strategy.ts` as a prototype traversal implementation
+  with the same difference-set contract.
+- Git adapter call sites that currently consume Node-yielding traversal APIs.
+- Tests that assert traversal correctness, queue behavior, read behavior, or telemetry behavior.
+- Durable documentation that describes traversal internals, user-visible traversal behavior, and
+  adapter boundaries.
+
+High-level implementation sequence:
+
 1. Introduce the new topology/frontier types.
 2. Replace `DagNodePort<NodeId, Node>` with `DagTopologyPort<NodeId, DomainHint>`.
 3. Rename traversal APIs to make `NodeId` output explicit.
@@ -573,7 +633,36 @@ Domain read/cache telemetry belongs to caller-side adapters.
 8. Add `withSuccessorCache` in a separate module.
 9. Update call sites to consume `NodeId` and resolve domain nodes outside the DAG core if needed.
 10. Update tests from Node-based assertions to NodeId-based assertions.
-11. Remove obsolete types, read-node helpers, and old telemetry names.
+11. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
+    prototype status and difference-set contract.
+12. Update Git adapter integration so the DAG core yields `NodeId` while gitlode still emits the
+    same commit object set.
+13. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
+    core, and keep adapter-level tests focused on commit object output sets.
+14. Update durable documentation according to the checklist below.
+15. Remove obsolete types, read-node helpers, and old telemetry names.
+
+### Stage 2 Durable Documentation Checklist
+
+Update these durable documents during Stage 2 alongside the implementation changes:
+
+- `packages/gitlode/docs/design/commit-traversal-internals.md`
+  - Replace the `DagNodePort<NodeId, Node>` seam with the new topology-based seam.
+  - Explain that the DAG core yields `NodeId` and that Git adapter code resolves commit objects
+    outside the DAG core when needed.
+  - Update queue/frontier policy from `WorkQueue<NodeId>` to `DagFrontier<DagFrontierItem<...>>`.
+  - Update certified-lazy cache and fallback descriptions to match the topology/cache-helper design.
+  - Update telemetry descriptions to remove node-read metric stability assumptions.
+
+- `packages/gitlode/docs/design/git-traversal.md`
+  - Preserve the user-visible contract that gitlode emits the same commit object set for full and
+    differential traversal.
+  - Avoid presenting traversal order as a stable contract. Representative examples may remain, but
+    they must not imply that frontier scheduling order is user-visible API.
+
+- `packages/gitlode/docs/design/architecture.md`
+  - Update adapter-boundary text if the implementation introduces an explicit topology adapter or
+    node-reader separation inside the Git adapter layer.
 
 ---
 

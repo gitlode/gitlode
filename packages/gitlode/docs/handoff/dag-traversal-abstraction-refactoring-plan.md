@@ -327,6 +327,22 @@ Implementation rules:
 - The helper should not make commit-object cache contents part of DAG correctness; the cache is only
   a performance optimization and read-sharing mechanism.
 
+### Accepted Stage 1-B Error Handling Policy
+
+`CommitTopologyAdapter.readCommit(oid)` should translate backend-specific commit read errors into
+`GitAdapterError` before throwing. `getSuccessors(oid)` and final commit-object yielding should both
+call this same `readCommit(oid)` method, so missing-commit and unexpected-read errors have consistent
+behavior regardless of whether the read happens during topology expansion or during final
+`NodeId -> RawCommit` resolution.
+
+Stage 2 should preserve the current error mapping shape:
+
+- isomorphic-git `NotFoundError` becomes `GitAdapterError` with code `"COMMIT_NOT_FOUND"`.
+- Other unexpected commit-read failures become `GitAdapterError` with code `"UNKNOWN"`.
+
+This keeps backend-specific error details inside the Git adapter boundary and prevents raw backend
+errors from crossing through the generic DAG traversal core.
+
 Rationale:
 
 - A local closure-based cache would work, but it makes the shared cache contract less visible.
@@ -799,6 +815,8 @@ For the Git adapter's `CommitTopologyAdapter` integration:
 - Topology expansion and final commit-object yielding reuse the same invocation-scoped
   `CommitOid -> RawCommit` cache.
 - Backend-specific commit read errors are translated inside the Git adapter boundary.
+- Missing commits are reported as `GitAdapterError` with code `"COMMIT_NOT_FOUND"`.
+- Unexpected commit-read failures are reported as `GitAdapterError` with code `"UNKNOWN"`.
 - Adapter-level tests should focus on emitted commit object sets rather than generic successor-cache
   behavior.
 

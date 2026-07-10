@@ -316,7 +316,7 @@ export function createDagFrontierItemFactory() {
   };
 }
 
-function createFrontierItem<NodeId extends PropertyKey, DomainHint = undefined>(
+export function createFrontierItem<NodeId extends PropertyKey, DomainHint = undefined>(
   nodeId: NodeId,
   scheduling: DagSchedulingContext,
   domainHint?: DomainHint,

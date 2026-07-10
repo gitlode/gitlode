@@ -131,7 +131,10 @@ function stringTopology(
   };
 }
 
-class RecordingFrontier<T extends DagFrontierItem<string>> implements DagFrontier<T> {
+class RecordingFrontier<
+  T extends DagFrontierItem<string, DomainHint>,
+  DomainHint,
+> implements DagFrontier<T> {
   private readonly items: T[] = [];
   readonly enqueued: T[] = [];
 
@@ -184,8 +187,11 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
     const result = new Set(
       await collect(
         walkDagReachableNodeIds(
+          {
+            graph: stringTopology({ left: ["root"], right: ["root"], root: [] }),
+            instrumentation: noopInstrumentation,
+          },
           ["left", "right"],
-          stringTopology({ left: ["root"], right: ["root"], root: [] }),
         ),
       ),
     );
@@ -196,15 +202,20 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
   it("yields deterministic order for identical input and topology", async () => {
     const graph = stringTopology({ left: ["root"], right: ["root"], root: [] });
 
-    const first = await collect(walkDagReachableNodeIds(["left", "right"], graph));
-    const second = await collect(walkDagReachableNodeIds(["left", "right"], graph));
+    const first = await collect(
+      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
+    );
+    const second = await collect(
+      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
+    );
 
     expect(first).toEqual(second);
   });
 
   it("records scheduling metadata and copied domain hints in frontier items", async () => {
     const frontier = new RecordingFrontier<
-      DagFrontierItem<string, { readonly parentIndex: number }>
+      DagFrontierItem<string, { readonly parentIndex: number }>,
+      { readonly parentIndex: number }
     >();
     const graph: DagTopologyPort<string, { readonly parentIndex: number }> = {
       async getSuccessors(nodeId) {

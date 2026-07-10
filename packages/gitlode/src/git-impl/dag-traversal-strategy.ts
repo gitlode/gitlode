@@ -32,6 +32,7 @@ export interface DagTopologyPort<NodeId extends PropertyKey, DomainHint = undefi
 export type DagFrontier<T> = WorkQueue<T>;
 
 export interface WalkDagContext<NodeId extends PropertyKey, DomainHint = undefined> {
+  readonly role?: DagTraversalRole;
   readonly graph: DagTopologyPort<NodeId, DomainHint>;
   readonly instrumentation: Instrumentation;
 }
@@ -52,14 +53,6 @@ export interface WalkDagConfiguredStrategyOptions<
 }
 
 const defaultStrategy: WalkDagStrategy = "certifiedLazy";
-
-export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, DomainHint = undefined>(
-  startNodeIds: Iterable<NodeId>,
-  graph: DagTopologyPort<NodeId, DomainHint>,
-  options: WalkDagStrategyOptions<NodeId, DomainHint> = {},
-): AsyncIterable<NodeId> {
-  yield* walkDagReachableNodeIdsWithRole(startNodeIds, graph, "include", options);
-}
 
 export function walkDagNodeIdsWithConfiguredStrategy<
   NodeId extends PropertyKey,
@@ -95,7 +88,7 @@ export async function* walkDagNodeIdsEagerExclude<
   const excluded =
     excludeNodeId !== undefined
       ? await collectAsyncIterableToSet(
-          walkDagReachableNodeIdsWithRole([excludeNodeId], context.graph, "exclude", options),
+          walkDagReachableNodeIds({ ...context, role: "exclude" }, [excludeNodeId], options),
         )
       : new Set<NodeId>();
 
@@ -207,7 +200,7 @@ export async function* walkDagNodeIdsCertifiedLazy<
 
   if (certificateFailureReason !== undefined) {
     const excluded = await collectAsyncIterableToSet(
-      walkDagReachableNodeIdsWithRole([excludeNodeId], context.graph, "exclude", options),
+      walkDagReachableNodeIds({ ...context, role: "exclude" }, [excludeNodeId], options),
     );
     for (const excludedNodeId of excluded) resultCandidates.delete(excludedNodeId);
   }
@@ -236,24 +229,25 @@ export async function* walkDagNodeIdsCertifiedLazy<
   }
 }
 
-async function* walkDagReachableNodeIdsWithRole<NodeId extends PropertyKey, DomainHint = undefined>(
-  startNodeIds: Iterable<NodeId>,
-  graph: DagTopologyPort<NodeId, DomainHint>,
-  role: DagTraversalRole,
+export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, DomainHint = undefined>(
+  context: WalkDagContext<NodeId, DomainHint>,
+  nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, DomainHint> = {},
 ): AsyncIterable<NodeId> {
+  const role = context.role ?? "include";
   const visited = new Set<NodeId>();
   const factory = createDagFrontierItemFactory();
   const frontier = options.createFrontier?.() ?? createDefaultDagFrontier<NodeId, DomainHint>();
-  frontier.enqueueMany(factory.createStartItems<NodeId, DomainHint>(startNodeIds, role));
+  frontier.enqueueMany(factory.createStartItems<NodeId, DomainHint>(nodeIds, role));
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
     if (visited.has(item.nodeId)) continue;
     visited.add(item.nodeId);
+
     yield item.nodeId;
 
-    const successors = await graph.getSuccessors(item.nodeId);
+    const successors = await context.graph.getSuccessors(item.nodeId);
     const successorItems = factory
       .createSuccessorItems(item, successors)
       .filter((successor) => !visited.has(successor.nodeId));

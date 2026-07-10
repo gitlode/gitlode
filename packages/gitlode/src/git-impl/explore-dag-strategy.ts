@@ -1,3 +1,4 @@
+import { noopInstrumentation } from "../instrumentation/index.js";
 import { collectAsyncIterableToSet } from "../support/index.js";
 import { KeyedSet } from "../support/keyed-set.js";
 import type { Brand } from "../type-utils/index.js";
@@ -765,10 +766,22 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
   hits: ReadonlySet<NodeId>,
 ): Promise<IncludePathClassification<NodeId>> {
   const newerSide = await collectAsyncIterableToSet(
-    walkDagReachableNodeIds(hits, includeGraph.predecessorsPort()),
+    walkDagReachableNodeIds(
+      {
+        graph: includeGraph.predecessorsPort(),
+        instrumentation: noopInstrumentation,
+      },
+      hits,
+    ),
   );
   const olderSide = await collectAsyncIterableToSet(
-    walkDagReachableNodeIds(hits, includeGraph.successorsPort()),
+    walkDagReachableNodeIds(
+      {
+        graph: includeGraph.successorsPort(),
+        instrumentation: noopInstrumentation,
+      },
+      hits,
+    ),
   );
   const excluded = new Set(olderSide);
   const yieldable = difference(newerSide, excluded);

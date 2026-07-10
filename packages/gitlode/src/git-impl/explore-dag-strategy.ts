@@ -1,3 +1,4 @@
+import { KeyedSet } from "../support/keyed-set.js";
 import type { Brand } from "../type-utils/index.js";
 import {
   collectReachableNodeIds,
@@ -104,19 +105,12 @@ export type CertifiedClosurePhaseResult<NodeId extends PropertyKey> =
       readonly terminalNodes: readonly NodeId[];
     };
 
-interface IncludeNodeStateBase<NodeId extends PropertyKey> {
+interface IncludeNodeState<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
   readonly predecessors: Set<NodeId>;
   readonly successors: Set<NodeId>;
+  readonly expanded: boolean;
 }
-
-export type IncludeNodeState<NodeId extends PropertyKey> =
-  | (IncludeNodeStateBase<NodeId> & {
-      readonly expanded: false;
-    })
-  | (IncludeNodeStateBase<NodeId> & {
-      readonly expanded: true;
-    });
 
 type ReadonlyIncludeNodeState<NodeId extends PropertyKey> = {
   readonly nodeId: NodeId;
@@ -260,8 +254,8 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
   private nextBranchId: BranchId = 1 as BranchId;
   private nextBranchGroupId: BranchGroupId = 1 as BranchGroupId;
   private closedBoundary?: NodeId;
-  private readonly branches = new Map<BranchId, BranchState<NodeId>>();
-  private readonly splits = new Map<SplitId, SplitState<NodeId>>();
+  private readonly branches = new KeyedSet<BranchId, BranchState<NodeId>>((value) => value.id);
+  private readonly splits = new KeyedSet<SplitId, SplitState<NodeId>>((value) => value.id);
   private readonly reachedByBranch = new Map<NodeId, Set<BranchId>>();
   private readonly terminalNodes = new Set<NodeId>();
 
@@ -269,7 +263,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
     this.graph = new ClosureGraphState(graph);
     this.rootBranchId = 0 as BranchId;
     this.graph.markClosedCover(startId);
-    this.branches.set(this.rootBranchId, {
+    this.branches.add({
       id: this.rootBranchId,
       splitId: 0 as SplitId,
       startedAt: startId,
@@ -349,7 +343,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
     const splitId = this.nextSplitId++ as SplitId;
     const branchIds = successors.map((successor) => {
       const branchId = this.nextBranchId++ as BranchId;
-      this.branches.set(branchId, {
+      this.branches.add({
         id: branchId,
         splitId,
         startedAt: successor,
@@ -367,7 +361,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
       triggers: new Set<NodeId>(),
       resolved: false,
     };
-    this.splits.set(splitId, split);
+    this.splits.add(split);
     return split;
   }
 
@@ -415,7 +409,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
   }
 
   private getBranchStateOrThrow(branchId: BranchId): BranchState<NodeId> {
-    const branch = this.branches.get(branchId);
+    const branch = this.branches.getByKey(branchId);
     if (branch === undefined) throw new Error(`Unknown branch: ${branchId}`);
     return branch;
   }
@@ -566,7 +560,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
   }
 
   private getSplitStateOrThrow(splitId: SplitId): SplitState<NodeId> {
-    const split = this.splits.get(splitId);
+    const split = this.splits.getByKey(splitId);
     if (split === undefined) throw new Error(`Unknown split: ${splitId}`);
     return split;
   }

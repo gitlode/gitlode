@@ -4,7 +4,7 @@ import type { Brand } from "../type-utils/index.js";
 import {
   type DagTopologyPort,
   type WalkDagContext,
-  walkDagReachable,
+  walkDagReachableNodeIds,
 } from "./dag-traversal-strategy.js";
 
 export type { DagTopologyPort, WalkDagContext } from "./dag-traversal-strategy.js";
@@ -765,10 +765,10 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
   hits: ReadonlySet<NodeId>,
 ): Promise<IncludePathClassification<NodeId>> {
   const newerSide = await collectAsyncIterableToSet(
-    walkDagReachable(hits, includeGraph.predecessorsPort()),
+    walkDagReachableNodeIds(hits, includeGraph.predecessorsPort()),
   );
   const olderSide = await collectAsyncIterableToSet(
-    walkDagReachable(hits, includeGraph.successorsPort()),
+    walkDagReachableNodeIds(hits, includeGraph.successorsPort()),
   );
   const excluded = new Set(olderSide);
   const yieldable = difference(newerSide, excluded);

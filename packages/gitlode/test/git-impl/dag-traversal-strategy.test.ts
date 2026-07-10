@@ -6,7 +6,7 @@ import {
   type DagFrontierItem,
   type DagTopologyPort,
   type WalkDagStrategyOptions,
-  walkDagReachable,
+  walkDagReachableNodeIds,
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,
 } from "../../src/git-impl/dag-traversal-strategy.js";
@@ -183,7 +183,7 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
   it("collects reachable node IDs from one or more starts", async () => {
     const result = new Set(
       await collect(
-        walkDagReachable(
+        walkDagReachableNodeIds(
           ["left", "right"],
           stringTopology({ left: ["root"], right: ["root"], root: [] }),
         ),
@@ -196,8 +196,8 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
   it("yields deterministic order for identical input and topology", async () => {
     const graph = stringTopology({ left: ["root"], right: ["root"], root: [] });
 
-    const first = await collect(walkDagReachable(["left", "right"], graph));
-    const second = await collect(walkDagReachable(["left", "right"], graph));
+    const first = await collect(walkDagReachableNodeIds(["left", "right"], graph));
+    const second = await collect(walkDagReachableNodeIds(["left", "right"], graph));
 
     expect(first).toEqual(second);
   });

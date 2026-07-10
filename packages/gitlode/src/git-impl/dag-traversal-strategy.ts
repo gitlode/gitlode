@@ -53,12 +53,12 @@ export interface WalkDagConfiguredStrategyOptions<
 
 const defaultStrategy: WalkDagStrategy = "certifiedLazy";
 
-export async function* walkDagReachable<NodeId extends PropertyKey, DomainHint = undefined>(
+export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, DomainHint = undefined>(
   startNodeIds: Iterable<NodeId>,
   graph: DagTopologyPort<NodeId, DomainHint>,
   options: WalkDagStrategyOptions<NodeId, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* walkDagReachableWithRole(startNodeIds, graph, "include", options);
+  yield* walkDagReachableNodeIdsWithRole(startNodeIds, graph, "include", options);
 }
 
 export function walkDagNodeIdsWithConfiguredStrategy<
@@ -95,7 +95,7 @@ export async function* walkDagNodeIdsEagerExclude<
   const excluded =
     excludeNodeId !== undefined
       ? await collectAsyncIterableToSet(
-          walkDagReachableWithRole([excludeNodeId], context.graph, "exclude", options),
+          walkDagReachableNodeIdsWithRole([excludeNodeId], context.graph, "exclude", options),
         )
       : new Set<NodeId>();
 
@@ -207,7 +207,7 @@ export async function* walkDagNodeIdsCertifiedLazy<
 
   if (certificateFailureReason !== undefined) {
     const excluded = await collectAsyncIterableToSet(
-      walkDagReachableWithRole([excludeNodeId], context.graph, "exclude", options),
+      walkDagReachableNodeIdsWithRole([excludeNodeId], context.graph, "exclude", options),
     );
     for (const excludedNodeId of excluded) resultCandidates.delete(excludedNodeId);
   }
@@ -236,7 +236,7 @@ export async function* walkDagNodeIdsCertifiedLazy<
   }
 }
 
-async function* walkDagReachableWithRole<NodeId extends PropertyKey, DomainHint = undefined>(
+async function* walkDagReachableNodeIdsWithRole<NodeId extends PropertyKey, DomainHint = undefined>(
   startNodeIds: Iterable<NodeId>,
   graph: DagTopologyPort<NodeId, DomainHint>,
   role: DagTraversalRole,

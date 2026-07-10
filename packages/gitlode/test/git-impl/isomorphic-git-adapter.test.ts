@@ -174,6 +174,27 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, after]));
   });
 
+  it("reuses commit objects read during topology expansion for final yielding", async () => {
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const child = await addCommit("a.txt", "child", "child", 2000);
+    const head = await addCommit("a.txt", "head", "head", 3000);
+
+    const readCommit = vi.spyOn(git, "readCommit");
+    try {
+      const commits = await collectAll(createAdapter(fs), head);
+
+      expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, child, root]));
+      const reads = readCommit.mock.calls.map((call) => call[0].oid);
+      expect(reads.filter((oid) => oid === head)).toHaveLength(1);
+      expect(reads.filter((oid) => oid === child)).toHaveLength(1);
+      expect(reads.filter((oid) => oid === root)).toHaveLength(1);
+    } finally {
+      readCommit.mockRestore();
+    }
+  });
+
   it("merge commit handling: exclusion stops at correct ancestors in a 2-parent DAG", async () => {
     // Build the DAG using writeCommit directly (no branch switching needed):
     //
@@ -878,6 +899,7 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
     const resolveRefEntry = entries.find((e) => e.name === "git.resolve_ref");
     const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
     const walkEntry = entries.find((e) => e.name === "git.walk_commits");
+    const traversalEntry = entries.find((e) => e.name === "dag.traversal");
     const traversalReadEntry = entries.find((e) => e.name === "dag.traversal.read_node.include");
     const collectReachableEntry = entries.find((e) => e.name === "dag.traversal.collect_reachable");
     const excludeReadEntry = entries.find((e) => e.name === "dag.traversal.read_node.exclude");
@@ -887,9 +909,10 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
     expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
     expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
     expect(walkEntry?.totalMs).toBeGreaterThan(0);
-    expect(traversalReadEntry?.totalMs).toBeGreaterThan(0);
-    expect(collectReachableEntry?.totalMs).toBeGreaterThan(0);
-    expect(excludeReadEntry?.totalMs).toBeGreaterThan(0);
+    expect(traversalEntry).toBeUndefined();
+    expect(traversalReadEntry).toBeUndefined();
+    expect(collectReachableEntry).toBeUndefined();
+    expect(excludeReadEntry).toBeUndefined();
     expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
     expect(blobEntry?.totalMs).toBeGreaterThan(0);
     expect(diffEntry?.totalMs).toBeGreaterThan(0);

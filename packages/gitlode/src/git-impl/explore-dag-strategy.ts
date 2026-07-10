@@ -1,11 +1,11 @@
 import type { Brand } from "../type-utils/index.js";
 import {
-  collectReachableNodes,
-  type DagNodePort,
+  collectReachableNodeIds,
+  type DagTopologyPort,
   type WalkDagContext,
 } from "./dag-traversal-strategy.js";
 
-export type { DagNodePort, WalkDagContext } from "./dag-traversal-strategy.js";
+export type { DagTopologyPort, WalkDagContext } from "./dag-traversal-strategy.js";
 
 /**
  * Prototype DAG traversal strategy using certified closure phases.
@@ -32,7 +32,7 @@ export type { DagNodePort, WalkDagContext } from "./dag-traversal-strategy.js";
  *   should own split, branch, trigger, and close-boundary transitions while `ClosureGraphState`
  *   owns closure-side node reads, expansion cache, and graph links.
  *
- * The prototype output contract remains the same as `walkDagEagerExclude()`:
+ * The prototype output contract remains the same as `walkDagNodeIdsEagerExclude()`:
  * `reachable(start) - reachable(exclude)`. Yield order is not part of that contract.
  */
 
@@ -56,16 +56,14 @@ interface UnexpandedCertifiedClosureNodeState<
 
 interface ExpandedCertifiedClosureNodeStateBase<
   NodeId extends PropertyKey,
-  Node,
 > extends CertifiedClosureNodeStateBase<NodeId> {
   readonly expanded: true;
-  readonly node: Node;
   readonly successors: readonly NodeId[];
 }
 
-export type CertifiedClosureNodeState<NodeId extends PropertyKey, Node> =
+export type CertifiedClosureNodeState<NodeId extends PropertyKey> =
   | UnexpandedCertifiedClosureNodeState<NodeId>
-  | ExpandedCertifiedClosureNodeStateBase<NodeId, Node>;
+  | ExpandedCertifiedClosureNodeStateBase<NodeId>;
 
 interface ReadonlyCertifiedClosureNodeState<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
@@ -112,29 +110,20 @@ interface IncludeNodeStateBase<NodeId extends PropertyKey> {
   readonly successors: Set<NodeId>;
 }
 
-export type IncludeNodeState<NodeId extends PropertyKey, Node> =
+export type IncludeNodeState<NodeId extends PropertyKey> =
   | (IncludeNodeStateBase<NodeId> & {
       readonly expanded: false;
     })
   | (IncludeNodeStateBase<NodeId> & {
       readonly expanded: true;
-      readonly node: Node;
     });
 
-type ReadonlyIncludeNodeState<NodeId extends PropertyKey, Node> =
-  | {
-      readonly nodeId: NodeId;
-      readonly predecessors: ReadonlySet<NodeId>;
-      readonly successors: ReadonlySet<NodeId>;
-      readonly expanded: false;
-    }
-  | {
-      readonly nodeId: NodeId;
-      readonly predecessors: ReadonlySet<NodeId>;
-      readonly successors: ReadonlySet<NodeId>;
-      readonly expanded: true;
-      readonly node: Node;
-    };
+type ReadonlyIncludeNodeState<NodeId extends PropertyKey> = {
+  readonly nodeId: NodeId;
+  readonly predecessors: ReadonlySet<NodeId>;
+  readonly successors: ReadonlySet<NodeId>;
+  readonly expanded: boolean;
+};
 
 export type IncludeExpansionResult<NodeId extends PropertyKey> =
   | {
@@ -161,18 +150,17 @@ interface IncludePathClassification<NodeId extends PropertyKey> {
   readonly excluded: ReadonlySet<NodeId>;
 }
 
-interface ReadonlyIncludeGraphState<NodeId extends PropertyKey, Node> {
+interface ReadonlyIncludeGraphState<NodeId extends PropertyKey> {
   has(nodeId: NodeId): boolean;
-  get(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId, Node> | undefined;
-  predecessorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>>;
-  successorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>>;
+  get(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId> | undefined;
+  predecessorsPort(): DagTopologyPort<NodeId>;
+  successorsPort(): DagTopologyPort<NodeId>;
   nodeIds(): NodeId[];
 }
 
 interface MutableIncludeGraphState<
   NodeId extends PropertyKey,
-  Node,
-> extends ReadonlyIncludeGraphState<NodeId, Node> {
+> extends ReadonlyIncludeGraphState<NodeId> {
   delete(nodeId: NodeId): void;
 }
 
@@ -197,12 +185,12 @@ interface TriggerHit<NodeId> {
  * left. The function is deliberately small-scope: it models only certified closure and does not
  * attempt include-side yielding.
  */
-export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey, Node>(
-  context: WalkDagContext<NodeId, Node>,
+export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey>(
+  context: WalkDagContext<NodeId>,
   startId: NodeId,
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
-  const { nodes } = context;
-  const phase = new CertifiedClosurePhase<NodeId, Node>(nodes, startId);
+  const { graph } = context;
+  const phase = new CertifiedClosurePhase<NodeId>(graph, startId);
   const frontier: ClosureFrontierItem<NodeId>[] = [
     { nodeId: startId, branchId: phase.rootBranchId },
   ];
@@ -221,13 +209,13 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
  * Walks the DAG difference by alternating include expansion with exclude certification phases.
  * This is still a prototype strategy and is not wired into production traversal yet.
  */
-export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKey, Node>(
-  context: WalkDagContext<NodeId, Node>,
+export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKey>(
+  context: WalkDagContext<NodeId>,
   startId: NodeId,
   excludeStartId: NodeId,
-): AsyncIterable<Node> {
-  const { nodes } = context;
-  const state = new IntegratedDifferenceState<NodeId, Node>(nodes);
+): AsyncIterable<NodeId> {
+  const { graph } = context;
+  const state = new IntegratedDifferenceState<NodeId>(graph);
   state.initializeInclude(startId);
 
   const frontier: DifferenceFrontierItem<NodeId>[] = [
@@ -264,10 +252,10 @@ export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKe
   yield* state.drainRemainingInclude();
 }
 
-class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
+class CertifiedClosurePhase<NodeId extends PropertyKey> {
   readonly rootBranchId: BranchId;
 
-  private readonly graph: ClosureGraphState<NodeId, Node>;
+  private readonly graph: ClosureGraphState<NodeId>;
   private nextSplitId: SplitId = 1 as SplitId;
   private nextBranchId: BranchId = 1 as BranchId;
   private nextBranchGroupId: BranchGroupId = 1 as BranchGroupId;
@@ -277,8 +265,8 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
   private readonly reachedByBranch = new Map<NodeId, Set<BranchId>>();
   private readonly terminalNodes = new Set<NodeId>();
 
-  constructor(nodes: DagNodePort<NodeId, Node>, startId: NodeId) {
-    this.graph = new ClosureGraphState(nodes);
+  constructor(graph: DagTopologyPort<NodeId>, startId: NodeId) {
+    this.graph = new ClosureGraphState(graph);
     this.rootBranchId = 0 as BranchId;
     this.graph.markClosedCover(startId);
     this.branches.set(this.rootBranchId, {
@@ -592,19 +580,19 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, Node = unknown> {
  * `recordTraversedEdge()`. The graph only needs predecessor links for walking back through the
  * certified closed region.
  */
-class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
-  private readonly nodes: DagNodePort<NodeId, Node>;
-  private readonly visited = new Map<NodeId, CertifiedClosureNodeState<NodeId, Node>>();
+class ClosureGraphState<NodeId extends PropertyKey> {
+  private readonly graph: DagTopologyPort<NodeId>;
+  private readonly visited = new Map<NodeId, CertifiedClosureNodeState<NodeId>>();
 
-  constructor(nodes: DagNodePort<NodeId, Node>) {
-    this.nodes = nodes;
+  constructor(graph: DagTopologyPort<NodeId>) {
+    this.graph = graph;
   }
 
   stateFor(nodeId: NodeId): ReadonlyCertifiedClosureNodeState<NodeId> {
     return this.mutableStateFor(nodeId);
   }
 
-  private mutableStateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId, Node> {
+  private mutableStateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId> {
     let state = this.visited.get(nodeId);
     if (state === undefined) {
       state = {
@@ -626,18 +614,17 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
       return state.successors;
     }
 
-    const node = await this.nodes.readNode(nodeId);
-    const successors = this.nodes.getSuccessors(node);
-    this.markExpanded(nodeId, node, successors);
-    return successors;
+    const successors = await this.graph.getSuccessors(nodeId);
+    const successorIds = successors.map((successor) => successor.nodeId);
+    this.markExpanded(nodeId, successorIds);
+    return successorIds;
   }
 
-  private markExpanded(nodeId: NodeId, node: Node, successors: readonly NodeId[]): void {
+  private markExpanded(nodeId: NodeId, successors: readonly NodeId[]): void {
     const state = this.mutableStateFor(nodeId);
     this.visited.set(nodeId, {
       ...state,
       expanded: true,
-      node,
       reached: true,
       successors,
     });
@@ -678,12 +665,12 @@ class ClosureGraphState<NodeId extends PropertyKey, Node = unknown> {
   }
 }
 
-export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknown> {
-  private readonly includeGraph: IncludeGraphState<NodeId, Node>;
+export class IntegratedDifferenceState<NodeId extends PropertyKey> {
+  private readonly includeGraph: IncludeGraphState<NodeId>;
   private readonly certifiedExclude = new CertifiedExcludeState<NodeId>();
 
-  constructor(nodes: DagNodePort<NodeId, Node>) {
-    this.includeGraph = new IncludeGraphState(nodes);
+  constructor(graph: DagTopologyPort<NodeId>) {
+    this.includeGraph = new IncludeGraphState(graph);
   }
 
   initializeInclude(startId: NodeId): void {
@@ -709,12 +696,12 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
 
   // Coordinator + certified-hit application responsibility. Exclude state absorbs the closure;
   // this method applies the resulting include-side hits to the include graph.
-  async *applyCertification(closure: CertifiedClosurePhaseResult<NodeId>): AsyncIterable<Node> {
+  async *applyCertification(closure: CertifiedClosurePhaseResult<NodeId>): AsyncIterable<NodeId> {
     const hits = this.certifiedExclude.absorbClosure(closure, this.includeGraph);
     yield* this.applyCertifiedHits(hits);
   }
 
-  async *applyCertifiedHits(hits: ReadonlySet<NodeId>): AsyncIterable<Node> {
+  async *applyCertifiedHits(hits: ReadonlySet<NodeId>): AsyncIterable<NodeId> {
     yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits);
   }
 
@@ -724,7 +711,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, Node = unknow
 
   // Coordinator + IncludeGraphState responsibility. The final drain is a coordinator decision; the
   // graph deletion and node cache access belong to include-side state.
-  *drainRemainingInclude(): Iterable<Node> {
+  *drainRemainingInclude(): Iterable<NodeId> {
     yield* drainUncertifiedInclude(this.includeGraph, this.certifiedExclude);
   }
 }
@@ -738,9 +725,9 @@ class CertifiedExcludeState<
     return this.certified.has(nodeId);
   }
 
-  absorbClosure<Node>(
+  absorbClosure(
     closure: CertifiedClosurePhaseResult<NodeId>,
-    includeGraph: ReadonlyIncludeGraphState<NodeId, Node>,
+    includeGraph: ReadonlyIncludeGraphState<NodeId>,
   ): Set<NodeId> {
     const hits = new Set<NodeId>();
     for (const nodeId of closure.certifiedNodes) {
@@ -756,11 +743,11 @@ class CertifiedExcludeState<
   }
 }
 
-async function* resolveCertifiedHits<NodeId extends PropertyKey, Node>(
-  includeGraph: MutableIncludeGraphState<NodeId, Node>,
+async function* resolveCertifiedHits<NodeId extends PropertyKey>(
+  includeGraph: MutableIncludeGraphState<NodeId>,
   certifiedExclude: ReadonlyCertifiedExcludeState<NodeId>,
   hits: ReadonlySet<NodeId>,
-): AsyncIterable<Node> {
+): AsyncIterable<NodeId> {
   if (hits.size === 0) return;
 
   const classification = await classifyCertifiedHits(includeGraph, hits);
@@ -774,16 +761,16 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey, Node>(
     const state = includeGraph.get(nodeId);
     if (state === undefined || !state.expanded || certifiedExclude.has(nodeId)) continue;
     includeGraph.delete(nodeId);
-    yield state.node;
+    yield nodeId;
   }
 }
 
-async function classifyCertifiedHits<NodeId extends PropertyKey, Node>(
-  includeGraph: ReadonlyIncludeGraphState<NodeId, Node>,
+async function classifyCertifiedHits<NodeId extends PropertyKey>(
+  includeGraph: ReadonlyIncludeGraphState<NodeId>,
   hits: ReadonlySet<NodeId>,
 ): Promise<IncludePathClassification<NodeId>> {
-  const newerSide = await collectReachableNodes(hits, includeGraph.predecessorsPort());
-  const olderSide = await collectReachableNodes(hits, includeGraph.successorsPort());
+  const newerSide = await collectReachableNodeIds(hits, includeGraph.predecessorsPort());
+  const olderSide = await collectReachableNodeIds(hits, includeGraph.successorsPort());
   const excluded = new Set(olderSide);
   const yieldable = difference(newerSide, excluded);
 
@@ -795,16 +782,16 @@ async function classifyCertifiedHits<NodeId extends PropertyKey, Node>(
   return { yieldable, excluded };
 }
 
-function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
-  includeGraph: MutableIncludeGraphState<NodeId, Node>,
+function* drainUncertifiedInclude<NodeId extends PropertyKey>(
+  includeGraph: MutableIncludeGraphState<NodeId>,
   certifiedExclude: ReadonlyCertifiedExcludeState<NodeId>,
-): Iterable<Node> {
+): Iterable<NodeId> {
   const nodeIds = includeGraph.nodeIds();
   for (const nodeId of nodeIds) {
     const state = includeGraph.get(nodeId);
     if (state === undefined || !state.expanded || certifiedExclude.has(nodeId)) continue;
     includeGraph.delete(nodeId);
-    yield state.node;
+    yield nodeId;
   }
 }
 
@@ -815,15 +802,12 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey, Node>(
  * at the same time. Expanded nodes are cached, but their links remain mutable because certified-hit
  * deletion detaches nodes from their neighbors.
  */
-class IncludeGraphState<
-  NodeId extends PropertyKey,
-  Node = unknown,
-> implements MutableIncludeGraphState<NodeId, Node> {
-  private readonly nodes: DagNodePort<NodeId, Node>;
-  private readonly visited = new Map<NodeId, IncludeNodeState<NodeId, Node>>();
+class IncludeGraphState<NodeId extends PropertyKey> implements MutableIncludeGraphState<NodeId> {
+  private readonly graph: DagTopologyPort<NodeId>;
+  private readonly visited = new Map<NodeId, IncludeNodeState<NodeId>>();
 
-  constructor(nodes: DagNodePort<NodeId, Node>) {
-    this.nodes = nodes;
+  constructor(graph: DagTopologyPort<NodeId>) {
+    this.graph = graph;
   }
 
   initialize(startId: NodeId): void {
@@ -834,15 +818,15 @@ class IncludeGraphState<
     return this.visited.has(nodeId);
   }
 
-  get(nodeId: NodeId): IncludeNodeState<NodeId, Node> | undefined {
+  get(nodeId: NodeId): IncludeNodeState<NodeId> | undefined {
     return this.visited.get(nodeId);
   }
 
-  stateFor(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId, Node> {
+  stateFor(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId> {
     return this.mutableStateFor(nodeId);
   }
 
-  private mutableStateFor(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
+  private mutableStateFor(nodeId: NodeId): IncludeNodeState<NodeId> {
     let state = this.visited.get(nodeId);
     if (state === undefined) {
       state = {
@@ -856,12 +840,11 @@ class IncludeGraphState<
     return state;
   }
 
-  private markNodeExpanded(nodeId: NodeId, node: Node): void {
+  private markNodeExpanded(nodeId: NodeId): void {
     const state = this.mutableStateFor(nodeId);
-    const expandedState: IncludeNodeState<NodeId, Node> = {
+    const expandedState: IncludeNodeState<NodeId> = {
       ...state,
       expanded: true,
-      node,
     };
     this.visited.set(nodeId, expandedState);
   }
@@ -872,13 +855,13 @@ class IncludeGraphState<
       return [...state.successors];
     }
 
-    const node = await this.nodes.readNode(nodeId);
-    const successors = this.nodes.getSuccessors(node);
-    this.markNodeExpanded(nodeId, node);
-    for (const successor of successors) {
+    const successors = await this.graph.getSuccessors(nodeId);
+    const successorIds = successors.map((successor) => successor.nodeId);
+    this.markNodeExpanded(nodeId);
+    for (const successor of successorIds) {
       this.recordExpandedEdge(nodeId, successor);
     }
-    return successors;
+    return successorIds;
   }
 
   private recordExpandedEdge(nodeId: NodeId, successorId: NodeId): void {
@@ -905,21 +888,21 @@ class IncludeGraphState<
     return [...this.visited.keys()];
   }
 
-  predecessorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>> {
+  predecessorsPort(): DagTopologyPort<NodeId> {
     return {
-      readNode: async (nodeId) => this.readNode(nodeId),
-      getSuccessors: (node) => [...node.predecessors],
+      getSuccessors: async (nodeId) =>
+        [...this.readNode(nodeId).predecessors].map((predecessor) => ({ nodeId: predecessor })),
     };
   }
 
-  successorsPort(): DagNodePort<NodeId, ReadonlyIncludeNodeState<NodeId, Node>> {
+  successorsPort(): DagTopologyPort<NodeId> {
     return {
-      readNode: async (nodeId) => this.readNode(nodeId),
-      getSuccessors: (node) => [...node.successors],
+      getSuccessors: async (nodeId) =>
+        [...this.readNode(nodeId).successors].map((successor) => ({ nodeId: successor })),
     };
   }
 
-  private readNode(nodeId: NodeId): IncludeNodeState<NodeId, Node> {
+  private readNode(nodeId: NodeId): IncludeNodeState<NodeId> {
     const state = this.visited.get(nodeId);
     if (state === undefined) throw new Error("Expected include visited node.");
     return state;

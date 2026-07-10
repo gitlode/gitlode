@@ -69,8 +69,9 @@ In these cases, `--incremental` with a state file provides a reliable checkpoint
 Several properties of Git's data model directly constrain what gitlode can and cannot guarantee.
 These are not limitations of gitlode — they are fundamental properties of Git objects:
 
-**Output order is not chronological.** gitlode traverses the commit DAG using BFS. Across merge
-branches, BFS order does not match commit timestamp order. Downstream systems must sort by
+**Output order is not chronological or otherwise stable.** gitlode traverses the commit DAG by
+walking parent links. Across merge branches, graph traversal order does not match commit timestamp
+order. Downstream systems must sort by
 `committer.timestamp` if chronological order is required; they must not rely on line order in
 `.jsonl` output files.
 
@@ -153,7 +154,7 @@ Responsibilities:
 - Coordinate output writer lifecycle.
 - Produce v2 checkpoint state only after successful output completion and sink close.
 
-Important behavior: for date filtering, Core skips old commits and continues traversal. It does not terminate early, because BFS graph traversal order is not chronological.
+Important behavior: for date filtering, Core skips old commits and continues traversal. It does not terminate early, because graph traversal order is not chronological.
 
 ### Git adapter layer
 

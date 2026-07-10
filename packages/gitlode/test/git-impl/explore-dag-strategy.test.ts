@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  type DagNodePort,
+  type DagTopologyPort,
   type WalkDagContext,
-  walkDagEagerExclude,
+  walkDagNodeIdsEagerExclude,
 } from "../../src/git-impl/dag-traversal-strategy.js";
 import {
   type CertifiedClosurePhaseResult,
@@ -12,10 +12,6 @@ import {
   walkDagPhaseCertifiedDifference,
 } from "../../src/git-impl/explore-dag-strategy.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
-
-interface TestNode {
-  readonly id: string;
-}
 
 describe("resolveDagCertifiedClosurePhase", () => {
   it("records a complete exclude path when no split closes", async () => {
@@ -97,7 +93,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
 
     const yielded = await collect(state.applyCertification(closedBoundaryResult(["A"], "A")));
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["C", "HEAD"]));
+    expect(new Set(yielded)).toEqual(new Set(["C", "HEAD"]));
   });
 
   it("excludes the path between simultaneous certified hits", async () => {
@@ -110,7 +106,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
 
     const yielded = await collect(state.applyCertification(closedBoundaryResult(["A", "B"], "A")));
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["HEAD"]));
+    expect(new Set(yielded)).toEqual(new Set(["HEAD"]));
   });
 
   it("keeps sibling certified-hit regions independent", async () => {
@@ -124,9 +120,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
 
     const yielded = await collect(state.applyCertification(closedBoundaryResult(["A", "B"], "A")));
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(
-      new Set(["A_CHILD", "B_CHILD", "HEAD"]),
-    );
+    expect(new Set(yielded)).toEqual(new Set(["A_CHILD", "B_CHILD", "HEAD"]));
   });
 
   it("prunes the successor side of a certified hit before draining remaining nodes", async () => {
@@ -138,7 +132,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
 
     const yielded = await resolveAndDrain(state, closedBoundaryResult(["A"], "A"));
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["C"]));
+    expect(new Set(yielded)).toEqual(new Set(["C"]));
   });
 
   it("excludes an include merge side that is an ancestor of another certified hit", async () => {
@@ -153,7 +147,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
 
     const yielded = await resolveAndDrain(state, closedBoundaryResult(["A", "B"], "A"));
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["HEAD"]));
+    expect(new Set(yielded)).toEqual(new Set(["HEAD"]));
   });
 
   it("lets descendants of an excluded path yield when they are not ancestors of a hit", async () => {
@@ -168,7 +162,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
 
     const yielded = await resolveAndDrain(state, closedBoundaryResult(["A", "B"], "A"));
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["Y", "Z", "HEAD"]));
+    expect(new Set(yielded)).toEqual(new Set(["Y", "Z", "HEAD"]));
   });
 
   it("lazily skips a stale frontier item produced by DAG traversal", async () => {
@@ -185,7 +179,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
       walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "C"),
     );
 
-    expect(yielded).toEqual([{ id: "HEAD" }]);
+    expect(yielded).toEqual(["HEAD"]);
     expect(reads).toEqual(["HEAD", "C"]);
   });
 });
@@ -203,7 +197,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
       walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
     );
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(new Set(["HEAD", "NEW"]));
+    expect(new Set(yielded)).toEqual(new Set(["HEAD", "NEW"]));
   });
 
   it("returns both include merge sides before the exclude boundary", async () => {
@@ -220,9 +214,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
       walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
     );
 
-    expect(new Set(yielded.map((node) => node.id))).toEqual(
-      new Set(["HEAD", "MERGE", "LEFT", "RIGHT"]),
-    );
+    expect(new Set(yielded)).toEqual(new Set(["HEAD", "MERGE", "LEFT", "RIGHT"]));
   });
 
   it("matches eager exclude when the exclude phase closes at a rejoined split", async () => {
@@ -289,7 +281,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
 
 async function createState(
   predecessorsByNode: Record<string, readonly string[]>,
-): Promise<IntegratedDifferenceState<string, TestNode>> {
+): Promise<IntegratedDifferenceState<string>> {
   const successorsByNode: Record<string, string[]> = {};
 
   for (const [successorId, predecessorIds] of Object.entries(predecessorsByNode)) {
@@ -300,7 +292,7 @@ async function createState(
     }
   }
 
-  const state = new IntegratedDifferenceState<string, TestNode>(createDagPort(successorsByNode));
+  const state = new IntegratedDifferenceState<string>(createDagPort(successorsByNode));
   for (const nodeId of Object.keys(successorsByNode)) {
     state.initializeInclude(nodeId);
   }
@@ -325,21 +317,20 @@ function closedBoundaryResult(
 function createDagPort(
   successorsByNode: Record<string, readonly string[]>,
   reads: string[] = [],
-): DagNodePort<string, TestNode> {
+): DagTopologyPort<string> {
   return {
-    async readNode(nodeId) {
+    async getSuccessors(nodeId) {
       reads.push(nodeId);
-      return { id: nodeId };
+      return (successorsByNode[nodeId] ?? []).map((successor) => ({ nodeId: successor }));
     },
-    getSuccessors: (node) => successorsByNode[node.id] ?? [],
   };
 }
 
-function createContext<NodeId extends PropertyKey, Node>(
-  nodes: DagNodePort<NodeId, Node>,
-): WalkDagContext<NodeId, Node> {
+function createContext<NodeId extends PropertyKey>(
+  graph: DagTopologyPort<NodeId>,
+): WalkDagContext<NodeId> {
   return {
-    nodes,
+    graph,
     instrumentation: noopInstrumentation,
   };
 }
@@ -363,23 +354,27 @@ async function expectPhaseDifferenceToMatchEager(
     ),
   );
   const eagerResult = await collectNodeIds(
-    walkDagEagerExclude(createContext(createDagPort(successorsByNode)), startId, excludeStartId),
+    walkDagNodeIdsEagerExclude(
+      createContext(createDagPort(successorsByNode)),
+      startId,
+      excludeStartId,
+    ),
   );
 
   expect(new Set(phaseResult)).toEqual(new Set(eagerResult));
 }
 
-async function collectNodeIds(items: AsyncIterable<TestNode>): Promise<string[]> {
-  return (await collect(items)).map((node) => node.id);
+async function collectNodeIds(items: AsyncIterable<string>): Promise<string[]> {
+  return await collect(items);
 }
 
 async function resolveAndDrain(
-  state: IntegratedDifferenceState<string, TestNode>,
+  state: IntegratedDifferenceState<string>,
   closure: CertifiedClosurePhaseResult<string>,
-): Promise<TestNode[]> {
+): Promise<string[]> {
   const result = await collect(state.applyCertification(closure));
-  for (const node of state.drainRemainingInclude()) {
-    result.push(node);
+  for (const nodeId of state.drainRemainingInclude()) {
+    result.push(nodeId);
   }
   return result;
 }

@@ -712,6 +712,32 @@ This migration is gitlode-scoped, not limited to `dag-traversal-strategy.ts`. It
 - Durable documentation that describes traversal internals, user-visible traversal behavior, and
   adapter boundaries.
 
+### Accepted Stage 1-E Explore Strategy Migration Policy
+
+`packages/gitlode/src/git-impl/explore-dag-strategy.ts` is not wired into production traversal today,
+but it is not deprecated code. It is a prototype strategy that may provide important future value to
+gitlode, so Stage 2 should apply the DAG abstraction improvements to it instead of leaving a legacy
+`DagNodePort` island behind.
+
+Stage 2 should migrate `explore-dag-strategy.ts` to the same `NodeId` / `DagTopologyPort` model as
+the production DAG traversal core:
+
+- Remove dependencies on `DagNodePort` and Node-yielding DAG traversal APIs.
+- Make `walkDagPhaseCertifiedDifference()` yield `NodeId` values.
+- Replace `collectReachableNodes()` usage with `collectReachableNodeIds()`.
+- Convert include-graph `predecessorsPort()` / `successorsPort()` adapters to `DagTopologyPort`.
+- Remove domain `Node` caches from traversal state.
+- Keep local graph links used for certified-hit classification as algorithmic state.
+
+Stage 2 should not over-optimize or fully redesign the prototype algorithm. Leave these concerns for
+follow-up work focused on `explore-dag-strategy.ts` itself:
+
+- Do not force closure-phase `branchId` and related phase-local metadata into shared
+  `DagFrontierItem` or `DomainHint`.
+- Do not require every prototype frontier item to use the production frontier abstraction.
+- Do not rewrite the certified-closure algorithm beyond what is needed to remove the old
+  `Node`-based traversal abstraction.
+
 High-level implementation sequence:
 
 1. Introduce the new topology/frontier types.
@@ -729,7 +755,7 @@ High-level implementation sequence:
    gitlode.
 10. Update tests from Node-based assertions to NodeId-based assertions.
 11. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
-    prototype status and difference-set contract.
+    prototype status, difference-set contract, and phase-local algorithm state.
 12. Update Git adapter integration so the DAG core yields `NodeId`, the adapter resolves those OIDs
     through the topology helper's invocation-scoped commit-object cache, and gitlode still emits the
     same commit object set.
@@ -772,6 +798,8 @@ Update these durable documents during Stage 2 alongside the implementation chang
 - `walkDagNodeIdsEagerExclude` returns `reachable(start) - reachable(exclude)`.
 - `walkDagNodeIdsEagerExclude(start, undefined)` equals `collectReachableNodeIds([start])`.
 - `walkDagNodeIdsCertifiedLazy` returns the same result set as `eagerExclude` for relevant fixtures.
+- `walkDagPhaseCertifiedDifference` continues to return the same `NodeId` result set as
+  `eagerExclude` for prototype fixtures, while yield order remains non-contractual.
 
 Recommended graph fixtures:
 
@@ -846,6 +874,8 @@ Verify:
 - Do not cache successors inside the traversal core.
 - Do not keep telemetry only to preserve old metric names.
 - Do not add a generic successor-cache helper in Stage 2.
+- Do not redesign or over-optimize the `explore-dag-strategy.ts` certified-closure algorithm beyond
+  the abstraction migration.
 - Do not let telemetry concerns shape traversal abstraction.
 
 ---

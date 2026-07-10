@@ -183,12 +183,12 @@ interface TriggerHit<NodeId> {
  */
 export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey>(
   context: WalkDagContext<NodeId>,
-  startId: NodeId,
+  nodeId: NodeId,
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
   const { graph } = context;
-  const phase = new CertifiedClosurePhase<NodeId>(graph, startId);
+  const phase = new CertifiedClosurePhase<NodeId>(graph, nodeId);
   const frontier: ClosureFrontierItem<NodeId>[] = [
-    { nodeId: startId, branchId: phase.rootBranchId },
+    { nodeId: nodeId, branchId: phase.rootBranchId },
   ];
 
   while (frontier.length > 0 && !phase.hasClosedBoundary()) {
@@ -207,16 +207,16 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
  */
 export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends PropertyKey>(
   context: WalkDagContext<NodeId>,
-  startId: NodeId,
-  excludeStartId: NodeId,
+  nodeId: NodeId,
+  excludeNodeId: NodeId,
 ): AsyncIterable<NodeId> {
   const { graph } = context;
   const state = new IntegratedDifferenceState<NodeId>(graph);
-  state.initializeInclude(startId);
+  state.initializeInclude(nodeId);
 
   const frontier: DifferenceFrontierItem<NodeId>[] = [
-    { side: "include", nodeId: startId },
-    { side: "exclude", nodeId: excludeStartId },
+    { side: "include", nodeId: nodeId },
+    { side: "exclude", nodeId: excludeNodeId },
   ];
 
   while (frontier.length > 0) {

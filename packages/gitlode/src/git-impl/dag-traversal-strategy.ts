@@ -265,7 +265,7 @@ export function createDefaultDagFrontier<
   });
 }
 
-function createDagFrontierItemFactory() {
+export function createDagFrontierItemFactory() {
   let discoveredOrder = 0;
 
   const createStartItem = <NodeId extends PropertyKey, DomainHint = undefined>(

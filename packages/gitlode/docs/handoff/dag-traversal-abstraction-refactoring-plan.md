@@ -879,6 +879,45 @@ Stage 2 of this abstraction refactor.
 
 ## 15. Implementation Order for a Coding Agent
 
+### Accepted Stage 1-G Implementation Staging Policy
+
+Stage 2 should be one cohesive refactoring PR because the work is one logical DAG abstraction
+migration. Do not split it into multiple PRs that require long-lived compatibility wrappers or leave
+old and new traversal abstractions coexisting across mainline history.
+
+Within that single PR, use explicit internal checkpoints so the diff remains reviewable and the
+intent of each group of changes is clear:
+
+1. **Type model and default frontier**
+   - Add the new topology/frontier types.
+   - Add the default frontier and item factory.
+
+2. **Production DAG core**
+   - Refactor `collectReachableNodeIds`, `walkDagNodeIdsEagerExclude`, and
+     `walkDagNodeIdsCertifiedLazy`.
+   - Remove `Node` and read/cache state from traversal correctness state.
+   - Shrink telemetry according to the Stage 2 telemetry policy.
+
+3. **Git adapter integration**
+   - Add `CommitTopologyAdapter`.
+   - Add the invocation-scoped `CommitOid -> RawCommit` cache.
+   - Keep error mapping in `readCommit(oid)`.
+   - Update `walkCommits()` so DAG-core OIDs are resolved back to commit objects inside the adapter.
+
+4. **Explore strategy migration**
+   - Migrate `explore-dag-strategy.ts` to `DagTopologyPort`.
+   - Make `walkDagPhaseCertifiedDifference()` yield `NodeId`.
+   - Preserve phase-local algorithm state and avoid over-optimization.
+
+5. **Tests and durable docs**
+   - Update traversal, frontier, scheduling metadata, adapter cache/error, and minimal telemetry tests.
+   - Update durable design and profiling docs listed in the Stage 2 checklist.
+
+6. **Cleanup and full validation**
+   - Remove obsolete `DagNodePort`, Node-yielding traversal APIs, old telemetry constants, and generic
+     cache-helper tasks.
+   - Run the full validation commands before finishing.
+
 Follow this order to reduce risk:
 
 1. Add the new type model:
@@ -934,3 +973,12 @@ Follow this order to reduce risk:
 - Node read telemetry constants.
 - Generic successor-cache helper tasks.
 - CertifiedLazy read/cache state types.
+
+Final validation for Stage 2 should run:
+
+- `npm run format:write`
+- `npm run format:check`
+- `npm run build`
+- `npm run lint`
+- `npm run test`
+- `git diff --check`

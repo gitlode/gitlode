@@ -2,11 +2,11 @@ import * as git from "isomorphic-git";
 import { describe, expect, it } from "vitest";
 
 import {
-  collectReachableNodeIds,
   type DagFrontier,
   type DagFrontierItem,
   type DagTopologyPort,
   type WalkDagStrategyOptions,
+  walkDagReachable,
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,
 } from "../../src/git-impl/dag-traversal-strategy.js";
@@ -181,12 +181,25 @@ class RecordingFrontier<T extends DagFrontierItem<string>> implements DagFrontie
 
 describe("DAG traversal NodeId API and frontier metadata", () => {
   it("collects reachable node IDs from one or more starts", async () => {
-    const result = await collectReachableNodeIds(
-      ["left", "right"],
-      stringTopology({ left: ["root"], right: ["root"], root: [] }),
+    const result = new Set(
+      await collect(
+        walkDagReachable(
+          ["left", "right"],
+          stringTopology({ left: ["root"], right: ["root"], root: [] }),
+        ),
+      ),
     );
 
     expect(result).toEqual(new Set(["left", "right", "root"]));
+  });
+
+  it("yields deterministic order for identical input and topology", async () => {
+    const graph = stringTopology({ left: ["root"], right: ["root"], root: [] });
+
+    const first = await collect(walkDagReachable(["left", "right"], graph));
+    const second = await collect(walkDagReachable(["left", "right"], graph));
+
+    expect(first).toEqual(second);
   });
 
   it("records scheduling metadata and copied domain hints in frontier items", async () => {

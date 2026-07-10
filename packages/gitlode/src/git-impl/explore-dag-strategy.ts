@@ -1,9 +1,10 @@
+import { collectAsyncIterableToSet } from "../support/index.js";
 import { KeyedSet } from "../support/keyed-set.js";
 import type { Brand } from "../type-utils/index.js";
 import {
-  collectReachableNodeIds,
   type DagTopologyPort,
   type WalkDagContext,
+  walkDagReachable,
 } from "./dag-traversal-strategy.js";
 
 export type { DagTopologyPort, WalkDagContext } from "./dag-traversal-strategy.js";
@@ -763,8 +764,12 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
   includeGraph: ReadonlyIncludeGraphState<NodeId>,
   hits: ReadonlySet<NodeId>,
 ): Promise<IncludePathClassification<NodeId>> {
-  const newerSide = await collectReachableNodeIds(hits, includeGraph.predecessorsPort());
-  const olderSide = await collectReachableNodeIds(hits, includeGraph.successorsPort());
+  const newerSide = await collectAsyncIterableToSet(
+    walkDagReachable(hits, includeGraph.predecessorsPort()),
+  );
+  const olderSide = await collectAsyncIterableToSet(
+    walkDagReachable(hits, includeGraph.successorsPort()),
+  );
   const excluded = new Set(olderSide);
   const yieldable = difference(newerSide, excluded);
 

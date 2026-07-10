@@ -8,6 +8,7 @@ export {
   captureGroupOrThrow,
 } from "./helpers.js";
 export { formatUnixTimestampWithOffset } from "./date.js";
+export { collectAsyncIterableToSet } from "./async-iterable.js";
 export type { AbsolutePath, AbsoluteDirectoryPath, IsoDateTimeString } from "./type.js";
 export type {
   WorkQueue,

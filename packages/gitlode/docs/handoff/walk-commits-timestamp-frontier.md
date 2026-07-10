@@ -172,8 +172,7 @@ The expected outer shape is now an integrated loop with side-tagged frontier ite
 
 ```ts
 type IntegratedFrontierItem<NodeId> =
-  | { side: "include"; nodeId: NodeId }
-  | { side: "exclude"; nodeId: NodeId };
+  { side: "include"; nodeId: NodeId } | { side: "exclude"; nodeId: NodeId };
 ```
 
 Include-side expansion still reads one node and enqueues its parents. Exclude-side expansion runs

@@ -647,7 +647,14 @@ It may be expensive, but it should not return different topology for the same `N
 
 ## 11. Telemetry Policy
 
-Do not preserve the old node-read-oriented telemetry model.
+Do not preserve the old node-read-oriented telemetry model in Stage 2. Also do not redesign DAG
+traversal telemetry as part of this refactor.
+
+The traversal logic has moved from Git-commit-specific behavior toward a generic `NodeId` / topology
+model. The existing telemetry was introduced for an earlier design and no longer reflects the new
+responsibility split cleanly. Redesigning telemetry at the same time as the DAG abstraction migration
+would make Stage 2 too large, so Stage 2 should temporarily shrink traversal telemetry and leave a
+full telemetry redesign for a separate session.
 
 Remove node-read-specific spans and counters such as:
 
@@ -660,42 +667,22 @@ cache_hits
 fallback_reads
 ```
 
-Use traversal-oriented spans instead:
+Stage 2 should keep only minimal outer operation telemetry, centered on the adapter-level
+`git.walk_commits` span and any existing top-level elapsed-time/reporting behavior needed by the
+profiling output. Do not add new DAG traversal child spans, frontier counters, commit-read/cache
+metrics, or per-node attributes in Stage 2.
 
-```ts
-const DAG_TRAVERSAL_SPAN = "dag.traversal";
-const DAG_TRAVERSAL_STEP_SPAN = "dag.traversal.step";
-const DAG_COLLECT_REACHABLE_SPAN = "dag.traversal.collect_reachable";
-const DAG_EXPAND_SUCCESSORS_SPAN = "dag.traversal.expand_successors";
-```
+The follow-up telemetry redesign should decide the post-refactor diagnostic model from scratch, with
+the new boundaries in mind:
 
-Suggested events/counters:
+- generic DAG traversal events;
+- Git adapter commit-read/cache diagnostics;
+- certified/fallback strategy diagnostics;
+- profiling output fields and summaries;
+- tests that intentionally cover the redesigned diagnostics.
 
-- `frontier_dequeued`
-- `frontier_skipped`
-- `successor_expansions`
-- `successors_seen`
-- `successor_items_enqueued`
-- `result_candidates`
-- `yielded`
-- `fallbacks`
-- `fallback_removed`
-
-Suggested root span attributes:
-
-- `strategy`
-- `result`
-- `fallback_reason`
-
-Suggested step-level attributes where practical:
-
-- `role`
-- `depth`
-- `discovered_order`
-
-Avoid high-cardinality `nodeId` attributes by default.
-
-Domain read/cache telemetry belongs to caller-side adapters.
+Until that redesign happens, telemetry must not be treated as a stable contract. The stable behavior
+for this refactor remains the emitted commit object set, not traversal order or telemetry details.
 
 ---
 
@@ -746,7 +733,7 @@ High-level implementation sequence:
 4. Refactor `collectReachableNodeIds` to use `DagTopologyPort` and `DagFrontierItem`.
 5. Refactor `eagerExclude` to yield `NodeId`.
 6. Refactor `certifiedLazy` to use NodeId-only state and no cache state.
-7. Update telemetry constants and instrumentation events.
+7. Shrink traversal telemetry by removing old node-read-oriented spans/counters without adding a new DAG telemetry model.
 8. Add a Git-adapter-internal commit topology helper object/class that implements
    `DagTopologyPort<CommitOid>`, owns the invocation-scoped commit-object cache, and exposes
    `readCommit(oid)` for final commit-object yielding.
@@ -774,7 +761,7 @@ Update these durable documents during Stage 2 alongside the implementation chang
     objects to the rest of gitlode by resolving OIDs through an adapter-internal topology helper.
   - Update queue/frontier policy from `WorkQueue<NodeId>` to `DagFrontier<DagFrontierItem<...>>`.
   - Update certified-lazy cache and fallback descriptions to match the topology-based design and adapter-owned cache policy.
-  - Update telemetry descriptions to remove node-read metric stability assumptions.
+  - Update telemetry descriptions to state that old node-read metrics are removed in Stage 2 and detailed telemetry will be redesigned separately.
 
 - `packages/gitlode/docs/design/git-traversal.md`
   - Preserve the user-visible contract that gitlode emits the same commit object set for full and
@@ -785,6 +772,11 @@ Update these durable documents during Stage 2 alongside the implementation chang
 - `packages/gitlode/docs/design/architecture.md`
   - Update adapter-boundary text if the implementation introduces an explicit topology adapter or
     node-reader separation inside the Git adapter layer.
+
+- `packages/gitlode/docs/profiling.md`
+  - Remove references to old DAG node-read spans and read/cache counters.
+  - Document that detailed traversal telemetry is temporarily reduced in Stage 2 and is expected to be
+    redesigned in a later telemetry-focused session.
 
 ---
 
@@ -852,15 +844,19 @@ Do not assert global `getSuccessors` minimization in traversal core tests. The D
 
 ### Telemetry Tests
 
-Keep telemetry tests light.
+Keep telemetry tests minimal in Stage 2.
 
 Verify:
 
-- Traversal span is created.
-- Strategy attribute is set.
-- `certifiedLazy` certified path sets `result = "certified"`.
-- `certifiedLazy` fallback path sets `result = "fallback"` and `fallback_reason`.
-- Old `read_node.*` spans are not required by tests.
+- Existing outer operation profiling/reporting still works, especially `git.walk_commits` where it
+  remains applicable.
+- Tests do not require `dag.traversal`, `dag.traversal.step`, `dag.traversal.collect_reachable`, or
+  `dag.traversal.read_node.*` spans.
+- Tests do not require old read/cache counters such as `include_reads`, `exclude_reads`, `cache_hits`,
+  or `fallback_reads`.
+
+Detailed DAG traversal telemetry tests should be added with the later telemetry redesign, not during
+Stage 2 of this abstraction refactor.
 
 ---
 
@@ -876,6 +872,7 @@ Verify:
 - Do not add a generic successor-cache helper in Stage 2.
 - Do not redesign or over-optimize the `explore-dag-strategy.ts` certified-closure algorithm beyond
   the abstraction migration.
+- Do not redesign DAG traversal telemetry in Stage 2; defer that work to a telemetry-focused follow-up.
 - Do not let telemetry concerns shape traversal abstraction.
 
 ---
@@ -921,10 +918,10 @@ Follow this order to reduce risk:
    - `walkDagNodeIdsEagerExclude`
    - `walkDagNodeIdsCertifiedLazy`
 
-8. Update telemetry:
-   - Remove node-read spans.
-   - Add traversal/topology expansion spans.
-   - Keep certified/fallback result attributes.
+8. Shrink telemetry:
+   - Remove node-read spans and read/cache counters.
+   - Keep only minimal outer operation profiling/reporting needed for Stage 2.
+   - Do not add a replacement DAG traversal telemetry model until a later telemetry redesign.
 
 9. Update call sites.
 

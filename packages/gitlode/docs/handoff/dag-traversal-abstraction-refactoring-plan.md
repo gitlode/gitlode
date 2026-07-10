@@ -154,7 +154,7 @@ Additional current issues:
 - Use one `createFrontier` factory per strategy options object.
 - Do not introduce phase-specific frontier factories yet.
 - Do not cache successors inside the DAG core.
-- Provide `withSuccessorCache` as an opt-in helper in a separate module.
+- Do not provide a generic successor-cache helper in Stage 2; use adapter-specific caches when a concrete caller needs them.
 
 ---
 
@@ -581,7 +581,7 @@ Fallback behavior:
 - Remove excluded IDs from `resultCandidates`.
 - Yield remaining `NodeId` values.
 
-If repeated `getSuccessors` calls are expensive, the caller should wrap the graph with `withSuccessorCache`.
+If repeated successor projection becomes expensive, address it in the concrete caller adapter first. Stage 2 should not add a generic successor-cache helper before there is a measured need or a second domain use case.
 
 ---
 
@@ -596,52 +596,30 @@ Rationale:
 - A cache may only add memory overhead.
 - Performance policy belongs to the caller-side topology adapter.
 
-However, repeated successor reads are expected to be common in real Git traversal scenarios. Provide an opt-in helper in a separate module.
+### Accepted Stage 1-C Cache Helper Policy
 
-### Module Boundary
+Do not implement `withSuccessorCache` or a `dag-topology-cache.ts` helper in Stage 2. The generic
+successor-cache helper idea is withdrawn for the initial refactor.
 
-Do not implement the cache helper in the traversal strategy file.
+Rationale:
 
-Suggested separate file:
+- The only concrete production caller in scope is currently the isomorphic-git adapter.
+- That adapter needs to reuse commit objects both while projecting successors and while converting
+  DAG-core-yielded OIDs back into commit objects.
+- A generic `NodeId -> DagSuccessor[]` cache only covers the traversal-expansion side and does not
+  address the adapter's `NodeId -> Node` resolution requirement.
+- Keeping an unused generic cache helper would add implementation and testing work without a concrete
+  Stage 2 consumer.
 
-```text
-dag-topology-cache.ts
-```
+Git adapter integration should rely on the `CommitTopologyAdapter` invocation-scoped
+`CommitOid -> RawCommit` cache. That cache is adapter-specific, outside the DAG core, and should
+serve both topology expansion and final commit-object yielding.
 
-### Helper
-
-```ts
-export function withSuccessorCache<NodeId extends PropertyKey, DomainHint = undefined>(
-  graph: DagTopologyPort<NodeId, DomainHint>,
-): DagTopologyPort<NodeId, DomainHint> {
-  const cache = new Map<NodeId, readonly DagSuccessor<NodeId, DomainHint>[]>();
-
-  return {
-    async getSuccessors(nodeId) {
-      const cached = cache.get(nodeId);
-      if (cached !== undefined) return cached;
-
-      const successors = await graph.getSuccessors(nodeId);
-      cache.set(nodeId, successors);
-      return successors;
-    },
-  };
-}
-```
-
-`withSuccessorCache` is not part of traversal correctness. The traversal core must not call it internally.
-
-### Git Adapter Commit Object Cache
-
-Git adapter integration may also use an invocation-scoped commit-object cache outside the DAG core.
-This cache is distinct from `withSuccessorCache`:
-
-- `withSuccessorCache` caches topology results, meaning `NodeId -> DagSuccessor[]`.
-- The Git adapter commit-object cache caches domain reads, meaning `CommitOid -> RawCommit`.
-
-The Git adapter commit-object cache should serve both topology expansion and final commit-object
-yielding. This keeps the DAG core NodeId-only while avoiding duplicate commit reads when a commit was
-already read to compute its successors before being yielded as part of the result set.
+If repeated successor projection later becomes a measured performance problem, first consider adding
+that cache inside the concrete adapter that needs it. If multiple domains need the same pattern,
+future work may introduce a generic cached topology adapter that combines `NodeId -> Node` reading,
+invocation-scoped node caching, topology projection, and caller-side final node resolution. Do not
+add that abstraction until there is a concrete measured need or another non-Git use case.
 
 ### Topology Stability Contract
 
@@ -727,23 +705,22 @@ High-level implementation sequence:
 5. Refactor `eagerExclude` to yield `NodeId`.
 6. Refactor `certifiedLazy` to use NodeId-only state and no cache state.
 7. Update telemetry constants and instrumentation events.
-8. Add `withSuccessorCache` in a separate module.
-9. Add a Git-adapter-internal commit topology helper object/class that implements
+8. Add a Git-adapter-internal commit topology helper object/class that implements
    `DagTopologyPort<CommitOid>`, owns the invocation-scoped commit-object cache, and exposes
    `readCommit(oid)` for final commit-object yielding.
-10. Update Git adapter call sites so they consume DAG-core `NodeId` output internally, resolve
-    commit objects through the topology helper, and continue yielding commit objects to the rest of
-    gitlode.
-11. Update tests from Node-based assertions to NodeId-based assertions.
-12. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
+9. Update Git adapter call sites so they consume DAG-core `NodeId` output internally, resolve
+   commit objects through the topology helper, and continue yielding commit objects to the rest of
+   gitlode.
+10. Update tests from Node-based assertions to NodeId-based assertions.
+11. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
     prototype status and difference-set contract.
-13. Update Git adapter integration so the DAG core yields `NodeId`, the adapter resolves those OIDs
+12. Update Git adapter integration so the DAG core yields `NodeId`, the adapter resolves those OIDs
     through the topology helper's invocation-scoped commit-object cache, and gitlode still emits the
     same commit object set.
-14. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
+13. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
     core, and keep adapter-level tests focused on commit object output sets.
-15. Update durable documentation according to the checklist below.
-16. Remove obsolete types, read-node helpers, and old telemetry names.
+14. Update durable documentation according to the checklist below.
+15. Remove obsolete types, read-node helpers, generic cache-helper tasks, and old telemetry names.
 
 ### Stage 2 Durable Documentation Checklist
 
@@ -754,7 +731,7 @@ Update these durable documents during Stage 2 alongside the implementation chang
   - Explain that the DAG core yields `NodeId`, while the Git adapter continues to yield commit
     objects to the rest of gitlode by resolving OIDs through an adapter-internal topology helper.
   - Update queue/frontier policy from `WorkQueue<NodeId>` to `DagFrontier<DagFrontierItem<...>>`.
-  - Update certified-lazy cache and fallback descriptions to match the topology/cache-helper design.
+  - Update certified-lazy cache and fallback descriptions to match the topology-based design and adapter-owned cache policy.
   - Update telemetry descriptions to remove node-read metric stability assumptions.
 
 - `packages/gitlode/docs/design/git-traversal.md`
@@ -815,15 +792,17 @@ Verify:
 - `discoveredOrder` is monotonic within a phase.
 - `DomainHint` is copied from `DagSuccessor` to `DagFrontierItem`.
 
-### Cache Helper Tests
+### Adapter Cache Tests
 
-For `withSuccessorCache`:
+For the Git adapter's `CommitTopologyAdapter` integration:
 
-- Repeated `getSuccessors` calls for the same `NodeId` call the underlying graph once.
-- Different `NodeId` values are cached independently.
-- Returned successors preserve the original objects/order.
+- Topology expansion and final commit-object yielding reuse the same invocation-scoped
+  `CommitOid -> RawCommit` cache.
+- Backend-specific commit read errors are translated inside the Git adapter boundary.
+- Adapter-level tests should focus on emitted commit object sets rather than generic successor-cache
+  behavior.
 
-Do not assert global `getSuccessors` minimization in traversal core tests. The DAG core intentionally does not own caching.
+Do not assert global `getSuccessors` minimization in traversal core tests. The DAG core intentionally does not own caching, and Stage 2 does not add a generic successor-cache helper.
 
 ### Telemetry Tests
 
@@ -848,6 +827,7 @@ Verify:
 - Do not add phase-specific frontier factories yet.
 - Do not cache successors inside the traversal core.
 - Do not keep telemetry only to preserve old metric names.
+- Do not add a generic successor-cache helper in Stage 2.
 - Do not let telemetry concerns shape traversal abstraction.
 
 ---
@@ -898,15 +878,14 @@ Follow this order to reduce risk:
    - Add traversal/topology expansion spans.
    - Keep certified/fallback result attributes.
 
-9. Add `withSuccessorCache` in a separate module, for example `dag-topology-cache.ts`.
+9. Update call sites.
 
-10. Update call sites.
+10. Update tests according to the testing plan.
 
-11. Update tests according to the testing plan.
-
-12. Remove obsolete code:
+11. Remove obsolete code:
 
 - `DagNodePort` if no longer needed.
 - Node-yielding traversal functions.
 - Node read telemetry constants.
+- Generic successor-cache helper tasks.
 - CertifiedLazy read/cache state types.

@@ -26,6 +26,13 @@ planning context with current design.
 
 ## Current handoff notes
 
+- [`dag-traversal-future-abstractions.md`](dag-traversal-future-abstractions.md): future
+  `DomainHint`, priority-frontier, and generic cached-topology ideas left after the NodeId/topology
+  DAG traversal refactor.
+- [`dag-traversal-telemetry-redesign.md`](dag-traversal-telemetry-redesign.md): deferred redesign
+  notes for post-refactor DAG traversal and Git adapter diagnostics.
+- [`explore-dag-strategy-next.md`](explore-dag-strategy-next.md): follow-up context for developing
+  the prototype certified-closure DAG strategy after the abstraction migration.
 - [`instrumentation-opentelemetry-migration.md`](instrumentation-opentelemetry-migration.md):
   historical continuation context for the span-first instrumentation migration.
 - [`profiling-and-walk-commits-next.md`](profiling-and-walk-commits-next.md): walkCommits

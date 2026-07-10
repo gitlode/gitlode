@@ -18,13 +18,13 @@ Therefore, branch extraction means traversing commits reachable from that branch
 
 ## Adapter-level traversal model
 
-The adapter traverses commits using manual BFS over parent links.
+The adapter traverses commits by walking parent links in the commit DAG. The exact yield order is not a stable contract.
 
 High-level steps:
 
 1. Resolve branch ref to a head OID.
 2. If an exclusion boundary exists, pre-compute all commits reachable from that boundary.
-3. Traverse from head with a queue.
+3. Traverse from head with a frontier.
 4. Skip commits already visited or excluded.
 5. Yield each remaining commit to Core.
 
@@ -48,7 +48,7 @@ gitGraph
 	commit id: "3"
 ```
 
-Example BFS traversal result list:
+Representative traversal result list:
 
 - `[3, 2, 1]`
 
@@ -86,7 +86,7 @@ Interpretation for state-based differential:
 - Let `M` denote the merge commit created by `merge feature`.
 - Newly included set is `{5, M, C, B, A}`.
 - Already processed set is `{3, 2, 1}`.
-- Example BFS traversal result list for this differential run: `[5, M, C, B, A]`
+- Representative traversal result list for this differential run: `[5, M, C, B, A]`
 
 ### Differential by commit object ID (OID) or ref
 
@@ -98,7 +98,7 @@ With `--since-ref`:
 Example traversal result list:
 
 - Uses the same traversal behavior as state-based differential.
-- For the visual above with `--since-ref 3` (or a tag pointing to commit 3), one BFS result is `[5, M, C, B, A]`.
+- For the visual above with `--since-ref 3` (or a tag pointing to commit 3), one representative result is `[5, M, C, B, A]`.
 
 Current runtime support is limited to repositories using the `sha1` object format. The object
 format gate runs before traversal planning/state-boundary consumption. Unsupported formats fail
@@ -117,7 +117,7 @@ Important behavior:
 - Filtering uses `continue`, not `break`.
 - Old commits are skipped, but traversal continues.
 
-Reason: BFS graph order is not chronological, especially around merges. Early stop would miss newer commits reachable through another path.
+Reason: graph traversal order is not chronological, especially around merges. Early stop would miss newer commits reachable through another path.
 
 Visual:
 
@@ -139,7 +139,7 @@ Interpretation for date-based filtering:
 - Commits older than the boundary are skipped.
 - Traversal still continues so `new-h1`, `new-m1`, and `new-m2` are not missed.
 - Let `M` denote the merge commit created by `merge hotfix`.
-- Representative BFS traversal list before date filtering: `[new-m2, M, new-m1, new-h1, old-2, old-1]`
+- Representative traversal list before date filtering: `[new-m2, M, new-m1, new-h1, old-2, old-1]`
 - Representative output list after date filtering: `[new-m2, M, new-m1, new-h1]`
 
 ## Merge handling and exclusion correctness

@@ -113,8 +113,11 @@ export function expectedOids(dag: BuiltDag): Set<string> {
   return new Set([...expectedLabels(dag.definition)].map((label) => dag.oid(label)));
 }
 
-export function assertOidSet(commits: readonly RawCommit[], expected: ReadonlySet<string>): void {
-  const returned = commits.map((commit) => commit.oid);
+export function assertOidSet(
+  commits: readonly (RawCommit | CommitOid)[],
+  expected: ReadonlySet<string>,
+): void {
+  const returned = commits.map((commit) => (typeof commit === "string" ? commit : commit.oid));
   expect(new Set(returned), "walkCommits OID set").toEqual(new Set(expected));
   expect(returned, "walkCommits must not return duplicate OIDs").toHaveLength(
     new Set(returned).size,

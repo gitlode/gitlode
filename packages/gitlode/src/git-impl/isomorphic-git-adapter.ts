@@ -14,7 +14,11 @@ import { instrumentAsyncIterable, type Instrumentation } from "../instrumentatio
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import { OrderedQueue } from "../support/index.js";
-import { type DagNodePort, walkDagWithConfiguredStrategy } from "./dag-traversal-strategy.js";
+import {
+  type DagFrontierItem,
+  type DagTopologyPort,
+  walkDagNodeIdsWithConfiguredStrategy,
+} from "./dag-traversal-strategy.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
@@ -191,27 +195,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
     yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", () => {
-      const nodes: DagNodePort<CommitOid, RawCommit> = {
-        readNode: async (oid) => {
-          try {
-            const { commit } = await git.readCommit({ fs: this._fs, dir: repoPath, oid });
-            return toRawCommit(oid, commit);
-          } catch (err) {
-            if (err instanceof Error && err.name === "NotFoundError") {
-              throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
-            }
-            throw new GitAdapterError(
-              `Unexpected error reading commit ${oid}: ${String(err)}`,
-              "UNKNOWN",
-              err,
-            );
-          }
-        },
-        getSuccessors: (node) => node.parents,
-      };
-      return walkDagWithConfiguredStrategy<CommitOid, RawCommit>(
+      const topology = new CommitTopologyAdapter(this._fs, repoPath);
+      const oidWalk = walkDagNodeIdsWithConfiguredStrategy<CommitOid>(
         {
-          nodes,
+          graph: topology,
           instrumentation: this._instrumentation,
         },
         oid,
@@ -219,13 +206,15 @@ export class IsomorphicGitAdapter implements GitAdapter {
         {
           certifiedLazy: {
             createFrontier: () =>
-              new OrderedQueue<CommitOid>({
+              new OrderedQueue<DagFrontierItem<CommitOid>>({
                 dequeueOrder: "lifo",
                 blockOrder: "preserve",
               }),
           },
         },
       );
+
+      return commitObjectsFromOids(oidWalk, topology);
     });
   }
 
@@ -399,6 +388,52 @@ export class IsomorphicGitAdapter implements GitAdapter {
       if (content[i] === 0) return true;
     }
     return false;
+  }
+}
+
+class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
+  private readonly cache = new Map<CommitOid, RawCommit>();
+  private readonly fs: FsClient;
+  private readonly repoPath: string;
+
+  constructor(fs: FsClient, repoPath: string) {
+    this.fs = fs;
+    this.repoPath = repoPath;
+  }
+
+  async getSuccessors(oid: CommitOid): Promise<readonly { readonly nodeId: CommitOid }[]> {
+    const commit = await this.readCommit(oid);
+    return commit.parents.map((parentOid) => ({ nodeId: parentOid }));
+  }
+
+  async readCommit(oid: CommitOid): Promise<RawCommit> {
+    const cached = this.cache.get(oid);
+    if (cached !== undefined) return cached;
+
+    try {
+      const { commit } = await git.readCommit({ fs: this.fs, dir: this.repoPath, oid });
+      const rawCommit = toRawCommit(oid, commit);
+      this.cache.set(oid, rawCommit);
+      return rawCommit;
+    } catch (err) {
+      if (err instanceof Error && err.name === "NotFoundError") {
+        throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
+      }
+      throw new GitAdapterError(
+        `Unexpected error reading commit ${oid}: ${String(err)}`,
+        "UNKNOWN",
+        err,
+      );
+    }
+  }
+}
+
+async function* commitObjectsFromOids(
+  oids: AsyncIterable<CommitOid>,
+  topology: CommitTopologyAdapter,
+): AsyncIterable<RawCommit> {
+  for await (const oid of oids) {
+    yield await topology.readCommit(oid);
   }
 }
 

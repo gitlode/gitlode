@@ -8,7 +8,7 @@ import {
 
 export type DagTraversalRole = "include" | "exclude";
 
-export interface DagSchedulingContext {
+export interface BasicDagSchedulingContext {
   readonly role: DagTraversalRole;
   readonly depth: number;
   readonly discoveredOrder: number;
@@ -19,7 +19,11 @@ export interface DagSuccessor<NodeId extends PropertyKey, DomainHint = undefined
   readonly domainHint?: DomainHint;
 }
 
-export interface DagFrontierItem<NodeId extends PropertyKey, DomainHint = undefined> {
+export interface DagFrontierItem<
+  NodeId extends PropertyKey,
+  DagSchedulingContext extends BasicDagSchedulingContext,
+  DomainHint = undefined,
+> {
   readonly nodeId: NodeId;
   readonly scheduling: DagSchedulingContext;
   readonly domainHint?: DomainHint;
@@ -39,8 +43,14 @@ export interface WalkDagContext<NodeId extends PropertyKey, DomainHint = undefin
 
 type WalkDagStrategy = "eagerExclude" | "certifiedLazy";
 
-export interface WalkDagStrategyOptions<NodeId extends PropertyKey, DomainHint = undefined> {
-  readonly createFrontier?: () => DagFrontier<DagFrontierItem<NodeId, DomainHint>>;
+export interface WalkDagStrategyOptions<
+  NodeId extends PropertyKey,
+  DagSchedulingContext extends BasicDagSchedulingContext,
+  DomainHint = undefined,
+> {
+  readonly createFrontier?: () => DagFrontier<
+    DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>
+  >;
 }
 
 export interface WalkDagConfiguredStrategyOptions<
@@ -48,8 +58,8 @@ export interface WalkDagConfiguredStrategyOptions<
   DomainHint = undefined,
 > {
   readonly strategy?: WalkDagStrategy;
-  readonly eagerExclude?: WalkDagStrategyOptions<NodeId, DomainHint>;
-  readonly certifiedLazy?: WalkDagStrategyOptions<NodeId, DomainHint>;
+  readonly eagerExclude?: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>;
+  readonly certifiedLazy?: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>;
 }
 
 const defaultStrategy: WalkDagStrategy = "certifiedLazy";
@@ -83,7 +93,7 @@ export async function* walkDagNodeIdsEagerExclude<
   context: WalkDagContext<NodeId, DomainHint>,
   nodeId: NodeId,
   excludeNodeId?: NodeId,
-  options: WalkDagStrategyOptions<NodeId, DomainHint> = {},
+  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
   const excluded =
     excludeNodeId !== undefined
@@ -93,9 +103,13 @@ export async function* walkDagNodeIdsEagerExclude<
       : new Set<NodeId>();
 
   const reachable = new Set<NodeId>();
-  const factory = createDagFrontierItemFactory();
-  const frontier = options.createFrontier?.() ?? createDefaultDagFrontier<NodeId, DomainHint>();
-  frontier.enqueue(factory.createStartItem<NodeId, DomainHint>(nodeId, "include"));
+  const factory = createDagFrontierItemFactory<NodeId, BasicDagSchedulingContext, DomainHint>(
+    createBasicDagSchedulingContext,
+  );
+  const frontier =
+    options.createFrontier?.() ??
+    createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
+  frontier.enqueue(factory.createStartItem(nodeId, "include"));
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
@@ -130,7 +144,7 @@ export async function* walkDagNodeIdsCertifiedLazy<
   context: WalkDagContext<NodeId, DomainHint>,
   nodeId: NodeId,
   excludeNodeId?: NodeId,
-  options: WalkDagStrategyOptions<NodeId, DomainHint> = {},
+  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
   if (excludeNodeId === undefined) {
     yield* walkDagNodeIdsEagerExclude(context, nodeId, undefined, options);
@@ -165,10 +179,13 @@ export async function* walkDagNodeIdsCertifiedLazy<
   singleExcludeSuccessor =
     excludeStartSuccessors.length === 1 ? firstOrThrow(excludeStartSuccessors).nodeId : null;
 
-  const factory = createDagFrontierItemFactory();
+  const factory = createDagFrontierItemFactory<NodeId, BasicDagSchedulingContext, DomainHint>(
+    createBasicDagSchedulingContext,
+  );
   const includeFrontier =
-    options.createFrontier?.() ?? createDefaultDagFrontier<NodeId, DomainHint>();
-  includeFrontier.enqueue(factory.createStartItem<NodeId, DomainHint>(nodeId, "include"));
+    options.createFrontier?.() ??
+    createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
+  includeFrontier.enqueue(factory.createStartItem(nodeId, "include"));
 
   while (!includeFrontier.isEmpty()) {
     const item = includeFrontier.dequeueOrThrow();
@@ -232,13 +249,17 @@ export async function* walkDagNodeIdsCertifiedLazy<
 export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, DomainHint = undefined>(
   context: WalkDagContext<NodeId, DomainHint>,
   nodeIds: Iterable<NodeId>,
-  options: WalkDagStrategyOptions<NodeId, DomainHint> = {},
+  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
   const role = context.role ?? "include";
   const visited = new Set<NodeId>();
-  const factory = createDagFrontierItemFactory();
-  const frontier = options.createFrontier?.() ?? createDefaultDagFrontier<NodeId, DomainHint>();
-  frontier.enqueueMany(factory.createStartItems<NodeId, DomainHint>(nodeIds, role));
+  const factory = createDagFrontierItemFactory<NodeId, BasicDagSchedulingContext, DomainHint>(
+    createBasicDagSchedulingContext,
+  );
+  const frontier =
+    options.createFrontier?.() ??
+    createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
+  frontier.enqueueMany(factory.createStartItems(nodeIds, role));
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
@@ -257,50 +278,70 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
 
 export function createDefaultDagFrontier<
   NodeId extends PropertyKey,
+  DagSchedulingContext extends BasicDagSchedulingContext,
   DomainHint = undefined,
->(): DagFrontier<DagFrontierItem<NodeId, DomainHint>> {
-  return new OrderedQueue<DagFrontierItem<NodeId, DomainHint>>({
+>(): DagFrontier<DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>> {
+  return new OrderedQueue<DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>>({
     dequeueOrder: "fifo",
     blockOrder: "preserve",
   });
 }
 
-export function createDagFrontierItemFactory() {
-  let discoveredOrder = 0;
-
-  const createStartItem = <NodeId extends PropertyKey, DomainHint = undefined>(
+export function createDagFrontierItemFactory<
+  NodeId extends PropertyKey,
+  DagSchedulingContext extends BasicDagSchedulingContext,
+  DomainHint = undefined,
+>(
+  createDagSchedulingContext: (
+    role: DagTraversalRole,
+    depth: number,
+    discoveredOrder: number,
+  ) => DagSchedulingContext,
+): {
+  createStartItem: (
     nodeId: NodeId,
     role: DagTraversalRole,
-  ): DagFrontierItem<NodeId, DomainHint> => {
-    return createFrontierItem(nodeId, {
-      role,
-      depth: 0,
-      discoveredOrder: discoveredOrder++,
-    });
-  };
-
-  const createStartItems = <NodeId extends PropertyKey, DomainHint = undefined>(
+  ) => DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>;
+  createStartItems: (
     nodeIds: Iterable<NodeId>,
     role: DagTraversalRole,
-  ): DagFrontierItem<NodeId, DomainHint>[] => {
-    return Array.from(nodeIds, (nodeId) => createStartItem<NodeId, DomainHint>(nodeId, role));
+  ) => DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>[];
+  createSuccessorItems: (
+    parent: DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>,
+    successors: readonly DagSuccessor<NodeId, DomainHint>[],
+  ) => DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>[];
+} {
+  let discoveredOrder = 0;
+
+  const createStartItem = (
+    nodeId: NodeId,
+    role: DagTraversalRole,
+  ): DagFrontierItem<NodeId, DagSchedulingContext, DomainHint> => {
+    return createFrontierItem(nodeId, createDagSchedulingContext(role, 0, discoveredOrder++));
   };
 
-  const createSuccessorItems = <NodeId extends PropertyKey, DomainHint = undefined>(
-    parent: DagFrontierItem<NodeId, DomainHint>,
+  const createStartItems = (
+    nodeIds: Iterable<NodeId>,
+    role: DagTraversalRole,
+  ): DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>[] => {
+    return Array.from(nodeIds, (nodeId) => createStartItem(nodeId, role));
+  };
+
+  const createSuccessorItems = (
+    parent: DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>,
     successors: readonly DagSuccessor<NodeId, DomainHint>[],
-  ): DagFrontierItem<NodeId, DomainHint>[] => {
-    const items: DagFrontierItem<NodeId, DomainHint>[] = [];
+  ): DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>[] => {
+    const items: DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>[] = [];
 
     for (const successor of successors) {
       items.push(
         createFrontierItem(
           successor.nodeId,
-          {
-            role: parent.scheduling.role,
-            depth: parent.scheduling.depth + 1,
-            discoveredOrder: discoveredOrder++,
-          },
+          createDagSchedulingContext(
+            parent.scheduling.role,
+            parent.scheduling.depth + 1,
+            discoveredOrder++,
+          ),
           successor.domainHint,
         ),
       );
@@ -316,15 +357,31 @@ export function createDagFrontierItemFactory() {
   };
 }
 
-export function createFrontierItem<NodeId extends PropertyKey, DomainHint = undefined>(
+export function createFrontierItem<
+  NodeId extends PropertyKey,
+  DagSchedulingContext extends BasicDagSchedulingContext,
+  DomainHint = undefined,
+>(
   nodeId: NodeId,
   scheduling: DagSchedulingContext,
   domainHint?: DomainHint,
-): DagFrontierItem<NodeId, DomainHint> {
+): DagFrontierItem<NodeId, DagSchedulingContext, DomainHint> {
   return {
     nodeId,
     scheduling,
     ...(domainHint === undefined ? {} : { domainHint }),
+  };
+}
+
+export function createBasicDagSchedulingContext(
+  role: DagTraversalRole,
+  depth: number,
+  discoveredOrder: number,
+): BasicDagSchedulingContext {
+  return {
+    role,
+    depth,
+    discoveredOrder,
   };
 }
 

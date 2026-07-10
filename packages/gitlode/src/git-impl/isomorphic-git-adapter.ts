@@ -15,6 +15,7 @@ import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import { OrderedQueue } from "../support/index.js";
 import {
+  type BasicDagSchedulingContext,
   type DagFrontierItem,
   type DagTopologyPort,
   walkDagNodeIdsWithConfiguredStrategy,
@@ -206,7 +207,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
         {
           certifiedLazy: {
             createFrontier: () =>
-              new OrderedQueue<DagFrontierItem<CommitOid>>({
+              new OrderedQueue<DagFrontierItem<CommitOid, BasicDagSchedulingContext>>({
                 dequeueOrder: "lifo",
                 blockOrder: "preserve",
               }),

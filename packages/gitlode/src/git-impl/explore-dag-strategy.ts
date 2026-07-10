@@ -205,7 +205,7 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
  * Walks the DAG difference by alternating include expansion with exclude certification phases.
  * This is still a prototype strategy and is not wired into production traversal yet.
  */
-export async function* walkDagPhaseCertifiedDifference<NodeId extends PropertyKey>(
+export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends PropertyKey>(
   context: WalkDagContext<NodeId>,
   startId: NodeId,
   excludeStartId: NodeId,

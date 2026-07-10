@@ -9,7 +9,7 @@ import {
   type CertifiedClosurePhaseResult,
   IntegratedDifferenceState,
   resolveDagCertifiedClosurePhase,
-  walkDagPhaseCertifiedDifference,
+  walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/git-impl/explore-dag-strategy.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
@@ -176,7 +176,7 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
     );
 
     const yielded = await collect(
-      walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "C"),
+      walkDagNodeIdsPhaseCertifiedDifference(createContext(port), "HEAD", "C"),
     );
 
     expect(yielded).toEqual(["HEAD"]);
@@ -194,7 +194,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
     });
 
     const yielded = await collect(
-      walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
+      walkDagNodeIdsPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
     );
 
     expect(new Set(yielded)).toEqual(new Set(["HEAD", "NEW"]));
@@ -211,7 +211,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
     });
 
     const yielded = await collect(
-      walkDagPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
+      walkDagNodeIdsPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
     );
 
     expect(new Set(yielded)).toEqual(new Set(["HEAD", "MERGE", "LEFT", "RIGHT"]));
@@ -347,7 +347,7 @@ async function expectPhaseDifferenceToMatchEager(
   excludeStartId: string,
 ): Promise<void> {
   const phaseResult = await collectNodeIds(
-    walkDagPhaseCertifiedDifference(
+    walkDagNodeIdsPhaseCertifiedDifference(
       createContext(createDagPort(successorsByNode)),
       startId,
       excludeStartId,

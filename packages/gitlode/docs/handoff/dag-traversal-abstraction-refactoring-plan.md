@@ -740,16 +740,12 @@ High-level implementation sequence:
 9. Update Git adapter call sites so they consume DAG-core `NodeId` output internally, resolve
    commit objects through the topology helper, and continue yielding commit objects to the rest of
    gitlode.
-10. Update tests from Node-based assertions to NodeId-based assertions.
-11. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
+10. Refactor `explore-dag-strategy.ts` onto the same topology-based abstraction, preserving its
     prototype status, difference-set contract, and phase-local algorithm state.
-12. Update Git adapter integration so the DAG core yields `NodeId`, the adapter resolves those OIDs
-    through the topology helper's invocation-scoped commit-object cache, and gitlode still emits the
-    same commit object set.
-13. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
+11. Update tests from Node-based assertions to NodeId-based assertions where they target the DAG
     core, and keep adapter-level tests focused on commit object output sets.
-14. Update durable documentation according to the checklist below.
-15. Remove obsolete types, read-node helpers, generic cache-helper tasks, and old telemetry names.
+12. Update durable documentation according to the checklist below.
+13. Remove obsolete types, read-node helpers, generic cache-helper tasks, and old telemetry names.
 
 ### Stage 2 Durable Documentation Checklist
 
@@ -968,7 +964,7 @@ Follow this order to reduce risk:
 
 11. Remove obsolete code:
 
-- `DagNodePort` if no longer needed.
+- `DagNodePort`.
 - Node-yielding traversal functions.
 - Node read telemetry constants.
 - Generic successor-cache helper tasks.
@@ -982,3 +978,27 @@ Final validation for Stage 2 should run:
 - `npm run lint`
 - `npm run test`
 - `git diff --check`
+
+---
+
+## 16. Stage 2 Entry Checklist
+
+Before implementation starts, confirm these accepted decisions remain true:
+
+- DAG core APIs are `NodeId`-yielding only; do not add Node-yielding compatibility wrappers.
+- DAG traversal correctness state is keyed by `NodeId`, not domain `Node` objects.
+- `DagTopologyPort<NodeId, DomainHint>` replaces `DagNodePort<NodeId, Node>`.
+- `DomainHint` is introduced as a scheduling-only seam, but the initial Git adapter integration does
+  not supply Git-specific hints.
+- The Git adapter continues to yield commit objects to the rest of gitlode.
+- `CommitTopologyAdapter` owns the invocation-scoped `CommitOid -> RawCommit` cache and exposes
+  `readCommit(oid)` for final commit-object yielding.
+- `CommitTopologyAdapter.readCommit(oid)` maps backend commit-read failures to `GitAdapterError`.
+- Do not add `withSuccessorCache`, `dag-topology-cache.ts`, or another generic successor-cache helper
+  in Stage 2.
+- Telemetry is reduced in Stage 2; do not add a replacement DAG traversal telemetry model until the
+  later telemetry redesign.
+- `explore-dag-strategy.ts` migrates to `NodeId` / topology abstractions without redesigning or
+  over-optimizing its certified-closure algorithm.
+- Durable design and profiling docs are updated during Stage 2 alongside implementation, not before.
+- Stage 2 is one cohesive PR with the internal checkpoints listed above.

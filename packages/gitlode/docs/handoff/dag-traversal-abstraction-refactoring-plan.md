@@ -473,6 +473,33 @@ function createFrontierItem<NodeId extends PropertyKey, DomainHint = undefined>(
 - `DomainHint` is copied from `DagSuccessor` to `DagFrontierItem` as-is.
 - `undefined` `domainHint` should preferably be omitted as an object field.
 
+### Accepted Stage 1-C DomainHint Policy
+
+Stage 2 should introduce the `DomainHint` seam, but the initial Git adapter integration should not
+supply Git-specific hints. `CommitTopologyAdapter.getSuccessors(oid)` should return successors
+without a `domainHint` field, so Git traversal uses `DomainHint = undefined` at first.
+
+Rationale:
+
+- Stage 2 should prioritize moving DAG correctness from domain `Node` objects to `NodeId` topology.
+- No concrete priority frontier policy is being implemented in this refactor.
+- Supplying production hints before a consumer exists could imply ordering semantics that are not part
+  of gitlode's stable behavior contract.
+- Keeping hints absent initially makes the Git adapter integration smaller while preserving the future
+  scheduling seam.
+
+Future scheduling work may add a Git-specific hint type when a concrete frontier policy needs it. A
+likely first candidate is parent-order metadata such as:
+
+```ts
+interface GitCommitDomainHint {
+  readonly parentIndex: number;
+}
+```
+
+`parentIndex` would be scheduling-only metadata. It must not change the reachable commit set, and it
+must not turn commit traversal order into a user-visible contract.
+
 ---
 
 ## 9. Strategy Behavior

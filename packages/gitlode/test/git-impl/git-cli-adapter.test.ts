@@ -1,7 +1,7 @@
 import nodeFs from "node:fs";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
@@ -138,7 +138,7 @@ describe("GitCliAdapter", () => {
       await mkdtemp(join(tmpdir(), "gitlode-git-cli-adapter-fake-bin-")),
       "fake-git.js",
     );
-    tempDirs.push(repoPath, binPath.slice(0, binPath.lastIndexOf("/")));
+    tempDirs.push(repoPath, dirname(binPath));
     const oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as CommitOid;
     await writeFile(
       binPath,

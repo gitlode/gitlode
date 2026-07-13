@@ -31,8 +31,9 @@ interface GitCommitDomainHint {
 
 `parentIndex` would allow future policies to prefer first-parent or mainline-like scheduling without
 changing correctness. Any timestamp-based or priority-based scheduling work should also keep result
-sets independent of hints. See [`walk-commits-timestamp-frontier.md`](walk-commits-timestamp-frontier.md)
-for the separate timestamp-priority frontier sketch.
+sets independent of hints. For the current durable frontier contracts, see
+`packages/gitlode/docs/design/commit-traversal-internals.md`; for phase-certified prototype
+continuation notes, see `packages/gitlode/docs/handoff/explore-dag-strategy-next.md`.
 
 ## Generic cached topology adapter
 

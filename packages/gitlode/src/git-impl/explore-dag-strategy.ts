@@ -3,10 +3,11 @@ import {
   noopInstrumentation,
   type InstrumentationSpan,
 } from "../instrumentation/index.js";
-import { collectAsyncIterableToSet } from "../support/index.js";
+import { collectAsyncIterableToSet, OrderedQueue } from "../support/index.js";
 import { KeyedSet } from "../support/keyed-set.js";
 import type { Brand } from "../type-utils/index.js";
 import {
+  type DagFrontier,
   type DagTopologyPort,
   type WalkDagContext,
   walkDagReachableNodeIds,
@@ -170,9 +171,14 @@ interface ReadonlyCertifiedExcludeState<NodeId extends PropertyKey> {
   has(nodeId: NodeId): boolean;
 }
 
-interface ClosureFrontierItem<NodeId> {
+export interface ClosureFrontierItem<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
   readonly branchId: BranchId;
+}
+
+export interface PhaseCertifiedStrategyOptions<NodeId extends PropertyKey> {
+  readonly createDifferenceFrontier?: () => DagFrontier<DifferenceFrontierItem<NodeId>>;
+  readonly createClosureFrontier?: () => DagFrontier<ClosureFrontierItem<NodeId>>;
 }
 
 interface DagPhaseCertifiedTelemetry {
@@ -194,9 +200,10 @@ interface TriggerHit<NodeId> {
 export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey>(
   context: WalkDagContext<NodeId>,
   nodeId: NodeId,
+  options: PhaseCertifiedStrategyOptions<NodeId> = {},
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
   return await context.instrumentation.runAsync("dag.certified_closure", async (span) => {
-    const result = await resolveDagCertifiedClosurePhaseCore(context, nodeId, { span });
+    const result = await resolveDagCertifiedClosurePhaseCore(context, nodeId, options, { span });
     span.setAttribute("result", result.kind);
     span.incrementCounter("certified_nodes", result.certifiedNodes.size);
     if (result.kind === "exhausted") {
@@ -209,20 +216,21 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
 async function resolveDagCertifiedClosurePhaseCore<NodeId extends PropertyKey>(
   context: WalkDagContext<NodeId>,
   nodeId: NodeId,
+  options: PhaseCertifiedStrategyOptions<NodeId>,
   telemetry?: DagPhaseCertifiedTelemetry,
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
   const { graph } = context;
   const phase = new CertifiedClosurePhase<NodeId>(graph, nodeId, telemetry);
-  const frontier: ClosureFrontierItem<NodeId>[] = [
-    { nodeId: nodeId, branchId: phase.rootBranchId },
-  ];
+  const frontier =
+    options.createClosureFrontier?.() ??
+    createDefaultPhaseCertifiedFrontier<ClosureFrontierItem<NodeId>>();
+  frontier.enqueue({ nodeId: nodeId, branchId: phase.rootBranchId });
 
-  while (frontier.length > 0 && !phase.hasClosedBoundary()) {
-    const item = frontier.shift();
-    if (item === undefined) break;
+  while (!frontier.isEmpty() && !phase.hasClosedBoundary()) {
+    const item = frontier.dequeueOrThrow();
 
     telemetry?.span.incrementCounter("traversal_steps");
-    frontier.push(...(await phase.advance(item)));
+    frontier.enqueueMany(await phase.advance(item));
   }
 
   return phase.toResult();
@@ -236,11 +244,13 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends Pro
   context: WalkDagContext<NodeId>,
   nodeId: NodeId,
   excludeNodeId: NodeId,
+  options: PhaseCertifiedStrategyOptions<NodeId> = {},
 ): AsyncIterable<NodeId> {
   yield* instrumentAsyncIterable(
     context.instrumentation,
     "dag.traversal",
-    (span) => walkDagNodeIdsPhaseCertifiedDifferenceCore(context, nodeId, excludeNodeId, { span }),
+    (span) =>
+      walkDagNodeIdsPhaseCertifiedDifferenceCore(context, nodeId, excludeNodeId, options, { span }),
     { attributes: { strategy: "phaseCertified" } },
   );
 }
@@ -249,20 +259,23 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<NodeId extends Proper
   context: WalkDagContext<NodeId>,
   nodeId: NodeId,
   excludeNodeId: NodeId,
+  options: PhaseCertifiedStrategyOptions<NodeId>,
   telemetry: DagPhaseCertifiedTelemetry,
 ): AsyncIterable<NodeId> {
   const { graph } = context;
   const state = new IntegratedDifferenceState<NodeId>(graph, telemetry);
   state.initializeInclude(nodeId);
 
-  const frontier: DifferenceFrontierItem<NodeId>[] = [
+  const frontier =
+    options.createDifferenceFrontier?.() ??
+    createDefaultPhaseCertifiedFrontier<DifferenceFrontierItem<NodeId>>();
+  frontier.enqueueMany([
     { role: "main", nodeId: nodeId },
     { role: "exclude", nodeId: excludeNodeId },
-  ];
+  ]);
 
-  while (frontier.length > 0) {
-    const item = frontier.shift();
-    if (item === undefined) break;
+  while (!frontier.isEmpty()) {
+    const item = frontier.dequeueOrThrow();
 
     if (item.role === "main") {
       telemetry.span.incrementCounter("traversal_steps");
@@ -282,15 +295,18 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<NodeId extends Proper
         continue;
       }
       if (expansion.kind === "expanded") {
-        for (const nodeId of expansion.enqueue) {
-          frontier.push({ role: "main", nodeId });
-        }
+        frontier.enqueueMany(expansion.enqueue.map((nodeId) => ({ role: "main", nodeId })));
       }
       continue;
     }
 
     telemetry.span.incrementCounter("closure_phases");
-    const closure = await resolveDagCertifiedClosurePhaseCore(context, item.nodeId, telemetry);
+    const closure = await resolveDagCertifiedClosurePhaseCore(
+      context,
+      item.nodeId,
+      options,
+      telemetry,
+    );
     telemetry.span.incrementCounter(
       closure.kind === "closed-boundary" ? "closed_boundary_phases" : "exhausted_phases",
     );
@@ -304,7 +320,7 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<NodeId extends Proper
     }
     const nextExcludeStart = state.nextExcludePhaseStart(closure);
     if (nextExcludeStart !== undefined) {
-      frontier.push({ role: "exclude", nodeId: nextExcludeStart });
+      frontier.enqueue({ role: "exclude", nodeId: nextExcludeStart });
     }
   }
 
@@ -313,6 +329,13 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<NodeId extends Proper
     telemetry.span.incrementCounter("yielded_nodes");
     yield yielded;
   }
+}
+
+function createDefaultPhaseCertifiedFrontier<T>(): DagFrontier<T> {
+  return new OrderedQueue<T>({
+    dequeueOrder: "fifo",
+    blockOrder: "preserve",
+  });
 }
 
 class CertifiedClosurePhase<NodeId extends PropertyKey> {

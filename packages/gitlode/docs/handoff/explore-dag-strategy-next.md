@@ -26,16 +26,12 @@ classification are algorithmic state and should not be removed merely because th
 
 ## Deferred algorithm work
 
-Future work on this file should focus on understanding and improving the certified-closure algorithm
-itself. In particular:
+The frontier injection seam is complete for the phase-certified prototype: difference coordination
+and each closure phase can now receive independent scheduling queues while preserving the durable
+result-set contract documented in `packages/gitlode/docs/design/commit-traversal-internals.md`.
 
-- review `ClosureGraphState` and `IncludeGraphState` as algorithmic state, not generic cache helpers;
-- evaluate closure-phase metadata such as `branchId` on its own terms;
-- decide whether any phase-local frontier metadata should map to shared `DagFrontierItem` scheduling
-  context, or remain prototype-specific;
-- avoid forcing `branchId` or closure-specific metadata into `DomainHint` unless it is genuinely
-  scheduling-only information for a concrete frontier policy;
-- avoid rewriting the algorithm just to mirror production traversal internals.
+The next scheduling-related task is to design priority metadata, if a concrete priority policy needs
+it. Do not add timestamp, priority, or generic scheduling context fields until that design is made.
 
 ## Suggested validation scenarios
 

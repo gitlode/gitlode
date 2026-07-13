@@ -49,3 +49,9 @@ small fixtures that cover:
 - disconnected exclude nodes;
 - stale or duplicate frontier items;
 - cases where certified-hit classification depends on both predecessor and successor links.
+
+## Telemetry status
+
+The prototype now has operation-level telemetry for the FIFO phase-certified baseline. Durable
+counter semantics live in `packages/gitlode/docs/design/commit-traversal-internals.md`; keep this
+handoff limited to future continuation notes rather than duplicating those definitions.

@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -224,10 +225,14 @@ export class GitCliAdapter implements GitAdapter {
   }
 }
 
-function processClosed(child: ChildProcess): Promise<number> {
-  return new Promise((resolve, reject) => {
-    child.on("error", reject);
-    child.on("close", (code) => resolve(code ?? 1));
+type ProcessCloseResult =
+  | { readonly ok: true; readonly code: number }
+  | { readonly ok: false; readonly error: unknown };
+
+function processClosed(child: ChildProcess): Promise<ProcessCloseResult> {
+  return new Promise((resolve) => {
+    child.on("error", (error) => resolve({ ok: false, error }));
+    child.on("close", (code) => resolve({ ok: true, code: code ?? 1 }));
   });
 }
 
@@ -248,8 +253,11 @@ async function* streamRevListBatchObjects(
   const catFileStderrChunks: Buffer[] = [];
   revList.stderr.on("data", (chunk: Buffer) => revListStderrChunks.push(chunk));
   catFile.stderr.on("data", (chunk: Buffer) => catFileStderrChunks.push(chunk));
-  revList.stdout.pipe(catFile.stdin);
 
+  const pipeClosed = pipeline(revList.stdout, catFile.stdin).then(
+    () => undefined,
+    (error: unknown) => error,
+  );
   const revListClosed = processClosed(revList);
   const catFileClosed = processClosed(catFile);
   let yielded = false;
@@ -272,9 +280,31 @@ async function* streamRevListBatchObjects(
     }
   }
 
-  const [revListCode, catFileCode] = await Promise.all([revListClosed, catFileClosed]);
+  const [revListResult, catFileResult, pipeError] = await Promise.all([
+    revListClosed,
+    catFileClosed,
+    pipeClosed,
+  ]);
   const revListStderr = Buffer.concat(revListStderrChunks).toString("utf8");
   const catFileStderr = Buffer.concat(catFileStderrChunks).toString("utf8");
+
+  if (!revListResult.ok) {
+    throw new GitAdapterError(
+      `Unexpected error walking commits: ${formatUnknownError(revListResult.error)}`,
+      "UNKNOWN",
+      revListResult.error,
+    );
+  }
+  if (!catFileResult.ok) {
+    throw new GitAdapterError(
+      `Unexpected error reading commit batch: ${formatUnknownError(catFileResult.error)}`,
+      "UNKNOWN",
+      catFileResult.error,
+    );
+  }
+
+  const revListCode = revListResult.code;
+  const catFileCode = catFileResult.code;
 
   if (revListCode !== 0) {
     if (isNotRepositoryError(revListStderr)) {
@@ -293,6 +323,13 @@ async function* streamRevListBatchObjects(
     throw new GitAdapterError(
       `Unexpected error reading commit batch: ${catFileStderr.trim()}`,
       "UNKNOWN",
+    );
+  }
+  if (pipeError !== undefined) {
+    throw new GitAdapterError(
+      `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(pipeError)}`,
+      "UNKNOWN",
+      pipeError,
     );
   }
 
@@ -335,10 +372,15 @@ async function* parseBatchObjectStream(stream: Readable): AsyncIterable<BatchObj
         }
       }
 
-      if (buffer.length < expectedSize) break;
+      if (buffer.length <= expectedSize) break;
+      if (buffer[expectedSize] !== 0x0a) {
+        throw new GitAdapterError(
+          `Unexpected cat-file batch delimiter for ${currentOid}`,
+          "UNKNOWN",
+        );
+      }
       const content = buffer.subarray(0, expectedSize);
-      buffer = buffer.subarray(expectedSize);
-      if (buffer[0] === 0x0a) buffer = buffer.subarray(1);
+      buffer = buffer.subarray(expectedSize + 1);
       yield { oid: currentOid, type: currentType, content };
       expectedSize = undefined;
       currentOid = "";
@@ -408,6 +450,10 @@ function isNotRepositoryError(stderr: string): boolean {
 function formatCommandFailure(result: GitCommandResult): string {
   const stderr = result.stderr.trim();
   return stderr.length > 0 ? stderr : `exit code ${result.code}`;
+}
+
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function parseRawCommit(oid: CommitOid, content: Buffer): RawCommit {

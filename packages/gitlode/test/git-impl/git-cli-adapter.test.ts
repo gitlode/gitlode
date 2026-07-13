@@ -1,5 +1,5 @@
 import nodeFs from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -129,6 +129,46 @@ describe("GitCliAdapter", () => {
           counters: expect.objectContaining({ yielded: 2 }),
         }),
       ]),
+    );
+  });
+
+  it("rejects truncated cat-file batch output that omits the payload delimiter", async () => {
+    const repoPath = await mkdtemp(join(tmpdir(), "gitlode-git-cli-adapter-fake-repo-"));
+    const binPath = join(
+      await mkdtemp(join(tmpdir(), "gitlode-git-cli-adapter-fake-bin-")),
+      "fake-git.js",
+    );
+    tempDirs.push(repoPath, binPath.slice(0, binPath.lastIndexOf("/")));
+    const oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as CommitOid;
+    await writeFile(
+      binPath,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("rev-list")) {
+  process.stdout.write("${oid}\\n");
+  process.exit(0);
+}
+if (args.includes("cat-file")) {
+  process.stdout.write("${oid} commit 4\\nabcd");
+  process.exit(0);
+}
+process.exit(0);
+`,
+    );
+    await chmod(binPath, 0o755);
+    const fallback = new IsomorphicGitAdapter({
+      fs: nodeFs,
+      diffAdapter: new JsDiffAdapter(),
+      instrumentation: noopInstrumentation,
+    });
+    const adapter = new GitCliAdapter({
+      instrumentation: noopInstrumentation,
+      fileChangeAdapter: fallback,
+      gitExecutable: binPath,
+    });
+
+    await expect(collectWalk(adapter, repoPath, oid)).rejects.toThrow(
+      "Unexpected truncated cat-file batch output",
     );
   });
 

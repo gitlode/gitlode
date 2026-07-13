@@ -336,3 +336,11 @@ node's timestamp to each successor path. The successor's own timestamp is not re
 decided. Timestamp assignment changes, equal timestamps, and non-monotonic child/parent timestamps
 may alter processing order but must not alter `reachable(start) - reachable(exclude)` membership.
 The actual Git adapter connection for committer timestamps has not been implemented yet.
+
+Closure re-expansion and branch-join detection are separate concerns. A compliant frontier may only
+hold and reorder the pending items produced by traversal; it must not synthesize, drop, or rewrite
+frontier items. When a closure branch reaches a successor, the phase records that reach immediately
+and detects joins against other branch groups before enqueueing the successor item. Because branch
+groups only merge and do not later split, dequeue-time re-expansion of an already-expanded closure
+node re-accesses topology for scheduling/telemetry but is not a separate opportunity to discover a
+new branch join.

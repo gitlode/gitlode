@@ -595,17 +595,23 @@ describe("phase-certified DomainHint scheduling", () => {
     ]);
   });
 
-  it("re-reads known closure nodes and preserves re-arrival path hints", async () => {
+  it("re-expands closure nodes through compliant FIFO scheduling and preserves successor hints", async () => {
     const frontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] = [];
     const reads: string[] = [];
     const recorder = new LocalInstrumentationRecorder(() => 0);
 
-    let injectedKnownNode = false;
     const result = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
       createContext(
         createTimestampDagPort(
-          { MERGE: ["JOIN", "RIGHT"], JOIN: ["NEXT"], RIGHT: [], NEXT: [] },
-          { MERGE: 100, JOIN: 70, RIGHT: 20, NEXT: 1 },
+          {
+            MERGE: ["A", "B", "C"],
+            A: ["JOIN"],
+            B: ["JOIN"],
+            C: [],
+            JOIN: ["NEXT"],
+            NEXT: [],
+          },
+          { MERGE: 100, A: 90, B: 80, C: 75, JOIN: 70, NEXT: 1 },
           reads,
         ),
         recorder,
@@ -618,18 +624,6 @@ describe("phase-certified DomainHint scheduling", () => {
               dequeueOrder: "fifo",
               blockOrder: "preserve",
             }),
-            (block) => {
-              if (injectedKnownNode || block.length !== 2) return block;
-              const join = block.find((item) => item.nodeId === "JOIN");
-              const right = block.find((item) => item.nodeId === "RIGHT");
-              if (join === undefined || right === undefined) return block;
-              injectedKnownNode = true;
-              return [
-                join,
-                { nodeId: "JOIN", branchId: right.branchId, domainHint: { sourceTimestamp: 33 } },
-                right,
-              ];
-            },
           );
           frontiers.push(frontier);
           return frontier;
@@ -637,97 +631,69 @@ describe("phase-certified DomainHint scheduling", () => {
       },
     );
 
-    expect(result).toEqual(closedBoundaryResult(["MERGE", "JOIN"], "JOIN"));
+    expect(result.kind).toBe("exhausted");
+    expect(result.certifiedNodes).toEqual(new Set(["MERGE", "A", "B", "C", "JOIN", "NEXT"]));
+    if (result.kind === "exhausted") {
+      expect(new Set(result.terminalNodes)).toEqual(new Set(["C", "NEXT"]));
+    }
     expect(reads.filter((nodeId) => nodeId === "JOIN")).toHaveLength(2);
+    expect(reads).toEqual(["MERGE", "A", "B", "C", "JOIN", "JOIN", "NEXT", "NEXT"]);
     expect(frontiers[0]?.dequeued.filter((item) => item.nodeId === "JOIN")).toEqual([
-      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 100 } },
-      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 33 } },
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 90 } },
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 80 } },
     ]);
     expect(frontiers[0]?.blocks).toContainEqual([
       { nodeId: "NEXT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 70 } },
     ]);
+    expect(
+      frontiers[0]?.blocks.filter((block) =>
+        block.some((item) => item.nodeId === "NEXT" && item.domainHint?.sourceTimestamp === 70),
+      ),
+    ).toHaveLength(2);
     expect(recorder.records()[0]?.counters).toEqual(
       expect.objectContaining({
-        exclude_expansions: 3,
-        successor_expansions: 3,
+        exclude_expansions: 8,
+        successor_expansions: 8,
       }),
     );
   });
 
-  it("inherits known-node closed-boundary hints into the next exclude phase", async () => {
-    const differenceFrontiers: RecordingFrontier<
-      DifferenceFrontierItem<string, PathTimestampHint>
-    >[] = [];
-    const closureFrontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] =
-      [];
+  it("keeps difference membership stable when compliant closure re-expansion occurs", async () => {
     const successors = {
       HEAD: ["NEW"],
       NEW: ["MERGE"],
-      MERGE: ["JOIN", "RIGHT"],
-      JOIN: ["OLD"],
-      RIGHT: [],
-      OLD: [],
+      MERGE: ["A", "B", "C"],
+      A: ["JOIN"],
+      B: ["JOIN"],
+      C: [],
+      JOIN: ["NEXT"],
+      NEXT: [],
     };
+    const reads: string[] = [];
 
-    let injectedKnownNodeInDifference = false;
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
         createContext(
-          createTimestampDagPort(successors, {
-            HEAD: 120,
-            NEW: 110,
-            MERGE: 100,
-            JOIN: 70,
-            RIGHT: 20,
-            OLD: 1,
-          }),
+          createTimestampDagPort(
+            successors,
+            { HEAD: 120, NEW: 110, MERGE: 100, A: 90, B: 80, C: 75, JOIN: 70, NEXT: 1 },
+            reads,
+          ),
         ),
         "HEAD",
         "MERGE",
         {
-          createDifferenceFrontier: () => {
-            const frontier = new RecordingFrontier(
-              new OrderedQueue<DifferenceFrontierItem<string, PathTimestampHint>>({
-                dequeueOrder: "fifo",
-                blockOrder: "preserve",
-              }),
-            );
-            differenceFrontiers.push(frontier);
-            return frontier;
-          },
-          createClosureFrontier: () => {
-            const frontier = new RecordingFrontier(
-              new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
-                dequeueOrder: "fifo",
-                blockOrder: "preserve",
-              }),
-              (block) => {
-                if (injectedKnownNodeInDifference || block.length !== 2) return block;
-                const join = block.find((item) => item.nodeId === "JOIN");
-                const right = block.find((item) => item.nodeId === "RIGHT");
-                if (join === undefined || right === undefined) return block;
-                injectedKnownNodeInDifference = true;
-                return [
-                  join,
-                  { nodeId: "JOIN", branchId: right.branchId, domainHint: { sourceTimestamp: 33 } },
-                  right,
-                ];
-              },
-            );
-            closureFrontiers.push(frontier);
-            return frontier;
-          },
+          createClosureFrontier: () =>
+            new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+              dequeueOrder: "fifo",
+              blockOrder: "preserve",
+            }),
         },
       ),
     );
 
     expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "MERGE"));
-    expect(differenceFrontiers[0]?.blocks).toContainEqual([
-      { role: "exclude", nodeId: "JOIN", domainHint: { sourceTimestamp: 33 } },
-    ]);
-    expect(closureFrontiers[1]?.blocks[0]).toEqual([
-      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 33 } },
-    ]);
+    expect(reads.filter((nodeId) => nodeId === "JOIN")).toHaveLength(2);
   });
 
   it("keeps path-specific hints for duplicate node ids", async () => {
@@ -1275,10 +1241,7 @@ class RecordingFrontier<T> implements DagFrontier<T> {
   readonly blocks: T[][] = [];
   readonly dequeued: T[] = [];
 
-  constructor(
-    private readonly inner: DagFrontier<T>,
-    private readonly prepareBlock: (block: T[]) => T[] = (block) => block,
-  ) {}
+  constructor(private readonly inner: DagFrontier<T>) {}
 
   get size(): number {
     return this.inner.size;
@@ -1289,13 +1252,12 @@ class RecordingFrontier<T> implements DagFrontier<T> {
   }
 
   enqueue(...items: T[]): void {
-    const block = this.prepareBlock([...items]);
-    this.blocks.push(block);
-    this.inner.enqueueMany(block);
+    this.blocks.push([...items]);
+    this.inner.enqueue(...items);
   }
 
   enqueueMany(items: Iterable<T>): void {
-    const block = this.prepareBlock(Array.from(items));
+    const block = Array.from(items);
     this.blocks.push(block);
     this.inner.enqueueMany(block);
   }

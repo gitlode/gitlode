@@ -75,3 +75,17 @@ successor/predecessor links for certified-hit classification and deletion, but `
 successor-cache API. Re-accessing topology through the DAG core should therefore increment DAG
 successor-expansion counters and call `DagTopologyPort.getSuccessors()` again, letting the Git
 adapter's `CommitTopologyAdapter` own commit-object reuse and cache-hit telemetry.
+
+## Closure re-expansion and frontier compliance follow-up
+
+A later review removed the artificial known-node fixture that mutated frontier blocks. Frontier
+factories are scheduling-only: they may preserve, reverse, prioritize, or otherwise reorder the
+items produced by traversal, but they must not add, delete, or rewrite `nodeId`, `branchId`, or
+`domainHint` values. Re-expansion coverage now uses a normal partial-rejoin topology where FIFO
+ordering causes two legitimate `JOIN` items to be queued before either is expanded.
+
+The review also confirmed the branch-join invariant used by the closure prototype: production
+successor frontier items pass through `reachSuccessorFromBranch()` or parent-continuation
+`reachNode()` before enqueue, so joins between different branch groups are discovered at reach time.
+Branch groups only merge afterward. Dequeue-time re-expansion can therefore re-access topology and
+propagate freshly returned successor hints, but it is not a meaningful separate branch-join trigger.

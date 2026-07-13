@@ -420,9 +420,9 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       return [];
     }
 
-    const frontier = state.expanded
-      ? this.resolveBranchByKnownNode(item.branchId, item.nodeId, item.domainHint)
-      : [];
+    // A re-expanded node may be reached by another branch, but new branch joins are detected when
+    // the successor frontier item is produced. Dequeue-time re-expansion is topology re-access only.
+    const frontier: ClosureFrontierItem<NodeId, DomainHint>[] = [];
 
     const successors = await this.graph.expand(item.nodeId);
     this.markTraversed(item.nodeId, item.branchId);
@@ -541,23 +541,6 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       joinedBranchId,
       domainHint,
     };
-  }
-
-  private resolveBranchByKnownNode(
-    branchId: BranchId,
-    knownNodeId: NodeId,
-    domainHint?: DomainHint,
-  ): ClosureFrontierItem<NodeId, DomainHint>[] {
-    const branch = this.getBranchStateOrThrow(branchId);
-    const joinedBranchId = this.findJoinedBranchAtNode(branch.splitId, branchId, knownNodeId);
-    if (joinedBranchId === undefined) return [];
-    return this.resolveBranchByTrigger({
-      splitId: branch.splitId,
-      triggerId: knownNodeId,
-      branchId,
-      joinedBranchId,
-      domainHint,
-    });
   }
 
   private resolveBranchByTrigger(
@@ -681,24 +664,6 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
 
     reached.add(branchId);
     return joinedBranchId;
-  }
-
-  private findJoinedBranchAtNode(
-    splitId: SplitId,
-    branchId: BranchId,
-    nodeId: NodeId,
-  ): BranchId | undefined {
-    const reached = this.reachedByBranch.get(nodeId);
-    if (reached === undefined) return undefined;
-    return [...reached].find((candidate) => {
-      const branch = this.getBranchStateOrThrow(candidate);
-      const currentBranch = this.getBranchStateOrThrow(branchId);
-      return (
-        branch.splitId === splitId &&
-        candidate !== branchId &&
-        branch.groupId !== currentBranch.groupId
-      );
-    });
   }
 
   private joinBranchGroups(leftBranchId: BranchId, rightBranchId: BranchId): void {

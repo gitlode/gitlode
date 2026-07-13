@@ -51,3 +51,16 @@ small fixtures that cover:
 The prototype now has operation-level telemetry for the FIFO phase-certified baseline. Durable
 counter semantics live in `packages/gitlode/docs/design/commit-traversal-internals.md`; keep this
 handoff limited to future continuation notes rather than duplicating those definitions.
+
+## Path scheduling hint status
+
+The phase-certified prototype now carries generic `DomainHint` values on difference and closure
+frontier items. These hints are path-local scheduling metadata: successor descriptors may project
+metadata from the node that was just expanded onto the path toward each successor, and injected
+frontiers may use that metadata for priority. Start items remain hintless.
+
+Synthetic tests cover child-timestamp-style projection, including closed-boundary hint inheritance
+into the next exclude phase. The next Git-specific task is to project a commit's committer timestamp
+from the normal commit read/expand operation onto the parent successor path. Do not pre-read parent
+commit timestamps, do not read pending frontier nodes only to assign priority, and do not make the
+Git adapter's result membership depend on timestamp monotonicity.

@@ -1,4 +1,8 @@
-import { noopInstrumentation } from "../instrumentation/index.js";
+import {
+  instrumentAsyncIterable,
+  noopInstrumentation,
+  type InstrumentationSpan,
+} from "../instrumentation/index.js";
 import { collectAsyncIterableToSet } from "../support/index.js";
 import { KeyedSet } from "../support/keyed-set.js";
 import type { Brand } from "../type-utils/index.js";
@@ -144,6 +148,8 @@ export type DifferenceFrontierItem<NodeId extends PropertyKey> =
 interface IncludePathClassification<NodeId extends PropertyKey> {
   readonly yieldable: ReadonlySet<NodeId>;
   readonly excluded: ReadonlySet<NodeId>;
+  readonly newerSideSize: number;
+  readonly olderSideSize: number;
 }
 
 interface ReadonlyIncludeGraphState<NodeId extends PropertyKey> {
@@ -169,6 +175,10 @@ interface ClosureFrontierItem<NodeId> {
   readonly branchId: BranchId;
 }
 
+interface DagPhaseCertifiedTelemetry {
+  readonly span: InstrumentationSpan;
+}
+
 interface TriggerHit<NodeId> {
   readonly splitId: SplitId;
   readonly triggerId: NodeId;
@@ -185,8 +195,24 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
   context: WalkDagContext<NodeId>,
   nodeId: NodeId,
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
+  return await context.instrumentation.runAsync("dag.certified_closure", async (span) => {
+    const result = await resolveDagCertifiedClosurePhaseCore(context, nodeId, { span });
+    span.setAttribute("result", result.kind);
+    span.incrementCounter("certified_nodes", result.certifiedNodes.size);
+    if (result.kind === "exhausted") {
+      span.incrementCounter("terminal_nodes", result.terminalNodes.length);
+    }
+    return result;
+  });
+}
+
+async function resolveDagCertifiedClosurePhaseCore<NodeId extends PropertyKey>(
+  context: WalkDagContext<NodeId>,
+  nodeId: NodeId,
+  telemetry?: DagPhaseCertifiedTelemetry,
+): Promise<CertifiedClosurePhaseResult<NodeId>> {
   const { graph } = context;
-  const phase = new CertifiedClosurePhase<NodeId>(graph, nodeId);
+  const phase = new CertifiedClosurePhase<NodeId>(graph, nodeId, telemetry);
   const frontier: ClosureFrontierItem<NodeId>[] = [
     { nodeId: nodeId, branchId: phase.rootBranchId },
   ];
@@ -195,6 +221,7 @@ export async function resolveDagCertifiedClosurePhase<NodeId extends PropertyKey
     const item = frontier.shift();
     if (item === undefined) break;
 
+    telemetry?.span.incrementCounter("traversal_steps");
     frontier.push(...(await phase.advance(item)));
   }
 
@@ -210,8 +237,22 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends Pro
   nodeId: NodeId,
   excludeNodeId: NodeId,
 ): AsyncIterable<NodeId> {
+  yield* instrumentAsyncIterable(
+    context.instrumentation,
+    "dag.traversal",
+    (span) => walkDagNodeIdsPhaseCertifiedDifferenceCore(context, nodeId, excludeNodeId, { span }),
+    { attributes: { strategy: "phaseCertified" } },
+  );
+}
+
+async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<NodeId extends PropertyKey>(
+  context: WalkDagContext<NodeId>,
+  nodeId: NodeId,
+  excludeNodeId: NodeId,
+  telemetry: DagPhaseCertifiedTelemetry,
+): AsyncIterable<NodeId> {
   const { graph } = context;
-  const state = new IntegratedDifferenceState<NodeId>(graph);
+  const state = new IntegratedDifferenceState<NodeId>(graph, telemetry);
   state.initializeInclude(nodeId);
 
   const frontier: DifferenceFrontierItem<NodeId>[] = [
@@ -224,9 +265,20 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends Pro
     if (item === undefined) break;
 
     if (item.role === "main") {
+      telemetry.span.incrementCounter("traversal_steps");
       const expansion = await state.expandInclude(item.nodeId);
+      if (
+        expansion.kind === "skipped" &&
+        (expansion.reason === "stale" || expansion.reason === "already-expanded")
+      ) {
+        telemetry.span.incrementCounter("stale_steps");
+      }
       if (expansion.kind === "skipped" && expansion.reason === "certified-hit") {
-        yield* state.applyCertifiedHits(new Set([item.nodeId]));
+        for await (const yielded of state.applyCertifiedHits(new Set([item.nodeId]))) {
+          telemetry.span.incrementCounter("certification_yielded_nodes");
+          telemetry.span.incrementCounter("yielded_nodes");
+          yield yielded;
+        }
         continue;
       }
       if (expansion.kind === "expanded") {
@@ -237,15 +289,30 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends Pro
       continue;
     }
 
-    const closure = await resolveDagCertifiedClosurePhase(context, item.nodeId);
-    yield* state.applyCertification(closure);
+    telemetry.span.incrementCounter("closure_phases");
+    const closure = await resolveDagCertifiedClosurePhaseCore(context, item.nodeId, telemetry);
+    telemetry.span.incrementCounter(
+      closure.kind === "closed-boundary" ? "closed_boundary_phases" : "exhausted_phases",
+    );
+    if (closure.kind === "exhausted") {
+      telemetry.span.incrementCounter("terminal_nodes", closure.terminalNodes.length);
+    }
+    for await (const yielded of state.applyCertification(closure)) {
+      telemetry.span.incrementCounter("certification_yielded_nodes");
+      telemetry.span.incrementCounter("yielded_nodes");
+      yield yielded;
+    }
     const nextExcludeStart = state.nextExcludePhaseStart(closure);
     if (nextExcludeStart !== undefined) {
       frontier.push({ role: "exclude", nodeId: nextExcludeStart });
     }
   }
 
-  yield* state.drainRemainingInclude();
+  for (const yielded of state.drainRemainingInclude()) {
+    telemetry.span.incrementCounter("drain_yielded_nodes");
+    telemetry.span.incrementCounter("yielded_nodes");
+    yield yielded;
+  }
 }
 
 class CertifiedClosurePhase<NodeId extends PropertyKey> {
@@ -261,8 +328,12 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
   private readonly reachedByBranch = new Map<NodeId, Set<BranchId>>();
   private readonly terminalNodes = new Set<NodeId>();
 
-  constructor(graph: DagTopologyPort<NodeId>, startId: NodeId) {
-    this.graph = new ClosureGraphState(graph);
+  constructor(
+    graph: DagTopologyPort<NodeId>,
+    startId: NodeId,
+    telemetry?: DagPhaseCertifiedTelemetry,
+  ) {
+    this.graph = new ClosureGraphState(graph, telemetry);
     this.rootBranchId = 0 as BranchId;
     this.graph.markClosedCover(startId);
     this.branches.add({
@@ -277,7 +348,10 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
 
   async advance(item: ClosureFrontierItem<NodeId>): Promise<ClosureFrontierItem<NodeId>[]> {
     const state = this.graph.stateFor(item.nodeId);
-    if (state.traversedBranches.has(item.branchId)) return [];
+    if (state.traversedBranches.has(item.branchId)) {
+      this.graph.recordStaleStep();
+      return [];
+    }
 
     const frontier = state.expanded
       ? this.resolveBranchByKnownNode(item.branchId, item.nodeId)
@@ -578,10 +652,12 @@ class CertifiedClosurePhase<NodeId extends PropertyKey> {
  */
 class ClosureGraphState<NodeId extends PropertyKey> {
   private readonly graph: DagTopologyPort<NodeId>;
+  private readonly telemetry?: DagPhaseCertifiedTelemetry;
   private readonly visited = new Map<NodeId, CertifiedClosureNodeState<NodeId>>();
 
-  constructor(graph: DagTopologyPort<NodeId>) {
+  constructor(graph: DagTopologyPort<NodeId>, telemetry?: DagPhaseCertifiedTelemetry) {
     this.graph = graph;
+    this.telemetry = telemetry;
   }
 
   stateFor(nodeId: NodeId): ReadonlyCertifiedClosureNodeState<NodeId> {
@@ -610,6 +686,8 @@ class ClosureGraphState<NodeId extends PropertyKey> {
       return state.successors;
     }
 
+    this.telemetry?.span.incrementCounter("successor_expansions");
+    this.telemetry?.span.incrementCounter("exclude_expansions");
     const successors = await this.graph.getSuccessors(nodeId);
     const successorIds = successors.map((successor) => successor.nodeId);
     this.markExpanded(nodeId, successorIds);
@@ -642,6 +720,10 @@ class ClosureGraphState<NodeId extends PropertyKey> {
     this.mutableStateFor(successorId).predecessors.add(nodeId);
   }
 
+  recordStaleStep(): void {
+    this.telemetry?.span.incrementCounter("stale_steps");
+  }
+
   states(): Iterable<ReadonlyCertifiedClosureNodeState<NodeId>> {
     return this.visited.values();
   }
@@ -664,9 +746,11 @@ class ClosureGraphState<NodeId extends PropertyKey> {
 export class IntegratedDifferenceState<NodeId extends PropertyKey> {
   private readonly includeGraph: IncludeGraphState<NodeId>;
   private readonly certifiedExclude = new CertifiedExcludeState<NodeId>();
+  private readonly telemetry?: DagPhaseCertifiedTelemetry;
 
-  constructor(graph: DagTopologyPort<NodeId>) {
-    this.includeGraph = new IncludeGraphState(graph);
+  constructor(graph: DagTopologyPort<NodeId>, telemetry?: DagPhaseCertifiedTelemetry) {
+    this.telemetry = telemetry;
+    this.includeGraph = new IncludeGraphState(graph, telemetry);
   }
 
   initializeInclude(startId: NodeId): void {
@@ -693,12 +777,16 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey> {
   // Coordinator + certified-hit application responsibility. Exclude state absorbs the closure;
   // this method applies the resulting include-side hits to the include graph.
   async *applyCertification(closure: CertifiedClosurePhaseResult<NodeId>): AsyncIterable<NodeId> {
-    const hits = this.certifiedExclude.absorbClosure(closure, this.includeGraph);
+    const { hits, newlyCertified } = this.certifiedExclude.absorbClosure(
+      closure,
+      this.includeGraph,
+    );
+    this.telemetry?.span.incrementCounter("certified_nodes", newlyCertified);
     yield* this.applyCertifiedHits(hits);
   }
 
   async *applyCertifiedHits(hits: ReadonlySet<NodeId>): AsyncIterable<NodeId> {
-    yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits);
+    yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits, this.telemetry);
   }
 
   nextExcludePhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
@@ -724,14 +812,16 @@ class CertifiedExcludeState<
   absorbClosure(
     closure: CertifiedClosurePhaseResult<NodeId>,
     includeGraph: ReadonlyIncludeGraphState<NodeId>,
-  ): Set<NodeId> {
+  ): { readonly hits: Set<NodeId>; readonly newlyCertified: number } {
     const hits = new Set<NodeId>();
+    let newlyCertified = 0;
     for (const nodeId of closure.certifiedNodes) {
+      if (!this.certified.has(nodeId)) newlyCertified++;
       this.certified.add(nodeId);
       if (includeGraph.has(nodeId)) hits.add(nodeId);
     }
 
-    return hits;
+    return { hits, newlyCertified };
   }
 
   nextPhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
@@ -743,14 +833,22 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey>(
   includeGraph: MutableIncludeGraphState<NodeId>,
   certifiedExclude: ReadonlyCertifiedExcludeState<NodeId>,
   hits: ReadonlySet<NodeId>,
+  telemetry?: DagPhaseCertifiedTelemetry,
 ): AsyncIterable<NodeId> {
   if (hits.size === 0) return;
+  telemetry?.span.incrementCounter("certified_hits", hits.size);
 
   const classification = await classifyCertifiedHits(includeGraph, hits);
+  telemetry?.span.incrementCounter("classification_runs");
+  telemetry?.span.incrementCounter("classification_newer_nodes", classification.newerSideSize);
+  telemetry?.span.incrementCounter("classification_older_nodes", classification.olderSideSize);
 
+  let excludedNodes = 0;
   for (const nodeId of classification.excluded) {
+    if (includeGraph.get(nodeId) !== undefined) excludedNodes++;
     includeGraph.delete(nodeId);
   }
+  telemetry?.span.incrementCounter("classification_excluded_nodes", excludedNodes);
 
   for (const nodeId of classification.yieldable) {
     if (classification.excluded.has(nodeId)) continue;
@@ -791,7 +889,7 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
     excluded.add(hit);
   }
 
-  return { yieldable, excluded };
+  return { yieldable, excluded, newerSideSize: newerSide.size, olderSideSize: olderSide.size };
 }
 
 function* drainUncertifiedInclude<NodeId extends PropertyKey>(
@@ -816,10 +914,12 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey>(
  */
 class IncludeGraphState<NodeId extends PropertyKey> implements MutableIncludeGraphState<NodeId> {
   private readonly graph: DagTopologyPort<NodeId>;
+  private readonly telemetry?: DagPhaseCertifiedTelemetry;
   private readonly visited = new Map<NodeId, IncludeNodeState<NodeId>>();
 
-  constructor(graph: DagTopologyPort<NodeId>) {
+  constructor(graph: DagTopologyPort<NodeId>, telemetry?: DagPhaseCertifiedTelemetry) {
     this.graph = graph;
+    this.telemetry = telemetry;
   }
 
   initialize(startId: NodeId): void {
@@ -867,6 +967,8 @@ class IncludeGraphState<NodeId extends PropertyKey> implements MutableIncludeGra
       return [...state.successors];
     }
 
+    this.telemetry?.span.incrementCounter("successor_expansions");
+    this.telemetry?.span.incrementCounter("main_expansions");
     const successors = await this.graph.getSuccessors(nodeId);
     const successorIds = successors.map((successor) => successor.nodeId);
     this.markNodeExpanded(nodeId);

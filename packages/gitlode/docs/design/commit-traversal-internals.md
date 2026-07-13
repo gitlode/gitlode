@@ -238,5 +238,49 @@ older exclude ancestor.
 - Path split cases have no partial certificate; they use conservative fallback.
 - Timestamp-priority traversal was considered but intentionally left out. Git DAG correctness must
   not depend on timestamp monotonicity.
-- Detailed DAG traversal telemetry should be redesigned around the new generic DAG / Git adapter
+- Phase-certified prototype telemetry is now defined in this document for the experimental
+  certified-closure strategy. Future telemetry work should preserve the generic DAG / Git adapter
   boundary.
+
+## Phase-certified prototype telemetry
+
+`explore-dag-strategy.ts` keeps a prototype strategy for the same difference contract,
+`reachable(includeStart) - reachable(excludeStart)`. It is not wired into production commit
+walking, but its instrumentation follows the same operation-level boundary as production DAG
+traversal so FIFO prototype runs can be compared with later frontier-policy experiments.
+
+`walkDagNodeIdsPhaseCertifiedDifference()` records one `dag.traversal` span with
+`strategy=phaseCertified`. Internal closure phases do not create child `dag.certified_closure` spans;
+their work is aggregated into the enclosing traversal span. The common counters have the same graph
+meaning as the production strategies:
+
+- `yielded_nodes`: nodes finally yielded by the difference operation only.
+- `traversal_steps`: include frontier items plus closure frontier items that are dequeued for work;
+  exclude coordinator items are phase triggers and are not counted separately from the closure start
+  item.
+- `stale_steps`: dequeued work items discarded as stale or duplicate, such as deleted include
+  states, already-expanded include nodes, or closure nodes already traversed by the same branch.
+  Certified hits are meaningful state transitions and are not stale.
+- `successor_expansions`, `main_expansions`, and `exclude_expansions`: calls to the underlying
+  `DagTopologyPort.getSuccessors()`. Include-side local predecessor/successor walks used for
+  certified-hit classification are local graph operations and are intentionally not counted as
+  topology expansions.
+
+The prototype also records strategy-specific counters on the same `dag.traversal` span:
+
+- closure outcomes: `closure_phases`, `closed_boundary_phases`, `exhausted_phases`,
+  `certified_nodes`, and `terminal_nodes`;
+- certified-hit classification: `certified_hits`, `classification_runs`,
+  `classification_newer_nodes`, `classification_older_nodes`, and
+  `classification_excluded_nodes`;
+- yield source split: `certification_yielded_nodes` and `drain_yielded_nodes`.
+
+For completed phase-certified difference operations, `yielded_nodes` is the sum of
+`certification_yielded_nodes` and `drain_yielded_nodes`, subject to the recorder's normal behavior
+of omitting counters that were never incremented.
+
+`resolveDagCertifiedClosurePhase()` is also a standalone operation. When called directly, it records
+one `dag.certified_closure` span with `result=closed-boundary` or `result=exhausted` after the phase
+finishes. Standalone closure spans record closure frontier steps, exclude-side successor expansions,
+`certified_nodes`, and exhausted-phase `terminal_nodes`. Difference traversal calls the shared
+closure core directly to avoid double-spanning internal phases.

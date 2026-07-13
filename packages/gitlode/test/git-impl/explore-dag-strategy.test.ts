@@ -11,7 +11,10 @@ import {
   resolveDagCertifiedClosurePhase,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/git-impl/explore-dag-strategy.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+} from "../../src/instrumentation/index.js";
 
 describe("resolveDagCertifiedClosurePhase", () => {
   it("records a complete exclude path when no split closes", async () => {
@@ -163,6 +166,164 @@ describe("resolveDagCertifiedClosurePhase", () => {
     );
 
     expect(renameClosureResult(original, (nodeId) => `renamed:${nodeId}`)).toEqual(renamed);
+  });
+});
+
+describe("phase-certified prototype telemetry", () => {
+  it("records standalone certified closure telemetry for exhausted closure", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await resolveDagCertifiedClosurePhase(
+      createContext(
+        createDagPort({
+          EXCLUDE: ["PARENT"],
+          PARENT: ["ROOT"],
+          ROOT: [],
+        }),
+        recorder,
+      ),
+      "EXCLUDE",
+    );
+
+    expect(result.kind).toBe("exhausted");
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.certified_closure",
+        attributes: { result: "exhausted" },
+        counters: {
+          certified_nodes: 3,
+          exclude_expansions: 3,
+          successor_expansions: 3,
+          terminal_nodes: 1,
+          traversal_steps: 3,
+        },
+      }),
+    ]);
+  });
+
+  it("records common counters and yield source counters for a linear difference", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const yielded = await collect(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(
+          createDagPort({
+            HEAD: ["NEW"],
+            NEW: ["EXCLUDE"],
+            EXCLUDE: ["OLD"],
+            OLD: [],
+          }),
+          recorder,
+        ),
+        "HEAD",
+        "EXCLUDE",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(new Set(["HEAD", "NEW"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: { strategy: "phaseCertified" },
+        counters: expect.objectContaining({
+          certified_nodes: 2,
+          closure_phases: 1,
+          certification_yielded_nodes: 2,
+          exclude_expansions: 2,
+          exhausted_phases: 1,
+          main_expansions: 2,
+          successor_expansions: 4,
+          terminal_nodes: 1,
+          traversal_steps: 5,
+          yielded_nodes: 2,
+        }),
+      }),
+    ]);
+    expect(
+      recorder.records().filter((record) => record.name === "dag.certified_closure"),
+    ).toHaveLength(0);
+  });
+
+  it("records multiple closed-boundary phases without double-counting certified nodes", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const yielded = await collect(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(
+          createDagPort({
+            HEAD: ["NEW"],
+            NEW: ["EXCLUDE_MERGE"],
+            EXCLUDE_MERGE: ["LEFT", "RIGHT"],
+            LEFT: ["JOIN"],
+            RIGHT: ["JOIN"],
+            JOIN: ["OLD"],
+            OLD: [],
+          }),
+          recorder,
+        ),
+        "HEAD",
+        "EXCLUDE_MERGE",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(new Set(["HEAD", "NEW"]));
+    const record = recorder.records()[0];
+    expect(record).toEqual(
+      expect.objectContaining({
+        name: "dag.traversal",
+        counters: expect.objectContaining({
+          certified_nodes: 5,
+          closed_boundary_phases: 1,
+          closure_phases: 2,
+          exhausted_phases: 1,
+        }),
+      }),
+    );
+    expect(record?.counters["certified_nodes"]).toBeLessThan(
+      (record?.counters["closure_phases"] ?? 0) + 5,
+    );
+  });
+
+  it("records certified-hit classification counters and yielded-node source relationships", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const yielded = await collect(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(
+          createDagPort({
+            HEAD: ["LEFT", "RIGHT"],
+            LEFT: ["EXCLUDE"],
+            RIGHT: ["NEW"],
+            NEW: ["EXCLUDE"],
+            EXCLUDE: ["OLD"],
+            OLD: [],
+          }),
+          recorder,
+        ),
+        "HEAD",
+        "EXCLUDE",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(new Set(["HEAD", "LEFT", "RIGHT", "NEW"]));
+    const counters = recorder.records()[0]?.counters ?? {};
+    expect(counters).toEqual(
+      expect.objectContaining({
+        certification_yielded_nodes: 4,
+        certified_hits: 2,
+        classification_excluded_nodes: 2,
+        classification_newer_nodes: 6,
+        classification_older_nodes: 2,
+        classification_runs: 2,
+        yielded_nodes: 4,
+      }),
+    );
+    expect(counters["yielded_nodes"]).toBe(
+      (counters["certification_yielded_nodes"] ?? 0) + (counters["drain_yielded_nodes"] ?? 0),
+    );
+    expect(
+      recorder.records().filter((record) => record.name === "dag.certified_closure"),
+    ).toHaveLength(0);
   });
 });
 
@@ -508,10 +669,11 @@ function createDagPort(
 
 function createContext<NodeId extends PropertyKey>(
   graph: DagTopologyPort<NodeId>,
+  instrumentation = noopInstrumentation,
 ): WalkDagContext<NodeId> {
   return {
     graph,
-    instrumentation: noopInstrumentation,
+    instrumentation,
   };
 }
 

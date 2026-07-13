@@ -900,19 +900,31 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
     const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
     const walkEntry = entries.find((e) => e.name === "git.walk_commits");
     const traversalEntry = entries.find((e) => e.name === "dag.traversal");
-    const traversalReadEntry = entries.find((e) => e.name === "dag.traversal.read_node.include");
-    const collectReachableEntry = entries.find((e) => e.name === "dag.traversal.collect_reachable");
-    const excludeReadEntry = entries.find((e) => e.name === "dag.traversal.read_node.exclude");
     const fileChangesEntry = entries.find((e) => e.name === "git.file_changes");
     const blobEntry = entries.find((e) => e.name === "git.blob_read");
     const diffEntry = entries.find((e) => e.name === "git.diff");
     expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
     expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
     expect(walkEntry?.totalMs).toBeGreaterThan(0);
-    expect(traversalEntry).toBeUndefined();
-    expect(traversalReadEntry).toBeUndefined();
-    expect(collectReachableEntry).toBeUndefined();
-    expect(excludeReadEntry).toBeUndefined();
+    expect(walkEntry?.counters).toEqual({
+      commit_reads: 2,
+      commits_yielded: 1,
+      materialize_commit_cache_hits: 1,
+      topology_commit_cache_hits: 1,
+      topology_commit_reads: 2,
+    });
+    expect(traversalEntry?.attributes).toEqual({
+      result: ["certified"],
+      strategy: ["certifiedLazy"],
+    });
+    expect(traversalEntry?.counters).toEqual(
+      expect.objectContaining({
+        exclude_expansions: 2,
+        main_expansions: 1,
+        successor_expansions: 3,
+        yielded_nodes: 1,
+      }),
+    );
     expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
     expect(blobEntry?.totalMs).toBeGreaterThan(0);
     expect(diffEntry?.totalMs).toBeGreaterThan(0);

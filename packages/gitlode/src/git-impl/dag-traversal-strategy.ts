@@ -1,4 +1,8 @@
-import { type Instrumentation } from "../instrumentation/index.js";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+  type InstrumentationSpan,
+} from "../instrumentation/index.js";
 import {
   collectAsyncIterableToSet,
   firstOrThrow,
@@ -36,7 +40,6 @@ export interface DagTopologyPort<NodeId extends PropertyKey, DomainHint = undefi
 export type DagFrontier<T> = WorkQueue<T>;
 
 export interface WalkDagContext<NodeId extends PropertyKey, DomainHint = undefined> {
-  readonly role?: DagTraversalRole;
   readonly graph: DagTopologyPort<NodeId, DomainHint>;
   readonly instrumentation: Instrumentation;
 }
@@ -49,6 +52,19 @@ export interface WalkDagStrategyOptions<
   readonly createFrontier?: () => DagFrontier<
     DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>
   >;
+}
+
+interface DagTraversalTelemetry {
+  readonly span: InstrumentationSpan;
+  readonly countYieldedNodes: boolean;
+}
+
+export interface WalkDagCoreContext<
+  NodeId extends PropertyKey,
+  DomainHint = undefined,
+> extends WalkDagContext<NodeId, DomainHint> {
+  readonly role: DagTraversalRole;
+  readonly telemetry: DagTraversalTelemetry;
 }
 
 /**
@@ -65,12 +81,47 @@ export async function* walkDagNodeIdsEagerExclude<
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
+  yield* instrumentAsyncIterable(
+    context.instrumentation,
+    "dag.traversal",
+    (span) =>
+      walkDagNodeIdsEagerExcludeCore(
+        {
+          ...context,
+          role: "main",
+          telemetry: { span, countYieldedNodes: true },
+        },
+        nodeId,
+        excludeNodeId,
+        options,
+      ),
+    { attributes: { strategy: "eagerExclude" } },
+  );
+}
+
+async function* walkDagNodeIdsEagerExcludeCore<NodeId extends PropertyKey, DomainHint = undefined>(
+  context: WalkDagCoreContext<NodeId, DomainHint>,
+  nodeId: NodeId,
+  excludeNodeId: NodeId | undefined,
+  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>,
+): AsyncIterable<NodeId> {
   const excluded =
     excludeNodeId !== undefined
       ? await collectAsyncIterableToSet(
-          walkDagReachableNodeIds({ ...context, role: "exclude" }, [excludeNodeId], options),
+          walkDagReachableNodeIdsCore(
+            {
+              ...context,
+              role: "exclude",
+              telemetry: { ...context.telemetry, countYieldedNodes: false },
+            },
+            [excludeNodeId],
+            options,
+          ),
         )
       : new Set<NodeId>();
+  if (excludeNodeId !== undefined) {
+    context.telemetry.span.incrementCounter("excluded_nodes", excluded.size);
+  }
 
   const reachable = new Set<NodeId>();
   const factory = createDagFrontierItemFactory<NodeId, BasicDagSchedulingContext, DomainHint>(
@@ -83,12 +134,17 @@ export async function* walkDagNodeIdsEagerExclude<
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
-    if (reachable.has(item.nodeId) || excluded.has(item.nodeId)) continue;
+    context.telemetry.span.incrementCounter("traversal_steps");
+    if (reachable.has(item.nodeId) || excluded.has(item.nodeId)) {
+      context.telemetry.span.incrementCounter("stale_steps");
+      continue;
+    }
     reachable.add(item.nodeId);
 
+    recordYieldedNode(context);
     yield item.nodeId;
 
-    const successors = await context.graph.getSuccessors(item.nodeId);
+    const successors = await expandDagSuccessors(context, item.nodeId);
     const successorItems = factory
       .createSuccessorItems(item, successors)
       .filter((successor) => !reachable.has(successor.nodeId) && !excluded.has(successor.nodeId));
@@ -116,8 +172,32 @@ export async function* walkDagNodeIdsCertifiedLazy<
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
+  yield* instrumentAsyncIterable(
+    context.instrumentation,
+    "dag.traversal",
+    (span) =>
+      walkDagNodeIdsCertifiedLazyCore(
+        {
+          ...context,
+          role: "main",
+          telemetry: { span, countYieldedNodes: true },
+        },
+        nodeId,
+        excludeNodeId,
+        options,
+      ),
+    { attributes: { strategy: "certifiedLazy" } },
+  );
+}
+
+async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, DomainHint = undefined>(
+  context: WalkDagCoreContext<NodeId, DomainHint>,
+  nodeId: NodeId,
+  excludeNodeId: NodeId | undefined,
+  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>,
+): AsyncIterable<NodeId> {
   if (excludeNodeId === undefined) {
-    yield* walkDagNodeIdsEagerExclude(context, nodeId, undefined, options);
+    yield* walkDagNodeIdsEagerExcludeCore(context, nodeId, undefined, options);
     return;
   }
 
@@ -143,7 +223,10 @@ export async function* walkDagNodeIdsCertifiedLazy<
   };
 
   markExcludeReached(excludeNodeId);
-  const excludeStartSuccessors = await context.graph.getSuccessors(excludeNodeId);
+  const excludeStartSuccessors = await expandDagSuccessors(
+    { ...context, role: "exclude" },
+    excludeNodeId,
+  );
   for (const successor of excludeStartSuccessors) markExcludeReached(successor.nodeId);
   if (hasPathSplit(excludeStartSuccessors)) excludePathSplit = true;
   singleExcludeSuccessor =
@@ -159,8 +242,12 @@ export async function* walkDagNodeIdsCertifiedLazy<
 
   while (!includeFrontier.isEmpty()) {
     const item = includeFrontier.dequeueOrThrow();
+    context.telemetry.span.incrementCounter("traversal_steps");
     const state = stateFor(item.nodeId);
-    if (includeExpanded.has(item.nodeId)) continue;
+    if (includeExpanded.has(item.nodeId)) {
+      context.telemetry.span.incrementCounter("stale_steps");
+      continue;
+    }
     if (state.fromExclude) {
       stopPoints.add(item.nodeId);
       await markExcludeSuccessors(item.nodeId);
@@ -170,7 +257,7 @@ export async function* walkDagNodeIdsCertifiedLazy<
     state.fromInclude = true;
     includeExpanded.add(item.nodeId);
     resultCandidates.add(item.nodeId);
-    const successors = await context.graph.getSuccessors(item.nodeId);
+    const successors = await expandDagSuccessors(context, item.nodeId);
     if (successors.length === 0) {
       includePathReachedTerminal = true;
       continue;
@@ -186,13 +273,33 @@ export async function* walkDagNodeIdsCertifiedLazy<
   const certificateFailureReason = getCertificateFailureReason();
 
   if (certificateFailureReason !== undefined) {
+    context.telemetry.span.setAttribute("result", "fallback");
+    context.telemetry.span.setAttribute("fallback_reason", certificateFailureReason);
     const excluded = await collectAsyncIterableToSet(
-      walkDagReachableNodeIds({ ...context, role: "exclude" }, [excludeNodeId], options),
+      walkDagReachableNodeIdsCore(
+        {
+          ...context,
+          role: "exclude",
+          telemetry: { ...context.telemetry, countYieldedNodes: false },
+        },
+        [excludeNodeId],
+        options,
+      ),
     );
-    for (const excludedNodeId of excluded) resultCandidates.delete(excludedNodeId);
+    context.telemetry.span.incrementCounter("excluded_nodes", excluded.size);
+    let removed = 0;
+    for (const excludedNodeId of excluded) {
+      if (resultCandidates.delete(excludedNodeId)) removed++;
+    }
+    context.telemetry.span.incrementCounter("fallback_removed", removed);
+  } else {
+    context.telemetry.span.setAttribute("result", "certified");
   }
 
-  yield* resultCandidates;
+  for (const resultCandidate of resultCandidates) {
+    recordYieldedNode(context);
+    yield resultCandidate;
+  }
 
   function getCertificateFailureReason(): string | undefined {
     if (includePathReachedTerminal || excludePathSplit || stopPoints.size === 0) {
@@ -210,7 +317,10 @@ export async function* walkDagNodeIdsCertifiedLazy<
   }
 
   async function markExcludeSuccessors(excludeReachedNodeId: NodeId): Promise<void> {
-    const successors = await context.graph.getSuccessors(excludeReachedNodeId);
+    const successors = await expandDagSuccessors(
+      { ...context, role: "exclude" },
+      excludeReachedNodeId,
+    );
     for (const successor of successors) markExcludeReached(successor.nodeId);
     if (hasPathSplit(successors)) excludePathSplit = true;
   }
@@ -221,7 +331,28 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  const role = context.role ?? "main";
+  yield* instrumentAsyncIterable(context.instrumentation, "dag.reachable", (span) =>
+    walkDagReachableNodeIdsCore(
+      {
+        ...context,
+        role: "main",
+        telemetry: { span, countYieldedNodes: true },
+      },
+      nodeIds,
+      options,
+    ),
+  );
+}
+
+export async function* walkDagReachableNodeIdsCore<
+  NodeId extends PropertyKey,
+  DomainHint = undefined,
+>(
+  context: WalkDagCoreContext<NodeId, DomainHint>,
+  nodeIds: Iterable<NodeId>,
+  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
+): AsyncIterable<NodeId> {
+  const role = context.role;
   const visited = new Set<NodeId>();
   const factory = createDagFrontierItemFactory<NodeId, BasicDagSchedulingContext, DomainHint>(
     createBasicDagSchedulingContext,
@@ -233,16 +364,41 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
-    if (visited.has(item.nodeId)) continue;
+    context.telemetry.span.incrementCounter("traversal_steps");
+    if (visited.has(item.nodeId)) {
+      context.telemetry.span.incrementCounter("stale_steps");
+      continue;
+    }
     visited.add(item.nodeId);
 
+    recordYieldedNode(context);
     yield item.nodeId;
 
-    const successors = await context.graph.getSuccessors(item.nodeId);
+    const successors = await expandDagSuccessors(context, item.nodeId);
     const successorItems = factory
       .createSuccessorItems(item, successors)
       .filter((successor) => !visited.has(successor.nodeId));
     frontier.enqueueMany(successorItems);
+  }
+}
+
+async function expandDagSuccessors<NodeId extends PropertyKey, DomainHint = undefined>(
+  context: WalkDagCoreContext<NodeId, DomainHint>,
+  nodeId: NodeId,
+): Promise<readonly DagSuccessor<NodeId, DomainHint>[]> {
+  const role = context.role;
+  context.telemetry.span.incrementCounter("successor_expansions");
+  context.telemetry.span.incrementCounter(
+    role === "exclude" ? "exclude_expansions" : "main_expansions",
+  );
+  return await context.graph.getSuccessors(nodeId);
+}
+
+function recordYieldedNode<NodeId extends PropertyKey, DomainHint = undefined>(
+  context: WalkDagCoreContext<NodeId, DomainHint>,
+): void {
+  if (context.telemetry.countYieldedNodes) {
+    context.telemetry.span.incrementCounter("yielded_nodes");
   }
 }
 

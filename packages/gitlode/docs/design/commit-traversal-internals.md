@@ -176,9 +176,46 @@ reported. Eager-exclude remains the characterization path for missing older excl
 
 ## Instrumentation and tests
 
-Stage 2 intentionally reduces traversal telemetry. Old DAG node-read spans and read/cache counters
-are removed, and detailed DAG traversal telemetry is expected to be redesigned in a separate
-telemetry-focused effort. The outer Git adapter operation remains `git.walk_commits`.
+Traversal instrumentation is designed to compare the efficiency of strategies that solve the same
+result-set problem, not to define a stable user-facing contract. The main diagnostic question is how
+much graph and commit-object work was needed to produce the final yielded commit set.
+
+The instrumentation boundary follows the implementation boundary:
+
+- the DAG traversal core records topology and strategy work;
+- the Git adapter records commit-object reads, commit cache hits, and yielded commit objects.
+
+This means the DAG core uses graph vocabulary such as successor expansion instead of Git-specific
+vocabulary such as commit read. For Git repositories, a successor expansion usually causes the
+adapter to read or reuse a commit object to project parent OIDs, but that object-level cost belongs
+to adapter telemetry.
+
+`dag.traversal` records the strategy-level operation for `reachable(start) - reachable(exclude)`.
+It includes the selected strategy and common counters such as `yielded_nodes`,
+`traversal_steps`, `successor_expansions`, `main_expansions`, `exclude_expansions`, and
+`stale_steps`. Strategy-specific diagnostics include `result=certified|fallback`,
+`fallback_reason`, `excluded_nodes`, and `fallback_removed` where applicable.
+
+`dag.reachable` records top-level `reachable(...)` operations. Its `yielded_nodes` counter means
+the number of nodes in that reachable result. When reachable traversal is used internally as an
+exclude-collection phase for `dag.traversal`, it is implemented through the reusable core rather than
+the public facade. In that context, internal reachable yields are not counted as parent
+`yielded_nodes`; the caller records the collection size as `excluded_nodes` instead.
+
+DAG traversal functions exported as public operations should keep operation-level telemetry
+semantics. Reusable traversal implementations may accept a context-specific telemetry observer so
+callers can report the same graph work in the vocabulary of the enclosing operation. Whether a
+helper is technically exported for another in-repository strategy module is less important than
+whether it represents a public traversal-domain operation.
+
+The adapter-level `git.walk_commits` span records `commits_yielded`, total backend
+`commit_reads`, and read/cache counters split by purpose. `topology_commit_reads` and
+`topology_commit_cache_hits` describe commit-object access while projecting DAG successors.
+`materialize_commit_reads` and `materialize_commit_cache_hits` describe commit-object access while
+turning yielded OIDs into `RawCommit` objects. The cache is intentionally shared by both purposes,
+but the counters stay separate so materialization cache hits do not hide whether caching helped the
+DAG topology walk. Comparing total `commit_reads` with `commits_yielded` shows commit-read overshoot
+for the walk. DAG counters explain which traversal path caused the extra topology work.
 
 The contract suite verifies:
 
@@ -187,6 +224,8 @@ The contract suite verifies:
 - missing start and exclusion commits map to `COMMIT_NOT_FOUND`;
 - certified-lazy avoids expanding older excluded ancestors in certified cases;
 - certified-lazy falls back for disconnected DAGs, path splits, and uncovered stop points.
+- traversal diagnostics cover representative reachable, eager-exclude, certified, fallback, and
+  adapter read/cache/yield cases without making every counter value a long-term contract.
 
 Adapter tests cover user-visible integration and include a certified single-successor walk that
 succeeds through the certified-lazy default while eager-exclude traversal would expand a deleted

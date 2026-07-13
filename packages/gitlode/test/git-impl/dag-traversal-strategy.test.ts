@@ -11,7 +11,10 @@ import {
   walkDagNodeIdsEagerExclude,
 } from "../../src/git-impl/dag-traversal-strategy.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+} from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
 import { OrderedQueue } from "../../src/support/index.js";
 import {
@@ -239,16 +242,155 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
     expect(new Set(yielded)).toEqual(new Set(["head", "first", "second"]));
     expect(frontier.enqueued.map((item) => item.nodeId)).toEqual(["head", "first", "second"]);
     expect(frontier.enqueued[0]?.scheduling).toEqual({
-      role: "include",
+      role: "main",
       depth: 0,
       discoveredOrder: 0,
     });
     expect(frontier.enqueued[1]?.scheduling).toEqual({
-      role: "include",
+      role: "main",
       depth: 1,
       discoveredOrder: 1,
     });
     expect(frontier.enqueued[2]?.domainHint).toEqual({ parentIndex: 1 });
+  });
+});
+
+describe("DAG traversal telemetry", () => {
+  it("records a top-level reachable operation with yielded nodes", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagReachableNodeIds(
+        {
+          graph: stringTopology({ head: ["left", "right"], left: [], right: [] }),
+          instrumentation: recorder,
+        },
+        ["head"],
+      ),
+    );
+
+    expect(new Set(result)).toEqual(new Set(["head", "left", "right"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.reachable",
+        counters: {
+          main_expansions: 3,
+          successor_expansions: 3,
+          traversal_steps: 3,
+          yielded_nodes: 3,
+        },
+      }),
+    ]);
+  });
+
+  it("records eager-exclude traversal output separately from excluded reachable collection", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagNodeIdsEagerExclude(
+        {
+          graph: stringTopology({
+            root: [],
+            release: ["root"],
+            head: ["release"],
+          }),
+          instrumentation: recorder,
+        },
+        "head",
+        "release",
+      ),
+    );
+
+    expect(result).toEqual(["head"]);
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: { strategy: "eagerExclude" },
+        counters: {
+          exclude_expansions: 2,
+          excluded_nodes: 2,
+          main_expansions: 1,
+          successor_expansions: 3,
+          traversal_steps: 3,
+          yielded_nodes: 1,
+        },
+      }),
+    ]);
+  });
+
+  it("records certified-lazy certificate success without fallback counters", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagNodeIdsCertifiedLazy(
+        {
+          graph: stringTopology({
+            old: [],
+            release: ["old"],
+            after: ["release"],
+            head: ["after"],
+          }),
+          instrumentation: recorder,
+        },
+        "head",
+        "release",
+        certifiedLazyOptions(),
+      ),
+    );
+
+    expect(new Set(result)).toEqual(new Set(["head", "after"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: { result: "certified", strategy: "certifiedLazy" },
+        counters: expect.objectContaining({
+          exclude_expansions: 2,
+          main_expansions: 2,
+          successor_expansions: 4,
+          yielded_nodes: 2,
+        }),
+      }),
+    ]);
+    expect(recorder.records()[0]?.counters).not.toHaveProperty("fallback_removed");
+    expect(recorder.records()[0]?.counters).not.toHaveProperty("excluded_nodes");
+  });
+
+  it("records certified-lazy fallback reason and removed candidates", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagNodeIdsCertifiedLazy(
+        {
+          graph: stringTopology({
+            headRoot: [],
+            head: ["headRoot"],
+            excludeRoot: [],
+            exclude: ["excludeRoot"],
+          }),
+          instrumentation: recorder,
+        },
+        "head",
+        "exclude",
+        certifiedLazyOptions(),
+      ),
+    );
+
+    expect(new Set(result)).toEqual(new Set(["head", "headRoot"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: {
+          fallback_reason: "open_include_path",
+          result: "fallback",
+          strategy: "certifiedLazy",
+        },
+        counters: expect.objectContaining({
+          excluded_nodes: 2,
+          fallback_removed: 0,
+          yielded_nodes: 2,
+        }),
+      }),
+    ]);
   });
 });
 

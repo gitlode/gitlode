@@ -92,10 +92,23 @@ implementation was selected. The current default is `isomorphic-git`. When `runt
 set to `git-cli`, the same run-level span also records `git.cli.version` after validating the Git
 executable with `git --version`.
 
-`git.walk_commits` is the adapter-level span for commit traversal. Stage 2 intentionally removed the
-old internal DAG node-read spans and read/cache counters such as `include_reads`, `exclude_reads`,
-`cache_hits`, and `fallback_reads`. Detailed DAG traversal diagnostics should be redesigned in a
-separate telemetry-focused effort around the new generic DAG / Git adapter boundary.
+`git.walk_commits` is the adapter-level span for commit traversal. For the isomorphic-git adapter,
+it records commit-object diagnostics such as `commits_yielded`, total backend `commit_reads`, and
+purpose-specific read/cache counters. `topology_commit_reads` and `topology_commit_cache_hits`
+describe commit access while projecting DAG successors. `materialize_commit_reads` and
+`materialize_commit_cache_hits` describe commit access while turning yielded OIDs into `RawCommit`
+objects. Comparing `commit_reads` with `commits_yielded` is a useful way to spot commit-read
+overshoot during DAG traversal.
+
+The generic DAG traversal core records strategy diagnostics on `dag.traversal`. These use graph
+vocabulary rather than Git object vocabulary. Useful details include `strategy`,
+`result=certified|fallback`, `fallback_reason`, `yielded_nodes`, `successor_expansions`,
+`main_expansions`, `exclude_expansions`, `excluded_nodes`, and `fallback_removed`. The counters are
+intended for developer comparison between traversal strategies; they are not a stable
+machine-readable contract.
+
+Top-level reachable-set walks use `dag.reachable`. In normal commit extraction, reachable walks are
+usually part of a larger `dag.traversal` operation and are summarized there instead.
 
 For `runtime.gitAdapter: "git-cli"`, compare `git.cli.rev_list` and `git.cli.cat_file_batch`
 instead. For cross-adapter benchmarks, keep the repository snapshot and extraction request identical

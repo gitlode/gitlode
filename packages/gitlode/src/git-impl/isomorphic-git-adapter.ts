@@ -10,7 +10,11 @@ import {
   type RawCommit,
   type RepositoryObjectFormat,
 } from "../git/index.js";
-import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+  type InstrumentationSpan,
+} from "../instrumentation/index.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import { OrderedQueue } from "../support/index.js";
@@ -196,8 +200,8 @@ export class IsomorphicGitAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", () => {
-      const topology = new CommitTopologyAdapter(this._fs, repoPath);
+    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
+      const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
       const oidWalk = walkDagNodeIdsCertifiedLazy<CommitOid>(
         {
           graph: topology,
@@ -395,22 +399,29 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
   private readonly cache = new Map<CommitOid, RawCommit>();
   private readonly fs: FsClient;
   private readonly repoPath: string;
+  private readonly span: InstrumentationSpan;
 
-  constructor(fs: FsClient, repoPath: string) {
+  constructor(fs: FsClient, repoPath: string, span: InstrumentationSpan) {
     this.fs = fs;
     this.repoPath = repoPath;
+    this.span = span;
   }
 
   async getSuccessors(oid: CommitOid): Promise<readonly DagSuccessor<CommitOid>[]> {
-    const commit = await this.readCommit(oid);
+    const commit = await this.readCommit(oid, "topology");
     return commit.parents.map((parentOid) => ({ nodeId: parentOid }));
   }
 
-  async readCommit(oid: CommitOid): Promise<RawCommit> {
+  async readCommit(oid: CommitOid, purpose: CommitReadPurpose): Promise<RawCommit> {
     const cached = this.cache.get(oid);
-    if (cached !== undefined) return cached;
+    if (cached !== undefined) {
+      this.span.incrementCounter(`${purpose}_commit_cache_hits`);
+      return cached;
+    }
 
     try {
+      this.span.incrementCounter("commit_reads");
+      this.span.incrementCounter(`${purpose}_commit_reads`);
       const { commit } = await git.readCommit({ fs: this.fs, dir: this.repoPath, oid });
       const rawCommit = toRawCommit(oid, commit);
       this.cache.set(oid, rawCommit);
@@ -426,14 +437,22 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
       );
     }
   }
+
+  incrementYieldedCommit(): void {
+    this.span.incrementCounter("commits_yielded");
+  }
 }
+
+type CommitReadPurpose = "topology" | "materialize";
 
 async function* commitObjectsFromOids(
   oids: AsyncIterable<CommitOid>,
   topology: CommitTopologyAdapter,
 ): AsyncIterable<RawCommit> {
   for await (const oid of oids) {
-    yield await topology.readCommit(oid);
+    const commit = await topology.readCommit(oid, "materialize");
+    topology.incrementYieldedCommit();
+    yield commit;
   }
 }
 

@@ -80,11 +80,23 @@ describe("executeWorkerRunRequest profiling", () => {
       (entry) => entry.name === "git.walk_commits",
     );
     expect(walkEntry?.totalMs).toBeGreaterThan(0);
+    expect(walkEntry?.counters).toEqual({
+      commit_reads: 1,
+      commits_yielded: 1,
+      materialize_commit_reads: 1,
+      topology_commit_cache_hits: 1,
+    });
 
     const traversalEntry = result.success.profileEntries.find(
       (entry) => entry.name === "dag.traversal",
     );
-    expect(traversalEntry).toBeUndefined();
+    expect(traversalEntry?.attributes).toEqual({ strategy: ["certifiedLazy"] });
+    expect(traversalEntry?.counters).toEqual({
+      main_expansions: 1,
+      successor_expansions: 1,
+      traversal_steps: 1,
+      yielded_nodes: 1,
+    });
 
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);

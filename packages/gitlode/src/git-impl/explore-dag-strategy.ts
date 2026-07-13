@@ -133,11 +133,11 @@ export type IncludeExpansionResult<NodeId extends PropertyKey> =
 
 export type DifferenceFrontierItem<NodeId extends PropertyKey> =
   | {
-      readonly side: "include";
+      readonly role: "main";
       readonly nodeId: NodeId;
     }
   | {
-      readonly side: "exclude";
+      readonly role: "exclude";
       readonly nodeId: NodeId;
     };
 
@@ -215,15 +215,15 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends Pro
   state.initializeInclude(nodeId);
 
   const frontier: DifferenceFrontierItem<NodeId>[] = [
-    { side: "include", nodeId: nodeId },
-    { side: "exclude", nodeId: excludeNodeId },
+    { role: "main", nodeId: nodeId },
+    { role: "exclude", nodeId: excludeNodeId },
   ];
 
   while (frontier.length > 0) {
     const item = frontier.shift();
     if (item === undefined) break;
 
-    if (item.side === "include") {
+    if (item.role === "main") {
       const expansion = await state.expandInclude(item.nodeId);
       if (expansion.kind === "skipped" && expansion.reason === "certified-hit") {
         yield* state.applyCertifiedHits(new Set([item.nodeId]));
@@ -231,7 +231,7 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends Pro
       }
       if (expansion.kind === "expanded") {
         for (const nodeId of expansion.enqueue) {
-          frontier.push({ side: "include", nodeId });
+          frontier.push({ role: "main", nodeId });
         }
       }
       continue;
@@ -241,7 +241,7 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<NodeId extends Pro
     yield* state.applyCertification(closure);
     const nextExcludeStart = state.nextExcludePhaseStart(closure);
     if (nextExcludeStart !== undefined) {
-      frontier.push({ side: "exclude", nodeId: nextExcludeStart });
+      frontier.push({ role: "exclude", nodeId: nextExcludeStart });
     }
   }
 

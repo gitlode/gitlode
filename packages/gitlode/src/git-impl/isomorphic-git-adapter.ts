@@ -18,7 +18,7 @@ import {
   type BasicDagSchedulingContext,
   type DagFrontierItem,
   type DagTopologyPort,
-  walkDagNodeIdsWithConfiguredStrategy,
+  walkDagNodeIdsCertifiedLazy,
 } from "./dag-traversal-strategy.js";
 
 export interface IsomorphicGitAdapterDependencies {
@@ -197,7 +197,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
   ): AsyncIterable<RawCommit> {
     yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", () => {
       const topology = new CommitTopologyAdapter(this._fs, repoPath);
-      const oidWalk = walkDagNodeIdsWithConfiguredStrategy<CommitOid>(
+      const oidWalk = walkDagNodeIdsCertifiedLazy<CommitOid>(
         {
           graph: topology,
           instrumentation: this._instrumentation,
@@ -205,13 +205,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
         oid,
         excludeOid,
         {
-          certifiedLazy: {
-            createFrontier: () =>
-              new OrderedQueue<DagFrontierItem<CommitOid, BasicDagSchedulingContext>>({
-                dequeueOrder: "lifo",
-                blockOrder: "preserve",
-              }),
-          },
+          createFrontier: () =>
+            new OrderedQueue<DagFrontierItem<CommitOid, BasicDagSchedulingContext>>({
+              dequeueOrder: "lifo",
+              blockOrder: "preserve",
+            }),
         },
       );
 

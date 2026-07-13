@@ -6,7 +6,7 @@ import {
   type WorkQueue,
 } from "../support/index.js";
 
-export type DagTraversalRole = "include" | "exclude";
+export type DagTraversalRole = "main" | "exclude";
 
 export interface BasicDagSchedulingContext {
   readonly role: DagTraversalRole;
@@ -41,8 +41,6 @@ export interface WalkDagContext<NodeId extends PropertyKey, DomainHint = undefin
   readonly instrumentation: Instrumentation;
 }
 
-type WalkDagStrategy = "eagerExclude" | "certifiedLazy";
-
 export interface WalkDagStrategyOptions<
   NodeId extends PropertyKey,
   DagSchedulingContext extends BasicDagSchedulingContext,
@@ -51,34 +49,6 @@ export interface WalkDagStrategyOptions<
   readonly createFrontier?: () => DagFrontier<
     DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>
   >;
-}
-
-export interface WalkDagConfiguredStrategyOptions<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
-> {
-  readonly strategy?: WalkDagStrategy;
-  readonly eagerExclude?: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>;
-  readonly certifiedLazy?: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>;
-}
-
-const defaultStrategy: WalkDagStrategy = "certifiedLazy";
-
-export function walkDagNodeIdsWithConfiguredStrategy<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
-  context: WalkDagContext<NodeId, DomainHint>,
-  nodeId: NodeId,
-  excludeNodeId?: NodeId,
-  options: WalkDagConfiguredStrategyOptions<NodeId, DomainHint> = {},
-): AsyncIterable<NodeId> {
-  switch (options.strategy ?? defaultStrategy) {
-    case "eagerExclude":
-      return walkDagNodeIdsEagerExclude(context, nodeId, excludeNodeId, options.eagerExclude);
-    case "certifiedLazy":
-      return walkDagNodeIdsCertifiedLazy(context, nodeId, excludeNodeId, options.certifiedLazy);
-  }
 }
 
 /**
@@ -109,7 +79,7 @@ export async function* walkDagNodeIdsEagerExclude<
   const frontier =
     options.createFrontier?.() ??
     createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
-  frontier.enqueue(factory.createStartItem(nodeId, "include"));
+  frontier.enqueue(factory.createStartItem(nodeId, "main"));
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
@@ -185,7 +155,7 @@ export async function* walkDagNodeIdsCertifiedLazy<
   const includeFrontier =
     options.createFrontier?.() ??
     createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
-  includeFrontier.enqueue(factory.createStartItem(nodeId, "include"));
+  includeFrontier.enqueue(factory.createStartItem(nodeId, "main"));
 
   while (!includeFrontier.isEmpty()) {
     const item = includeFrontier.dequeueOrThrow();
@@ -251,7 +221,7 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  const role = context.role ?? "include";
+  const role = context.role ?? "main";
   const visited = new Set<NodeId>();
   const factory = createDagFrontierItemFactory<NodeId, BasicDagSchedulingContext, DomainHint>(
     createBasicDagSchedulingContext,

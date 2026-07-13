@@ -81,6 +81,89 @@ describe("resolveDagCertifiedClosurePhase", () => {
       expect(new Set(result.terminalNodes)).toEqual(new Set(["LEFT_ROOT", "RIGHT_ROOT"]));
     }
   });
+
+  it("certifies only the reached closed region when split/rejoin is nested", async () => {
+    const result = await resolveDagCertifiedClosurePhase(
+      createContext(
+        createDagPort({
+          OUTER: ["LEFT", "RIGHT"],
+          LEFT: ["LEFT_INNER"],
+          LEFT_INNER: ["LEFT_A", "LEFT_B"],
+          LEFT_A: ["LEFT_JOIN"],
+          LEFT_B: ["LEFT_JOIN"],
+          LEFT_JOIN: ["OUTER_JOIN"],
+          RIGHT: ["OUTER_JOIN"],
+          OUTER_JOIN: ["ROOT"],
+          ROOT: [],
+        }),
+      ),
+      "OUTER",
+    );
+
+    expect(result.kind).toBe("closed-boundary");
+    expect(result.certifiedNodes).toEqual(
+      new Set([
+        "OUTER",
+        "LEFT",
+        "RIGHT",
+        "LEFT_INNER",
+        "LEFT_A",
+        "LEFT_B",
+        "LEFT_JOIN",
+        "OUTER_JOIN",
+      ]),
+    );
+    if (result.kind === "closed-boundary") {
+      expect(result.closedBoundary).toBe("OUTER_JOIN");
+    }
+  });
+
+  it("keeps a partially rejoined split exhausted when one branch remains terminal", async () => {
+    const result = await resolveDagCertifiedClosurePhase(
+      createContext(
+        createDagPort({
+          SPLIT: ["LEFT", "MIDDLE", "RIGHT"],
+          LEFT: ["JOIN"],
+          MIDDLE: ["JOIN"],
+          RIGHT: ["RIGHT_ROOT"],
+          JOIN: ["JOIN_ROOT"],
+          RIGHT_ROOT: [],
+          JOIN_ROOT: [],
+        }),
+      ),
+      "SPLIT",
+    );
+
+    expect(result.kind).toBe("exhausted");
+    expect(result.certifiedNodes).toEqual(
+      new Set(["SPLIT", "LEFT", "MIDDLE", "RIGHT", "JOIN", "RIGHT_ROOT", "JOIN_ROOT"]),
+    );
+    if (result.kind === "exhausted") {
+      expect(new Set(result.terminalNodes)).toEqual(new Set(["RIGHT_ROOT", "JOIN_ROOT"]));
+    }
+  });
+
+  it("preserves closure results under a one-to-one node id rename", async () => {
+    const dag = {
+      MERGE: ["LEFT", "RIGHT"],
+      LEFT: ["JOIN"],
+      RIGHT: ["JOIN"],
+      JOIN: ["ROOT"],
+      ROOT: [],
+    };
+    const renamedDag = renameDag(dag, (nodeId) => `renamed:${nodeId}`);
+
+    const original = await resolveDagCertifiedClosurePhase(
+      createContext(createDagPort(dag)),
+      "MERGE",
+    );
+    const renamed = await resolveDagCertifiedClosurePhase(
+      createContext(createDagPort(renamedDag)),
+      "renamed:MERGE",
+    );
+
+    expect(renameClosureResult(original, (nodeId) => `renamed:${nodeId}`)).toEqual(renamed);
+  });
 });
 
 describe("IntegratedDifferenceState certified hit resolution", () => {
@@ -277,6 +360,103 @@ describe("walkDagPhaseCertifiedDifference", () => {
       "EXCLUDE",
     );
   });
+
+  it("matches an independent reachable-difference oracle for nested split/rejoin", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
+      {
+        HEAD: ["OUTER"],
+        OUTER: ["LEFT", "RIGHT"],
+        LEFT: ["LEFT_INNER"],
+        LEFT_INNER: ["LEFT_A", "LEFT_B"],
+        LEFT_A: ["LEFT_JOIN"],
+        LEFT_B: ["LEFT_JOIN"],
+        LEFT_JOIN: ["EXCLUDE"],
+        RIGHT: ["EXCLUDE"],
+        EXCLUDE: ["OLD"],
+        OLD: [],
+      },
+      "HEAD",
+      "EXCLUDE",
+    );
+  });
+
+  it("matches an independent reachable-difference oracle after a rejoin then resplit", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
+      {
+        HEAD: ["AFTER_LEFT", "AFTER_RIGHT"],
+        AFTER_LEFT: ["JOIN"],
+        AFTER_RIGHT: ["JOIN"],
+        JOIN: ["BEFORE_LEFT", "BEFORE_RIGHT"],
+        BEFORE_LEFT: ["EXCLUDE"],
+        BEFORE_RIGHT: ["EXCLUDE"],
+        EXCLUDE: ["OLD"],
+        OLD: [],
+      },
+      "HEAD",
+      "EXCLUDE",
+    );
+  });
+
+  it("matches an independent reachable-difference oracle for a three-way partial rejoin", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
+      {
+        HEAD: ["A", "B", "C"],
+        A: ["AB_JOIN"],
+        B: ["AB_JOIN"],
+        C: ["EXCLUDE"],
+        AB_JOIN: ["EXCLUDE"],
+        EXCLUDE: ["OLD"],
+        OLD: [],
+      },
+      "HEAD",
+      "EXCLUDE",
+    );
+  });
+
+  it("matches an independent reachable-difference oracle when include and exclude share only older history", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
+      {
+        INCLUDE_HEAD: ["INCLUDE_ONLY"],
+        INCLUDE_ONLY: ["COMMON"],
+        EXCLUDE_HEAD: ["EXCLUDE_ONLY"],
+        EXCLUDE_ONLY: ["COMMON"],
+        COMMON: ["ROOT"],
+        ROOT: [],
+      },
+      "INCLUDE_HEAD",
+      "EXCLUDE_HEAD",
+    );
+  });
+
+  it("matches an independent reachable-difference oracle when exclude starts from an include descendant", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
+      {
+        HEAD: ["MID"],
+        MID: ["EXCLUDE"],
+        EXCLUDE: ["ROOT"],
+        ROOT: [],
+      },
+      "MID",
+      "HEAD",
+    );
+  });
+
+  it("matches an independent reachable-difference oracle for criss-cross-style multiple rejoin paths", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
+      {
+        HEAD: ["M1", "M2"],
+        M1: ["A1", "B0"],
+        M2: ["B1", "A0"],
+        A1: ["A0"],
+        B1: ["B0"],
+        A0: ["BASE"],
+        B0: ["BASE"],
+        BASE: [],
+      },
+      "HEAD",
+      "BASE",
+    );
+  });
 });
 
 async function createState(
@@ -362,6 +542,81 @@ async function expectPhaseDifferenceToMatchEager(
   );
 
   expect(new Set(phaseResult)).toEqual(new Set(eagerResult));
+}
+
+async function expectPhaseDifferenceToMatchReachableDifference(
+  successorsByNode: Record<string, readonly string[]>,
+  startId: string,
+  excludeStartId: string,
+): Promise<void> {
+  const yielded = await collectNodeIds(
+    walkDagNodeIdsPhaseCertifiedDifference(
+      createContext(createDagPort(successorsByNode)),
+      startId,
+      excludeStartId,
+    ),
+  );
+
+  expect(new Set(yielded)).toEqual(reachableDifference(successorsByNode, startId, excludeStartId));
+  expect(yielded).toHaveLength(new Set(yielded).size);
+}
+
+function reachableDifference(
+  successorsByNode: Record<string, readonly string[]>,
+  startId: string,
+  excludeStartId: string,
+): Set<string> {
+  const included = reachable(successorsByNode, startId);
+  for (const nodeId of reachable(successorsByNode, excludeStartId)) {
+    included.delete(nodeId);
+  }
+  return included;
+}
+
+function reachable(
+  successorsByNode: Record<string, readonly string[]>,
+  startId: string,
+): Set<string> {
+  const result = new Set<string>();
+  const pending = [startId];
+  while (pending.length > 0) {
+    const nodeId = pending.pop();
+    if (nodeId === undefined || result.has(nodeId)) continue;
+    result.add(nodeId);
+    pending.push(...(successorsByNode[nodeId] ?? []));
+  }
+  return result;
+}
+
+function renameDag(
+  successorsByNode: Record<string, readonly string[]>,
+  rename: (nodeId: string) => string,
+): Record<string, readonly string[]> {
+  return Object.fromEntries(
+    Object.entries(successorsByNode).map(([nodeId, successors]) => [
+      rename(nodeId),
+      successors.map(rename),
+    ]),
+  );
+}
+
+function renameClosureResult(
+  result: CertifiedClosurePhaseResult<string>,
+  rename: (nodeId: string) => string,
+): CertifiedClosurePhaseResult<string> {
+  if (result.kind === "closed-boundary") {
+    return {
+      kind: "closed-boundary",
+      certifiedNodes: new Set([...result.certifiedNodes].map(rename)),
+      closedBoundary: rename(result.closedBoundary),
+    };
+  }
+
+  return {
+    kind: "exhausted",
+    certifiedNodes: new Set([...result.certifiedNodes].map(rename)),
+    terminalNodes: result.terminalNodes.map(rename),
+  };
 }
 
 async function collectNodeIds(items: AsyncIterable<string>): Promise<string[]> {

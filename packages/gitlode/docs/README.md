@@ -10,11 +10,11 @@ here.
 
 gitlode documentation is organized for three primary audiences.
 
-| Audience      | Needs                                                                                         | Start here                                                             |
-| ------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| End users     | Run gitlode, configure extraction, understand output, and troubleshoot user-visible behavior. | [`usage.md`](usage.md)                                                 |
-| Developers    | Understand implementation design, behavior contracts, trade-offs, and maintenance policy.     | [`design/`](design/)                                                   |
-| Coding agents | Find task-specific canonical docs and avoid duplicating or drifting design rules.             | Repository-level `AGENTS.md`, then this index and [`design/`](design/) |
+| Audience      | Needs                                                                                         | Start here                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| End users     | Run gitlode, configure extraction, understand output, and troubleshoot user-visible behavior. | [`usage.md`](usage.md)                                                           |
+| Developers    | Understand implementation design, behavior contracts, trade-offs, and maintenance policy.     | [`design/`](design/)                                                             |
+| Coding agents | Find task-specific canonical docs, agent-facing working principles, and routing guardrails.   | Repository-level `AGENTS.md`, then [`agents/`](agents/) and [`design/`](design/) |
 
 These audiences overlap. For example, plugin authors and advanced users may need both the user guide
 and design documentation. Coding agents should use the same durable design docs as human developers,
@@ -35,6 +35,7 @@ back to the canonical document instead of becoming independent specifications.
 | Durable implementation design contracts  | [`design/`](design/)             |
 | Contributor and repository policies      | [`contributing/`](contributing/) |
 | Profiling output interpretation          | [`profiling.md`](profiling.md)   |
+| Durable agent collaboration guidance     | [`agents/`](agents/)             |
 | Continuation context for unfinished work | [`handoff/`](handoff/)           |
 
 ## Documentation map
@@ -46,6 +47,7 @@ back to the canonical document instead of becoming independent specifications.
   agents.
 - [`contributing/`](contributing/): contributor-facing repository maintenance policies, such as
   lint rule adoption.
+- [`agents/`](agents/): durable collaboration and working-principle documents for coding agents.
 - [`handoff/`](handoff/): continuation notes for in-progress or future work. Handoff documents are
   not durable source-of-truth design documents.
 
@@ -57,6 +59,8 @@ When changing behavior, update the documentation for every affected audience:
   [`profiling.md`](profiling.md).
 - Implementation contract changes should update the appropriate document in [`design/`](design/).
 - Contributor policy changes should update the appropriate document in [`contributing/`](contributing/).
+- Durable changes to agent collaboration practices should update the appropriate document in
+  [`agents/`](agents/).
 - Temporary planning or continuation notes should live in [`handoff/`](handoff/) until stable
   decisions are migrated into durable docs.
 - Agent-specific entrypoints, such as GitHub Copilot instruction files, should route to these docs

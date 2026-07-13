@@ -14,7 +14,8 @@ gitlode documentation is organized for three audiences:
 - **Developers**: people maintaining gitlode. Start with `packages/gitlode/docs/README.md` and
   `packages/gitlode/docs/design/`.
 - **Coding agents**: currently Codex and GitHub Copilot. Start here, then follow the same
-  durable docs as human developers.
+  durable docs as human developers. Durable agent-facing collaboration guidance lives in
+  `packages/gitlode/docs/agents/`.
 
 Agent-specific instruction files may provide routing and guardrails, but they must not become
 independent sources of truth for design contracts.
@@ -27,6 +28,7 @@ Use these documentation homes when changing behavior:
 - Durable implementation design contracts: `packages/gitlode/docs/design/`
 - Contributor and repository policies: `packages/gitlode/docs/contributing/`
 - Profiling output interpretation: `packages/gitlode/docs/profiling.md`
+- Durable agent collaboration and working principles: `packages/gitlode/docs/agents/`
 - Temporary continuation notes: `packages/gitlode/docs/handoff/`
 
 Avoid duplicating normative facts such as CLI validation rules, output schema fields, architecture
@@ -91,6 +93,8 @@ Read:
 - Keep durable design contracts in `packages/gitlode/docs/design/`, not in agent-specific entrypoints.
 - Keep end-user workflows and user-visible behavior in `packages/gitlode/docs/usage.md`.
 - Keep handoff documents focused on continuation context; migrate stable decisions into durable docs.
+- Keep durable agent collaboration guidance in `packages/gitlode/docs/agents/`, not in temporary
+  handoff notes.
 - Update documentation for every affected audience when changing behavior.
 - Code comments must be written in English.
 - Run `npm run format:write` before finishing implementation work, then verify with

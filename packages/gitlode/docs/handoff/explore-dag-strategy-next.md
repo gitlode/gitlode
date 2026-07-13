@@ -64,3 +64,14 @@ into the next exclude phase. The next Git-specific task is to project a commit's
 from the normal commit read/expand operation onto the parent successor path. Do not pre-read parent
 commit timestamps, do not read pending frontier nodes only to assign priority, and do not make the
 Git adapter's result membership depend on timestamp monotonicity.
+
+## Successor cache responsibility follow-up
+
+A review follow-up aligned the phase-certified prototype with the durable DAG-core contract that
+successor and domain-object caching belong to adapters, not traversal strategy state. Closure state
+now keeps only correctness data such as reached/expanded flags, traversed branches, closed-cover
+marks, and predecessor links used for branch-resolution walks. Include state keeps observed local
+successor/predecessor links for certified-hit classification and deletion, but `expand()` is not a
+successor-cache API. Re-accessing topology through the DAG core should therefore increment DAG
+successor-expansion counters and call `DagTopologyPort.getSuccessors()` again, letting the Git
+adapter's `CommitTopologyAdapter` own commit-object reuse and cache-hit telemetry.

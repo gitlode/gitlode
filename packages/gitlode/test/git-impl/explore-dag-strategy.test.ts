@@ -595,6 +595,141 @@ describe("phase-certified DomainHint scheduling", () => {
     ]);
   });
 
+  it("re-reads known closure nodes and preserves re-arrival path hints", async () => {
+    const frontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] = [];
+    const reads: string[] = [];
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    let injectedKnownNode = false;
+    const result = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
+      createContext(
+        createTimestampDagPort(
+          { MERGE: ["JOIN", "RIGHT"], JOIN: ["NEXT"], RIGHT: [], NEXT: [] },
+          { MERGE: 100, JOIN: 70, RIGHT: 20, NEXT: 1 },
+          reads,
+        ),
+        recorder,
+      ),
+      "MERGE",
+      {
+        createClosureFrontier: () => {
+          const frontier = new RecordingFrontier(
+            new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+              dequeueOrder: "fifo",
+              blockOrder: "preserve",
+            }),
+            (block) => {
+              if (injectedKnownNode || block.length !== 2) return block;
+              const join = block.find((item) => item.nodeId === "JOIN");
+              const right = block.find((item) => item.nodeId === "RIGHT");
+              if (join === undefined || right === undefined) return block;
+              injectedKnownNode = true;
+              return [
+                join,
+                { nodeId: "JOIN", branchId: right.branchId, domainHint: { sourceTimestamp: 33 } },
+                right,
+              ];
+            },
+          );
+          frontiers.push(frontier);
+          return frontier;
+        },
+      },
+    );
+
+    expect(result).toEqual(closedBoundaryResult(["MERGE", "JOIN"], "JOIN"));
+    expect(reads.filter((nodeId) => nodeId === "JOIN")).toHaveLength(2);
+    expect(frontiers[0]?.dequeued.filter((item) => item.nodeId === "JOIN")).toEqual([
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 100 } },
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 33 } },
+    ]);
+    expect(frontiers[0]?.blocks).toContainEqual([
+      { nodeId: "NEXT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 70 } },
+    ]);
+    expect(recorder.records()[0]?.counters).toEqual(
+      expect.objectContaining({
+        exclude_expansions: 3,
+        successor_expansions: 3,
+      }),
+    );
+  });
+
+  it("inherits known-node closed-boundary hints into the next exclude phase", async () => {
+    const differenceFrontiers: RecordingFrontier<
+      DifferenceFrontierItem<string, PathTimestampHint>
+    >[] = [];
+    const closureFrontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] =
+      [];
+    const successors = {
+      HEAD: ["NEW"],
+      NEW: ["MERGE"],
+      MERGE: ["JOIN", "RIGHT"],
+      JOIN: ["OLD"],
+      RIGHT: [],
+      OLD: [],
+    };
+
+    let injectedKnownNodeInDifference = false;
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(successors, {
+            HEAD: 120,
+            NEW: 110,
+            MERGE: 100,
+            JOIN: 70,
+            RIGHT: 20,
+            OLD: 1,
+          }),
+        ),
+        "HEAD",
+        "MERGE",
+        {
+          createDifferenceFrontier: () => {
+            const frontier = new RecordingFrontier(
+              new OrderedQueue<DifferenceFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+            );
+            differenceFrontiers.push(frontier);
+            return frontier;
+          },
+          createClosureFrontier: () => {
+            const frontier = new RecordingFrontier(
+              new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+              (block) => {
+                if (injectedKnownNodeInDifference || block.length !== 2) return block;
+                const join = block.find((item) => item.nodeId === "JOIN");
+                const right = block.find((item) => item.nodeId === "RIGHT");
+                if (join === undefined || right === undefined) return block;
+                injectedKnownNodeInDifference = true;
+                return [
+                  join,
+                  { nodeId: "JOIN", branchId: right.branchId, domainHint: { sourceTimestamp: 33 } },
+                  right,
+                ];
+              },
+            );
+            closureFrontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "MERGE"));
+    expect(differenceFrontiers[0]?.blocks).toContainEqual([
+      { role: "exclude", nodeId: "JOIN", domainHint: { sourceTimestamp: 33 } },
+    ]);
+    expect(closureFrontiers[1]?.blocks[0]).toEqual([
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 33 } },
+    ]);
+  });
+
   it("keeps path-specific hints for duplicate node ids", async () => {
     const frontiers: RecordingFrontier<DifferenceFrontierItem<string, PathTimestampHint>>[] = [];
     await collectNodeIds(
@@ -1140,7 +1275,10 @@ class RecordingFrontier<T> implements DagFrontier<T> {
   readonly blocks: T[][] = [];
   readonly dequeued: T[] = [];
 
-  constructor(private readonly inner: DagFrontier<T>) {}
+  constructor(
+    private readonly inner: DagFrontier<T>,
+    private readonly prepareBlock: (block: T[]) => T[] = (block) => block,
+  ) {}
 
   get size(): number {
     return this.inner.size;
@@ -1151,12 +1289,13 @@ class RecordingFrontier<T> implements DagFrontier<T> {
   }
 
   enqueue(...items: T[]): void {
-    this.blocks.push([...items]);
-    this.inner.enqueue(...items);
+    const block = this.prepareBlock([...items]);
+    this.blocks.push(block);
+    this.inner.enqueueMany(block);
   }
 
   enqueueMany(items: Iterable<T>): void {
-    const block = Array.from(items);
+    const block = this.prepareBlock(Array.from(items));
     this.blocks.push(block);
     this.inner.enqueueMany(block);
   }

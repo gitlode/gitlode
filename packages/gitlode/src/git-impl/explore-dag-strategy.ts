@@ -29,8 +29,8 @@ export type { DagSuccessor, DagTopologyPort, WalkDagContext } from "./dag-traver
  *   include expansion and exclude certification phases, and it should make frontier additions and
  *   yield points visible from the main loop.
  * - Include graph bookkeeping should live in an include-side state object. It should own visited
- *   include nodes, cached node objects, expanded flags, and the derived successor/predecessor links
- *   used for local classification.
+ *   include nodes, expanded flags, and the observed successor/predecessor links used for local
+ *   classification.
  * - Certified exclude bookkeeping should live in an exclude-side state object. It should own the
  *   certified exclude set, absorb closure phase results, report include-side hits, and decide
  *   whether another exclude phase should start from a closed boundary.
@@ -39,7 +39,7 @@ export type { DagSuccessor, DagTopologyPort, WalkDagContext } from "./dag-traver
  * - Closure phase traversal should keep its main loop visible in
  *   `resolveDagCertifiedClosurePhase()`. The loop should drive frontier items; `CertifiedClosurePhase`
  *   should own split, branch, trigger, and close-boundary transitions while `ClosureGraphState`
- *   owns closure-side node reads, expansion cache, and graph links.
+ *   owns closure correctness state and graph links observed during branch traversal.
  *
  * The prototype output contract remains the same as `walkDagNodeIdsEagerExclude()`:
  * `reachable(start) - reachable(exclude)`. Yield order is not part of that contract.
@@ -67,7 +67,6 @@ interface ExpandedCertifiedClosureNodeStateBase<
   NodeId extends PropertyKey,
 > extends CertifiedClosureNodeStateBase<NodeId> {
   readonly expanded: true;
-  readonly successors: readonly NodeId[];
 }
 
 export type CertifiedClosureNodeState<NodeId extends PropertyKey> =
@@ -422,7 +421,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     }
 
     const frontier = state.expanded
-      ? this.resolveBranchByKnownNode(item.branchId, item.nodeId)
+      ? this.resolveBranchByKnownNode(item.branchId, item.nodeId, item.domainHint)
       : [];
 
     const successors = await this.graph.expand(item.nodeId);
@@ -547,6 +546,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
   private resolveBranchByKnownNode(
     branchId: BranchId,
     knownNodeId: NodeId,
+    domainHint?: DomainHint,
   ): ClosureFrontierItem<NodeId, DomainHint>[] {
     const branch = this.getBranchStateOrThrow(branchId);
     const joinedBranchId = this.findJoinedBranchAtNode(branch.splitId, branchId, knownNodeId);
@@ -556,6 +556,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       triggerId: knownNodeId,
       branchId,
       joinedBranchId,
+      domainHint,
     });
   }
 
@@ -787,26 +788,19 @@ class ClosureGraphState<NodeId extends PropertyKey, DomainHint = undefined> {
   }
 
   async expand(nodeId: NodeId): Promise<readonly DagSuccessor<NodeId, DomainHint>[]> {
-    const state = this.mutableStateFor(nodeId);
-    if (state.expanded) {
-      return state.successors.map((nodeId) => ({ nodeId }));
-    }
-
     this.telemetry?.span.incrementCounter("successor_expansions");
     this.telemetry?.span.incrementCounter("exclude_expansions");
     const successors = await this.graph.getSuccessors(nodeId);
-    const successorIds = successors.map((successor) => successor.nodeId);
-    this.markExpanded(nodeId, successorIds);
+    this.markExpanded(nodeId);
     return successors;
   }
 
-  private markExpanded(nodeId: NodeId, successors: readonly NodeId[]): void {
+  private markExpanded(nodeId: NodeId): void {
     const state = this.mutableStateFor(nodeId);
     this.visited.set(nodeId, {
       ...state,
       expanded: true,
       reached: true,
-      successors,
     });
   }
 
@@ -900,7 +894,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, DomainHint = 
   }
 
   // Coordinator + IncludeGraphState responsibility. The final drain is a coordinator decision; the
-  // graph deletion and node cache access belong to include-side state.
+  // observed local graph deletion belongs to include-side state.
   *drainRemainingInclude(): Iterable<NodeId> {
     yield* drainUncertifiedInclude(this.includeGraph, this.certifiedExclude);
   }
@@ -1015,8 +1009,8 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey>(
  * Stores the include-side local DAG used for certified-hit classification and deletion.
  *
  * Include expansion owns edge discovery, so `expand()` records both successor and predecessor links
- * at the same time. Expanded nodes are cached, but their links remain mutable because certified-hit
- * deletion detaches nodes from their neighbors.
+ * at the same time. Those observed links are local DAG state for certified-hit classification, not a
+ * topology cache; certified-hit deletion detaches nodes from their neighbors.
  */
 class IncludeGraphState<
   NodeId extends PropertyKey,
@@ -1071,10 +1065,7 @@ class IncludeGraphState<
   }
 
   async expand(nodeId: NodeId): Promise<readonly DagSuccessor<NodeId, DomainHint>[]> {
-    const state = this.mutableStateFor(nodeId);
-    if (state.expanded) {
-      return [...state.successors].map((successor) => ({ nodeId: successor }));
-    }
+    this.mutableStateFor(nodeId);
 
     this.telemetry?.span.incrementCounter("successor_expansions");
     this.telemetry?.span.incrementCounter("main_expansions");

@@ -17,6 +17,7 @@ import { OrderedQueue } from "../support/index.js";
 import {
   type BasicDagSchedulingContext,
   type DagFrontierItem,
+  type DagSuccessor,
   type DagTopologyPort,
   walkDagNodeIdsCertifiedLazy,
 } from "./dag-traversal-strategy.js";
@@ -400,7 +401,7 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
     this.repoPath = repoPath;
   }
 
-  async getSuccessors(oid: CommitOid): Promise<readonly { readonly nodeId: CommitOid }[]> {
+  async getSuccessors(oid: CommitOid): Promise<readonly DagSuccessor<CommitOid>[]> {
     const commit = await this.readCommit(oid);
     return commit.parents.map((parentOid) => ({ nodeId: parentOid }));
   }

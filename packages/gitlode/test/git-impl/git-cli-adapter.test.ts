@@ -7,7 +7,10 @@ import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { GitCliAdapter, IsomorphicGitAdapter, JsDiffAdapter } from "../../src/git-impl/index.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+} from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
 
 const AUTHOR = {
@@ -93,18 +96,40 @@ describe("GitCliAdapter", () => {
     expect(await adapter.classifyRefType(repoPath, "v1.0.0")).toBe("tag-annotated");
   });
 
-  it("walks commits through git rev-list and excludes reachable history", async () => {
+  it("streams rev-list output into cat-file batch and excludes reachable history", async () => {
     const repoPath = await makeTempRepo();
     const first = await addCommit(repoPath, "file.txt", "1", "first");
     const second = await addCommit(repoPath, "file.txt", "2", "second");
     const third = await addCommit(repoPath, "file.txt", "3", "third");
+    const instrumentation = new LocalInstrumentationRecorder(() => Date.now());
+    const fallback = new IsomorphicGitAdapter({
+      fs: nodeFs,
+      diffAdapter: new JsDiffAdapter(),
+      instrumentation: noopInstrumentation,
+    });
+    const adapter = new GitCliAdapter({
+      instrumentation,
+      fileChangeAdapter: fallback,
+    });
 
-    const adapter = createAdapter();
     const commits = await collectWalk(adapter, repoPath, third, first);
 
     expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([second, third]));
     expect(commits[0]?.author.timezoneOffset).toBe(0);
     expect(commits[0]?.parents.length).toBeGreaterThan(0);
+    expect(instrumentation.records()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "git.cli.rev_list",
+          attributes: expect.objectContaining({ strategy: "git-cli-rev-list-stream" }),
+          counters: expect.objectContaining({ yielded: 2 }),
+        }),
+        expect.objectContaining({
+          name: "git.cli.cat_file_batch",
+          counters: expect.objectContaining({ yielded: 2 }),
+        }),
+      ]),
+    );
   });
 
   it("delegates file changes to the configured file-change adapter", async () => {

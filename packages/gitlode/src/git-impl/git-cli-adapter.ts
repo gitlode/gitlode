@@ -1,4 +1,6 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -9,7 +11,7 @@ import {
   type RawCommit,
   type RepositoryObjectFormat,
 } from "../git/index.js";
-import type { Instrumentation } from "../instrumentation/index.js";
+import type { Instrumentation, InstrumentationSpan } from "../instrumentation/index.js";
 import type { CommitOid, OidProfile, RefType } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import { captureGroupOrThrow } from "../support/index.js";
@@ -152,39 +154,34 @@ export class GitCliAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    const oids = await this._instrumentation.runAsync("git.cli.rev_list", async (span) => {
-      const args = ["rev-list", "--topo-order", oid];
-      if (excludeOid !== undefined) args.push("--not", excludeOid);
-      const result = await this._runGit(repoPath, args, [0, 128]);
-      if (result.code !== 0) {
-        if (isNotRepositoryError(result.stderr)) {
-          throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
+    const args = ["rev-list", "--topo-order", oid];
+    if (excludeOid !== undefined) args.push("--not", excludeOid);
+
+    const revListSpan = this._instrumentation.startSpan("git.cli.rev_list");
+    const catFileSpan = this._instrumentation.startSpan("git.cli.cat_file_batch");
+    revListSpan.setAttribute("strategy", "git-cli-rev-list-stream");
+    let spanError: unknown;
+    try {
+      for await (const object of streamRevListBatchObjects(
+        this._gitExecutable,
+        repoPath,
+        args,
+        revListSpan,
+        catFileSpan,
+      )) {
+        if (object.type !== "commit") {
+          throw new GitAdapterError(`Commit not found: ${object.oid}`, "COMMIT_NOT_FOUND");
         }
-        throw new GitAdapterError(
-          `Unexpected error walking commits: ${formatCommandFailure(result)}`,
-          "UNKNOWN",
-        );
+        revListSpan.incrementCounter("yielded");
+        catFileSpan.incrementCounter("yielded");
+        yield parseRawCommit(object.oid as CommitOid, object.content);
       }
-      const values = result.stdout
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0) as CommitOid[];
-      span.setAttribute("strategy", "git-cli-rev-list");
-      span.incrementCounter("yielded", values.length);
-      return values;
-    });
-
-    if (oids.length === 0) return;
-
-    const objects = await this._instrumentation.runAsync("git.cli.cat_file_batch", async () =>
-      this._readBatchObjects(repoPath, oids),
-    );
-
-    for (const object of objects) {
-      if (object.type !== "commit") {
-        throw new GitAdapterError(`Commit not found: ${object.oid}`, "COMMIT_NOT_FOUND");
-      }
-      yield parseRawCommit(object.oid as CommitOid, object.content);
+    } catch (error) {
+      spanError = error;
+      throw error;
+    } finally {
+      revListSpan.end(spanError);
+      catFileSpan.end(spanError);
     }
   }
 
@@ -226,25 +223,173 @@ export class GitCliAdapter implements GitAdapter {
   private async _runGitRaw(args: readonly string[]): Promise<GitCommandResult> {
     return await runCommand(this._gitExecutable, args);
   }
+}
 
-  private async _readBatchObjects(
-    repoPath: string,
-    oids: readonly CommitOid[],
-  ): Promise<readonly BatchObject[]> {
-    const result = await runCommand(this._gitExecutable, ["-C", repoPath, "cat-file", "--batch"], {
-      stdin: oids.map((value) => `${value}\n`).join(""),
-      encoding: "buffer",
-    });
-    if (result.code !== 0) {
-      if (isNotRepositoryError(result.stderr.toString("utf8"))) {
-        throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
-      }
-      throw new GitAdapterError(
-        `Unexpected error reading commit batch: ${result.stderr.toString("utf8").trim()}`,
-        "UNKNOWN",
-      );
+type ProcessCloseResult =
+  | { readonly ok: true; readonly code: number }
+  | { readonly ok: false; readonly error: unknown };
+
+function processClosed(child: ChildProcess): Promise<ProcessCloseResult> {
+  return new Promise((resolve) => {
+    child.on("error", (error) => resolve({ ok: false, error }));
+    child.on("close", (code) => resolve({ ok: true, code: code ?? 1 }));
+  });
+}
+
+async function* streamRevListBatchObjects(
+  command: string,
+  repoPath: string,
+  revListArgs: readonly string[],
+  revListSpan: InstrumentationSpan,
+  catFileSpan: InstrumentationSpan,
+): AsyncIterable<BatchObject> {
+  const revList = spawn(command, ["-C", repoPath, ...revListArgs], {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const catFile = spawn(command, ["-C", repoPath, "cat-file", "--batch"], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const revListStderrChunks: Buffer[] = [];
+  const catFileStderrChunks: Buffer[] = [];
+  revList.stderr.on("data", (chunk: Buffer) => revListStderrChunks.push(chunk));
+  catFile.stderr.on("data", (chunk: Buffer) => catFileStderrChunks.push(chunk));
+
+  const pipeClosed = pipeline(revList.stdout, catFile.stdin).then(
+    () => undefined,
+    (error: unknown) => error,
+  );
+  const revListClosed = processClosed(revList);
+  const catFileClosed = processClosed(catFile);
+  let yielded = false;
+  let completed = false;
+
+  try {
+    for await (const object of parseBatchObjectStream(catFile.stdout)) {
+      yielded = true;
+      yield object;
     }
-    return parseBatchOutput(result.stdout, oids);
+    completed = true;
+  } catch (error) {
+    revList.kill();
+    catFile.kill();
+    throw error;
+  } finally {
+    if (!completed) {
+      revList.kill();
+      catFile.kill();
+    }
+  }
+
+  const [revListResult, catFileResult, pipeError] = await Promise.all([
+    revListClosed,
+    catFileClosed,
+    pipeClosed,
+  ]);
+  const revListStderr = Buffer.concat(revListStderrChunks).toString("utf8");
+  const catFileStderr = Buffer.concat(catFileStderrChunks).toString("utf8");
+
+  if (!revListResult.ok) {
+    throw new GitAdapterError(
+      `Unexpected error walking commits: ${formatUnknownError(revListResult.error)}`,
+      "UNKNOWN",
+      revListResult.error,
+    );
+  }
+  if (!catFileResult.ok) {
+    throw new GitAdapterError(
+      `Unexpected error reading commit batch: ${formatUnknownError(catFileResult.error)}`,
+      "UNKNOWN",
+      catFileResult.error,
+    );
+  }
+
+  const revListCode = revListResult.code;
+  const catFileCode = catFileResult.code;
+
+  if (revListCode !== 0) {
+    if (isNotRepositoryError(revListStderr)) {
+      throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
+    }
+    const result = { stdout: "", stderr: revListStderr, code: revListCode };
+    throw new GitAdapterError(
+      `Unexpected error walking commits: ${formatCommandFailure(result)}`,
+      "UNKNOWN",
+    );
+  }
+  if (catFileCode !== 0) {
+    if (isNotRepositoryError(catFileStderr)) {
+      throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
+    }
+    throw new GitAdapterError(
+      `Unexpected error reading commit batch: ${catFileStderr.trim()}`,
+      "UNKNOWN",
+    );
+  }
+  if (pipeError !== undefined) {
+    throw new GitAdapterError(
+      `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(pipeError)}`,
+      "UNKNOWN",
+      pipeError,
+    );
+  }
+
+  if (!yielded) {
+    revListSpan.incrementCounter("yielded", 0);
+    catFileSpan.incrementCounter("yielded", 0);
+  }
+}
+
+async function* parseBatchObjectStream(stream: Readable): AsyncIterable<BatchObject> {
+  let buffer = Buffer.alloc(0);
+  let expectedSize: number | undefined;
+  let currentOid = "";
+  let currentType = "";
+
+  for await (const chunk of stream) {
+    buffer = Buffer.concat([buffer, chunk as Buffer]);
+    while (true) {
+      if (expectedSize === undefined) {
+        const headerEnd = buffer.indexOf(0x0a);
+        if (headerEnd < 0) break;
+        const header = buffer.subarray(0, headerEnd).toString("utf8");
+        buffer = buffer.subarray(headerEnd + 1);
+        const missingMatch = /^([0-9a-f]+) missing$/.exec(header);
+        if (missingMatch) {
+          throw new GitAdapterError(
+            `Commit not found: ${captureGroupOrThrow(missingMatch, 1)}`,
+            "COMMIT_NOT_FOUND",
+          );
+        }
+        const match = /^([0-9a-f]+) (\S+) (\d+)$/.exec(header);
+        if (!match) {
+          throw new GitAdapterError(`Unexpected cat-file batch header: ${header}`, "UNKNOWN");
+        }
+        currentOid = captureGroupOrThrow(match, 1);
+        currentType = captureGroupOrThrow(match, 2);
+        expectedSize = Number(captureGroupOrThrow(match, 3));
+        if (!Number.isSafeInteger(expectedSize) || expectedSize < 0) {
+          throw new GitAdapterError(`Unexpected cat-file batch size for ${currentOid}`, "UNKNOWN");
+        }
+      }
+
+      if (buffer.length <= expectedSize) break;
+      if (buffer[expectedSize] !== 0x0a) {
+        throw new GitAdapterError(
+          `Unexpected cat-file batch delimiter for ${currentOid}`,
+          "UNKNOWN",
+        );
+      }
+      const content = buffer.subarray(0, expectedSize);
+      buffer = buffer.subarray(expectedSize + 1);
+      yield { oid: currentOid, type: currentType, content };
+      expectedSize = undefined;
+      currentOid = "";
+      currentType = "";
+    }
+  }
+
+  if (expectedSize !== undefined || buffer.length > 0) {
+    throw new GitAdapterError("Unexpected truncated cat-file batch output", "UNKNOWN");
   }
 }
 
@@ -307,39 +452,8 @@ function formatCommandFailure(result: GitCommandResult): string {
   return stderr.length > 0 ? stderr : `exit code ${result.code}`;
 }
 
-function parseBatchOutput(
-  output: Buffer,
-  expectedOids: readonly CommitOid[],
-): readonly BatchObject[] {
-  const objects: BatchObject[] = [];
-  let offset = 0;
-  for (const expectedOid of expectedOids) {
-    const headerEnd = output.indexOf(0x0a, offset);
-    if (headerEnd < 0) {
-      throw new GitAdapterError(`Commit not found: ${expectedOid}`, "COMMIT_NOT_FOUND");
-    }
-    const header = output.subarray(offset, headerEnd).toString("utf8");
-    offset = headerEnd + 1;
-    const missingMatch = /^([0-9a-f]+) missing$/.exec(header);
-    if (missingMatch) {
-      throw new GitAdapterError(`Commit not found: ${expectedOid}`, "COMMIT_NOT_FOUND");
-    }
-    const match = /^([0-9a-f]+) (\S+) (\d+)$/.exec(header);
-    if (!match) {
-      throw new GitAdapterError(`Unexpected cat-file batch header: ${header}`, "UNKNOWN");
-    }
-    const oid = captureGroupOrThrow(match, 1);
-    const type = captureGroupOrThrow(match, 2);
-    const size = Number(captureGroupOrThrow(match, 3));
-    if (!Number.isSafeInteger(size) || size < 0 || offset + size > output.length) {
-      throw new GitAdapterError(`Unexpected cat-file batch size for ${oid}`, "UNKNOWN");
-    }
-    const content = output.subarray(offset, offset + size);
-    offset += size;
-    if (output[offset] === 0x0a) offset += 1;
-    objects.push({ oid, type, content });
-  }
-  return objects;
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function parseRawCommit(oid: CommitOid, content: Buffer): RawCommit {

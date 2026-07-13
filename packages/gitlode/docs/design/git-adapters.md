@@ -78,15 +78,15 @@ during traversal.
 
 The hybrid adapter uses Git CLI commands for traversal-oriented repository operations:
 
-| Adapter operation             | Git CLI mechanism                                             |
-| ----------------------------- | ------------------------------------------------------------- |
-| Git executable validation     | `git --version`                                               |
-| Ref resolution / tag peeling  | `git -C <repo> rev-parse --verify <ref>^{commit}`             |
-| Object format lookup          | `git -C <repo> config --get extensions.objectFormat`          |
-| Remote URL lookup             | `git -C <repo> config --get remote.origin.url`                |
-| Commit range traversal        | `git -C <repo> rev-list --topo-order <start> --not <exclude>` |
-| Commit metadata batch reading | `git -C <repo> cat-file --batch`                              |
-| Merge base lookup             | `git -C <repo> merge-base <oid...>`                           |
+| Adapter operation             | Git CLI mechanism                                                  |
+| ----------------------------- | ------------------------------------------------------------------ |
+| Git executable validation     | `git --version`                                                    |
+| Ref resolution / tag peeling  | `git -C <repo> rev-parse --verify <ref>^{commit}`                  |
+| Object format lookup          | `git -C <repo> config --get extensions.objectFormat`               |
+| Remote URL lookup             | `git -C <repo> config --get remote.origin.url`                     |
+| Commit range traversal        | `git -C <repo> rev-list --topo-order <start> --not <exclude>`      |
+| Commit metadata batch reading | `git -C <repo> cat-file --batch` fed by streamed `rev-list` stdout |
+| Merge base lookup             | `git -C <repo> merge-base <oid...>`                                |
 
 All commands are invoked with argv arrays rather than shell-interpolated command strings.
 
@@ -148,8 +148,6 @@ Useful scenarios:
 
 ## Current limitations and future work
 
-- The `git-cli` adapter currently collects `rev-list` output before batch-reading commit metadata.
-  A streaming pipeline may reduce memory usage for very large result sets.
 - File-change expansion remains isomorphic-git-backed. A full CLI file-change implementation can be
   considered later if file-granularity performance becomes the next bottleneck.
 - Adapter selection is config-only. A CLI override remains out of scope unless future user workflows

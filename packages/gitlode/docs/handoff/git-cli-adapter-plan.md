@@ -27,7 +27,6 @@ should happen in chat/review first, then be summarized here only if it remains u
 
 ## Follow-up candidates
 
-- Stream `rev-list` output into `cat-file --batch` instead of collecting the OID list first.
 - Consider a full CLI file-change implementation if file-granularity extraction becomes a bottleneck.
 - Add benchmark fixtures or scripts for large `v9..v10` style ranges if repeatable performance
   comparisons become part of routine development.

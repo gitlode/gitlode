@@ -242,6 +242,32 @@ older exclude ancestor.
   certified-closure strategy. Future telemetry work should preserve the generic DAG / Git adapter
   boundary.
 
+## Phase-certified prototype frontier injection
+
+`explore-dag-strategy.ts` keeps separate injectable frontier factories for the experimental
+phase-certified prototype:
+
+- the difference coordinator frontier schedules include-side work items and exclude closure-phase
+  triggers;
+- the closure frontier schedules node/branch work inside one certified-closure phase.
+
+When no factory is supplied, both frontiers use `OrderedQueue` with `dequeueOrder: "fifo"` and
+`blockOrder: "preserve"`, matching the previous array `shift()` / `push()` behavior. A difference
+operation creates one difference frontier. Each closure phase creates a fresh closure frontier; a
+difference operation that starts multiple closure phases therefore receives multiple independent
+closure queues, and standalone `resolveDagCertifiedClosurePhase()` creates one closure queue per
+operation.
+
+These frontiers are scheduling-only seams. They hold pending items and select the next item to
+process, but they do not own visited state, stale detection, deduplication, certified/excluded state,
+or the decision to start another closure phase. Closure frontier items still carry `branchId` because
+that value is closure-algorithm correctness state for split/rejoin resolution, not a scheduling hint
+or `DomainHint`.
+
+Alternative policies may change processing order, but must not change the reachable-difference
+result set. Successor groups are enqueued as blocks so block-aware policies can preserve or reverse
+within-block order consistently without moving correctness state into the queue.
+
 ## Phase-certified prototype telemetry
 
 `explore-dag-strategy.ts` keeps a prototype strategy for the same difference contract,

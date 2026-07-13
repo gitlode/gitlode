@@ -4,9 +4,12 @@ import {
   type DagTopologyPort,
   type WalkDagContext,
   walkDagNodeIdsEagerExclude,
+  type DagFrontier,
 } from "../../src/git-impl/dag-traversal-strategy.js";
 import {
   type CertifiedClosurePhaseResult,
+  type ClosureFrontierItem,
+  type DifferenceFrontierItem,
   IntegratedDifferenceState,
   resolveDagCertifiedClosurePhase,
   walkDagNodeIdsPhaseCertifiedDifference,
@@ -15,6 +18,7 @@ import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
 } from "../../src/instrumentation/index.js";
+import { OrderedQueue } from "../../src/support/index.js";
 
 describe("resolveDagCertifiedClosurePhase", () => {
   it("records a complete exclude path when no split closes", async () => {
@@ -327,6 +331,163 @@ describe("phase-certified prototype telemetry", () => {
   });
 });
 
+describe("phase-certified frontier injection", () => {
+  it("uses the injected difference frontier and preserves enqueue blocks", async () => {
+    const frontiers: RecordingFrontier<DifferenceFrontierItem<string>>[] = [];
+    const successorsByNode = {
+      HEAD: ["B", "A"],
+      A: ["EXCLUDE"],
+      B: ["EXCLUDE"],
+      EXCLUDE: ["OLD"],
+      OLD: [],
+    };
+
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(createDagPort(successorsByNode)),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () => {
+            const frontier = new RecordingFrontier<DifferenceFrontierItem<string>>(
+              new OrderedQueue({ dequeueOrder: "lifo", blockOrder: "reverse" }),
+            );
+            frontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(frontiers).toHaveLength(1);
+    expect(frontiers[0]?.blocks).toContainEqual([
+      { role: "main", nodeId: "HEAD" },
+      { role: "exclude", nodeId: "EXCLUDE" },
+    ]);
+    expect(frontiers[0]?.blocks).toContainEqual([
+      { role: "main", nodeId: "B" },
+      { role: "main", nodeId: "A" },
+    ]);
+    expect(frontiers[0]?.dequeued[0]).toEqual({ role: "exclude", nodeId: "EXCLUDE" });
+    expect(new Set(yielded)).toEqual(reachableDifference(successorsByNode, "HEAD", "EXCLUDE"));
+  });
+
+  it("uses the injected closure frontier for a standalone closure phase", async () => {
+    const frontiers: RecordingFrontier<ClosureFrontierItem<string>>[] = [];
+
+    const result = await resolveDagCertifiedClosurePhase(
+      createContext(
+        createDagPort({
+          MERGE: ["LEFT", "RIGHT"],
+          LEFT: ["JOIN"],
+          RIGHT: ["JOIN"],
+          JOIN: ["ROOT"],
+          ROOT: [],
+        }),
+      ),
+      "MERGE",
+      {
+        createClosureFrontier: () => {
+          const frontier = new RecordingFrontier<ClosureFrontierItem<string>>(
+            new OrderedQueue({ dequeueOrder: "fifo", blockOrder: "preserve" }),
+          );
+          frontiers.push(frontier);
+          return frontier;
+        },
+      },
+    );
+
+    expect(result).toEqual(closedBoundaryResult(["MERGE", "LEFT", "RIGHT", "JOIN"], "JOIN"));
+    expect(frontiers).toHaveLength(1);
+    const rootItem = frontiers[0]?.blocks[0]?.[0];
+    expect(rootItem?.nodeId).toBe("MERGE");
+    expect(frontiers[0]?.blocks).toContainEqual([
+      {
+        nodeId: "LEFT",
+        branchId: expect.any(Number) as unknown as ClosureFrontierItem<string>["branchId"],
+      },
+      {
+        nodeId: "RIGHT",
+        branchId: expect.any(Number) as unknown as ClosureFrontierItem<string>["branchId"],
+      },
+    ]);
+    const splitBranchIds = frontiers[0]?.blocks
+      .find((block) => block.length === 2)
+      ?.map((item) => item.branchId);
+    expect(new Set(splitBranchIds)).toHaveProperty("size", 2);
+  });
+
+  it("creates a fresh closure frontier for each difference closure phase", async () => {
+    const frontiers: RecordingFrontier<ClosureFrontierItem<string>>[] = [];
+
+    await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(
+          createDagPort({
+            HEAD: ["NEW"],
+            NEW: ["EXCLUDE_MERGE"],
+            EXCLUDE_MERGE: ["LEFT", "RIGHT"],
+            LEFT: ["JOIN"],
+            RIGHT: ["JOIN"],
+            JOIN: ["OLD"],
+            OLD: [],
+          }),
+        ),
+        "HEAD",
+        "EXCLUDE_MERGE",
+        {
+          createClosureFrontier: () => {
+            const frontier = new RecordingFrontier<ClosureFrontierItem<string>>(
+              new OrderedQueue({ dequeueOrder: "fifo", blockOrder: "preserve" }),
+            );
+            frontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(frontiers).toHaveLength(2);
+    expect(frontiers[0]).not.toBe(frontiers[1]);
+    expect(frontiers.every((frontier) => frontier.dequeued.length > 0)).toBe(true);
+  });
+
+  it("keeps the result set invariant with alternative frontier policies", async () => {
+    const successorsByNode = {
+      HEAD: ["C", "A", "B"],
+      A: ["EXCLUDE"],
+      B: ["EXCLUDE"],
+      C: ["D"],
+      D: ["EXCLUDE"],
+      EXCLUDE: ["OLD"],
+      OLD: [],
+    };
+
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(createDagPort(successorsByNode)),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () =>
+            new OrderedQueue<DifferenceFrontierItem<string>>({
+              dequeueOrder: "lifo",
+              blockOrder: "preserve",
+            }),
+          createClosureFrontier: () =>
+            new OrderedQueue<ClosureFrontierItem<string>>({
+              dequeueOrder: "lifo",
+              blockOrder: "preserve",
+            }),
+        },
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successorsByNode, "HEAD", "EXCLUDE"));
+    expect(yielded).toHaveLength(new Set(yielded).size);
+  });
+});
+
 describe("IntegratedDifferenceState certified hit resolution", () => {
   it("yields the visited newer side of a single certified hit", async () => {
     const state = await createState({
@@ -619,6 +780,56 @@ describe("walkDagPhaseCertifiedDifference", () => {
     );
   });
 });
+
+class RecordingFrontier<T> implements DagFrontier<T> {
+  readonly blocks: T[][] = [];
+  readonly dequeued: T[] = [];
+
+  constructor(private readonly inner: DagFrontier<T>) {}
+
+  get size(): number {
+    return this.inner.size;
+  }
+
+  isEmpty(): boolean {
+    return this.inner.isEmpty();
+  }
+
+  enqueue(...items: T[]): void {
+    this.blocks.push([...items]);
+    this.inner.enqueue(...items);
+  }
+
+  enqueueMany(items: Iterable<T>): void {
+    const block = Array.from(items);
+    this.blocks.push(block);
+    this.inner.enqueueMany(block);
+  }
+
+  peek(): T | undefined {
+    return this.inner.peek();
+  }
+
+  peekOrThrow(): T {
+    return this.inner.peekOrThrow();
+  }
+
+  dequeue(): T | undefined {
+    const item = this.inner.dequeue();
+    if (item !== undefined) this.dequeued.push(item);
+    return item;
+  }
+
+  dequeueOrThrow(): T {
+    const item = this.inner.dequeueOrThrow();
+    this.dequeued.push(item);
+    return item;
+  }
+
+  clear(): void {
+    this.inner.clear();
+  }
+}
 
 async function createState(
   predecessorsByNode: Record<string, readonly string[]>,

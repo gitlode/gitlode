@@ -93,3 +93,19 @@ successor frontier items pass through `reachSuccessorFromBranch()` or parent-con
 `reachNode()` before enqueue, so joins between different branch groups are discovered at reach time.
 Branch groups only merge afterward. Dequeue-time re-expansion can therefore re-access topology and
 propagate freshly returned successor hints, but it is not a meaningful separate branch-join trigger.
+
+## B-validation follow-up status
+
+A dedicated phase-certified efficiency validation suite now compares FIFO/preserve with the Git
+child-derived timestamp priority policy on controlled Git-like favorable, equal-timestamp, and
+non-monotonic fixtures. The previous opaque strict synthetic fixture and later ancestor-parent merge
+fixture were replaced rather than kept. The favorable fixture uses only ordinary zero-, one-, and
+two-parent commit shapes, reachable named commits, independent merge parents, and monotonically
+non-increasing parent timestamps while recording strict timestamp-priority reductions in graph-work
+telemetry. The equal-timestamp control uses the same topology and records exact FIFO equivalence for
+counters and topology access traces. The non-monotonic fixture remains Git-like with independent
+merge parents, but marks one intentional timestamp anomaly and records strict graph-work regressions
+when timestamps prioritize an unhelpful path. The suite remains limited to deterministic synthetic
+Git-history telemetry and topology access traces; it does not benchmark wall-clock time, real
+repositories, memory behavior, or production adoption. Production connection remains out of scope
+until a separate adoption gate.

@@ -1040,6 +1040,7 @@ describe("Git commit timestamp priority frontier policy", () => {
     const closureFrontiers: RecordingFrontier<
       ClosureFrontierItem<string, CommitPathSchedulingHint>
     >[] = [];
+    const policyOptions = createCommitTimestampPhaseCertifiedStrategyOptions<string>();
 
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference<string, CommitPathSchedulingHint>(
@@ -1069,20 +1070,12 @@ describe("Git commit timestamp priority frontier policy", () => {
         "MERGE",
         {
           createDifferenceFrontier: () => {
-            const frontier = new RecordingFrontier(
-              createCommitTimestampPriorityFrontier<
-                DifferenceFrontierItem<string, CommitPathSchedulingHint>
-              >(),
-            );
+            const frontier = new RecordingFrontier(policyOptions.createDifferenceFrontier!());
             differenceFrontiers.push(frontier);
             return frontier;
           },
           createClosureFrontier: () => {
-            const frontier = new RecordingFrontier(
-              createCommitTimestampPriorityFrontier<
-                ClosureFrontierItem<string, CommitPathSchedulingHint>
-              >(),
-            );
+            const frontier = new RecordingFrontier(policyOptions.createClosureFrontier!());
             closureFrontiers.push(frontier);
             return frontier;
           },
@@ -1114,6 +1107,58 @@ describe("Git commit timestamp priority frontier policy", () => {
         branchId: expect.any(Number),
         domainHint: { sourceCommitterTimestamp: 60 },
       },
+    ]);
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "MERGE"));
+  });
+
+  it("uses the phase-certified options factory for closure newest-first scheduling", async () => {
+    const successors = {
+      HEAD: ["MERGE"],
+      MERGE: ["A", "B", "C"],
+      A: ["A_NEXT"],
+      A_NEXT: [],
+      B: ["B_NEXT"],
+      B_NEXT: [],
+      C: [],
+    };
+    const closureFrontiers: RecordingFrontier<
+      ClosureFrontierItem<string, CommitPathSchedulingHint>
+    >[] = [];
+    const policyOptions = createCommitTimestampPhaseCertifiedStrategyOptions<string>();
+
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, CommitPathSchedulingHint>(
+        createContext(
+          createCommitTimestampDagPort(successors, {
+            HEAD: 10,
+            MERGE: 1,
+            A: 100,
+            A_NEXT: 0,
+            B: 2,
+            B_NEXT: 0,
+            C: 0,
+          }),
+        ),
+        "HEAD",
+        "MERGE",
+        {
+          createDifferenceFrontier: () => policyOptions.createDifferenceFrontier!(),
+          createClosureFrontier: () => {
+            const frontier = new RecordingFrontier(policyOptions.createClosureFrontier!());
+            closureFrontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(closureFrontiers[0]?.dequeued.map((item) => item.nodeId)).toEqual([
+      "MERGE",
+      "A",
+      "A_NEXT",
+      "B",
+      "B_NEXT",
+      "C",
     ]);
     expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "MERGE"));
   });

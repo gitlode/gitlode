@@ -76,6 +76,22 @@ The current production Git frontier is still the injected LIFO/preserve frontier
 does not inspect them for priority, so timestamps do not affect result membership and do not make
 yield order contractual.
 
+The Git-specific timestamp-priority frontier policy is an explicit domain policy for prototype
+experiments. Its comparator only reads `domainHint?.sourceCommitterTimestamp` from queued frontier
+items:
+
+- hintless items sort before hinted items, so include/exclude starts and standalone closure roots can
+  bootstrap without pre-reading parent commits;
+- when both items are hinted, newer child-derived committer timestamps sort before older timestamps;
+- hintless ties and equal-timestamp ties return `0`, leaving stable enqueue-order tie-breaking to
+  `PriorityQueue`;
+- the comparator must not inspect node IDs, traversal role, branch IDs, topology, commit objects,
+  visited/certified state, or external mutable state.
+
+The policy is scheduling-only. It is a heuristic over the expanded child commit's timestamp, not a
+claim about the pending parent node's timestamp. It must not change reachable-difference membership,
+certificate decisions, adapter commit-read/cache responsibility, or telemetry counter definitions.
+
 ## Configured strategies
 
 Two strategies are kept in the module:
@@ -256,9 +272,9 @@ older exclude ancestor.
 - The certificate does not advance beyond the exclusion start node's direct successor. A branch
   forked several generations before release currently falls back.
 - Path split cases have no partial certificate; they use conservative fallback.
-- Timestamp-priority frontier ordering remains future work. The Git adapter now transports
-  child-derived committer timestamp path hints, but production ordering still does not inspect them
-  and Git DAG correctness must not depend on timestamp monotonicity.
+- Git timestamp-priority frontier ordering is implemented as an explicit phase-certified prototype
+  injection policy. Production certified-lazy ordering still does not inspect timestamps, and Git DAG
+  correctness must not depend on timestamp monotonicity.
 - Phase-certified prototype telemetry is now defined in this document for the experimental
   certified-closure strategy. Future telemetry work should preserve the generic DAG / Git adapter
   boundary.
@@ -288,6 +304,17 @@ or `DomainHint`.
 Alternative policies may change processing order, but must not change the reachable-difference
 result set. Successor groups are enqueued as blocks so block-aware policies can preserve or reverse
 within-block order consistently without moving correctness state into the queue.
+
+For Git timestamp-priority experiments, the same commit timestamp priority contract is injected into
+both `createDifferenceFrontier` and `createClosureFrontier`. The difference operation receives one
+fresh priority queue for its coordinator frontier. Every closure phase receives its own fresh priority
+queue, including closed-boundary follow-up phases and standalone closure operations. Queue instances
+must not be shared across difference operations or closure phases.
+
+The generic phase-certified default remains FIFO/preserve. Git timestamp priority is only active when
+callers explicitly inject the Git-specific policy. The phase-certified strategy is still not wired
+into production commit walking, and production certified-lazy traversal keeps its LIFO/preserve
+frontier until a separate production adoption gate changes that decision.
 
 ## Phase-certified prototype telemetry
 

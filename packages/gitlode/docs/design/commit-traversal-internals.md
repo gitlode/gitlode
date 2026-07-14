@@ -310,3 +310,37 @@ one `dag.certified_closure` span with `result=closed-boundary` or `result=exhaus
 finishes. Standalone closure spans record closure frontier steps, exclude-side successor expansions,
 `certified_nodes`, and exhausted-phase `terminal_nodes`. Difference traversal calls the shared
 closure core directly to avoid double-spanning internal phases.
+
+### Phase-certified path scheduling hints
+
+The phase-certified prototype also permits frontier items to carry a generic `DomainHint`. A hint is
+path scheduling metadata, not node metadata and not correctness state. It must not participate in
+reachable-set membership, visited keys, stale checks, certified sets, split or rejoin decisions,
+branch grouping, include-side classification, or yield eligibility. Changing or omitting hints must
+not change the result set.
+
+Hints are transported from an expanded node to the frontier items for its successor paths. The start
+items for a difference walk are enqueued as one hintless bootstrap block in `main start`, then
+`exclude start` order; standalone closure roots also start without a hint. A future Git-specific
+priority policy is expected to treat hintless start items as bootstrap work that runs before hinted
+items, but that ordering belongs to the injected frontier comparator rather than the algorithm.
+
+A single node ID may appear in multiple queued items with different hints when multiple paths reach
+that node. The phase-certified prototype therefore keeps hints on frontier items and does not merge
+them into a single `NodeId -> DomainHint` value. Closed-boundary closure phases carry the trigger
+path hint that established the boundary into both the next difference-side exclude item and the next
+closure root item, while the public `CertifiedClosurePhaseResult` remains hint-free.
+
+Synthetic timestamp tests model the intended future Git projection by attaching the expanded child
+node's timestamp to each successor path. The successor's own timestamp is not read before priority is
+decided. Timestamp assignment changes, equal timestamps, and non-monotonic child/parent timestamps
+may alter processing order but must not alter `reachable(start) - reachable(exclude)` membership.
+The actual Git adapter connection for committer timestamps has not been implemented yet.
+
+Closure re-expansion and branch-join detection are separate concerns. A compliant frontier may only
+hold and reorder the pending items produced by traversal; it must not synthesize, drop, or rewrite
+frontier items. When a closure branch reaches a successor, the phase records that reach immediately
+and detects joins against other branch groups before enqueueing the successor item. Because branch
+groups only merge and do not later split, dequeue-time re-expansion of an already-expanded closure
+node re-accesses topology for scheduling/telemetry but is not a separate opportunity to discover a
+new branch join.

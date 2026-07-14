@@ -18,7 +18,7 @@ import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
 } from "../../src/instrumentation/index.js";
-import { OrderedQueue } from "../../src/support/index.js";
+import { OrderedQueue, PriorityQueue } from "../../src/support/index.js";
 
 describe("resolveDagCertifiedClosurePhase", () => {
   it("records a complete exclude path when no split closes", async () => {
@@ -488,6 +488,422 @@ describe("phase-certified frontier injection", () => {
   });
 });
 
+describe("phase-certified DomainHint scheduling", () => {
+  it("starts difference with hintless main/exclude items in a stable bootstrap block", async () => {
+    const frontiers: RecordingFrontier<DifferenceFrontierItem<string, PathTimestampHint>>[] = [];
+
+    await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(createTimestampDagPort({ HEAD: [], EXCLUDE: [] }, { HEAD: 10, EXCLUDE: 1 })),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () => {
+            const frontier = new RecordingFrontier(
+              createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
+            );
+            frontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(frontiers[0]?.blocks[0]).toEqual([
+      { role: "main", nodeId: "HEAD" },
+      { role: "exclude", nodeId: "EXCLUDE" },
+    ]);
+    expect(frontiers[0]?.dequeued.slice(0, 2)).toEqual([
+      { role: "main", nodeId: "HEAD" },
+      { role: "exclude", nodeId: "EXCLUDE" },
+    ]);
+  });
+
+  it("copies include successor path hints without reading successor timestamps", async () => {
+    const frontiers: RecordingFrontier<DifferenceFrontierItem<string, PathTimestampHint>>[] = [];
+
+    await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            {
+              HEAD: ["OLD_SUCCESSOR", "NEW_SUCCESSOR"],
+              OLD_SUCCESSOR: [],
+              NEW_SUCCESSOR: [],
+              EXCLUDE: [],
+            },
+            { HEAD: 100, OLD_SUCCESSOR: 1, NEW_SUCCESSOR: 999, EXCLUDE: 0 },
+          ),
+        ),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () => {
+            const frontier = new RecordingFrontier(
+              new OrderedQueue<DifferenceFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+            );
+            frontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(frontiers[0]?.blocks).toContainEqual([
+      { role: "main", nodeId: "OLD_SUCCESSOR", domainHint: { sourceTimestamp: 100 } },
+      { role: "main", nodeId: "NEW_SUCCESSOR", domainHint: { sourceTimestamp: 100 } },
+    ]);
+  });
+
+  it("propagates closure successor path hints through split branches", async () => {
+    const frontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] = [];
+
+    const result = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
+      createContext(
+        createTimestampDagPort(
+          { MERGE: ["LEFT", "RIGHT"], LEFT: ["JOIN"], RIGHT: ["JOIN"], JOIN: [] },
+          { MERGE: 50, LEFT: 40, RIGHT: 30, JOIN: 20 },
+        ),
+      ),
+      "MERGE",
+      {
+        createClosureFrontier: () => {
+          const frontier = new RecordingFrontier(
+            new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+              dequeueOrder: "fifo",
+              blockOrder: "preserve",
+            }),
+          );
+          frontiers.push(frontier);
+          return frontier;
+        },
+      },
+    );
+
+    expect(result).toEqual(closedBoundaryResult(["MERGE", "LEFT", "RIGHT", "JOIN"], "JOIN"));
+    expect(frontiers[0]?.blocks[0]).toEqual([{ nodeId: "MERGE", branchId: expect.any(Number) }]);
+    const splitBlock = frontiers[0]?.blocks.find((block) => block.length === 2);
+    expect(splitBlock).toEqual([
+      { nodeId: "LEFT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 50 } },
+      { nodeId: "RIGHT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 50 } },
+    ]);
+    expect(frontiers[0]?.blocks).toContainEqual([
+      { nodeId: "JOIN", branchId: splitBlock?.[0]?.branchId, domainHint: { sourceTimestamp: 40 } },
+    ]);
+  });
+
+  it("re-expands closure nodes through compliant FIFO scheduling and preserves successor hints", async () => {
+    const frontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] = [];
+    const reads: string[] = [];
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
+      createContext(
+        createTimestampDagPort(
+          {
+            MERGE: ["A", "B", "C"],
+            A: ["JOIN"],
+            B: ["JOIN"],
+            C: [],
+            JOIN: ["NEXT"],
+            NEXT: [],
+          },
+          { MERGE: 100, A: 90, B: 80, C: 75, JOIN: 70, NEXT: 1 },
+          reads,
+        ),
+        recorder,
+      ),
+      "MERGE",
+      {
+        createClosureFrontier: () => {
+          const frontier = new RecordingFrontier(
+            new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+              dequeueOrder: "fifo",
+              blockOrder: "preserve",
+            }),
+          );
+          frontiers.push(frontier);
+          return frontier;
+        },
+      },
+    );
+
+    expect(result.kind).toBe("exhausted");
+    expect(result.certifiedNodes).toEqual(new Set(["MERGE", "A", "B", "C", "JOIN", "NEXT"]));
+    if (result.kind === "exhausted") {
+      expect(new Set(result.terminalNodes)).toEqual(new Set(["C", "NEXT"]));
+    }
+    expect(reads.filter((nodeId) => nodeId === "JOIN")).toHaveLength(2);
+    expect(reads).toEqual(["MERGE", "A", "B", "C", "JOIN", "JOIN", "NEXT", "NEXT"]);
+    expect(frontiers[0]?.dequeued.filter((item) => item.nodeId === "JOIN")).toEqual([
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 90 } },
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 80 } },
+    ]);
+    expect(frontiers[0]?.blocks).toContainEqual([
+      { nodeId: "NEXT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 70 } },
+    ]);
+    expect(
+      frontiers[0]?.blocks.filter((block) =>
+        block.some((item) => item.nodeId === "NEXT" && item.domainHint?.sourceTimestamp === 70),
+      ),
+    ).toHaveLength(2);
+    expect(recorder.records()[0]?.counters).toEqual(
+      expect.objectContaining({
+        exclude_expansions: 8,
+        successor_expansions: 8,
+      }),
+    );
+  });
+
+  it("keeps difference membership stable when compliant closure re-expansion occurs", async () => {
+    const successors = {
+      HEAD: ["NEW"],
+      NEW: ["MERGE"],
+      MERGE: ["A", "B", "C"],
+      A: ["JOIN"],
+      B: ["JOIN"],
+      C: [],
+      JOIN: ["NEXT"],
+      NEXT: [],
+    };
+    const reads: string[] = [];
+
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            successors,
+            { HEAD: 120, NEW: 110, MERGE: 100, A: 90, B: 80, C: 75, JOIN: 70, NEXT: 1 },
+            reads,
+          ),
+        ),
+        "HEAD",
+        "MERGE",
+        {
+          createClosureFrontier: () =>
+            new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+              dequeueOrder: "fifo",
+              blockOrder: "preserve",
+            }),
+        },
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "MERGE"));
+    expect(reads.filter((nodeId) => nodeId === "JOIN")).toHaveLength(2);
+  });
+
+  it("keeps path-specific hints for duplicate node ids", async () => {
+    const frontiers: RecordingFrontier<DifferenceFrontierItem<string, PathTimestampHint>>[] = [];
+    await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            { HEAD: ["LEFT", "RIGHT"], LEFT: ["JOIN"], RIGHT: ["JOIN"], JOIN: [], EXCLUDE: [] },
+            { HEAD: 100, LEFT: 10, RIGHT: 20, JOIN: 999, EXCLUDE: 0 },
+          ),
+        ),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () => {
+            const f = new RecordingFrontier(
+              new OrderedQueue<DifferenceFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+            );
+            frontiers.push(f);
+            return f;
+          },
+        },
+      ),
+    );
+
+    const joinItems = frontiers[0]?.blocks.flat().filter((item) => item.nodeId === "JOIN") ?? [];
+    expect(joinItems).toEqual([
+      { role: "main", nodeId: "JOIN", domainHint: { sourceTimestamp: 10 } },
+      { role: "main", nodeId: "JOIN", domainHint: { sourceTimestamp: 20 } },
+    ]);
+  });
+
+  it("passes closed-boundary trigger hints to the next exclude item and closure root", async () => {
+    const differenceFrontiers: RecordingFrontier<
+      DifferenceFrontierItem<string, PathTimestampHint>
+    >[] = [];
+    const closureFrontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] =
+      [];
+
+    await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            {
+              HEAD: ["NEW"],
+              NEW: ["MERGE"],
+              MERGE: ["LEFT", "RIGHT"],
+              LEFT: ["JOIN"],
+              RIGHT: ["JOIN"],
+              JOIN: ["OLD"],
+              OLD: [],
+            },
+            { HEAD: 100, NEW: 90, MERGE: 80, LEFT: 70, RIGHT: 60, JOIN: 50, OLD: 40 },
+          ),
+        ),
+        "HEAD",
+        "MERGE",
+        {
+          createDifferenceFrontier: () => {
+            const f = new RecordingFrontier(
+              new OrderedQueue<DifferenceFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+            );
+            differenceFrontiers.push(f);
+            return f;
+          },
+          createClosureFrontier: () => {
+            const f = new RecordingFrontier(
+              new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+            );
+            closureFrontiers.push(f);
+            return f;
+          },
+        },
+      ),
+    );
+
+    expect(differenceFrontiers[0]?.blocks).toContainEqual([
+      { role: "exclude", nodeId: "JOIN", domainHint: { sourceTimestamp: 60 } },
+    ]);
+    expect(closureFrontiers[1]?.blocks[0]).toEqual([
+      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 60 } },
+    ]);
+    const standalone = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
+      createContext(
+        createTimestampDagPort(
+          { MERGE: ["A", "B"], A: ["J"], B: ["J"], J: [] },
+          { MERGE: 1, A: 2, B: 3, J: 4 },
+        ),
+      ),
+      "MERGE",
+    );
+    expect("closedBoundaryDomainHint" in standalone).toBe(false);
+  });
+
+  it("uses newest-first priority without changing membership, including equal and non-monotonic timestamps", async () => {
+    const successors = {
+      HEAD: ["LOW", "HIGH", "EQUAL_A", "EQUAL_B"],
+      LOW: ["LOW_NEXT"],
+      HIGH: ["HIGH_NEXT"],
+      EQUAL_A: ["EQUAL_A_NEXT"],
+      EQUAL_B: ["EQUAL_B_NEXT"],
+      LOW_NEXT: ["EXCLUDE"],
+      HIGH_NEXT: ["EXCLUDE"],
+      EQUAL_A_NEXT: ["EXCLUDE"],
+      EQUAL_B_NEXT: ["EXCLUDE"],
+      EXCLUDE: ["OLDER"],
+      OLDER: [],
+    };
+    const timestamps = {
+      HEAD: 1,
+      LOW: 10,
+      HIGH: 100,
+      EQUAL_A: 50,
+      EQUAL_B: 50,
+      LOW_NEXT: 9,
+      HIGH_NEXT: 99,
+      EQUAL_A_NEXT: 49,
+      EQUAL_B_NEXT: 49,
+      EXCLUDE: 200,
+      OLDER: 300,
+    };
+    const reads: string[] = [];
+    const frontiers: RecordingFrontier<DifferenceFrontierItem<string, PathTimestampHint>>[] = [];
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(createTimestampDagPort(successors, timestamps, reads)),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () => {
+            const f = new RecordingFrontier(
+              createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
+            );
+            frontiers.push(f);
+            return f;
+          },
+          createClosureFrontier: () =>
+            createTimestampPriorityQueue<ClosureFrontierItem<string, PathTimestampHint>>(),
+        },
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
+    expect(frontiers[0]?.dequeued.map((item) => item.nodeId)).toContain("HIGH");
+    expect(reads.indexOf("HIGH_NEXT")).toBeLessThan(reads.indexOf("EQUAL_A"));
+    expect(reads.indexOf("EQUAL_A_NEXT")).toBeLessThan(reads.indexOf("EQUAL_B_NEXT"));
+  });
+
+  it("keeps membership invariant when timestamp assignments change", async () => {
+    const successors = {
+      HEAD: ["A", "B"],
+      A: ["A_NEXT"],
+      B: ["B_NEXT"],
+      A_NEXT: ["EXCLUDE"],
+      B_NEXT: ["EXCLUDE"],
+      EXCLUDE: ["ROOT"],
+      ROOT: [],
+    };
+    const firstReads: string[] = [];
+    const secondReads: string[] = [];
+    const first = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            successors,
+            { HEAD: 1, A: 0, B: 20, A_NEXT: 0, B_NEXT: 0, EXCLUDE: 0, ROOT: 0 },
+            firstReads,
+          ),
+        ),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () =>
+            createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
+        },
+      ),
+    );
+    const second = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            successors,
+            { HEAD: 1, A: 20, B: 0, A_NEXT: 0, B_NEXT: 0, EXCLUDE: 0, ROOT: 0 },
+            secondReads,
+          ),
+        ),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () =>
+            createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
+        },
+      ),
+    );
+
+    expect(new Set(first)).toEqual(new Set(second));
+    expect(firstReads).not.toEqual(secondReads);
+  });
+});
+
 describe("IntegratedDifferenceState certified hit resolution", () => {
   it("yields the visited newer side of a single certified hit", async () => {
     const state = await createState({
@@ -780,6 +1196,46 @@ describe("walkDagPhaseCertifiedDifference", () => {
     );
   });
 });
+
+interface PathTimestampHint {
+  readonly sourceTimestamp: number;
+}
+
+function createTimestampDagPort(
+  successorsByNode: Record<string, readonly string[]>,
+  timestamps: Record<string, number>,
+  reads: string[] = [],
+): DagTopologyPort<string, PathTimestampHint> {
+  return {
+    async getSuccessors(nodeId) {
+      reads.push(nodeId);
+      const sourceTimestamp = timestamps[nodeId];
+      if (sourceTimestamp === undefined) throw new Error(`Missing timestamp for ${nodeId}.`);
+      return (successorsByNode[nodeId] ?? []).map((successor) => ({
+        nodeId: successor,
+        domainHint: { sourceTimestamp },
+      }));
+    },
+  };
+}
+
+function compareTimestampHintedItems<T extends { readonly domainHint?: PathTimestampHint }>(
+  left: T,
+  right: T,
+): number {
+  const leftPriority = left.domainHint?.sourceTimestamp;
+  const rightPriority = right.domainHint?.sourceTimestamp;
+  if (leftPriority === undefined && rightPriority === undefined) return 0;
+  if (leftPriority === undefined) return -1;
+  if (rightPriority === undefined) return 1;
+  return rightPriority - leftPriority;
+}
+
+function createTimestampPriorityQueue<
+  T extends { readonly domainHint?: PathTimestampHint },
+>(): PriorityQueue<T> {
+  return new PriorityQueue(compareTimestampHintedItems);
+}
 
 class RecordingFrontier<T> implements DagFrontier<T> {
   readonly blocks: T[][] = [];

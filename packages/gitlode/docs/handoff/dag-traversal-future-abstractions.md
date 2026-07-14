@@ -61,3 +61,10 @@ case that demonstrates the generic shape.
   explicitly accepted.
 - Do not make traversal order a stable user-facing contract.
 - Prefer adapter-specific caching until a generic abstraction has more than one concrete consumer.
+
+## Timestamp path-hint continuation note
+
+For phase-certified traversal, timestamp-like `DomainHint` values are now proven as path scheduling
+metadata rather than node metadata. Future Git work should connect this by taking the committer
+timestamp from the child commit already read during successor expansion and attaching it to each
+parent successor descriptor. Parent commit timestamp prefetch remains out of scope.

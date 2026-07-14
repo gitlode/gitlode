@@ -61,11 +61,13 @@ frontiers may use that metadata for priority. Start items remain hintless.
 
 Synthetic tests cover child-timestamp-style projection, including closed-boundary hint inheritance
 into the next exclude phase. The Git adapter now projects child committer timestamps from normal
-topology reads onto parent successor paths; durable semantics live in
-`packages/gitlode/docs/design/commit-traversal-internals.md`. The next task is a stable
-timestamp-priority frontier policy. Do not pre-read parent commit timestamps, do not read pending
-frontier nodes only to assign priority, and do not make result membership depend on timestamp
-monotonicity.
+topology reads onto parent successor paths. A stable Git timestamp-priority frontier policy now exists
+for explicit phase-certified prototype injection; durable semantics live in
+`packages/gitlode/docs/design/commit-traversal-internals.md`.
+
+Next work should focus on the production adoption gate: design whether and how the Git adapter should
+connect production commit walking to the phase-certified strategy, expand A/B/C correctness,
+efficiency, and resource validation, and keep parent timestamp pre-reads out of any production plan.
 
 ## Successor cache responsibility follow-up
 

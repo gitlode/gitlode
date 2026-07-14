@@ -20,23 +20,24 @@ interface RunResult {
 }
 
 describe("phase-certified timestamp-priority efficiency validation", () => {
-  it("compares FIFO and timestamp priority on a Git-like favorable topology", async () => {
-    const fixture = createGitLikeFixture("favorable");
+  it("reduces graph work on a favorable Git-like topology", async () => {
+    const fixture = createFavorableFixture("favorable");
 
     const fifo = await runFixture(fixture, "fifo");
     const priority = await runFixture(fixture, "priority");
 
     expectMembershipAndOracle(fixture, fifo);
     expectMembershipAndOracle(fixture, priority);
-    expect(priority.reads.indexOf("RECENT_1")).toBeLessThan(fifo.reads.indexOf("RECENT_1"));
-    expect(priority.counters.successor_expansions).toBeLessThanOrEqual(
-      fifo.counters.successor_expansions,
-    );
-    expect(priority.counters.main_expansions).toBeLessThanOrEqual(fifo.counters.main_expansions);
+    expect(priority.reads).toEqual(["H", "E", "A", "G", "J", "R", "K", "L", "G", "B", "F"]);
+    expect(fifo.reads).toEqual(["H", "E", "A", "G", "G", "J", "K", "L", "R", "R", "B", "F"]);
+    expect(priority.counters.traversal_steps).toBeLessThan(fifo.counters.traversal_steps);
+    expect(priority.counters.successor_expansions).toBeLessThan(fifo.counters.successor_expansions);
+    expect(priority.counters.exclude_expansions).toBeLessThan(fifo.counters.exclude_expansions);
+    expect(priority.counters.main_expansions).toBe(fifo.counters.main_expansions);
   });
 
   it("uses equal timestamps as a stable-tie control for both frontiers", async () => {
-    const fixture = createGitLikeFixture("equal");
+    const fixture = createFavorableFixture("equal");
 
     const fifo = await runFixture(fixture, "fifo");
     const priority = await runFixture(fixture, "priority");
@@ -48,63 +49,136 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
     expect(priority.counters).toEqual(fifo.counters);
   });
 
-  it("shows non-monotonic timestamps are only a heuristic, not a guarantee", async () => {
-    const fixture = createGitLikeFixture("non-monotonic");
+  it("increases graph work when non-monotonic timestamps favor an unhelpful path", async () => {
+    const fixture = createNonMonotonicFixture();
 
     const fifo = await runFixture(fixture, "fifo");
     const priority = await runFixture(fixture, "priority");
 
     expectMembershipAndOracle(fixture, fifo);
     expectMembershipAndOracle(fixture, priority);
-    expect(priority.reads.indexOf("DISTRACT_1")).toBeLessThan(fifo.reads.indexOf("DISTRACT_1"));
-    expect(priority.counters.traversal_steps).toBeGreaterThanOrEqual(fifo.counters.traversal_steps);
-    expect(priority.counters.successor_expansions).toBeGreaterThanOrEqual(
+    expect(priority.reads).toEqual([
+      "H",
+      "E",
+      "A",
+      "B",
+      "C",
+      "D",
+      "D",
+      "F",
+      "J",
+      "R",
+      "R",
+      "R",
+      "J",
+      "L",
+      "R",
+      "F",
+      "F",
+      "F",
+      "G",
+      "L",
+      "R",
+    ]);
+    expect(fifo.reads).toEqual([
+      "H",
+      "E",
+      "A",
+      "B",
+      "C",
+      "D",
+      "F",
+      "G",
+      "L",
+      "J",
+      "L",
+      "D",
+      "F",
+      "J",
+      "F",
+      "R",
+    ]);
+    expect(priority.counters.traversal_steps).toBeGreaterThan(fifo.counters.traversal_steps);
+    expect(priority.counters.successor_expansions).toBeGreaterThan(
       fifo.counters.successor_expansions,
     );
+    expect(priority.counters.exclude_expansions).toBeGreaterThan(fifo.counters.exclude_expansions);
+    expect(priority.counters.main_expansions).toBe(fifo.counters.main_expansions);
   });
 });
 
-function createGitLikeFixture(kind: "favorable" | "equal" | "non-monotonic"): Fixture {
+function createFavorableFixture(kind: "favorable" | "equal"): Fixture {
   const successors = {
-    HEAD: ["DISTRACT", "RECENT"],
-    EXCLUDE: ["OLD_LEFT", "OLD_RIGHT"],
-    OLD_LEFT: ["JOIN"],
-    OLD_RIGHT: ["JOIN"],
-    JOIN: ["DISTRACT"],
-    DISTRACT: ["DISTRACT_1", "DISTRACT_2", "DISTRACT_3", "DISTRACT_4"],
-    DISTRACT_1: ["ROOT"],
-    DISTRACT_2: ["ROOT"],
-    DISTRACT_3: ["ROOT"],
-    DISTRACT_4: ["ROOT"],
-    ROOT: [],
-    RECENT: ["RECENT_1"],
-    RECENT_1: ["JOIN"],
+    H: ["B", "F", "G"],
+    E: ["A", "G"],
+    A: ["G", "J", "K", "L"],
+    B: [],
+    C: [],
+    D: ["F"],
+    F: ["J", "K"],
+    G: [],
+    J: ["R"],
+    K: ["R"],
+    L: [],
+    R: [],
   } satisfies Record<string, readonly string[]>;
 
-  const favorable = {
-    HEAD: 1_000,
-    EXCLUDE: 900,
-    OLD_LEFT: 800,
-    OLD_RIGHT: 800,
-    JOIN: 700,
-    DISTRACT: 10,
-    DISTRACT_1: 10,
-    DISTRACT_2: 10,
-    DISTRACT_3: 10,
-    DISTRACT_4: 10,
-    ROOT: 1,
-    RECENT: 1_000,
-    RECENT_1: 1_000,
+  const timestamps = {
+    H: 737,
+    E: 260,
+    A: 770,
+    B: 474,
+    C: 130,
+    D: 906,
+    F: 24,
+    G: 630,
+    J: 998,
+    K: 54,
+    L: 880,
+    R: 1,
   };
 
-  const timestamps =
-    kind === "equal"
-      ? Object.fromEntries(Object.keys(successors).map((nodeId) => [nodeId, 1]))
-      : kind === "non-monotonic"
-        ? { ...favorable, DISTRACT: 2_000, DISTRACT_1: 2_000, DISTRACT_2: 2_000 }
-        : favorable;
+  return {
+    successors,
+    timestamps: kind === "equal" ? equalTimestamps(successors) : timestamps,
+    start: "H",
+    exclude: "E",
+  };
+}
 
-  return { successors, timestamps, start: "HEAD", exclude: "EXCLUDE" };
+function createNonMonotonicFixture(): Fixture {
+  return {
+    successors: {
+      H: ["B", "F", "G", "J"],
+      E: ["A", "B", "C", "D"],
+      A: ["F", "G", "L"],
+      B: ["J", "L"],
+      C: ["D", "F", "J"],
+      D: ["F"],
+      F: ["R"],
+      G: ["R"],
+      J: ["R"],
+      K: [],
+      L: ["R"],
+      R: [],
+    },
+    timestamps: {
+      H: 365,
+      E: 929,
+      A: 146,
+      B: 207,
+      C: 925,
+      D: 147,
+      F: 661,
+      G: 275,
+      J: 240,
+      K: 111,
+      L: 324,
+      R: 684,
+    },
+    start: "H",
+    exclude: "E",
+  };
 }
 
 async function runFixture(fixture: Fixture, policy: "fifo" | "priority"): Promise<RunResult> {
@@ -190,6 +264,12 @@ function reachable(
   return result;
 }
 
+function equalTimestamps(
+  successorsByNode: Record<string, readonly string[]>,
+): Record<string, number> {
+  return Object.fromEntries(Object.keys(successorsByNode).map((nodeId) => [nodeId, 1]));
+}
+
 function normalizeCounters(counters: Record<string, number>): Record<string, number> {
   const names = [
     "traversal_steps",
@@ -199,6 +279,9 @@ function normalizeCounters(counters: Record<string, number>): Record<string, num
     "stale_steps",
     "closure_phases",
     "classification_runs",
+    "classification_newer_nodes",
+    "classification_older_nodes",
+    "classification_excluded_nodes",
     "certified_hits",
     "certification_yielded_nodes",
     "drain_yielded_nodes",

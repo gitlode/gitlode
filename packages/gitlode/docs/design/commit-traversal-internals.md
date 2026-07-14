@@ -407,14 +407,16 @@ checks. Telemetry counters such as `traversal_steps`, `successor_expansions`, `m
 counts make graph work comparable without relying on elapsed time. `yielded_nodes` is treated as an
 output-size counter rather than a standalone efficiency proof.
 
-The favorable synthetic topology gives recent paths high child-derived timestamps and old distracting
-paths low timestamps, so the priority queue advances the recent path earlier than FIFO. The equal
-timestamp control uses the same topology with all timestamps equal; because the comparator returns
-`0` for equal hinted items and for hintless ties, the priority queue preserves enqueue sequence in
-both the difference and closure frontiers and matches FIFO telemetry and topology access order. The
-non-monotonic control intentionally gives an old distracting path a newer child-derived timestamp to
-show that timestamp priority is a heuristic: correctness is unchanged, but the policy is not
-contracted to improve graph work and can follow an unhelpful path first.
+The favorable synthetic topology has exclude-side closure branches where child-derived timestamps
+prioritize a path that avoids redundant exclude-side expansions. The validation asserts strict
+reductions in `traversal_steps`, `successor_expansions`, and `exclude_expansions` for timestamp
+priority compared with FIFO. The equal-timestamp control uses the favorable topology with all
+timestamps equal; because the comparator returns `0` for equal hinted items and for hintless ties,
+the priority queue preserves enqueue sequence in both the difference and closure frontiers and
+matches FIFO telemetry and topology access order exactly. A separate non-monotonic topology assigns
+newer child-derived timestamps to an unhelpful path, causing strict increases in the same graph-work
+counters and demonstrating that timestamp priority remains a heuristic rather than a correctness or
+performance guarantee.
 
 These tests do not prove that timestamp priority is beneficial on real repositories, do not compare
 processing time, and do not connect the phase-certified prototype to production commit walking.

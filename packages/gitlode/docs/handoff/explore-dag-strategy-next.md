@@ -96,4 +96,11 @@ propagate freshly returned successor hints, but it is not a meaningful separate 
 
 ## B-validation follow-up status
 
-A dedicated phase-certified efficiency validation suite now compares FIFO/preserve with the Git child-derived timestamp priority policy on synthetic favorable, equal-timestamp, and non-monotonic fixtures. The suite is intentionally limited to deterministic graph-work telemetry and topology access traces; it does not benchmark wall-clock time, real repositories, memory behavior, or production adoption. Future work should strengthen these fixtures if new telemetry reveals a clearer graph-work reduction opportunity, and production connection remains out of scope until a separate adoption gate.
+A dedicated phase-certified efficiency validation suite now compares FIFO/preserve with the Git
+child-derived timestamp priority policy on synthetic favorable, equal-timestamp, and non-monotonic
+fixtures. The favorable fixture records strict timestamp-priority reductions in graph-work telemetry,
+the equal-timestamp control records exact FIFO equivalence for counters and topology access traces,
+and the non-monotonic fixture records strict graph-work regressions when timestamps prioritize an
+unhelpful path. The suite remains limited to deterministic synthetic telemetry and topology access
+traces; it does not benchmark wall-clock time, real repositories, memory behavior, or production
+adoption. Production connection remains out of scope until a separate adoption gate.

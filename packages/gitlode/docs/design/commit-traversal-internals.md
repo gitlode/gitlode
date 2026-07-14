@@ -397,8 +397,9 @@ new branch join.
 
 Synthetic B-validation tests compare the experimental phase-certified difference operation with the
 FIFO/preserve default frontier and the explicit Git child-derived timestamp priority frontier. These
-fixtures are algorithmic queue-policy controls: they exercise deterministic DAG shapes and telemetry
-counters, not wall-clock performance and not real repository performance.
+fixtures are controlled Git-history patterns: they use commit-to-parent edges, ordinary zero-, one-,
+and two-parent commits, branch heads, merge commits, and shared older history. They are not arbitrary
+DAG stress tests, wall-clock benchmarks, or real repository performance claims.
 
 The tests use the same `reachable(includeStart) - reachable(excludeStart)` operation for both
 policies and check membership against an independent reachable-difference oracle with duplicate-yield
@@ -407,16 +408,17 @@ checks. Telemetry counters such as `traversal_steps`, `successor_expansions`, `m
 counts make graph work comparable without relying on elapsed time. `yielded_nodes` is treated as an
 output-size counter rather than a standalone efficiency proof.
 
-The favorable synthetic topology has exclude-side closure branches where child-derived timestamps
-prioritize a path that avoids redundant exclude-side expansions. The validation asserts strict
-reductions in `traversal_steps`, `successor_expansions`, and `exclude_expansions` for timestamp
-priority compared with FIFO. The equal-timestamp control uses the favorable topology with all
-timestamps equal; because the comparator returns `0` for equal hinted items and for hintless ties,
-the priority queue preserves enqueue sequence in both the difference and closure frontiers and
-matches FIFO telemetry and topology access order exactly. A separate non-monotonic topology assigns
-newer child-derived timestamps to an unhelpful path, causing strict increases in the same graph-work
-counters and demonstrating that timestamp priority remains a heuristic rather than a correctness or
-performance guarantee.
+The favorable fixture models a normal Git-like history with an include head, an exclude boundary,
+recent feature history, an older merge region, and monotonically non-increasing parent timestamps.
+Child-derived timestamp priority reaches the useful older-main path before FIFO's stale root-side
+path and strictly reduces `traversal_steps`, `successor_expansions`, and `exclude_expansions`. The
+equal-timestamp control uses the same topology with all timestamps equal; because the comparator
+returns `0` for equal hinted items and for hintless ties, the priority queue preserves enqueue
+sequence in both the difference and closure frontiers and matches FIFO telemetry and topology access
+order exactly. The non-monotonic fixture is also Git-like, but marks one shared-merge-to-shared-side
+edge with an intentional timestamp anomaly. That anomaly makes priority follow an unhelpful root-side
+path first and strictly increases the same graph-work counters, demonstrating that timestamp priority
+remains a heuristic rather than a correctness or performance guarantee.
 
 These tests do not prove that timestamp priority is beneficial on real repositories, do not compare
 processing time, and do not connect the phase-certified prototype to production commit walking.

@@ -11,6 +11,7 @@ interface Fixture {
   readonly timestamps: Record<string, number>;
   readonly start: string;
   readonly exclude: string;
+  readonly timestampAnomalyEdges?: ReadonlySet<string>;
 }
 
 interface RunResult {
@@ -22,35 +23,8 @@ interface RunResult {
 describe("phase-certified timestamp-priority efficiency validation", () => {
   it("reduces graph work on a favorable Git-like topology", async () => {
     const fixture = createFavorableFixture("favorable");
-
-    const fifo = await runFixture(fixture, "fifo");
-    const priority = await runFixture(fixture, "priority");
-
-    expectMembershipAndOracle(fixture, fifo);
-    expectMembershipAndOracle(fixture, priority);
-    expect(priority.reads).toEqual(["H", "E", "A", "G", "J", "R", "K", "L", "G", "B", "F"]);
-    expect(fifo.reads).toEqual(["H", "E", "A", "G", "G", "J", "K", "L", "R", "R", "B", "F"]);
-    expect(priority.counters.traversal_steps).toBeLessThan(fifo.counters.traversal_steps);
-    expect(priority.counters.successor_expansions).toBeLessThan(fifo.counters.successor_expansions);
-    expect(priority.counters.exclude_expansions).toBeLessThan(fifo.counters.exclude_expansions);
-    expect(priority.counters.main_expansions).toBe(fifo.counters.main_expansions);
-  });
-
-  it("uses equal timestamps as a stable-tie control for both frontiers", async () => {
-    const fixture = createFavorableFixture("equal");
-
-    const fifo = await runFixture(fixture, "fifo");
-    const priority = await runFixture(fixture, "priority");
-
-    expectMembershipAndOracle(fixture, fifo);
-    expectMembershipAndOracle(fixture, priority);
-    expect(priority.yielded).toHaveLength(new Set(priority.yielded).size);
-    expect(priority.reads).toEqual(fifo.reads);
-    expect(priority.counters).toEqual(fifo.counters);
-  });
-
-  it("increases graph work when non-monotonic timestamps favor an unhelpful path", async () => {
-    const fixture = createNonMonotonicFixture();
+    expectGitLikeFixture(fixture);
+    expectParentTimestampsToBeNonIncreasing(fixture);
 
     const fifo = await runFixture(fixture, "fifo");
     const priority = await runFixture(fixture, "priority");
@@ -58,45 +32,80 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
     expectMembershipAndOracle(fixture, fifo);
     expectMembershipAndOracle(fixture, priority);
     expect(priority.reads).toEqual([
-      "H",
-      "E",
-      "A",
-      "B",
-      "C",
-      "D",
-      "D",
-      "F",
-      "J",
-      "R",
-      "R",
-      "R",
-      "J",
-      "L",
-      "R",
-      "F",
-      "F",
-      "F",
-      "G",
-      "L",
-      "R",
+      "INCLUDE_HEAD",
+      "EXCLUDE_HEAD",
+      "OLD_MERGE",
+      "OLD_SIDE",
+      "OLD_MAIN",
+      "OLD_SIDE",
+      "FEATURE_BASE",
+      "FEATURE_TIP",
+      "ROOT",
     ]);
     expect(fifo.reads).toEqual([
-      "H",
-      "E",
-      "A",
-      "B",
-      "C",
-      "D",
-      "F",
-      "G",
-      "L",
-      "J",
-      "L",
-      "D",
-      "F",
-      "J",
-      "F",
-      "R",
+      "INCLUDE_HEAD",
+      "EXCLUDE_HEAD",
+      "OLD_MERGE",
+      "OLD_SIDE",
+      "OLD_MAIN",
+      "OLD_SIDE",
+      "ROOT",
+      "FEATURE_BASE",
+      "FEATURE_TIP",
+      "ROOT",
+    ]);
+    expect(priority.counters.traversal_steps).toBeLessThan(fifo.counters.traversal_steps);
+    expect(priority.counters.successor_expansions).toBeLessThan(fifo.counters.successor_expansions);
+    expect(priority.counters.exclude_expansions).toBeLessThan(fifo.counters.exclude_expansions);
+    expect(priority.counters.main_expansions).toBe(fifo.counters.main_expansions);
+  });
+
+  it("uses equal timestamps as a stable-tie control for both frontiers", async () => {
+    const favorable = createFavorableFixture("favorable");
+    const equal = createFavorableFixture("equal");
+    expectGitLikeFixture(equal);
+
+    const favorableFifo = await runFixture(favorable, "fifo");
+    const fifo = await runFixture(equal, "fifo");
+    const priority = await runFixture(equal, "priority");
+
+    expectMembershipAndOracle(equal, fifo);
+    expectMembershipAndOracle(equal, priority);
+    expect(priority.yielded).toHaveLength(new Set(priority.yielded).size);
+    expect(fifo.reads).toEqual(favorableFifo.reads);
+    expect(fifo.counters).toEqual(favorableFifo.counters);
+    expect(priority.reads).toEqual(fifo.reads);
+    expect(priority.counters).toEqual(fifo.counters);
+  });
+
+  it("increases graph work when non-monotonic timestamps favor an unhelpful path", async () => {
+    const fixture = createNonMonotonicFixture();
+    expectGitLikeFixture(fixture);
+    expectParentTimestampsToBeNonIncreasing(fixture);
+
+    const fifo = await runFixture(fixture, "fifo");
+    const priority = await runFixture(fixture, "priority");
+
+    expectMembershipAndOracle(fixture, fifo);
+    expectMembershipAndOracle(fixture, priority);
+    expect(priority.reads).toEqual([
+      "INCLUDE_HEAD",
+      "EXCLUDE_HEAD",
+      "SHARED_MERGE",
+      "SHARED_SIDE",
+      "ROOT",
+      "SHARED_SIDE",
+      "RECENT_MERGE",
+      "ROOT",
+    ]);
+    expect(fifo.reads).toEqual([
+      "INCLUDE_HEAD",
+      "EXCLUDE_HEAD",
+      "SHARED_MERGE",
+      "SHARED_SIDE",
+      "SHARED_SIDE",
+      "RECENT_MERGE",
+      "ROOT",
     ]);
     expect(priority.counters.traversal_steps).toBeGreaterThan(fifo.counters.traversal_steps);
     expect(priority.counters.successor_expansions).toBeGreaterThan(
@@ -109,75 +118,56 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
 
 function createFavorableFixture(kind: "favorable" | "equal"): Fixture {
   const successors = {
-    H: ["B", "F", "G"],
-    E: ["A", "G"],
-    A: ["G", "J", "K", "L"],
-    B: [],
-    C: [],
-    D: ["F"],
-    F: ["J", "K"],
-    G: [],
-    J: ["R"],
-    K: ["R"],
-    L: [],
-    R: [],
+    INCLUDE_HEAD: ["FEATURE_TIP", "EXCLUDE_HEAD"],
+    FEATURE_TIP: ["FEATURE_BASE"],
+    EXCLUDE_HEAD: ["OLD_MERGE", "OLD_SIDE"],
+    OLD_MERGE: ["OLD_MAIN", "OLD_SIDE"],
+    OLD_MAIN: ["FEATURE_BASE"],
+    FEATURE_BASE: ["ROOT"],
+    OLD_SIDE: ["ROOT"],
+    ROOT: [],
   } satisfies Record<string, readonly string[]>;
 
   const timestamps = {
-    H: 737,
-    E: 260,
-    A: 770,
-    B: 474,
-    C: 130,
-    D: 906,
-    F: 24,
-    G: 630,
-    J: 998,
-    K: 54,
-    L: 880,
-    R: 1,
+    INCLUDE_HEAD: 1_000,
+    FEATURE_TIP: 990,
+    EXCLUDE_HEAD: 980,
+    OLD_MERGE: 970,
+    OLD_MAIN: 960,
+    FEATURE_BASE: 950,
+    OLD_SIDE: 940,
+    ROOT: 0,
   };
 
   return {
     successors,
     timestamps: kind === "equal" ? equalTimestamps(successors) : timestamps,
-    start: "H",
-    exclude: "E",
+    start: "INCLUDE_HEAD",
+    exclude: "EXCLUDE_HEAD",
   };
 }
 
 function createNonMonotonicFixture(): Fixture {
   return {
     successors: {
-      H: ["B", "F", "G", "J"],
-      E: ["A", "B", "C", "D"],
-      A: ["F", "G", "L"],
-      B: ["J", "L"],
-      C: ["D", "F", "J"],
-      D: ["F"],
-      F: ["R"],
-      G: ["R"],
-      J: ["R"],
-      K: [],
-      L: ["R"],
-      R: [],
+      INCLUDE_HEAD: ["RECENT_MERGE", "SHARED_MERGE"],
+      RECENT_MERGE: ["SHARED_MERGE", "SHARED_SIDE"],
+      EXCLUDE_HEAD: ["SHARED_MERGE", "SHARED_SIDE"],
+      SHARED_MERGE: ["SHARED_SIDE", "ROOT"],
+      SHARED_SIDE: ["ROOT"],
+      ROOT: [],
     },
     timestamps: {
-      H: 365,
-      E: 929,
-      A: 146,
-      B: 207,
-      C: 925,
-      D: 147,
-      F: 661,
-      G: 275,
-      J: 240,
-      K: 111,
-      L: 324,
-      R: 684,
+      INCLUDE_HEAD: 1_000,
+      RECENT_MERGE: 980,
+      EXCLUDE_HEAD: 970,
+      SHARED_MERGE: 250,
+      SHARED_SIDE: 950,
+      ROOT: 0,
     },
-    start: "H",
-    exclude: "E",
+    timestampAnomalyEdges: new Set([edgeKey("SHARED_MERGE", "SHARED_SIDE")]),
+    start: "INCLUDE_HEAD",
+    exclude: "EXCLUDE_HEAD",
   };
 }
 
@@ -239,6 +229,46 @@ function expectMembershipAndOracle(fixture: Fixture, result: RunResult): void {
   expect(result.yielded).toHaveLength(new Set(result.yielded).size);
 }
 
+function expectGitLikeFixture(fixture: Fixture): void {
+  const declared = new Set(Object.keys(fixture.successors));
+  const reachableNodes = new Set([
+    ...reachable(fixture.successors, fixture.start),
+    ...reachable(fixture.successors, fixture.exclude),
+  ]);
+
+  expect(reachableNodes).toEqual(declared);
+  for (const [nodeId, successors] of Object.entries(fixture.successors)) {
+    expect(successors.length, `${nodeId} must have at most two parents`).toBeLessThanOrEqual(2);
+    for (const successor of successors) {
+      expect(declared.has(successor), `${nodeId} references undeclared parent ${successor}`).toBe(
+        true,
+      );
+    }
+  }
+}
+
+function expectParentTimestampsToBeNonIncreasing(fixture: Fixture): void {
+  const anomalies = fixture.timestampAnomalyEdges ?? new Set<string>();
+  let observedAnomalies = 0;
+
+  for (const [child, parents] of Object.entries(fixture.successors)) {
+    for (const parent of parents) {
+      const key = edgeKey(child, parent);
+      if (anomalies.has(key)) {
+        observedAnomalies += 1;
+        expect(fixture.timestamps[child]).toBeLessThan(fixture.timestamps[parent]);
+        continue;
+      }
+      expect(
+        fixture.timestamps[child],
+        `${child} should not be older than ${parent}`,
+      ).toBeGreaterThanOrEqual(fixture.timestamps[parent] ?? Number.POSITIVE_INFINITY);
+    }
+  }
+
+  expect(observedAnomalies).toBe(anomalies.size);
+}
+
 function reachableDifference(
   successorsByNode: Record<string, readonly string[]>,
   startId: string,
@@ -268,6 +298,10 @@ function equalTimestamps(
   successorsByNode: Record<string, readonly string[]>,
 ): Record<string, number> {
   return Object.fromEntries(Object.keys(successorsByNode).map((nodeId) => [nodeId, 1]));
+}
+
+function edgeKey(child: string, parent: string): string {
+  return `${child}->${parent}`;
 }
 
 function normalizeCounters(counters: Record<string, number>): Record<string, number> {

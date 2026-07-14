@@ -383,7 +383,7 @@ Synthetic timestamp tests model the intended future Git projection by attaching 
 node's timestamp to each successor path. The successor's own timestamp is not read before priority is
 decided. Timestamp assignment changes, equal timestamps, and non-monotonic child/parent timestamps
 may alter processing order but must not alter `reachable(start) - reachable(exclude)` membership.
-The actual Git adapter connection for committer timestamps has not been implemented yet.
+The Git adapter now projects child committer timestamps during normal topology reads, while production commit walking still does not use the phase-certified prototype or the timestamp-priority policy.
 
 Closure re-expansion and branch-join detection are separate concerns. A compliant frontier may only
 hold and reorder the pending items produced by traversal; it must not synthesize, drop, or rewrite
@@ -392,3 +392,30 @@ and detects joins against other branch groups before enqueueing the successor it
 groups only merge and do not later split, dequeue-time re-expansion of an already-expanded closure
 node re-accesses topology for scheduling/telemetry but is not a separate opportunity to discover a
 new branch join.
+
+## Phase-certified B-validation status
+
+Synthetic B-validation tests compare the experimental phase-certified difference operation with the
+FIFO/preserve default frontier and the explicit Git child-derived timestamp priority frontier. These
+fixtures are algorithmic queue-policy controls: they exercise deterministic DAG shapes and telemetry
+counters, not wall-clock performance and not real repository performance.
+
+The tests use the same `reachable(includeStart) - reachable(excludeStart)` operation for both
+policies and check membership against an independent reachable-difference oracle with duplicate-yield
+checks. Telemetry counters such as `traversal_steps`, `successor_expansions`, `main_expansions`,
+`exclude_expansions`, `stale_steps`, closure-phase counts, classification counts, and yield-source
+counts make graph work comparable without relying on elapsed time. `yielded_nodes` is treated as an
+output-size counter rather than a standalone efficiency proof.
+
+The favorable synthetic topology gives recent paths high child-derived timestamps and old distracting
+paths low timestamps, so the priority queue advances the recent path earlier than FIFO. The equal
+timestamp control uses the same topology with all timestamps equal; because the comparator returns
+`0` for equal hinted items and for hintless ties, the priority queue preserves enqueue sequence in
+both the difference and closure frontiers and matches FIFO telemetry and topology access order. The
+non-monotonic control intentionally gives an old distracting path a newer child-derived timestamp to
+show that timestamp priority is a heuristic: correctness is unchanged, but the policy is not
+contracted to improve graph work and can follow an unhelpful path first.
+
+These tests do not prove that timestamp priority is beneficial on real repositories, do not compare
+processing time, and do not connect the phase-certified prototype to production commit walking.
+Production adoption remains a separate design and validation gate.

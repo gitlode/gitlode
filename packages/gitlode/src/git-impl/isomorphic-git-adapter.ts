@@ -123,7 +123,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async classifyRefType(repoPath: string, ref: string): Promise<RefType> {
     try {
-      await git.resolveRef({ fs: this._fs, dir: repoPath, ref: `refs/heads/${ref}` });
+      await git.resolveRef({
+        fs: this._fs,
+        dir: repoPath,
+        ref: `refs/heads/${ref}`,
+      });
       return "branch";
     } catch {
       // Not a branch under refs/heads.
@@ -202,7 +206,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
   ): AsyncIterable<RawCommit> {
     yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
       const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
-      const oidWalk = walkDagNodeIdsCertifiedLazy<CommitOid>(
+      const oidWalk = walkDagNodeIdsCertifiedLazy<CommitOid, CommitPathSchedulingHint>(
         {
           graph: topology,
           instrumentation: this._instrumentation,
@@ -211,7 +215,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
         excludeOid,
         {
           createFrontier: () =>
-            new OrderedQueue<DagFrontierItem<CommitOid, BasicDagSchedulingContext>>({
+            new OrderedQueue<
+              DagFrontierItem<CommitOid, BasicDagSchedulingContext, CommitPathSchedulingHint>
+            >({
               dequeueOrder: "lifo",
               blockOrder: "preserve",
             }),
@@ -364,7 +370,14 @@ export class IsomorphicGitAdapter implements GitAdapter {
     const beforeSize = contentA.length;
     const afterSize = contentB.length;
     if (this._isBinary(contentA) || this._isBinary(contentB)) {
-      return { path, status, beforeSize, afterSize, additions: null, deletions: null };
+      return {
+        path,
+        status,
+        beforeSize,
+        afterSize,
+        additions: null,
+        deletions: null,
+      };
     }
 
     const { additions, deletions } = this._diffAdapter.computeLineDiff(contentA, contentB);
@@ -378,7 +391,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
       deletions < 0
     ) {
       throw new GitAdapterError(
-        `DiffAdapter returned invalid values: additions=${String(additions)}, deletions=${String(deletions)}`,
+        `DiffAdapter returned invalid values: additions=${String(
+          additions,
+        )}, deletions=${String(deletions)}`,
         "UNKNOWN",
       );
     }
@@ -395,7 +410,15 @@ export class IsomorphicGitAdapter implements GitAdapter {
   }
 }
 
-class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
+export interface CommitPathSchedulingHint {
+  /**
+   * Unix seconds from the expanded child commit's committer timestamp. This is path-local
+   * scheduling metadata, not metadata about the pending parent node.
+   */
+  readonly sourceCommitterTimestamp: number;
+}
+
+class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSchedulingHint> {
   private readonly cache = new Map<CommitOid, RawCommit>();
   private readonly fs: FsClient;
   private readonly repoPath: string;
@@ -407,9 +430,11 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
     this.span = span;
   }
 
-  async getSuccessors(oid: CommitOid): Promise<readonly DagSuccessor<CommitOid>[]> {
+  async getSuccessors(
+    oid: CommitOid,
+  ): Promise<readonly DagSuccessor<CommitOid, CommitPathSchedulingHint>[]> {
     const commit = await this.readCommit(oid, "topology");
-    return commit.parents.map((parentOid) => ({ nodeId: parentOid }));
+    return projectCommitParentSuccessors(commit);
   }
 
   async readCommit(oid: CommitOid, purpose: CommitReadPurpose): Promise<RawCommit> {
@@ -422,7 +447,11 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
     try {
       this.span.incrementCounter("commit_reads");
       this.span.incrementCounter(`${purpose}_commit_reads`);
-      const { commit } = await git.readCommit({ fs: this.fs, dir: this.repoPath, oid });
+      const { commit } = await git.readCommit({
+        fs: this.fs,
+        dir: this.repoPath,
+        oid,
+      });
       const rawCommit = toRawCommit(oid, commit);
       this.cache.set(oid, rawCommit);
       return rawCommit;
@@ -441,6 +470,15 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid> {
   incrementYieldedCommit(): void {
     this.span.incrementCounter("commits_yielded");
   }
+}
+
+export function projectCommitParentSuccessors(
+  commit: RawCommit,
+): readonly DagSuccessor<CommitOid, CommitPathSchedulingHint>[] {
+  const domainHint: CommitPathSchedulingHint = {
+    sourceCommitterTimestamp: commit.committer.timestamp,
+  };
+  return commit.parents.map((parentOid) => ({ nodeId: parentOid, domainHint }));
 }
 
 type CommitReadPurpose = "topology" | "materialize";

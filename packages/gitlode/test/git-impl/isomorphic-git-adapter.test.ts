@@ -3,7 +3,10 @@ import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IsomorphicGitAdapterDependencies } from "../../src/git-impl/index.js";
-import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+import {
+  IsomorphicGitAdapter,
+  projectCommitParentSuccessors,
+} from "../../src/git-impl/isomorphic-git-adapter.js";
 import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
@@ -93,6 +96,25 @@ async function writeCommit(
     },
   });
 }
+
+describe("commit parent successor path scheduling hints", () => {
+  it("projects the expanded child committer timestamp onto every parent path", () => {
+    const commit: RawCommit = {
+      oid: "c".repeat(40) as never,
+      message: "merge\n",
+      author: { ...AUTHOR, timestamp: 111 },
+      committer: { ...AUTHOR, timestamp: 222 },
+      parents: ["a".repeat(40) as never, "b".repeat(40) as never],
+    };
+
+    const successors = projectCommitParentSuccessors(commit);
+
+    expect(successors).toEqual([
+      { nodeId: "a".repeat(40), domainHint: { sourceCommitterTimestamp: 222 } },
+      { nodeId: "b".repeat(40), domainHint: { sourceCommitterTimestamp: 222 } },
+    ]);
+  });
+});
 
 describe("IsomorphicGitAdapter.walkCommits", () => {
   it("full traversal (no excludeHash) yields all commits", async () => {
@@ -461,7 +483,12 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
       dir: "/",
       ref: "v1.0-ann",
       object: sha,
-      tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
+      tagger: {
+        name: "Tagger",
+        email: "tag@example.com",
+        timestamp: 0,
+        timezoneOffset: 0,
+      },
       message: "release v1.0",
     });
     const adapter = createAdapter(fs);
@@ -519,7 +546,12 @@ describe("IsomorphicGitAdapter.classifyRefType", () => {
       dir: "/",
       ref: "v1.0-ann",
       object: sha,
-      tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
+      tagger: {
+        name: "Tagger",
+        email: "tag@example.com",
+        timestamp: 0,
+        timezoneOffset: 0,
+      },
       message: "release v1.0",
     });
     const adapter = createAdapter(fs);
@@ -778,7 +810,11 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     const sha1 = await addCommit("a.txt", "line1\n", "root commit");
 
     // Create a commit with same tree as sha1 (no file changes)
-    const { commit: parentCommit } = await git.readCommit({ fs, dir: "/", oid: sha1 });
+    const { commit: parentCommit } = await git.readCommit({
+      fs,
+      dir: "/",
+      oid: sha1,
+    });
     const emptyCommit = await git.writeCommit({
       fs,
       dir: "/",

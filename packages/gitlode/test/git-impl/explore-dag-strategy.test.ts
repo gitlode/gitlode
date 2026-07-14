@@ -912,7 +912,9 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
       HEAD: [],
     });
 
-    const yielded = await collect(state.applyCertification(closedBoundaryResult(["A"], "A")));
+    const yielded = await collect(
+      state.applyClosureAndResolveIncludeHits(closedBoundaryResult(["A"], "A")),
+    );
 
     expect(new Set(yielded)).toEqual(new Set(["C", "HEAD"]));
   });
@@ -925,7 +927,9 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
       HEAD: [],
     });
 
-    const yielded = await collect(state.applyCertification(closedBoundaryResult(["A", "B"], "A")));
+    const yielded = await collect(
+      state.applyClosureAndResolveIncludeHits(closedBoundaryResult(["A", "B"], "A")),
+    );
 
     expect(new Set(yielded)).toEqual(new Set(["HEAD"]));
   });
@@ -939,7 +943,9 @@ describe("IntegratedDifferenceState certified hit resolution", () => {
       HEAD: [],
     });
 
-    const yielded = await collect(state.applyCertification(closedBoundaryResult(["A", "B"], "A")));
+    const yielded = await collect(
+      state.applyClosureAndResolveIncludeHits(closedBoundaryResult(["A", "B"], "A")),
+    );
 
     expect(new Set(yielded)).toEqual(new Set(["A_CHILD", "B_CHILD", "HEAD"]));
   });
@@ -1305,7 +1311,7 @@ async function createState(
     state.initializeInclude(nodeId);
   }
   for (const nodeId of Object.keys(successorsByNode)) {
-    await state.expandInclude(nodeId);
+    await state.advanceIncludeNode(nodeId);
   }
 
   return state;
@@ -1456,7 +1462,7 @@ async function resolveAndDrain(
   state: IntegratedDifferenceState<string>,
   closure: CertifiedClosurePhaseResult<string>,
 ): Promise<string[]> {
-  const result = await collect(state.applyCertification(closure));
+  const result = await collect(state.applyClosureAndResolveIncludeHits(closure));
   for (const nodeId of state.drainRemainingInclude()) {
     result.push(nodeId);
   }

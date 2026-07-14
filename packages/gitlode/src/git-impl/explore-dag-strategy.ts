@@ -23,22 +23,22 @@ export type { DagSuccessor, DagTopologyPort, WalkDagContext } from "./dag-traver
  * split/branch/trigger/close-boundary rules executable while they mature toward a production
  * strategy.
  *
- * Refactoring target:
+ * Responsibility model:
  *
- * - `walkDagPhaseCertifiedDifference()` should act as the coordinator. It owns the interleaving of
- *   include expansion and exclude certification phases, and it should make frontier additions and
+ * - `walkDagNodeIdsPhaseCertifiedDifference()` acts as the coordinator. It owns the interleaving of
+ *   include expansion and exclude certification phases, and it makes frontier additions and
  *   yield points visible from the main loop.
- * - Include graph bookkeeping should live in an include-side state object. It should own visited
+ * - Include graph bookkeeping lives in an include-side state object. It owns visited
  *   include nodes, expanded flags, and the observed successor/predecessor links used for local
  *   classification.
- * - Certified exclude bookkeeping should live in an exclude-side state object. It should own the
- *   certified exclude set, absorb closure phase results, report include-side hits, and decide
+ * - Certified exclude bookkeeping lives in an exclude-side state object. It owns the
+ *   certified exclude set, absorbs closure phase results, reports include-side hits, and decides
  *   whether another exclude phase should start from a closed boundary.
- * - Certified hit classification should live in a focused helper. It should classify include-side
+ * - Certified hit classification lives in a focused helper. It classifies include-side
  *   nodes into yieldable and excluded regions without mutating the traversal frontier.
- * - Closure phase traversal should keep its main loop visible in
- *   `resolveDagCertifiedClosurePhase()`. The loop should drive frontier items; `CertifiedClosurePhase`
- *   should own split, branch, trigger, and close-boundary transitions while `ClosureGraphState`
+ * - Closure phase traversal keeps its main loop visible in
+ *   `resolveDagCertifiedClosurePhase()`. The loop drives frontier items; `CertifiedClosurePhase`
+ *   owns split, branch, trigger, and close-boundary transitions while `ClosureGraphState`
  *   owns closure correctness state and graph links observed during branch traversal.
  *
  * The prototype output contract remains the same as `walkDagNodeIdsEagerExclude()`:
@@ -49,29 +49,14 @@ export type SplitId = Brand<number, "SplitId">;
 export type BranchId = Brand<number, "BranchId">;
 export type BranchGroupId = Brand<number, "BranchGroupId">;
 
-interface CertifiedClosureNodeStateBase<NodeId extends PropertyKey> {
+export interface CertifiedClosureNodeState<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
   readonly predecessors: Set<NodeId>;
   readonly traversedBranches: Set<BranchId>;
   reached: boolean;
   closedCover: boolean;
+  expanded: boolean;
 }
-
-interface UnexpandedCertifiedClosureNodeState<
-  NodeId extends PropertyKey,
-> extends CertifiedClosureNodeStateBase<NodeId> {
-  readonly expanded: false;
-}
-
-interface ExpandedCertifiedClosureNodeStateBase<
-  NodeId extends PropertyKey,
-> extends CertifiedClosureNodeStateBase<NodeId> {
-  readonly expanded: true;
-}
-
-export type CertifiedClosureNodeState<NodeId extends PropertyKey> =
-  | UnexpandedCertifiedClosureNodeState<NodeId>
-  | ExpandedCertifiedClosureNodeStateBase<NodeId>;
 
 interface ReadonlyCertifiedClosureNodeState<NodeId extends PropertyKey> {
   readonly nodeId: NodeId;
@@ -88,15 +73,13 @@ interface SplitState<NodeId extends PropertyKey> {
   readonly openedFromBranchId: BranchId;
   readonly branchIds: readonly BranchId[];
   readonly triggers: Set<NodeId>;
-  resolved: boolean;
-  closeBoundary?: NodeId;
+  status: "open" | "closed";
 }
 
 interface BranchState<NodeId extends PropertyKey> {
   readonly id: BranchId;
   readonly splitId: SplitId;
   readonly startedAt: NodeId;
-  tip: NodeId;
   groupId: BranchGroupId;
 }
 
@@ -126,14 +109,17 @@ type ReadonlyIncludeNodeState<NodeId extends PropertyKey> = {
   readonly expanded: boolean;
 };
 
-export type IncludeExpansionResult<NodeId extends PropertyKey, DomainHint = undefined> =
+export type IncludeNodeAdvanceResult<NodeId extends PropertyKey, DomainHint = undefined> =
   | {
       readonly kind: "expanded";
-      readonly enqueue: readonly DagSuccessor<NodeId, DomainHint>[];
+      readonly successors: readonly DagSuccessor<NodeId, DomainHint>[];
     }
   | {
-      readonly kind: "skipped";
-      readonly reason: "stale" | "certified-hit" | "already-expanded";
+      readonly kind: "certified-hit";
+    }
+  | {
+      readonly kind: "ignored";
+      readonly reason: "stale" | "already-expanded";
     };
 
 export type DifferenceFrontierItem<NodeId extends PropertyKey, DomainHint = undefined> =
@@ -158,15 +144,15 @@ interface IncludePathClassification<NodeId extends PropertyKey> {
 interface ReadonlyIncludeGraphState<NodeId extends PropertyKey> {
   has(nodeId: NodeId): boolean;
   get(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId> | undefined;
-  predecessorsPort(): DagTopologyPort<NodeId>;
-  successorsPort(): DagTopologyPort<NodeId>;
+  createPredecessorTopology(): DagTopologyPort<NodeId>;
+  createSuccessorTopology(): DagTopologyPort<NodeId>;
   nodeIds(): NodeId[];
 }
 
 interface MutableIncludeGraphState<
   NodeId extends PropertyKey,
 > extends ReadonlyIncludeGraphState<NodeId> {
-  delete(nodeId: NodeId): void;
+  detachAndRemoveNode(nodeId: NodeId): void;
 }
 
 interface ReadonlyCertifiedExcludeState<NodeId extends PropertyKey> {
@@ -188,13 +174,20 @@ interface DagPhaseCertifiedTelemetry {
   readonly span: InstrumentationSpan;
 }
 
-interface TriggerHit<NodeId, DomainHint = undefined> {
+interface BranchJoinTrigger<NodeId, DomainHint = undefined> {
   readonly splitId: SplitId;
   readonly triggerId: NodeId;
   readonly branchId: BranchId;
   readonly joinedBranchId: BranchId;
   readonly domainHint?: DomainHint;
 }
+
+type BranchGroupJoinDetection =
+  | { readonly kind: "no-join" }
+  | {
+      readonly kind: "join-detected";
+      readonly joinedBranchId: BranchId;
+    };
 
 /**
  * Resolves one closure phase until it can prove a closed boundary, or until there is no frontier
@@ -223,7 +216,7 @@ export async function resolveDagCertifiedClosurePhase<
   });
 }
 
-interface CertifiedClosureCoreResolution<NodeId extends PropertyKey, DomainHint = undefined> {
+interface CertifiedClosurePhaseResolution<NodeId extends PropertyKey, DomainHint = undefined> {
   readonly result: CertifiedClosurePhaseResult<NodeId>;
   readonly closedBoundaryDomainHint?: DomainHint;
 }
@@ -237,7 +230,7 @@ async function resolveDagCertifiedClosurePhaseCore<
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint>,
   telemetry?: DagPhaseCertifiedTelemetry,
   rootDomainHint?: DomainHint,
-): Promise<CertifiedClosureCoreResolution<NodeId, DomainHint>> {
+): Promise<CertifiedClosurePhaseResolution<NodeId, DomainHint>> {
   const { graph } = context;
   const phase = new CertifiedClosurePhase<NodeId, DomainHint>(graph, nodeId, telemetry);
   const frontier =
@@ -253,10 +246,10 @@ async function resolveDagCertifiedClosurePhaseCore<
     const item = frontier.dequeueOrThrow();
 
     telemetry?.span.incrementCounter("traversal_steps");
-    frontier.enqueueMany(await phase.advance(item));
+    frontier.enqueueMany(await phase.processFrontierItem(item));
   }
 
-  return phase.toCoreResolution();
+  return phase.buildResolution();
 }
 
 /**
@@ -308,24 +301,21 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
 
     if (item.role === "main") {
       telemetry.span.incrementCounter("traversal_steps");
-      const expansion = await state.expandInclude(item.nodeId);
-      if (
-        expansion.kind === "skipped" &&
-        (expansion.reason === "stale" || expansion.reason === "already-expanded")
-      ) {
+      const advance = await state.advanceIncludeNode(item.nodeId);
+      if (advance.kind === "ignored") {
         telemetry.span.incrementCounter("stale_steps");
       }
-      if (expansion.kind === "skipped" && expansion.reason === "certified-hit") {
-        for await (const yielded of state.applyCertifiedHits(new Set([item.nodeId]))) {
+      if (advance.kind === "certified-hit") {
+        for await (const yielded of state.resolveIncludeHits(new Set([item.nodeId]))) {
           telemetry.span.incrementCounter("certification_yielded_nodes");
           telemetry.span.incrementCounter("yielded_nodes");
           yield yielded;
         }
         continue;
       }
-      if (expansion.kind === "expanded") {
+      if (advance.kind === "expanded") {
         frontier.enqueueMany(
-          expansion.enqueue.map((successor) => ({
+          advance.successors.map((successor) => ({
             role: "main" as const,
             nodeId: successor.nodeId,
             ...(successor.domainHint === undefined ? {} : { domainHint: successor.domainHint }),
@@ -350,12 +340,12 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
     if (closure.kind === "exhausted") {
       telemetry.span.incrementCounter("terminal_nodes", closure.terminalNodes.length);
     }
-    for await (const yielded of state.applyCertification(closure)) {
+    for await (const yielded of state.applyClosureAndResolveIncludeHits(closure)) {
       telemetry.span.incrementCounter("certification_yielded_nodes");
       telemetry.span.incrementCounter("yielded_nodes");
       yield yielded;
     }
-    const nextExcludeStart = state.nextExcludePhaseStart(closure);
+    const nextExcludeStart = state.nextClosurePhaseStart(closure);
     if (nextExcludeStart !== undefined) {
       frontier.enqueue({
         role: "exclude",
@@ -400,21 +390,20 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
   ) {
     this.graph = new ClosureGraphState(graph, telemetry);
     this.rootBranchId = 0 as BranchId;
-    this.graph.markClosedCover(startId);
+    this.graph.markCoveredByClosedRegion(startId);
     this.branches.add({
       id: this.rootBranchId,
       splitId: 0 as SplitId,
       startedAt: startId,
-      tip: startId,
       groupId: 0 as BranchGroupId,
     });
-    this.reachNode(startId, this.rootBranchId);
+    this.recordBranchReachAndDetectJoin(startId, this.rootBranchId, 0 as SplitId);
   }
 
-  async advance(
+  async processFrontierItem(
     item: ClosureFrontierItem<NodeId, DomainHint>,
   ): Promise<ClosureFrontierItem<NodeId, DomainHint>[]> {
-    const state = this.graph.stateFor(item.nodeId);
+    const state = this.graph.getNodeStateOrThrow(item.nodeId);
     if (state.traversedBranches.has(item.branchId)) {
       this.graph.recordStaleStep();
       return [];
@@ -425,7 +414,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     const frontier: ClosureFrontierItem<NodeId, DomainHint>[] = [];
 
     const successors = await this.graph.expand(item.nodeId);
-    this.markTraversed(item.nodeId, item.branchId);
+    this.graph.recordBranchTraversal(item.nodeId, item.branchId);
 
     if (successors.length === 0) {
       this.markTerminal(item.nodeId);
@@ -435,11 +424,11 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     if (successors.length === 1) {
       const successor = successors[0];
       if (successor === undefined) throw new Error("Expected single successor.");
-      frontier.push(...this.advanceSingleSuccessor(item, successor));
+      frontier.push(...this.processSingleSuccessor(item, successor));
       return frontier;
     }
 
-    frontier.push(...this.advanceSplitSuccessors(item, successors));
+    frontier.push(...this.processSplitSuccessors(item, successors));
     return frontier;
   }
 
@@ -447,18 +436,18 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     return this.closedBoundary !== undefined;
   }
 
-  private advanceSingleSuccessor(
+  private processSingleSuccessor(
     item: ClosureFrontierItem<NodeId, DomainHint>,
     successor: DagSuccessor<NodeId, DomainHint>,
   ): ClosureFrontierItem<NodeId, DomainHint>[] {
-    this.recordTraversedEdge(item.nodeId, successor.nodeId);
-    const hit = this.reachSuccessorFromBranch(
+    this.graph.recordTraversedEdge(item.nodeId, successor.nodeId);
+    const hit = this.advanceBranchToSuccessorAndDetectJoin(
       item.branchId,
       successor.nodeId,
       successor.domainHint,
     );
-    const frontier = hit === undefined ? [] : this.resolveBranchByTrigger(hit);
-    if (!this.graph.stateFor(successor.nodeId).expanded) {
+    const frontier = hit === undefined ? [] : this.applyBranchJoinTrigger(hit);
+    if (!this.graph.getNodeStateOrThrow(successor.nodeId).expanded) {
       frontier.push({
         nodeId: successor.nodeId,
         branchId: item.branchId,
@@ -468,7 +457,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     return frontier;
   }
 
-  private advanceSplitSuccessors(
+  private processSplitSuccessors(
     item: ClosureFrontierItem<NodeId, DomainHint>,
     successors: readonly DagSuccessor<NodeId, DomainHint>[],
   ): ClosureFrontierItem<NodeId, DomainHint>[] {
@@ -480,11 +469,15 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     );
     for (const branchId of childSplit.branchIds) {
       const branch = this.getBranchStateOrThrow(branchId);
-      this.recordTraversedEdge(item.nodeId, branch.startedAt);
+      this.graph.recordTraversedEdge(item.nodeId, branch.startedAt);
       const successor = successors.find((candidate) => candidate.nodeId === branch.startedAt);
-      const hit = this.reachSuccessorFromBranch(branch.id, branch.startedAt, successor?.domainHint);
-      if (hit !== undefined) frontier.push(...this.resolveBranchByTrigger(hit));
-      if (!this.graph.stateFor(branch.startedAt).expanded) {
+      const hit = this.advanceBranchToSuccessorAndDetectJoin(
+        branch.id,
+        branch.startedAt,
+        successor?.domainHint,
+      );
+      if (hit !== undefined) frontier.push(...this.applyBranchJoinTrigger(hit));
+      if (!this.graph.getNodeStateOrThrow(branch.startedAt).expanded) {
         frontier.push({
           nodeId: branch.startedAt,
           branchId: branch.id,
@@ -507,7 +500,6 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
         id: branchId,
         splitId,
         startedAt: successor,
-        tip: successor,
         groupId: this.nextBranchGroupId++ as BranchGroupId,
       });
       return branchId;
@@ -519,42 +511,41 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       openedFromBranchId,
       branchIds,
       triggers: new Set<NodeId>(),
-      resolved: false,
+      status: "open",
     };
     this.splits.add(split);
     return split;
   }
 
-  private reachSuccessorFromBranch(
+  private advanceBranchToSuccessorAndDetectJoin(
     branchId: BranchId,
     successorId: NodeId,
     domainHint?: DomainHint,
-  ): TriggerHit<NodeId, DomainHint> | undefined {
+  ): BranchJoinTrigger<NodeId, DomainHint> | undefined {
     const branch = this.getBranchStateOrThrow(branchId);
-    branch.tip = successorId;
-    const joinedBranchId = this.reachNode(successorId, branchId, branch.splitId);
-    if (joinedBranchId === undefined) return undefined;
+    const join = this.recordBranchReachAndDetectJoin(successorId, branchId, branch.splitId);
+    if (join.kind === "no-join") return undefined;
     return {
       splitId: branch.splitId,
       triggerId: successorId,
       branchId,
-      joinedBranchId,
+      joinedBranchId: join.joinedBranchId,
       domainHint,
     };
   }
 
-  private resolveBranchByTrigger(
-    hit: TriggerHit<NodeId, DomainHint>,
+  private applyBranchJoinTrigger(
+    hit: BranchJoinTrigger<NodeId, DomainHint>,
   ): ClosureFrontierItem<NodeId, DomainHint>[] {
     const split = this.getSplitStateOrThrow(hit.splitId);
-    if (split.resolved) return [];
+    if (split.status === "closed") return [];
     split.triggers.add(hit.triggerId);
-    this.joinBranchGroups(hit.branchId, hit.joinedBranchId);
+    this.mergeBranchGroups(hit.branchId, hit.joinedBranchId);
 
     const boundary = this.findCloseBoundary(split);
     if (boundary === undefined) return [];
 
-    return this.closeSplit(split, boundary, hit.domainHint);
+    return this.closeSplitAndPropagate(split, boundary, hit.domainHint);
   }
 
   private getBranchStateOrThrow(branchId: BranchId): BranchState<NodeId> {
@@ -563,42 +554,36 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     return branch;
   }
 
-  private markTraversed(nodeId: NodeId, branchId: BranchId): void {
-    this.graph.markTraversed(nodeId, branchId);
-  }
-
   private markTerminal(nodeId: NodeId): void {
     this.terminalNodes.add(nodeId);
   }
 
-  private recordTraversedEdge(nodeId: NodeId, successorId: NodeId): void {
-    this.graph.recordTraversedEdge(nodeId, successorId);
-  }
-
-  private closeSplit(
+  private closeSplitAndPropagate(
     split: SplitState<NodeId>,
     boundary: NodeId,
     domainHint?: DomainHint,
   ): ClosureFrontierItem<NodeId, DomainHint>[] {
-    split.resolved = true;
-    split.closeBoundary = boundary;
+    split.status = "closed";
     this.markClosedRegion(split.openedAt, boundary);
 
     const parentBranch = this.getBranchStateOrThrow(split.openedFromBranchId);
-    parentBranch.tip = boundary;
     if (parentBranch.splitId === (0 as SplitId)) {
       this.closedBoundary = boundary;
       this.closedBoundaryDomainHint = domainHint;
       return [];
     }
 
-    const joinedBranchId = this.reachNode(boundary, parentBranch.id, parentBranch.splitId);
-    if (joinedBranchId !== undefined) {
-      const parentFrontier = this.resolveBranchByTrigger({
+    const join = this.recordBranchReachAndDetectJoin(
+      boundary,
+      parentBranch.id,
+      parentBranch.splitId,
+    );
+    if (join.kind === "join-detected") {
+      const parentFrontier = this.applyBranchJoinTrigger({
         splitId: parentBranch.splitId,
         triggerId: boundary,
         branchId: parentBranch.id,
-        joinedBranchId,
+        joinedBranchId: join.joinedBranchId,
         domainHint,
       });
       if (parentFrontier.length > 0 || this.hasClosedBoundary()) return parentFrontier;
@@ -613,13 +598,13 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     ];
   }
 
-  toCoreResolution(): CertifiedClosureCoreResolution<NodeId, DomainHint> {
+  buildResolution(): CertifiedClosurePhaseResolution<NodeId, DomainHint> {
     if (this.closedBoundary !== undefined) {
       return {
         result: {
           kind: "closed-boundary",
           certifiedNodes: new Set(
-            [...this.graph.states()]
+            [...this.graph.nodeStates()]
               .filter((state) => state.closedCover)
               .map((state) => state.nodeId),
           ),
@@ -633,14 +618,20 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       result: {
         kind: "exhausted",
         certifiedNodes: new Set(
-          [...this.graph.states()].filter((state) => state.reached).map((state) => state.nodeId),
+          [...this.graph.nodeStates()]
+            .filter((state) => state.reached)
+            .map((state) => state.nodeId),
         ),
         terminalNodes: [...this.terminalNodes],
       },
     };
   }
 
-  private reachNode(nodeId: NodeId, branchId: BranchId, splitId?: SplitId): BranchId | undefined {
+  private recordBranchReachAndDetectJoin(
+    nodeId: NodeId,
+    branchId: BranchId,
+    splitId: SplitId,
+  ): BranchGroupJoinDetection {
     this.graph.markReached(nodeId);
 
     let reached = this.reachedByBranch.get(nodeId);
@@ -648,31 +639,33 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       reached = new Set<BranchId>();
       this.reachedByBranch.set(nodeId, reached);
     }
-
-    const joinedBranchId =
-      splitId === undefined
-        ? undefined
-        : [...reached].find((candidate) => {
-            const branch = this.getBranchStateOrThrow(candidate);
-            const currentBranch = this.getBranchStateOrThrow(branchId);
-            return (
-              branch.splitId === splitId &&
-              candidate !== branchId &&
-              branch.groupId !== currentBranch.groupId
-            );
-          });
-
     reached.add(branchId);
-    return joinedBranchId;
+
+    const joinedBranchId = [...reached].find((candidate) => {
+      const branch = this.getBranchStateOrThrow(candidate);
+      const currentBranch = this.getBranchStateOrThrow(branchId);
+      return (
+        branch.splitId === splitId &&
+        candidate !== branchId &&
+        branch.groupId !== currentBranch.groupId
+      );
+    });
+
+    // Reach registration and join detection complete together before successor work is enqueued.
+    return joinedBranchId === undefined
+      ? { kind: "no-join" }
+      : { kind: "join-detected", joinedBranchId };
   }
 
-  private joinBranchGroups(leftBranchId: BranchId, rightBranchId: BranchId): void {
+  private mergeBranchGroups(leftBranchId: BranchId, rightBranchId: BranchId): void {
     const left = this.getBranchStateOrThrow(leftBranchId);
     const right = this.getBranchStateOrThrow(rightBranchId);
     if (left.groupId === right.groupId) return;
 
     const from = right.groupId;
     const to = left.groupId;
+    // Branch groups only merge. Reassigning the whole matching group preserves earlier joins and
+    // prevents later traversal order from splitting a resolved relationship apart.
     for (const branch of this.branches.values()) {
       if (branch.splitId === left.splitId && branch.groupId === from) {
         branch.groupId = to;
@@ -703,7 +696,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
 
   private markClosedRegion(openedAt: NodeId, boundary: NodeId): void {
     for (const nodeId of this.walkPredecessorsUntil(boundary, openedAt)) {
-      this.graph.markClosedCover(nodeId);
+      this.graph.markCoveredByClosedRegion(nodeId);
     }
   }
 
@@ -732,11 +725,13 @@ class ClosureGraphState<NodeId extends PropertyKey, DomainHint = undefined> {
     this.telemetry = telemetry;
   }
 
-  stateFor(nodeId: NodeId): ReadonlyCertifiedClosureNodeState<NodeId> {
-    return this.mutableStateFor(nodeId);
+  getNodeStateOrThrow(nodeId: NodeId): ReadonlyCertifiedClosureNodeState<NodeId> {
+    const state = this.visited.get(nodeId);
+    if (state === undefined) throw new Error("Expected reached closure node.");
+    return state;
   }
 
-  private mutableStateFor(nodeId: NodeId): CertifiedClosureNodeState<NodeId> {
+  private ensureMutableNodeState(nodeId: NodeId): CertifiedClosureNodeState<NodeId> {
     let state = this.visited.get(nodeId);
     if (state === undefined) {
       state = {
@@ -756,12 +751,12 @@ class ClosureGraphState<NodeId extends PropertyKey, DomainHint = undefined> {
     this.telemetry?.span.incrementCounter("successor_expansions");
     this.telemetry?.span.incrementCounter("exclude_expansions");
     const successors = await this.graph.getSuccessors(nodeId);
-    this.markExpanded(nodeId);
+    this.markExpandedAndReached(nodeId);
     return successors;
   }
 
-  private markExpanded(nodeId: NodeId): void {
-    const state = this.mutableStateFor(nodeId);
+  private markExpandedAndReached(nodeId: NodeId): void {
+    const state = this.ensureMutableNodeState(nodeId);
     this.visited.set(nodeId, {
       ...state,
       expanded: true,
@@ -770,26 +765,26 @@ class ClosureGraphState<NodeId extends PropertyKey, DomainHint = undefined> {
   }
 
   markReached(nodeId: NodeId): void {
-    this.mutableStateFor(nodeId).reached = true;
+    this.ensureMutableNodeState(nodeId).reached = true;
   }
 
-  markClosedCover(nodeId: NodeId): void {
-    this.mutableStateFor(nodeId).closedCover = true;
+  markCoveredByClosedRegion(nodeId: NodeId): void {
+    this.ensureMutableNodeState(nodeId).closedCover = true;
   }
 
-  markTraversed(nodeId: NodeId, branchId: BranchId): void {
-    this.mutableStateFor(nodeId).traversedBranches.add(branchId);
+  recordBranchTraversal(nodeId: NodeId, branchId: BranchId): void {
+    this.ensureMutableNodeState(nodeId).traversedBranches.add(branchId);
   }
 
   recordTraversedEdge(nodeId: NodeId, successorId: NodeId): void {
-    this.mutableStateFor(successorId).predecessors.add(nodeId);
+    this.ensureMutableNodeState(successorId).predecessors.add(nodeId);
   }
 
   recordStaleStep(): void {
     this.telemetry?.span.incrementCounter("stale_steps");
   }
 
-  states(): Iterable<ReadonlyCertifiedClosureNodeState<NodeId>> {
+  nodeStates(): Iterable<ReadonlyCertifiedClosureNodeState<NodeId>> {
     return this.visited.values();
   }
 
@@ -803,7 +798,11 @@ class ClosureGraphState<NodeId extends PropertyKey, DomainHint = undefined> {
       seen.add(nodeId);
       yield nodeId;
       if (nodeId === stop) continue;
-      for (const predecessor of this.stateFor(nodeId).predecessors) stack.push(predecessor);
+      // These links reconstruct the certified closed region; they are correctness state, not a
+      // successor cache. Every walked node must already have been reached by a closure branch.
+      for (const predecessor of this.getNodeStateOrThrow(nodeId).predecessors) {
+        stack.push(predecessor);
+      }
     }
   }
 }
@@ -824,38 +823,40 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, DomainHint = 
 
   // Difference-state policy plus include-side graph expansion. The returned result tells the
   // coordinator whether to enqueue more include work or resolve a certified hit.
-  async expandInclude(nodeId: NodeId): Promise<IncludeExpansionResult<NodeId, DomainHint>> {
+  async advanceIncludeNode(nodeId: NodeId): Promise<IncludeNodeAdvanceResult<NodeId, DomainHint>> {
     const state = this.includeGraph.get(nodeId);
-    if (state === undefined) return { kind: "skipped", reason: "stale" };
+    if (state === undefined) return { kind: "ignored", reason: "stale" };
 
     if (this.certifiedExclude.has(nodeId)) {
-      return { kind: "skipped", reason: "certified-hit" };
+      return { kind: "certified-hit" };
     }
 
-    if (state.expanded) return { kind: "skipped", reason: "already-expanded" };
+    if (state.expanded) return { kind: "ignored", reason: "already-expanded" };
 
     const successors = await this.includeGraph.expand(nodeId);
 
-    return { kind: "expanded", enqueue: successors };
+    return { kind: "expanded", successors };
   }
 
   // Coordinator + certified-hit application responsibility. Exclude state absorbs the closure;
   // this method applies the resulting include-side hits to the include graph.
-  async *applyCertification(closure: CertifiedClosurePhaseResult<NodeId>): AsyncIterable<NodeId> {
-    const { hits, newlyCertified } = this.certifiedExclude.absorbClosure(
+  async *applyClosureAndResolveIncludeHits(
+    closure: CertifiedClosurePhaseResult<NodeId>,
+  ): AsyncIterable<NodeId> {
+    const { includeHits, newlyCertifiedCount } = this.certifiedExclude.absorbClosureCertification(
       closure,
       this.includeGraph,
     );
-    this.telemetry?.span.incrementCounter("certified_nodes", newlyCertified);
-    yield* this.applyCertifiedHits(hits);
+    this.telemetry?.span.incrementCounter("certified_nodes", newlyCertifiedCount);
+    yield* this.resolveIncludeHits(includeHits);
   }
 
-  async *applyCertifiedHits(hits: ReadonlySet<NodeId>): AsyncIterable<NodeId> {
+  async *resolveIncludeHits(hits: ReadonlySet<NodeId>): AsyncIterable<NodeId> {
     yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits, this.telemetry);
   }
 
-  nextExcludePhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
-    return this.certifiedExclude.nextPhaseStart(closure);
+  nextClosurePhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
+    return this.certifiedExclude.nextClosurePhaseStart(closure);
   }
 
   // Coordinator + IncludeGraphState responsibility. The final drain is a coordinator decision; the
@@ -874,22 +875,22 @@ class CertifiedExcludeState<
     return this.certified.has(nodeId);
   }
 
-  absorbClosure(
+  absorbClosureCertification(
     closure: CertifiedClosurePhaseResult<NodeId>,
     includeGraph: ReadonlyIncludeGraphState<NodeId>,
-  ): { readonly hits: Set<NodeId>; readonly newlyCertified: number } {
-    const hits = new Set<NodeId>();
-    let newlyCertified = 0;
+  ): { readonly includeHits: Set<NodeId>; readonly newlyCertifiedCount: number } {
+    const includeHits = new Set<NodeId>();
+    let newlyCertifiedCount = 0;
     for (const nodeId of closure.certifiedNodes) {
-      if (!this.certified.has(nodeId)) newlyCertified++;
+      if (!this.certified.has(nodeId)) newlyCertifiedCount++;
       this.certified.add(nodeId);
-      if (includeGraph.has(nodeId)) hits.add(nodeId);
+      if (includeGraph.has(nodeId)) includeHits.add(nodeId);
     }
 
-    return { hits, newlyCertified };
+    return { includeHits, newlyCertifiedCount };
   }
 
-  nextPhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
+  nextClosurePhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
     return closure.kind === "closed-boundary" ? closure.closedBoundary : undefined;
   }
 }
@@ -911,7 +912,7 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey>(
   let excludedNodes = 0;
   for (const nodeId of classification.excluded) {
     if (includeGraph.get(nodeId) !== undefined) excludedNodes++;
-    includeGraph.delete(nodeId);
+    includeGraph.detachAndRemoveNode(nodeId);
   }
   telemetry?.span.incrementCounter("classification_excluded_nodes", excludedNodes);
 
@@ -919,7 +920,7 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey>(
     if (classification.excluded.has(nodeId)) continue;
     const state = includeGraph.get(nodeId);
     if (state === undefined || !state.expanded || certifiedExclude.has(nodeId)) continue;
-    includeGraph.delete(nodeId);
+    includeGraph.detachAndRemoveNode(nodeId);
     yield nodeId;
   }
 }
@@ -931,7 +932,7 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
   const newerSide = await collectAsyncIterableToSet(
     walkDagReachableNodeIds(
       {
-        graph: includeGraph.predecessorsPort(),
+        graph: includeGraph.createPredecessorTopology(),
         instrumentation: noopInstrumentation,
       },
       hits,
@@ -940,7 +941,7 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
   const olderSide = await collectAsyncIterableToSet(
     walkDagReachableNodeIds(
       {
-        graph: includeGraph.successorsPort(),
+        graph: includeGraph.createSuccessorTopology(),
         instrumentation: noopInstrumentation,
       },
       hits,
@@ -965,7 +966,7 @@ function* drainUncertifiedInclude<NodeId extends PropertyKey>(
   for (const nodeId of nodeIds) {
     const state = includeGraph.get(nodeId);
     if (state === undefined || !state.expanded || certifiedExclude.has(nodeId)) continue;
-    includeGraph.delete(nodeId);
+    includeGraph.detachAndRemoveNode(nodeId);
     yield nodeId;
   }
 }
@@ -991,22 +992,18 @@ class IncludeGraphState<
   }
 
   initialize(startId: NodeId): void {
-    this.mutableStateFor(startId);
+    this.ensureNodeState(startId);
   }
 
   has(nodeId: NodeId): boolean {
     return this.visited.has(nodeId);
   }
 
-  get(nodeId: NodeId): IncludeNodeState<NodeId> | undefined {
+  get(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId> | undefined {
     return this.visited.get(nodeId);
   }
 
-  stateFor(nodeId: NodeId): ReadonlyIncludeNodeState<NodeId> {
-    return this.mutableStateFor(nodeId);
-  }
-
-  private mutableStateFor(nodeId: NodeId): IncludeNodeState<NodeId> {
+  private ensureNodeState(nodeId: NodeId): IncludeNodeState<NodeId> {
     let state = this.visited.get(nodeId);
     if (state === undefined) {
       state = {
@@ -1021,7 +1018,7 @@ class IncludeGraphState<
   }
 
   private markNodeExpanded(nodeId: NodeId): void {
-    const state = this.mutableStateFor(nodeId);
+    const state = this.ensureNodeState(nodeId);
     const expandedState: IncludeNodeState<NodeId> = {
       ...state,
       expanded: true,
@@ -1030,7 +1027,7 @@ class IncludeGraphState<
   }
 
   async expand(nodeId: NodeId): Promise<readonly DagSuccessor<NodeId, DomainHint>[]> {
-    this.mutableStateFor(nodeId);
+    this.ensureNodeState(nodeId);
 
     this.telemetry?.span.incrementCounter("successor_expansions");
     this.telemetry?.span.incrementCounter("main_expansions");
@@ -1044,13 +1041,13 @@ class IncludeGraphState<
   }
 
   private recordExpandedEdge(nodeId: NodeId, successorId: NodeId): void {
-    const node = this.mutableStateFor(nodeId);
-    const successor = this.mutableStateFor(successorId);
+    const node = this.ensureNodeState(nodeId);
+    const successor = this.ensureNodeState(successorId);
     successor.predecessors.add(nodeId);
     node.successors.add(successorId);
   }
 
-  delete(nodeId: NodeId): void {
+  detachAndRemoveNode(nodeId: NodeId): void {
     const state = this.visited.get(nodeId);
     if (state === undefined) return;
 
@@ -1067,21 +1064,23 @@ class IncludeGraphState<
     return [...this.visited.keys()];
   }
 
-  predecessorsPort(): DagTopologyPort<NodeId> {
+  createPredecessorTopology(): DagTopologyPort<NodeId> {
     return {
       getSuccessors: async (nodeId) =>
-        [...this.readNode(nodeId).predecessors].map((predecessor) => ({ nodeId: predecessor })),
+        [...this.getNodeOrThrow(nodeId).predecessors].map((predecessor) => ({
+          nodeId: predecessor,
+        })),
     };
   }
 
-  successorsPort(): DagTopologyPort<NodeId> {
+  createSuccessorTopology(): DagTopologyPort<NodeId> {
     return {
       getSuccessors: async (nodeId) =>
-        [...this.readNode(nodeId).successors].map((successor) => ({ nodeId: successor })),
+        [...this.getNodeOrThrow(nodeId).successors].map((successor) => ({ nodeId: successor })),
     };
   }
 
-  private readNode(nodeId: NodeId): IncludeNodeState<NodeId> {
+  private getNodeOrThrow(nodeId: NodeId): IncludeNodeState<NodeId> {
     const state = this.visited.get(nodeId);
     if (state === undefined) throw new Error("Expected include visited node.");
     return state;

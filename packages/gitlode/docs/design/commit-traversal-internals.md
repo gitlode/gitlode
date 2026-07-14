@@ -48,13 +48,33 @@ Correctness state is keyed by `NodeId`; the DAG core does not know the domain no
 `NodeId` values.
 
 For Git commits, `IsomorphicGitAdapter` maps `NodeId` to `CommitOid`. It uses an adapter-internal
-`CommitTopologyAdapter` that implements `DagTopologyPort<CommitOid>`, reads commit objects as needed
-to project parents into successors, and exposes `readCommit(oid)` so the adapter can convert
-DAG-core-yielded OIDs back into `RawCommit` objects. The rest of gitlode still receives commit
-objects from the Git adapter.
+`CommitTopologyAdapter` that implements `DagTopologyPort<CommitOid, CommitPathSchedulingHint>`, reads
+commit objects as needed to project parents into successors, and exposes `readCommit(oid)` so the
+adapter can convert DAG-core-yielded OIDs back into `RawCommit` objects. The rest of gitlode still
+receives commit objects from the Git adapter.
 
 This keeps strategy code focused on graph traversal. Isomorphic-git commit objects, timezone
 normalization, commit-object caching, and backend error mapping stay inside the adapter boundary.
+
+## Git commit path scheduling hints
+
+`CommitTopologyAdapter` projects Git-specific scheduling metadata while it performs the normal
+topology read for an expanded child commit. After `readCommit(oid, "topology")` returns the child
+`RawCommit`, the adapter creates a `CommitPathSchedulingHint` whose `sourceCommitterTimestamp` is
+the child commit's committer timestamp in Unix seconds. It then attaches that same child-derived
+hint value to every parent successor path produced from the child.
+
+The hint is path-local scheduling metadata. It is not metadata about the pending parent node, is not
+correctness state, and must not be used for visited keys, exclusion state, certificates, or yield
+eligibility. The adapter does not pre-read parent commits, does not perform a hint-specific commit
+read, and does not rely on timestamp monotonicity. Start items, including include starts, exclude
+starts, and standalone reachable starts, remain hintless until their first topology expansion
+produces successor paths.
+
+The current production Git frontier is still the injected LIFO/preserve frontier used by
+`walkDagNodeIdsCertifiedLazy()`. It transports `CommitPathSchedulingHint` values type-safely but
+does not inspect them for priority, so timestamps do not affect result membership and do not make
+yield order contractual.
 
 ## Configured strategies
 
@@ -236,8 +256,9 @@ older exclude ancestor.
 - The certificate does not advance beyond the exclusion start node's direct successor. A branch
   forked several generations before release currently falls back.
 - Path split cases have no partial certificate; they use conservative fallback.
-- Timestamp-priority traversal was considered but intentionally left out. Git DAG correctness must
-  not depend on timestamp monotonicity.
+- Timestamp-priority frontier ordering remains future work. The Git adapter now transports
+  child-derived committer timestamp path hints, but production ordering still does not inspect them
+  and Git DAG correctness must not depend on timestamp monotonicity.
 - Phase-certified prototype telemetry is now defined in this document for the experimental
   certified-closure strategy. Future telemetry work should preserve the generic DAG / Git adapter
   boundary.

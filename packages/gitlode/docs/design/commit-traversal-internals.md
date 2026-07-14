@@ -92,16 +92,18 @@ The policy is scheduling-only. It is a heuristic over the expanded child commit'
 claim about the pending parent node's timestamp. It must not change reachable-difference membership,
 certificate decisions, adapter commit-read/cache responsibility, or telemetry counter definitions.
 
-## Configured strategies
+## Available strategies
 
-Two strategies are kept in the module:
+The production DAG traversal module exports two difference strategies:
 
 - `walkDagNodeIdsEagerExclude`
 - `walkDagNodeIdsCertifiedLazy`
 
-`walkDagNodeIdsWithConfiguredStrategy()` accepts a strategy option and defaults to
-`"certifiedLazy"`. Keeping the option makes tests and pre-release validation easy while both
-implementations remain in the tree.
+The phase-certified prototype is exported separately as
+`walkDagNodeIdsPhaseCertifiedDifference()`. There is currently no shared strategy dispatcher or
+runtime strategy-selection option. `IsomorphicGitAdapter` calls `walkDagNodeIdsCertifiedLazy()`
+directly, so certified-lazy remains the production behavior until a separate adoption task adds an
+explicit selection seam.
 
 The strategy names describe traversal logic:
 
@@ -369,9 +371,9 @@ not change the result set.
 
 Hints are transported from an expanded node to the frontier items for its successor paths. The start
 items for a difference walk are enqueued as one hintless bootstrap block in `main start`, then
-`exclude start` order; standalone closure roots also start without a hint. A future Git-specific
-priority policy is expected to treat hintless start items as bootstrap work that runs before hinted
-items, but that ordering belongs to the injected frontier comparator rather than the algorithm.
+`exclude start` order; standalone closure roots also start without a hint. The Git timestamp-priority
+policy treats hintless start items as bootstrap work that runs before hinted items, but that ordering
+belongs to the injected frontier comparator rather than the algorithm.
 
 A single node ID may appear in multiple queued items with different hints when multiple paths reach
 that node. The phase-certified prototype therefore keeps hints on frontier items and does not merge

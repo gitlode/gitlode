@@ -14,14 +14,16 @@ The Git adapter currently resolves yielded commit OIDs back to commit objects th
 adapter-local `CommitTopologyAdapter`, which owns an invocation-scoped `CommitOid -> RawCommit`
 cache.
 
-## DomainHint and future priority scheduling
+## DomainHint and remaining scheduling ideas
 
 `DomainHint` exists as a scheduling-only seam. It must not affect the reachable node set, and it
 must not turn traversal order into a user-visible contract.
 
-The initial Git adapter integration intentionally supplies no Git-specific hints. If a future
-frontier policy needs Git-specific scheduling data, a likely first candidate is parent-order
-metadata:
+The Git adapter now projects the expanded child commit's committer timestamp onto each parent path,
+and the phase-certified prototype has an explicit stable timestamp-priority policy. Those current
+contracts are documented in `packages/gitlode/docs/design/commit-traversal-internals.md`.
+
+A separate future policy could still consider parent-order metadata:
 
 ```ts
 interface GitCommitDomainHint {
@@ -30,10 +32,8 @@ interface GitCommitDomainHint {
 ```
 
 `parentIndex` would allow future policies to prefer first-parent or mainline-like scheduling without
-changing correctness. Any timestamp-based or priority-based scheduling work should also keep result
-sets independent of hints. For the current durable frontier contracts, see
-`packages/gitlode/docs/design/commit-traversal-internals.md`; for phase-certified prototype
-continuation notes, see `packages/gitlode/docs/handoff/explore-dag-strategy-next.md`.
+changing correctness. Do not add it without a concrete policy and validation need. Result sets must
+remain independent of every scheduling hint.
 
 ## Generic cached topology adapter
 
@@ -64,7 +64,8 @@ case that demonstrates the generic shape.
 
 ## Timestamp path-hint continuation note
 
-For phase-certified traversal, timestamp-like `DomainHint` values are now proven as path scheduling
-metadata rather than node metadata. Future Git work should connect this by taking the committer
-timestamp from the child commit already read during successor expansion and attaching it to each
-parent successor descriptor. Parent commit timestamp prefetch remains out of scope.
+For phase-certified traversal, timestamp-like `DomainHint` values are path scheduling metadata rather
+than node metadata. The Git adapter now takes the committer timestamp from the child commit already
+read during successor expansion and attaches it to each parent successor descriptor. Parent commit
+timestamp prefetch remains out of scope. Production strategy selection and phase-certified adoption
+remain separate work.

@@ -24,19 +24,20 @@ reachable(start) - reachable(exclude)
 Yield order is not the contract. Local graph links used by the prototype for certified-hit
 classification are algorithmic state and should not be removed merely because they look like caches.
 
-## Deferred algorithm work
+## Frontier and scheduling status
 
 The frontier injection seam is complete for the phase-certified prototype: difference coordination
 and each closure phase can now receive independent scheduling queues while preserving the durable
 result-set contract documented in `packages/gitlode/docs/design/commit-traversal-internals.md`.
 
-The next scheduling-related task is to design priority metadata, if a concrete priority policy needs
-it. Do not add timestamp, priority, or generic scheduling context fields until that design is made.
+Generic path-local `DomainHint` transport, Git child-committer-timestamp projection, and the stable
+timestamp-priority policy are implemented. The next work is not another scheduling metadata design;
+it is to align the strategy call shape, organize module ownership, and then design an internal
+production selection seam.
 
-## Suggested validation scenarios
+## Correctness validation status
 
-When developing the prototype further, compare its output set against eager-exclude traversal on
-small fixtures that cover:
+The prototype has an independent reachable-difference oracle and focused fixtures covering:
 
 - simple linear history;
 - merge commits and split/rejoin shapes;
@@ -45,6 +46,9 @@ small fixtures that cover:
 - disconnected exclude nodes;
 - stale or duplicate frontier items;
 - cases where certified-hit classification depends on both predecessor and successor links.
+
+Add further correctness fixtures only for a newly identified topology or invariant gap; do not grow
+the suite merely by adding topologically equivalent graphs.
 
 ## Telemetry status
 
@@ -65,9 +69,11 @@ topology reads onto parent successor paths. A stable Git timestamp-priority fron
 for explicit phase-certified prototype injection; durable semantics live in
 `packages/gitlode/docs/design/commit-traversal-internals.md`.
 
-Next work should focus on the production adoption gate: design whether and how the Git adapter should
-connect production commit walking to the phase-certified strategy, expand A/B/C correctness,
-efficiency, and resource validation, and keep parent timestamp pre-reads out of any production plan.
+Correctness validation has a substantial topology-oriented baseline, and B-validation now compares
+FIFO and timestamp-priority graph work on controlled Git-like fixtures. Memory-oriented C-validation
+remains lower priority. Before production adoption, align the strategy call shape, organize the
+generic DAG and Git-specific module boundaries, and then design how the Git adapter selects an
+internal experimental strategy. Keep parent timestamp pre-reads out of that production plan.
 
 ## Successor cache responsibility follow-up
 

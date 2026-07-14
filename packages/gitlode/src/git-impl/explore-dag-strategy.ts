@@ -36,10 +36,10 @@ export type { DagSuccessor, DagTopologyPort, WalkDagContext } from "./dag-traver
  *   whether another exclude phase should start from a closed boundary.
  * - Certified hit classification lives in a focused helper. It classifies include-side
  *   nodes into yieldable and excluded regions without mutating the traversal frontier.
- * - Closure phase traversal keeps its main loop visible in
- *   `resolveDagCertifiedClosurePhase()`. The loop drives frontier items; `CertifiedClosurePhase`
- *   owns split, branch, trigger, and close-boundary transitions while `ClosureGraphState`
- *   owns closure correctness state and graph links observed during branch traversal.
+ * - `resolveDagCertifiedClosurePhase()` provides the standalone instrumentation boundary, while
+ *   `resolveDagCertifiedClosurePhaseCore()` keeps the shared closure frontier loop visible.
+ *   `CertifiedClosurePhase` owns split, branch, join, and close-boundary transitions, while
+ *   `ClosureGraphState` owns closure node correctness state and observed predecessor links.
  *
  * The prototype output contract remains the same as `walkDagNodeIdsEagerExclude()`:
  * `reachable(start) - reachable(exclude)`. Yield order is not part of that contract.
@@ -397,7 +397,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       startedAt: startId,
       groupId: 0 as BranchGroupId,
     });
-    this.recordBranchReachAndDetectJoin(startId, this.rootBranchId, 0 as SplitId);
+    this.recordBranchReachAndDetectJoin(startId, this.rootBranchId);
   }
 
   async processFrontierItem(
@@ -523,7 +523,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     domainHint?: DomainHint,
   ): BranchJoinTrigger<NodeId, DomainHint> | undefined {
     const branch = this.getBranchStateOrThrow(branchId);
-    const join = this.recordBranchReachAndDetectJoin(successorId, branchId, branch.splitId);
+    const join = this.recordBranchReachAndDetectJoin(successorId, branchId);
     if (join.kind === "no-join") return undefined;
     return {
       splitId: branch.splitId,
@@ -573,11 +573,7 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
       return [];
     }
 
-    const join = this.recordBranchReachAndDetectJoin(
-      boundary,
-      parentBranch.id,
-      parentBranch.splitId,
-    );
+    const join = this.recordBranchReachAndDetectJoin(boundary, parentBranch.id);
     if (join.kind === "join-detected") {
       const parentFrontier = this.applyBranchJoinTrigger({
         splitId: parentBranch.splitId,
@@ -630,7 +626,6 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
   private recordBranchReachAndDetectJoin(
     nodeId: NodeId,
     branchId: BranchId,
-    splitId: SplitId,
   ): BranchGroupJoinDetection {
     this.graph.markReached(nodeId);
 
@@ -641,9 +636,10 @@ class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = undefined> 
     }
     reached.add(branchId);
 
+    const currentBranch = this.getBranchStateOrThrow(branchId);
+    const splitId = currentBranch.splitId;
     const joinedBranchId = [...reached].find((candidate) => {
       const branch = this.getBranchStateOrThrow(candidate);
-      const currentBranch = this.getBranchStateOrThrow(branchId);
       return (
         branch.splitId === splitId &&
         candidate !== branchId &&

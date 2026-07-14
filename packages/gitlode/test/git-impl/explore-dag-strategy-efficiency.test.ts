@@ -34,24 +34,24 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
     expect(priority.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
-      "OLD_MERGE",
-      "OLD_SIDE",
-      "OLD_MAIN",
-      "OLD_SIDE",
-      "FEATURE_BASE",
-      "FEATURE_TIP",
+      "EXCLUDE_MERGE",
+      "MAIN_BASE",
+      "TOPIC_TIP",
+      "MAIN_OLDER",
+      "SHARED_JOIN",
+      "MAIN_TIP",
       "ROOT",
     ]);
     expect(fifo.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
-      "OLD_MERGE",
-      "OLD_SIDE",
-      "OLD_MAIN",
-      "OLD_SIDE",
+      "EXCLUDE_MERGE",
+      "MAIN_BASE",
+      "TOPIC_TIP",
+      "MAIN_OLDER",
       "ROOT",
-      "FEATURE_BASE",
-      "FEATURE_TIP",
+      "SHARED_JOIN",
+      "MAIN_TIP",
       "ROOT",
     ]);
     expect(priority.counters.traversal_steps).toBeLessThan(fifo.counters.traversal_steps);
@@ -91,20 +91,18 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
     expect(priority.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
-      "SHARED_MERGE",
-      "SHARED_SIDE",
+      "TOPIC_TIP",
+      "MAIN_BASE",
       "ROOT",
-      "SHARED_SIDE",
-      "RECENT_MERGE",
+      "TOPIC_BASE",
       "ROOT",
     ]);
     expect(fifo.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
-      "SHARED_MERGE",
-      "SHARED_SIDE",
-      "SHARED_SIDE",
-      "RECENT_MERGE",
+      "TOPIC_TIP",
+      "MAIN_BASE",
+      "TOPIC_BASE",
       "ROOT",
     ]);
     expect(priority.counters.traversal_steps).toBeGreaterThan(fifo.counters.traversal_steps);
@@ -117,25 +115,30 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
 });
 
 function createFavorableFixture(kind: "favorable" | "equal"): Fixture {
+  // INCLUDE_HEAD follows MAIN_TIP on the mainline.
+  // EXCLUDE_HEAD follows EXCLUDE_MERGE, an ordinary merge of MAIN_BASE and TOPIC_TIP.
+  // MAIN_BASE and TOPIC_TIP are independent parents that converge later at ROOT.
   const successors = {
-    INCLUDE_HEAD: ["FEATURE_TIP", "EXCLUDE_HEAD"],
-    FEATURE_TIP: ["FEATURE_BASE"],
-    EXCLUDE_HEAD: ["OLD_MERGE", "OLD_SIDE"],
-    OLD_MERGE: ["OLD_MAIN", "OLD_SIDE"],
-    OLD_MAIN: ["FEATURE_BASE"],
-    FEATURE_BASE: ["ROOT"],
-    OLD_SIDE: ["ROOT"],
+    INCLUDE_HEAD: ["MAIN_TIP"],
+    MAIN_TIP: ["MAIN_BASE"],
+    EXCLUDE_HEAD: ["EXCLUDE_MERGE"],
+    EXCLUDE_MERGE: ["MAIN_BASE", "TOPIC_TIP"],
+    MAIN_BASE: ["MAIN_OLDER"],
+    MAIN_OLDER: ["SHARED_JOIN"],
+    TOPIC_TIP: ["ROOT"],
+    SHARED_JOIN: ["ROOT"],
     ROOT: [],
   } satisfies Record<string, readonly string[]>;
 
   const timestamps = {
     INCLUDE_HEAD: 1_000,
-    FEATURE_TIP: 990,
+    MAIN_TIP: 990,
     EXCLUDE_HEAD: 980,
-    OLD_MERGE: 970,
-    OLD_MAIN: 960,
-    FEATURE_BASE: 950,
-    OLD_SIDE: 940,
+    EXCLUDE_MERGE: 970,
+    MAIN_BASE: 960,
+    MAIN_OLDER: 950,
+    TOPIC_TIP: 940,
+    SHARED_JOIN: 930,
     ROOT: 0,
   };
 
@@ -148,24 +151,27 @@ function createFavorableFixture(kind: "favorable" | "equal"): Fixture {
 }
 
 function createNonMonotonicFixture(): Fixture {
+  // INCLUDE_HEAD follows MAIN_BASE on the mainline.
+  // EXCLUDE_HEAD is an ordinary merge of independent TOPIC_TIP and MAIN_BASE parents.
+  // TOPIC_TIP carries the intentional timestamp anomaly on its TOPIC_BASE edge.
   return {
     successors: {
-      INCLUDE_HEAD: ["RECENT_MERGE", "SHARED_MERGE"],
-      RECENT_MERGE: ["SHARED_MERGE", "SHARED_SIDE"],
-      EXCLUDE_HEAD: ["SHARED_MERGE", "SHARED_SIDE"],
-      SHARED_MERGE: ["SHARED_SIDE", "ROOT"],
-      SHARED_SIDE: ["ROOT"],
+      INCLUDE_HEAD: ["MAIN_BASE"],
+      EXCLUDE_HEAD: ["TOPIC_TIP", "MAIN_BASE"],
+      TOPIC_TIP: ["TOPIC_BASE"],
+      TOPIC_BASE: ["ROOT"],
+      MAIN_BASE: ["ROOT"],
       ROOT: [],
     },
     timestamps: {
       INCLUDE_HEAD: 1_000,
-      RECENT_MERGE: 980,
-      EXCLUDE_HEAD: 970,
-      SHARED_MERGE: 250,
-      SHARED_SIDE: 950,
+      EXCLUDE_HEAD: 990,
+      TOPIC_TIP: 420,
+      TOPIC_BASE: 970,
+      MAIN_BASE: 980,
       ROOT: 0,
     },
-    timestampAnomalyEdges: new Set([edgeKey("SHARED_MERGE", "SHARED_SIDE")]),
+    timestampAnomalyEdges: new Set([edgeKey("TOPIC_TIP", "TOPIC_BASE")]),
     start: "INCLUDE_HEAD",
     exclude: "EXCLUDE_HEAD",
   };
@@ -239,6 +245,20 @@ function expectGitLikeFixture(fixture: Fixture): void {
   expect(reachableNodes).toEqual(declared);
   for (const [nodeId, successors] of Object.entries(fixture.successors)) {
     expect(successors.length, `${nodeId} must have at most two parents`).toBeLessThanOrEqual(2);
+    if (successors.length === 2) {
+      const [leftParent, rightParent] = successors;
+      if (leftParent === undefined || rightParent === undefined) {
+        throw new Error(`Expected two parents for ${nodeId}.`);
+      }
+      expect(
+        reachable(fixture.successors, leftParent).has(rightParent),
+        `${nodeId} parent ${rightParent} must not be reachable from ${leftParent}`,
+      ).toBe(false);
+      expect(
+        reachable(fixture.successors, rightParent).has(leftParent),
+        `${nodeId} parent ${leftParent} must not be reachable from ${rightParent}`,
+      ).toBe(false);
+    }
     for (const successor of successors) {
       expect(declared.has(successor), `${nodeId} references undeclared parent ${successor}`).toBe(
         true,

@@ -4,8 +4,7 @@ This note preserves follow-up context for the phase-certified prototype in `pack
 
 ## Current baseline
 
-`packages/gitlode/src/dag/phase-certified.ts` is the prototype traversal facade. It is not wired into production commit
-walking today, but it is not deprecated. The implementation is now split across `phase-certified.ts`
+`packages/gitlode/src/dag/phase-certified.ts` is the prototype traversal facade. It is reachable from production commit walking only through the internal experimental strategy seam, but it is not the default. The implementation is now split across `phase-certified.ts`
 for orchestration, `certified-closure.ts` for the closure state machine,
 `phase-certified-difference-state.ts` for include/certified integration state, and
 `phase-certified-types.ts` for shared contracts. Durable module ownership details live in the design
@@ -33,9 +32,7 @@ and each closure phase can now receive independent scheduling queues while prese
 result-set contract documented in `packages/gitlode/docs/design/commit-traversal-internals.md`.
 
 Generic path-local `DomainHint` transport, Git child-committer-timestamp projection, and the stable
-timestamp-priority policy are implemented. The next work is not another scheduling metadata design;
-The strategies now share an optional-exclude `DagDifferenceWalker` call shape while retaining their
-meaningfully different frontier option types. Module ownership is now organized. The next work is to design an internal production selection seam.
+timestamp-priority policy are implemented. The next work is not another scheduling metadata design; the strategies now share an optional-exclude `DagDifferenceWalker` call shape while retaining their meaningfully different frontier option types. Module ownership is now organized, and the internal production selection seam now exists for real-repository validation.
 
 ## Correctness validation status
 
@@ -72,7 +69,7 @@ for explicit phase-certified prototype injection; durable semantics live in
 `packages/gitlode/docs/design/commit-traversal-internals.md`.
 
 Correctness validation has a substantial topology-oriented baseline in `packages/gitlode/test/dag/phase-certified.test.ts`, and Git-specific B-validation now compares FIFO and timestamp-priority graph work in `packages/gitlode/test/git-impl/commit-traversal/timestamp-frontier-policy-efficiency.test.ts` on controlled Git-like fixtures. Memory-oriented C-validation
-remains lower priority. The generic DAG and Git-specific commit-traversal module boundaries are now organized: generic traversal lives in `packages/gitlode/src/dag/`, while Git timestamp hints and policies live in `packages/gitlode/src/git-impl/commit-traversal/`. Before production adoption, design how the Git adapter selects an internal experimental strategy. Keep parent timestamp pre-reads out of that production plan.
+remains lower priority. The generic DAG and Git-specific commit-traversal module boundaries are now organized: generic traversal lives in `packages/gitlode/src/dag/`, while Git timestamp hints and policies live in `packages/gitlode/src/git-impl/commit-traversal/`. Before production adoption, run a real-repository validation harness and operational comparison through the internal experimental strategy seam. Keep parent timestamp pre-reads out of that production plan.
 
 ## Successor cache responsibility follow-up
 
@@ -112,5 +109,4 @@ counters and topology access traces. The non-monotonic fixture remains Git-like 
 merge parents, but marks one intentional timestamp anomaly and records strict graph-work regressions
 when timestamps prioritize an unhelpful path. The suite remains limited to deterministic synthetic
 Git-history telemetry and topology access traces; it does not benchmark wall-clock time, real
-repositories, memory behavior, or production adoption. Production connection remains out of scope
-until a separate adoption gate.
+repositories, memory behavior, or production adoption. Default production adoption remains out of scope until a separate adoption gate; rollback from experiments is unsetting `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`.

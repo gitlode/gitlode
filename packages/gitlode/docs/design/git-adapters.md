@@ -55,7 +55,7 @@ environments where invoking `git` is undesirable or unavailable.
 
 The adapter performs commit traversal by reading commit objects and parent links through
 isomorphic-git, then delegating to the internal DAG walker. With an exclusion boundary, the current
-production strategy is the certified-lazy walker documented in `commit-traversal-internals.md`. That
+default strategy is the certified-lazy walker documented in `commit-traversal-internals.md`. Internal experiments may select `phase-certified-fifo` or `phase-certified-timestamp` with `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`; this is not CLI/config/public API. That
 strategy can avoid reading older excluded ancestors in certified cases, but it falls back to full
 reachable-set subtraction when its conservative certificate does not hold.
 

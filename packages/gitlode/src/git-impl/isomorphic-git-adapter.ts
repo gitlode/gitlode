@@ -1,13 +1,7 @@
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
-import {
-  type BasicDagSchedulingContext,
-  type DagFrontierItem,
-  type DagSuccessor,
-  type DagTopologyPort,
-  walkDagNodeIdsCertifiedLazy,
-} from "../dag/index.js";
+import { type DagSuccessor, type DagTopologyPort } from "../dag/index.js";
 import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -24,24 +18,33 @@ import {
 } from "../instrumentation/index.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
-import { OrderedQueue } from "../support/index.js";
-import type { CommitPathSchedulingHint } from "./commit-traversal/index.js";
+import {
+  DEFAULT_COMMIT_TRAVERSAL_STRATEGY,
+  createCommitTraversalStrategy,
+  type CommitPathSchedulingHint,
+  type CommitTraversalStrategy,
+} from "./commit-traversal/index.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
   readonly diffAdapter: DiffAdapter;
   readonly instrumentation: Instrumentation;
+  readonly commitTraversalStrategy?: CommitTraversalStrategy;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _diffAdapter: DiffAdapter;
   private readonly _instrumentation: Instrumentation;
+  private readonly _commitTraversalStrategy: CommitTraversalStrategy;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
     this._diffAdapter = dependencies.diffAdapter;
     this._instrumentation = dependencies.instrumentation;
+    this._commitTraversalStrategy =
+      dependencies.commitTraversalStrategy ??
+      createCommitTraversalStrategy(DEFAULT_COMMIT_TRAVERSAL_STRATEGY);
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -206,23 +209,16 @@ export class IsomorphicGitAdapter implements GitAdapter {
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
     yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
+      const strategy = this._commitTraversalStrategy;
+      span.setAttribute("strategy", strategy.name);
       const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
-      const oidWalk = walkDagNodeIdsCertifiedLazy<CommitOid, CommitPathSchedulingHint>(
+      const oidWalk = strategy.walk(
         {
           graph: topology,
           instrumentation: this._instrumentation,
         },
         oid,
         excludeOid,
-        {
-          createFrontier: () =>
-            new OrderedQueue<
-              DagFrontierItem<CommitOid, BasicDagSchedulingContext, CommitPathSchedulingHint>
-            >({
-              dequeueOrder: "lifo",
-              blockOrder: "preserve",
-            }),
-        },
       );
 
       return commitObjectsFromOids(oidWalk, topology);

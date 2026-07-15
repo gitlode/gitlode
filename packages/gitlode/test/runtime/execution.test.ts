@@ -68,10 +68,14 @@ describe("executeWorkerRunRequest profiling", () => {
       },
     };
 
-    const result = await executeWorkerRunRequest(request, {
-      reporter: { emit(_event: ProgressEvent) {} },
-      renderDiagnostic() {},
-    });
+    const result = await executeWorkerRunRequest(
+      request,
+      {
+        reporter: { emit(_event: ProgressEvent) {} },
+        renderDiagnostic() {},
+      },
+      { environment: {} },
+    );
 
     expect(result.kind).toBe("success");
     if (result.kind !== "success") return;
@@ -80,6 +84,7 @@ describe("executeWorkerRunRequest profiling", () => {
       (entry) => entry.name === "git.walk_commits",
     );
     expect(walkEntry?.totalMs).toBeGreaterThan(0);
+    expect(walkEntry?.attributes).toEqual({ strategy: ["certified-lazy"] });
     expect(walkEntry?.counters).toEqual({
       commit_reads: 1,
       commits_yielded: 1,
@@ -233,5 +238,113 @@ describe("executeWorkerRunRequest profiling", () => {
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
     expect(runEntry?.attributes?.["git.cli.version"]?.[0]).toMatch(/^git version /);
+  });
+});
+
+describe("executeWorkerRunRequest commit traversal strategy environment", () => {
+  async function createOneCommitRequest(
+    gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
+  ) {
+    const repoDir = await makeTempDir("gitlode-execution-strategy-repo-");
+    const outputDir = await makeTempDir("gitlode-execution-strategy-output-");
+
+    await git.init({ fs: nodeFs, dir: repoDir, defaultBranch: "main" });
+    await git.setConfig({ fs: nodeFs, dir: repoDir, path: "user.name", value: "Tester" });
+    await git.setConfig({
+      fs: nodeFs,
+      dir: repoDir,
+      path: "user.email",
+      value: "test@example.com",
+    });
+    await writeFile(join(repoDir, "file.txt"), "hello\n");
+    await git.add({ fs: nodeFs, dir: repoDir, filepath: "file.txt" });
+    await git.commit({
+      fs: nodeFs,
+      dir: repoDir,
+      message: "initial",
+      author: { name: "Tester", email: "test@example.com", timestamp: 1_000, timezoneOffset: 0 },
+    });
+
+    return {
+      input: {
+        repositoryPath: repoDir as AbsolutePath,
+        refs: ["main"],
+        outputDir: outputDir as AbsolutePath,
+        rotation: {},
+        granularity: "commit" as const,
+        profile: true,
+        gitAdapter,
+      },
+      priorState: {
+        version: 2 as const,
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        repositoryPath: repoDir as AbsolutePath,
+        refs: [],
+      },
+    } satisfies WorkerRunRequest;
+  }
+
+  async function runWithEnvironment(
+    environment: Readonly<Record<string, string | undefined>>,
+    gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
+  ) {
+    return await executeWorkerRunRequest(
+      await createOneCommitRequest(gitAdapter),
+      { reporter: { emit(_event: ProgressEvent) {} }, renderDiagnostic() {} },
+      { environment },
+    );
+  }
+
+  it.each([
+    [undefined, "certified-lazy", "certifiedLazy"],
+    ["phase-certified-fifo", "phase-certified-fifo", "phaseCertified"],
+    ["phase-certified-timestamp", "phase-certified-timestamp", "phaseCertified"],
+  ] as const)("selects %s through injected environment", async (value, outer, inner) => {
+    const environment = value === undefined ? {} : { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: value };
+    const result = await runWithEnvironment(environment);
+
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
+    const walkEntry = result.success.profileEntries.find(
+      (entry) => entry.name === "git.walk_commits",
+    );
+    const traversalEntry = result.success.profileEntries.find(
+      (entry) => entry.name === "dag.traversal",
+    );
+    expect(walkEntry?.attributes?.strategy).toEqual([outer]);
+    expect(traversalEntry?.attributes?.strategy).toEqual([inner]);
+  });
+
+  it("returns a user error for invalid isomorphic-git strategy environment", async () => {
+    const result = await runWithEnvironment({ GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" });
+    expect(result).toMatchObject({ kind: "user-error" });
+    expect(result.kind === "user-error" ? result.message : "").toContain(
+      "GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL",
+    );
+    expect(result.kind === "user-error" ? result.message : "").toContain("bad");
+    expect(result.kind === "user-error" ? result.message : "").toContain("certified-lazy");
+    expect(result.kind === "user-error" ? result.message : "").toContain("phase-certified-fifo");
+    expect(result.kind === "user-error" ? result.message : "").toContain(
+      "phase-certified-timestamp",
+    );
+  });
+
+  it("ignores invalid strategy environment on the actual git-cli runtime path", async () => {
+    const result = await runWithEnvironment(
+      { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" },
+      "git-cli",
+    );
+
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      expect(result.message).not.toContain("GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL");
+      return;
+    }
+
+    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    expect(result.success.profileEntries.some((entry) => entry.name === "git.cli.rev_list")).toBe(
+      true,
+    );
   });
 });

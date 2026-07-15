@@ -98,10 +98,10 @@ The production DAG traversal module exports two difference strategies:
 - `walkDagNodeIdsCertifiedLazy`
 
 The phase-certified prototype is exported separately as
-`walkDagNodeIdsPhaseCertifiedDifference()`. There is currently no shared strategy dispatcher or
-runtime strategy-selection option. `IsomorphicGitAdapter` calls `walkDagNodeIdsCertifiedLazy()`
-directly, so certified-lazy remains the production behavior until a separate adoption task adds an
-explicit selection seam.
+`walkDagNodeIdsPhaseCertifiedDifference()`. The Git commit-traversal domain now binds these generic
+walkers behind a `CommitTraversalStrategy` descriptor so `IsomorphicGitAdapter` receives one common
+`DagDifferenceWalker` shape. The production default remains certified-lazy; phase-certified modes
+are reachable only through the internal experiment seam described below.
 
 Configured strategies share the `DagDifferenceWalker` callable contract: they accept a context, an
 include start, and an optional exclude start. With no exclude start, every strategy yields
@@ -323,15 +323,13 @@ queue, including closed-boundary follow-up phases and standalone closure operati
 must not be shared across difference operations or closure phases.
 
 The generic phase-certified default remains FIFO/preserve. Git timestamp priority is only active when
-callers explicitly inject the Git-specific policy. The phase-certified strategy is still not wired
-into production commit walking, and production certified-lazy traversal keeps its LIFO/preserve
-frontier until a separate production adoption gate changes that decision.
+callers explicitly inject the Git-specific policy. The phase-certified strategies are reachable through the internal experiment seam, but production default remains certified-lazy with its LIFO/preserve frontier until a separate production adoption gate changes that decision.
 
 ## Phase-certified prototype telemetry
 
 `packages/gitlode/src/dag/phase-certified.ts` keeps the facade for a prototype strategy with the same difference contract,
 `reachable(includeStart) - reachable(excludeStart)`. The facade coordinates include work, exclude
-closure phases, frontier lifecycle, and operation-level telemetry. `packages/gitlode/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/gitlode/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/gitlode/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is not wired into production commit walking, but its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO prototype runs can be compared with later frontier-policy experiments.
+closure phases, frontier lifecycle, and operation-level telemetry. `packages/gitlode/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/gitlode/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/gitlode/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is wired only through the internal experiment seam; its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO and timestamp-priority runs can be compared with certified-lazy.
 
 `walkDagNodeIdsPhaseCertifiedDifference()` records one `dag.traversal` span with
 `strategy=phaseCertified`. Internal closure phases do not create child `dag.certified_closure` spans;
@@ -393,7 +391,7 @@ Synthetic timestamp tests model the intended future Git projection by attaching 
 node's timestamp to each successor path. The successor's own timestamp is not read before priority is
 decided. Timestamp assignment changes, equal timestamps, and non-monotonic child/parent timestamps
 may alter processing order but must not alter `reachable(start) - reachable(exclude)` membership.
-The Git adapter now projects child committer timestamps during normal topology reads, while production commit walking still does not use the phase-certified prototype or the timestamp-priority policy.
+The Git adapter projects child committer timestamps during normal topology reads. Those hints affect scheduling only when the internal `phase-certified-timestamp` strategy is explicitly selected; they do not change membership or cause parent pre-reads.
 
 Closure re-expansion and branch-join detection are separate concerns. A compliant frontier may only
 hold and reorder the pending items produced by traversal; it must not synthesize, drop, or rewrite
@@ -439,3 +437,15 @@ remains a heuristic rather than a correctness or performance guarantee.
 These tests do not prove that timestamp priority is beneficial on real repositories, do not compare
 processing time, and do not connect the phase-certified prototype to production commit walking.
 Production adoption remains a separate design and validation gate.
+
+## Internal Git strategy selection seam
+
+`packages/gitlode/src/git-impl/commit-traversal/strategy.ts` defines the Git-domain strategy descriptor used by `IsomorphicGitAdapter`. The only supported internal mode names are:
+
+- `certified-lazy` — production default, `walkDagNodeIdsCertifiedLazy()` with the existing LIFO/preserve frontier.
+- `phase-certified-fifo` — `walkDagNodeIdsPhaseCertifiedDifference()` with the generic FIFO/preserve defaults.
+- `phase-certified-timestamp` — `walkDagNodeIdsPhaseCertifiedDifference()` with Git child-committer timestamp priority injected into both difference and closure frontiers.
+
+The selector is the internal environment variable `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. It is not a CLI option, normal config field, worker input field, or package public API. Only `undefined` selects the default; empty strings, whitespace, case variants, and unknown values are errors for `runtime.gitAdapter: "isomorphic-git"`. The variable is ignored for `runtime.gitAdapter: "git-cli"`, including the isomorphic-git file-change fallback, so rollback is simply unsetting the variable.
+
+Profiling separates adapter-domain and generic-DAG decisions. `git.walk_commits.strategy` records the full Git mode above, while the nested `dag.traversal.strategy` remains `certifiedLazy` or `phaseCertified`. Existing counters such as `yielded_nodes`, `traversal_steps`, `successor_expansions`, closure/classification counters, and adapter read/cache counters remain the comparison surface; no Git-specific policy name is added to generic DAG telemetry.

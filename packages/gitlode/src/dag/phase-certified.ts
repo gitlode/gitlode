@@ -22,7 +22,7 @@ interface PhaseCertifiedDifferenceCoreContext<
 /**
  * Prototype DAG traversal strategy using certified closure phases.
  *
- * This facade is intentionally not wired into production traversal yet. It owns the public
+ * This facade remains a prototype; production traversal reaches it only through Git-domain internal experiment selection. It owns the public
  * instrumentation boundaries, the difference and closure frontier loops, default FIFO/preserve
  * frontier creation, and orchestration between the certified closure state machine and the
  * include/certified integration state.

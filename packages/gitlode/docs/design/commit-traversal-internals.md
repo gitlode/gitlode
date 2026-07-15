@@ -105,6 +105,12 @@ runtime strategy-selection option. `IsomorphicGitAdapter` calls `walkDagNodeIdsC
 directly, so certified-lazy remains the production behavior until a separate adoption task adds an
 explicit selection seam.
 
+Configured strategies share the `DagDifferenceWalker` callable contract: they accept a context, an
+include start, and an optional exclude start. With no exclude start, every strategy yields
+`reachable(includeStart)`. Strategy-specific frontier options are bound before exposing a walker
+through this contract; the contract does not flatten the phase-certified difference/closure frontier
+factories into the single-frontier options used by eager-exclude and certified-lazy.
+
 The strategy names describe traversal logic:
 
 - `eagerExclude` eagerly builds the full excluded reachable set before include-side traversal.

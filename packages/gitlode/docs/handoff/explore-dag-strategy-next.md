@@ -32,8 +32,9 @@ result-set contract documented in `packages/gitlode/docs/design/commit-traversal
 
 Generic path-local `DomainHint` transport, Git child-committer-timestamp projection, and the stable
 timestamp-priority policy are implemented. The next work is not another scheduling metadata design;
-it is to align the strategy call shape, organize module ownership, and then design an internal
-production selection seam.
+The strategies now share an optional-exclude `DagDifferenceWalker` call shape while retaining their
+meaningfully different frontier option types. The next work is to organize module ownership and then
+design an internal production selection seam.
 
 ## Correctness validation status
 

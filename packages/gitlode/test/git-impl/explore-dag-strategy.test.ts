@@ -254,6 +254,39 @@ describe("phase-certified prototype telemetry", () => {
     ).toHaveLength(0);
   });
 
+  it("uses the phase-certified strategy boundary for a walk without an exclude start", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const yielded = await collect(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(
+          createDagPort({
+            HEAD: ["PARENT"],
+            PARENT: ["ROOT"],
+            ROOT: [],
+          }),
+          recorder,
+        ),
+        "HEAD",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(new Set(["HEAD", "PARENT", "ROOT"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: { strategy: "phaseCertified" },
+        counters: {
+          drain_yielded_nodes: 3,
+          main_expansions: 3,
+          successor_expansions: 3,
+          traversal_steps: 3,
+          yielded_nodes: 3,
+        },
+      }),
+    ]);
+  });
+
   it("records multiple closed-boundary phases without double-counting certified nodes", async () => {
     const recorder = new LocalInstrumentationRecorder(() => 0);
 

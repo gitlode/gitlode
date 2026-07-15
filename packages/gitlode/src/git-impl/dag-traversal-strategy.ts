@@ -44,6 +44,16 @@ export interface WalkDagContext<NodeId extends PropertyKey, DomainHint = undefin
   readonly instrumentation: Instrumentation;
 }
 
+/**
+ * Common callable shape for a configured DAG difference strategy. Strategy-specific frontier
+ * options are bound before exposing a walker through this contract.
+ */
+export type DagDifferenceWalker<NodeId extends PropertyKey, DomainHint = undefined> = (
+  context: WalkDagContext<NodeId, DomainHint>,
+  nodeId: NodeId,
+  excludeNodeId?: NodeId,
+) => AsyncIterable<NodeId>;
+
 export interface WalkDagStrategyOptions<
   NodeId extends PropertyKey,
   DagSchedulingContext extends BasicDagSchedulingContext,

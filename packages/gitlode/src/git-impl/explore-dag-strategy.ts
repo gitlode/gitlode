@@ -42,7 +42,8 @@ export type { DagSuccessor, DagTopologyPort, WalkDagContext } from "./dag-traver
  *   `ClosureGraphState` owns closure node correctness state and observed predecessor links.
  *
  * The prototype output contract remains the same as `walkDagNodeIdsEagerExclude()`:
- * `reachable(start) - reachable(exclude)`. Yield order is not part of that contract.
+ * `reachable(start) - reachable(exclude)` when an exclude start exists, and `reachable(start)`
+ * otherwise. Yield order is not part of that contract.
  */
 
 export type SplitId = Brand<number, "SplitId">;
@@ -174,6 +175,13 @@ interface DagPhaseCertifiedTelemetry {
   readonly span: InstrumentationSpan;
 }
 
+interface PhaseCertifiedDifferenceCoreContext<
+  NodeId extends PropertyKey,
+  DomainHint = undefined,
+> extends WalkDagContext<NodeId, DomainHint> {
+  readonly telemetry: DagPhaseCertifiedTelemetry;
+}
+
 interface BranchJoinTrigger<NodeId, DomainHint = undefined> {
   readonly splitId: SplitId;
   readonly triggerId: NodeId;
@@ -253,8 +261,10 @@ async function resolveDagCertifiedClosurePhaseCore<
 }
 
 /**
- * Walks the DAG difference by alternating include expansion with exclude certification phases.
- * This is still a prototype strategy and is not wired into production traversal yet.
+ * Walks the DAG difference by alternating include expansion with exclude certification phases. If
+ * no exclude start is supplied, it walks every node reachable from the include start using the
+ * configured difference frontier. This is still a prototype strategy and is not wired into
+ * production traversal yet.
  */
 export async function* walkDagNodeIdsPhaseCertifiedDifference<
   NodeId extends PropertyKey,
@@ -262,14 +272,19 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<
 >(
   context: WalkDagContext<NodeId, DomainHint>,
   nodeId: NodeId,
-  excludeNodeId: NodeId,
+  excludeNodeId?: NodeId,
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
 ): AsyncIterable<NodeId> {
   yield* instrumentAsyncIterable(
     context.instrumentation,
     "dag.traversal",
     (span) =>
-      walkDagNodeIdsPhaseCertifiedDifferenceCore(context, nodeId, excludeNodeId, options, { span }),
+      walkDagNodeIdsPhaseCertifiedDifferenceCore(
+        { ...context, telemetry: { span } },
+        nodeId,
+        excludeNodeId,
+        options,
+      ),
     { attributes: { strategy: "phaseCertified" } },
   );
 }
@@ -278,23 +293,26 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
   NodeId extends PropertyKey,
   DomainHint = undefined,
 >(
-  context: WalkDagContext<NodeId, DomainHint>,
+  context: PhaseCertifiedDifferenceCoreContext<NodeId, DomainHint>,
   nodeId: NodeId,
-  excludeNodeId: NodeId,
+  excludeNodeId: NodeId | undefined,
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint>,
-  telemetry: DagPhaseCertifiedTelemetry,
 ): AsyncIterable<NodeId> {
-  const { graph } = context;
+  const { graph, telemetry } = context;
   const state = new IntegratedDifferenceState<NodeId, DomainHint>(graph, telemetry);
   state.initializeInclude(nodeId);
 
   const frontier =
     options.createDifferenceFrontier?.() ??
     createDefaultPhaseCertifiedFrontier<DifferenceFrontierItem<NodeId, DomainHint>>();
-  frontier.enqueueMany([
-    { role: "main", nodeId: nodeId },
-    { role: "exclude", nodeId: excludeNodeId },
-  ]);
+  frontier.enqueueMany(
+    excludeNodeId === undefined
+      ? [{ role: "main", nodeId: nodeId }]
+      : [
+          { role: "main", nodeId: nodeId },
+          { role: "exclude", nodeId: excludeNodeId },
+        ],
+  );
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();

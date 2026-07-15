@@ -2,6 +2,7 @@ import * as git from "isomorphic-git";
 import { describe, expect, it } from "vitest";
 
 import {
+  type DagDifferenceWalker,
   type DagFrontier,
   type DagFrontierItem,
   type DagTopologyPort,
@@ -10,6 +11,7 @@ import {
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,
 } from "../../src/git-impl/dag-traversal-strategy.js";
+import { walkDagNodeIdsPhaseCertifiedDifference } from "../../src/git-impl/explore-dag-strategy.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,
@@ -28,12 +30,18 @@ import {
 
 type Walker = (dag: BuiltDag, head: CommitOid, exclude?: CommitOid) => Promise<CommitOid[]>;
 
+const eagerExcludeStrategy: DagDifferenceWalker<CommitOid> = walkDagNodeIdsEagerExclude;
+const certifiedLazyStrategy: DagDifferenceWalker<CommitOid> = (context, nodeId, excludeNodeId) =>
+  walkDagNodeIdsCertifiedLazy(context, nodeId, excludeNodeId, certifiedLazyOptions());
+const phaseCertifiedStrategy: DagDifferenceWalker<CommitOid> = (context, nodeId, excludeNodeId) =>
+  walkDagNodeIdsPhaseCertifiedDifference(context, nodeId, excludeNodeId);
+
 const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
   {
     name: "eagerExclude",
     async walk(dag, head, exclude) {
       const commits: CommitOid[] = [];
-      for await (const commit of walkDagNodeIdsEagerExclude(
+      for await (const commit of eagerExcludeStrategy(
         {
           graph: rawCommitTopologyPort(dag),
           instrumentation: noopInstrumentation,
@@ -50,14 +58,30 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
     name: "certifiedLazy",
     async walk(dag, head, exclude) {
       const commits: CommitOid[] = [];
-      for await (const commit of walkDagNodeIdsCertifiedLazy(
+      for await (const commit of certifiedLazyStrategy(
         {
           graph: rawCommitTopologyPort(dag),
           instrumentation: noopInstrumentation,
         },
         head,
         exclude,
-        certifiedLazyOptions(),
+      )) {
+        commits.push(commit);
+      }
+      return commits;
+    },
+  },
+  {
+    name: "phaseCertified",
+    async walk(dag, head, exclude) {
+      const commits: CommitOid[] = [];
+      for await (const commit of phaseCertifiedStrategy(
+        {
+          graph: rawCommitTopologyPort(dag),
+          instrumentation: noopInstrumentation,
+        },
+        head,
+        exclude,
       )) {
         commits.push(commit);
       }

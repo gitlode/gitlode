@@ -19,7 +19,7 @@ export type {
   ClosureFrontierItem,
   DifferenceFrontierItem,
   PhaseCertifiedStrategyOptions,
-} from "./phase-certified.js";
+} from "./phase-certified-types.js";
 export {
   resolveDagCertifiedClosurePhase,
   walkDagNodeIdsPhaseCertifiedDifference,

@@ -292,7 +292,7 @@ older exclude ancestor.
 
 ## Phase-certified prototype frontier injection
 
-`packages/gitlode/src/dag/phase-certified.ts` keeps separate injectable frontier factories for the experimental
+`packages/gitlode/src/dag/phase-certified.ts` is the facade for separate injectable frontier factories in the experimental
 phase-certified prototype:
 
 - the difference coordinator frontier schedules include-side work items and exclude closure-phase
@@ -329,10 +329,9 @@ frontier until a separate production adoption gate changes that decision.
 
 ## Phase-certified prototype telemetry
 
-`packages/gitlode/src/dag/phase-certified.ts` keeps a prototype strategy for the same difference contract,
-`reachable(includeStart) - reachable(excludeStart)`. It is not wired into production commit
-walking, but its instrumentation follows the same operation-level boundary as production DAG
-traversal so FIFO prototype runs can be compared with later frontier-policy experiments.
+`packages/gitlode/src/dag/phase-certified.ts` keeps the facade for a prototype strategy with the same difference contract,
+`reachable(includeStart) - reachable(excludeStart)`. The facade coordinates include work, exclude
+closure phases, frontier lifecycle, and operation-level telemetry. `packages/gitlode/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/gitlode/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/gitlode/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is not wired into production commit walking, but its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO prototype runs can be compared with later frontier-policy experiments.
 
 `walkDagNodeIdsPhaseCertifiedDifference()` records one `dag.traversal` span with
 `strategy=phaseCertified`. Internal closure phases do not create child `dag.certified_closure` spans;

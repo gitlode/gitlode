@@ -103,6 +103,8 @@ This layering keeps policy decisions in Core and implementation details in adapt
 
 `packages/gitlode/src/dag/` is an internal generic DAG subsystem used below the Git adapter boundary. It owns node-ID-based traversal algorithms and graph-work instrumentation, but it is not part of the package public API. Git-specific code implements a topology port and calls the DAG subsystem; the DAG subsystem must not depend on Git commit objects, adapter caches, isomorphic-git errors, or Git-specific scheduling hints.
 
+The phase-certified prototype remains internal and production-unconnected. Its module ownership is split so `phase-certified.ts` owns facade orchestration, instrumentation boundaries, default FIFO/preserve frontier creation, and the difference/closure frontier loops; `certified-closure.ts` owns the closure state machine for split, branch, join, terminal, and closed-boundary resolution; `phase-certified-difference-state.ts` owns include-side graph state, certified exclude integration, certified-hit classification, and final drain; and `phase-certified-types.ts` owns shared generic contracts used by those modules. Telemetry counter names and meanings, scheduling semantics, and Git-specific timestamp policy ownership remain unchanged.
+
 ## Layer Responsibilities
 
 ### CLI layer

@@ -11,7 +11,7 @@ import {
   walkDagNodeIdsEagerExclude,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/dag/index.js";
-import { IntegratedDifferenceState } from "../../src/dag/phase-certified.js";
+import { IntegratedDifferenceState } from "../../src/dag/phase-certified-difference-state.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,

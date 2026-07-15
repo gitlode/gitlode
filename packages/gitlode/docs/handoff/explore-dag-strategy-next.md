@@ -1,12 +1,15 @@
 # Explore DAG Strategy Follow-up Handoff
 
-This note preserves follow-up context for the phase-certified prototype now located at `packages/gitlode/src/dag/phase-certified.ts` after the NodeId/topology DAG traversal refactor. Historical references to the former explore strategy name are not current source paths.
+This note preserves follow-up context for the phase-certified prototype in `packages/gitlode/src/dag/` after the NodeId/topology DAG traversal refactor. Historical references to the former explore strategy name are not current source paths.
 
 ## Current baseline
 
-`packages/gitlode/src/dag/phase-certified.ts` is a prototype traversal strategy. It is not wired into production commit
-walking today, but it is not deprecated. It may still provide important future value if the
-certified-closure approach is developed further.
+`packages/gitlode/src/dag/phase-certified.ts` is the prototype traversal facade. It is not wired into production commit
+walking today, but it is not deprecated. The implementation is now split across `phase-certified.ts`
+for orchestration, `certified-closure.ts` for the closure state machine,
+`phase-certified-difference-state.ts` for include/certified integration state, and
+`phase-certified-types.ts` for shared contracts. Durable module ownership details live in the design
+docs.
 
 The refactor migrated the file away from the old `DagNodePort` / domain-node-yielding abstraction and
 onto the same `NodeId` / `DagTopologyPort` model used by the production DAG traversal core. That work
@@ -32,8 +35,7 @@ result-set contract documented in `packages/gitlode/docs/design/commit-traversal
 Generic path-local `DomainHint` transport, Git child-committer-timestamp projection, and the stable
 timestamp-priority policy are implemented. The next work is not another scheduling metadata design;
 The strategies now share an optional-exclude `DagDifferenceWalker` call shape while retaining their
-meaningfully different frontier option types. The next work is to organize module ownership and then
-design an internal production selection seam.
+meaningfully different frontier option types. Module ownership is now organized. The next work is to design an internal production selection seam.
 
 ## Correctness validation status
 

@@ -259,6 +259,11 @@ but the counters stay separate so materialization cache hits do not hide whether
 DAG topology walk. Comparing total `commit_reads` with `commits_yielded` shows commit-read overshoot
 for the walk. DAG counters explain which traversal path caused the extra topology work.
 
+The traversal contract tests live under `packages/gitlode/test/dag/` because they primarily verify
+the generic DAG subsystem. Git timestamp-priority policy and B-validation tests live under
+`packages/gitlode/test/git-impl/commit-traversal/` because the policy is Git-specific even when it
+uses generic DAG fixtures.
+
 The contract suite verifies:
 
 - eager-exclude and certified-lazy return the same OID set;

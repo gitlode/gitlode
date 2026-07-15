@@ -3,13 +3,10 @@ import {
   noopInstrumentation,
   type InstrumentationSpan,
 } from "../instrumentation/index.js";
-import { collectAsyncIterableToSet, OrderedQueue } from "../support/index.js";
-import { KeyedSet } from "../support/keyed-set.js";
+import { collectAsyncIterableToSet, KeyedSet, OrderedQueue } from "../support/index.js";
 import type { Brand } from "../type-utils/index.js";
 import { walkDagReachableNodeIds } from "./traversal.js";
 import type { DagFrontier, DagSuccessor, DagTopologyPort, WalkDagContext } from "./types.js";
-
-export type { DagSuccessor, DagTopologyPort, WalkDagContext } from "./types.js";
 
 /**
  * Prototype DAG traversal strategy using certified closure phases.

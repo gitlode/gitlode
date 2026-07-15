@@ -1,9 +1,9 @@
-import type { DagFrontier } from "../../dag/index.js";
 import type {
   ClosureFrontierItem,
+  DagFrontier,
   DifferenceFrontierItem,
   PhaseCertifiedStrategyOptions,
-} from "../../dag/phase-certified.js";
+} from "../../dag/index.js";
 import { PriorityQueue } from "../../support/index.js";
 import type { CommitPathSchedulingHint } from "./types.js";
 

@@ -281,6 +281,12 @@ Each layer follows:
 
 This improves type discoverability and keeps runtime modules focused.
 
+Source domains expose their supported in-repository import boundary through `index.ts`. Cross-domain
+imports must use the target domain barrel, while direct module imports are allowed within the same
+domain for implementation details that are not part of the supported boundary. Tests should mirror
+source ownership where practical; cross-domain integration tests live with the primary subject under
+test, and same-domain implementation tests may import the specific internal module they inspect.
+
 ## Profiling Instrumentation
 
 When `--profile` is set and extraction succeeds, gitlode emits per-stage timing to stderr:

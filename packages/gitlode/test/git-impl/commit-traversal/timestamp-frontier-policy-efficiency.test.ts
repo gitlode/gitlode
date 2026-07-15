@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { DagTopologyPort, WalkDagContext } from "../../src/dag/index.js";
-import { walkDagNodeIdsPhaseCertifiedDifference } from "../../src/dag/phase-certified.js";
-import { createCommitTimestampPhaseCertifiedStrategyOptions } from "../../src/git-impl/commit-traversal/index.js";
-import type { CommitPathSchedulingHint } from "../../src/git-impl/commit-traversal/index.js";
-import { LocalInstrumentationRecorder } from "../../src/instrumentation/index.js";
+import type { DagTopologyPort, WalkDagContext } from "../../../src/dag/index.js";
+import { walkDagNodeIdsPhaseCertifiedDifference } from "../../../src/dag/index.js";
+import { createCommitTimestampPhaseCertifiedStrategyOptions } from "../../../src/git-impl/commit-traversal/index.js";
+import type { CommitPathSchedulingHint } from "../../../src/git-impl/commit-traversal/index.js";
+import { LocalInstrumentationRecorder } from "../../../src/instrumentation/index.js";
 
 interface Fixture {
   readonly successors: Record<string, readonly string[]>;

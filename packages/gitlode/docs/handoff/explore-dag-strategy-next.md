@@ -69,8 +69,7 @@ topology reads onto parent successor paths. A stable Git timestamp-priority fron
 for explicit phase-certified prototype injection; durable semantics live in
 `packages/gitlode/docs/design/commit-traversal-internals.md`.
 
-Correctness validation has a substantial topology-oriented baseline, and B-validation now compares
-FIFO and timestamp-priority graph work on controlled Git-like fixtures. Memory-oriented C-validation
+Correctness validation has a substantial topology-oriented baseline in `packages/gitlode/test/dag/phase-certified.test.ts`, and Git-specific B-validation now compares FIFO and timestamp-priority graph work in `packages/gitlode/test/git-impl/commit-traversal/timestamp-frontier-policy-efficiency.test.ts` on controlled Git-like fixtures. Memory-oriented C-validation
 remains lower priority. The generic DAG and Git-specific commit-traversal module boundaries are now organized: generic traversal lives in `packages/gitlode/src/dag/`, while Git timestamp hints and policies live in `packages/gitlode/src/git-impl/commit-traversal/`. Before production adoption, design how the Git adapter selects an internal experimental strategy. Keep parent timestamp pre-reads out of that production plan.
 
 ## Successor cache responsibility follow-up

@@ -66,6 +66,31 @@ function makeGraph(timestamps: Record<string, number> = {}): TestGraph {
   );
 }
 
+function makeTimestampPriorityGraph(): TestGraph {
+  return new TestGraph(
+    new Map<Node, readonly Node[]>([
+      [oid("M"), [oid("old-child"), oid("new-child")]],
+      [oid("old-child"), [oid("old-parent")]],
+      [oid("new-child"), [oid("new-parent")]],
+      [oid("old-parent"), []],
+      [oid("new-parent"), []],
+    ]),
+    new Map<Node, number>([
+      [oid("M"), 1_000],
+      [oid("old-child"), 10],
+      [oid("new-child"), 100],
+      [oid("old-parent"), 1],
+      [oid("new-parent"), 1],
+    ]),
+  );
+}
+
+function indexOfExpandedNode(graph: TestGraph, nodeId: Node): number {
+  const index = graph.access.indexOf(nodeId);
+  expect(index).toBeGreaterThanOrEqual(0);
+  return index;
+}
+
 describe("commit traversal strategy resolver", () => {
   it("resolves the default only for undefined and accepts exact strategy names", () => {
     expect(resolveCommitTraversalStrategyName(undefined)).toBe("certified-lazy");
@@ -110,9 +135,25 @@ describe("commit traversal strategy factory", () => {
   });
 
   it("binds phase-certified-timestamp to the Git timestamp priority policy", async () => {
-    const graph = makeGraph({ M: 100, A: 1, B: 10, E: 50 });
-    const result = await collect("phase-certified-timestamp", graph);
-    expect(result).toEqual([oid("A"), oid("M"), oid("D"), oid("B")]);
+    const fifoGraph = makeTimestampPriorityGraph();
+    const timestampGraph = makeTimestampPriorityGraph();
+
+    const fifoResult = await collect("phase-certified-fifo", fifoGraph, undefined);
+    const timestampResult = await collect("phase-certified-timestamp", timestampGraph, undefined);
+
+    expect(new Set(timestampResult)).toEqual(new Set(fifoResult));
+    expect(timestampResult).toHaveLength(new Set(timestampResult).size);
+    expect(fifoResult).toHaveLength(new Set(fifoResult).size);
+
+    expect(indexOfExpandedNode(fifoGraph, oid("old-parent"))).toBeLessThan(
+      indexOfExpandedNode(fifoGraph, oid("new-parent")),
+    );
+    expect(indexOfExpandedNode(timestampGraph, oid("new-parent"))).toBeLessThan(
+      indexOfExpandedNode(timestampGraph, oid("old-parent")),
+    );
+    expect(indexOfExpandedNode(timestampGraph, oid("new-child"))).toBeLessThan(
+      indexOfExpandedNode(timestampGraph, oid("old-parent")),
+    );
   });
 
   it("keeps reachable difference membership equal and duplicate-free across modes", async () => {

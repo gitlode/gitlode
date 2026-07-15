@@ -154,7 +154,7 @@ type BuildGitAdapterResult =
   | { readonly kind: "success"; readonly adapter: GitAdapter; readonly gitVersion?: string }
   | { readonly kind: "user-error"; readonly message: string };
 
-export function resolveIsomorphicCommitTraversalStrategyFromEnvironment(
+function resolveIsomorphicCommitTraversalStrategyFromEnvironment(
   environment: Readonly<Record<string, string | undefined>>,
 ) {
   return createCommitTraversalStrategy(

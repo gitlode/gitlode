@@ -375,7 +375,7 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     );
   });
 
-  it("uses injected commit traversal strategies with equal merge-difference membership", async () => {
+  it("uses injected strategies with equal merge-difference membership and adapter-owned read/cache telemetry", async () => {
     // root -- fork -- release -- mainAfter -- merge (head)
     //           \-- sideA -- sideB --------/
     const { fs, init, addCommit, collectAll } = makeRepo();
@@ -389,37 +389,56 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     const sideB = await writeCommit(fs, tree, [sideA], "side B", 3500);
     const head = await writeCommit(fs, tree, [mainAfter, sideB], "merge", 5000);
     const expected = new Set([head, mainAfter, sideB, sideA]);
+    const readCommit = vi.spyOn(git, "readCommit");
 
-    for (const strategyName of [
-      "certified-lazy",
-      "phase-certified-fifo",
-      "phase-certified-timestamp",
-    ] as const) {
-      let time = 0;
-      const { LocalInstrumentationRecorder } = await import("../../src/instrumentation/index.js");
-      const instrumentation = new LocalInstrumentationRecorder(() => ++time);
-      const commits = await collectAll(
-        createAdapter(fs, {
-          instrumentation,
-          commitTraversalStrategy: createCommitTraversalStrategy(strategyName),
-        }),
-        head,
-        release,
-      );
-      const oids = commits.map((commit) => commit.oid);
-      expect(new Set(oids)).toEqual(expected);
-      expect(oids).toHaveLength(new Set(oids).size);
+    try {
+      for (const strategyName of [
+        "certified-lazy",
+        "phase-certified-fifo",
+        "phase-certified-timestamp",
+      ] as const) {
+        readCommit.mockClear();
+        let time = 0;
+        const { LocalInstrumentationRecorder } = await import("../../src/instrumentation/index.js");
+        const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+        const commits = await collectAll(
+          createAdapter(fs, {
+            instrumentation,
+            commitTraversalStrategy: createCommitTraversalStrategy(strategyName),
+          }),
+          head,
+          release,
+        );
+        const oids = commits.map((commit) => commit.oid);
+        expect(new Set(oids)).toEqual(expected);
+        expect(oids).toHaveLength(new Set(oids).size);
 
-      const entries = instrumentation.summary();
-      expect(
-        entries.find((entry) => entry.name === "git.walk_commits")?.attributes?.strategy,
-      ).toEqual([strategyName]);
-      expect(entries.find((entry) => entry.name === "dag.traversal")?.attributes?.strategy).toEqual(
-        [strategyName === "certified-lazy" ? "certifiedLazy" : "phaseCertified"],
-      );
-      expect(entries.find((entry) => entry.name === "git.walk_commits")?.counters).toEqual(
-        expect.objectContaining({ commits_yielded: 4 }),
-      );
+        const entries = instrumentation.summary();
+        const walkEntry = entries.find((entry) => entry.name === "git.walk_commits");
+        expect(walkEntry?.attributes?.strategy).toEqual([strategyName]);
+        expect(
+          entries.find((entry) => entry.name === "dag.traversal")?.attributes?.strategy,
+        ).toEqual([strategyName === "certified-lazy" ? "certifiedLazy" : "phaseCertified"]);
+        expect(walkEntry?.counters).toEqual(
+          expect.objectContaining({
+            commit_reads: strategyName === "certified-lazy" ? 6 : 7,
+            commits_yielded: 4,
+            materialize_commit_cache_hits: 4,
+            topology_commit_reads: strategyName === "certified-lazy" ? 6 : 7,
+          }),
+        );
+        expect(walkEntry?.counters?.materialize_commit_reads).toBeUndefined();
+        expect(walkEntry?.counters?.commit_reads).toBe(walkEntry?.counters?.topology_commit_reads);
+
+        const readOids = readCommit.mock.calls.map(([options]) => options.oid);
+        expect(readOids).toHaveLength(walkEntry?.counters?.commit_reads ?? -1);
+        expect(readOids).toHaveLength(new Set(readOids).size);
+        for (const yieldedOid of oids) {
+          expect(readOids).toContain(yieldedOid);
+        }
+      }
+    } finally {
+      readCommit.mockRestore();
     }
   });
 

@@ -7,10 +7,7 @@ import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ProgressEvent } from "../../src/core/index.js";
-import {
-  executeWorkerRunRequest,
-  resolveIsomorphicCommitTraversalStrategyFromEnvironment,
-} from "../../src/runtime/execution.js";
+import { executeWorkerRunRequest } from "../../src/runtime/execution.js";
 import type { WorkerRunRequest } from "../../src/runtime/types.js";
 import type { AbsolutePath } from "../../src/support/index.js";
 
@@ -332,11 +329,22 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     );
   });
 
-  it("keeps invalid strategy handling isolated to the isomorphic selection helper", () => {
-    expect(() =>
-      resolveIsomorphicCommitTraversalStrategyFromEnvironment({
-        GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad",
-      }),
-    ).toThrow("GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL");
+  it("ignores invalid strategy environment on the actual git-cli runtime path", async () => {
+    const result = await runWithEnvironment(
+      { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" },
+      "git-cli",
+    );
+
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") {
+      expect(result.message).not.toContain("GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL");
+      return;
+    }
+
+    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    expect(result.success.profileEntries.some((entry) => entry.name === "git.cli.rev_list")).toBe(
+      true,
+    );
   });
 });

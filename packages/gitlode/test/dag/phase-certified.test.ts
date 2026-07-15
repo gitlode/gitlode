@@ -11,7 +11,7 @@ import {
   walkDagNodeIdsEagerExclude,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/dag/index.js";
-import { IntegratedDifferenceState } from "../../src/dag/phase-certified-difference-state.js";
+import { PhaseCertifiedDifferenceState } from "../../src/dag/phase-certified-difference-state.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
@@ -935,7 +935,7 @@ describe("phase-certified DomainHint scheduling", () => {
   });
 });
 
-describe("IntegratedDifferenceState certified hit resolution", () => {
+describe("PhaseCertifiedDifferenceState certified hit resolution", () => {
   it("yields the visited newer side of a single certified hit", async () => {
     const state = await createState({
       A: ["C"],
@@ -1326,7 +1326,7 @@ class RecordingFrontier<T> implements DagFrontier<T> {
 
 async function createState(
   predecessorsByNode: Record<string, readonly string[]>,
-): Promise<IntegratedDifferenceState<string>> {
+): Promise<PhaseCertifiedDifferenceState<string>> {
   const successorsByNode: Record<string, string[]> = {};
 
   for (const [successorId, predecessorIds] of Object.entries(predecessorsByNode)) {
@@ -1337,7 +1337,7 @@ async function createState(
     }
   }
 
-  const state = new IntegratedDifferenceState<string>(createDagPort(successorsByNode));
+  const state = new PhaseCertifiedDifferenceState<string>(createDagPort(successorsByNode));
   for (const nodeId of Object.keys(successorsByNode)) {
     state.initializeInclude(nodeId);
   }
@@ -1490,7 +1490,7 @@ async function collectNodeIds(items: AsyncIterable<string>): Promise<string[]> {
 }
 
 async function resolveAndDrain(
-  state: IntegratedDifferenceState<string>,
+  state: PhaseCertifiedDifferenceState<string>,
   closure: CertifiedClosurePhaseResult<string>,
 ): Promise<string[]> {
   const result = await collect(state.applyClosureAndResolveIncludeHits(closure));

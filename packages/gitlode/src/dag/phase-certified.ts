@@ -1,7 +1,7 @@
 import { instrumentAsyncIterable } from "../instrumentation/index.js";
 import { OrderedQueue } from "../support/index.js";
 import { CertifiedClosurePhase } from "./certified-closure.js";
-import { IntegratedDifferenceState } from "./phase-certified-difference-state.js";
+import { PhaseCertifiedDifferenceState } from "./phase-certified-difference-state.js";
 import type {
   CertifiedClosurePhaseResult,
   CertifiedClosurePhaseResolution,
@@ -129,7 +129,7 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint>,
 ): AsyncIterable<NodeId> {
   const { graph, telemetry } = context;
-  const state = new IntegratedDifferenceState<NodeId, DomainHint>(graph, telemetry);
+  const state = new PhaseCertifiedDifferenceState<NodeId, DomainHint>(graph, telemetry);
   state.initializeInclude(nodeId);
 
   const frontier =
@@ -193,11 +193,10 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
       telemetry.span.incrementCounter("yielded_nodes");
       yield yielded;
     }
-    const nextExcludeStart = state.nextClosurePhaseStart(closure);
-    if (nextExcludeStart !== undefined) {
+    if (closure.kind === "closed-boundary") {
       frontier.enqueue({
         role: "exclude",
-        nodeId: nextExcludeStart,
+        nodeId: closure.closedBoundary,
         ...(closedBoundaryDomainHint === undefined ? {} : { domainHint: closedBoundaryDomainHint }),
       });
     }

@@ -60,7 +60,12 @@ interface ReadonlyCertifiedExcludeState<NodeId extends PropertyKey> {
   has(nodeId: NodeId): boolean;
 }
 
-export class IntegratedDifferenceState<NodeId extends PropertyKey, DomainHint = undefined> {
+/**
+ * Integrates certified-exclude membership with the observed include-side graph.
+ *
+ * Frontier sequencing and the decision to start another closure phase belong to the facade.
+ */
+export class PhaseCertifiedDifferenceState<NodeId extends PropertyKey, DomainHint = undefined> {
   private readonly includeGraph: IncludeGraphState<NodeId, DomainHint>;
   private readonly certifiedExclude = new CertifiedExcludeState<NodeId>();
   private readonly telemetry?: DagPhaseCertifiedTelemetry;
@@ -91,8 +96,8 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, DomainHint = 
     return { kind: "expanded", successors };
   }
 
-  // Coordinator + certified-hit application responsibility. Exclude state absorbs the closure;
-  // this method applies the resulting include-side hits to the include graph.
+  // Exclude state absorbs the closure; this method applies the resulting certified hits to the
+  // include graph.
   async *applyClosureAndResolveIncludeHits(
     closure: CertifiedClosurePhaseResult<NodeId>,
   ): AsyncIterable<NodeId> {
@@ -108,12 +113,7 @@ export class IntegratedDifferenceState<NodeId extends PropertyKey, DomainHint = 
     yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits, this.telemetry);
   }
 
-  nextClosurePhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
-    return this.certifiedExclude.nextClosurePhaseStart(closure);
-  }
-
-  // Coordinator + IncludeGraphState responsibility. The final drain is a coordinator decision; the
-  // observed local graph deletion belongs to include-side state.
+  // The facade decides when to drain; observed local graph deletion belongs to include-side state.
   *drainRemainingInclude(): Iterable<NodeId> {
     yield* drainUncertifiedInclude(this.includeGraph, this.certifiedExclude);
   }
@@ -141,10 +141,6 @@ class CertifiedExcludeState<
     }
 
     return { includeHits, newlyCertifiedCount };
-  }
-
-  nextClosurePhaseStart(closure: CertifiedClosurePhaseResult<NodeId>): NodeId | undefined {
-    return closure.kind === "closed-boundary" ? closure.closedBoundary : undefined;
   }
 }
 

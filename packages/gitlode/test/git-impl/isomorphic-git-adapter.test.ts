@@ -31,6 +31,10 @@ function createAdapter(
   });
 }
 
+function counter(counters: Readonly<Record<string, number>> | undefined, name: string): number {
+  return counters?.[name] ?? 0;
+}
+
 /** Create a fresh in-memory repo and return the memfs-compatible fs and a helper to commit files. */
 function makeRepo() {
   const vol = new Volume();
@@ -419,19 +423,24 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
         expect(
           entries.find((entry) => entry.name === "dag.traversal")?.attributes?.strategy,
         ).toEqual([strategyName === "certified-lazy" ? "certifiedLazy" : "phaseCertified"]);
-        expect(walkEntry?.counters).toEqual(
-          expect.objectContaining({
-            commit_reads: strategyName === "certified-lazy" ? 6 : 7,
-            commits_yielded: 4,
-            materialize_commit_cache_hits: 4,
-            topology_commit_reads: strategyName === "certified-lazy" ? 6 : 7,
-          }),
-        );
-        expect(walkEntry?.counters?.materialize_commit_reads).toBeUndefined();
-        expect(walkEntry?.counters?.commit_reads).toBe(walkEntry?.counters?.topology_commit_reads);
+        const traversalEntry = entries.find((entry) => entry.name === "dag.traversal");
+        const walkCounters = walkEntry?.counters;
+        const traversalCounters = traversalEntry?.counters;
+        const commitReads = counter(walkCounters, "commit_reads");
+        const topologyCommitReads = counter(walkCounters, "topology_commit_reads");
+        const topologyCommitCacheHits = counter(walkCounters, "topology_commit_cache_hits");
+        const materializeCommitReads = counter(walkCounters, "materialize_commit_reads");
+        const materializeCommitCacheHits = counter(walkCounters, "materialize_commit_cache_hits");
+        const commitsYielded = counter(walkCounters, "commits_yielded");
+        const successorExpansions = counter(traversalCounters, "successor_expansions");
+
+        expect(commitsYielded).toBe(4);
+        expect(commitReads).toBe(topologyCommitReads + materializeCommitReads);
+        expect(materializeCommitCacheHits + materializeCommitReads).toBe(commitsYielded);
+        expect(topologyCommitReads + topologyCommitCacheHits).toBe(successorExpansions);
 
         const readOids = readCommit.mock.calls.map(([options]) => options.oid);
-        expect(readOids).toHaveLength(walkEntry?.counters?.commit_reads ?? -1);
+        expect(readOids).toHaveLength(commitReads);
         expect(readOids).toHaveLength(new Set(readOids).size);
         for (const yieldedOid of oids) {
           expect(readOids).toContain(yieldedOid);

@@ -38,13 +38,14 @@ class TestGraph implements DagTopologyPort<Node, CommitPathSchedulingHint> {
 async function collect(
   strategyName: CommitTraversalStrategyName,
   graph: TestGraph,
+  excludeNodeId: Node | undefined,
 ): Promise<Node[]> {
   const strategy = createCommitTraversalStrategy(strategyName);
   const result: Node[] = [];
   for await (const node of strategy.walk(
     { graph, instrumentation: noopInstrumentation },
     oid("M"),
-    oid("E"),
+    excludeNodeId,
   )) {
     result.push(node);
   }
@@ -125,12 +126,12 @@ describe("commit traversal strategy factory", () => {
   });
 
   it("binds certified-lazy to the production LIFO/preserve walker", async () => {
-    const result = await collect("certified-lazy", makeGraph());
+    const result = await collect("certified-lazy", makeGraph(), oid("E"));
     expect(result).toEqual([oid("M"), oid("A"), oid("B"), oid("D")]);
   });
 
   it("binds phase-certified-fifo to the generic FIFO/preserve phase-certified walker", async () => {
-    const result = await collect("phase-certified-fifo", makeGraph());
+    const result = await collect("phase-certified-fifo", makeGraph(), oid("E"));
     expect(result).toEqual([oid("A"), oid("M"), oid("D"), oid("B")]);
   });
 
@@ -163,15 +164,23 @@ describe("commit traversal strategy factory", () => {
       "phase-certified-fifo",
       "phase-certified-timestamp",
     ] as const) {
-      const result = await collect(name, makeGraph({ A: 1, B: 10, C: 100, D: 5 }));
+      const result = await collect(name, makeGraph({ A: 1, B: 10, C: 100, D: 5 }), oid("E"));
       expect(new Set(result)).toEqual(expected);
       expect(result).toHaveLength(new Set(result).size);
     }
   });
 
   it("does not let timestamp assignment change membership", async () => {
-    const first = await collect("phase-certified-timestamp", makeGraph({ A: 1, B: 10, C: 100 }));
-    const second = await collect("phase-certified-timestamp", makeGraph({ A: 100, B: 1, C: 2 }));
+    const first = await collect(
+      "phase-certified-timestamp",
+      makeGraph({ A: 1, B: 10, C: 100 }),
+      oid("E"),
+    );
+    const second = await collect(
+      "phase-certified-timestamp",
+      makeGraph({ A: 100, B: 1, C: 2 }),
+      oid("E"),
+    );
     expect(new Set(first)).toEqual(new Set(second));
   });
 });

@@ -101,6 +101,8 @@ The architecture is layered:
 
 This layering keeps policy decisions in Core and implementation details in adapter/output modules.
 
+`packages/gitlode/src/dag/` is an internal generic DAG subsystem used below the Git adapter boundary. It owns node-ID-based traversal algorithms and graph-work instrumentation, but it is not part of the package public API. Git-specific code implements a topology port and calls the DAG subsystem; the DAG subsystem must not depend on Git commit objects, adapter caches, isomorphic-git errors, or Git-specific scheduling hints.
+
 ## Layer Responsibilities
 
 ### CLI layer
@@ -172,10 +174,12 @@ Responsibilities:
 - Detect repository object format (defaulting to `sha1` when unset).
 - Read origin URL when available.
 - Traverse commits reachable from a head commit, optionally excluding history reachable from `excludeHash`.
+- Implement the commit DAG topology port used by the internal `src/dag` traversal subsystem.
+- Keep invocation-scoped commit object caching shared between topology reads and yielded-commit materialization.
+- Record adapter-level commit read/cache/yield telemetry and translate library/runtime failures into `GitAdapterError` codes.
 - Compute per-file line-level diff statistics via an internal `DiffAdapter` strategy.
-- Translate library/runtime failures into `GitAdapterError` codes.
 
-The default adapter uses isomorphic-git internally and keeps those details from leaking upward. The
+The default adapter uses isomorphic-git internally and keeps those details from leaking upward. Commit traversal uses the generic `src/dag` certified-lazy strategy as the production default, with a Git adapter-injected LIFO/preserve frontier. Git child timestamp scheduling hints and the timestamp-priority frontier experiment are owned by `packages/gitlode/src/git-impl/commit-traversal/`; phase-certified traversal remains an internal prototype and is not connected to production commit walking. The
 config-only `runtime.gitAdapter` setting selects the Git implementation. The default value is
 `isomorphic-git`; `git-cli` uses the Git executable for traversal-oriented operations and delegates
 file-change expansion to the existing isomorphic-git implementation. Durable adapter-selection and

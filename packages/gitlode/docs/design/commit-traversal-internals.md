@@ -33,10 +33,9 @@ design documents, especially `git-traversal.md`.
 
 ## Strategy boundary
 
-`dag-traversal-strategy.ts` is written as a DAG traversal module rather than a Git-object-specific
-walker.
+`packages/gitlode/src/dag/` is the internal generic DAG traversal subsystem rather than a Git-object-specific walker.
 
-The DAG core depends on topology only:
+The DAG core depends on topology only and does not depend on Git commit objects, adapter caches, adapter error translation, isomorphic-git, or `CommitPathSchedulingHint`:
 
 ```ts
 export interface DagTopologyPort<NodeId extends PropertyKey, DomainHint = undefined> {
@@ -76,8 +75,7 @@ The current production Git frontier is still the injected LIFO/preserve frontier
 does not inspect them for priority, so timestamps do not affect result membership and do not make
 yield order contractual.
 
-The Git-specific timestamp-priority frontier policy is an explicit domain policy for prototype
-experiments. Its comparator only reads `domainHint?.sourceCommitterTimestamp` from queued frontier
+The Git-specific timestamp-priority frontier policy is owned by `packages/gitlode/src/git-impl/commit-traversal/` and is an explicit domain policy for prototype experiments. Its comparator only reads `domainHint?.sourceCommitterTimestamp` from queued frontier
 items:
 
 - hintless items sort before hinted items, so include/exclude starts and standalone closure roots can
@@ -289,7 +287,7 @@ older exclude ancestor.
 
 ## Phase-certified prototype frontier injection
 
-`explore-dag-strategy.ts` keeps separate injectable frontier factories for the experimental
+`packages/gitlode/src/dag/phase-certified.ts` keeps separate injectable frontier factories for the experimental
 phase-certified prototype:
 
 - the difference coordinator frontier schedules include-side work items and exclude closure-phase
@@ -326,7 +324,7 @@ frontier until a separate production adoption gate changes that decision.
 
 ## Phase-certified prototype telemetry
 
-`explore-dag-strategy.ts` keeps a prototype strategy for the same difference contract,
+`packages/gitlode/src/dag/phase-certified.ts` keeps a prototype strategy for the same difference contract,
 `reachable(includeStart) - reachable(excludeStart)`. It is not wired into production commit
 walking, but its instrumentation follows the same operation-level boundary as production DAG
 traversal so FIFO prototype runs can be compared with later frontier-policy experiments.

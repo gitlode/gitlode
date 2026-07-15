@@ -6,13 +6,11 @@ design documents; this handoff is only continuation context for possible later s
 
 ## Current baseline
 
-The DAG traversal core is now topology-based: traversal correctness depends on stable `NodeId`
+The internal generic DAG subsystem at `packages/gitlode/src/dag/` is now topology-based: traversal correctness depends on stable `NodeId`
 identity and `NodeId -> successors` relationships. Domain object reads, domain-object caching, and
 final `NodeId -> Node` resolution belong to caller-side adapters.
 
-The Git adapter currently resolves yielded commit OIDs back to commit objects through its
-adapter-local `CommitTopologyAdapter`, which owns an invocation-scoped `CommitOid -> RawCommit`
-cache.
+The Git adapter currently resolves yielded commit OIDs back to commit objects through its adapter-local `CommitTopologyAdapter`, which owns an invocation-scoped `CommitOid -> RawCommit` cache plus adapter read/cache telemetry and Git object error translation. Git-specific timestamp hints and policies are owned by `packages/gitlode/src/git-impl/commit-traversal/`, not by the generic DAG subsystem.
 
 ## DomainHint and remaining scheduling ideas
 

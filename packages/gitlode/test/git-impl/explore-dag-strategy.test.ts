@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createCommitTimestampPhaseCertifiedStrategyOptions,
-  createCommitTimestampPriorityFrontier,
-} from "../../src/git-impl/commit-timestamp-frontier-policy.js";
-import {
   type DagTopologyPort,
   type WalkDagContext,
   walkDagNodeIdsEagerExclude,
   type DagFrontier,
-} from "../../src/git-impl/dag-traversal-strategy.js";
+} from "../../src/dag/index.js";
 import {
   type CertifiedClosurePhaseResult,
   type BranchId,
@@ -18,8 +14,12 @@ import {
   IntegratedDifferenceState,
   resolveDagCertifiedClosurePhase,
   walkDagNodeIdsPhaseCertifiedDifference,
-} from "../../src/git-impl/explore-dag-strategy.js";
-import type { CommitPathSchedulingHint } from "../../src/git-impl/isomorphic-git-adapter.js";
+} from "../../src/dag/phase-certified.js";
+import {
+  createCommitTimestampPhaseCertifiedStrategyOptions,
+  createCommitTimestampPriorityFrontier,
+} from "../../src/git-impl/commit-traversal/index.js";
+import type { CommitPathSchedulingHint } from "../../src/git-impl/commit-traversal/index.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,

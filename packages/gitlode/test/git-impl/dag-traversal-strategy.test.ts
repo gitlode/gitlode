@@ -10,8 +10,8 @@ import {
   walkDagReachableNodeIds,
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,
-} from "../../src/git-impl/dag-traversal-strategy.js";
-import { walkDagNodeIdsPhaseCertifiedDifference } from "../../src/git-impl/explore-dag-strategy.js";
+} from "../../src/dag/index.js";
+import { walkDagNodeIdsPhaseCertifiedDifference } from "../../src/dag/phase-certified.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,

@@ -1,11 +1,11 @@
-import { PriorityQueue } from "../support/index.js";
-import type { DagFrontier } from "./dag-traversal-strategy.js";
 import type {
   ClosureFrontierItem,
+  DagFrontier,
   DifferenceFrontierItem,
   PhaseCertifiedStrategyOptions,
-} from "./explore-dag-strategy.js";
-import type { CommitPathSchedulingHint } from "./isomorphic-git-adapter.js";
+} from "../../dag/index.js";
+import { PriorityQueue } from "../../support/index.js";
+import type { CommitPathSchedulingHint } from "./types.js";
 
 export function compareCommitTimestampHintedItems<
   T extends { readonly domainHint?: CommitPathSchedulingHint },

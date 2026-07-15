@@ -1,6 +1,13 @@
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
+import {
+  type BasicDagSchedulingContext,
+  type DagFrontierItem,
+  type DagSuccessor,
+  type DagTopologyPort,
+  walkDagNodeIdsCertifiedLazy,
+} from "../dag/index.js";
 import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -18,13 +25,7 @@ import {
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import { OrderedQueue } from "../support/index.js";
-import {
-  type BasicDagSchedulingContext,
-  type DagFrontierItem,
-  type DagSuccessor,
-  type DagTopologyPort,
-  walkDagNodeIdsCertifiedLazy,
-} from "./dag-traversal-strategy.js";
+import type { CommitPathSchedulingHint } from "./commit-traversal/index.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
@@ -408,14 +409,6 @@ export class IsomorphicGitAdapter implements GitAdapter {
     }
     return false;
   }
-}
-
-export interface CommitPathSchedulingHint {
-  /**
-   * Unix seconds from the expanded child commit's committer timestamp. This is path-local
-   * scheduling metadata, not metadata about the pending parent node.
-   */
-  readonly sourceCommitterTimestamp: number;
 }
 
 class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSchedulingHint> {

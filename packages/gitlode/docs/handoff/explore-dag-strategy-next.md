@@ -1,11 +1,10 @@
 # Explore DAG Strategy Follow-up Handoff
 
-This note preserves follow-up context for `packages/gitlode/src/git-impl/explore-dag-strategy.ts`
-after the NodeId/topology DAG traversal refactor.
+This note preserves follow-up context for the phase-certified prototype now located at `packages/gitlode/src/dag/phase-certified.ts` after the NodeId/topology DAG traversal refactor. Historical references to the former explore strategy name are not current source paths.
 
 ## Current baseline
 
-`explore-dag-strategy.ts` is a prototype traversal strategy. It is not wired into production commit
+`packages/gitlode/src/dag/phase-certified.ts` is a prototype traversal strategy. It is not wired into production commit
 walking today, but it is not deprecated. It may still provide important future value if the
 certified-closure approach is developed further.
 
@@ -70,11 +69,8 @@ topology reads onto parent successor paths. A stable Git timestamp-priority fron
 for explicit phase-certified prototype injection; durable semantics live in
 `packages/gitlode/docs/design/commit-traversal-internals.md`.
 
-Correctness validation has a substantial topology-oriented baseline, and B-validation now compares
-FIFO and timestamp-priority graph work on controlled Git-like fixtures. Memory-oriented C-validation
-remains lower priority. Before production adoption, align the strategy call shape, organize the
-generic DAG and Git-specific module boundaries, and then design how the Git adapter selects an
-internal experimental strategy. Keep parent timestamp pre-reads out of that production plan.
+Correctness validation has a substantial topology-oriented baseline in `packages/gitlode/test/dag/phase-certified.test.ts`, and Git-specific B-validation now compares FIFO and timestamp-priority graph work in `packages/gitlode/test/git-impl/commit-traversal/timestamp-frontier-policy-efficiency.test.ts` on controlled Git-like fixtures. Memory-oriented C-validation
+remains lower priority. The generic DAG and Git-specific commit-traversal module boundaries are now organized: generic traversal lives in `packages/gitlode/src/dag/`, while Git timestamp hints and policies live in `packages/gitlode/src/git-impl/commit-traversal/`. Before production adoption, design how the Git adapter selects an internal experimental strategy. Keep parent timestamp pre-reads out of that production plan.
 
 ## Successor cache responsibility follow-up
 

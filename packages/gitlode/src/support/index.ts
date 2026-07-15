@@ -19,3 +19,5 @@ export type {
 } from "./work-queue.js";
 export { PriorityQueue, OrderedQueue } from "./work-queue.js";
 export { dirnameOfFilePath, resolveFilePath } from "./path.js";
+export { KeyedSet } from "./keyed-set.js";
+export type { ReadonlyKeyedSet } from "./keyed-set.js";

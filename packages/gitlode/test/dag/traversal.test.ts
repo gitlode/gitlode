@@ -10,8 +10,8 @@ import {
   walkDagReachableNodeIds,
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,
+  walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/dag/index.js";
-import { walkDagNodeIdsPhaseCertifiedDifference } from "../../src/dag/index.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,

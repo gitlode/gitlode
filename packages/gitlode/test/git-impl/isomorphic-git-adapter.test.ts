@@ -2,6 +2,7 @@ import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it, vi } from "vitest";
 
+import { createCommitTraversalStrategy } from "../../src/git-impl/commit-traversal/index.js";
 import type { IsomorphicGitAdapterDependencies } from "../../src/git-impl/index.js";
 import {
   IsomorphicGitAdapter,
@@ -26,6 +27,7 @@ function createAdapter(
     fs,
     diffAdapter: overrides.diffAdapter ?? new JsDiffAdapter(),
     instrumentation: overrides.instrumentation ?? noopInstrumentation,
+    commitTraversalStrategy: overrides.commitTraversalStrategy,
   });
 }
 
@@ -371,6 +373,54 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(new Set(commits.map((commit) => commit.oid))).toEqual(
       new Set([head, mainAfter, sideB, sideA]),
     );
+  });
+
+  it("uses injected commit traversal strategies with equal merge-difference membership", async () => {
+    // root -- fork -- release -- mainAfter -- merge (head)
+    //           \-- sideA -- sideB --------/
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const fork = await writeCommit(fs, tree, [root], "fork", 2000);
+    const release = await writeCommit(fs, tree, [fork], "release", 3000);
+    const mainAfter = await writeCommit(fs, tree, [release], "main after release", 4000);
+    const sideA = await writeCommit(fs, tree, [fork], "side A", 2500);
+    const sideB = await writeCommit(fs, tree, [sideA], "side B", 3500);
+    const head = await writeCommit(fs, tree, [mainAfter, sideB], "merge", 5000);
+    const expected = new Set([head, mainAfter, sideB, sideA]);
+
+    for (const strategyName of [
+      "certified-lazy",
+      "phase-certified-fifo",
+      "phase-certified-timestamp",
+    ] as const) {
+      let time = 0;
+      const { LocalInstrumentationRecorder } = await import("../../src/instrumentation/index.js");
+      const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+      const commits = await collectAll(
+        createAdapter(fs, {
+          instrumentation,
+          commitTraversalStrategy: createCommitTraversalStrategy(strategyName),
+        }),
+        head,
+        release,
+      );
+      const oids = commits.map((commit) => commit.oid);
+      expect(new Set(oids)).toEqual(expected);
+      expect(oids).toHaveLength(new Set(oids).size);
+
+      const entries = instrumentation.summary();
+      expect(
+        entries.find((entry) => entry.name === "git.walk_commits")?.attributes?.strategy,
+      ).toEqual([strategyName]);
+      expect(entries.find((entry) => entry.name === "dag.traversal")?.attributes?.strategy).toEqual(
+        [strategyName === "certified-lazy" ? "certifiedLazy" : "phaseCertified"],
+      );
+      expect(entries.find((entry) => entry.name === "git.walk_commits")?.counters).toEqual(
+        expect.objectContaining({ commits_yielded: 4 }),
+      );
+    }
   });
 
   it("subtracts ancestors of an unreachable excludeHash that shares an ancestor with head", async () => {
@@ -942,6 +992,7 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
     expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
     expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
     expect(walkEntry?.totalMs).toBeGreaterThan(0);
+    expect(walkEntry?.attributes).toEqual({ strategy: ["certified-lazy"] });
     expect(walkEntry?.counters).toEqual({
       commit_reads: 2,
       commits_yielded: 1,

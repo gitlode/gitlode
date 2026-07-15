@@ -18,7 +18,14 @@ import {
   DefaultTraversalPlanner,
   EnrichingFactProjector,
 } from "../core/index.js";
-import { GitCliAdapter, IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
+import {
+  EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
+  GitCliAdapter,
+  IsomorphicGitAdapter,
+  JsDiffAdapter,
+  createCommitTraversalStrategy,
+  resolveCommitTraversalStrategyName,
+} from "../git-impl/index.js";
 import { type GitAdapter, GitAdapterError } from "../git/index.js";
 import {
   LocalInstrumentationRecorder,
@@ -51,6 +58,10 @@ type BuildProjectorResult =
 export interface RuntimeExecutionProgress {
   readonly reporter: ProgressReporter;
   readonly renderDiagnostic: (severity: "warn" | "error", message: string) => void;
+}
+
+export interface RuntimeExecutionDependencies {
+  readonly environment: Readonly<Record<string, string | undefined>>;
 }
 
 export type RuntimeExecutionResult =
@@ -143,26 +154,53 @@ type BuildGitAdapterResult =
   | { readonly kind: "success"; readonly adapter: GitAdapter; readonly gitVersion?: string }
   | { readonly kind: "user-error"; readonly message: string };
 
+export function resolveIsomorphicCommitTraversalStrategyFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>>,
+) {
+  return createCommitTraversalStrategy(
+    resolveCommitTraversalStrategyName(environment[EXPERIMENTAL_COMMIT_TRAVERSAL_ENV]),
+  );
+}
+
 async function buildGitAdapter(
   input: WorkerRunInput,
   instrumentation: Instrumentation,
+  dependencies: RuntimeExecutionDependencies,
 ): Promise<BuildGitAdapterResult> {
-  const isomorphicAdapter = new IsomorphicGitAdapter({
-    fs: nodeFs,
-    diffAdapter: new JsDiffAdapter(),
-    instrumentation,
-  });
+  const createDefaultIsomorphicAdapter = (): IsomorphicGitAdapter =>
+    new IsomorphicGitAdapter({
+      fs: nodeFs,
+      diffAdapter: new JsDiffAdapter(),
+      instrumentation,
+    });
 
   switch (input.gitAdapter) {
-    case "isomorphic-git":
+    case "isomorphic-git": {
+      let commitTraversalStrategy;
+      try {
+        commitTraversalStrategy = resolveIsomorphicCommitTraversalStrategyFromEnvironment(
+          dependencies.environment,
+        );
+      } catch (error) {
+        return {
+          kind: "user-error",
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
       return {
         kind: "success",
-        adapter: isomorphicAdapter,
+        adapter: new IsomorphicGitAdapter({
+          fs: nodeFs,
+          diffAdapter: new JsDiffAdapter(),
+          instrumentation,
+          commitTraversalStrategy,
+        }),
       };
+    }
     case "git-cli": {
       const adapter = new GitCliAdapter({
         instrumentation,
-        fileChangeAdapter: isomorphicAdapter,
+        fileChangeAdapter: createDefaultIsomorphicAdapter(),
       });
       try {
         const gitVersion = await adapter.validateGitExecutable();
@@ -284,6 +322,7 @@ async function finishUserError(
 export async function executeWorkerRunRequest(
   request: WorkerRunRequest,
   progress: RuntimeExecutionProgress,
+  dependencies: RuntimeExecutionDependencies = { environment: process.env },
 ): Promise<RuntimeExecutionResult> {
   const { input, priorState } = request;
   const recorder = input.profile
@@ -303,7 +342,7 @@ export async function executeWorkerRunRequest(
   });
 
   try {
-    const gitAdapterResult = await buildGitAdapter(input, instrumentation);
+    const gitAdapterResult = await buildGitAdapter(input, instrumentation, dependencies);
     if (gitAdapterResult.kind === "user-error") {
       return await finishUserError(runSpan, gitAdapterResult.message);
     }

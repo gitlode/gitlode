@@ -92,8 +92,7 @@ implementation was selected. The current default is `isomorphic-git`. When `runt
 set to `git-cli`, the same run-level span also records `git.cli.version` after validating the Git
 executable with `git --version`.
 
-`git.walk_commits` is the adapter-level span for commit traversal. For the isomorphic-git adapter,
-it records commit-object diagnostics such as `commits_yielded`, total backend `commit_reads`, and
+`git.walk_commits` is the adapter-level span for commit traversal. For the isomorphic-git adapter, it records `strategy` as the full Git commit traversal mode (`certified-lazy`, `phase-certified-fifo`, or `phase-certified-timestamp`) plus commit-object diagnostics such as `commits_yielded`, total backend `commit_reads`, and
 purpose-specific read/cache counters. `topology_commit_reads` and `topology_commit_cache_hits`
 describe commit access while projecting DAG successors. `materialize_commit_reads` and
 `materialize_commit_cache_hits` describe commit access while turning yielded OIDs into `RawCommit`

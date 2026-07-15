@@ -1,10 +1,5 @@
 import { prepareMappings } from "./classifier.js";
-import type { MappingDefinition, PreparedMappings, RuleSetName } from "./classifier.js";
-
-export interface PreparedRuleSet {
-  readonly name: RuleSetName;
-  readonly mappings: PreparedMappings;
-}
+import type { MappingDefinition, PreparedMappings, PreparedRuleSet, RuleSetName } from "./types.js";
 
 const COMMON_MAPPING_ENTRIES = [
   // Programming languages and source-like formats.

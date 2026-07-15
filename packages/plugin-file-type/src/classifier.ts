@@ -1,54 +1,15 @@
-import type { PreparedConfig } from "./config.js";
-
-export type RuleSetName = "common";
-export type MappingSource = "plugin-config" | RuleSetName;
-
-declare const basenameSignatureBrand: unique symbol;
-declare const suffixSignatureBrand: unique symbol;
-
-export type BasenameSignature = string & {
-  readonly [basenameSignatureBrand]: "BasenameSignature";
-};
-export type SuffixSignature = string & { readonly [suffixSignatureBrand]: "SuffixSignature" };
-
-export interface BasenameMappingEntry {
-  readonly signature: BasenameSignature;
-  readonly name: string;
-  readonly source: MappingSource;
-}
-
-export interface SuffixMappingEntry {
-  readonly signature: SuffixSignature;
-  readonly suffixLower: string;
-  readonly name: string;
-  readonly source: MappingSource;
-}
-
-export interface PreparedMappings {
-  readonly basenames: ReadonlyMap<BasenameSignature, BasenameMappingEntry>;
-  readonly suffixes: ReadonlyMap<SuffixSignature, SuffixMappingEntry>;
-}
-
-export interface MappingDefinition {
-  readonly signature: string;
-  readonly name: string;
-  readonly source: MappingSource;
-}
-
-export type MappingParseResult =
-  | { readonly ok: true; readonly value: PreparedMappings }
-  | { readonly ok: false; readonly message: string };
-
-type SignatureParseResult =
-  | { readonly ok: true; readonly type: "basename"; readonly value: BasenameSignature }
-  | { readonly ok: true; readonly type: "suffix"; readonly value: SuffixSignature }
-  | { readonly ok: false; readonly message: string };
-
-export interface Classification {
-  readonly name: string;
-  readonly source: MappingSource | "unknown";
-  readonly matched: string | null;
-}
+import type {
+  BasenameMappingEntry,
+  BasenameSignature,
+  Classification,
+  MappingDefinition,
+  MappingParseResult,
+  PreparedConfig,
+  PreparedMappings,
+  SignatureParseResult,
+  SuffixMappingEntry,
+  SuffixSignature,
+} from "./types.js";
 
 export function prepareMappings(definitions: Iterable<MappingDefinition>): MappingParseResult {
   const basenames = new Map<BasenameSignature, BasenameMappingEntry>();

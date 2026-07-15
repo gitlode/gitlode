@@ -9,9 +9,8 @@ import type {
 } from "gitlode/plugin-api";
 
 import { classifyPath } from "./classifier.js";
-import type { Classification } from "./classifier.js";
 import { parseConfig } from "./config.js";
-import type { PreparedConfig } from "./config.js";
+import type { Classification, PreparedConfig } from "./types.js";
 
 const factory: PluginFactory = async (rawConfig: unknown) => {
   let runtime: PluginRuntimeContext | undefined;

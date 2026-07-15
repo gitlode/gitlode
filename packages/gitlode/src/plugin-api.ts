@@ -15,3 +15,4 @@ export type {
   ProjectedFileChange,
 } from "./core/index.js";
 export type { CommitOid } from "./model/index.js";
+export type * from "./type-utils/index.js";

@@ -163,32 +163,6 @@ excluded node IDs before producing output. A failed certificate must not leak pa
 The DAG core does not cache domain nodes or successors. Git commit-object reuse belongs to the
 adapter's `CommitTopologyAdapter` cache.
 
-### Phase-certified closure root classification
-
-The experimental phase-certified closure resolver classifies the closure root by expanding that root
-exactly once before any closure frontier exists:
-
-- a root with zero successors immediately resolves to an exhausted closure containing only the root
-  as both a certified and terminal node;
-- a root with one successor immediately resolves to a closed boundary at that successor, certifying
-  both the root and the boundary without expanding the boundary or reading farther topology;
-- a root with two or more successors opens the existing split/rejoin state machine and enqueues the
-  successor branch items into a fresh closure frontier.
-
-A closure frontier is therefore created only when branch scheduling is necessary. Terminal and
-single-successor roots do not create one; a split root creates one fresh frontier for that closure
-phase, and nested splits in the same phase reuse that frontier. The frontier remains a
-scheduling-only abstraction and does not own visited state, edge state, certification state, or
-branch correctness state.
-
-Root classification still counts as traversal work. The root expansion increments the same
-`traversal_steps`, `successor_expansions`, and `exclude_expansions` counters that a dequeued closure
-frontier item would have incremented, and the expansion counters must continue to match actual
-`DagTopologyPort.getSuccessors()` calls. For single-successor closure roots, the successor
-descriptor's domain hint is inherited as the closed-boundary hint passed to the next exclude phase;
-this uses the already-read successor descriptor and must not pre-read the boundary node's own
-metadata.
-
 ## Certificate
 
 Certified-lazy traversal uses a conservative path certificate. It avoids full
@@ -316,6 +290,32 @@ older exclude ancestor.
   certified-closure strategy. Future telemetry work should preserve the generic DAG / Git adapter
   boundary.
 
+## Phase-certified prototype closure resolution
+
+The experimental phase-certified closure resolver classifies the closure root by expanding that root
+exactly once before any closure frontier exists:
+
+- a root with zero successors immediately resolves to an exhausted closure containing only the root
+  as both a certified and terminal node;
+- a root with one successor immediately resolves to a closed boundary at that successor, certifying
+  both the root and the boundary node without expanding the boundary or reading farther topology;
+- a root with two or more successors opens the existing split/rejoin state machine and enqueues the
+  successor branch items into a fresh closure frontier.
+
+A closure frontier is therefore created only when branch scheduling is necessary. Terminal and
+single-successor roots do not create one; a split root creates one fresh frontier for that closure
+phase, and nested splits in the same phase reuse that frontier. The frontier remains a
+scheduling-only abstraction and does not own visited state, edge state, certification state, or
+branch correctness state.
+
+Root classification still counts as traversal work. The root expansion performs a real
+`DagTopologyPort.getSuccessors()` call and increments `traversal_steps`, `successor_expansions`, and
+`exclude_expansions` once. Split-closure frontier items also increment those expansion counters when
+they expand topology, so expansion counters must continue to match actual topology access. For
+single-successor closure roots, the successor descriptor's domain hint is inherited as the
+closed-boundary hint passed to the next exclude phase; this uses the already-read successor
+descriptor and must not pre-read the boundary node's own metadata.
+
 ## Phase-certified prototype frontier injection
 
 `packages/gitlode/src/dag/phase-certified.ts` is the facade for separate injectable frontier factories in the experimental
@@ -327,10 +327,12 @@ phase-certified prototype:
 
 When no factory is supplied, both frontiers use `OrderedQueue` with `dequeueOrder: "fifo"` and
 `blockOrder: "preserve"`, matching the previous array `shift()` / `push()` behavior. A difference
-operation creates one difference frontier. Each closure phase creates a fresh closure frontier; a
-difference operation that starts multiple closure phases therefore receives multiple independent
-closure queues, and standalone `resolveDagCertifiedClosurePhase()` creates one closure queue per
-operation.
+operation creates one difference frontier. Closure frontier creation depends on closure root
+classification: terminal and single-successor roots do not create a closure frontier, while a split
+root creates one fresh closure frontier for that closure phase. Nested splits inside that phase reuse
+the same closure frontier; a later closure phase whose root is also a split receives a different
+fresh closure frontier. Standalone `resolveDagCertifiedClosurePhase()` follows the same rule and
+creates a closure frontier only when its root is a split.
 
 These frontiers are scheduling-only seams. They hold pending items and select the next item to
 process, but they do not own visited state, stale detection, deduplication, certified/excluded state,
@@ -343,10 +345,12 @@ result set. Successor groups are enqueued as blocks so block-aware policies can 
 within-block order consistently without moving correctness state into the queue.
 
 For Git timestamp-priority experiments, the same commit timestamp priority contract is injected into
-both `createDifferenceFrontier` and `createClosureFrontier`. The difference operation receives one
-fresh priority queue for its coordinator frontier. Every closure phase receives its own fresh priority
-queue, including closed-boundary follow-up phases and standalone closure operations. Queue instances
-must not be shared across difference operations or closure phases.
+both `createDifferenceFrontier` and `createClosureFrontier`. The difference coordinator receives one
+fresh priority queue for its coordinator frontier. The closure frontier factory is called only for
+split closure roots: terminal and single-successor closure phases do not create a priority queue,
+each split closure phase receives one fresh priority queue, and nested splits in that same phase
+reuse it. Queue instances must not be shared across difference operations or across separate split
+closure phases.
 
 The generic phase-certified default remains FIFO/preserve. Git timestamp priority is only active when
 callers explicitly inject the Git-specific policy. The phase-certified strategies are reachable through the internal experiment seam, but production default remains certified-lazy with its LIFO/preserve frontier until a separate production adoption gate changes that decision.
@@ -363,16 +367,18 @@ their work is aggregated into the enclosing traversal span. The common counters 
 meaning as the production strategies:
 
 - `yielded_nodes`: nodes finally yielded by the difference operation only.
-- `traversal_steps`: include frontier items plus closure frontier items that are dequeued for work;
-  exclude coordinator items are phase triggers and are not counted separately from the closure start
-  item.
+- `traversal_steps`: dequeued include frontier items, closure root classification steps, and
+  dequeued split-closure frontier items. Exclude coordinator items are phase triggers and are not
+  counted as an additional step separate from the closure root classification they start.
 - `stale_steps`: dequeued work items discarded as stale or duplicate, such as deleted include
   states, already-expanded include nodes, or closure nodes already traversed by the same branch.
   Certified hits are meaningful state transitions and are not stale.
 - `successor_expansions`, `main_expansions`, and `exclude_expansions`: calls to the underlying
-  `DagTopologyPort.getSuccessors()`. Include-side local predecessor/successor walks used for
-  certified-hit classification are local graph operations and are intentionally not counted as
-  topology expansions.
+  `DagTopologyPort.getSuccessors()`. Closure root classification performs a real topology read and
+  increments `successor_expansions` and `exclude_expansions` once; each split-closure frontier
+  expansion does the same. Include-side local predecessor/successor walks used for certified-hit
+  classification are local graph operations and are intentionally not counted as topology
+  expansions.
 
 The prototype also records strategy-specific counters on the same `dag.traversal` span:
 
@@ -389,9 +395,10 @@ of omitting counters that were never incremented.
 
 `resolveDagCertifiedClosurePhase()` is also a standalone operation. When called directly, it records
 one `dag.certified_closure` span with `result=closed-boundary` or `result=exhausted` after the phase
-finishes. Standalone closure spans record closure frontier steps, exclude-side successor expansions,
-`certified_nodes`, and exhausted-phase `terminal_nodes`. Difference traversal calls the shared
-closure core directly to avoid double-spanning internal phases.
+finishes. Standalone closure spans record the closure root classification step, any split-branch
+frontier steps, exclude-side successor expansions, `certified_nodes`, and exhausted-phase
+`terminal_nodes`. Difference traversal calls the shared closure core directly to avoid double-spanning
+internal phases.
 
 ### Phase-certified path scheduling hints
 

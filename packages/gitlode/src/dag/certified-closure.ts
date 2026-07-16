@@ -92,6 +92,34 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = unde
     this.recordBranchReachAndDetectJoin(startId, this.rootBranchId);
   }
 
+  async begin(rootDomainHint?: DomainHint): Promise<ClosureFrontierItem<NodeId, DomainHint>[]> {
+    const rootItem: ClosureFrontierItem<NodeId, DomainHint> = {
+      nodeId: this.getBranchStateOrThrow(this.rootBranchId).startedAt,
+      branchId: this.rootBranchId,
+      ...(rootDomainHint === undefined ? {} : { domainHint: rootDomainHint }),
+    };
+    const successors = await this.graph.expand(rootItem.nodeId);
+    this.graph.recordBranchTraversal(rootItem.nodeId, rootItem.branchId);
+
+    if (successors.length === 0) {
+      this.markTerminal(rootItem.nodeId);
+      return [];
+    }
+
+    if (successors.length === 1) {
+      const successor = successors[0];
+      if (successor === undefined) throw new Error("Expected single successor.");
+      this.graph.recordTraversedEdge(rootItem.nodeId, successor.nodeId);
+      this.recordBranchReachAndDetectJoin(successor.nodeId, rootItem.branchId);
+      this.graph.markCoveredByClosedRegion(successor.nodeId);
+      this.closedBoundary = successor.nodeId;
+      this.closedBoundaryDomainHint = successor.domainHint;
+      return [];
+    }
+
+    return this.processSplitSuccessors(rootItem, successors);
+  }
+
   async processFrontierItem(
     item: ClosureFrontierItem<NodeId, DomainHint>,
   ): Promise<ClosureFrontierItem<NodeId, DomainHint>[]> {

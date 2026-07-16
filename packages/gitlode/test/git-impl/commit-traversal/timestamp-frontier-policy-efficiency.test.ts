@@ -34,24 +34,24 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
     expect(priority.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
+      "MAIN_TIP",
       "EXCLUDE_MERGE",
       "MAIN_BASE",
       "TOPIC_TIP",
       "MAIN_OLDER",
       "SHARED_JOIN",
-      "MAIN_TIP",
       "ROOT",
     ]);
     expect(fifo.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
+      "MAIN_TIP",
       "EXCLUDE_MERGE",
       "MAIN_BASE",
       "TOPIC_TIP",
       "MAIN_OLDER",
       "ROOT",
       "SHARED_JOIN",
-      "MAIN_TIP",
       "ROOT",
     ]);
     expect(priority.counters.traversal_steps).toBeLessThan(fifo.counters.traversal_steps);
@@ -133,7 +133,7 @@ function createFavorableFixture(kind: "favorable" | "equal"): Fixture {
   const timestamps = {
     INCLUDE_HEAD: 1_000,
     MAIN_TIP: 990,
-    EXCLUDE_HEAD: 980,
+    EXCLUDE_HEAD: 995,
     EXCLUDE_MERGE: 970,
     MAIN_BASE: 960,
     MAIN_OLDER: 950,

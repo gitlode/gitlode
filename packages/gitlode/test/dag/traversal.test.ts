@@ -2,17 +2,21 @@ import * as git from "isomorphic-git";
 import { describe, expect, it } from "vitest";
 
 import {
-  type DagNodePort,
+  type DagDifferenceWalker,
+  type DagFrontier,
+  type DagFrontierItem,
+  type DagTopologyPort,
   type WalkDagStrategyOptions,
-  walkDagCertifiedLazy,
-  walkDagEagerExclude,
-} from "../../src/git-impl/dag-traversal-strategy.js";
+  walkDagReachableNodeIds,
+  walkDagNodeIdsCertifiedLazy,
+  walkDagNodeIdsEagerExclude,
+  walkDagNodeIdsPhaseCertifiedDifference,
+} from "../../src/dag/index.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
 } from "../../src/instrumentation/index.js";
-import type { ProfileSummaryEntry } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
 import { OrderedQueue } from "../../src/support/index.js";
 import {
@@ -24,16 +28,22 @@ import {
   type DagDefinition,
 } from "../support/commit-dag.js";
 
-type Walker = (dag: BuiltDag, head: CommitOid, exclude?: CommitOid) => Promise<RawCommit[]>;
+type Walker = (dag: BuiltDag, head: CommitOid, exclude?: CommitOid) => Promise<CommitOid[]>;
+
+const eagerExcludeStrategy: DagDifferenceWalker<CommitOid> = walkDagNodeIdsEagerExclude;
+const certifiedLazyStrategy: DagDifferenceWalker<CommitOid> = (context, nodeId, excludeNodeId) =>
+  walkDagNodeIdsCertifiedLazy(context, nodeId, excludeNodeId, certifiedLazyOptions());
+const phaseCertifiedStrategy: DagDifferenceWalker<CommitOid> = (context, nodeId, excludeNodeId) =>
+  walkDagNodeIdsPhaseCertifiedDifference(context, nodeId, excludeNodeId);
 
 const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
   {
     name: "eagerExclude",
     async walk(dag, head, exclude) {
-      const commits: RawCommit[] = [];
-      for await (const commit of walkDagEagerExclude(
+      const commits: CommitOid[] = [];
+      for await (const commit of eagerExcludeStrategy(
         {
-          nodes: rawCommitNodePort(dag),
+          graph: rawCommitTopologyPort(dag),
           instrumentation: noopInstrumentation,
         },
         head,
@@ -47,15 +57,31 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
   {
     name: "certifiedLazy",
     async walk(dag, head, exclude) {
-      const commits: RawCommit[] = [];
-      for await (const commit of walkDagCertifiedLazy(
+      const commits: CommitOid[] = [];
+      for await (const commit of certifiedLazyStrategy(
         {
-          nodes: rawCommitNodePort(dag),
+          graph: rawCommitTopologyPort(dag),
           instrumentation: noopInstrumentation,
         },
         head,
         exclude,
-        certifiedLazyOptions(),
+      )) {
+        commits.push(commit);
+      }
+      return commits;
+    },
+  },
+  {
+    name: "phaseCertified",
+    async walk(dag, head, exclude) {
+      const commits: CommitOid[] = [];
+      for await (const commit of phaseCertifiedStrategy(
+        {
+          graph: rawCommitTopologyPort(dag),
+          instrumentation: noopInstrumentation,
+        },
+        head,
+        exclude,
       )) {
         commits.push(commit);
       }
@@ -64,20 +90,20 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
   },
 ];
 
-function rawCommitNodePort(dag: BuiltDag, requests?: string[]): DagNodePort<CommitOid, RawCommit> {
+function rawCommitTopologyPort(dag: BuiltDag, requests?: string[]): DagTopologyPort<CommitOid> {
   return {
-    async readNode(oid) {
+    async getSuccessors(oid) {
       requests?.push(oid);
-      return readCommitForPort(dag, oid);
+      const commit = await readCommitForPort(dag, oid);
+      return commit.parents.map((parent) => ({ nodeId: parent }));
     },
-    getSuccessors: (node) => node.parents,
   };
 }
 
 function certifiedLazyOptions(): WalkDagStrategyOptions<CommitOid> {
   return {
-    createIncludeQueue: () =>
-      new OrderedQueue<CommitOid>({
+    createFrontier: () =>
+      new OrderedQueue<DagFrontierItem<CommitOid>>({
         dequeueOrder: "lifo",
         blockOrder: "preserve",
       }),
@@ -120,6 +146,282 @@ function toRawCommit(hash: CommitOid, commit: IsomorphicGitCommitObject): RawCom
     },
     parents: commit.parent as unknown as readonly CommitOid[],
   };
+}
+
+function stringTopology(
+  successorsByNode: Record<string, readonly string[]>,
+): DagTopologyPort<string> {
+  return {
+    async getSuccessors(nodeId) {
+      return (successorsByNode[nodeId] ?? []).map((successor) => ({ nodeId: successor }));
+    },
+  };
+}
+
+class RecordingFrontier<
+  T extends DagFrontierItem<string, DomainHint>,
+  DomainHint,
+> implements DagFrontier<T> {
+  private readonly items: T[] = [];
+  readonly enqueued: T[] = [];
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  isEmpty(): boolean {
+    return this.items.length === 0;
+  }
+
+  enqueue(...items: T[]): void {
+    this.items.push(...items);
+    this.enqueued.push(...items);
+  }
+
+  enqueueMany(items: Iterable<T>): void {
+    const block = [...items];
+    this.items.push(...block);
+    this.enqueued.push(...block);
+  }
+
+  peek(): T | undefined {
+    return this.items[0];
+  }
+
+  peekOrThrow(): T {
+    const item = this.peek();
+    if (item === undefined) throw new Error("Cannot peek from an empty queue.");
+    return item;
+  }
+
+  dequeue(): T | undefined {
+    return this.items.shift();
+  }
+
+  dequeueOrThrow(): T {
+    const item = this.dequeue();
+    if (item === undefined) throw new Error("Cannot dequeue from an empty queue.");
+    return item;
+  }
+
+  clear(): void {
+    this.items.length = 0;
+  }
+}
+
+describe("DAG traversal NodeId API and frontier metadata", () => {
+  it("collects reachable node IDs from one or more starts", async () => {
+    const result = new Set(
+      await collect(
+        walkDagReachableNodeIds(
+          {
+            graph: stringTopology({ left: ["root"], right: ["root"], root: [] }),
+            instrumentation: noopInstrumentation,
+          },
+          ["left", "right"],
+        ),
+      ),
+    );
+
+    expect(result).toEqual(new Set(["left", "right", "root"]));
+  });
+
+  it("yields deterministic order for identical input and topology", async () => {
+    const graph = stringTopology({ left: ["root"], right: ["root"], root: [] });
+
+    const first = await collect(
+      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
+    );
+    const second = await collect(
+      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
+    );
+
+    expect(first).toEqual(second);
+  });
+
+  it("records scheduling metadata and copied domain hints in frontier items", async () => {
+    const frontier = new RecordingFrontier<
+      DagFrontierItem<string, { readonly parentIndex: number }>,
+      { readonly parentIndex: number }
+    >();
+    const graph: DagTopologyPort<string, { readonly parentIndex: number }> = {
+      async getSuccessors(nodeId) {
+        if (nodeId !== "head") return [];
+        return [
+          { nodeId: "first", domainHint: { parentIndex: 0 } },
+          { nodeId: "second", domainHint: { parentIndex: 1 } },
+        ];
+      },
+    };
+
+    const yielded = await collect(
+      walkDagNodeIdsEagerExclude(
+        { graph, instrumentation: noopInstrumentation },
+        "head",
+        undefined,
+        { createFrontier: () => frontier },
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(new Set(["head", "first", "second"]));
+    expect(frontier.enqueued.map((item) => item.nodeId)).toEqual(["head", "first", "second"]);
+    expect(frontier.enqueued[0]?.scheduling).toEqual({
+      role: "main",
+      depth: 0,
+      discoveredOrder: 0,
+    });
+    expect(frontier.enqueued[1]?.scheduling).toEqual({
+      role: "main",
+      depth: 1,
+      discoveredOrder: 1,
+    });
+    expect(frontier.enqueued[2]?.domainHint).toEqual({ parentIndex: 1 });
+  });
+});
+
+describe("DAG traversal telemetry", () => {
+  it("records a top-level reachable operation with yielded nodes", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagReachableNodeIds(
+        {
+          graph: stringTopology({ head: ["left", "right"], left: [], right: [] }),
+          instrumentation: recorder,
+        },
+        ["head"],
+      ),
+    );
+
+    expect(new Set(result)).toEqual(new Set(["head", "left", "right"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.reachable",
+        counters: {
+          main_expansions: 3,
+          successor_expansions: 3,
+          traversal_steps: 3,
+          yielded_nodes: 3,
+        },
+      }),
+    ]);
+  });
+
+  it("records eager-exclude traversal output separately from excluded reachable collection", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagNodeIdsEagerExclude(
+        {
+          graph: stringTopology({
+            root: [],
+            release: ["root"],
+            head: ["release"],
+          }),
+          instrumentation: recorder,
+        },
+        "head",
+        "release",
+      ),
+    );
+
+    expect(result).toEqual(["head"]);
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: { strategy: "eagerExclude" },
+        counters: {
+          exclude_expansions: 2,
+          excluded_nodes: 2,
+          main_expansions: 1,
+          successor_expansions: 3,
+          traversal_steps: 3,
+          yielded_nodes: 1,
+        },
+      }),
+    ]);
+  });
+
+  it("records certified-lazy certificate success without fallback counters", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagNodeIdsCertifiedLazy(
+        {
+          graph: stringTopology({
+            old: [],
+            release: ["old"],
+            after: ["release"],
+            head: ["after"],
+          }),
+          instrumentation: recorder,
+        },
+        "head",
+        "release",
+        certifiedLazyOptions(),
+      ),
+    );
+
+    expect(new Set(result)).toEqual(new Set(["head", "after"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: { result: "certified", strategy: "certifiedLazy" },
+        counters: expect.objectContaining({
+          exclude_expansions: 2,
+          main_expansions: 2,
+          successor_expansions: 4,
+          yielded_nodes: 2,
+        }),
+      }),
+    ]);
+    expect(recorder.records()[0]?.counters).not.toHaveProperty("fallback_removed");
+    expect(recorder.records()[0]?.counters).not.toHaveProperty("excluded_nodes");
+  });
+
+  it("records certified-lazy fallback reason and removed candidates", async () => {
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const result = await collect(
+      walkDagNodeIdsCertifiedLazy(
+        {
+          graph: stringTopology({
+            headRoot: [],
+            head: ["headRoot"],
+            excludeRoot: [],
+            exclude: ["excludeRoot"],
+          }),
+          instrumentation: recorder,
+        },
+        "head",
+        "exclude",
+        certifiedLazyOptions(),
+      ),
+    );
+
+    expect(new Set(result)).toEqual(new Set(["head", "headRoot"]));
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "dag.traversal",
+        attributes: {
+          fallback_reason: "open_include_path",
+          result: "fallback",
+          strategy: "certifiedLazy",
+        },
+        counters: expect.objectContaining({
+          excluded_nodes: 2,
+          fallback_removed: 0,
+          yielded_nodes: 2,
+        }),
+      }),
+    ]);
+  });
+});
+
+async function collect<T>(items: AsyncIterable<T>): Promise<T[]> {
+  const result: T[] = [];
+  for await (const item of items) result.push(item);
+  return result;
 }
 
 const cases: readonly DagDefinition[] = [
@@ -487,9 +789,9 @@ describe("DAG traversal eagerExclude read trace", () => {
     exclude?: CommitOid,
     requests: string[] = [],
   ): Promise<readonly string[]> {
-    const commits = walkDagEagerExclude(
+    const commits = walkDagNodeIdsEagerExclude(
       {
-        nodes: rawCommitNodePort(dag, requests),
+        graph: rawCommitTopologyPort(dag, requests),
         instrumentation: noopInstrumentation,
       },
       head,
@@ -592,9 +894,9 @@ describe("DAG traversal certifiedLazy read trace", () => {
     exclude?: CommitOid,
     requests: string[] = [],
   ): Promise<readonly string[]> {
-    const commits = walkDagCertifiedLazy(
+    const commits = walkDagNodeIdsCertifiedLazy(
       {
-        nodes: rawCommitNodePort(dag, requests),
+        graph: rawCommitTopologyPort(dag, requests),
         instrumentation: noopInstrumentation,
       },
       head,
@@ -692,173 +994,4 @@ describe("DAG traversal certifiedLazy read trace", () => {
 
     expect(labelsRead).toEqual(new Set(Object.keys(definition.nodes)));
   });
-
-  it("does not read the same OID more than once through the read seam", async () => {
-    const dag = await buildDag({
-      name: "cached fallback",
-      nodes: {
-        root: {},
-        leftAnchor: { parents: ["root"] },
-        rightAnchor: { parents: ["root"] },
-        release: { parents: ["leftAnchor", "rightAnchor"] },
-        head: { parents: ["release"] },
-      },
-      head: "head",
-      exclude: "release",
-    });
-
-    const requests = await trace(dag, dag.oid("head"), dag.oid("release"));
-    expect(new Set(requests).size).toBe(requests.length);
-  });
-
-  it("instruments certifiedLazy include-side exploration and exclude-side work", async () => {
-    const dag = await buildDag({
-      name: "certifiedLazy profiler",
-      nodes: {
-        old: {},
-        common: { parents: ["old"] },
-        releaseBase: { parents: ["common"] },
-        release: { parents: ["releaseBase"] },
-        main: { parents: ["release"] },
-        branchA: { parents: ["common"] },
-        branchB: { parents: ["branchA"] },
-        head: { parents: ["main", "branchB"] },
-      },
-      head: "head",
-      exclude: "release",
-    });
-
-    const { entries } = await profileCertifiedLazy(dag, dag.oid("head"), dag.oid("release"));
-
-    expect(entries.find((entry) => entry.name === "dag.traversal.step")?.totalMs).toBeGreaterThan(
-      0,
-    );
-    expect(
-      entries.find((entry) => entry.name === "dag.traversal.collect_reachable")?.totalMs,
-    ).toBeGreaterThan(0);
-  });
-
-  it("records a successful single-anchor certificate without fallback work", async () => {
-    const definition = cases.find((item) => item.name === "single-anchor certificate candidate")!;
-    const dag = await buildDag(definition);
-    const { traversalEntry } = await profileCertifiedLazy(
-      dag,
-      dag.oid(definition.head),
-      dag.oid(definition.exclude!),
-    );
-
-    expect(traversalEntry?.attributes?.strategy).toEqual(["certifiedLazy"]);
-    expect(traversalEntry?.attributes?.result).toEqual(["certified"]);
-    expect(traversalEntry?.counters?.include_reads).toBe(2);
-    expect(traversalEntry?.counters?.exclude_reads).toBe(1);
-    expect(traversalEntry?.counters?.yielded).toBe(2);
-    expect(traversalEntry?.counters?.fallback_reads ?? 0).toBe(0);
-  });
-
-  it("records fallback reason and additional reads for disconnected histories", async () => {
-    const definition = cases.find((item) => item.name === "fully disconnected head and exclude")!;
-    const dag = await buildDag(definition);
-    const { traversalEntry } = await profileCertifiedLazy(
-      dag,
-      dag.oid(definition.head),
-      dag.oid(definition.exclude!),
-    );
-
-    expect(traversalEntry?.attributes?.result).toEqual(["fallback"]);
-    expect(traversalEntry?.attributes?.fallback_reason).toEqual(["open_include_path"]);
-    expect(traversalEntry?.counters?.fallback_reads).toBe(1);
-    expect(traversalEntry?.counters?.fallback_removed ?? 0).toBe(0);
-  });
-
-  it("records cache hits when fallback reuses nodes read during exploration", async () => {
-    const dag = await buildDag({
-      name: "cached fallback instrumentation",
-      nodes: {
-        root: {},
-        leftAnchor: { parents: ["root"] },
-        rightAnchor: { parents: ["root"] },
-        release: { parents: ["leftAnchor", "rightAnchor"] },
-        head: { parents: ["release"] },
-      },
-      head: "head",
-      exclude: "release",
-    });
-
-    const { traversalEntry } = await profileCertifiedLazy(dag, dag.oid("head"), dag.oid("release"));
-
-    expect(traversalEntry?.attributes?.result).toEqual(["fallback"]);
-    expect(traversalEntry?.attributes?.fallback_reason).toEqual(["exclude_path_split"]);
-    expect(traversalEntry?.counters?.cache_hits).toBeGreaterThan(0);
-    expect(traversalEntry?.counters?.fallback_reads).toBe(3);
-    expect(traversalEntry?.counters?.fallback_removed ?? 0).toBe(0);
-  });
 });
-
-describe("DAG traversal eagerExclude instrumentation", () => {
-  it("records strategy, read counters, and yielded count", async () => {
-    const dag = await buildDag({
-      name: "eager instrumentation",
-      nodes: {
-        root: {},
-        release: { parents: ["root"] },
-        main: { parents: ["release"] },
-        side: { parents: ["root"] },
-        head: { parents: ["main", "side"] },
-      },
-      head: "head",
-      exclude: "release",
-    });
-
-    let time = 0;
-    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
-    const commits = walkDagEagerExclude(
-      {
-        nodes: rawCommitNodePort(dag),
-        instrumentation,
-      },
-      dag.oid("head"),
-      dag.oid("release"),
-    );
-    for await (const _commit of commits) {
-      // Drain iterator so instrumentation spans close.
-    }
-
-    const traversalEntry = instrumentation
-      .summary()
-      .find((entry) => entry.name === "dag.traversal");
-    expect(traversalEntry?.attributes?.strategy).toEqual(["eagerExclude"]);
-    expect(traversalEntry?.counters?.exclude_reads).toBe(2);
-    expect(traversalEntry?.counters?.include_reads).toBe(3);
-    expect(traversalEntry?.counters?.yielded).toBe(3);
-  });
-});
-
-async function profileCertifiedLazy(
-  dag: BuiltDag,
-  head: CommitOid,
-  exclude: CommitOid,
-): Promise<{
-  readonly entries: readonly ProfileSummaryEntry[];
-  readonly traversalEntry: ProfileSummaryEntry | undefined;
-}> {
-  let time = 0;
-  const instrumentation = new LocalInstrumentationRecorder(() => ++time);
-  const commits = walkDagCertifiedLazy(
-    {
-      nodes: rawCommitNodePort(dag),
-      instrumentation,
-    },
-    head,
-    exclude,
-    certifiedLazyOptions(),
-  );
-  for await (const _commit of commits) {
-    // Drain iterator so instrumentation spans close.
-  }
-
-  const entries = instrumentation.summary();
-  return {
-    entries,
-    traversalEntry: entries.find((entry) => entry.name === "dag.traversal"),
-  };
-}

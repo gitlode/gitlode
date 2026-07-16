@@ -1,6 +1,7 @@
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
+import { type DagSuccessor, type DagTopologyPort } from "../dag/index.js";
 import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -10,27 +11,40 @@ import {
   type RawCommit,
   type RepositoryObjectFormat,
 } from "../git/index.js";
-import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+  type InstrumentationSpan,
+} from "../instrumentation/index.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
-import { OrderedQueue } from "../support/index.js";
-import { type DagNodePort, walkDagWithConfiguredStrategy } from "./dag-traversal-strategy.js";
+import {
+  DEFAULT_COMMIT_TRAVERSAL_STRATEGY,
+  createCommitTraversalStrategy,
+  type CommitPathSchedulingHint,
+  type CommitTraversalStrategy,
+} from "./commit-traversal/index.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
   readonly diffAdapter: DiffAdapter;
   readonly instrumentation: Instrumentation;
+  readonly commitTraversalStrategy?: CommitTraversalStrategy;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _diffAdapter: DiffAdapter;
   private readonly _instrumentation: Instrumentation;
+  private readonly _commitTraversalStrategy: CommitTraversalStrategy;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
     this._diffAdapter = dependencies.diffAdapter;
     this._instrumentation = dependencies.instrumentation;
+    this._commitTraversalStrategy =
+      dependencies.commitTraversalStrategy ??
+      createCommitTraversalStrategy(DEFAULT_COMMIT_TRAVERSAL_STRATEGY);
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -113,7 +127,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async classifyRefType(repoPath: string, ref: string): Promise<RefType> {
     try {
-      await git.resolveRef({ fs: this._fs, dir: repoPath, ref: `refs/heads/${ref}` });
+      await git.resolveRef({
+        fs: this._fs,
+        dir: repoPath,
+        ref: `refs/heads/${ref}`,
+      });
       return "branch";
     } catch {
       // Not a branch under refs/heads.
@@ -190,42 +208,20 @@ export class IsomorphicGitAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", () => {
-      const nodes: DagNodePort<CommitOid, RawCommit> = {
-        readNode: async (oid) => {
-          try {
-            const { commit } = await git.readCommit({ fs: this._fs, dir: repoPath, oid });
-            return toRawCommit(oid, commit);
-          } catch (err) {
-            if (err instanceof Error && err.name === "NotFoundError") {
-              throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
-            }
-            throw new GitAdapterError(
-              `Unexpected error reading commit ${oid}: ${String(err)}`,
-              "UNKNOWN",
-              err,
-            );
-          }
-        },
-        getSuccessors: (node) => node.parents,
-      };
-      return walkDagWithConfiguredStrategy<CommitOid, RawCommit>(
+    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
+      const strategy = this._commitTraversalStrategy;
+      span.setAttribute("strategy", strategy.name);
+      const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
+      const oidWalk = strategy.walk(
         {
-          nodes,
+          graph: topology,
           instrumentation: this._instrumentation,
         },
         oid,
         excludeOid,
-        {
-          certifiedLazy: {
-            createIncludeQueue: () =>
-              new OrderedQueue<CommitOid>({
-                dequeueOrder: "lifo",
-                blockOrder: "preserve",
-              }),
-          },
-        },
       );
+
+      return commitObjectsFromOids(oidWalk, topology);
     });
   }
 
@@ -371,7 +367,14 @@ export class IsomorphicGitAdapter implements GitAdapter {
     const beforeSize = contentA.length;
     const afterSize = contentB.length;
     if (this._isBinary(contentA) || this._isBinary(contentB)) {
-      return { path, status, beforeSize, afterSize, additions: null, deletions: null };
+      return {
+        path,
+        status,
+        beforeSize,
+        afterSize,
+        additions: null,
+        deletions: null,
+      };
     }
 
     const { additions, deletions } = this._diffAdapter.computeLineDiff(contentA, contentB);
@@ -385,7 +388,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
       deletions < 0
     ) {
       throw new GitAdapterError(
-        `DiffAdapter returned invalid values: additions=${String(additions)}, deletions=${String(deletions)}`,
+        `DiffAdapter returned invalid values: additions=${String(
+          additions,
+        )}, deletions=${String(deletions)}`,
         "UNKNOWN",
       );
     }
@@ -399,6 +404,82 @@ export class IsomorphicGitAdapter implements GitAdapter {
       if (content[i] === 0) return true;
     }
     return false;
+  }
+}
+
+class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSchedulingHint> {
+  private readonly cache = new Map<CommitOid, RawCommit>();
+  private readonly fs: FsClient;
+  private readonly repoPath: string;
+  private readonly span: InstrumentationSpan;
+
+  constructor(fs: FsClient, repoPath: string, span: InstrumentationSpan) {
+    this.fs = fs;
+    this.repoPath = repoPath;
+    this.span = span;
+  }
+
+  async getSuccessors(
+    oid: CommitOid,
+  ): Promise<readonly DagSuccessor<CommitOid, CommitPathSchedulingHint>[]> {
+    const commit = await this.readCommit(oid, "topology");
+    return projectCommitParentSuccessors(commit);
+  }
+
+  async readCommit(oid: CommitOid, purpose: CommitReadPurpose): Promise<RawCommit> {
+    const cached = this.cache.get(oid);
+    if (cached !== undefined) {
+      this.span.incrementCounter(`${purpose}_commit_cache_hits`);
+      return cached;
+    }
+
+    try {
+      this.span.incrementCounter("commit_reads");
+      this.span.incrementCounter(`${purpose}_commit_reads`);
+      const { commit } = await git.readCommit({
+        fs: this.fs,
+        dir: this.repoPath,
+        oid,
+      });
+      const rawCommit = toRawCommit(oid, commit);
+      this.cache.set(oid, rawCommit);
+      return rawCommit;
+    } catch (err) {
+      if (err instanceof Error && err.name === "NotFoundError") {
+        throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
+      }
+      throw new GitAdapterError(
+        `Unexpected error reading commit ${oid}: ${String(err)}`,
+        "UNKNOWN",
+        err,
+      );
+    }
+  }
+
+  incrementYieldedCommit(): void {
+    this.span.incrementCounter("commits_yielded");
+  }
+}
+
+export function projectCommitParentSuccessors(
+  commit: RawCommit,
+): readonly DagSuccessor<CommitOid, CommitPathSchedulingHint>[] {
+  const domainHint: CommitPathSchedulingHint = {
+    sourceCommitterTimestamp: commit.committer.timestamp,
+  };
+  return commit.parents.map((parentOid) => ({ nodeId: parentOid, domainHint }));
+}
+
+type CommitReadPurpose = "topology" | "materialize";
+
+async function* commitObjectsFromOids(
+  oids: AsyncIterable<CommitOid>,
+  topology: CommitTopologyAdapter,
+): AsyncIterable<RawCommit> {
+  for await (const oid of oids) {
+    const commit = await topology.readCommit(oid, "materialize");
+    topology.incrementYieldedCommit();
+    yield commit;
   }
 }
 

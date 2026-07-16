@@ -69,8 +69,9 @@ In these cases, `--incremental` with a state file provides a reliable checkpoint
 Several properties of Git's data model directly constrain what gitlode can and cannot guarantee.
 These are not limitations of gitlode — they are fundamental properties of Git objects:
 
-**Output order is not chronological.** gitlode traverses the commit DAG using BFS. Across merge
-branches, BFS order does not match commit timestamp order. Downstream systems must sort by
+**Output order is not chronological or otherwise stable.** gitlode traverses the commit DAG by
+walking parent links. Across merge branches, graph traversal order does not match commit timestamp
+order. Downstream systems must sort by
 `committer.timestamp` if chronological order is required; they must not rely on line order in
 `.jsonl` output files.
 
@@ -99,6 +100,10 @@ The architecture is layered:
 4. Output layer owns JSONL serialization and file rotation.
 
 This layering keeps policy decisions in Core and implementation details in adapter/output modules.
+
+`packages/gitlode/src/dag/` is an internal generic DAG subsystem used below the Git adapter boundary. It owns node-ID-based traversal algorithms and graph-work instrumentation, but it is not part of the package public API. Git-specific code implements a topology port and calls the DAG subsystem; the DAG subsystem must not depend on Git commit objects, adapter caches, isomorphic-git errors, or Git-specific scheduling hints.
+
+The phase-certified prototype remains internal and is reachable from production commit walking only through an internal experimental strategy seam. Its module ownership is split so `phase-certified.ts` owns facade orchestration, instrumentation boundaries, default FIFO/preserve frontier creation, and the difference/closure frontier loops; `certified-closure.ts` owns the closure state machine for split, branch, join, terminal, and closed-boundary resolution; `phase-certified-difference-state.ts` owns include-side graph state, certified exclude integration, certified-hit classification, and final drain; and `phase-certified-types.ts` owns shared generic contracts used by those modules. Telemetry counter names and meanings, scheduling semantics, and Git-specific timestamp policy ownership remain unchanged.
 
 ## Layer Responsibilities
 
@@ -153,7 +158,7 @@ Responsibilities:
 - Coordinate output writer lifecycle.
 - Produce v2 checkpoint state only after successful output completion and sink close.
 
-Important behavior: for date filtering, Core skips old commits and continues traversal. It does not terminate early, because BFS graph traversal order is not chronological.
+Important behavior: for date filtering, Core skips old commits and continues traversal. It does not terminate early, because graph traversal order is not chronological.
 
 ### Git adapter layer
 
@@ -171,10 +176,12 @@ Responsibilities:
 - Detect repository object format (defaulting to `sha1` when unset).
 - Read origin URL when available.
 - Traverse commits reachable from a head commit, optionally excluding history reachable from `excludeHash`.
+- Implement the commit DAG topology port used by the internal `src/dag` traversal subsystem.
+- Keep invocation-scoped commit object caching shared between topology reads and yielded-commit materialization.
+- Record adapter-level commit read/cache/yield telemetry and translate library/runtime failures into `GitAdapterError` codes.
 - Compute per-file line-level diff statistics via an internal `DiffAdapter` strategy.
-- Translate library/runtime failures into `GitAdapterError` codes.
 
-The default adapter uses isomorphic-git internally and keeps those details from leaking upward. The
+The default adapter uses isomorphic-git internally and keeps those details from leaking upward. Commit traversal uses the generic `src/dag` certified-lazy strategy as the production default, with a Git adapter-injected LIFO/preserve frontier. Git child timestamp scheduling hints and the timestamp-priority frontier experiment are owned by `packages/gitlode/src/git-impl/commit-traversal/`; phase-certified traversal remains an internal prototype, but `IsomorphicGitAdapter` can select it for internal experiments via `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. The
 config-only `runtime.gitAdapter` setting selects the Git implementation. The default value is
 `isomorphic-git`; `git-cli` uses the Git executable for traversal-oriented operations and delegates
 file-change expansion to the existing isomorphic-git implementation. Durable adapter-selection and
@@ -275,6 +282,12 @@ Each layer follows:
 - `index.ts` as a re-export barrel.
 
 This improves type discoverability and keeps runtime modules focused.
+
+Source domains expose their supported in-repository import boundary through `index.ts`. Cross-domain
+imports must use the target domain barrel, while direct module imports are allowed within the same
+domain for implementation details that are not part of the supported boundary. Tests should mirror
+source ownership where practical; cross-domain integration tests live with the primary subject under
+test, and same-domain implementation tests may import the specific internal module they inspect.
 
 ## Profiling Instrumentation
 

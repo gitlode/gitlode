@@ -5,18 +5,16 @@
 This document describes the internal traversal strategies used to implement
 `GitAdapter.walkCommits()`.
 
-It focuses on implementation structure, correctness constraints, performance trade-offs, and
-diagnostics. It intentionally does not replace `git-traversal.md`, which is the canonical document
-for traversal behavior that affects gitlode's final output.
+It focuses on implementation structure, correctness constraints, performance trade-offs, and test
+coverage. It intentionally does not replace `git-traversal.md`, which is the canonical document for
+traversal behavior that affects gitlode's final output.
 
 The output contract remains owned by `git-traversal.md`:
 
 - without an exclusion boundary: `reachable(start)`
 - with an exclusion boundary: `reachable(start) - reachable(exclude)`
 
-The result set must match that contract. Yield order is not contractual. `AsyncIterable<Node>` is
-used so strategies can emit nodes once they are safe to emit; consumers must not treat traversal
-order as a semantic guarantee.
+The result set must match that contract. Yield order is not contractual.
 
 ## Scope and non-goals
 
@@ -25,82 +23,121 @@ This design covers:
 - the internal DAG traversal seam used by `IsomorphicGitAdapter.walkCommits()`;
 - the eager-exclude reference strategy;
 - the certified-lazy strategy used by the current default;
-- queue policy injection;
+- frontier policy injection;
 - certificate and fallback conditions;
-- tests and instrumentation used to protect the behavior.
+- tests used to protect the behavior.
 
-This design does not cover:
-
-- ref resolution;
-- extraction planning across multiple refs;
-- state-file semantics;
-- output schema;
-- date-based filtering after traversal.
-
-Those topics belong in other design documents, especially `git-traversal.md`.
+This design does not cover ref resolution, extraction planning across multiple refs, state-file
+semantics, output schema, or date-based filtering after traversal. Those topics belong in other
+design documents, especially `git-traversal.md`.
 
 ## Strategy boundary
 
-`dag-traversal-strategy.ts` is written as a DAG traversal module rather than a Git-object-specific
-walker.
+`packages/gitlode/src/dag/` is the internal generic DAG traversal subsystem rather than a Git-object-specific walker.
 
-The adapter supplies a `DagNodePort<NodeId, Node>`:
+The DAG core depends on topology only and does not depend on Git commit objects, adapter caches, adapter error translation, isomorphic-git, or `CommitPathSchedulingHint`:
 
-- `readNode(nodeId)` reads a node and translates backend-specific errors before they cross into
-  strategy code.
-- `getSuccessors(node)` returns successor IDs along the traversal direction.
+```ts
+export interface DagTopologyPort<NodeId extends PropertyKey, DomainHint = undefined> {
+  getSuccessors(nodeId: NodeId): Promise<readonly DagSuccessor<NodeId, DomainHint>[]>;
+}
+```
 
-For Git commits, `IsomorphicGitAdapter` maps:
+Correctness state is keyed by `NodeId`; the DAG core does not know the domain node type and yields
+`NodeId` values.
 
-- `NodeId` to `CommitOid`;
-- `Node` to `RawCommit`;
-- `getSuccessors(node)` to `node.parents`.
+For Git commits, `IsomorphicGitAdapter` maps `NodeId` to `CommitOid`. It uses an adapter-internal
+`CommitTopologyAdapter` that implements `DagTopologyPort<CommitOid, CommitPathSchedulingHint>`, reads
+commit objects as needed to project parents into successors, and exposes `readCommit(oid)` so the
+adapter can convert DAG-core-yielded OIDs back into `RawCommit` objects. The rest of gitlode still
+receives commit objects from the Git adapter.
 
 This keeps strategy code focused on graph traversal. Isomorphic-git commit objects, timezone
-normalization, and backend error mapping stay inside the adapter boundary.
+normalization, commit-object caching, and backend error mapping stay inside the adapter boundary.
 
-## Configured strategies
+## Git commit path scheduling hints
 
-Two strategies are kept in the module:
+`CommitTopologyAdapter` projects Git-specific scheduling metadata while it performs the normal
+topology read for an expanded child commit. After `readCommit(oid, "topology")` returns the child
+`RawCommit`, the adapter creates a `CommitPathSchedulingHint` whose `sourceCommitterTimestamp` is
+the child commit's committer timestamp in Unix seconds. It then attaches that same child-derived
+hint value to every parent successor path produced from the child.
 
-- `walkDagEagerExclude`
-- `walkDagCertifiedLazy`
+The hint is path-local scheduling metadata. It is not metadata about the pending parent node, is not
+correctness state, and must not be used for visited keys, exclusion state, certificates, or yield
+eligibility. The adapter does not pre-read parent commits, does not perform a hint-specific commit
+read, and does not rely on timestamp monotonicity. Start items, including include starts, exclude
+starts, and standalone reachable starts, remain hintless until their first topology expansion
+produces successor paths.
 
-`walkDagWithConfiguredStrategy()` accepts a strategy option and defaults to `"certifiedLazy"`.
-Keeping the option makes tests and pre-release validation easy while both implementations remain in
-the tree.
+The current production Git frontier is still the injected LIFO/preserve frontier used by
+`walkDagNodeIdsCertifiedLazy()`. It transports `CommitPathSchedulingHint` values type-safely but
+does not inspect them for priority, so timestamps do not affect result membership and do not make
+yield order contractual.
+
+The Git-specific timestamp-priority frontier policy is owned by `packages/gitlode/src/git-impl/commit-traversal/` and is an explicit domain policy for prototype experiments. Its comparator only reads `domainHint?.sourceCommitterTimestamp` from queued frontier
+items:
+
+- hintless items sort before hinted items, so include/exclude starts and standalone closure roots can
+  bootstrap without pre-reading parent commits;
+- when both items are hinted, newer child-derived committer timestamps sort before older timestamps;
+- hintless ties and equal-timestamp ties return `0`, leaving stable enqueue-order tie-breaking to
+  `PriorityQueue`;
+- the comparator must not inspect node IDs, traversal role, branch IDs, topology, commit objects,
+  visited/certified state, or external mutable state.
+
+The policy is scheduling-only. It is a heuristic over the expanded child commit's timestamp, not a
+claim about the pending parent node's timestamp. It must not change reachable-difference membership,
+certificate decisions, adapter commit-read/cache responsibility, or telemetry counter definitions.
+
+## Available strategies
+
+The production DAG traversal module exports two difference strategies:
+
+- `walkDagNodeIdsEagerExclude`
+- `walkDagNodeIdsCertifiedLazy`
+
+The phase-certified prototype is exported separately as
+`walkDagNodeIdsPhaseCertifiedDifference()`. The Git commit-traversal domain now binds these generic
+walkers behind a `CommitTraversalStrategy` descriptor so `IsomorphicGitAdapter` receives one common
+`DagDifferenceWalker` shape. The production default remains certified-lazy; phase-certified modes
+are reachable only through the internal experiment seam described below.
+
+Configured strategies share the `DagDifferenceWalker` callable contract: they accept a context, an
+include start, and an optional exclude start. With no exclude start, every strategy yields
+`reachable(includeStart)`. Strategy-specific frontier options are bound before exposing a walker
+through this contract; the contract does not flatten the phase-certified difference/closure frontier
+factories into the single-frontier options used by eager-exclude and certified-lazy.
 
 The strategy names describe traversal logic:
 
 - `eagerExclude` eagerly builds the full excluded reachable set before include-side traversal.
 - `certifiedLazy` delays full exclude-side traversal and yields only after proving that delayed
-  reads cannot affect the result set, or after falling back to full subtraction.
+  topology expansion cannot affect the result set, or after falling back to full subtraction.
 
-## Queue Policy
+## Frontier policy
 
-Strategies use `WorkQueue<NodeId>` for their frontiers. The DAG default is:
+Strategies use `DagFrontier<DagFrontierItem<NodeId, DomainHint>>` for their frontiers. The DAG
+default is FIFO with preserved successor-block order.
 
-```ts
-new OrderedQueue<NodeId>({
-  dequeueOrder: "fifo",
-  blockOrder: "preserve",
-});
-```
+The frontier is scheduling-only. It does not deduplicate by `nodeId`, track visited/excluded state,
+or prove correctness. Traversal loops validate dequeued items against their own state because stale
+or duplicate frontier items are allowed.
 
-Any other queue policy represents domain or strategy knowledge and must be injected explicitly.
-`IsomorphicGitAdapter` injects a LIFO/preserve include queue for certified-lazy traversal so Git
-commit parent order continues to prioritize the mainline path.
+Any non-default policy represents domain or strategy knowledge and must be injected explicitly.
+`IsomorphicGitAdapter` injects a LIFO/preserve frontier for certified-lazy traversal so Git commit
+parent order continues to prioritize the mainline path without making yield order contractual.
 
 ## Eager-exclude strategy
 
-`walkDagEagerExclude()` is the reference implementation.
+`walkDagNodeIdsEagerExclude()` is the reference implementation.
 
-When `excludeNodeId` exists, it first computes all nodes reachable from that exclusion boundary.
+When `excludeNodeId` exists, it first computes all node IDs reachable from that exclusion boundary.
 Then it performs include-side traversal from the start node:
 
-1. skip nodes already visited;
-2. skip nodes in the excluded set;
-3. read and yield the remaining node;
+1. skip node IDs already visited;
+2. skip node IDs in the excluded set;
+3. yield the remaining node ID;
 4. enqueue successors that are neither visited nor excluded.
 
 This is simple and robust, but expensive for large repositories because `reachable(exclude)` may
@@ -108,21 +145,23 @@ walk deep historical ancestors that will never affect the final output.
 
 ## Certified-lazy strategy
 
-`walkDagCertifiedLazy()` is the production default.
+`walkDagNodeIdsCertifiedLazy()` is the production default.
 
-When no exclusion boundary is provided, it delegates to `walkDagEagerExclude()` because there is no
-exclude-side reasoning to optimize.
+When no exclusion boundary is provided, it delegates to `walkDagNodeIdsEagerExclude()` because there
+is no exclude-side reasoning to optimize.
 
 When an exclusion boundary exists, it uses a lazy two-sided view of the DAG:
 
-- include-side traversal buffers candidate result nodes instead of yielding immediately;
-- exclude-side reads are limited to the exclusion start node and stop points encountered by the
-  include-side traversal;
-- every read node is cached so fallback can reuse it;
+- include-side traversal buffers candidate result node IDs instead of yielding immediately;
+- exclude-side topology expansion is limited to the exclusion start node and stop points encountered
+  by include-side traversal;
 - results are yielded only after traversal either obtains a certificate or completes fallback.
 
 Buffering is intentional: if a certificate fails, the strategy must still be able to remove all
-excluded nodes before producing output. A failed certificate must not leak partial results.
+excluded node IDs before producing output. A failed certificate must not leak partial results.
+
+The DAG core does not cache domain nodes or successors. Git commit-object reuse belongs to the
+adapter's `CommitTopologyAdapter` cache.
 
 ## Certificate
 
@@ -136,24 +175,22 @@ The current implementation may certify only when all of these are true:
 - include-side traversal reaches at least one exclude-marked stop point;
 - no include-side path reaches a terminal node outside the exclude-marked frontier;
 - the exclude-side start node has either no successors or exactly one direct successor;
-- no exclude-side node read during start-node inspection or stop-point successor marking creates a
-  path split;
+- no exclude-side node expanded during start-node inspection or stop-point successor marking creates
+  a path split;
 - every stop point is either the exclude-side start node or the single certified exclude successor.
 
 When the certificate holds, older exclude successors are known not to affect the result set for the
-current conservative model. The walker can yield buffered include-side candidates without reading
-those older successors merely to prove they are excluded.
+current conservative model. The walker can yield buffered include-side candidate IDs without
+expanding those older successors merely to prove they are excluded.
 
 This deliberately accepts a narrower certificate than might be theoretically possible. The goal is a
 safe, predictable optimization, not an exhaustive proof engine.
 
 ## Fallback
 
-If the certificate does not hold, certified-lazy traversal falls back to a cached
-`reachable(exclude)` collection.
-
-Fallback reuses nodes already read through the strategy's internal DAG node seam. It then deletes
-the full excluded set from buffered include-side candidates before yielding.
+If the certificate does not hold, certified-lazy traversal falls back to a full
+`reachable(exclude)` collection and deletes the full excluded set from buffered include-side
+candidates before yielding.
 
 Current fallback boundaries include:
 
@@ -163,58 +200,337 @@ Current fallback boundaries include:
 - any stop point not equal to the exclude-side start node or the single certified exclude
   successor.
 
-Fallback preserves the same result-set contract as eager-exclude. It may do a similar amount of
-work, but cached reads avoid re-reading nodes already inspected by certified-lazy traversal.
+Fallback preserves the same result-set contract as eager-exclude. It may do a similar amount of work
+because DAG traversal no longer owns a successor cache.
 
 ## Error handling
 
 Strategy code does not translate backend-specific errors.
 
-The adapter-provided `DagNodePort.readNode()` is responsible for converting backend failures into
-adapter-domain errors before they cross into traversal strategy code. For isomorphic-git commit
-reads, missing start and exclusion commits are mapped to `GitAdapterError` with
-`COMMIT_NOT_FOUND`.
+`CommitTopologyAdapter.readCommit(oid)` is responsible for converting isomorphic-git commit-read
+failures into adapter-domain errors before they cross into traversal strategy code or the rest of
+gitlode. Missing start and exclusion commits are mapped to `GitAdapterError` with
+`COMMIT_NOT_FOUND`; unexpected commit-read failures are mapped to `UNKNOWN`.
 
-Certified-lazy traversal may intentionally avoid reading older exclude successors when its
+Certified-lazy traversal may intentionally avoid expanding older exclude successors when its
 certificate succeeds. Therefore a missing object beyond a valid certificate is not guaranteed to be
 reported. Eager-exclude remains the characterization path for missing older exclude ancestors.
 
 ## Instrumentation and tests
 
-DAG strategy internals use `dag.*` profiling spans such as:
+Traversal instrumentation is designed to compare the efficiency of strategies that solve the same
+result-set problem, not to define a stable user-facing contract. The main diagnostic question is how
+much graph and commit-object work was needed to produce the final yielded commit set.
 
-- `dag.traversal`
-- `dag.traversal.step`
-- `dag.traversal.collect_reachable`
-- `dag.traversal.read_node.include`
-- `dag.traversal.read_node.exclude`
+The instrumentation boundary follows the implementation boundary:
 
-The outer Git adapter operation remains `git.walk_commits`. Strategy attributes and counters such
-as `strategy`, `result`, `fallback_reason`, `include_reads`, and `yielded` belong to
-`dag.traversal`, not the adapter-level Git span.
+- the DAG traversal core records topology and strategy work;
+- the Git adapter records commit-object reads, commit cache hits, and yielded commit objects.
 
-The DAG node read seam is internal, not public API. Contract tests inject it directly so they can
-assert read sets without patching the imported `isomorphic-git` ESM module.
+This means the DAG core uses graph vocabulary such as successor expansion instead of Git-specific
+vocabulary such as commit read. For Git repositories, a successor expansion usually causes the
+adapter to read or reuse a commit object to project parent OIDs, but that object-level cost belongs
+to adapter telemetry.
+
+`dag.traversal` records the strategy-level operation for `reachable(start) - reachable(exclude)`.
+It includes the selected strategy and common counters such as `yielded_nodes`,
+`traversal_steps`, `successor_expansions`, `main_expansions`, `exclude_expansions`, and
+`stale_steps`. Strategy-specific diagnostics include `result=certified|fallback`,
+`fallback_reason`, `excluded_nodes`, and `fallback_removed` where applicable.
+
+`dag.reachable` records top-level `reachable(...)` operations. Its `yielded_nodes` counter means
+the number of nodes in that reachable result. When reachable traversal is used internally as an
+exclude-collection phase for `dag.traversal`, it is implemented through the reusable core rather than
+the public facade. In that context, internal reachable yields are not counted as parent
+`yielded_nodes`; the caller records the collection size as `excluded_nodes` instead.
+
+DAG traversal functions exported as public operations should keep operation-level telemetry
+semantics. Reusable traversal implementations may accept a context-specific telemetry observer so
+callers can report the same graph work in the vocabulary of the enclosing operation. Whether a
+helper is technically exported for another in-repository strategy module is less important than
+whether it represents a public traversal-domain operation.
+
+The adapter-level `git.walk_commits` span records `commits_yielded`, total backend
+`commit_reads`, and read/cache counters split by purpose. `topology_commit_reads` and
+`topology_commit_cache_hits` describe commit-object access while projecting DAG successors.
+`materialize_commit_reads` and `materialize_commit_cache_hits` describe commit-object access while
+turning yielded OIDs into `RawCommit` objects. The cache is intentionally shared by both purposes,
+but the counters stay separate so materialization cache hits do not hide whether caching helped the
+DAG topology walk. Comparing total `commit_reads` with `commits_yielded` shows commit-read overshoot
+for the walk. DAG counters explain which traversal path caused the extra topology work.
+
+The traversal contract tests live under `packages/gitlode/test/dag/` because they primarily verify
+the generic DAG subsystem. Git timestamp-priority policy and synthetic graph-work efficiency tests
+live under `packages/gitlode/test/git-impl/commit-traversal/` because the policy is Git-specific even
+when it uses generic DAG fixtures.
 
 The contract suite verifies:
 
 - eager-exclude and certified-lazy return the same OID set;
 - output membership does not depend on commit timestamps;
 - missing start and exclusion commits map to `COMMIT_NOT_FOUND`;
-- certified-lazy avoids reading older excluded ancestors in certified cases;
-- certified-lazy falls back for disconnected DAGs, path splits, and uncovered stop points;
-- cached fallback does not re-read the same OID through the read seam.
+- certified-lazy avoids expanding older excluded ancestors in certified cases;
+- certified-lazy falls back for disconnected DAGs, path splits, and uncovered stop points.
+- traversal diagnostics cover representative reachable, eager-exclude, certified, fallback, and
+  adapter read/cache/yield cases without making every counter value a long-term contract.
+- phase-certified closure roots stop after one topology read for terminal and single-successor
+  cardinalities, while split roots enter the split/rejoin state machine;
+- phase-certified difference traversal stops after include-result finality without processing stale
+  main work or an exclude-side tail that can no longer change membership;
+- complex phase-certified correctness fixtures use an independent reachable-difference oracle rather
+  than treating another traversal strategy as their sole oracle;
+- focused graph-work fixtures use exact topology traces and telemetry accounting only when those
+  observations are part of the behavior the fixture is intended to protect.
 
 Adapter tests cover user-visible integration and include a certified single-successor walk that
-succeeds through the certified-lazy default while eager-exclude traversal would read a deleted older
-exclude ancestor.
+succeeds through the certified-lazy default while eager-exclude traversal would expand a deleted
+older exclude ancestor.
 
 ## Known limitations and future work
 
 - The certificate does not advance beyond the exclusion start node's direct successor. A branch
   forked several generations before release currently falls back.
 - Path split cases have no partial certificate; they use conservative fallback.
-- Timestamp-priority traversal was considered but intentionally left out. Git DAG correctness must
-  not depend on timestamp monotonicity.
-- The strategy module is generic over DAG nodes, but current production use is still Git commit
-  traversal.
+- Git timestamp-priority frontier ordering is implemented as an explicit phase-certified prototype
+  injection policy. Production certified-lazy ordering still does not inspect timestamps, and Git DAG
+  correctness must not depend on timestamp monotonicity.
+- Phase-certified prototype telemetry is now defined in this document for the experimental
+  certified-closure strategy. Future telemetry work should preserve the generic DAG / Git adapter
+  boundary.
+
+## Phase-certified prototype closure resolution
+
+The experimental phase-certified closure resolver classifies the closure root by expanding that root
+exactly once before any closure frontier exists:
+
+- a root with zero successors immediately resolves to an exhausted closure containing only the root
+  as both a certified and terminal node;
+- a root with one successor immediately resolves to a closed boundary at that successor, certifying
+  both the root and the boundary node without expanding the boundary or reading farther topology;
+- a root with two or more successors opens the existing split/rejoin state machine and enqueues the
+  successor branch items into a fresh closure frontier.
+
+A closure frontier is therefore created only when branch scheduling is necessary. Terminal and
+single-successor roots do not create one; a split root creates one fresh frontier for that closure
+phase, and nested splits in the same phase reuse that frontier. The frontier remains a
+scheduling-only abstraction and does not own visited state, edge state, certification state, or
+branch correctness state.
+
+Root classification still counts as traversal work. The root expansion performs a real
+`DagTopologyPort.getSuccessors()` call and increments `traversal_steps`, `successor_expansions`, and
+`exclude_expansions` once. Split-closure frontier items also increment those expansion counters when
+they expand topology, so expansion counters must continue to match actual topology access. For
+single-successor closure roots, the successor descriptor's domain hint is inherited as the
+closed-boundary hint passed to the next exclude phase; this uses the already-read successor
+descriptor and must not pre-read the boundary node's own metadata.
+
+## Phase-certified prototype frontier injection
+
+`packages/gitlode/src/dag/phase-certified.ts` is the facade for separate injectable frontier factories in the experimental
+phase-certified prototype:
+
+- the difference coordinator frontier schedules include-side work items and exclude closure-phase
+  triggers;
+- the closure frontier schedules node/branch work inside one certified-closure phase.
+
+When no factory is supplied, both frontiers use `OrderedQueue` with `dequeueOrder: "fifo"` and
+`blockOrder: "preserve"`, matching the previous array `shift()` / `push()` behavior. A difference
+operation creates one difference frontier. Closure frontier creation depends on closure root
+classification: terminal and single-successor roots do not create a closure frontier, while a split
+root creates one fresh closure frontier for that closure phase. Nested splits inside that phase reuse
+the same closure frontier; a later closure phase whose root is also a split receives a different
+fresh closure frontier. Standalone `resolveDagCertifiedClosurePhase()` follows the same rule and
+creates a closure frontier only when its root is a split.
+
+These frontiers are scheduling-only seams. They hold pending items and select the next item to
+process, but they do not own visited state, stale detection, deduplication, certified/excluded state,
+or the decision to start another closure phase. Closure frontier items still carry `branchId` because
+that value is closure-algorithm correctness state for split/rejoin resolution, not a scheduling hint
+or `DomainHint`.
+
+Alternative policies may change processing order, but must not change the reachable-difference
+result set. Successor groups are enqueued as blocks so block-aware policies can preserve or reverse
+within-block order consistently without moving correctness state into the queue.
+
+For Git timestamp-priority experiments, the same commit timestamp priority contract is injected into
+both `createDifferenceFrontier` and `createClosureFrontier`. The difference coordinator receives one
+fresh priority queue for its coordinator frontier. The closure frontier factory is called only for
+split closure roots: terminal and single-successor closure phases do not create a priority queue,
+each split closure phase receives one fresh priority queue, and nested splits in that same phase
+reuse it. Queue instances must not be shared across difference operations or across separate split
+closure phases.
+
+The generic phase-certified default remains FIFO/preserve. Git timestamp priority is only active when
+callers explicitly inject the Git-specific policy. The phase-certified strategies are reachable through the internal experiment seam, but production default remains certified-lazy with its LIFO/preserve frontier until a separate production adoption gate changes that decision.
+
+## Phase-certified prototype telemetry
+
+`packages/gitlode/src/dag/phase-certified.ts` keeps the facade for a prototype strategy with the same difference contract,
+`reachable(includeStart) - reachable(excludeStart)`. The facade coordinates include work, exclude
+closure phases, frontier lifecycle, result-finality termination, and operation-level telemetry. `packages/gitlode/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/gitlode/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/gitlode/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is wired only through the internal experiment seam; its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO and timestamp-priority runs can be compared with certified-lazy.
+
+`walkDagNodeIdsPhaseCertifiedDifference()` records one `dag.traversal` span with
+`strategy=phaseCertified`. Internal closure phases do not create child `dag.certified_closure` spans;
+their work is aggregated into the enclosing traversal span. The common counters have the same graph
+meaning as the production strategies:
+
+- `yielded_nodes`: nodes finally yielded by the difference operation only.
+- `traversal_steps`: dequeued include frontier items, closure root classification steps, and
+  dequeued split-closure frontier items. Exclude coordinator items are phase triggers and are not
+  counted as an additional step separate from the closure root classification they start.
+- `stale_steps`: dequeued work items discarded as stale or duplicate, such as deleted include
+  states, already-expanded include nodes, or closure nodes already traversed by the same branch.
+  Certified hits are meaningful state transitions and are not stale.
+- `successor_expansions`, `main_expansions`, and `exclude_expansions`: calls to the underlying
+  `DagTopologyPort.getSuccessors()`. Closure root classification performs a real topology read and
+  increments `successor_expansions` and `exclude_expansions` once; each split-closure frontier
+  expansion does the same. Include-side local predecessor/successor walks used for certified-hit
+  classification are local graph operations and are intentionally not counted as topology
+  expansions.
+
+The prototype also records strategy-specific counters on the same `dag.traversal` span:
+
+- closure outcomes: `closure_phases`, `closed_boundary_phases`, `exhausted_phases`,
+  `certified_nodes`, and `terminal_nodes`;
+- certified-hit classification: `certified_hits`, `classification_runs`,
+  `classification_newer_nodes`, `classification_older_nodes`, and
+  `classification_excluded_nodes`;
+- yield source split: `certification_yielded_nodes` and `drain_yielded_nodes`.
+
+For completed phase-certified difference operations, `yielded_nodes` is the sum of
+`certification_yielded_nodes` and `drain_yielded_nodes`, subject to the recorder's normal behavior
+of omitting counters that were never incremented.
+
+Phase-certified difference termination uses include-result finality, not main-queue emptiness,
+terminal-node discovery, queue role counts, timestamps, or a frontier-policy-specific condition.
+`PhaseCertifiedDifferenceState` exposes whether the include side is fully resolved by checking
+whether the include graph is empty. That graph contains exactly include nodes that have not yet been
+finally yielded or excluded: the include start is registered before traversal; each include successor
+is registered before its main frontier item is enqueued; certified-hit classification removes nodes
+whose exclusion is proven; yielded nodes are removed only when they are expanded, so their successors
+have already been registered; and a pending main item for a removed graph node is stale. Therefore,
+when the include graph is empty, every include-side result decision is final and remaining main or
+exclude frontier items cannot change `reachable(includeStart) - reachable(excludeStart)`. A temporary
+lack of main work or reaching an include terminal is not sufficient, because an unknown exclude path
+may still intersect an already expanded include node.
+
+After include-result finality, the facade stops the outer difference loop without dequeuing pending
+stale main items or pending exclude items. If an exclude closure resolves the include graph, the
+facade also suppresses scheduling of the next closed-boundary exclude item. The operation sets
+`termination_reason` on the `dag.traversal` span after the loop: `frontier-exhausted` when the
+difference frontier naturally became empty, including reachable-only walks and the case where
+frontier exhaustion and include resolution happen together; otherwise `include-resolved`, meaning
+include finality left unprocessed scheduling work in the frontier. Existing graph-work counters keep
+counting only actual processed work and topology reads; no abandoned-frontier counter is recorded
+because queued item count is not equivalent to avoided topology expansion count.
+
+`resolveDagCertifiedClosurePhase()` is also a standalone operation. When called directly, it records
+one `dag.certified_closure` span with `result=closed-boundary` or `result=exhausted` after the phase
+finishes. Standalone closure spans record the closure root classification step, any split-branch
+frontier steps, exclude-side successor expansions, `certified_nodes`, and exhausted-phase
+`terminal_nodes`. Difference traversal calls the shared closure core directly to avoid double-spanning
+internal phases.
+
+### Phase-certified path scheduling hints
+
+The phase-certified prototype also permits frontier items to carry a generic `DomainHint`. A hint is
+path scheduling metadata, not node metadata and not correctness state. It must not participate in
+reachable-set membership, visited keys, stale checks, certified sets, split or rejoin decisions,
+branch grouping, include-side classification, or yield eligibility. Changing or omitting hints must
+not change the result set.
+
+Hints are transported from an expanded node to the frontier items for its successor paths. The start
+items for a difference walk are enqueued as one hintless bootstrap block in `main start`, then
+`exclude start` order; standalone closure roots also start without a hint. The Git timestamp-priority
+policy treats hintless start items as bootstrap work that runs before hinted items, but that ordering
+belongs to the injected frontier comparator rather than the algorithm.
+
+A single node ID may appear in multiple queued items with different hints when multiple paths reach
+that node. The phase-certified prototype therefore keeps hints on frontier items and does not merge
+them into a single `NodeId -> DomainHint` value. Closed-boundary closure phases carry the trigger
+path hint that established the boundary into both the next difference-side exclude item and the next
+closure root item, while the public `CertifiedClosurePhaseResult` remains hint-free.
+
+Git timestamp scheduling tests model the adapter's projection contract by attaching the expanded
+child node's committer timestamp to each successor path. The successor's own timestamp is not read
+before priority is decided. Timestamp assignment changes, equal timestamps, and non-monotonic
+child/parent timestamps may alter processing order but must not alter
+`reachable(start) - reachable(exclude)` membership. The Git adapter performs the same child-derived
+projection during normal topology reads. Those hints affect scheduling only when the internal
+`phase-certified-timestamp` strategy is explicitly selected; they do not change membership or cause
+parent pre-reads.
+
+Closure re-expansion and branch-join detection are separate concerns. A compliant frontier may only
+hold and reorder the pending items produced by traversal; it must not synthesize, drop, or rewrite
+frontier items. When a closure branch reaches a successor, the phase records that reach immediately
+and detects joins against other branch groups before enqueueing the successor item. Because branch
+groups only merge and do not later split, dequeue-time re-expansion of an already-expanded closure
+node re-accesses topology for scheduling/telemetry but is not a separate opportunity to discover a
+new branch join.
+
+## Phase-certified synthetic graph-work efficiency validation
+
+Synthetic graph-work efficiency tests compare the experimental phase-certified difference operation
+with the FIFO/preserve default frontier and the explicit Git child-derived timestamp priority
+frontier. These fixtures are controlled Git-history patterns: they use commit-to-parent edges,
+ordinary zero-, one-, and two-parent commits, branch heads, merge commits, and shared older history.
+They are not arbitrary DAG stress tests, wall-clock benchmarks, or real repository performance
+claims.
+
+For this validation suite, two-parent fixture commits are constrained to merge parents that are not
+reachable from one another. This is a fixture-design guardrail so the observed graph-work comparison
+is not coupled to ancestor-parent merge shapes; it is not a general production contract for all Git
+merges.
+
+The tests use the same `reachable(includeStart) - reachable(excludeStart)` operation for both
+policies and check membership against an independent reachable-difference oracle with duplicate-yield
+checks. Telemetry counters such as `traversal_steps`, `successor_expansions`, `main_expansions`,
+`exclude_expansions`, `stale_steps`, closure-phase counts, classification counts, and yield-source
+counts make graph work comparable without relying on elapsed time. `yielded_nodes` is treated as an
+output-size counter rather than a standalone efficiency proof. Each policy run also checks that
+`successor_expansions` equals the observed topology-read trace length and that
+`main_expansions + exclude_expansions` equals `successor_expansions`. These are accounting
+invariants, not snapshots of how much work a particular strategy must always perform.
+
+Separate absolute regression fixtures protect the two early-termination contracts that relative
+policy comparisons cannot establish: a single-successor closure root must not read its boundary or
+downstream topology, and a difference walk must not dequeue or expand pending work after include
+result finality. Exact topology traces and `termination_reason` assertions are appropriate in those
+fixtures because avoiding that work is the behavior under test. Correctness-only topology fixtures
+remain membership-focused so legitimate scheduling or graph-work improvements do not require
+unrelated expectation changes.
+
+The favorable fixture models a normal Git-like history with an include head, an exclude boundary, a
+mainline path, a topic-side path, an ordinary two-parent merge whose parents are independent, shared
+older history, and monotonically non-increasing parent timestamps. Child-derived timestamp priority
+reaches the useful shared-join path before FIFO's stale root-side path and strictly reduces
+`traversal_steps`, `successor_expansions`, and `exclude_expansions`. The equal-timestamp control uses
+the same topology with all timestamps equal; because the comparator returns `0` for equal hinted
+items and for hintless ties, the priority queue preserves enqueue sequence in both the difference and
+closure frontiers and matches FIFO telemetry and topology access order exactly. The non-monotonic
+fixture is also Git-like and uses independent merge parents, but marks one topic-tip-to-topic-base
+edge with an intentional timestamp anomaly. That anomaly makes priority follow an unhelpful root-side
+path first and strictly increases the same graph-work counters, demonstrating that timestamp priority
+remains a heuristic rather than a correctness or performance guarantee.
+
+All three controlled policy fixtures currently terminate with `termination_reason=include-resolved`:
+their include results become final while scheduling work remains pending. This observation protects
+the intended result-finality behavior in these fixtures; it is not a requirement that every
+phase-certified traversal terminate for the same reason.
+
+These tests do not prove that timestamp priority is beneficial on real repositories and do not
+compare processing time. The internal strategy selection seam can route production commit walking
+through the prototype for controlled experiments, but the synthetic suite does not validate that
+operational use. Default production adoption remains a separate design and validation gate.
+
+## Internal Git strategy selection seam
+
+`packages/gitlode/src/git-impl/commit-traversal/strategy.ts` defines the Git-domain strategy descriptor used by `IsomorphicGitAdapter`. The only supported internal mode names are:
+
+- `certified-lazy` — production default, `walkDagNodeIdsCertifiedLazy()` with the existing LIFO/preserve frontier.
+- `phase-certified-fifo` — `walkDagNodeIdsPhaseCertifiedDifference()` with the generic FIFO/preserve defaults.
+- `phase-certified-timestamp` — `walkDagNodeIdsPhaseCertifiedDifference()` with Git child-committer timestamp priority injected into both difference and closure frontiers.
+
+The selector is the internal environment variable `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. It is not a CLI option, normal config field, worker input field, or package public API. Only `undefined` selects the default; empty strings, whitespace, case variants, and unknown values are errors for `runtime.gitAdapter: "isomorphic-git"`. The variable is ignored for `runtime.gitAdapter: "git-cli"`, including the isomorphic-git file-change fallback, so rollback is simply unsetting the variable.
+
+Profiling separates adapter-domain and generic-DAG decisions. `git.walk_commits.strategy` records the full Git mode above, while the nested `dag.traversal.strategy` remains `certifiedLazy` or `phaseCertified`. Existing counters such as `yielded_nodes`, `traversal_steps`, `successor_expansions`, closure/classification counters, and adapter read/cache counters remain the comparison surface; no Git-specific policy name is added to generic DAG telemetry.

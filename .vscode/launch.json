@@ -13,7 +13,7 @@
         "--output-dir",
         "${workspaceFolder}/packages/gitlode/out",
         "--config",
-        "${workspaceFolder}/packages/gitlode/out/config.json"
+        "${input:config}"
       ],
       "preLaunchTask": "npm: build",
       "outFiles": ["${workspaceFolder}/packages/gitlode/dist/**/*.js"],
@@ -22,6 +22,7 @@
       "console": "integratedTerminal",
       "outputCapture": "std",
       "env": {
+        "GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL": "phase-certified-timestamp"
         // "NODE_ENV": "development",
         // "DEBUG": "isomorphic-git:*" // Enable debug logging for isomorphic-git
       }
@@ -39,7 +40,7 @@
         "--output-dir",
         "${workspaceFolder}/packages/gitlode/out",
         "--config",
-        "${workspaceFolder}/packages/gitlode/out/config.json",
+        "${input:config}",
         "--state",
         "${workspaceFolder}/out/state.json"
       ],
@@ -48,6 +49,7 @@
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"],
       "env": {
+        "GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL": "phase-certified-timestamp"
         // "NODE_ENV": "development",
         // "DEBUG": "isomorphic-git:*" // Enable debug logging for isomorphic-git
       }
@@ -65,6 +67,12 @@
       "type": "promptString",
       "description": "Git ref/branch",
       "default": "main"
+    },
+    {
+      "id": "config",
+      "type": "promptString",
+      "description": "Path to the config file",
+      "default": "${workspaceFolder}/packages/gitlode/out/config.json"
     }
   ]
 }

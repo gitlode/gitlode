@@ -260,9 +260,9 @@ DAG topology walk. Comparing total `commit_reads` with `commits_yielded` shows c
 for the walk. DAG counters explain which traversal path caused the extra topology work.
 
 The traversal contract tests live under `packages/gitlode/test/dag/` because they primarily verify
-the generic DAG subsystem. Git timestamp-priority policy and B-validation tests live under
-`packages/gitlode/test/git-impl/commit-traversal/` because the policy is Git-specific even when it
-uses generic DAG fixtures.
+the generic DAG subsystem. Git timestamp-priority policy and synthetic graph-work efficiency tests
+live under `packages/gitlode/test/git-impl/commit-traversal/` because the policy is Git-specific even
+when it uses generic DAG fixtures.
 
 The contract suite verifies:
 
@@ -401,17 +401,18 @@ groups only merge and do not later split, dequeue-time re-expansion of an alread
 node re-accesses topology for scheduling/telemetry but is not a separate opportunity to discover a
 new branch join.
 
-## Phase-certified B-validation status
+## Phase-certified synthetic graph-work efficiency validation
 
-Synthetic B-validation tests compare the experimental phase-certified difference operation with the
-FIFO/preserve default frontier and the explicit Git child-derived timestamp priority frontier. These
-fixtures are controlled Git-history patterns: they use commit-to-parent edges, ordinary zero-, one-,
-and two-parent commits, branch heads, merge commits, and shared older history. They are not arbitrary
-DAG stress tests, wall-clock benchmarks, or real repository performance claims.
+Synthetic graph-work efficiency tests compare the experimental phase-certified difference operation
+with the FIFO/preserve default frontier and the explicit Git child-derived timestamp priority
+frontier. These fixtures are controlled Git-history patterns: they use commit-to-parent edges,
+ordinary zero-, one-, and two-parent commits, branch heads, merge commits, and shared older history.
+They are not arbitrary DAG stress tests, wall-clock benchmarks, or real repository performance
+claims.
 
 For this validation suite, two-parent fixture commits are constrained to merge parents that are not
-reachable from one another. This is a fixture-design guardrail so the observed B-validation signal is
-not coupled to ancestor-parent merge shapes; it is not a general production contract for all Git
+reachable from one another. This is a fixture-design guardrail so the observed graph-work comparison
+is not coupled to ancestor-parent merge shapes; it is not a general production contract for all Git
 merges.
 
 The tests use the same `reachable(includeStart) - reachable(excludeStart)` operation for both
@@ -434,9 +435,10 @@ edge with an intentional timestamp anomaly. That anomaly makes priority follow a
 path first and strictly increases the same graph-work counters, demonstrating that timestamp priority
 remains a heuristic rather than a correctness or performance guarantee.
 
-These tests do not prove that timestamp priority is beneficial on real repositories, do not compare
-processing time, and do not connect the phase-certified prototype to production commit walking.
-Production adoption remains a separate design and validation gate.
+These tests do not prove that timestamp priority is beneficial on real repositories and do not
+compare processing time. The internal strategy selection seam can route production commit walking
+through the prototype for controlled experiments, but the synthetic suite does not validate that
+operational use. Default production adoption remains a separate design and validation gate.
 
 ## Internal Git strategy selection seam
 

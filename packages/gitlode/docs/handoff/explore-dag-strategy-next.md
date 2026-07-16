@@ -1,112 +1,66 @@
-# Explore DAG Strategy Follow-up Handoff
+# Phase-Certified DAG Follow-up Handoff
 
-This note preserves follow-up context for the phase-certified prototype in `packages/gitlode/src/dag/` after the NodeId/topology DAG traversal refactor. Historical references to the former explore strategy name are not current source paths.
+This note contains only the context needed to resume unfinished work on the experimental
+phase-certified DAG traversal. Durable contracts and completed design decisions live in
+`packages/gitlode/docs/design/commit-traversal-internals.md`; module boundaries live in
+`packages/gitlode/docs/design/architecture.md`; telemetry interpretation lives in
+`packages/gitlode/docs/profiling.md`.
 
-## Current baseline
+## Current blocker
 
-`packages/gitlode/src/dag/phase-certified.ts` is the prototype traversal facade. It is reachable from production commit walking only through the internal experimental strategy seam, but it is not the default. The implementation is now split across `phase-certified.ts`
-for orchestration, `certified-closure.ts` for the closure state machine,
-`phase-certified-difference-state.ts` for include/certified integration state, and
-`phase-certified-types.ts` for shared contracts. Durable module ownership details live in the design
-docs.
+The phase-certified implementation remains experimental and is not the production default. During
+local repository trials, its telemetry exposed multiple serious problems that should have been
+detectable by unit-level fixtures. The concrete failures still need to be recorded before this note
+can describe their topology, symptoms, and invariants precisely.
 
-The refactor migrated the file away from the old `DagNodePort` / domain-node-yielding abstraction and
-onto the same `NodeId` / `DagTopologyPort` model used by the production DAG traversal core. That work
-was intentionally limited to the abstraction migration.
+Do not proceed with the previously considered real-repository comparison harness or a production
+adoption decision until these problems have deterministic unit reproductions and fixes. The internal
+strategy selector remains useful for controlled diagnosis, but its existence is not evidence that
+the prototype is ready for broader use.
 
-## Contract to preserve while iterating
+## Next work
 
-The prototype should continue to model the same difference-set contract as production traversal:
+Handle each reported problem independently:
 
-```text
-reachable(start) - reachable(exclude)
-```
+1. Record the smallest topology and scheduling conditions that reproduce it.
+2. Add a deterministic unit fixture at the narrowest responsible layer. Use an independent
+   reachable-difference oracle for result membership where applicable, and assert the relevant
+   state or telemetry invariant rather than only wall-clock behavior.
+3. Identify whether the gap is in the closure state machine, difference integration state,
+   scheduling interaction, or instrumentation.
+4. Fix the implementation without weakening existing correctness or synthetic graph-work efficiency
+   assertions.
+5. Re-run the focused DAG, commit-traversal policy, strategy seam, and adapter integration suites.
 
-Yield order is not the contract. Local graph links used by the prototype for certified-hit
-classification are algorithmic state and should not be removed merely because they look like caches.
+After all known failures are fixed, reassess the validation inventory before returning to
+real-repository experiments. Correctness validation remains the first priority. Synthetic graph-work
+efficiency validation is useful only after the operation is correct. Memory-efficiency validation
+remains lower priority unless a reported failure makes it relevant.
 
-## Frontier and scheduling status
+## Resume points
 
-The frontier injection seam is complete for the phase-certified prototype: difference coordination
-and each closure phase can now receive independent scheduling queues while preserving the durable
-result-set contract documented in `packages/gitlode/docs/design/commit-traversal-internals.md`.
+- Phase-certified facade and orchestration:
+  `packages/gitlode/src/dag/phase-certified.ts`
+- Certified-closure state machine:
+  `packages/gitlode/src/dag/certified-closure.ts`
+- Include/certified integration state:
+  `packages/gitlode/src/dag/phase-certified-difference-state.ts`
+- Correctness fixtures:
+  `packages/gitlode/test/dag/phase-certified.test.ts`
+- Timestamp scheduling and synthetic graph-work efficiency fixtures:
+  `packages/gitlode/test/git-impl/commit-traversal/timestamp-frontier-policy.test.ts` and
+  `timestamp-frontier-policy-efficiency.test.ts`
+- Internal strategy selection and adapter integration fixtures:
+  `packages/gitlode/test/git-impl/commit-traversal/strategy.test.ts` and
+  `packages/gitlode/test/git-impl/isomorphic-git-adapter.test.ts`
 
-Generic path-local `DomainHint` transport, Git child-committer-timestamp projection, and the stable
-timestamp-priority policy are implemented. The next work is not another scheduling metadata design; the strategies now share an optional-exclude `DagDifferenceWalker` call shape while retaining their meaningfully different frontier option types. Module ownership is now organized, and the internal production selection seam now exists for real-repository validation.
+The production default is still `certified-lazy`. The phase-certified FIFO and timestamp modes are
+selected only through the internal `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL` seam. Unset that variable
+to return to the default.
 
-## Correctness validation status
+## Deferred work
 
-The prototype has an independent reachable-difference oracle and focused fixtures covering:
-
-- simple linear history;
-- merge commits and split/rejoin shapes;
-- exclude ancestors that fully certify a result;
-- exclude ancestors that force fallback or continued exploration;
-- disconnected exclude nodes;
-- stale or duplicate frontier items;
-- cases where certified-hit classification depends on both predecessor and successor links.
-
-Add further correctness fixtures only for a newly identified topology or invariant gap; do not grow
-the suite merely by adding topologically equivalent graphs.
-
-## Telemetry status
-
-The prototype now has operation-level telemetry for the FIFO phase-certified baseline. Durable
-counter semantics live in `packages/gitlode/docs/design/commit-traversal-internals.md`; keep this
-handoff limited to future continuation notes rather than duplicating those definitions.
-
-## Path scheduling hint status
-
-The phase-certified prototype now carries generic `DomainHint` values on difference and closure
-frontier items. These hints are path-local scheduling metadata: successor descriptors may project
-metadata from the node that was just expanded onto the path toward each successor, and injected
-frontiers may use that metadata for priority. Start items remain hintless.
-
-Synthetic tests cover child-timestamp-style projection, including closed-boundary hint inheritance
-into the next exclude phase. The Git adapter now projects child committer timestamps from normal
-topology reads onto parent successor paths. A stable Git timestamp-priority frontier policy now exists
-for explicit phase-certified prototype injection; durable semantics live in
-`packages/gitlode/docs/design/commit-traversal-internals.md`.
-
-Correctness validation has a substantial topology-oriented baseline in `packages/gitlode/test/dag/phase-certified.test.ts`, and Git-specific B-validation now compares FIFO and timestamp-priority graph work in `packages/gitlode/test/git-impl/commit-traversal/timestamp-frontier-policy-efficiency.test.ts` on controlled Git-like fixtures. Memory-oriented C-validation
-remains lower priority. The generic DAG and Git-specific commit-traversal module boundaries are now organized: generic traversal lives in `packages/gitlode/src/dag/`, while Git timestamp hints and policies live in `packages/gitlode/src/git-impl/commit-traversal/`. Before production adoption, run a real-repository validation harness and operational comparison through the internal experimental strategy seam. Keep parent timestamp pre-reads out of that production plan.
-
-## Successor cache responsibility follow-up
-
-A review follow-up aligned the phase-certified prototype with the durable DAG-core contract that
-successor and domain-object caching belong to adapters, not traversal strategy state. Closure state
-now keeps only correctness data such as reached/expanded flags, traversed branches, closed-cover
-marks, and predecessor links used for branch-resolution walks. Include state keeps observed local
-successor/predecessor links for certified-hit classification and deletion, but `expand()` is not a
-successor-cache API. Re-accessing topology through the DAG core should therefore increment DAG
-successor-expansion counters and call `DagTopologyPort.getSuccessors()` again, letting the Git
-adapter's `CommitTopologyAdapter` own commit-object reuse and cache-hit telemetry.
-
-## Closure re-expansion and frontier compliance follow-up
-
-A later review removed the artificial known-node fixture that mutated frontier blocks. Frontier
-factories are scheduling-only: they may preserve, reverse, prioritize, or otherwise reorder the
-items produced by traversal, but they must not add, delete, or rewrite `nodeId`, `branchId`, or
-`domainHint` values. Re-expansion coverage now uses a normal partial-rejoin topology where FIFO
-ordering causes two legitimate `JOIN` items to be queued before either is expanded.
-
-The review also confirmed the branch-join invariant used by the closure prototype: production
-successor frontier items pass through `reachSuccessorFromBranch()` or parent-continuation
-`reachNode()` before enqueue, so joins between different branch groups are discovered at reach time.
-Branch groups only merge afterward. Dequeue-time re-expansion can therefore re-access topology and
-propagate freshly returned successor hints, but it is not a meaningful separate branch-join trigger.
-
-## B-validation follow-up status
-
-A dedicated phase-certified efficiency validation suite now compares FIFO/preserve with the Git
-child-derived timestamp priority policy on controlled Git-like favorable, equal-timestamp, and
-non-monotonic fixtures. The previous opaque strict synthetic fixture and later ancestor-parent merge
-fixture were replaced rather than kept. The favorable fixture uses only ordinary zero-, one-, and
-two-parent commit shapes, reachable named commits, independent merge parents, and monotonically
-non-increasing parent timestamps while recording strict timestamp-priority reductions in graph-work
-telemetry. The equal-timestamp control uses the same topology and records exact FIFO equivalence for
-counters and topology access traces. The non-monotonic fixture remains Git-like with independent
-merge parents, but marks one intentional timestamp anomaly and records strict graph-work regressions
-when timestamps prioritize an unhelpful path. The suite remains limited to deterministic synthetic
-Git-history telemetry and topology access traces; it does not benchmark wall-clock time, real
-repositories, memory behavior, or production adoption. Default production adoption remains out of scope until a separate adoption gate; rollback from experiments is unsetting `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`.
+- A real-repository comparison harness and operational evaluation.
+- Any decision to change the production default or expose strategy selection to users.
+- Memory-efficiency validation unless evidence raises its priority.
+- Further directory or abstraction work that is not required to diagnose a concrete failure.

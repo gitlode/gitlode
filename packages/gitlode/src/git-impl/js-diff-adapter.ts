@@ -4,8 +4,7 @@ import type { DiffAdapter } from "../git/index.js";
 
 /**
  * Default DiffAdapter backed by the `diff` package's diffLines, using UTF-8
- * decoding. Behavior is equivalent to the original inline implementation in
- * IsomorphicGitAdapter.
+ * decoding.
  */
 export class JsDiffAdapter implements DiffAdapter {
   computeLineDiff(before: Uint8Array, after: Uint8Array): { additions: number; deletions: number } {

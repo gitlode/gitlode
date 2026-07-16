@@ -36,17 +36,14 @@ export interface FileChange {
 }
 
 /**
- * Internal strategy interface for computing line-level diff statistics from
- * raw byte content. Owned exclusively by IsomorphicGitAdapter.
- *
- * DiffAdapter is not part of the GitAdapter public contract and must not be
- * exported through src/git/index.ts or referenced by Core layer modules.
+ * Interface for computing line-level diff statistics from
+ * raw byte content.
  *
  * Contract invariants for any implementation:
  * - For identical byte inputs, computeLineDiff must return identical additions/deletions.
  * - additions and deletions must be finite non-negative integers.
- * - Binary detection and null-result responsibility belong to the caller
- *   (IsomorphicGitAdapter); computeLineDiff is only invoked for text content.
+ * - Binary detection and null-result responsibility belong to the caller;
+ *   computeLineDiff is only invoked for text content.
  */
 export interface DiffAdapter {
   computeLineDiff(

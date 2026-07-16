@@ -18,6 +18,7 @@ interface RunResult {
   readonly yielded: readonly string[];
   readonly counters: Record<string, number>;
   readonly reads: readonly string[];
+  readonly terminationReason: unknown;
 }
 
 describe("phase-certified timestamp-priority efficiency validation", () => {
@@ -31,6 +32,10 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
 
     expectMembershipAndOracle(fixture, fifo);
     expectMembershipAndOracle(fixture, priority);
+    expectTelemetryAccounting(fifo);
+    expectTelemetryAccounting(priority);
+    expect(fifo.terminationReason).toBe("include-resolved");
+    expect(priority.terminationReason).toBe("include-resolved");
     // Result-finality stops both policies before the final stale ROOT re-expansion that older
     // expectations counted after the include result was already fixed.
     expect(priority.reads).toEqual([
@@ -71,6 +76,11 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
 
     expectMembershipAndOracle(equal, fifo);
     expectMembershipAndOracle(equal, priority);
+    expectTelemetryAccounting(favorableFifo);
+    expectTelemetryAccounting(fifo);
+    expectTelemetryAccounting(priority);
+    expect(fifo.terminationReason).toBe("include-resolved");
+    expect(priority.terminationReason).toBe("include-resolved");
     expect(priority.yielded).toHaveLength(new Set(priority.yielded).size);
     expect(fifo.reads).toEqual(favorableFifo.reads);
     expect(fifo.counters).toEqual(favorableFifo.counters);
@@ -88,6 +98,10 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
 
     expectMembershipAndOracle(fixture, fifo);
     expectMembershipAndOracle(fixture, priority);
+    expectTelemetryAccounting(fifo);
+    expectTelemetryAccounting(priority);
+    expect(fifo.terminationReason).toBe("include-resolved");
+    expect(priority.terminationReason).toBe("include-resolved");
     // Result-finality preserves the non-monotonic priority penalty while avoiding a final stale
     // ROOT re-expansion after the include graph has been fully resolved.
     expect(priority.reads).toEqual([
@@ -199,7 +213,13 @@ async function runFixture(fixture: Fixture, policy: "fifo" | "priority"): Promis
     yielded.push(nodeId);
   }
 
-  return { yielded, counters: normalizeCounters(recorder.records()[0]?.counters ?? {}), reads };
+  const record = recorder.records()[0];
+  return {
+    yielded,
+    counters: normalizeCounters(record?.counters ?? {}),
+    reads,
+    terminationReason: record?.attributes["termination_reason"],
+  };
 }
 
 function createCommitTimestampDagPort(
@@ -233,6 +253,13 @@ function expectMembershipAndOracle(fixture: Fixture, result: RunResult): void {
     reachableDifference(fixture.successors, fixture.start, fixture.exclude),
   );
   expect(result.yielded).toHaveLength(new Set(result.yielded).size);
+}
+
+function expectTelemetryAccounting(result: RunResult): void {
+  expect(result.counters.successor_expansions).toBe(result.reads.length);
+  expect(result.counters.main_expansions + result.counters.exclude_expansions).toBe(
+    result.counters.successor_expansions,
+  );
 }
 
 function expectGitLikeFixture(fixture: Fixture): void {

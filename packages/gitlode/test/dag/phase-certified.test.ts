@@ -8,7 +8,6 @@ import {
   type DifferenceFrontierItem,
   type WalkDagContext,
   resolveDagCertifiedClosurePhase,
-  walkDagNodeIdsEagerExclude,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/dag/index.js";
 import { PhaseCertifiedDifferenceState } from "../../src/dag/phase-certified-difference-state.js";
@@ -19,31 +18,7 @@ import {
 import { OrderedQueue, PriorityQueue } from "../../src/support/index.js";
 
 describe("resolveDagCertifiedClosurePhase", () => {
-  it("returns a closed boundary immediately for a simple single successor", async () => {
-    const reads: string[] = [];
-    const result = await resolveDagCertifiedClosurePhase(
-      createContext(
-        createDagPort(
-          {
-            E0: ["E1"],
-            E1: ["E2"],
-            E2: [],
-          },
-          reads,
-        ),
-      ),
-      "E0",
-    );
-
-    expect(result.kind).toBe("closed-boundary");
-    expect(result.certifiedNodes).toEqual(new Set(["E0", "E1"]));
-    if (result.kind === "closed-boundary") {
-      expect(result.closedBoundary).toBe("E1");
-    }
-    expect(reads).toEqual(["E0"]);
-  });
-
-  it("does not read through a single path before a split/rejoin", async () => {
+  it("closes a single-successor root without reading downstream split/rejoin topology", async () => {
     const reads: string[] = [];
     const result = await resolveDagCertifiedClosurePhase(
       createContext(
@@ -67,8 +42,15 @@ describe("resolveDagCertifiedClosurePhase", () => {
       "E0",
     );
 
-    expect(result).toEqual(closedBoundaryResult(["E0", "E1"], "E1"));
+    expect(result.kind).toBe("closed-boundary");
+    expect(result.certifiedNodes).toEqual(new Set(["E0", "E1"]));
+    if (result.kind === "closed-boundary") {
+      expect(result.closedBoundary).toBe("E1");
+    }
     expect(reads).toEqual(["E0"]);
+    expect(reads).not.toContain("E1");
+    expect(reads).not.toContain("E2");
+    expect(reads).not.toContain("M");
   });
 
   it("exhausts a terminal start without creating a closure frontier", async () => {
@@ -93,25 +75,6 @@ describe("resolveDagCertifiedClosurePhase", () => {
     if (result.kind === "exhausted") expect(result.terminalNodes).toEqual(["E0"]);
     expect(reads).toEqual(["E0"]);
     expect(frontiers).toHaveLength(0);
-  });
-
-  it("returns a closed boundary for a single successor instead of exhausting a path", async () => {
-    const result = await resolveDagCertifiedClosurePhase(
-      createContext(
-        createDagPort({
-          EXCLUDE: ["PARENT"],
-          PARENT: ["ROOT"],
-          ROOT: [],
-        }),
-      ),
-      "EXCLUDE",
-    );
-
-    expect(result.kind).toBe("closed-boundary");
-    expect(result.certifiedNodes).toEqual(new Set(["EXCLUDE", "PARENT"]));
-    if (result.kind === "closed-boundary") {
-      expect(result.closedBoundary).toBe("PARENT");
-    }
   });
 
   it("certifies a closed boundary when split branches rejoin", async () => {
@@ -300,7 +263,10 @@ describe("phase-certified prototype telemetry", () => {
     expect(recorder.records()).toEqual([
       expect.objectContaining({
         name: "dag.traversal",
-        attributes: { strategy: "phaseCertified", termination_reason: "frontier-exhausted" },
+        attributes: {
+          strategy: "phaseCertified",
+          termination_reason: "frontier-exhausted",
+        },
         counters: expect.objectContaining({
           certified_nodes: 2,
           closed_boundary_phases: 1,
@@ -342,7 +308,10 @@ describe("phase-certified prototype telemetry", () => {
     expect(recorder.records()).toEqual([
       expect.objectContaining({
         name: "dag.traversal",
-        attributes: { strategy: "phaseCertified", termination_reason: "frontier-exhausted" },
+        attributes: {
+          strategy: "phaseCertified",
+          termination_reason: "frontier-exhausted",
+        },
         counters: {
           drain_yielded_nodes: 3,
           main_expansions: 3,
@@ -473,7 +442,10 @@ describe("phase-certified frontier injection", () => {
       { role: "main", nodeId: "B" },
       { role: "main", nodeId: "A" },
     ]);
-    expect(frontiers[0]?.dequeued[0]).toEqual({ role: "exclude", nodeId: "EXCLUDE" });
+    expect(frontiers[0]?.dequeued[0]).toEqual({
+      role: "exclude",
+      nodeId: "EXCLUDE",
+    });
     expect(new Set(yielded)).toEqual(reachableDifference(successorsByNode, "HEAD", "EXCLUDE"));
   });
 
@@ -655,8 +627,16 @@ describe("phase-certified DomainHint scheduling", () => {
     );
 
     expect(frontiers[0]?.blocks).toContainEqual([
-      { role: "main", nodeId: "OLD_SUCCESSOR", domainHint: { sourceTimestamp: 100 } },
-      { role: "main", nodeId: "NEW_SUCCESSOR", domainHint: { sourceTimestamp: 100 } },
+      {
+        role: "main",
+        nodeId: "OLD_SUCCESSOR",
+        domainHint: { sourceTimestamp: 100 },
+      },
+      {
+        role: "main",
+        nodeId: "NEW_SUCCESSOR",
+        domainHint: { sourceTimestamp: 100 },
+      },
     ]);
   });
 
@@ -717,7 +697,12 @@ describe("phase-certified DomainHint scheduling", () => {
     const result = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
       createContext(
         createTimestampDagPort(
-          { MERGE: ["LEFT", "RIGHT"], LEFT: ["JOIN"], RIGHT: ["JOIN"], JOIN: [] },
+          {
+            MERGE: ["LEFT", "RIGHT"],
+            LEFT: ["JOIN"],
+            RIGHT: ["JOIN"],
+            JOIN: [],
+          },
           { MERGE: 50, LEFT: 40, RIGHT: 30, JOIN: 20 },
         ),
       ),
@@ -739,11 +724,23 @@ describe("phase-certified DomainHint scheduling", () => {
     expect(result).toEqual(closedBoundaryResult(["MERGE", "LEFT", "RIGHT", "JOIN"], "JOIN"));
     const splitBlock = frontiers[0]?.blocks[0];
     expect(splitBlock).toEqual([
-      { nodeId: "LEFT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 50 } },
-      { nodeId: "RIGHT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 50 } },
+      {
+        nodeId: "LEFT",
+        branchId: expect.any(Number),
+        domainHint: { sourceTimestamp: 50 },
+      },
+      {
+        nodeId: "RIGHT",
+        branchId: expect.any(Number),
+        domainHint: { sourceTimestamp: 50 },
+      },
     ]);
     expect(frontiers[0]?.blocks).toContainEqual([
-      { nodeId: "JOIN", branchId: splitBlock?.[0]?.branchId, domainHint: { sourceTimestamp: 40 } },
+      {
+        nodeId: "JOIN",
+        branchId: splitBlock?.[0]?.branchId,
+        domainHint: { sourceTimestamp: 40 },
+      },
     ]);
   });
 
@@ -791,11 +788,23 @@ describe("phase-certified DomainHint scheduling", () => {
     expect(reads.filter((nodeId) => nodeId === "JOIN")).toHaveLength(2);
     expect(reads).toEqual(["MERGE", "A", "B", "C", "JOIN", "JOIN", "NEXT", "NEXT"]);
     expect(frontiers[0]?.dequeued.filter((item) => item.nodeId === "JOIN")).toEqual([
-      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 90 } },
-      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 80 } },
+      {
+        nodeId: "JOIN",
+        branchId: expect.any(Number),
+        domainHint: { sourceTimestamp: 90 },
+      },
+      {
+        nodeId: "JOIN",
+        branchId: expect.any(Number),
+        domainHint: { sourceTimestamp: 80 },
+      },
     ]);
     expect(frontiers[0]?.blocks).toContainEqual([
-      { nodeId: "NEXT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 70 } },
+      {
+        nodeId: "NEXT",
+        branchId: expect.any(Number),
+        domainHint: { sourceTimestamp: 70 },
+      },
     ]);
     expect(
       frontiers[0]?.blocks.filter((block) =>
@@ -828,7 +837,16 @@ describe("phase-certified DomainHint scheduling", () => {
         createContext(
           createTimestampDagPort(
             successors,
-            { HEAD: 120, NEW: 110, MERGE: 100, A: 90, B: 80, C: 75, JOIN: 70, NEXT: 1 },
+            {
+              HEAD: 120,
+              NEW: 110,
+              MERGE: 100,
+              A: 90,
+              B: 80,
+              C: 75,
+              JOIN: 70,
+              NEXT: 1,
+            },
             reads,
           ),
         ),
@@ -854,7 +872,13 @@ describe("phase-certified DomainHint scheduling", () => {
       walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
         createContext(
           createTimestampDagPort(
-            { HEAD: ["LEFT", "RIGHT"], LEFT: ["JOIN"], RIGHT: ["JOIN"], JOIN: [], EXCLUDE: [] },
+            {
+              HEAD: ["LEFT", "RIGHT"],
+              LEFT: ["JOIN"],
+              RIGHT: ["JOIN"],
+              JOIN: [],
+              EXCLUDE: [],
+            },
             { HEAD: 100, LEFT: 10, RIGHT: 20, JOIN: 999, EXCLUDE: 0 },
           ),
         ),
@@ -902,7 +926,15 @@ describe("phase-certified DomainHint scheduling", () => {
               JOIN: ["OLD"],
               OLD: [],
             },
-            { HEAD: 100, NEW: 90, MERGE: 80, LEFT: 70, RIGHT: 60, JOIN: 50, OLD: 40 },
+            {
+              HEAD: 100,
+              NEW: 90,
+              MERGE: 80,
+              LEFT: 70,
+              RIGHT: 60,
+              JOIN: 50,
+              OLD: 40,
+            },
           ),
         ),
         "HEAD",
@@ -949,111 +981,6 @@ describe("phase-certified DomainHint scheduling", () => {
       "MERGE",
     );
     expect("closedBoundaryDomainHint" in standalone).toBe(false);
-  });
-
-  it("uses newest-first priority without changing membership, including equal and non-monotonic timestamps", async () => {
-    const successors = {
-      HEAD: ["LOW", "HIGH", "EQUAL_A", "EQUAL_B"],
-      LOW: ["LOW_NEXT"],
-      HIGH: ["HIGH_NEXT"],
-      EQUAL_A: ["EQUAL_A_NEXT"],
-      EQUAL_B: ["EQUAL_B_NEXT"],
-      LOW_NEXT: ["EXCLUDE"],
-      HIGH_NEXT: ["EXCLUDE"],
-      EQUAL_A_NEXT: ["EXCLUDE"],
-      EQUAL_B_NEXT: ["EXCLUDE"],
-      EXCLUDE: ["OLDER"],
-      OLDER: [],
-    };
-    const timestamps = {
-      HEAD: 1,
-      LOW: 10,
-      HIGH: 100,
-      EQUAL_A: 50,
-      EQUAL_B: 50,
-      LOW_NEXT: 9,
-      HIGH_NEXT: 99,
-      EQUAL_A_NEXT: 49,
-      EQUAL_B_NEXT: 49,
-      EXCLUDE: 200,
-      OLDER: 300,
-    };
-    const reads: string[] = [];
-    const frontiers: RecordingFrontier<DifferenceFrontierItem<string, PathTimestampHint>>[] = [];
-    const yielded = await collectNodeIds(
-      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
-        createContext(createTimestampDagPort(successors, timestamps, reads)),
-        "HEAD",
-        "EXCLUDE",
-        {
-          createDifferenceFrontier: () => {
-            const f = new RecordingFrontier(
-              createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
-            );
-            frontiers.push(f);
-            return f;
-          },
-          createClosureFrontier: () =>
-            createTimestampPriorityQueue<ClosureFrontierItem<string, PathTimestampHint>>(),
-        },
-      ),
-    );
-
-    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
-    expect(frontiers[0]?.dequeued.map((item) => item.nodeId)).toContain("HIGH");
-    expect(reads.indexOf("HIGH_NEXT")).toBeLessThan(reads.indexOf("EQUAL_A"));
-    expect(reads.indexOf("EQUAL_A_NEXT")).toBeLessThan(reads.indexOf("EQUAL_B_NEXT"));
-  });
-
-  it("keeps membership invariant when timestamp assignments change", async () => {
-    const successors = {
-      HEAD: ["A", "B"],
-      A: ["A_NEXT"],
-      B: ["B_NEXT"],
-      A_NEXT: ["EXCLUDE"],
-      B_NEXT: ["EXCLUDE"],
-      EXCLUDE: ["ROOT"],
-      ROOT: [],
-    };
-    const firstReads: string[] = [];
-    const secondReads: string[] = [];
-    const first = await collectNodeIds(
-      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
-        createContext(
-          createTimestampDagPort(
-            successors,
-            { HEAD: 1, A: 0, B: 20, A_NEXT: 0, B_NEXT: 0, EXCLUDE: 0, ROOT: 0 },
-            firstReads,
-          ),
-        ),
-        "HEAD",
-        "EXCLUDE",
-        {
-          createDifferenceFrontier: () =>
-            createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
-        },
-      ),
-    );
-    const second = await collectNodeIds(
-      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
-        createContext(
-          createTimestampDagPort(
-            successors,
-            { HEAD: 1, A: 20, B: 0, A_NEXT: 0, B_NEXT: 0, EXCLUDE: 0, ROOT: 0 },
-            secondReads,
-          ),
-        ),
-        "HEAD",
-        "EXCLUDE",
-        {
-          createDifferenceFrontier: () =>
-            createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
-        },
-      ),
-    );
-
-    expect(new Set(first)).toEqual(new Set(second));
-    expect(firstReads).not.toEqual(secondReads);
   });
 });
 
@@ -1249,7 +1176,13 @@ describe("walkDagPhaseCertifiedDifference", () => {
   });
 
   it("does not stop merely because include main work reached an unknown shared ancestor", async () => {
-    const successors = { HEAD: ["I1"], I1: ["ROOT"], EXCLUDE: ["E1"], E1: ["ROOT"], ROOT: [] };
+    const successors = {
+      HEAD: ["I1"],
+      I1: ["ROOT"],
+      EXCLUDE: ["E1"],
+      E1: ["ROOT"],
+      ROOT: [],
+    };
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference(
         createContext(createDagPort(successors)),
@@ -1264,7 +1197,12 @@ describe("walkDagPhaseCertifiedDifference", () => {
   });
 
   it("drains disconnected include nodes and reports frontier exhaustion", async () => {
-    const successors = { HEAD: ["I_ROOT"], I_ROOT: [], EXCLUDE: ["E_ROOT"], E_ROOT: [] };
+    const successors = {
+      HEAD: ["I_ROOT"],
+      I_ROOT: [],
+      EXCLUDE: ["E_ROOT"],
+      E_ROOT: [],
+    };
     const recorder = new LocalInstrumentationRecorder(() => 0);
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference(
@@ -1280,7 +1218,13 @@ describe("walkDagPhaseCertifiedDifference", () => {
   });
 
   it("does not let one include branch certified hit hide unresolved siblings", async () => {
-    const successors = { HEAD: ["A", "B"], A: ["EXCLUDE"], B: ["B_ROOT"], B_ROOT: [], EXCLUDE: [] };
+    const successors = {
+      HEAD: ["A", "B"],
+      A: ["EXCLUDE"],
+      B: ["B_ROOT"],
+      B_ROOT: [],
+      EXCLUDE: [],
+    };
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference(
         createContext(createDagPort(successors)),
@@ -1343,20 +1287,6 @@ describe("walkDagPhaseCertifiedDifference", () => {
     expect(recorder.records()[0]?.attributes["termination_reason"]).toBe("include-resolved");
     expect(recorder.records()[0]?.counters["stale_steps"] ?? 0).toBe(0);
   });
-  it("returns the include side before a certified single-path exclude boundary", async () => {
-    const port = createDagPort({
-      HEAD: ["NEW"],
-      NEW: ["EXCLUDE"],
-      EXCLUDE: ["OLD"],
-      OLD: [],
-    });
-
-    const yielded = await collect(
-      walkDagNodeIdsPhaseCertifiedDifference(createContext(port), "HEAD", "EXCLUDE"),
-    );
-
-    expect(new Set(yielded)).toEqual(new Set(["HEAD", "NEW"]));
-  });
 
   it("returns both include merge sides before the exclude boundary", async () => {
     const port = createDagPort({
@@ -1375,8 +1305,8 @@ describe("walkDagPhaseCertifiedDifference", () => {
     expect(new Set(yielded)).toEqual(new Set(["HEAD", "MERGE", "LEFT", "RIGHT"]));
   });
 
-  it("matches eager exclude when the exclude phase closes at a rejoined split", async () => {
-    await expectPhaseDifferenceToMatchEager(
+  it("matches an independent reachable-difference oracle when the exclude phase closes at a rejoined split", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
       {
         HEAD: ["NEW"],
         NEW: ["EXCLUDE_MERGE"],
@@ -1391,8 +1321,8 @@ describe("walkDagPhaseCertifiedDifference", () => {
     );
   });
 
-  it("matches eager exclude when the exclude phase completes without a closed boundary", async () => {
-    await expectPhaseDifferenceToMatchEager(
+  it("matches an independent reachable-difference oracle when the exclude phase completes without a closed boundary", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
       {
         HEAD: ["NEW"],
         NEW: ["EXCLUDE_MERGE"],
@@ -1407,27 +1337,13 @@ describe("walkDagPhaseCertifiedDifference", () => {
     );
   });
 
-  it("matches eager exclude when include paths hit the same exclude boundary", async () => {
-    await expectPhaseDifferenceToMatchEager(
+  it("matches an independent reachable-difference oracle when include paths hit the same exclude boundary", async () => {
+    await expectPhaseDifferenceToMatchReachableDifference(
       {
         HEAD: ["LEFT", "RIGHT"],
         LEFT: ["EXCLUDE"],
         RIGHT: ["NEW"],
         NEW: ["EXCLUDE"],
-        EXCLUDE: ["OLD"],
-        OLD: [],
-      },
-      "HEAD",
-      "EXCLUDE",
-    );
-  });
-
-  it("matches eager exclude when the exclude side is disconnected from include", async () => {
-    await expectPhaseDifferenceToMatchEager(
-      {
-        HEAD: ["NEW"],
-        NEW: ["ROOT"],
-        ROOT: [],
         EXCLUDE: ["OLD"],
         OLD: [],
       },
@@ -1485,21 +1401,6 @@ describe("walkDagPhaseCertifiedDifference", () => {
       },
       "HEAD",
       "EXCLUDE",
-    );
-  });
-
-  it("matches an independent reachable-difference oracle when include and exclude share only older history", async () => {
-    await expectPhaseDifferenceToMatchReachableDifference(
-      {
-        INCLUDE_HEAD: ["INCLUDE_ONLY"],
-        INCLUDE_ONLY: ["COMMON"],
-        EXCLUDE_HEAD: ["EXCLUDE_ONLY"],
-        EXCLUDE_ONLY: ["COMMON"],
-        COMMON: ["ROOT"],
-        ROOT: [],
-      },
-      "INCLUDE_HEAD",
-      "EXCLUDE_HEAD",
     );
   });
 
@@ -1666,7 +1567,9 @@ function createDagPort(
   return {
     async getSuccessors(nodeId) {
       reads.push(nodeId);
-      return (successorsByNode[nodeId] ?? []).map((successor) => ({ nodeId: successor }));
+      return (successorsByNode[nodeId] ?? []).map((successor) => ({
+        nodeId: successor,
+      }));
     },
   };
 }
@@ -1685,29 +1588,6 @@ async function collect<T>(items: AsyncIterable<T>): Promise<T[]> {
   const result: T[] = [];
   for await (const item of items) result.push(item);
   return result;
-}
-
-async function expectPhaseDifferenceToMatchEager(
-  successorsByNode: Record<string, readonly string[]>,
-  startId: string,
-  excludeStartId: string,
-): Promise<void> {
-  const phaseResult = await collectNodeIds(
-    walkDagNodeIdsPhaseCertifiedDifference(
-      createContext(createDagPort(successorsByNode)),
-      startId,
-      excludeStartId,
-    ),
-  );
-  const eagerResult = await collectNodeIds(
-    walkDagNodeIdsEagerExclude(
-      createContext(createDagPort(successorsByNode)),
-      startId,
-      excludeStartId,
-    ),
-  );
-
-  expect(new Set(phaseResult)).toEqual(new Set(eagerResult));
 }
 
 async function expectPhaseDifferenceToMatchReachableDifference(

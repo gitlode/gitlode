@@ -163,6 +163,32 @@ excluded node IDs before producing output. A failed certificate must not leak pa
 The DAG core does not cache domain nodes or successors. Git commit-object reuse belongs to the
 adapter's `CommitTopologyAdapter` cache.
 
+### Phase-certified closure root classification
+
+The experimental phase-certified closure resolver classifies the closure root by expanding that root
+exactly once before any closure frontier exists:
+
+- a root with zero successors immediately resolves to an exhausted closure containing only the root
+  as both a certified and terminal node;
+- a root with one successor immediately resolves to a closed boundary at that successor, certifying
+  both the root and the boundary without expanding the boundary or reading farther topology;
+- a root with two or more successors opens the existing split/rejoin state machine and enqueues the
+  successor branch items into a fresh closure frontier.
+
+A closure frontier is therefore created only when branch scheduling is necessary. Terminal and
+single-successor roots do not create one; a split root creates one fresh frontier for that closure
+phase, and nested splits in the same phase reuse that frontier. The frontier remains a
+scheduling-only abstraction and does not own visited state, edge state, certification state, or
+branch correctness state.
+
+Root classification still counts as traversal work. The root expansion increments the same
+`traversal_steps`, `successor_expansions`, and `exclude_expansions` counters that a dequeued closure
+frontier item would have incremented, and the expansion counters must continue to match actual
+`DagTopologyPort.getSuccessors()` calls. For single-successor closure roots, the successor
+descriptor's domain hint is inherited as the closed-boundary hint passed to the next exclude phase;
+this uses the already-read successor descriptor and must not pre-read the boundary node's own
+metadata.
+
 ## Certificate
 
 Certified-lazy traversal uses a conservative path certificate. It avoids full

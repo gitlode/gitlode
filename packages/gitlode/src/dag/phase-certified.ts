@@ -147,7 +147,7 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
         ],
   );
 
-  while (!frontier.isEmpty()) {
+  while (!frontier.isEmpty() && !state.isIncludeResolved()) {
     const item = frontier.dequeueOrThrow();
 
     if (item.role === "main") {
@@ -196,6 +196,10 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
       telemetry.span.incrementCounter("yielded_nodes");
       yield yielded;
     }
+    // Once the include graph is empty, remaining scheduled main/exclude work is stale with
+    // respect to the result set. Do not create a follow-up exclude phase after finality.
+    if (state.isIncludeResolved()) break;
+
     if (closure.kind === "closed-boundary") {
       frontier.enqueue({
         role: "exclude",
@@ -204,6 +208,9 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
       });
     }
   }
+
+  const terminationReason = frontier.isEmpty() ? "frontier-exhausted" : "include-resolved";
+  telemetry.span.setAttribute("termination_reason", terminationReason);
 
   for (const yielded of state.drainRemainingInclude()) {
     telemetry.span.incrementCounter("drain_yielded_nodes");

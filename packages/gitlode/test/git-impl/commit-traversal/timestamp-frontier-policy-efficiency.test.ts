@@ -31,6 +31,8 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
 
     expectMembershipAndOracle(fixture, fifo);
     expectMembershipAndOracle(fixture, priority);
+    // Result-finality stops both policies before the final stale ROOT re-expansion that older
+    // expectations counted after the include result was already fixed.
     expect(priority.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
@@ -40,7 +42,6 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
       "TOPIC_TIP",
       "MAIN_OLDER",
       "SHARED_JOIN",
-      "ROOT",
     ]);
     expect(fifo.reads).toEqual([
       "INCLUDE_HEAD",
@@ -52,7 +53,6 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
       "MAIN_OLDER",
       "ROOT",
       "SHARED_JOIN",
-      "ROOT",
     ]);
     expect(priority.counters.traversal_steps).toBeLessThan(fifo.counters.traversal_steps);
     expect(priority.counters.successor_expansions).toBeLessThan(fifo.counters.successor_expansions);
@@ -88,6 +88,8 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
 
     expectMembershipAndOracle(fixture, fifo);
     expectMembershipAndOracle(fixture, priority);
+    // Result-finality preserves the non-monotonic priority penalty while avoiding a final stale
+    // ROOT re-expansion after the include graph has been fully resolved.
     expect(priority.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
@@ -95,7 +97,6 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
       "MAIN_BASE",
       "ROOT",
       "TOPIC_BASE",
-      "ROOT",
     ]);
     expect(fifo.reads).toEqual([
       "INCLUDE_HEAD",
@@ -103,7 +104,6 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
       "TOPIC_TIP",
       "MAIN_BASE",
       "TOPIC_BASE",
-      "ROOT",
     ]);
     expect(priority.counters.traversal_steps).toBeGreaterThan(fifo.counters.traversal_steps);
     expect(priority.counters.successor_expansions).toBeGreaterThan(

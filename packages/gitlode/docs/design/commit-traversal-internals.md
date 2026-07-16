@@ -359,7 +359,7 @@ callers explicitly inject the Git-specific policy. The phase-certified strategie
 
 `packages/gitlode/src/dag/phase-certified.ts` keeps the facade for a prototype strategy with the same difference contract,
 `reachable(includeStart) - reachable(excludeStart)`. The facade coordinates include work, exclude
-closure phases, frontier lifecycle, and operation-level telemetry. `packages/gitlode/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/gitlode/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/gitlode/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is wired only through the internal experiment seam; its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO and timestamp-priority runs can be compared with certified-lazy.
+closure phases, frontier lifecycle, result-finality termination, and operation-level telemetry. `packages/gitlode/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/gitlode/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/gitlode/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is wired only through the internal experiment seam; its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO and timestamp-priority runs can be compared with certified-lazy.
 
 `walkDagNodeIdsPhaseCertifiedDifference()` records one `dag.traversal` span with
 `strategy=phaseCertified`. Internal closure phases do not create child `dag.certified_closure` spans;
@@ -392,6 +392,29 @@ The prototype also records strategy-specific counters on the same `dag.traversal
 For completed phase-certified difference operations, `yielded_nodes` is the sum of
 `certification_yielded_nodes` and `drain_yielded_nodes`, subject to the recorder's normal behavior
 of omitting counters that were never incremented.
+
+Phase-certified difference termination uses include-result finality, not main-queue emptiness,
+terminal-node discovery, queue role counts, timestamps, or a frontier-policy-specific condition.
+`PhaseCertifiedDifferenceState` exposes whether the include side is fully resolved by checking
+whether the include graph is empty. That graph contains exactly include nodes that have not yet been
+finally yielded or excluded: the include start is registered before traversal; each include successor
+is registered before its main frontier item is enqueued; certified-hit classification removes nodes
+whose exclusion is proven; yielded nodes are removed only when they are expanded, so their successors
+have already been registered; and a pending main item for a removed graph node is stale. Therefore,
+when the include graph is empty, every include-side result decision is final and remaining main or
+exclude frontier items cannot change `reachable(includeStart) - reachable(excludeStart)`. A temporary
+lack of main work or reaching an include terminal is not sufficient, because an unknown exclude path
+may still intersect an already expanded include node.
+
+After include-result finality, the facade stops the outer difference loop without dequeuing pending
+stale main items or pending exclude items. If an exclude closure resolves the include graph, the
+facade also suppresses scheduling of the next closed-boundary exclude item. The operation sets
+`termination_reason` on the `dag.traversal` span after the loop: `frontier-exhausted` when the
+difference frontier naturally became empty, including reachable-only walks and the case where
+frontier exhaustion and include resolution happen together; otherwise `include-resolved`, meaning
+include finality left unprocessed scheduling work in the frontier. Existing graph-work counters keep
+counting only actual processed work and topology reads; no abandoned-frontier counter is recorded
+because queued item count is not equivalent to avoided topology expansion count.
 
 `resolveDagCertifiedClosurePhase()` is also a standalone operation. When called directly, it records
 one `dag.certified_closure` span with `result=closed-boundary` or `result=exhausted` after the phase

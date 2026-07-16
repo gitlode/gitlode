@@ -6,28 +6,26 @@ phase-certified DAG traversal. Durable contracts and completed design decisions 
 `packages/gitlode/docs/design/architecture.md`; telemetry interpretation lives in
 `packages/gitlode/docs/profiling.md`.
 
-## Current blocker
+## Current status
 
 The phase-certified implementation remains experimental and is not the production default. The
-closure-phase root-cardinality issue has been fixed and documented in the durable traversal design.
-The next known blocker is outer difference-loop termination: a single closure phase no longer reads
-through single-successor roots, but the difference coordinator may still schedule subsequent exclude
-phases until it reaches a terminal boundary.
+closure-phase root-cardinality issue and the outer difference-loop result-finality blocker have been
+fixed and documented in the durable traversal design. The difference coordinator now stops when the
+include graph is fully resolved, records `termination_reason`, and avoids scheduling follow-up
+exclude work after result finality.
 
-Do not change difference termination as follow-up cleanup without first agreeing on the correctness
-invariant with a human reviewer. Keep real-repository comparison harness work and production adoption
-decisions deferred until the remaining termination semantics have deterministic unit coverage.
+Keep real-repository comparison harness work and production adoption decisions deferred until the
+remaining validation work below has been completed.
 
 ## Next work
 
-Handle the outer difference termination problem independently:
+Continue validation without changing the production default:
 
-1. Define the include/exclude result-finality invariant with a human reviewer.
-2. Add deterministic fixtures that distinguish one closure phase's no-read-ahead contract from the
-   coordinator's decision to schedule later exclude phases.
-3. Fix only the coordinator behavior needed for that invariant, preserving independent
-   reachable-difference membership tests and existing graph-work efficiency assertions.
-4. Re-run the focused DAG, commit-traversal policy, strategy seam, and adapter integration suites.
+1. Add or run a real-repository comparison harness for phase-certified FIFO and timestamp modes
+   against the production certified-lazy strategy.
+2. Review memory behavior on large histories if the validation harness shows promising graph-work
+   savings.
+3. Decide separately whether any phase-certified mode should become production-facing.
 
 ## Resume points
 

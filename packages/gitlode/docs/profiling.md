@@ -102,9 +102,14 @@ overshoot during DAG traversal.
 The generic DAG traversal core records strategy diagnostics on `dag.traversal`. These use graph
 vocabulary rather than Git object vocabulary. Useful details include `strategy`,
 `result=certified|fallback`, `fallback_reason`, `yielded_nodes`, `successor_expansions`,
-`main_expansions`, `exclude_expansions`, `excluded_nodes`, and `fallback_removed`. The counters are
-intended for developer comparison between traversal strategies; they are not a stable
-machine-readable contract.
+`main_expansions`, `exclude_expansions`, `excluded_nodes`, and `fallback_removed`. For the
+experimental `phaseCertified` DAG strategy, normal completion also records `termination_reason`:
+`frontier-exhausted` means the difference frontier naturally emptied (including reachable-only walks
+and ties where include resolution happened as the frontier emptied), while `include-resolved` means
+the include graph became fully resolved with pending scheduling work left unprocessed. Existing
+expansion counters still describe actual `getSuccessors()` calls, not queued work that was skipped
+after result finality. The counters are intended for developer comparison between traversal
+strategies; they are not a stable machine-readable contract.
 
 Top-level reachable-set walks use `dag.reachable`. In normal commit extraction, reachable walks are
 usually part of a larger `dag.traversal` operation and are summarized there instead.

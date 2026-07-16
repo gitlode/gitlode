@@ -48,6 +48,7 @@ interface ReadonlyIncludeGraphState<NodeId extends PropertyKey> {
   createPredecessorTopology(): DagTopologyPort<NodeId>;
   createSuccessorTopology(): DagTopologyPort<NodeId>;
   nodeIds(): NodeId[];
+  isEmpty(): boolean;
 }
 
 interface MutableIncludeGraphState<
@@ -77,6 +78,19 @@ export class PhaseCertifiedDifferenceState<NodeId extends PropertyKey, DomainHin
 
   initializeInclude(startId: NodeId): void {
     this.includeGraph.initialize(startId);
+  }
+
+  /**
+   * True when every include node observed so far has been finally yielded or excluded.
+   *
+   * Include graph entries represent unresolved include-side nodes: the start node is registered
+   * before traversal, successors are registered before their main frontier items are scheduled,
+   * certified-hit exclusions delete nodes, and yielded expanded nodes are deleted only after their
+   * successors have already been registered. Pending main items for deleted nodes are therefore
+   * stale and cannot change the result set.
+   */
+  isIncludeResolved(): boolean {
+    return this.includeGraph.isEmpty();
   }
 
   // Difference-state policy plus include-side graph expansion. The returned result tells the
@@ -311,6 +325,10 @@ class IncludeGraphState<
 
   nodeIds(): NodeId[] {
     return [...this.visited.keys()];
+  }
+
+  isEmpty(): boolean {
+    return this.visited.size === 0;
   }
 
   createPredecessorTopology(): DagTopologyPort<NodeId> {

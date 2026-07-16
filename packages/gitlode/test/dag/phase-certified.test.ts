@@ -300,7 +300,7 @@ describe("phase-certified prototype telemetry", () => {
     expect(recorder.records()).toEqual([
       expect.objectContaining({
         name: "dag.traversal",
-        attributes: { strategy: "phaseCertified" },
+        attributes: { strategy: "phaseCertified", termination_reason: "frontier-exhausted" },
         counters: expect.objectContaining({
           certified_nodes: 2,
           closed_boundary_phases: 1,
@@ -342,7 +342,7 @@ describe("phase-certified prototype telemetry", () => {
     expect(recorder.records()).toEqual([
       expect.objectContaining({
         name: "dag.traversal",
-        attributes: { strategy: "phaseCertified" },
+        attributes: { strategy: "phaseCertified", termination_reason: "frontier-exhausted" },
         counters: {
           drain_yielded_nodes: 3,
           main_expansions: 3,
@@ -384,8 +384,7 @@ describe("phase-certified prototype telemetry", () => {
         counters: expect.objectContaining({
           certified_nodes: 5,
           closed_boundary_phases: 2,
-          closure_phases: 3,
-          exhausted_phases: 1,
+          closure_phases: 2,
         }),
       }),
     );
@@ -705,11 +704,11 @@ describe("phase-certified DomainHint scheduling", () => {
       ),
     );
 
-    expect(differenceFrontiers[0]?.blocks).toContainEqual([
+    expect(differenceFrontiers[0]?.blocks).not.toContainEqual([
       { role: "exclude", nodeId: "OLD", domainHint: { sourceTimestamp: 80 } },
     ]);
     expect(closureFrontiers).toHaveLength(0);
-    expect(reads.slice(0, 2)).toEqual(["HEAD", "EXCLUDE"]);
+    expect(reads).toEqual(["HEAD", "EXCLUDE"]);
   });
 
   it("propagates closure successor path hints through split branches", async () => {
@@ -1059,6 +1058,22 @@ describe("phase-certified DomainHint scheduling", () => {
 });
 
 describe("PhaseCertifiedDifferenceState certified hit resolution", () => {
+  it("reports include resolution state from include graph emptiness", async () => {
+    const state = new PhaseCertifiedDifferenceState<string>(
+      createDagPort({ HEAD: ["A", "B"], A: ["EXCLUDE"], B: [], EXCLUDE: [] }),
+    );
+    state.initializeInclude("HEAD");
+    expect(state.isIncludeResolved()).toBe(false);
+    await state.advanceIncludeNode("HEAD");
+    await state.advanceIncludeNode("A");
+    await collect(
+      state.applyClosureAndResolveIncludeHits(closedBoundaryResult(["EXCLUDE"], "EXCLUDE")),
+    );
+    expect(state.isIncludeResolved()).toBe(false);
+    await state.advanceIncludeNode("B");
+    expect([...state.drainRemainingInclude()]).toEqual(["B"]);
+    expect(state.isIncludeResolved()).toBe(true);
+  });
   it("yields the visited newer side of a single certified hit", async () => {
     const state = await createState({
       A: ["C"],
@@ -1166,6 +1181,168 @@ describe("PhaseCertifiedDifferenceState certified hit resolution", () => {
 });
 
 describe("walkDagPhaseCertifiedDifference", () => {
+  it("stops a timestamp-priority linear difference after include result finality", async () => {
+    const successors = {
+      HEAD: ["NEW"],
+      NEW: ["EXCLUDE"],
+      EXCLUDE: ["OLD"],
+      OLD: ["ROOT"],
+      ROOT: [],
+    };
+    const reads: string[] = [];
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            successors,
+            { HEAD: 100, NEW: 90, EXCLUDE: 80, OLD: 70, ROOT: 60 },
+            reads,
+          ),
+          recorder,
+        ),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () =>
+            createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
+        },
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
+    expect(yielded).toHaveLength(new Set(yielded).size);
+    expect(reads).toEqual(["HEAD", "EXCLUDE", "NEW"]);
+    expect(reads).not.toContain("OLD");
+    expect(reads).not.toContain("ROOT");
+    expect(recorder.records()[0]?.attributes["termination_reason"]).toBe("include-resolved");
+    const counters = recorder.records()[0]?.counters ?? {};
+    expect(counters["successor_expansions"]).toBe(reads.length);
+    expect((counters["main_expansions"] ?? 0) + (counters["exclude_expansions"] ?? 0)).toBe(
+      counters["successor_expansions"],
+    );
+  });
+
+  it("stops a FIFO linear difference before expanding work after result finality", async () => {
+    const successors = {
+      HEAD: ["NEW"],
+      NEW: ["EXCLUDE"],
+      EXCLUDE: ["OLD"],
+      OLD: ["ROOT"],
+      ROOT: [],
+    };
+    const reads: string[] = [];
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(createDagPort(successors, reads), recorder),
+        "HEAD",
+        "EXCLUDE",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
+    expect(reads).not.toContain("ROOT");
+    expect(recorder.records()[0]?.attributes["termination_reason"]).toBe("include-resolved");
+  });
+
+  it("does not stop merely because include main work reached an unknown shared ancestor", async () => {
+    const successors = { HEAD: ["I1"], I1: ["ROOT"], EXCLUDE: ["E1"], E1: ["ROOT"], ROOT: [] };
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(createDagPort(successors)),
+        "HEAD",
+        "EXCLUDE",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
+    expect(yielded).not.toContain("ROOT");
+    expect(yielded).toHaveLength(new Set(yielded).size);
+  });
+
+  it("drains disconnected include nodes and reports frontier exhaustion", async () => {
+    const successors = { HEAD: ["I_ROOT"], I_ROOT: [], EXCLUDE: ["E_ROOT"], E_ROOT: [] };
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(createDagPort(successors), recorder),
+        "HEAD",
+        "EXCLUDE",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
+    expect(yielded).toHaveLength(new Set(yielded).size);
+    expect(recorder.records()[0]?.attributes["termination_reason"]).toBe("frontier-exhausted");
+  });
+
+  it("does not let one include branch certified hit hide unresolved siblings", async () => {
+    const successors = { HEAD: ["A", "B"], A: ["EXCLUDE"], B: ["B_ROOT"], B_ROOT: [], EXCLUDE: [] };
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(createDagPort(successors)),
+        "HEAD",
+        "EXCLUDE",
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
+    expect(yielded).toHaveLength(new Set(yielded).size);
+    expect(yielded).toEqual(expect.arrayContaining(["B", "B_ROOT"]));
+  });
+
+  it("does not dequeue stale main or pending exclude work after certified-hit finality", async () => {
+    const successors = {
+      HEAD: ["LEFT", "RIGHT"],
+      LEFT: ["EXCLUDE"],
+      RIGHT: ["EXCLUDE"],
+      EXCLUDE: ["OLD"],
+      OLD: [],
+    };
+    const reads: string[] = [];
+    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const frontiers: RecordingFrontier<DifferenceFrontierItem<string>>[] = [];
+
+    const yielded = await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            successors,
+            { HEAD: 100, LEFT: 90, RIGHT: 90, EXCLUDE: 80, OLD: 1 },
+            reads,
+          ),
+          recorder,
+        ),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () => {
+            const frontier = new RecordingFrontier(
+              createTimestampPriorityQueue<DifferenceFrontierItem<string, PathTimestampHint>>(),
+            );
+            frontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "EXCLUDE"));
+    expect(
+      frontiers[0]?.dequeued.filter((item) => item.role === "main" && item.nodeId === "EXCLUDE"),
+    ).toHaveLength(1);
+    expect(frontiers[0]?.dequeued).not.toContainEqual({
+      role: "exclude",
+      nodeId: "OLD",
+      domainHint: { sourceTimestamp: 80 },
+    });
+    expect(reads).not.toContain("OLD");
+    expect(recorder.records()[0]?.attributes["termination_reason"]).toBe("include-resolved");
+    expect(recorder.records()[0]?.counters["stale_steps"] ?? 0).toBe(0);
+  });
   it("returns the include side before a certified single-path exclude boundary", async () => {
     const port = createDagPort({
       HEAD: ["NEW"],

@@ -17,17 +17,11 @@ export type CertifiedClosurePhaseResult<NodeId extends PropertyKey> =
       readonly terminalNodes: readonly NodeId[];
     };
 
-export type DifferenceFrontierItem<NodeId extends PropertyKey, DomainHint = undefined> =
-  | {
-      readonly role: "main";
-      readonly nodeId: NodeId;
-      readonly domainHint?: DomainHint;
-    }
-  | {
-      readonly role: "exclude";
-      readonly nodeId: NodeId;
-      readonly domainHint?: DomainHint;
-    };
+export interface DifferenceFrontierItem<NodeId extends PropertyKey, DomainHint = undefined> {
+  readonly role: "main" | "exclude";
+  readonly nodeId: NodeId;
+  readonly domainHint?: DomainHint;
+}
 
 export interface ClosureFrontierItem<NodeId extends PropertyKey, DomainHint = undefined> {
   readonly nodeId: NodeId;

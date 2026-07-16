@@ -13,34 +13,32 @@ closure-phase root-cardinality issue and the outer difference-loop result-finali
 fixed and documented in the durable traversal design. Phase-certified traversal now records
 `termination_reason` on `dag.traversal` spans.
 
-Before real-repository validation, the unit-level phase-certified efficiency test design needs a
-focused audit because the two recently fixed topology-access bugs were not caught by the previous
-fixture set.
+The follow-up unit-test audit is complete. Single-successor and result-finality behavior now have
+absolute topology-access regressions, complex correctness fixtures use an independent
+reachable-difference oracle, and the Git-like favorable, equal-timestamp, and non-monotonic
+efficiency fixtures check both policy comparisons and topology/telemetry accounting. Completed
+contracts and fixture-design principles are recorded in
+`packages/gitlode/docs/design/commit-traversal-internals.md` rather than repeated here.
 
 ## Next work
 
-Audit and tighten the unit-level phase-certified efficiency test design before adding broader
-real-repository validation. This is not primarily a test-count increase; it should clarify what each
-fixture proves, the minimum assertions needed for that proof, and whether any assertion freezes
-unwanted graph work as acceptable behavior.
+There is no active implementation task committed by this handoff. The next decision is whether to
+resume controlled real-repository evaluation now that the known unit-level blockers and the fixture
+audit are complete.
 
-Review at least these questions:
+If operational evaluation resumes, define the comparison protocol before building a harness:
 
-1. For simple topologies, do fixtures encode absolute invariants that prohibit topology access after
-   result-finality or beyond a single-successor closure boundary?
-2. Do FIFO-vs-timestamp relative comparisons miss unnecessary exploration that both policies perform
-   in common?
-3. Are any fixtures treating current telemetry values as expected snapshots in a way that legitimizes
-   inappropriate graph work?
-4. Do any correctness-only membership fixtures need topology-access assertions to catch avoidable
-   reads?
-5. Are the favorable, equal-timestamp, and non-monotonic synthetic fixtures distinct in purpose, or
-   are any redundant?
-6. Which assertions should stay strict, and which exact snapshots are brittle against legitimate
-   algorithm improvements?
-7. For each fixture, are topology access traces, `successor_expansions`, `main_expansions`,
-   `exclude_expansions`, and `termination_reason` checked only where they support that fixture's
-   purpose?
+1. Keep the repository snapshot, include/exclude OIDs, adapter, and extraction request identical.
+2. Compare `certified-lazy`, `phase-certified-fifo`, and `phase-certified-timestamp` through the
+   existing internal selector; do not expose a new user-facing option for the experiment.
+3. Verify result membership independently of yield order before interpreting efficiency.
+4. Record `git.walk_commits.strategy`, nested `dag.traversal` counters and `termination_reason`, and
+   adapter commit read/cache counters. Use elapsed time as supporting evidence rather than the sole
+   efficiency measure.
+5. Include repositories and boundaries with merge-heavy, equal/near-equal timestamp, and timestamp
+   non-monotonic histories. Do not treat the synthetic favorable fixture as proof of real-world
+   benefit.
+6. Keep production-default adoption as a separate decision after results are reviewed.
 
 ## Resume points
 
@@ -63,14 +61,12 @@ The production default is still `certified-lazy`. The phase-certified FIFO and t
 selected only through the internal `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL` seam. Unset that variable
 to return to the default.
 
-## Deferred work
+## Deferred decisions
 
-Defer the following until the unit-level efficiency test design audit is complete:
-
-- Real-repository comparison harness.
-- Real-repository operational evaluation.
-- Memory-efficiency validation.
-- Any decision to change the production default.
-- Any decision to expose phase-certified modes to users.
-- Production adoption decision.
-- Further directory or abstraction work that is not required to diagnose a concrete failure.
+- Memory-efficiency validation remains lower priority unless profiling or operational runs show a
+  concrete concern.
+- Do not change the production default until correctness and operational evidence have been reviewed.
+- Do not expose phase-certified modes through CLI, normal configuration, worker input, or package
+  public API as part of the experiment.
+- Further directory or abstraction work should be driven by a concrete maintenance need rather than
+  resumed solely because it appeared in an older roadmap.

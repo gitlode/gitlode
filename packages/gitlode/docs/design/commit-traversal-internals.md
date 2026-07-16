@@ -273,6 +273,14 @@ The contract suite verifies:
 - certified-lazy falls back for disconnected DAGs, path splits, and uncovered stop points.
 - traversal diagnostics cover representative reachable, eager-exclude, certified, fallback, and
   adapter read/cache/yield cases without making every counter value a long-term contract.
+- phase-certified closure roots stop after one topology read for terminal and single-successor
+  cardinalities, while split roots enter the split/rejoin state machine;
+- phase-certified difference traversal stops after include-result finality without processing stale
+  main work or an exclude-side tail that can no longer change membership;
+- complex phase-certified correctness fixtures use an independent reachable-difference oracle rather
+  than treating another traversal strategy as their sole oracle;
+- focused graph-work fixtures use exact topology traces and telemetry accounting only when those
+  observations are part of the behavior the fixture is intended to protect.
 
 Adapter tests cover user-visible integration and include a certified single-successor walk that
 succeeds through the certified-lazy default while eager-exclude traversal would expand a deleted
@@ -443,11 +451,14 @@ them into a single `NodeId -> DomainHint` value. Closed-boundary closure phases 
 path hint that established the boundary into both the next difference-side exclude item and the next
 closure root item, while the public `CertifiedClosurePhaseResult` remains hint-free.
 
-Synthetic timestamp tests model the intended future Git projection by attaching the expanded child
-node's timestamp to each successor path. The successor's own timestamp is not read before priority is
-decided. Timestamp assignment changes, equal timestamps, and non-monotonic child/parent timestamps
-may alter processing order but must not alter `reachable(start) - reachable(exclude)` membership.
-The Git adapter projects child committer timestamps during normal topology reads. Those hints affect scheduling only when the internal `phase-certified-timestamp` strategy is explicitly selected; they do not change membership or cause parent pre-reads.
+Git timestamp scheduling tests model the adapter's projection contract by attaching the expanded
+child node's committer timestamp to each successor path. The successor's own timestamp is not read
+before priority is decided. Timestamp assignment changes, equal timestamps, and non-monotonic
+child/parent timestamps may alter processing order but must not alter
+`reachable(start) - reachable(exclude)` membership. The Git adapter performs the same child-derived
+projection during normal topology reads. Those hints affect scheduling only when the internal
+`phase-certified-timestamp` strategy is explicitly selected; they do not change membership or cause
+parent pre-reads.
 
 Closure re-expansion and branch-join detection are separate concerns. A compliant frontier may only
 hold and reorder the pending items produced by traversal; it must not synthesize, drop, or rewrite
@@ -476,7 +487,18 @@ policies and check membership against an independent reachable-difference oracle
 checks. Telemetry counters such as `traversal_steps`, `successor_expansions`, `main_expansions`,
 `exclude_expansions`, `stale_steps`, closure-phase counts, classification counts, and yield-source
 counts make graph work comparable without relying on elapsed time. `yielded_nodes` is treated as an
-output-size counter rather than a standalone efficiency proof.
+output-size counter rather than a standalone efficiency proof. Each policy run also checks that
+`successor_expansions` equals the observed topology-read trace length and that
+`main_expansions + exclude_expansions` equals `successor_expansions`. These are accounting
+invariants, not snapshots of how much work a particular strategy must always perform.
+
+Separate absolute regression fixtures protect the two early-termination contracts that relative
+policy comparisons cannot establish: a single-successor closure root must not read its boundary or
+downstream topology, and a difference walk must not dequeue or expand pending work after include
+result finality. Exact topology traces and `termination_reason` assertions are appropriate in those
+fixtures because avoiding that work is the behavior under test. Correctness-only topology fixtures
+remain membership-focused so legitimate scheduling or graph-work improvements do not require
+unrelated expectation changes.
 
 The favorable fixture models a normal Git-like history with an include head, an exclude boundary, a
 mainline path, a topic-side path, an ordinary two-parent merge whose parents are independent, shared
@@ -490,6 +512,11 @@ fixture is also Git-like and uses independent merge parents, but marks one topic
 edge with an intentional timestamp anomaly. That anomaly makes priority follow an unhelpful root-side
 path first and strictly increases the same graph-work counters, demonstrating that timestamp priority
 remains a heuristic rather than a correctness or performance guarantee.
+
+All three controlled policy fixtures currently terminate with `termination_reason=include-resolved`:
+their include results become final while scheduling work remains pending. This observation protects
+the intended result-finality behavior in these fixtures; it is not a requirement that every
+phase-certified traversal terminate for the same reason.
 
 These tests do not prove that timestamp priority is beneficial on real repositories and do not
 compare processing time. The internal strategy selection seam can route production commit walking

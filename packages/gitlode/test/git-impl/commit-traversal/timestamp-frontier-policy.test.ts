@@ -193,7 +193,7 @@ describe("Git commit timestamp priority frontier policy", () => {
     );
 
     expect(differenceFrontiers).toHaveLength(1);
-    expect(closureFrontiers.length).toBeGreaterThanOrEqual(2);
+    expect(closureFrontiers).toHaveLength(1);
     expect(differenceFrontiers[0]).not.toBe(closureFrontiers[0]);
     expect(differenceFrontiers[0]?.dequeued.slice(0, 2)).toEqual([
       { role: "main", nodeId: "HEAD" },
@@ -201,21 +201,12 @@ describe("Git commit timestamp priority frontier policy", () => {
     ]);
     expect(reads.indexOf("HIGH_NEXT")).toBeLessThan(reads.indexOf("EQUAL_A"));
     expect(reads.indexOf("EQUAL_A_NEXT")).toBeLessThan(reads.indexOf("EQUAL_B_NEXT"));
-    expect(closureFrontiers[0]).not.toBe(closureFrontiers[1]);
-    expect(closureFrontiers[0]?.dequeued.map((item) => item.nodeId)).toEqual([
-      "MERGE",
-      "LEFT",
-      "RIGHT",
-    ]);
+    expect(closureFrontiers[0]?.dequeued.map((item) => item.nodeId)).toEqual(["LEFT", "RIGHT"]);
     expect(differenceFrontiers[0]?.blocks).toContainEqual([
       { role: "exclude", nodeId: "JOIN", domainHint: { sourceCommitterTimestamp: 60 } },
     ]);
-    expect(closureFrontiers[1]?.blocks[0]).toEqual([
-      {
-        nodeId: "JOIN",
-        branchId: expect.any(Number),
-        domainHint: { sourceCommitterTimestamp: 60 },
-      },
+    expect(differenceFrontiers[0]?.blocks).toContainEqual([
+      { role: "exclude", nodeId: "OLD", domainHint: { sourceCommitterTimestamp: 500 } },
     ]);
     expect(new Set(yielded)).toEqual(reachableDifference(successors, "HEAD", "MERGE"));
   });
@@ -262,7 +253,6 @@ describe("Git commit timestamp priority frontier policy", () => {
     );
 
     expect(closureFrontiers[0]?.dequeued.map((item) => item.nodeId)).toEqual([
-      "MERGE",
       "A",
       "A_NEXT",
       "B",

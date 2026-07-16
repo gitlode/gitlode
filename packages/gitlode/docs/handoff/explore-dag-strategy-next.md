@@ -8,34 +8,26 @@ phase-certified DAG traversal. Durable contracts and completed design decisions 
 
 ## Current blocker
 
-The phase-certified implementation remains experimental and is not the production default. During
-local repository trials, its telemetry exposed multiple serious problems that should have been
-detectable by unit-level fixtures. The concrete failures still need to be recorded before this note
-can describe their topology, symptoms, and invariants precisely.
+The phase-certified implementation remains experimental and is not the production default. The
+closure-phase root-cardinality issue has been fixed and documented in the durable traversal design.
+The next known blocker is outer difference-loop termination: a single closure phase no longer reads
+through single-successor roots, but the difference coordinator may still schedule subsequent exclude
+phases until it reaches a terminal boundary.
 
-Do not proceed with the previously considered real-repository comparison harness or a production
-adoption decision until these problems have deterministic unit reproductions and fixes. The internal
-strategy selector remains useful for controlled diagnosis, but its existence is not evidence that
-the prototype is ready for broader use.
+Do not change difference termination as follow-up cleanup without first agreeing on the correctness
+invariant with a human reviewer. Keep real-repository comparison harness work and production adoption
+decisions deferred until the remaining termination semantics have deterministic unit coverage.
 
 ## Next work
 
-Handle each reported problem independently:
+Handle the outer difference termination problem independently:
 
-1. Record the smallest topology and scheduling conditions that reproduce it.
-2. Add a deterministic unit fixture at the narrowest responsible layer. Use an independent
-   reachable-difference oracle for result membership where applicable, and assert the relevant
-   state or telemetry invariant rather than only wall-clock behavior.
-3. Identify whether the gap is in the closure state machine, difference integration state,
-   scheduling interaction, or instrumentation.
-4. Fix the implementation without weakening existing correctness or synthetic graph-work efficiency
-   assertions.
-5. Re-run the focused DAG, commit-traversal policy, strategy seam, and adapter integration suites.
-
-After all known failures are fixed, reassess the validation inventory before returning to
-real-repository experiments. Correctness validation remains the first priority. Synthetic graph-work
-efficiency validation is useful only after the operation is correct. Memory-efficiency validation
-remains lower priority unless a reported failure makes it relevant.
+1. Define the include/exclude result-finality invariant with a human reviewer.
+2. Add deterministic fixtures that distinguish one closure phase's no-read-ahead contract from the
+   coordinator's decision to schedule later exclude phases.
+3. Fix only the coordinator behavior needed for that invariant, preserving independent
+   reachable-difference membership tests and existing graph-work efficiency assertions.
+4. Re-run the focused DAG, commit-traversal policy, strategy seam, and adapter integration suites.
 
 ## Resume points
 

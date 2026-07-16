@@ -19,7 +19,83 @@ import {
 import { OrderedQueue, PriorityQueue } from "../../src/support/index.js";
 
 describe("resolveDagCertifiedClosurePhase", () => {
-  it("records a complete exclude path when no split closes", async () => {
+  it("returns a closed boundary immediately for a simple single successor", async () => {
+    const reads: string[] = [];
+    const result = await resolveDagCertifiedClosurePhase(
+      createContext(
+        createDagPort(
+          {
+            E0: ["E1"],
+            E1: ["E2"],
+            E2: [],
+          },
+          reads,
+        ),
+      ),
+      "E0",
+    );
+
+    expect(result.kind).toBe("closed-boundary");
+    expect(result.certifiedNodes).toEqual(new Set(["E0", "E1"]));
+    if (result.kind === "closed-boundary") {
+      expect(result.closedBoundary).toBe("E1");
+    }
+    expect(reads).toEqual(["E0"]);
+  });
+
+  it("does not read through a single path before a split/rejoin", async () => {
+    const reads: string[] = [];
+    const result = await resolveDagCertifiedClosurePhase(
+      createContext(
+        createDagPort(
+          {
+            E0: ["E1"],
+            E1: ["E2"],
+            E2: ["M"],
+            M: ["F0", "G0"],
+            F0: ["F1"],
+            F1: ["F2"],
+            F2: ["F3"],
+            G0: ["G1"],
+            G1: ["G2"],
+            G2: ["F3"],
+            F3: [],
+          },
+          reads,
+        ),
+      ),
+      "E0",
+    );
+
+    expect(result).toEqual(closedBoundaryResult(["E0", "E1"], "E1"));
+    expect(reads).toEqual(["E0"]);
+  });
+
+  it("exhausts a terminal start without creating a closure frontier", async () => {
+    const reads: string[] = [];
+    const frontiers: RecordingFrontier<ClosureFrontierItem<string>>[] = [];
+    const result = await resolveDagCertifiedClosurePhase(
+      createContext(createDagPort({ E0: [] }, reads)),
+      "E0",
+      {
+        createClosureFrontier: () => {
+          const frontier = new RecordingFrontier<ClosureFrontierItem<string>>(
+            new OrderedQueue({ dequeueOrder: "fifo", blockOrder: "preserve" }),
+          );
+          frontiers.push(frontier);
+          return frontier;
+        },
+      },
+    );
+
+    expect(result.kind).toBe("exhausted");
+    expect(result.certifiedNodes).toEqual(new Set(["E0"]));
+    if (result.kind === "exhausted") expect(result.terminalNodes).toEqual(["E0"]);
+    expect(reads).toEqual(["E0"]);
+    expect(frontiers).toHaveLength(0);
+  });
+
+  it("returns a closed boundary for a single successor instead of exhausting a path", async () => {
     const result = await resolveDagCertifiedClosurePhase(
       createContext(
         createDagPort({
@@ -31,10 +107,10 @@ describe("resolveDagCertifiedClosurePhase", () => {
       "EXCLUDE",
     );
 
-    expect(result.kind).toBe("exhausted");
-    expect(result.certifiedNodes).toEqual(new Set(["EXCLUDE", "PARENT", "ROOT"]));
-    if (result.kind === "exhausted") {
-      expect(result.terminalNodes).toEqual(["ROOT"]);
+    expect(result.kind).toBe("closed-boundary");
+    expect(result.certifiedNodes).toEqual(new Set(["EXCLUDE", "PARENT"]));
+    if (result.kind === "closed-boundary") {
+      expect(result.closedBoundary).toBe("PARENT");
     }
   });
 
@@ -178,9 +254,7 @@ describe("phase-certified prototype telemetry", () => {
     const result = await resolveDagCertifiedClosurePhase(
       createContext(
         createDagPort({
-          EXCLUDE: ["PARENT"],
-          PARENT: ["ROOT"],
-          ROOT: [],
+          EXCLUDE: [],
         }),
         recorder,
       ),
@@ -193,11 +267,11 @@ describe("phase-certified prototype telemetry", () => {
         name: "dag.certified_closure",
         attributes: { result: "exhausted" },
         counters: {
-          certified_nodes: 3,
-          exclude_expansions: 3,
-          successor_expansions: 3,
+          certified_nodes: 1,
+          exclude_expansions: 1,
+          successor_expansions: 1,
           terminal_nodes: 1,
-          traversal_steps: 3,
+          traversal_steps: 1,
         },
       }),
     ]);
@@ -229,7 +303,8 @@ describe("phase-certified prototype telemetry", () => {
         attributes: { strategy: "phaseCertified" },
         counters: expect.objectContaining({
           certified_nodes: 2,
-          closure_phases: 1,
+          closed_boundary_phases: 1,
+          closure_phases: 2,
           certification_yielded_nodes: 2,
           exclude_expansions: 2,
           exhausted_phases: 1,
@@ -308,8 +383,8 @@ describe("phase-certified prototype telemetry", () => {
         name: "dag.traversal",
         counters: expect.objectContaining({
           certified_nodes: 5,
-          closed_boundary_phases: 1,
-          closure_phases: 2,
+          closed_boundary_phases: 2,
+          closure_phases: 3,
           exhausted_phases: 1,
         }),
       }),
@@ -430,9 +505,7 @@ describe("phase-certified frontier injection", () => {
 
     expect(result).toEqual(closedBoundaryResult(["MERGE", "LEFT", "RIGHT", "JOIN"], "JOIN"));
     expect(frontiers).toHaveLength(1);
-    const rootItem = frontiers[0]?.blocks[0]?.[0];
-    expect(rootItem?.nodeId).toBe("MERGE");
-    expect(frontiers[0]?.blocks).toContainEqual([
+    expect(frontiers[0]?.blocks[0]).toEqual([
       {
         nodeId: "LEFT",
         branchId: expect.any(Number) as unknown as ClosureFrontierItem<string>["branchId"],
@@ -478,8 +551,7 @@ describe("phase-certified frontier injection", () => {
       ),
     );
 
-    expect(frontiers).toHaveLength(2);
-    expect(frontiers[0]).not.toBe(frontiers[1]);
+    expect(frontiers).toHaveLength(1);
     expect(frontiers.every((frontier) => frontier.dequeued.length > 0)).toBe(true);
   });
 
@@ -589,6 +661,57 @@ describe("phase-certified DomainHint scheduling", () => {
     ]);
   });
 
+  it("inherits a single-successor closure boundary hint without a closure frontier", async () => {
+    const differenceFrontiers: RecordingFrontier<
+      DifferenceFrontierItem<string, PathTimestampHint>
+    >[] = [];
+    const closureFrontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] =
+      [];
+    const reads: string[] = [];
+
+    await collectNodeIds(
+      walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
+        createContext(
+          createTimestampDagPort(
+            { HEAD: ["EXCLUDE"], EXCLUDE: ["OLD"], OLD: [] },
+            { HEAD: 100, EXCLUDE: 80, OLD: 10 },
+            reads,
+          ),
+        ),
+        "HEAD",
+        "EXCLUDE",
+        {
+          createDifferenceFrontier: () => {
+            const frontier = new RecordingFrontier(
+              new OrderedQueue<DifferenceFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+            );
+            differenceFrontiers.push(frontier);
+            return frontier;
+          },
+          createClosureFrontier: () => {
+            const frontier = new RecordingFrontier(
+              new OrderedQueue<ClosureFrontierItem<string, PathTimestampHint>>({
+                dequeueOrder: "fifo",
+                blockOrder: "preserve",
+              }),
+            );
+            closureFrontiers.push(frontier);
+            return frontier;
+          },
+        },
+      ),
+    );
+
+    expect(differenceFrontiers[0]?.blocks).toContainEqual([
+      { role: "exclude", nodeId: "OLD", domainHint: { sourceTimestamp: 80 } },
+    ]);
+    expect(closureFrontiers).toHaveLength(0);
+    expect(reads.slice(0, 2)).toEqual(["HEAD", "EXCLUDE"]);
+  });
+
   it("propagates closure successor path hints through split branches", async () => {
     const frontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] = [];
 
@@ -615,8 +738,7 @@ describe("phase-certified DomainHint scheduling", () => {
     );
 
     expect(result).toEqual(closedBoundaryResult(["MERGE", "LEFT", "RIGHT", "JOIN"], "JOIN"));
-    expect(frontiers[0]?.blocks[0]).toEqual([{ nodeId: "MERGE", branchId: expect.any(Number) }]);
-    const splitBlock = frontiers[0]?.blocks.find((block) => block.length === 2);
+    const splitBlock = frontiers[0]?.blocks[0];
     expect(splitBlock).toEqual([
       { nodeId: "LEFT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 50 } },
       { nodeId: "RIGHT", branchId: expect.any(Number), domainHint: { sourceTimestamp: 50 } },
@@ -814,8 +936,9 @@ describe("phase-certified DomainHint scheduling", () => {
     expect(differenceFrontiers[0]?.blocks).toContainEqual([
       { role: "exclude", nodeId: "JOIN", domainHint: { sourceTimestamp: 60 } },
     ]);
-    expect(closureFrontiers[1]?.blocks[0]).toEqual([
-      { nodeId: "JOIN", branchId: expect.any(Number), domainHint: { sourceTimestamp: 60 } },
+    expect(closureFrontiers).toHaveLength(1);
+    expect(differenceFrontiers[0]?.blocks).toContainEqual([
+      { role: "exclude", nodeId: "OLD", domainHint: { sourceTimestamp: 50 } },
     ]);
     const standalone = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
       createContext(

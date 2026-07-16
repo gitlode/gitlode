@@ -4,6 +4,13 @@ This note preserves follow-up context for the phase-certified prototype in `pack
 
 ## Current baseline
 
+The certified-closure phase now classifies each root by successor cardinality before creating a
+closure frontier: terminal roots exhaust immediately, single-successor roots become immediate closed
+boundaries, and only split roots allocate a closure frontier for branch scheduling. Durable details
+live in `packages/gitlode/docs/design/commit-traversal-internals.md`. The remaining priority is the
+separate outer difference termination problem; do not conflate it with single-successor closure
+short-circuiting.
+
 `packages/gitlode/src/dag/phase-certified.ts` is the prototype traversal facade. It is reachable from production commit walking only through the internal experimental strategy seam, but it is not the default. The implementation is now split across `phase-certified.ts`
 for orchestration, `certified-closure.ts` for the closure state machine,
 `phase-certified-difference-state.ts` for include/certified integration state, and

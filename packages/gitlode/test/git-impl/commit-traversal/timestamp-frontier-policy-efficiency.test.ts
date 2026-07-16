@@ -34,30 +34,31 @@ describe("phase-certified timestamp-priority efficiency validation", () => {
     expect(priority.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
+      "MAIN_TIP",
+      "MAIN_BASE",
       "EXCLUDE_MERGE",
       "MAIN_BASE",
       "TOPIC_TIP",
       "MAIN_OLDER",
       "SHARED_JOIN",
-      "MAIN_TIP",
       "ROOT",
     ]);
     expect(fifo.reads).toEqual([
       "INCLUDE_HEAD",
       "EXCLUDE_HEAD",
+      "MAIN_TIP",
       "EXCLUDE_MERGE",
       "MAIN_BASE",
       "TOPIC_TIP",
       "MAIN_OLDER",
       "ROOT",
       "SHARED_JOIN",
-      "MAIN_TIP",
       "ROOT",
     ]);
-    expect(priority.counters.traversal_steps).toBeLessThan(fifo.counters.traversal_steps);
-    expect(priority.counters.successor_expansions).toBeLessThan(fifo.counters.successor_expansions);
     expect(priority.counters.exclude_expansions).toBeLessThan(fifo.counters.exclude_expansions);
-    expect(priority.counters.main_expansions).toBe(fifo.counters.main_expansions);
+    expect(priority.counters.successor_expansions).toBe(fifo.counters.successor_expansions);
+    expect(priority.counters.traversal_steps).toBe(fifo.counters.traversal_steps);
+    expect(priority.counters.main_expansions).toBeGreaterThan(fifo.counters.main_expansions);
   });
 
   it("uses equal timestamps as a stable-tie control for both frontiers", async () => {

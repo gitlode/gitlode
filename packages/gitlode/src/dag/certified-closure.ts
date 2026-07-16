@@ -74,12 +74,14 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = unde
   private readonly splits = new KeyedSet<SplitId, SplitState<NodeId>>((value) => value.id);
   private readonly reachedByBranch = new Map<NodeId, Set<BranchId>>();
   private readonly terminalNodes = new Set<NodeId>();
+  private readonly startId: NodeId;
 
   constructor(
     graph: DagTopologyPort<NodeId, DomainHint>,
     startId: NodeId,
     telemetry?: DagPhaseCertifiedTelemetry,
   ) {
+    this.startId = startId;
     this.graph = new ClosureGraphState(graph, telemetry);
     this.rootBranchId = 0 as BranchId;
     this.graph.markCoveredByClosedRegion(startId);
@@ -90,6 +92,35 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = unde
       groupId: 0 as BranchGroupId,
     });
     this.recordBranchReachAndDetectJoin(startId, this.rootBranchId);
+  }
+
+  async begin(
+    rootDomainHint?: DomainHint,
+  ): Promise<
+    | { readonly kind: "terminal" | "single" }
+    | { readonly kind: "split"; readonly frontier: ClosureFrontierItem<NodeId, DomainHint>[] }
+  > {
+    const rootItem = {
+      nodeId: this.startId,
+      branchId: this.rootBranchId,
+      ...(rootDomainHint === undefined ? {} : { domainHint: rootDomainHint }),
+    };
+    const successors = await this.graph.expand(this.startId);
+    this.graph.recordBranchTraversal(this.startId, this.rootBranchId);
+
+    if (successors.length === 0) {
+      this.markTerminal(this.startId);
+      return { kind: "terminal" };
+    }
+
+    if (successors.length === 1) {
+      const successor = successors[0];
+      if (successor === undefined) throw new Error("Expected single successor.");
+      this.closeSingleSuccessorBoundary(rootItem, successor);
+      return { kind: "single" };
+    }
+
+    return { kind: "split", frontier: this.processSplitSuccessors(rootItem, successors) };
   }
 
   async processFrontierItem(
@@ -126,6 +157,17 @@ export class CertifiedClosurePhase<NodeId extends PropertyKey, DomainHint = unde
 
   hasClosedBoundary(): boolean {
     return this.closedBoundary !== undefined;
+  }
+
+  private closeSingleSuccessorBoundary(
+    item: ClosureFrontierItem<NodeId, DomainHint>,
+    successor: DagSuccessor<NodeId, DomainHint>,
+  ): void {
+    this.graph.recordTraversedEdge(item.nodeId, successor.nodeId);
+    this.recordBranchReachAndDetectJoin(successor.nodeId, item.branchId);
+    this.graph.markCoveredByClosedRegion(successor.nodeId);
+    this.closedBoundary = successor.nodeId;
+    this.closedBoundaryDomainHint = successor.domainHint;
   }
 
   private processSingleSuccessor(

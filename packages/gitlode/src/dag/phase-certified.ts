@@ -71,14 +71,15 @@ async function resolveDagCertifiedClosurePhaseCore<
 ): Promise<CertifiedClosurePhaseResolution<NodeId, DomainHint>> {
   const { graph } = context;
   const phase = new CertifiedClosurePhase<NodeId, DomainHint>(graph, nodeId, telemetry);
+
+  telemetry?.span.incrementCounter("traversal_steps");
+  const begin = await phase.begin(rootDomainHint);
+  if (begin.kind !== "split") return phase.buildResolution();
+
   const frontier =
     options.createClosureFrontier?.() ??
     createDefaultPhaseCertifiedFrontier<ClosureFrontierItem<NodeId, DomainHint>>();
-  frontier.enqueue({
-    nodeId: nodeId,
-    branchId: phase.rootBranchId,
-    ...(rootDomainHint === undefined ? {} : { domainHint: rootDomainHint }),
-  });
+  frontier.enqueueMany(begin.frontier);
 
   while (!frontier.isEmpty() && !phase.hasClosedBoundary()) {
     const item = frontier.dequeueOrThrow();

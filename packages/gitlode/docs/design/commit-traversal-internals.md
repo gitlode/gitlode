@@ -301,10 +301,11 @@ phase-certified prototype:
 
 When no factory is supplied, both frontiers use `OrderedQueue` with `dequeueOrder: "fifo"` and
 `blockOrder: "preserve"`, matching the previous array `shift()` / `push()` behavior. A difference
-operation creates one difference frontier. Each closure phase creates a fresh closure frontier; a
-difference operation that starts multiple closure phases therefore receives multiple independent
-closure queues, and standalone `resolveDagCertifiedClosurePhase()` creates one closure queue per
-operation.
+operation creates one difference frontier. A certified-closure phase creates a fresh closure frontier
+only after its root is classified as a split that needs branch scheduling. Terminal and
+single-successor closure roots do not create a closure frontier. A difference operation that starts
+multiple split closure phases therefore receives multiple independent closure queues, while
+standalone `resolveDagCertifiedClosurePhase()` creates a closure queue only for a split root.
 
 These frontiers are scheduling-only seams. They hold pending items and select the next item to
 process, but they do not own visited state, stale detection, deduplication, certified/excluded state,
@@ -325,6 +326,34 @@ must not be shared across difference operations or closure phases.
 The generic phase-certified default remains FIFO/preserve. Git timestamp priority is only active when
 callers explicitly inject the Git-specific policy. The phase-certified strategies are reachable through the internal experiment seam, but production default remains certified-lazy with its LIFO/preserve frontier until a separate production adoption gate changes that decision.
 
+### Certified-closure root classification
+
+Each `resolveDagCertifiedClosurePhase()` / internal closure phase begins by expanding the closure
+root exactly once and classifying the root by successor cardinality before the split/rejoin state
+machine is entered:
+
+- zero successors: the phase is immediately `exhausted`, the root is the only certified and
+  terminal node, and no closure frontier is created;
+- one successor: the phase immediately returns `closed-boundary`, with the root and boundary
+  successor both included in `certifiedNodes`, and no closure frontier is created;
+- two or more successors: the root opens the first split, a fresh closure frontier is created, and
+  the split successor branch items are enqueued as the first scheduling block.
+
+The root itself is not enqueued and then dequeued merely to bootstrap a phase. This preserves the
+invariant that root topology is read once, avoiding duplicate expansion when the facade has already
+classified the root. For split roots, the existing split/rejoin and nested split/rejoin state machine
+continues from the root's successor branch items.
+
+Root classification is still graph work. Even though terminal and single-successor roots bypass the
+closure frontier, the root expansion increments `traversal_steps`, `successor_expansions`, and
+`exclude_expansions` once. For all closure flows, `successor_expansions` and `exclude_expansions`
+continue to match actual calls to `DagTopologyPort.getSuccessors()`; telemetry must not be adjusted
+by issuing extra topology reads or by hiding reads.
+
+For a single-successor root, the successor descriptor's path-local `domainHint` becomes the internal
+`closedBoundaryDomainHint` carried to the next exclude frontier item. The boundary node's own
+metadata is not pre-read to produce that hint.
+
 ## Phase-certified prototype telemetry
 
 `packages/gitlode/src/dag/phase-certified.ts` keeps the facade for a prototype strategy with the same difference contract,
@@ -337,9 +366,9 @@ their work is aggregated into the enclosing traversal span. The common counters 
 meaning as the production strategies:
 
 - `yielded_nodes`: nodes finally yielded by the difference operation only.
-- `traversal_steps`: include frontier items plus closure frontier items that are dequeued for work;
-  exclude coordinator items are phase triggers and are not counted separately from the closure start
-  item.
+- `traversal_steps`: include frontier items plus closure root classifications and closure frontier
+  items that are dequeued for work; exclude coordinator items are phase triggers and are not counted
+  separately from the closure root classification.
 - `stale_steps`: dequeued work items discarded as stale or duplicate, such as deleted include
   states, already-expanded include nodes, or closure nodes already traversed by the same branch.
   Certified hits are meaningful state transitions and are not stale.

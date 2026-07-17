@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.11.0
+
+### Minor Changes
+
+- f54225f: [Changed] Improved `walkCommits` traversal performance for differential extraction by avoiding some unnecessary reads of older excluded history. The set of emitted commit records is unchanged, but commit output order may differ from previous versions. Depending on repository topology, traversal may be faster; cases that cannot be safely optimized fall back to the previous full exclusion behavior.
+- 6e34a21: [Changed] Reworked --profile around span-based instrumentation with attributes, counters, compact details, and improved walk_commits diagnostics for traversal performance analysis. The old wall/work stage-profiler model was removed from active runtime paths, and detailed profiling guidance now lives in a dedicated profiling document.
+- ca5c2ee: [Added] Added internal experimental commit traversal strategies for future performance evaluation. The default `certified-lazy` behavior remains unchanged, and no CLI, configuration, output-schema, or migration changes are required.
+- 304185a: [Added] Added a config-selectable git-cli Git adapter for users who want gitlode to delegate traversal-heavy operations to the system Git executable. The default remains isomorphic-git, and the new git-cli mode can be enabled with runtime.gitAdapter: "git-cli" in the config file while preserving existing file-change output behavior.
+- 12a1c95: [Changed] Profiling span names for DAG traversal are reorganized under the
+  `dag.traversal.*` prefix: `git.walk_commits.exclude_collect` becomes
+  `dag.traversal.collect_reachable`, `git.walk_commits.exclude_collect.read_commit`
+  becomes `dag.traversal.read_node.exclude`, and include-side node reads are now
+  separately instrumented as `dag.traversal.read_node.include`. The certified-lazy
+  fallback reason `"exclude_merge"` is renamed to `"exclude_path_split"`.
+
 ## 0.10.0
 
 ### Minor Changes

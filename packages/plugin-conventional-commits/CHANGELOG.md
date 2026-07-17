@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [f54225f]
+- Updated dependencies [6e34a21]
+- Updated dependencies [ca5c2ee]
+- Updated dependencies [304185a]
+- Updated dependencies [12a1c95]
+  - gitlode@0.11.0
+
 ## 0.4.0
 
 ### Minor Changes

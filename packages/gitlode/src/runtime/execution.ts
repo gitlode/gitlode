@@ -18,8 +18,20 @@ import {
   DefaultTraversalPlanner,
   EnrichingFactProjector,
 } from "../core/index.js";
-import { IsomorphicGitAdapter, JsDiffAdapter } from "../git-impl/index.js";
+import {
+  EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
+  GitCliAdapter,
+  IsomorphicGitAdapter,
+  JsDiffAdapter,
+  createCommitTraversalStrategy,
+  resolveCommitTraversalStrategyName,
+} from "../git-impl/index.js";
 import { type GitAdapter, GitAdapterError } from "../git/index.js";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+  type Instrumentation,
+} from "../instrumentation/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
 import {
   checkPluginCompatibility,
@@ -28,7 +40,6 @@ import {
   resolvePluginEntries,
 } from "../plugins/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
-import { DefaultStageProfiler } from "../profile/index.js";
 import { validateExtractionState } from "../state/state-store.js";
 import { type AbsoluteDirectoryPath, type AbsolutePath, firstOrThrow } from "../support/index.js";
 import type { WorkerRunInput, WorkerRunRange, WorkerRunRequest } from "./types.js";
@@ -47,6 +58,10 @@ type BuildProjectorResult =
 export interface RuntimeExecutionProgress {
   readonly reporter: ProgressReporter;
   readonly renderDiagnostic: (severity: "warn" | "error", message: string) => void;
+}
+
+export interface RuntimeExecutionDependencies {
+  readonly environment: Readonly<Record<string, string | undefined>>;
 }
 
 export type RuntimeExecutionResult =
@@ -135,6 +150,76 @@ async function resolveExtractionRange(
   }
 }
 
+type BuildGitAdapterResult =
+  | { readonly kind: "success"; readonly adapter: GitAdapter; readonly gitVersion?: string }
+  | { readonly kind: "user-error"; readonly message: string };
+
+function resolveIsomorphicCommitTraversalStrategyFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>>,
+) {
+  return createCommitTraversalStrategy(
+    resolveCommitTraversalStrategyName(environment[EXPERIMENTAL_COMMIT_TRAVERSAL_ENV]),
+  );
+}
+
+async function buildGitAdapter(
+  input: WorkerRunInput,
+  instrumentation: Instrumentation,
+  dependencies: RuntimeExecutionDependencies,
+): Promise<BuildGitAdapterResult> {
+  const createDefaultIsomorphicAdapter = (): IsomorphicGitAdapter =>
+    new IsomorphicGitAdapter({
+      fs: nodeFs,
+      diffAdapter: new JsDiffAdapter(),
+      instrumentation,
+    });
+
+  switch (input.gitAdapter) {
+    case "isomorphic-git": {
+      let commitTraversalStrategy;
+      try {
+        commitTraversalStrategy = resolveIsomorphicCommitTraversalStrategyFromEnvironment(
+          dependencies.environment,
+        );
+      } catch (error) {
+        return {
+          kind: "user-error",
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+      return {
+        kind: "success",
+        adapter: new IsomorphicGitAdapter({
+          fs: nodeFs,
+          diffAdapter: new JsDiffAdapter(),
+          instrumentation,
+          commitTraversalStrategy,
+        }),
+      };
+    }
+    case "git-cli": {
+      const adapter = new GitCliAdapter({
+        instrumentation,
+        fileChangeAdapter: createDefaultIsomorphicAdapter(),
+      });
+      try {
+        const gitVersion = await adapter.validateGitExecutable();
+        return {
+          kind: "success",
+          adapter,
+          gitVersion,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          kind: "user-error",
+          message,
+        };
+      }
+    }
+  }
+}
+
 function resolveOutputPrefix(
   outputPrefix: string | undefined,
   repoUrl: string | null,
@@ -159,11 +244,14 @@ async function buildCustomProjector(
     extensions: ConfigExtensionsSection;
   },
   progress: RuntimeExecutionProgress,
-  projectionProfiler?: ReturnType<typeof DefaultStageProfiler.prototype.createScopedProfiler>,
+  instrumentation: Instrumentation,
 ): Promise<BuildProjectorResult> {
   progress.reporter.emit({ type: "phase-start", phase: "initializing-plugins" });
 
-  const pluginEntriesResult = await resolvePluginEntries(config.extensions, config.baseDir);
+  const pluginEntriesResult = await instrumentation.runAsync(
+    "gitlode.plugins.resolve_entries",
+    async () => await resolvePluginEntries(config.extensions, config.baseDir),
+  );
   if (pluginEntriesResult.kind === "termination") {
     return {
       kind: "termination",
@@ -173,23 +261,29 @@ async function buildCustomProjector(
 
   const pluginEntries = pluginEntriesResult.entries;
 
-  await checkPluginCompatibility(pluginEntries, config.extensions, config.baseDir, {
-    warn(message) {
-      progress.renderDiagnostic("warn", message);
-    },
+  await instrumentation.runAsync("gitlode.plugins.check_compatibility", async () => {
+    await checkPluginCompatibility(pluginEntries, config.extensions, config.baseDir, {
+      warn(message) {
+        progress.renderDiagnostic("warn", message);
+      },
+    });
   });
 
-  const pluginsProfiler = projectionProfiler?.createScopedProfiler("plugins");
-
-  const pluginInitResults = await initializePlugins(pluginEntries, (entry) => ({
-    warn(message) {
-      progress.renderDiagnostic("warn", `Plugin "${entry.namespace}": ${message}`);
+  const pluginInitResults = await instrumentation.runAsync(
+    "gitlode.plugins.initialize",
+    async (span) => {
+      span.incrementCounter("plugins", pluginEntries.length);
+      return await initializePlugins(pluginEntries, (entry) => ({
+        warn(message) {
+          progress.renderDiagnostic("warn", `Plugin "${entry.namespace}": ${message}`);
+        },
+        error(message) {
+          progress.renderDiagnostic("error", `Plugin "${entry.namespace}": ${message}`);
+        },
+        instrumentation,
+      }));
     },
-    error(message) {
-      progress.renderDiagnostic("error", `Plugin "${entry.namespace}": ${message}`);
-    },
-    profiler: pluginsProfiler?.createScopedProfiler(entry.namespace),
-  }));
+  );
 
   const pluginInitFailures = pluginInitResults.filter((result) => result.type === "fatal");
   if (pluginInitFailures.length > 0) {
@@ -213,44 +307,82 @@ async function buildCustomProjector(
   };
 }
 
+async function finishUserError(
+  runSpan: ReturnType<Instrumentation["startSpan"]>,
+  message: string,
+): Promise<RuntimeExecutionResult> {
+  runSpan.setAttribute("gitlode.result", "user-error");
+  runSpan.end();
+  return {
+    kind: "user-error",
+    message,
+  };
+}
+
 export async function executeWorkerRunRequest(
   request: WorkerRunRequest,
   progress: RuntimeExecutionProgress,
+  dependencies: RuntimeExecutionDependencies = { environment: process.env },
 ): Promise<RuntimeExecutionResult> {
   const { input, priorState } = request;
-  const rootProfiler = new DefaultStageProfiler("elapsed", () => performance.now());
-  const profilingRootProfiler = input.profile ? rootProfiler : undefined;
+  const recorder = input.profile
+    ? new LocalInstrumentationRecorder(() => performance.now())
+    : undefined;
+  const instrumentation = recorder ?? noopInstrumentation;
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
-  rootProfiler.start();
-
   const resolvedRepoPath: AbsolutePath = input.repositoryPath;
+  const runSpan = instrumentation.startSpan("gitlode.run", {
+    attributes: {
+      "gitlode.granularity": input.granularity,
+      "gitlode.profile": input.profile,
+      "git.adapter": input.gitAdapter,
+    },
+  });
 
   try {
-    const gitAdapter = new IsomorphicGitAdapter({
-      fs: nodeFs,
-      diffAdapter: new JsDiffAdapter(),
-      profiler: profilingRootProfiler?.createScopedProfiler("git"),
+    const gitAdapterResult = await buildGitAdapter(input, instrumentation, dependencies);
+    if (gitAdapterResult.kind === "user-error") {
+      return await finishUserError(runSpan, gitAdapterResult.message);
+    }
+    if (gitAdapterResult.gitVersion !== undefined) {
+      runSpan.setAttribute("git.cli.version", gitAdapterResult.gitVersion);
+    }
+    const gitAdapter = gitAdapterResult.adapter;
+
+    await instrumentation.runAsync(
+      "gitlode.validate_repository_access",
+      async () => await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter),
+    );
+
+    const repositoryObjectFormat = await instrumentation.runAsync(
+      "gitlode.resolve_object_format",
+      async (span) => {
+        const objectFormat = await resolveRepositoryObjectFormat(resolvedRepoPath, gitAdapter);
+        span.setAttribute("git.object_format", objectFormat);
+        return objectFormat;
+      },
+    );
+
+    instrumentation.run("gitlode.state.validate", () => {
+      validateExtractionState(priorState, resolvedRepoPath, repositoryObjectFormat);
     });
 
-    await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter);
-
-    const repositoryObjectFormat = await resolveRepositoryObjectFormat(
-      resolvedRepoPath,
-      gitAdapter,
+    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await instrumentation.runAsync(
+      "gitlode.repository_basics",
+      async () =>
+        await resolveRepositoryBasics(resolvedRepoPath, gitAdapter, input.repoName, input.repoUrl),
     );
 
-    validateExtractionState(priorState, resolvedRepoPath, repositoryObjectFormat);
-
-    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await resolveRepositoryBasics(
-      resolvedRepoPath,
-      gitAdapter,
-      input.repoName,
-      input.repoUrl,
+    const resolvedRange = await instrumentation.runAsync(
+      "gitlode.resolve_extraction_range",
+      async (span) => {
+        span.setAttribute("gitlode.range.kind", input.range?.type ?? "none");
+        return await resolveExtractionRange(input.range, resolvedRepoPath, gitAdapter);
+      },
     );
 
-    const resolvedRange = await resolveExtractionRange(input.range, resolvedRepoPath, gitAdapter);
     const resolvedOutputPrefix = resolveOutputPrefix(
       input.outputPrefix,
       resolvedRepoUrl,
@@ -266,13 +398,8 @@ export async function executeWorkerRunRequest(
       maxDiffSize: input.maxDiffSize,
     };
 
-    const planningProfiler = profilingRootProfiler?.createScopedProfiler("planning");
-    const traversalProfiler = profilingRootProfiler?.createScopedProfiler("traversal");
-    const projectionProfiler = profilingRootProfiler?.createScopedProfiler("projection");
-    const writeProfiler = profilingRootProfiler?.createScopedProfiler("write");
-
-    const traversalPlanner = new DefaultTraversalPlanner(gitAdapter, planningProfiler);
-    const traversalExtractor = new DefaultCommitTraversalExtractor(gitAdapter, traversalProfiler);
+    const traversalPlanner = new DefaultTraversalPlanner(gitAdapter, instrumentation);
+    const traversalExtractor = new DefaultCommitTraversalExtractor(gitAdapter, instrumentation);
     const fileChangeExpander = new DefaultFileChangeExpander(
       gitAdapter,
       extractorConfig.maxDiffSize,
@@ -281,7 +408,7 @@ export async function executeWorkerRunRequest(
     let projector: FactProjector;
     const { configBaseDir: configPath, extensions } = input;
     if (!configPath || !hasEffectiveExtensionsConfig(extensions)) {
-      projector = new DefaultFactProjector(resolvedRepoName, resolvedRepoUrl, projectionProfiler);
+      projector = new DefaultFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
     } else {
       const projectorResult = await buildCustomProjector(
         {
@@ -291,13 +418,10 @@ export async function executeWorkerRunRequest(
           extensions,
         },
         progress,
-        projectionProfiler,
+        instrumentation,
       );
       if (projectorResult.kind === "termination") {
-        return {
-          kind: "user-error",
-          message: projectorResult.message,
-        };
+        return await finishUserError(runSpan, projectorResult.message);
       }
       projector = projectorResult.projector;
     }
@@ -318,19 +442,31 @@ export async function executeWorkerRunRequest(
       projector,
       sink,
       reporter: progress.reporter,
-      profiler: writeProfiler,
+      instrumentation,
     });
 
-    const result = await coordinator.run({
-      repositoryPath: resolvedRepoPath,
-      repoName: resolvedRepoName,
-      repoUrl: resolvedRepoUrl,
-      refs: [...extractorConfig.refs],
-      granularity: extractorConfig.granularity,
-      range: extractorConfig.range,
-      priorState,
-      sessionTimestamp,
+    const result = await instrumentation.runAsync("gitlode.extract", async (span) => {
+      span.incrementCounter("refs", extractorConfig.refs.length);
+      const coordinatorResult = await coordinator.run({
+        repositoryPath: resolvedRepoPath,
+        repoName: resolvedRepoName,
+        repoUrl: resolvedRepoUrl,
+        refs: [...extractorConfig.refs],
+        granularity: extractorConfig.granularity,
+        range: extractorConfig.range,
+        priorState,
+        sessionTimestamp,
+      });
+      span.incrementCounter("records", coordinatorResult.recordsWritten);
+      span.incrementCounter("commits", coordinatorResult.commitsTraversed);
+      span.incrementCounter("skipped_diffs", coordinatorResult.skippedDiffs);
+      return coordinatorResult;
     });
+
+    runSpan.incrementCounter("records", result.recordsWritten);
+    runSpan.incrementCounter("commits", result.commitsTraversed);
+    runSpan.setAttribute("gitlode.result", "success");
+    runSpan.end();
 
     const success: RunSuccessPayload = {
       recordsWritten: result.recordsWritten,
@@ -339,7 +475,7 @@ export async function executeWorkerRunRequest(
       bytesWritten: sink.bytesWritten,
       elapsedMs: performance.now() - startMs,
       refs: result.refs,
-      profileEntries: rootProfiler.entries(),
+      profileEntries: recorder?.summary() ?? [],
       skippedDiffs: result.skippedDiffs,
     };
 
@@ -348,7 +484,8 @@ export async function executeWorkerRunRequest(
       success,
       state: result.state,
     };
-  } finally {
-    rootProfiler.stop();
+  } catch (error) {
+    runSpan.end(error);
+    throw error;
   }
 }

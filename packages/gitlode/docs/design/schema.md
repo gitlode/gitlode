@@ -2,9 +2,10 @@
 
 ## Purpose
 
-This document explains the output format, field semantics, and serialization logic in the current implementation.
-
-Normative rules remain in `.github/instructions/schema.instructions.md`.
+This document is the canonical design contract for output records, JSONL file formatting, field
+semantics, and serialization behavior in the current implementation. Agent-specific entrypoints may
+summarize or route to this document, but they must not replace it as the durable schema source of
+truth.
 
 ## File format overview
 
@@ -303,7 +304,8 @@ Changes are computed against the **first parent only**.
 
 ## References
 
-- `.github/instructions/schema.instructions.md`
+- `packages/gitlode/docs/design/cli.md`
+- `packages/gitlode/docs/design/architecture.md`
 - `src/output/utils.ts`
 - `src/output/writer.ts`
 - `src/core/types.ts`

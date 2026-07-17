@@ -1,6 +1,7 @@
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
+import { type DagSuccessor, type DagTopologyPort } from "../dag/index.js";
 import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
@@ -9,68 +10,51 @@ import {
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
-} from "../git/types.js";
+} from "../git/index.js";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+  type InstrumentationSpan,
+} from "../instrumentation/index.js";
 import type { RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
-import { type StageProfiler, withProfilerAsync } from "../profile/index.js";
-import { shiftOrThrow } from "../support/index.js";
+import {
+  DEFAULT_COMMIT_TRAVERSAL_STRATEGY,
+  createCommitTraversalStrategy,
+  type CommitPathSchedulingHint,
+  type CommitTraversalStrategy,
+} from "./commit-traversal/index.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
   readonly diffAdapter: DiffAdapter;
-  readonly profiler?: StageProfiler;
+  readonly instrumentation: Instrumentation;
+  readonly commitTraversalStrategy?: CommitTraversalStrategy;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _diffAdapter: DiffAdapter;
-  private _resolveRefProfiler?: StageProfiler;
-  private _repositoryObjectFormatProfiler?: StageProfiler;
-  private _getRemoteUrlProfiler?: StageProfiler;
-  private _walkCommitsProfiler?: StageProfiler;
-  private _walkReadCommitProfiler?: StageProfiler;
-  private _excludeCollectProfiler?: StageProfiler;
-  private _excludeReadCommitProfiler?: StageProfiler;
-  private _mergeBaseProfiler?: StageProfiler;
-  private _fileChangesProfiler?: StageProfiler;
-  private _blobReadProfiler?: StageProfiler;
-  private _diffProfiler?: StageProfiler;
+  private readonly _instrumentation: Instrumentation;
+  private readonly _commitTraversalStrategy: CommitTraversalStrategy;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
     this._diffAdapter = dependencies.diffAdapter;
-    this._configureProfilers(dependencies.profiler);
+    this._instrumentation = dependencies.instrumentation;
+    this._commitTraversalStrategy =
+      dependencies.commitTraversalStrategy ??
+      createCommitTraversalStrategy(DEFAULT_COMMIT_TRAVERSAL_STRATEGY);
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
     return ["sha1"];
   }
 
-  private _configureProfilers(profiler: StageProfiler | undefined): void {
-    if (profiler === undefined) {
-      return;
-    }
-
-    this._resolveRefProfiler = profiler.createScopedProfiler("resolve-ref");
-    this._repositoryObjectFormatProfiler = profiler.createScopedProfiler(
-      "repository-object-format",
-    );
-    this._getRemoteUrlProfiler = profiler.createScopedProfiler("get-remote-url");
-    this._walkCommitsProfiler = profiler.createScopedProfiler("walk-commits");
-    this._walkReadCommitProfiler = this._walkCommitsProfiler.createScopedProfiler("read-commit");
-    this._excludeCollectProfiler = profiler.createScopedProfiler("exclude-collect");
-    this._excludeReadCommitProfiler =
-      this._excludeCollectProfiler.createScopedProfiler("read-commit");
-    this._mergeBaseProfiler = profiler.createScopedProfiler("merge-base");
-    this._fileChangesProfiler = profiler.createScopedProfiler("file-changes");
-    this._blobReadProfiler = profiler.createScopedProfiler("blob-read");
-    this._diffProfiler = profiler.createScopedProfiler("diff");
-  }
-
   async resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
     let oid: string;
     try {
-      oid = (await withProfilerAsync(this._resolveRefProfiler, async () =>
+      oid = (await this._instrumentation.runAsync("git.resolve_ref", async () =>
         git.resolveRef({ fs: this._fs, dir: repoPath, ref }),
       )) as string;
     } catch (err) {
@@ -109,7 +93,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat> {
     try {
-      const raw = await withProfilerAsync(this._repositoryObjectFormatProfiler, async () =>
+      const raw = await this._instrumentation.runAsync("git.repository_object_format", async () =>
         git.getConfig({
           fs: this._fs,
           dir: repoPath,
@@ -143,7 +127,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async classifyRefType(repoPath: string, ref: string): Promise<RefType> {
     try {
-      await git.resolveRef({ fs: this._fs, dir: repoPath, ref: `refs/heads/${ref}` });
+      await git.resolveRef({
+        fs: this._fs,
+        dir: repoPath,
+        ref: `refs/heads/${ref}`,
+      });
       return "branch";
     } catch {
       // Not a branch under refs/heads.
@@ -195,7 +183,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async getRemoteUrl(repoPath: string): Promise<string | null> {
     try {
-      const url = await withProfilerAsync(this._getRemoteUrlProfiler, async () =>
+      const url = await this._instrumentation.runAsync("git.get_remote_url", async () =>
         git.getConfig({
           fs: this._fs,
           dir: repoPath,
@@ -217,70 +205,29 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   async *walkCommits(
     repoPath: string,
-    head: CommitOid,
-    excludeHash?: CommitOid,
+    oid: CommitOid,
+    excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    const excluded = excludeHash
-      ? await this._collectReachable(repoPath, excludeHash)
-      : new Set<string>();
-
-    const queue: string[] = [head];
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-      const next = await withProfilerAsync(this._walkCommitsProfiler, async () => {
-        const hash = shiftOrThrow(queue);
-        if (visited.has(hash) || excluded.has(hash)) return null;
-        visited.add(hash);
-
-        const { commit } = await withProfilerAsync(this._walkReadCommitProfiler, async () =>
-          git.readCommit({
-            fs: this._fs,
-            dir: repoPath,
-            oid: hash,
-          }),
-        );
-
-        return { hash, commit };
-      });
-
-      if (next === null) continue;
-
-      yield {
-        oid: next.hash as CommitOid,
-        message: next.commit.message,
-        author: {
-          name: next.commit.author.name,
-          email: next.commit.author.email,
-          timestamp: next.commit.author.timestamp,
-          // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
-          // this behavior is based on JavaScript Date.getTimezoneOffset().
-          // the adapter negates that value before populating this field.
-          timezoneOffset: -next.commit.author.timezoneOffset,
+    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
+      const strategy = this._commitTraversalStrategy;
+      span.setAttribute("strategy", strategy.name);
+      const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
+      const oidWalk = strategy.walk(
+        {
+          graph: topology,
+          instrumentation: this._instrumentation,
         },
-        committer: {
-          name: next.commit.committer.name,
-          email: next.commit.committer.email,
-          timestamp: next.commit.committer.timestamp,
-          // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
-          // this behavior is based on JavaScript Date.getTimezoneOffset().
-          // the adapter negates that value before populating this field.
-          timezoneOffset: -next.commit.committer.timezoneOffset,
-        },
-        parents: next.commit.parent as CommitOid[],
-      };
+        oid,
+        excludeOid,
+      );
 
-      for (const parent of next.commit.parent) {
-        if (!visited.has(parent) && !excluded.has(parent)) {
-          queue.push(parent);
-        }
-      }
-    }
+      return commitObjectsFromOids(oidWalk, topology);
+    });
   }
 
   async findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null> {
     try {
-      const result = await withProfilerAsync(this._mergeBaseProfiler, async () =>
+      const result = await this._instrumentation.runAsync("git.merge_base", async () =>
         git.findMergeBase({
           fs: this._fs,
           dir: repoPath,
@@ -303,7 +250,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
     commitOid: CommitOid,
     parentOid?: CommitOid,
   ): Promise<readonly FileChange[]> {
-    return withProfilerAsync(this._fileChangesProfiler, async () => {
+    return await this._instrumentation.runAsync("git.file_changes", async () => {
       const changes: FileChange[] = [];
 
       if (parentOid !== undefined) {
@@ -327,10 +274,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
             if (A.type === "blob" && B.type === "blob") {
               const [oidA, oidB] = await Promise.all([A.entry.oid(), B.entry.oid()]);
               if (oidA === oidB) return; // unchanged
-              const [contentA, contentB] = await withProfilerAsync(this._blobReadProfiler, () =>
-                Promise.all([A.entry.content(), B.entry.content()]),
+              const [contentA, contentB] = await this._instrumentation.runAsync(
+                "git.blob_read",
+                async () => Promise.all([A.entry.content(), B.entry.content()]),
               );
-              const change = await withProfilerAsync(this._diffProfiler, async () =>
+              const change = await this._instrumentation.runAsync("git.diff", async () =>
                 this._buildFileChange(
                   filepath,
                   "modified",
@@ -344,10 +292,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
             // Added (no parent blob at this path)
             if (B.type === "blob") {
-              const contentB = await withProfilerAsync(this._blobReadProfiler, () =>
+              const contentB = await this._instrumentation.runAsync("git.blob_read", async () =>
                 B.entry.content(),
               );
-              const change = await withProfilerAsync(this._diffProfiler, async () =>
+              const change = await this._instrumentation.runAsync("git.diff", async () =>
                 this._buildFileChange(
                   filepath,
                   "added",
@@ -361,10 +309,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
             // Deleted (no child blob at this path)
             if (A.type === "blob") {
-              const contentA = await withProfilerAsync(this._blobReadProfiler, () =>
+              const contentA = await this._instrumentation.runAsync("git.blob_read", async () =>
                 A.entry.content(),
               );
-              const change = await withProfilerAsync(this._diffProfiler, async () =>
+              const change = await this._instrumentation.runAsync("git.diff", async () =>
                 this._buildFileChange(
                   filepath,
                   "deleted",
@@ -390,10 +338,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
             if (A.type !== "blob") return;
 
-            const contentA = await withProfilerAsync(this._blobReadProfiler, () =>
+            const contentA = await this._instrumentation.runAsync("git.blob_read", async () =>
               A.entry.content(),
             );
-            const change = await withProfilerAsync(this._diffProfiler, async () =>
+            const change = await this._instrumentation.runAsync("git.diff", async () =>
               this._buildFileChange(
                 filepath,
                 "added",
@@ -419,7 +367,14 @@ export class IsomorphicGitAdapter implements GitAdapter {
     const beforeSize = contentA.length;
     const afterSize = contentB.length;
     if (this._isBinary(contentA) || this._isBinary(contentB)) {
-      return { path, status, beforeSize, afterSize, additions: null, deletions: null };
+      return {
+        path,
+        status,
+        beforeSize,
+        afterSize,
+        additions: null,
+        deletions: null,
+      };
     }
 
     const { additions, deletions } = this._diffAdapter.computeLineDiff(contentA, contentB);
@@ -433,7 +388,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
       deletions < 0
     ) {
       throw new GitAdapterError(
-        `DiffAdapter returned invalid values: additions=${String(additions)}, deletions=${String(deletions)}`,
+        `DiffAdapter returned invalid values: additions=${String(
+          additions,
+        )}, deletions=${String(deletions)}`,
         "UNKNOWN",
       );
     }
@@ -448,41 +405,81 @@ export class IsomorphicGitAdapter implements GitAdapter {
     }
     return false;
   }
+}
 
-  private async _collectReachable(repoPath: string, startHash: string): Promise<Set<string>> {
-    return withProfilerAsync(this._excludeCollectProfiler, async () => {
-      const reachable = new Set<string>();
-      const queue = [startHash];
-      while (queue.length > 0) {
-        const hash = shiftOrThrow(queue);
-        if (reachable.has(hash)) continue;
-        reachable.add(hash);
-        let commitParents: string[];
-        try {
-          const { commit } = await withProfilerAsync(this._excludeReadCommitProfiler, async () =>
-            git.readCommit({
-              fs: this._fs,
-              dir: repoPath,
-              oid: hash,
-            }),
-          );
-          commitParents = commit.parent;
-        } catch (err) {
-          if (err instanceof Error && err.name === "NotFoundError") {
-            throw new GitAdapterError(`Commit not found: ${hash}`, "COMMIT_NOT_FOUND", err);
-          }
-          throw new GitAdapterError(
-            `Unexpected error reading commit ${hash}: ${String(err)}`,
-            "UNKNOWN",
-            err,
-          );
-        }
-        for (const parent of commitParents) {
-          queue.push(parent);
-        }
+class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSchedulingHint> {
+  private readonly cache = new Map<CommitOid, RawCommit>();
+  private readonly fs: FsClient;
+  private readonly repoPath: string;
+  private readonly span: InstrumentationSpan;
+
+  constructor(fs: FsClient, repoPath: string, span: InstrumentationSpan) {
+    this.fs = fs;
+    this.repoPath = repoPath;
+    this.span = span;
+  }
+
+  async getSuccessors(
+    oid: CommitOid,
+  ): Promise<readonly DagSuccessor<CommitOid, CommitPathSchedulingHint>[]> {
+    const commit = await this.readCommit(oid, "topology");
+    return projectCommitParentSuccessors(commit);
+  }
+
+  async readCommit(oid: CommitOid, purpose: CommitReadPurpose): Promise<RawCommit> {
+    const cached = this.cache.get(oid);
+    if (cached !== undefined) {
+      this.span.incrementCounter(`${purpose}_commit_cache_hits`);
+      return cached;
+    }
+
+    try {
+      this.span.incrementCounter("commit_reads");
+      this.span.incrementCounter(`${purpose}_commit_reads`);
+      const { commit } = await git.readCommit({
+        fs: this.fs,
+        dir: this.repoPath,
+        oid,
+      });
+      const rawCommit = toRawCommit(oid, commit);
+      this.cache.set(oid, rawCommit);
+      return rawCommit;
+    } catch (err) {
+      if (err instanceof Error && err.name === "NotFoundError") {
+        throw new GitAdapterError(`Commit not found: ${oid}`, "COMMIT_NOT_FOUND", err);
       }
-      return reachable;
-    });
+      throw new GitAdapterError(
+        `Unexpected error reading commit ${oid}: ${String(err)}`,
+        "UNKNOWN",
+        err,
+      );
+    }
+  }
+
+  incrementYieldedCommit(): void {
+    this.span.incrementCounter("commits_yielded");
+  }
+}
+
+export function projectCommitParentSuccessors(
+  commit: RawCommit,
+): readonly DagSuccessor<CommitOid, CommitPathSchedulingHint>[] {
+  const domainHint: CommitPathSchedulingHint = {
+    sourceCommitterTimestamp: commit.committer.timestamp,
+  };
+  return commit.parents.map((parentOid) => ({ nodeId: parentOid, domainHint }));
+}
+
+type CommitReadPurpose = "topology" | "materialize";
+
+async function* commitObjectsFromOids(
+  oids: AsyncIterable<CommitOid>,
+  topology: CommitTopologyAdapter,
+): AsyncIterable<RawCommit> {
+  for await (const oid of oids) {
+    const commit = await topology.readCommit(oid, "materialize");
+    topology.incrementYieldedCommit();
+    yield commit;
   }
 }
 
@@ -505,5 +502,31 @@ async function classifyWalkerEntry(
   return {
     type: await entry.type(),
     entry,
+  };
+}
+
+function toRawCommit(oid: CommitOid, commit: git.CommitObject): RawCommit {
+  return {
+    oid,
+    message: commit.message,
+    author: {
+      name: commit.author.name,
+      email: commit.author.email,
+      timestamp: commit.author.timestamp,
+      // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
+      // this behavior is based on JavaScript Date.getTimezoneOffset().
+      // the adapter negates that value before populating this field.
+      timezoneOffset: -commit.author.timezoneOffset,
+    },
+    committer: {
+      name: commit.committer.name,
+      email: commit.committer.email,
+      timestamp: commit.committer.timestamp,
+      // isomorphic-git stores UTC offsets with inverted sign: JST (+09:00) is timezoneOffset -540.
+      // this behavior is based on JavaScript Date.getTimezoneOffset().
+      // the adapter negates that value before populating this field.
+      timezoneOffset: -commit.committer.timezoneOffset,
+    },
+    parents: commit.parent as CommitOid[],
   };
 }

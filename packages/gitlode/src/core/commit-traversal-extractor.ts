@@ -1,6 +1,6 @@
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
-import { type StageProfiler, withProfiler } from "../profile/index.js";
+import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
 import type {
   TraversalPlan,
   CommitFact,
@@ -38,16 +38,20 @@ function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | 
 
 export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor {
   private readonly adapter: GitAdapter;
-  private readonly profiler?: StageProfiler;
+  private readonly instrumentation: Instrumentation;
 
-  constructor(adapter: GitAdapter, profiler?: StageProfiler) {
+  constructor(adapter: GitAdapter, instrumentation: Instrumentation) {
     this.adapter = adapter;
-    this.profiler = profiler;
+    this.instrumentation = instrumentation;
   }
 
   extract(request: CommitTraversalRequest, reporter: ProgressReporter): AsyncIterable<CommitFact> {
     const { repositoryPath, repoName, repoUrl, plans, range } = request;
-    return this.iterateCommitFacts(plans, repositoryPath, repoName, repoUrl, range, reporter);
+    return instrumentAsyncIterable(this.instrumentation, "gitlode.traversal", (span) => {
+      span.incrementCounter("plans", plans.length);
+      span.setAttribute("gitlode.range.kind", range?.type ?? "none");
+      return this.iterateCommitFacts(plans, repositoryPath, repoName, repoUrl, range, reporter);
+    });
   }
 
   private async *iterateCommitFacts(
@@ -95,7 +99,9 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
         plan.head,
         plan.excludeHash,
       )) {
-        const fact = withProfiler(this.profiler, () => processRawCommit(rawCommit));
+        const fact = this.instrumentation.run("gitlode.traversal.process_commit", () =>
+          processRawCommit(rawCommit),
+        );
         if (fact !== null) yield fact;
       }
     } catch (err) {
@@ -106,7 +112,9 @@ export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor
         });
         // Full traversal without excludeHash; already-visited commits are skipped via deduplication.
         for await (const rawCommit of this.adapter.walkCommits(repositoryPath, plan.head)) {
-          const fact = withProfiler(this.profiler, () => processRawCommit(rawCommit));
+          const fact = this.instrumentation.run("gitlode.traversal.process_commit", () =>
+            processRawCommit(rawCommit),
+          );
           if (fact !== null) yield fact;
         }
       } else {

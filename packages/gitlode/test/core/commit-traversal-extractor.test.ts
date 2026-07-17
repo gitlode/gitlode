@@ -10,6 +10,7 @@ import type {
   ProgressReporter,
 } from "../../src/core/index.js";
 import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 function makeOid(n: number): CommitOid {
   return n.toString(16).padStart(12, "0") as CommitOid;
@@ -80,6 +81,10 @@ function makeAdapter(
   };
 }
 
+function makeTraverser(adapter: GitAdapter): DefaultCommitTraversalExtractor {
+  return new DefaultCommitTraversalExtractor(adapter, noopInstrumentation);
+}
+
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
     yield item;
@@ -112,9 +117,7 @@ describe("DefaultCommitTraversalExtractor", () => {
   it("yields all commits for the provided plan", async () => {
     const commits = [makeRawCommit(3, [2]), makeRawCommit(2, [1]), makeRawCommit(1)];
     const head = makeOid(3);
-    const traverser = new DefaultCommitTraversalExtractor(
-      makeAdapter({ commits: { [head]: toAsyncIter(commits) } }),
-    );
+    const traverser = makeTraverser(makeAdapter({ commits: { [head]: toAsyncIter(commits) } }));
 
     const facts = await collectFacts(
       traverser.extract(baseRequest({ plans: [makePlan("main", head)] }), makeReporter()),
@@ -125,7 +128,7 @@ describe("DefaultCommitTraversalExtractor", () => {
 
   it("maps repoName and remoteUrl onto CommitFact.repository", async () => {
     const head = makeOid(1);
-    const traverser = new DefaultCommitTraversalExtractor(
+    const traverser = makeTraverser(
       makeAdapter({ commits: { [head]: toAsyncIter([makeRawCommit(1)]) } }),
     );
 
@@ -149,7 +152,7 @@ describe("DefaultCommitTraversalExtractor", () => {
   it("preserves branch order without interleaving", async () => {
     const headMain = makeOid(100);
     const headDevelop = makeOid(200);
-    const traverser = new DefaultCommitTraversalExtractor(
+    const traverser = makeTraverser(
       makeAdapter({
         commits: {
           [headMain]: toAsyncIter([makeRawCommit(100), makeRawCommit(101)]),
@@ -174,7 +177,7 @@ describe("DefaultCommitTraversalExtractor", () => {
     const shared = makeRawCommit(1);
     const headMain = makeOid(10);
     const headDevelop = makeOid(20);
-    const traverser = new DefaultCommitTraversalExtractor(
+    const traverser = makeTraverser(
       makeAdapter({
         commits: {
           [headMain]: toAsyncIter([makeRawCommit(10, [1]), shared]),
@@ -225,7 +228,7 @@ describe("DefaultCommitTraversalExtractor", () => {
         timezoneOffset: 0,
       },
     };
-    const traverser = new DefaultCommitTraversalExtractor(
+    const traverser = makeTraverser(
       makeAdapter({ commits: { [head]: toAsyncIter([newCommit, oldCommit, newerCommit]) } }),
     );
 
@@ -246,7 +249,7 @@ describe("DefaultCommitTraversalExtractor", () => {
     const boundary = new Date("2024-01-15T00:00:00Z");
     const boundaryTs = boundary.getTime() / 1000;
     const head = makeOid(1);
-    const traverser = new DefaultCommitTraversalExtractor(
+    const traverser = makeTraverser(
       makeAdapter({
         commits: {
           [head]: toAsyncIter([
@@ -290,7 +293,7 @@ describe("DefaultCommitTraversalExtractor", () => {
     const head = makeOid(5);
     const excludeHash = makeOid(2);
     const walkSpy = vi.fn(async function* () {});
-    const traverser = new DefaultCommitTraversalExtractor({
+    const traverser = makeTraverser({
       supportedObjectFormats() {
         return ["sha1"];
       },
@@ -330,7 +333,7 @@ describe("DefaultCommitTraversalExtractor", () => {
     const staleExclude = makeOid(99);
     const fullCommits = [makeRawCommit(5, [4]), makeRawCommit(4)];
     let walkCallCount = 0;
-    const traverser = new DefaultCommitTraversalExtractor({
+    const traverser = makeTraverser({
       supportedObjectFormats() {
         return ["sha1"];
       },
@@ -373,7 +376,7 @@ describe("DefaultCommitTraversalExtractor", () => {
   });
 
   it("yields zero commits when no plans are provided", async () => {
-    const traverser = new DefaultCommitTraversalExtractor(makeAdapter());
+    const traverser = makeTraverser(makeAdapter());
 
     const facts = await collectFacts(traverser.extract(baseRequest({ plans: [] }), makeReporter()));
 
@@ -383,9 +386,7 @@ describe("DefaultCommitTraversalExtractor", () => {
   it("sets type: 'commit' on all yielded CommitFact objects", async () => {
     const commits = [makeRawCommit(1), makeRawCommit(2)];
     const head = makeOid(1);
-    const traverser = new DefaultCommitTraversalExtractor(
-      makeAdapter({ commits: { [head]: toAsyncIter(commits) } }),
-    );
+    const traverser = makeTraverser(makeAdapter({ commits: { [head]: toAsyncIter(commits) } }));
 
     const facts = await collectFacts(
       traverser.extract(baseRequest({ plans: [makePlan("main", head)] }), makeReporter()),

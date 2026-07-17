@@ -303,6 +303,9 @@ earlier runs.
 
 ## CLI Reference
 
+This section summarizes user-facing CLI options. For the developer-facing CLI contract, validation
+rules, stderr behavior, and implementation notes, see [CLI Interface Design](design/cli.md).
+
 ```
 gitlode [options] <repository-path>
 ```
@@ -377,51 +380,26 @@ Precedence rules:
 - Scalar/path defaults use `CLI explicit > config > built-in`
 - `--rotate-lines` and `--rotate-size` override their own thresholds independently
 - effective profile is `--profile OR runtime.profile`
+- effective Git adapter is `runtime.gitAdapter OR "isomorphic-git"`; there is no CLI override
 
 Conflict rule:
 
 - `extraction.range` in config cannot be used with `--incremental`.
 
-### Profiling output
+### Profiling
 
-When `--profile` is set and the run succeeds, gitlode appends an aligned block to stderr after the
-default completion summary:
+`--profile` appends a local timing and diagnostic summary to stderr after a successful run:
 
-```
-Profile
-  elapsed                      : wall=  18.40ms  work=  18.40ms
-  elapsed/planning             : wall=   1.10ms  work=   1.10ms
-  elapsed/traversal            : wall=   8.25ms  work=   8.25ms
-  elapsed/projection           : wall=   3.75ms  work=   3.75ms
-  elapsed/write                : wall=   2.10ms  work=   2.10ms
-  elapsed/git/blob-read        : wall=   0.80ms  work=   0.80ms
-  elapsed/git/diff             : wall=   1.45ms  work=   1.45ms
-  skipped_diffs                : 12
+```bash
+gitlode --profile -r main ./my-repo
 ```
 
-Each line represents one profiling entry from the per-run profiler tree.
+This output is intended for troubleshooting unexpectedly slow runs, operational investigation, and
+development work on extraction and traversal logic. It is not needed for normal extraction
+workflows and is suppressed by `--quiet`.
 
-| Entry path                 | What it measures                                                               |
-| -------------------------- | ------------------------------------------------------------------------------ |
-| `elapsed`                  | Total extraction wall/work duration captured by the root profiler              |
-| `elapsed/planning`         | Branch-planning work before traversal begins                                   |
-| `elapsed/traversal`        | Commit traversal and commit-fact materialization                               |
-| `elapsed/projection`       | Fact-to-output-record mapping in the active projector                          |
-| `elapsed/write`            | `OutputSink.write()` and `OutputSink.close()` only                             |
-| `elapsed/git/blob-read`    | Blob reads inside `IsomorphicGitAdapter.getFileChanges()`                      |
-| `elapsed/git/diff`         | Diff-stat computation inside `IsomorphicGitAdapter.getFileChanges()`           |
-| `elapsed/git/...` children | Additional Git-internal sub-stages such as `resolve-ref`, `walk-commits`, etc. |
-
-`wall` shows elapsed time for that scoped profiler. `work` shows additive measured work inside the
-same scope. The root `elapsed` entry is always present on successful runs. Additional stage entries
-are populated when profiling is enabled.
-
-`skipped_diffs` reports how many file-level diffs were emitted with `null` additions/deletions due
-to either binary content or the `--max-diff-size` guardrail.
-
-In commit-granularity mode (no `--per-file`), Git file-expansion sub-stages such as
-`elapsed/git/blob-read` and `elapsed/git/diff` remain at `0.00ms` because `getFileChanges()` is
-never called.
+For the output format, span names, and `walk_commits` diagnostic details, see
+[Profiling Guide](profiling.md).
 
 ### Mutual exclusion rules
 
@@ -550,7 +528,8 @@ gitlode -r main --config ./gitlode.config.json ./my-repo
     "name": "repo-override"
   },
   "runtime": {
-    "profile": true
+    "profile": true,
+    "gitAdapter": "isomorphic-git"
   },
   "extensions": {
     "my-plugin": {
@@ -568,11 +547,16 @@ gitlode -r main --config ./gitlode.config.json ./my-repo
 | `extraction`    |          | Defaults for `--ref` and snapshot range.                                                  |
 | `output`        |          | Defaults for output directory/prefix and rotation thresholds.                             |
 | `repository`    |          | Defaults for `--repo-name` / `--repo-url`.                                                |
-| `runtime`       |          | Defaults for runtime flags (currently `profile` only).                                    |
+| `runtime`       |          | Defaults for runtime behavior such as `profile` and `gitAdapter`.                         |
 | `extensions`    |          | Map from namespace to plugin entry. When present, must have at least one entry.           |
 | `entrypoint`    | ✅       | Module path or specifier. Relative paths resolve from the config file directory.          |
 | `config`        |          | Passed to the plugin factory. Any JSON value.                                             |
 | `failurePolicy` |          | `"skip-fact"` (default) or `"fatal"`. Controls behavior when the plugin errors on a fact. |
+
+`runtime.gitAdapter` defaults to `"isomorphic-git"`. Use `"git-cli"` to delegate
+traversal-oriented operations to the Git executable while retaining the existing isomorphic-git
+file-change expansion path. The `git-cli` adapter requires `git` to be available on `PATH`; gitlode
+validates this with `git --version` before traversal.
 
 For complete schema and precedence details, see [Configuration File Design](design/configuration.md).
 

@@ -1,16 +1,13 @@
 import { prepareMappings } from "./classifier.js";
-import type { MappingDefinition, PreparedMappings, RuleSetName } from "./classifier.js";
 import { BUILT_IN_RULE_SETS } from "./rule-sets.js";
-import type { PreparedRuleSet } from "./rule-sets.js";
-
-export type UnknownPolicy = "emit" | "skip";
-
-export interface PreparedConfig {
-  readonly debug: boolean;
-  readonly ruleSets: readonly PreparedRuleSet[];
-  readonly mappings: PreparedMappings;
-  readonly unknownPolicy: UnknownPolicy;
-}
+import type {
+  MappingDefinition,
+  PreparedConfig,
+  PreparedMappings,
+  PreparedRuleSet,
+  RuleSetName,
+  UnknownPolicy,
+} from "./types.js";
 
 export type ConfigParseResult =
   | { readonly ok: true; readonly value: PreparedConfig }

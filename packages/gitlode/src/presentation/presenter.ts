@@ -1,5 +1,5 @@
 import type { ProgressEvent } from "../core/index.js";
-import type { ProfilingEntry } from "../profile/index.js";
+import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import { writeDiagnosticLines, splitMessageLines, type DiagnosticSeverity } from "./diagnostics.js";
 import {
   ProgressController,
@@ -17,7 +17,7 @@ export interface RunPresenter {
   renderUserError(message: string): void;
   renderRuntimeError(error: unknown): void;
   renderSummary(data: SummaryData): void;
-  renderProfile(entries: readonly ProfilingEntry[], skippedDiffs?: number): void;
+  renderProfile(entries: readonly ProfileSummaryEntry[], skippedDiffs?: number): void;
 }
 
 interface CreateRunPresenterOptions {

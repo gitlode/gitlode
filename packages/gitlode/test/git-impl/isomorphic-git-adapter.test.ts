@@ -2,10 +2,15 @@ import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it, vi } from "vitest";
 
+import { createCommitTraversalStrategy } from "../../src/git-impl/commit-traversal/index.js";
 import type { IsomorphicGitAdapterDependencies } from "../../src/git-impl/index.js";
-import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+import {
+  IsomorphicGitAdapter,
+  projectCommitParentSuccessors,
+} from "../../src/git-impl/isomorphic-git-adapter.js";
 import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
-import type { RawCommit } from "../../src/git/index.js";
+import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -21,8 +26,13 @@ function createAdapter(
   return new IsomorphicGitAdapter({
     fs,
     diffAdapter: overrides.diffAdapter ?? new JsDiffAdapter(),
-    profiler: overrides.profiler,
+    instrumentation: overrides.instrumentation ?? noopInstrumentation,
+    commitTraversalStrategy: overrides.commitTraversalStrategy,
   });
+}
+
+function counter(counters: Readonly<Record<string, number>> | undefined, name: string): number {
+  return counters?.[name] ?? 0;
 }
 
 /** Create a fresh in-memory repo and return the memfs-compatible fs and a helper to commit files. */
@@ -72,6 +82,45 @@ function makeRepo() {
 
   return { fs, init, addCommit, collectAll };
 }
+
+async function writeCommit(
+  fs: IsomorphicGitAdapterDependencies["fs"],
+  tree: string,
+  parents: string[],
+  message: string,
+  timestamp: number,
+): Promise<string> {
+  return git.writeCommit({
+    fs,
+    dir: "/",
+    commit: {
+      tree,
+      parent: parents,
+      message: `${message}\n`,
+      author: { ...AUTHOR, timestamp },
+      committer: { ...AUTHOR, timestamp },
+    },
+  });
+}
+
+describe("commit parent successor path scheduling hints", () => {
+  it("projects the expanded child committer timestamp onto every parent path", () => {
+    const commit: RawCommit = {
+      oid: "c".repeat(40) as never,
+      message: "merge\n",
+      author: { ...AUTHOR, timestamp: 111 },
+      committer: { ...AUTHOR, timestamp: 222 },
+      parents: ["a".repeat(40) as never, "b".repeat(40) as never],
+    };
+
+    const successors = projectCommitParentSuccessors(commit);
+
+    expect(successors).toEqual([
+      { nodeId: "a".repeat(40), domainHint: { sourceCommitterTimestamp: 222 } },
+      { nodeId: "b".repeat(40), domainHint: { sourceCommitterTimestamp: 222 } },
+    ]);
+  });
+});
 
 describe("IsomorphicGitAdapter.walkCommits", () => {
   it("full traversal (no excludeHash) yields all commits", async () => {
@@ -135,6 +184,43 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(oids).toContain(sha2);
     expect(oids).toContain(sha3);
     expect(oids).toHaveLength(2);
+  });
+
+  it("uses the certified-lazy default through the adapter for a certified single-anchor walk", async () => {
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const old = await addCommit("a.txt", "old", "old", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: old })).commit.tree;
+    const release = await writeCommit(fs, tree, [old], "release", 2000);
+    const after = await writeCommit(fs, tree, [release], "after", 3000);
+    const head = await writeCommit(fs, tree, [after], "head", 4000);
+
+    fs.unlinkSync(`/.git/objects/${old.slice(0, 2)}/${old.slice(2)}`);
+
+    const commits = await collectAll(createAdapter(fs), head, release);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, after]));
+  });
+
+  it("reuses commit objects read during topology expansion for final yielding", async () => {
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const child = await addCommit("a.txt", "child", "child", 2000);
+    const head = await addCommit("a.txt", "head", "head", 3000);
+
+    const readCommit = vi.spyOn(git, "readCommit");
+    try {
+      const commits = await collectAll(createAdapter(fs), head);
+
+      expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, child, root]));
+      const reads = readCommit.mock.calls.map((call) => call[0].oid);
+      expect(reads.filter((oid) => oid === head)).toHaveLength(1);
+      expect(reads.filter((oid) => oid === child)).toHaveLength(1);
+      expect(reads.filter((oid) => oid === root)).toHaveLength(1);
+    } finally {
+      readCommit.mockRestore();
+    }
   });
 
   it("merge commit handling: exclusion stops at correct ancestors in a 2-parent DAG", async () => {
@@ -271,6 +357,155 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     expect(oids.has(sha1)).toBe(false);
     expect(results).toHaveLength(5);
   });
+
+  it("includes a branch forked before the excluded release and merged afterward", async () => {
+    // root -- fork -- release -- mainAfter -- merge (head)
+    //           \-- sideA -- sideB --------/
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const fork = await writeCommit(fs, tree, [root], "fork", 2000);
+    const release = await writeCommit(fs, tree, [fork], "release", 3000);
+    const mainAfter = await writeCommit(fs, tree, [release], "main after release", 4000);
+    const sideA = await writeCommit(fs, tree, [fork], "side A", 2500);
+    const sideB = await writeCommit(fs, tree, [sideA], "side B", 3500);
+    const head = await writeCommit(fs, tree, [mainAfter, sideB], "merge", 5000);
+
+    const commits = await collectAll(createAdapter(fs), head, release);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(
+      new Set([head, mainAfter, sideB, sideA]),
+    );
+  });
+
+  it("uses injected strategies with equal merge-difference membership and adapter-owned read/cache telemetry", async () => {
+    // root -- fork -- release -- mainAfter -- merge (head)
+    //           \-- sideA -- sideB --------/
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const fork = await writeCommit(fs, tree, [root], "fork", 2000);
+    const release = await writeCommit(fs, tree, [fork], "release", 3000);
+    const mainAfter = await writeCommit(fs, tree, [release], "main after release", 4000);
+    const sideA = await writeCommit(fs, tree, [fork], "side A", 2500);
+    const sideB = await writeCommit(fs, tree, [sideA], "side B", 3500);
+    const head = await writeCommit(fs, tree, [mainAfter, sideB], "merge", 5000);
+    const expected = new Set([head, mainAfter, sideB, sideA]);
+    const readCommit = vi.spyOn(git, "readCommit");
+
+    try {
+      for (const strategyName of [
+        "certified-lazy",
+        "phase-certified-fifo",
+        "phase-certified-timestamp",
+      ] as const) {
+        readCommit.mockClear();
+        let time = 0;
+        const { LocalInstrumentationRecorder } = await import("../../src/instrumentation/index.js");
+        const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+        const commits = await collectAll(
+          createAdapter(fs, {
+            instrumentation,
+            commitTraversalStrategy: createCommitTraversalStrategy(strategyName),
+          }),
+          head,
+          release,
+        );
+        const oids = commits.map((commit) => commit.oid);
+        expect(new Set(oids)).toEqual(expected);
+        expect(oids).toHaveLength(new Set(oids).size);
+
+        const entries = instrumentation.summary();
+        const walkEntry = entries.find((entry) => entry.name === "git.walk_commits");
+        expect(walkEntry?.attributes?.strategy).toEqual([strategyName]);
+        expect(
+          entries.find((entry) => entry.name === "dag.traversal")?.attributes?.strategy,
+        ).toEqual([strategyName === "certified-lazy" ? "certifiedLazy" : "phaseCertified"]);
+        const traversalEntry = entries.find((entry) => entry.name === "dag.traversal");
+        const walkCounters = walkEntry?.counters;
+        const traversalCounters = traversalEntry?.counters;
+        const commitReads = counter(walkCounters, "commit_reads");
+        const topologyCommitReads = counter(walkCounters, "topology_commit_reads");
+        const topologyCommitCacheHits = counter(walkCounters, "topology_commit_cache_hits");
+        const materializeCommitReads = counter(walkCounters, "materialize_commit_reads");
+        const materializeCommitCacheHits = counter(walkCounters, "materialize_commit_cache_hits");
+        const commitsYielded = counter(walkCounters, "commits_yielded");
+        const successorExpansions = counter(traversalCounters, "successor_expansions");
+
+        expect(commitsYielded).toBe(4);
+        expect(commitReads).toBe(topologyCommitReads + materializeCommitReads);
+        expect(materializeCommitCacheHits + materializeCommitReads).toBe(commitsYielded);
+        expect(topologyCommitReads + topologyCommitCacheHits).toBe(successorExpansions);
+
+        const readOids = readCommit.mock.calls.map(([options]) => options.oid);
+        expect(readOids).toHaveLength(commitReads);
+        expect(readOids).toHaveLength(new Set(readOids).size);
+        for (const yieldedOid of oids) {
+          expect(readOids).toContain(yieldedOid);
+        }
+      }
+    } finally {
+      readCommit.mockRestore();
+    }
+  });
+
+  it("subtracts ancestors of an unreachable excludeHash that shares an ancestor with head", async () => {
+    // root -- common -- headA -- headB (head)
+    //                \-- excludedTip (excludeHash)
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 1000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const common = await writeCommit(fs, tree, [root], "common", 2000);
+    const headA = await writeCommit(fs, tree, [common], "head A", 3000);
+    const head = await writeCommit(fs, tree, [headA], "head B", 4000);
+    const excludedTip = await writeCommit(fs, tree, [common], "excluded tip", 3500);
+
+    const commits = await collectAll(createAdapter(fs), head, excludedTip);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, headA]));
+  });
+
+  it("walks the reachable set when commit timestamps run backward", async () => {
+    // root(3000) -- child(1000) -- head(2000)
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "root", "root", 3000);
+    const tree = (await git.readCommit({ fs, dir: "/", oid: root })).commit.tree;
+    const child = await writeCommit(fs, tree, [root], "child", 1000);
+    const head = await writeCommit(fs, tree, [child], "head", 2000);
+
+    const commits = await collectAll(createAdapter(fs), head);
+
+    expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([head, child, root]));
+  });
+
+  it("maps a missing include-side start commit to COMMIT_NOT_FOUND", async () => {
+    const { fs, init, collectAll } = makeRepo();
+    await init();
+
+    const error = await collectAll(createAdapter(fs), "0".repeat(40)).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(GitAdapterError);
+    expect((error as GitAdapterError).code).toBe("COMMIT_NOT_FOUND");
+  });
+
+  it("maps a missing excludeHash to COMMIT_NOT_FOUND", async () => {
+    const { fs, init, addCommit, collectAll } = makeRepo();
+    await init();
+    const head = await addCommit("a.txt", "head", "head", 1000);
+
+    const error = await collectAll(createAdapter(fs), head, "0".repeat(40)).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(GitAdapterError);
+    expect((error as GitAdapterError).code).toBe("COMMIT_NOT_FOUND");
+  });
 });
 
 describe("IsomorphicGitAdapter.getRemoteUrl", () => {
@@ -326,7 +561,12 @@ describe("IsomorphicGitAdapter.resolveRef", () => {
       dir: "/",
       ref: "v1.0-ann",
       object: sha,
-      tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
+      tagger: {
+        name: "Tagger",
+        email: "tag@example.com",
+        timestamp: 0,
+        timezoneOffset: 0,
+      },
       message: "release v1.0",
     });
     const adapter = createAdapter(fs);
@@ -384,7 +624,12 @@ describe("IsomorphicGitAdapter.classifyRefType", () => {
       dir: "/",
       ref: "v1.0-ann",
       object: sha,
-      tagger: { name: "Tagger", email: "tag@example.com", timestamp: 0, timezoneOffset: 0 },
+      tagger: {
+        name: "Tagger",
+        email: "tag@example.com",
+        timestamp: 0,
+        timezoneOffset: 0,
+      },
       message: "release v1.0",
     });
     const adapter = createAdapter(fs);
@@ -643,7 +888,11 @@ describe("IsomorphicGitAdapter.getFileChanges", () => {
     const sha1 = await addCommit("a.txt", "line1\n", "root commit");
 
     // Create a commit with same tree as sha1 (no file changes)
-    const { commit: parentCommit } = await git.readCommit({ fs, dir: "/", oid: sha1 });
+    const { commit: parentCommit } = await git.readCommit({
+      fs,
+      dir: "/",
+      oid: sha1,
+    });
     const emptyCommit = await git.writeCommit({
       fs,
       dir: "/",
@@ -737,8 +986,8 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
   });
 });
 
-describe("IsomorphicGitAdapter profiler injection", () => {
-  it("adapter-level and file-change sub-stage entries accumulate when a profiler is passed to the constructor", async () => {
+describe("IsomorphicGitAdapter instrumentation injection", () => {
+  it("adapter-level and file-change spans accumulate when instrumentation is passed to the constructor", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha1 = await addCommit("a.txt", "hello\nworld\n", "root commit");
@@ -747,10 +996,10 @@ describe("IsomorphicGitAdapter profiler injection", () => {
     let time = 0;
     const clock = () => ++time;
 
-    const { DefaultStageProfiler } = await import("../../src/profile/index.js");
-    const profiler = new DefaultStageProfiler("git", clock);
+    const { LocalInstrumentationRecorder } = await import("../../src/instrumentation/index.js");
+    const instrumentation = new LocalInstrumentationRecorder(clock);
 
-    const adapter = createAdapter(fs, { profiler });
+    const adapter = createAdapter(fs, { instrumentation });
 
     await adapter.getFileChanges("/", sha2 as never, sha1 as never);
     // Also exercise resolve and merge-base paths so adapter-level buckets are populated.
@@ -760,35 +1009,39 @@ describe("IsomorphicGitAdapter profiler injection", () => {
       // Drain iterator
     }
 
-    const entries = profiler.entries();
-    const resolveRefEntry = entries.find((e) => e.name.endsWith("/resolve-ref"));
-    const mergeBaseEntry = entries.find((e) => e.name.endsWith("/merge-base"));
-    const walkEntry = entries.find((e) => e.name.endsWith("/walk-commits"));
-    const walkReadCommitEntry = entries.find((e) => e.name.endsWith("/walk-commits/read-commit"));
-    const excludeCollectEntry = entries.find((e) => e.name.endsWith("/exclude-collect"));
-    const excludeReadCommitEntry = entries.find((e) =>
-      e.name.endsWith("/exclude-collect/read-commit"),
+    const entries = instrumentation.summary();
+    const resolveRefEntry = entries.find((e) => e.name === "git.resolve_ref");
+    const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
+    const walkEntry = entries.find((e) => e.name === "git.walk_commits");
+    const traversalEntry = entries.find((e) => e.name === "dag.traversal");
+    const fileChangesEntry = entries.find((e) => e.name === "git.file_changes");
+    const blobEntry = entries.find((e) => e.name === "git.blob_read");
+    const diffEntry = entries.find((e) => e.name === "git.diff");
+    expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
+    expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
+    expect(walkEntry?.totalMs).toBeGreaterThan(0);
+    expect(walkEntry?.attributes).toEqual({ strategy: ["certified-lazy"] });
+    expect(walkEntry?.counters).toEqual({
+      commit_reads: 2,
+      commits_yielded: 1,
+      materialize_commit_cache_hits: 1,
+      topology_commit_cache_hits: 1,
+      topology_commit_reads: 2,
+    });
+    expect(traversalEntry?.attributes).toEqual({
+      result: ["certified"],
+      strategy: ["certifiedLazy"],
+    });
+    expect(traversalEntry?.counters).toEqual(
+      expect.objectContaining({
+        exclude_expansions: 2,
+        main_expansions: 1,
+        successor_expansions: 3,
+        yielded_nodes: 1,
+      }),
     );
-    const fileChangesEntry = entries.find((e) => e.name.endsWith("/file-changes"));
-    const blobEntry = entries.find((e) => e.name.endsWith("/blob-read"));
-    const diffEntry = entries.find((e) => e.name.endsWith("/diff"));
-    expect(resolveRefEntry?.wallMs).toBeGreaterThan(0);
-    expect(resolveRefEntry?.workMs).toBeGreaterThan(0);
-    expect(mergeBaseEntry?.wallMs).toBeGreaterThan(0);
-    expect(mergeBaseEntry?.workMs).toBeGreaterThan(0);
-    expect(walkEntry?.wallMs).toBeGreaterThan(0);
-    expect(walkEntry?.workMs).toBeGreaterThan(0);
-    expect(walkReadCommitEntry?.wallMs).toBeGreaterThan(0);
-    expect(walkReadCommitEntry?.workMs).toBeGreaterThan(0);
-    expect(excludeCollectEntry?.wallMs).toBeGreaterThan(0);
-    expect(excludeCollectEntry?.workMs).toBeGreaterThan(0);
-    expect(excludeReadCommitEntry?.wallMs).toBeGreaterThan(0);
-    expect(excludeReadCommitEntry?.workMs).toBeGreaterThan(0);
-    expect(fileChangesEntry?.wallMs).toBeGreaterThan(0);
-    expect(fileChangesEntry?.workMs).toBeGreaterThan(0);
-    expect(blobEntry?.wallMs).toBeGreaterThan(0);
-    expect(blobEntry?.workMs).toBeGreaterThan(0);
-    expect(diffEntry?.wallMs).toBeGreaterThan(0);
-    expect(diffEntry?.workMs).toBeGreaterThan(0);
+    expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
+    expect(blobEntry?.totalMs).toBeGreaterThan(0);
+    expect(diffEntry?.totalMs).toBeGreaterThan(0);
   });
 });

@@ -27,8 +27,11 @@ export interface ConfigRepositorySection {
   readonly url?: string;
 }
 
+export type GitAdapterName = "isomorphic-git" | "git-cli";
+
 export interface ConfigRuntimeSection {
   readonly profile?: boolean;
+  readonly gitAdapter?: GitAdapterName;
 }
 
 export interface ConfigExtensionEntry {

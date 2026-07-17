@@ -74,7 +74,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 5,
         elapsedMs: 6,
         refs: ["main"],
-        profileEntries: [{ name: "elapsed", wallMs: 1, workMs: 1 }],
+        profileEntries: [{ name: "gitlode.run", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 }],
         skippedDiffs: 2,
       },
     });

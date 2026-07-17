@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DefaultFileChangeExpander } from "../../src/core/file-change-expander.js";
 import type { CommitFact } from "../../src/core/types.js";
-import type { FileChange, GitAdapter } from "../../src/git-api/types.js";
+import type { FileChange, GitAdapter } from "../../src/git/types.js";
 
 const REPO_PATH = "/fake/repo";
 

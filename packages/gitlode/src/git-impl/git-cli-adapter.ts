@@ -6,7 +6,7 @@ import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
   GitAdapterError,
   type RawPerson,
-  type FileChange,
+  type FileBlobChange,
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
@@ -18,7 +18,7 @@ import { captureGroupOrThrow } from "../support/index.js";
 
 export interface GitCliAdapterDependencies {
   readonly instrumentation: Instrumentation;
-  readonly fileChangeAdapter: Pick<GitAdapter, "getFileChanges">;
+  readonly fileBlobChangeAdapter: Pick<GitAdapter, "getFileBlobChanges">;
   readonly gitExecutable?: string;
 }
 
@@ -38,12 +38,12 @@ const DEFAULT_GIT_EXECUTABLE = "git";
 
 export class GitCliAdapter implements GitAdapter {
   private readonly _instrumentation: Instrumentation;
-  private readonly _fileChangeAdapter: Pick<GitAdapter, "getFileChanges">;
+  private readonly _fileBlobChangeAdapter: Pick<GitAdapter, "getFileBlobChanges">;
   private readonly _gitExecutable: string;
 
   constructor(dependencies: GitCliAdapterDependencies) {
     this._instrumentation = dependencies.instrumentation;
-    this._fileChangeAdapter = dependencies.fileChangeAdapter;
+    this._fileBlobChangeAdapter = dependencies.fileBlobChangeAdapter;
     this._gitExecutable = dependencies.gitExecutable ?? DEFAULT_GIT_EXECUTABLE;
   }
 
@@ -200,12 +200,12 @@ export class GitCliAdapter implements GitAdapter {
     return line.length > 0 ? (line as CommitOid) : null;
   }
 
-  async getFileChanges(
+  async *getFileBlobChanges(
     repoPath: string,
     commitOid: CommitOid,
     parentOid?: CommitOid,
-  ): Promise<readonly FileChange[]> {
-    return await this._fileChangeAdapter.getFileChanges(repoPath, commitOid, parentOid);
+  ): AsyncIterable<FileBlobChange> {
+    yield* this._fileBlobChangeAdapter.getFileBlobChanges(repoPath, commitOid, parentOid);
   }
 
   private async _runGit(
@@ -339,7 +339,7 @@ async function* streamRevListBatchObjects(
   }
 }
 
-async function* parseBatchObjectStream(stream: Readable): AsyncIterable<BatchObject> {
+export async function* parseBatchObjectStream(stream: Readable): AsyncIterable<BatchObject> {
   let buffer = Buffer.alloc(0);
   let expectedSize: number | undefined;
   let currentOid = "";

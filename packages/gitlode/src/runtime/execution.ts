@@ -170,7 +170,6 @@ async function buildGitAdapter(
   const createDefaultIsomorphicAdapter = (): IsomorphicGitAdapter =>
     new IsomorphicGitAdapter({
       fs: nodeFs,
-      diffAdapter: new JsDiffAdapter(),
       instrumentation,
     });
 
@@ -191,7 +190,6 @@ async function buildGitAdapter(
         kind: "success",
         adapter: new IsomorphicGitAdapter({
           fs: nodeFs,
-          diffAdapter: new JsDiffAdapter(),
           instrumentation,
           commitTraversalStrategy,
         }),
@@ -200,7 +198,7 @@ async function buildGitAdapter(
     case "git-cli": {
       const adapter = new GitCliAdapter({
         instrumentation,
-        fileChangeAdapter: createDefaultIsomorphicAdapter(),
+        fileBlobChangeAdapter: createDefaultIsomorphicAdapter(),
       });
       try {
         const gitVersion = await adapter.validateGitExecutable();
@@ -402,6 +400,8 @@ export async function executeWorkerRunRequest(
     const traversalExtractor = new DefaultCommitTraversalExtractor(gitAdapter, instrumentation);
     const fileChangeExpander = new DefaultFileChangeExpander(
       gitAdapter,
+      new JsDiffAdapter(),
+      instrumentation,
       extractorConfig.maxDiffSize,
     );
 

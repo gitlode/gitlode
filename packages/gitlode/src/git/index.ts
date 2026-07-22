@@ -1,6 +1,8 @@
 export type {
   DiffAdapter,
-  FileChange,
+  FileBlobChange,
+  FileBlobMode,
+  FileBlobSnapshot,
   GitAdapter,
   RawCommit,
   RawPerson,

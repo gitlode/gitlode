@@ -75,9 +75,7 @@ function makeAdapter(
     async findMergeBase() {
       return null;
     },
-    async getFileChanges() {
-      return [];
-    },
+    async *getFileBlobChanges() {},
   };
 }
 
@@ -313,9 +311,7 @@ describe("DefaultCommitTraversalExtractor", () => {
       async findMergeBase() {
         return null;
       },
-      async getFileChanges() {
-        return [];
-      },
+      async *getFileBlobChanges() {},
     });
 
     await collectFacts(
@@ -360,9 +356,7 @@ describe("DefaultCommitTraversalExtractor", () => {
       async findMergeBase() {
         return null;
       },
-      async getFileChanges() {
-        return [];
-      },
+      async *getFileBlobChanges() {},
     });
     const reporter = makeReporter();
 

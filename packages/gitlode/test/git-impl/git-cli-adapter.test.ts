@@ -1,12 +1,14 @@
 import nodeFs from "node:fs";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { Readable } from "node:stream";
 
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { GitCliAdapter, IsomorphicGitAdapter, JsDiffAdapter } from "../../src/git-impl/index.js";
+import { parseBatchObjectStream } from "../../src/git-impl/git-cli-adapter.js";
+import { GitCliAdapter, IsomorphicGitAdapter } from "../../src/git-impl/index.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
@@ -38,12 +40,11 @@ async function makeTempRepo(): Promise<string> {
 function createAdapter(): GitCliAdapter {
   const fallback = new IsomorphicGitAdapter({
     fs: nodeFs,
-    diffAdapter: new JsDiffAdapter(),
     instrumentation: noopInstrumentation,
   });
   return new GitCliAdapter({
     instrumentation: noopInstrumentation,
-    fileChangeAdapter: fallback,
+    fileBlobChangeAdapter: fallback,
   });
 }
 
@@ -104,12 +105,11 @@ describe("GitCliAdapter", () => {
     const instrumentation = new LocalInstrumentationRecorder(() => Date.now());
     const fallback = new IsomorphicGitAdapter({
       fs: nodeFs,
-      diffAdapter: new JsDiffAdapter(),
       instrumentation: noopInstrumentation,
     });
     const adapter = new GitCliAdapter({
       instrumentation,
-      fileChangeAdapter: fallback,
+      fileBlobChangeAdapter: fallback,
     });
 
     const commits = await collectWalk(adapter, repoPath, third, first);
@@ -133,46 +133,17 @@ describe("GitCliAdapter", () => {
   });
 
   it("rejects truncated cat-file batch output that omits the payload delimiter", async () => {
-    const repoPath = await mkdtemp(join(tmpdir(), "gitlode-git-cli-adapter-fake-repo-"));
-    const binPath = join(
-      await mkdtemp(join(tmpdir(), "gitlode-git-cli-adapter-fake-bin-")),
-      "fake-git.js",
-    );
-    tempDirs.push(repoPath, dirname(binPath));
     const oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as CommitOid;
-    await writeFile(
-      binPath,
-      `#!/usr/bin/env node
-const args = process.argv.slice(2);
-if (args.includes("rev-list")) {
-  process.stdout.write("${oid}\\n");
-  process.exit(0);
-}
-if (args.includes("cat-file")) {
-  process.stdout.write("${oid} commit 4\\nabcd");
-  process.exit(0);
-}
-process.exit(0);
-`,
-    );
-    await chmod(binPath, 0o755);
-    const fallback = new IsomorphicGitAdapter({
-      fs: nodeFs,
-      diffAdapter: new JsDiffAdapter(),
-      instrumentation: noopInstrumentation,
-    });
-    const adapter = new GitCliAdapter({
-      instrumentation: noopInstrumentation,
-      fileChangeAdapter: fallback,
-      gitExecutable: binPath,
-    });
+    const stream = Readable.from([Buffer.from(`${oid} commit 4\nabcd`)]);
 
-    await expect(collectWalk(adapter, repoPath, oid)).rejects.toThrow(
-      "Unexpected truncated cat-file batch output",
-    );
+    await expect(async () => {
+      for await (const _object of parseBatchObjectStream(stream)) {
+        // Drain the parser.
+      }
+    }).rejects.toThrow("Unexpected truncated cat-file batch output");
   });
 
-  it("delegates file changes to the configured file-change adapter", async () => {
+  it("delegates file blob changes to the configured temporary fallback", async () => {
     const repoPath = await makeTempRepo();
     const first = await addCommit(repoPath, "file.txt", "one\n", "first");
     const second = await addCommit(repoPath, "file.txt", "one\ntwo\n", "second");
@@ -180,13 +151,18 @@ process.exit(0);
     const cliAdapter = createAdapter();
     const isomorphicAdapter = new IsomorphicGitAdapter({
       fs: nodeFs,
-      diffAdapter: new JsDiffAdapter(),
       instrumentation: noopInstrumentation,
     });
 
-    await expect(cliAdapter.getFileChanges(repoPath, second, first)).resolves.toEqual(
-      await isomorphicAdapter.getFileChanges(repoPath, second, first),
-    );
+    const cliChanges = [];
+    for await (const change of cliAdapter.getFileBlobChanges(repoPath, second, first)) {
+      cliChanges.push(change);
+    }
+    const isomorphicChanges = [];
+    for await (const change of isomorphicAdapter.getFileBlobChanges(repoPath, second, first)) {
+      isomorphicChanges.push(change);
+    }
+    expect(cliChanges).toEqual(isomorphicChanges);
   });
 
   it("finds merge bases and returns null for disconnected histories", async () => {

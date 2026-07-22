@@ -55,9 +55,7 @@ function makeAdapter(options: {
     async findMergeBase() {
       return options.mergeBase !== undefined ? options.mergeBase : null;
     },
-    async getFileChanges() {
-      return [];
-    },
+    async *getFileBlobChanges() {},
   };
 }
 

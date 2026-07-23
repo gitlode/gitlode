@@ -4,13 +4,13 @@ import { DefaultCommitTraversalExtractor } from "../../src/core/commit-traversal
 import type {
   TraversalPlan,
   CommitFact,
-  CommitOid,
   CommitTraversalRequest,
   ProgressEvent,
   ProgressReporter,
 } from "../../src/core/index.js";
 import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
+import type { CommitOid } from "../../src/model/index.js";
 
 function makeOid(n: number): CommitOid {
   return n.toString(16).padStart(12, "0") as CommitOid;
@@ -43,6 +43,9 @@ function makeAdapter(
   } = {},
 ): GitAdapter {
   return {
+    [Symbol.asyncDispose]() {
+      return Promise.resolve();
+    },
     supportedObjectFormats() {
       return ["sha1"];
     },
@@ -105,7 +108,7 @@ function baseRequest(overrides: Partial<CommitTraversalRequest> = {}): CommitTra
   return {
     repositoryPath: "/repo",
     repoName: "test-repo",
-    remoteUrl: null,
+    repoUrl: null,
     plans: [makePlan("main", makeOid(1))],
     ...overrides,
   };

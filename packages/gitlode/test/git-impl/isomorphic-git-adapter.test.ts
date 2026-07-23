@@ -818,6 +818,37 @@ describe("IsomorphicGitAdapter.getFileBlobChanges", () => {
     );
   });
 
+  it("returns a modified blob fact when only the executable mode changes", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const root = await addCommit("script.sh", "echo hello\n", "root");
+    fs.chmodSync("/script.sh", 0o755);
+    await git.add({ fs, dir: "/", filepath: "script.sh" });
+    const executable = await git.commit({
+      fs,
+      dir: "/",
+      message: "make executable",
+      author: AUTHOR,
+    });
+
+    const changes = await collectFileBlobChanges(createAdapter(fs), executable, root);
+
+    expect(changes).toEqual([
+      expect.objectContaining({
+        status: "modified",
+        before: expect.objectContaining({
+          mode: "100644",
+          content: new TextEncoder().encode("echo hello\n"),
+        }),
+        after: expect.objectContaining({
+          mode: "100755",
+          content: new TextEncoder().encode("echo hello\n"),
+        }),
+      }),
+    ]);
+    expect(changes[0]?.before?.oid).toBe(changes[0]?.after?.oid);
+  });
+
   it("returns no changes when the commit reuses its parent tree", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();

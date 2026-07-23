@@ -68,7 +68,8 @@ export interface DiffAdapter {
   };
 }
 
-export interface GitAdapter {
+/** Run-scoped repository access resource. Its construction owner disposes it after the run. */
+export interface GitAdapter extends AsyncDisposable {
   /** Object formats this adapter implementation can handle */
   supportedObjectFormats(): readonly OidProfile[];
 

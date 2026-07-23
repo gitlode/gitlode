@@ -49,6 +49,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
     return ["sha1"];
   }
 
+  [Symbol.asyncDispose](): Promise<void> {
+    return Promise.resolve();
+  }
+
   async resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
     let oid: string;
     try {
@@ -278,11 +282,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
           // Both blobs
           if (A.type === "blob" && B.type === "blob") {
             const [oidA, oidB] = await Promise.all([A.entry.oid(), B.entry.oid()]);
-            if (oidA === oidB) return; // unchanged
             const [before, after] = await Promise.all([
               describeFileBlobSnapshot(filepath, A.entry, oidA),
               describeFileBlobSnapshot(filepath, B.entry, oidB),
             ]);
+            if (before.oid === after.oid && before.mode === after.mode) return;
             descriptors.push({ status: "modified", before, after });
             return;
           }

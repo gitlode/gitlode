@@ -28,6 +28,13 @@ should happen in chat/review first, then be summarized here only if it remains u
 ## Follow-up candidates
 
 - Consider a full CLI file-change implementation if file-granularity extraction becomes a bottleneck.
+- Replace the per-commit `git diff-tree` change-discovery process with direct commit/tree object
+  reads over the repository-scoped persistent `git cat-file --batch` session, then compare tree
+  structure in TypeScript. Profiling on Windows showed that CLI blob reads were faster than the
+  isomorphic-git path, while one `diff-tree` process per commit dominated file-granularity runtime.
+  Keep this as a separate follow-up: preserve raw A/M/D facts, file modes, symlink/submodule
+  transitions, consumer-paced blob materialization, and the rule that rename detection remains
+  outside `GitAdapter`.
 - Add benchmark fixtures or scripts for large `v9..v10` style ranges if repeatable performance
   comparisons become part of routine development.
 - Revisit adapter interface decomposition only if future adapters make the current `GitAdapter`

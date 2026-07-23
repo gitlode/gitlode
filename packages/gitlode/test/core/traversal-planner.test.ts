@@ -31,6 +31,9 @@ function makeAdapter(options: {
   resolveRefError?: { ref: string; code: "REF_NOT_FOUND" };
 }): GitAdapter {
   return {
+    [Symbol.asyncDispose]() {
+      return Promise.resolve();
+    },
     supportedObjectFormats() {
       return ["sha1"];
     },

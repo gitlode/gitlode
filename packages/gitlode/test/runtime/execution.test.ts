@@ -180,6 +180,11 @@ describe("executeWorkerRunRequest profiling", () => {
 
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    const fileBlobBatchEntry = result.success.profileEntries.find(
+      (entry) => entry.name === "git.cli.file_blob_batch",
+    );
+    expect(fileBlobBatchEntry?.calls).toBe(1);
+    expect(fileBlobBatchEntry?.counters).toEqual({ blob_bytes: 6, objects_read: 1 });
   });
 
   it("runs successfully with the git-cli adapter selected", async () => {

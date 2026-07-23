@@ -1,5 +1,5 @@
 import nodeFs from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -7,7 +7,10 @@ import { Readable } from "node:stream";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseBatchObjectStream } from "../../src/git-impl/git-cli-adapter.js";
+import {
+  parseBatchObjectStream,
+  parseRawDiffTreeOutput,
+} from "../../src/git-impl/git-cli-adapter.js";
 import { GitCliAdapter, IsomorphicGitAdapter } from "../../src/git-impl/index.js";
 import {
   LocalInstrumentationRecorder,
@@ -38,13 +41,8 @@ async function makeTempRepo(): Promise<string> {
 }
 
 function createAdapter(): GitCliAdapter {
-  const fallback = new IsomorphicGitAdapter({
-    fs: nodeFs,
-    instrumentation: noopInstrumentation,
-  });
   return new GitCliAdapter({
     instrumentation: noopInstrumentation,
-    fileBlobChangeAdapter: fallback,
   });
 }
 
@@ -68,6 +66,19 @@ async function collectWalk(
   const commits = [];
   for await (const commit of adapter.walkCommits(repoPath, head, exclude)) commits.push(commit);
   return commits;
+}
+
+async function collectFileBlobChanges(
+  adapter: GitCliAdapter,
+  repoPath: string,
+  commitOid: CommitOid,
+  parentOid?: CommitOid,
+) {
+  const changes = [];
+  for await (const change of adapter.getFileBlobChanges(repoPath, commitOid, parentOid)) {
+    changes.push(change);
+  }
+  return changes;
 }
 
 describe("GitCliAdapter", () => {
@@ -103,13 +114,8 @@ describe("GitCliAdapter", () => {
     const second = await addCommit(repoPath, "file.txt", "2", "second");
     const third = await addCommit(repoPath, "file.txt", "3", "third");
     const instrumentation = new LocalInstrumentationRecorder(() => Date.now());
-    const fallback = new IsomorphicGitAdapter({
-      fs: nodeFs,
-      instrumentation: noopInstrumentation,
-    });
     const adapter = new GitCliAdapter({
       instrumentation,
-      fileBlobChangeAdapter: fallback,
     });
 
     const commits = await collectWalk(adapter, repoPath, third, first);
@@ -143,12 +149,86 @@ describe("GitCliAdapter", () => {
     }).rejects.toThrow("Unexpected truncated cat-file batch output");
   });
 
-  it("delegates file blob changes to the configured temporary fallback", async () => {
+  it("assembles fragmented cat-file payloads into one Uint8Array", async () => {
+    const oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as CommitOid;
+    const payload = Buffer.alloc(64 * 1024, 0x61);
+    const response = Buffer.concat([
+      Buffer.from(`${oid} blob ${payload.length}\n`),
+      payload,
+      Buffer.from("\n"),
+    ]);
+    const chunks = [];
+    for (let offset = 0; offset < response.length; offset += 997) {
+      chunks.push(response.subarray(offset, offset + 997));
+    }
+
+    const objects = [];
+    for await (const object of parseBatchObjectStream(Readable.from(chunks))) {
+      objects.push(object);
+    }
+
+    expect(objects).toEqual([{ oid, type: "blob", content: new Uint8Array(payload) }]);
+  });
+
+  it("normalizes raw A/M/D/T entries into file-backed blob changes", () => {
+    const zero = "0".repeat(40);
+    const first = "1".repeat(40);
+    const second = "2".repeat(40);
+    const third = "3".repeat(40);
+    const fourth = "4".repeat(40);
+    const output = Buffer.from(
+      [
+        `:000000 100644 ${zero} ${first} A\0added name\n.txt\0`,
+        `:100644 100755 ${first} ${first} M\0script.sh\0`,
+        `:120000 160000 ${second} ${third} T\0dependency\0`,
+        `:160000 100644 ${third} ${fourth} T\0vendor.txt\0`,
+        `:160000 160000 ${third} ${fourth} M\0ignored-submodule\0`,
+      ].join(""),
+    );
+
+    expect(parseRawDiffTreeOutput(output)).toEqual([
+      {
+        status: "added",
+        before: null,
+        after: { path: "added name\n.txt", oid: first, mode: "100644" },
+      },
+      {
+        status: "modified",
+        before: { path: "script.sh", oid: first, mode: "100644" },
+        after: { path: "script.sh", oid: first, mode: "100755" },
+      },
+      {
+        status: "deleted",
+        before: { path: "dependency", oid: second, mode: "120000" },
+        after: null,
+      },
+      {
+        status: "added",
+        before: null,
+        after: { path: "vendor.txt", oid: fourth, mode: "100644" },
+      },
+    ]);
+  });
+
+  it("rejects unterminated or unsupported raw diff-tree entries", () => {
+    expect(() =>
+      parseRawDiffTreeOutput(
+        Buffer.from(`:000000 100644 ${"0".repeat(40)} ${"1".repeat(40)} A\0path`),
+      ),
+    ).toThrow("Unexpected unterminated diff-tree output");
+    expect(() =>
+      parseRawDiffTreeOutput(
+        Buffer.from(`:000000 100644 ${"0".repeat(40)} ${"1".repeat(40)} R100\0path\0`),
+      ),
+    ).toThrow("Unexpected diff-tree entry");
+  });
+
+  it("reads file blob changes through the Git CLI with isomorphic-git parity", async () => {
     const repoPath = await makeTempRepo();
     const first = await addCommit(repoPath, "file.txt", "one\n", "first");
     const second = await addCommit(repoPath, "file.txt", "one\ntwo\n", "second");
 
-    const cliAdapter = createAdapter();
+    await using cliAdapter = createAdapter();
     const isomorphicAdapter = new IsomorphicGitAdapter({
       fs: nodeFs,
       instrumentation: noopInstrumentation,
@@ -163,6 +243,132 @@ describe("GitCliAdapter", () => {
       isomorphicChanges.push(change);
     }
     expect(cliChanges).toEqual(isomorphicChanges);
+  });
+
+  it("reads root additions and later additions and deletions without rename inference", async () => {
+    const repoPath = await makeTempRepo();
+    const root = await addCommit(repoPath, "a.txt", "a\n", "root");
+    const added = await addCommit(repoPath, "b.txt", "b\n", "add b");
+    await rm(join(repoPath, "a.txt"));
+    await git.remove({ fs: nodeFs, dir: repoPath, filepath: "a.txt" });
+    const deleted = (await git.commit({
+      fs: nodeFs,
+      dir: repoPath,
+      message: "delete a",
+      author: AUTHOR,
+    })) as CommitOid;
+    await using adapter = createAdapter();
+
+    const rootChanges = await collectFileBlobChanges(adapter, repoPath, root);
+    const addedChanges = await collectFileBlobChanges(adapter, repoPath, added, root);
+    const deletedChanges = await collectFileBlobChanges(adapter, repoPath, deleted, added);
+
+    expect(rootChanges).toEqual([
+      expect.objectContaining({
+        status: "added",
+        before: null,
+        after: expect.objectContaining({ path: "a.txt", content: new TextEncoder().encode("a\n") }),
+      }),
+    ]);
+    expect(addedChanges).toEqual([
+      expect.objectContaining({
+        status: "added",
+        before: null,
+        after: expect.objectContaining({ path: "b.txt", content: new TextEncoder().encode("b\n") }),
+      }),
+    ]);
+    expect(deletedChanges).toEqual([
+      expect.objectContaining({
+        status: "deleted",
+        before: expect.objectContaining({
+          path: "a.txt",
+          content: new TextEncoder().encode("a\n"),
+        }),
+        after: null,
+      }),
+    ]);
+  });
+
+  it("reports an exact-content rename as independent deleted and added blob facts", async () => {
+    const repoPath = await makeTempRepo();
+    const root = await addCommit(repoPath, "before.txt", "same\n", "root");
+    await rename(join(repoPath, "before.txt"), join(repoPath, "after.txt"));
+    await git.remove({ fs: nodeFs, dir: repoPath, filepath: "before.txt" });
+    await git.add({ fs: nodeFs, dir: repoPath, filepath: "after.txt" });
+    const renamed = (await git.commit({
+      fs: nodeFs,
+      dir: repoPath,
+      message: "rename",
+      author: AUTHOR,
+    })) as CommitOid;
+    await using adapter = createAdapter();
+
+    const changes = await collectFileBlobChanges(adapter, repoPath, renamed, root);
+
+    expect(
+      changes.map((change) => ({
+        status: change.status,
+        path: change.before?.path ?? change.after?.path,
+        oid: change.before?.oid ?? change.after?.oid,
+      })),
+    ).toEqual(
+      expect.arrayContaining([
+        { status: "deleted", path: "before.txt", oid: expect.any(String) },
+        { status: "added", path: "after.txt", oid: expect.any(String) },
+      ]),
+    );
+    expect(changes).toHaveLength(2);
+    expect(changes[0]?.before?.oid ?? changes[0]?.after?.oid).toBe(
+      changes[1]?.before?.oid ?? changes[1]?.after?.oid,
+    );
+  });
+
+  it("reuses one file-blob cat-file batch session per repository until disposal", async () => {
+    const repoPath = await makeTempRepo();
+    const root = await addCommit(repoPath, "file.txt", "one\n", "root");
+    const second = await addCommit(repoPath, "file.txt", "one\ntwo\n", "second");
+    let time = 0;
+    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+
+    async function exerciseAdapter() {
+      await using adapter = new GitCliAdapter({ instrumentation });
+      await collectFileBlobChanges(adapter, repoPath, root);
+      await collectFileBlobChanges(adapter, repoPath, second, root);
+    }
+    await exerciseAdapter();
+
+    const sessions = instrumentation
+      .records()
+      .filter((record) => record.name === "git.cli.file_blob_batch");
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.counters).toEqual({ blob_bytes: 16, objects_read: 3 });
+  });
+
+  it("materializes CLI blob contents one change at a time as the consumer advances", async () => {
+    const repoPath = await makeTempRepo();
+    await writeFile(join(repoPath, "a.txt"), "a\n");
+    await writeFile(join(repoPath, "b.txt"), "b\n");
+    await git.add({ fs: nodeFs, dir: repoPath, filepath: "a.txt" });
+    await git.add({ fs: nodeFs, dir: repoPath, filepath: "b.txt" });
+    const root = (await git.commit({
+      fs: nodeFs,
+      dir: repoPath,
+      message: "root",
+      author: AUTHOR,
+    })) as CommitOid;
+    let time = 0;
+    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+    await using adapter = new GitCliAdapter({ instrumentation });
+    const iterator = adapter.getFileBlobChanges(repoPath, root)[Symbol.asyncIterator]();
+    const blobReadCalls = () =>
+      instrumentation.summary().find((entry) => entry.name === "git.blob_read")?.calls ?? 0;
+
+    expect(blobReadCalls()).toBe(0);
+    expect((await iterator.next()).done).toBe(false);
+    expect(blobReadCalls()).toBe(1);
+    expect((await iterator.next()).done).toBe(false);
+    expect(blobReadCalls()).toBe(2);
+    expect((await iterator.next()).done).toBe(true);
   });
 
   it("finds merge bases and returns null for disconnected histories", async () => {

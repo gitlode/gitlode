@@ -151,7 +151,11 @@ async function resolveExtractionRange(
 }
 
 type BuildGitAdapterResult =
-  | { readonly kind: "success"; readonly adapter: GitAdapter; readonly gitVersion?: string }
+  | {
+      readonly kind: "success";
+      readonly adapter: GitAdapter;
+      readonly gitVersion?: string;
+    }
   | { readonly kind: "user-error"; readonly message: string };
 
 function resolveIsomorphicCommitTraversalStrategyFromEnvironment(
@@ -167,12 +171,6 @@ async function buildGitAdapter(
   instrumentation: Instrumentation,
   dependencies: RuntimeExecutionDependencies,
 ): Promise<BuildGitAdapterResult> {
-  const createDefaultIsomorphicAdapter = (): IsomorphicGitAdapter =>
-    new IsomorphicGitAdapter({
-      fs: nodeFs,
-      instrumentation,
-    });
-
   switch (input.gitAdapter) {
     case "isomorphic-git": {
       let commitTraversalStrategy;
@@ -198,7 +196,6 @@ async function buildGitAdapter(
     case "git-cli": {
       const adapter = new GitCliAdapter({
         instrumentation,
-        fileBlobChangeAdapter: createDefaultIsomorphicAdapter(),
       });
       try {
         const gitVersion = await adapter.validateGitExecutable();
@@ -347,7 +344,7 @@ export async function executeWorkerRunRequest(
     if (gitAdapterResult.gitVersion !== undefined) {
       runSpan.setAttribute("git.cli.version", gitAdapterResult.gitVersion);
     }
-    const gitAdapter = gitAdapterResult.adapter;
+    await using gitAdapter = gitAdapterResult.adapter;
 
     await instrumentation.runAsync(
       "gitlode.validate_repository_access",
@@ -462,6 +459,10 @@ export async function executeWorkerRunRequest(
       span.incrementCounter("skipped_diffs", coordinatorResult.skippedDiffs);
       return coordinatorResult;
     });
+
+    // End run-scoped Git processes before taking the profiling snapshot. The
+    // await-using declaration still guarantees cleanup on every earlier exit.
+    await gitAdapter[Symbol.asyncDispose]();
 
     runSpan.incrementCounter("records", result.recordsWritten);
     runSpan.incrementCounter("commits", result.commitsTraversed);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [0e54d85]
+  - gitlode@0.12.0
+
 ## 0.6.0
 
 ### Patch Changes

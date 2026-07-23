@@ -1,35 +1,23 @@
-# Git CLI Adapter Handoff
+# Git CLI Tree-Object Follow-up Handoff
 
-## Status
+## Purpose
 
-The Git CLI adapter work planned in this handoff has completed through Phase 4. Stable behavior and
-implementation contracts have been migrated to durable documentation:
+This temporary handoff contains only continuation context for the unimplemented tree-object and
+`cat-file --batch` process-management follow-up. Current behavior and implemented contracts are
+defined in the durable documentation:
 
-- adapter selection and implementation boundaries: [`../design/git-adapters.md`](../design/git-adapters.md);
-- user-facing config and workflows: [`../usage.md`](../usage.md);
-- config schema and precedence: [`../design/configuration.md`](../design/configuration.md);
-- profiling diagnostics: [`../profiling.md`](../profiling.md).
+- [`../design/git-adapters.md`](../design/git-adapters.md)
+- [`../design/architecture.md`](../design/architecture.md)
+- [`../design/schema.md`](../design/schema.md)
+- [`../profiling.md`](../profiling.md)
 
-This file now remains only as continuation context for possible follow-up work. New design discussion
-should happen in chat/review first, then be summarized here only if it remains unresolved.
+Update the affected durable documents during the follow-up. Delete this handoff after that work is
+complete; do not retain it as implementation history.
 
-## Completed decisions
+## Goal
 
-- `runtime.gitAdapter` is config-only; there is no CLI flag.
-- Supported values are `"isomorphic-git"` and `"git-cli"`; default is `"isomorphic-git"`.
-- `git-cli` validates the Git executable with `git --version` before traversal.
-- `git-cli` is a hybrid adapter: Git CLI handles traversal-oriented operations, while file-change
-  expansion delegates to the existing isomorphic-git path.
-- Adapter correctness is set-based. Commit/file-change output ordering is not required to match
-  across adapters.
-- Profiling records `git.adapter` for all runs and `git.cli.version` when the Git CLI adapter is
-  selected.
-
-## Planned tree-object and `cat-file --batch` process-management follow-up
-
-This is a separate future task, not part of the current file-blob implementation. The design
-direction has already been discussed sufficiently that a future session should start from the
-guidance below rather than reopening the high-level process-sharing question.
+Replace per-commit CLI change discovery with persistent commit/tree object reads and structural tree
+comparison while preserving the repository-fact boundary defined in the durable adapter design.
 
 ### Motivation
 
@@ -121,10 +109,3 @@ The future implementation must preserve:
 
 Physical process sharing may be reconsidered only if later profiling shows a material benefit and
 the request scheduling, response routing, and cancellation contracts are designed explicitly.
-
-## Other follow-up candidates
-
-- Add benchmark fixtures or scripts for large `v9..v10` style ranges if repeatable performance
-  comparisons become part of routine development.
-- Revisit adapter interface decomposition only if future adapters make the current `GitAdapter`
-  boundary awkward.

@@ -553,10 +553,10 @@ gitlode -r main --config ./gitlode.config.json ./my-repo
 | `config`        |          | Passed to the plugin factory. Any JSON value.                                             |
 | `failurePolicy` |          | `"skip-fact"` (default) or `"fatal"`. Controls behavior when the plugin errors on a fact. |
 
-`runtime.gitAdapter` defaults to `"isomorphic-git"`. Use `"git-cli"` to delegate
-traversal-oriented operations to the Git executable while retaining the existing isomorphic-git
-file-change expansion path. The `git-cli` adapter requires `git` to be available on `PATH`; gitlode
-validates this with `git --version` before traversal.
+`runtime.gitAdapter` defaults to `"isomorphic-git"`. Use `"git-cli"` to read commit traversal and
+file-blob facts through the Git executable. File-size skipping, binary detection, and line-diff
+statistics use the same Core policy for both adapters. The `git-cli` adapter requires `git` to be
+available on `PATH`; gitlode validates this with `git --version` before traversal.
 
 For complete schema and precedence details, see [Configuration File Design](design/configuration.md).
 

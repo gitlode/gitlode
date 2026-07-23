@@ -19,6 +19,7 @@ const AUTHOR = {
 
 let exitSpy: MockInstance;
 let stderrSpy: MockInstance;
+let stdoutSpy: MockInstance;
 const originalArgv = process.argv.slice();
 
 function setArgv(...args: string[]) {
@@ -44,6 +45,7 @@ async function expectUserErrorTermination(
   });
   expect(exitSpy).not.toHaveBeenCalled();
   expect(stderrSpy).not.toHaveBeenCalled();
+  expect(stdoutSpy).not.toHaveBeenCalled();
 }
 
 async function expectSuccessTermination(
@@ -58,6 +60,7 @@ beforeEach(() => {
   exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new Error(`process.exit(${code})`);
   });
+  stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 });
 
@@ -767,6 +770,16 @@ describe("parseArgs – unknown option rejection", () => {
 
   it("returns success termination for --help", async () => {
     setArgv("--help");
+    await expectSuccessTermination(loadBootstrapInput());
+  });
+
+  it("returns success termination for --version", async () => {
+    setArgv("--version");
+    await expectSuccessTermination(loadBootstrapInput());
+  });
+
+  it("returns success termination for -v", async () => {
+    setArgv("-v");
     await expectSuccessTermination(loadBootstrapInput());
   });
 });

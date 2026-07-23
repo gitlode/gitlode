@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { Argument, Command, CommanderError, Option } from "commander";
 import { z } from "zod";
 
+import packageJson from "../../package.json" with { type: "json" };
 import { loadConfigFile } from "../config/index.js";
 import type {
   ConfigExtensionsSection,
@@ -136,6 +137,7 @@ export const program = new Command()
       // forwarding the raw Commander output from here.
     },
   })
+  .version(packageJson.version, "-v, --version", "output the current version")
   .addArgument(new Argument("<repository-path>", "Local path to the Git repository"))
   .addHelpOption(new Option("-h, --help", "display help for command").hideHelp())
   .addOption(
@@ -292,6 +294,7 @@ async function parseCliOptions(): Promise<BootstrapResult<ParsedCliOptions>> {
       program.parse(process.argv);
     } catch (err) {
       if (err instanceof CommanderError) {
+        if (err.code === "commander.version") successTermination();
         if (err.code === "commander.helpDisplayed") successTermination();
         if (err.code === "commander.unknownOption") {
           // err.message format: "error: unknown option '--foo'"

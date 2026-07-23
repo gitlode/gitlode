@@ -21,5 +21,9 @@ design decision becomes durable, migrate the stable content to the appropriate c
 - profiling diagnostics behavior: [`../profiling.md`](../profiling.md);
 - implementation contracts and rationale: [`../design/`](../design/).
 
-After migration, remove or shorten obsolete handoff details so future readers do not confuse
-planning context with current design.
+After migration:
+
+- delete the handoff document when no unfinished work remains; do not retain it as implementation
+  history;
+- when unfinished work remains, remove completed sections and keep only the context needed to
+  continue that work.

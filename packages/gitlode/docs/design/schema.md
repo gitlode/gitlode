@@ -256,7 +256,7 @@ Relative path from the repository root. Uses `/` as the separator regardless of 
 ### `file.status`
 
 - `"added"`: file exists in this commit but not in the parent
-- `"modified"`: file exists in both commits with different content
+- `"modified"`: file exists in both commits with different content or a different file mode
 - `"deleted"`: file exists in the parent but not in this commit
 
 Rename detection is not performed. A renamed file appears as a `"deleted"` entry for the old path and an `"added"` entry for the new path.
@@ -265,10 +265,11 @@ Rename detection is not performed. A renamed file appears as a `"deleted"` entry
 
 Line-level diff statistics. `null` when the file is binary (contains NUL bytes in the first 8000 bytes).
 
-Diff computation is delegated to an internal `DiffAdapter` strategy inside `IsomorphicGitAdapter`.
-The default implementation uses the `diff` package's `diffLines` function with UTF-8 decoding,
-producing behavior identical to previous versions. Binary detection and the `null` result for
-binary files are owned by `IsomorphicGitAdapter` and do not involve the `DiffAdapter` strategy.
+Git adapters return the before/after blob facts; `DefaultFileChangeExpander` owns the derived output
+policy. It applies the configured maximum-size guard, detects binary content using the first 8,000
+bytes, and delegates eligible text content to a `DiffAdapter`. The default `JsDiffAdapter` uses the
+`diff` package's `diffLines` function with UTF-8 decoding. Size-skipped and binary changes both emit
+`null` additions/deletions without invoking the diff strategy.
 
 For `"added"` files: `deletions` is `0`, `additions` is the total line count.
 For `"deleted"` files: `additions` is `0`, `deletions` is the total line count.

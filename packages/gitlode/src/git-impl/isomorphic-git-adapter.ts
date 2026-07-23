@@ -5,8 +5,9 @@ import { type DagSuccessor, type DagTopologyPort } from "../dag/index.js";
 import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
-  type DiffAdapter,
-  type FileChange,
+  type FileBlobChange,
+  type FileBlobMode,
+  type FileBlobSnapshot,
   type GitAdapter,
   type RawCommit,
   type RepositoryObjectFormat,
@@ -16,7 +17,7 @@ import {
   type Instrumentation,
   type InstrumentationSpan,
 } from "../instrumentation/index.js";
-import type { RefType, CommitOid, OidProfile } from "../model/index.js";
+import type { BlobOid, RefType, CommitOid, OidProfile } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import {
   DEFAULT_COMMIT_TRAVERSAL_STRATEGY,
@@ -27,20 +28,17 @@ import {
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
-  readonly diffAdapter: DiffAdapter;
   readonly instrumentation: Instrumentation;
   readonly commitTraversalStrategy?: CommitTraversalStrategy;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
-  private readonly _diffAdapter: DiffAdapter;
   private readonly _instrumentation: Instrumentation;
   private readonly _commitTraversalStrategy: CommitTraversalStrategy;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
-    this._diffAdapter = dependencies.diffAdapter;
     this._instrumentation = dependencies.instrumentation;
     this._commitTraversalStrategy =
       dependencies.commitTraversalStrategy ??
@@ -49,6 +47,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
   supportedObjectFormats(): readonly OidProfile[] {
     return ["sha1"];
+  }
+
+  [Symbol.asyncDispose](): Promise<void> {
+    return Promise.resolve();
   }
 
   async resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
@@ -245,166 +247,177 @@ export class IsomorphicGitAdapter implements GitAdapter {
     }
   }
 
-  async getFileChanges(
+  async *getFileBlobChanges(
     repoPath: string,
     commitOid: CommitOid,
     parentOid?: CommitOid,
-  ): Promise<readonly FileChange[]> {
-    return await this._instrumentation.runAsync("git.file_changes", async () => {
-      const changes: FileChange[] = [];
-
-      if (parentOid !== undefined) {
-        await git.walk({
-          fs: this._fs,
-          dir: repoPath,
-          trees: [git.TREE({ ref: parentOid }), git.TREE({ ref: commitOid })],
-          map: async (filepath, entries) => {
-            if (filepath === ".") return;
-
-            const A = await classifyWalkerEntry(entries[0]);
-            const B = await classifyWalkerEntry(entries[1]);
-
-            // Skip submodules
-            if (A.type === "commit" || B.type === "commit") return;
-
-            // Both trees → walk() descends naturally; skip this entry from output
-            if (A.type === "tree" && B.type === "tree") return;
-
-            // Both blobs
-            if (A.type === "blob" && B.type === "blob") {
-              const [oidA, oidB] = await Promise.all([A.entry.oid(), B.entry.oid()]);
-              if (oidA === oidB) return; // unchanged
-              const [contentA, contentB] = await this._instrumentation.runAsync(
-                "git.blob_read",
-                async () => Promise.all([A.entry.content(), B.entry.content()]),
-              );
-              const change = await this._instrumentation.runAsync("git.diff", async () =>
-                this._buildFileChange(
-                  filepath,
-                  "modified",
-                  contentA ?? new Uint8Array(0),
-                  contentB ?? new Uint8Array(0),
-                ),
-              );
-              changes.push(change);
-              return;
-            }
-
-            // Added (no parent blob at this path)
-            if (B.type === "blob") {
-              const contentB = await this._instrumentation.runAsync("git.blob_read", async () =>
-                B.entry.content(),
-              );
-              const change = await this._instrumentation.runAsync("git.diff", async () =>
-                this._buildFileChange(
-                  filepath,
-                  "added",
-                  new Uint8Array(0),
-                  contentB ?? new Uint8Array(0),
-                ),
-              );
-              changes.push(change);
-              return;
-            }
-
-            // Deleted (no child blob at this path)
-            if (A.type === "blob") {
-              const contentA = await this._instrumentation.runAsync("git.blob_read", async () =>
-                A.entry.content(),
-              );
-              const change = await this._instrumentation.runAsync("git.diff", async () =>
-                this._buildFileChange(
-                  filepath,
-                  "deleted",
-                  contentA ?? new Uint8Array(0),
-                  new Uint8Array(0),
-                ),
-              );
-              changes.push(change);
-            }
-          },
-        });
-      } else {
-        // Root commit: single-tree walk; every blob is "added"
-        await git.walk({
-          fs: this._fs,
-          dir: repoPath,
-          trees: [git.TREE({ ref: commitOid })],
-          map: async (filepath, entries) => {
-            if (filepath === ".") return;
-
-            const A = await classifyWalkerEntry(entries[0]);
-            if (A.type === null || A.type === undefined) return;
-
-            if (A.type !== "blob") return;
-
-            const contentA = await this._instrumentation.runAsync("git.blob_read", async () =>
-              A.entry.content(),
-            );
-            const change = await this._instrumentation.runAsync("git.diff", async () =>
-              this._buildFileChange(
-                filepath,
-                "added",
-                new Uint8Array(0),
-                contentA ?? new Uint8Array(0),
-              ),
-            );
-            changes.push(change);
-          },
-        });
-      }
-
-      return changes;
-    });
+  ): AsyncIterable<FileBlobChange> {
+    yield* instrumentAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
+      this._getFileBlobChanges(repoPath, commitOid, parentOid, span),
+    );
   }
 
-  private async _buildFileChange(
-    path: string,
-    status: "added" | "modified" | "deleted",
-    contentA: Uint8Array,
-    contentB: Uint8Array,
-  ): Promise<FileChange> {
-    const beforeSize = contentA.length;
-    const afterSize = contentB.length;
-    if (this._isBinary(contentA) || this._isBinary(contentB)) {
-      return {
-        path,
-        status,
-        beforeSize,
-        afterSize,
-        additions: null,
-        deletions: null,
-      };
+  private async *_getFileBlobChanges(
+    repoPath: string,
+    commitOid: CommitOid,
+    parentOid: CommitOid | undefined,
+    span: InstrumentationSpan,
+  ): AsyncIterable<FileBlobChange> {
+    const descriptors: FileBlobChangeDescriptor[] = [];
+
+    if (parentOid !== undefined) {
+      await git.walk({
+        fs: this._fs,
+        dir: repoPath,
+        trees: [git.TREE({ ref: parentOid }), git.TREE({ ref: commitOid })],
+        map: async (filepath, entries) => {
+          if (filepath === ".") return;
+
+          const A = await classifyWalkerEntry(entries[0]);
+          const B = await classifyWalkerEntry(entries[1]);
+
+          // Both trees → walk() descends naturally; skip this entry from output
+          if (A.type === "tree" && B.type === "tree") return;
+
+          // Both blobs
+          if (A.type === "blob" && B.type === "blob") {
+            const [oidA, oidB] = await Promise.all([A.entry.oid(), B.entry.oid()]);
+            const [before, after] = await Promise.all([
+              describeFileBlobSnapshot(filepath, A.entry, oidA),
+              describeFileBlobSnapshot(filepath, B.entry, oidB),
+            ]);
+            if (before.oid === after.oid && before.mode === after.mode) return;
+            descriptors.push({ status: "modified", before, after });
+            return;
+          }
+
+          // Added (no parent blob at this path)
+          if (B.type === "blob") {
+            const after = await describeFileBlobSnapshot(filepath, B.entry);
+            descriptors.push({ status: "added", before: null, after });
+            return;
+          }
+
+          // Deleted (no child blob at this path)
+          if (A.type === "blob") {
+            const before = await describeFileBlobSnapshot(filepath, A.entry);
+            descriptors.push({ status: "deleted", before, after: null });
+          }
+        },
+      });
+    } else {
+      // Root commit: single-tree walk; every blob is "added"
+      await git.walk({
+        fs: this._fs,
+        dir: repoPath,
+        trees: [git.TREE({ ref: commitOid })],
+        map: async (filepath, entries) => {
+          if (filepath === ".") return;
+
+          const A = await classifyWalkerEntry(entries[0]);
+          if (A.type === null || A.type === undefined) return;
+
+          if (A.type !== "blob") return;
+
+          const after = await describeFileBlobSnapshot(filepath, A.entry);
+          descriptors.push({ status: "added", before: null, after });
+        },
+      });
     }
 
-    const { additions, deletions } = this._diffAdapter.computeLineDiff(contentA, contentB);
-
-    if (
-      !Number.isFinite(additions) ||
-      !Number.isInteger(additions) ||
-      additions < 0 ||
-      !Number.isFinite(deletions) ||
-      !Number.isInteger(deletions) ||
-      deletions < 0
-    ) {
-      throw new GitAdapterError(
-        `DiffAdapter returned invalid values: additions=${String(
-          additions,
-        )}, deletions=${String(deletions)}`,
-        "UNKNOWN",
+    // The walk buffers only lightweight descriptors. Blob contents are read one
+    // change at a time so materialization follows the consumer's pace.
+    for (const descriptor of descriptors) {
+      const change = await materializeFileBlobChange(descriptor, this._instrumentation);
+      span.incrementCounter("yielded");
+      span.incrementCounter(change.status);
+      span.incrementCounter(
+        "blob_bytes",
+        (change.before?.content.length ?? 0) + (change.after?.content.length ?? 0),
       );
+      yield change;
     }
-
-    return { path, status, beforeSize, afterSize, additions, deletions };
   }
+}
 
-  private _isBinary(content: Uint8Array): boolean {
-    const limit = Math.min(content.length, 8000);
-    for (let i = 0; i < limit; i++) {
-      if (content[i] === 0) return true;
+interface FileBlobSnapshotDescriptor {
+  readonly path: string;
+  readonly oid: BlobOid;
+  readonly mode: FileBlobMode;
+  readonly entry: git.WalkerEntry;
+}
+
+type FileBlobChangeDescriptor =
+  | {
+      readonly status: "added";
+      readonly before: null;
+      readonly after: FileBlobSnapshotDescriptor;
     }
-    return false;
+  | {
+      readonly status: "modified";
+      readonly before: FileBlobSnapshotDescriptor;
+      readonly after: FileBlobSnapshotDescriptor;
+    }
+  | {
+      readonly status: "deleted";
+      readonly before: FileBlobSnapshotDescriptor;
+      readonly after: null;
+    };
+
+async function describeFileBlobSnapshot(
+  path: string,
+  entry: git.WalkerEntry,
+  knownOid?: string,
+): Promise<FileBlobSnapshotDescriptor> {
+  const [oid, mode] = await Promise.all([knownOid ?? entry.oid(), entry.mode()]);
+  return {
+    path,
+    oid: oid as BlobOid,
+    mode: normalizeFileBlobMode(mode),
+    entry,
+  };
+}
+
+async function materializeFileBlobChange(
+  descriptor: FileBlobChangeDescriptor,
+  instrumentation: Instrumentation,
+): Promise<FileBlobChange> {
+  switch (descriptor.status) {
+    case "added":
+      return {
+        status: "added",
+        before: null,
+        after: await materializeFileBlobSnapshot(descriptor.after, instrumentation),
+      };
+    case "modified": {
+      const [before, after] = await Promise.all([
+        materializeFileBlobSnapshot(descriptor.before, instrumentation),
+        materializeFileBlobSnapshot(descriptor.after, instrumentation),
+      ]);
+      return { status: "modified", before, after };
+    }
+    case "deleted":
+      return {
+        status: "deleted",
+        before: await materializeFileBlobSnapshot(descriptor.before, instrumentation),
+        after: null,
+      };
   }
+}
+
+async function materializeFileBlobSnapshot(
+  descriptor: FileBlobSnapshotDescriptor,
+  instrumentation: Instrumentation,
+): Promise<FileBlobSnapshot> {
+  const content = await instrumentation.runAsync("git.blob_read", async () =>
+    descriptor.entry.content(),
+  );
+  return {
+    path: descriptor.path,
+    oid: descriptor.oid,
+    mode: descriptor.mode,
+    content: content ?? new Uint8Array(0),
+  };
 }
 
 class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSchedulingHint> {
@@ -503,6 +516,14 @@ async function classifyWalkerEntry(
     type: await entry.type(),
     entry,
   };
+}
+
+function normalizeFileBlobMode(mode: number): FileBlobMode {
+  const normalized = mode.toString(8).padStart(6, "0");
+  if (normalized === "100644" || normalized === "100755" || normalized === "120000") {
+    return normalized;
+  }
+  throw new GitAdapterError(`Unexpected file blob mode: ${normalized}`, "UNKNOWN");
 }
 
 function toRawCommit(oid: CommitOid, commit: git.CommitObject): RawCommit {

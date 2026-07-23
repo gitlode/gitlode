@@ -1,4 +1,4 @@
-import type { CommitOid, OidProfile, PersonIdentity, RefType } from "../model/index.js";
+import type { BlobOid, CommitOid, OidProfile, PersonIdentity, RefType } from "../model/index.js";
 
 export type RepositoryObjectFormat = string;
 
@@ -22,31 +22,41 @@ export interface RawCommit {
   readonly parents: readonly CommitOid[];
 }
 
-export interface FileChange {
+export type FileBlobMode = "100644" | "100755" | "120000";
+
+export interface FileBlobSnapshot {
   readonly path: string;
-  readonly status: "added" | "modified" | "deleted";
-  /** Blob byte size before this change (0 for added files). */
-  readonly beforeSize: number;
-  /** Blob byte size after this change (0 for deleted files). */
-  readonly afterSize: number;
-  /** null for binary files */
-  readonly additions: number | null;
-  /** null for binary files */
-  readonly deletions: number | null;
+  readonly oid: BlobOid;
+  readonly mode: FileBlobMode;
+  readonly content: Uint8Array;
 }
 
+export type FileBlobChange =
+  | {
+      readonly status: "added";
+      readonly before: null;
+      readonly after: FileBlobSnapshot;
+    }
+  | {
+      readonly status: "modified";
+      readonly before: FileBlobSnapshot;
+      readonly after: FileBlobSnapshot;
+    }
+  | {
+      readonly status: "deleted";
+      readonly before: FileBlobSnapshot;
+      readonly after: null;
+    };
+
 /**
- * Internal strategy interface for computing line-level diff statistics from
- * raw byte content. Owned exclusively by IsomorphicGitAdapter.
- *
- * DiffAdapter is not part of the GitAdapter public contract and must not be
- * exported through src/git/index.ts or referenced by Core layer modules.
+ * Interface for computing line-level diff statistics from
+ * raw byte content.
  *
  * Contract invariants for any implementation:
  * - For identical byte inputs, computeLineDiff must return identical additions/deletions.
  * - additions and deletions must be finite non-negative integers.
- * - Binary detection and null-result responsibility belong to the caller
- *   (IsomorphicGitAdapter); computeLineDiff is only invoked for text content.
+ * - Binary detection and null-result responsibility belong to the caller;
+ *   computeLineDiff is only invoked for text content.
  */
 export interface DiffAdapter {
   computeLineDiff(
@@ -58,7 +68,8 @@ export interface DiffAdapter {
   };
 }
 
-export interface GitAdapter {
+/** Run-scoped repository access resource. Its construction owner disposes it after the run. */
+export interface GitAdapter extends AsyncDisposable {
   /** Object formats this adapter implementation can handle */
   supportedObjectFormats(): readonly OidProfile[];
 
@@ -81,11 +92,12 @@ export interface GitAdapter {
    *  Returns null if no common ancestor exists (detached histories). */
   findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null>;
 
-  /** Return per-file change information between a commit and its parent.
-   *  Pass parentOid for normal commits; omit for root commits (all files are "added"). */
-  getFileChanges(
+  /** Return changed file-backed blobs between a commit and its parent.
+   *  Pass parentOid for normal commits; omit for root commits (all blobs are "added").
+   *  The iteration order of file changes is unspecified. */
+  getFileBlobChanges(
     repoPath: string,
     commitOid: CommitOid,
     parentOid?: CommitOid,
-  ): Promise<readonly FileChange[]>;
+  ): AsyncIterable<FileBlobChange>;
 }

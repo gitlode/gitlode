@@ -23,7 +23,7 @@ Git adapter selection is config-only:
 Supported values:
 
 - `isomorphic-git` — default.
-- `git-cli` — hybrid adapter backed by the Git executable for traversal-oriented operations.
+- `git-cli` — adapter backed by the Git executable for repository access and object reads.
 
 There is intentionally no CLI flag for adapter selection. The effective adapter is
 `config runtime.gitAdapter OR "isomorphic-git"`.
@@ -38,14 +38,23 @@ All adapter implementations must preserve these behavior-level contracts:
 - `resolveRef()` resolves branches, tags, and raw commit OIDs to commit OIDs.
 - `classifyRefType()` returns the runtime ref category used by traversal planning and state handling.
 - `walkCommits(repoPath, start, exclude)` yields the set `reachable(start) - reachable(exclude)`.
-- `getFileChanges()` returns the file-change facts needed by file-granularity extraction.
+- `getFileBlobChanges()` yields added/modified/deleted file-backed blob facts, including path, object
+  ID, Git file mode, and byte content for each present side. Its iteration order is unspecified.
 - `findMergeBase()` returns a lowest common ancestor or `null` when no common ancestor exists.
 - Backend-specific failures are translated to `GitAdapterError` where callers depend on adapter-domain
   error codes.
+- `GitAdapter` is a run-scoped `AsyncDisposable` resource. The runtime that constructs it owns
+  disposal; orchestration stages that receive it do not dispose it.
 
 Adapter-invariant correctness is based on result sets, not traversal order. Two adapters may yield
 commits or file changes in different orders as long as the final commit set or file-change set is the
 same for the same repository snapshot and extraction request.
+
+`GitAdapter` does not compute line-diff statistics, classify binary content, enforce
+`--max-diff-size`, or infer renames. `DefaultFileChangeExpander` composes a `GitAdapter` with a
+`DiffAdapter`, applies the size guard before binary detection, applies the 8,000-byte NUL heuristic,
+and invokes the diff strategy only for eligible text content. Keeping these derived decisions above
+repository access gives both Git backends one file-level output policy.
 
 ## `isomorphic-git` adapter
 
@@ -59,7 +68,7 @@ default strategy is the certified-lazy walker documented in `commit-traversal-in
 strategy can avoid reading older excluded ancestors in certified cases, but it falls back to full
 reachable-set subtraction when its conservative certificate does not hold.
 
-## `git-cli` hybrid adapter
+## `git-cli` adapter
 
 The `git-cli` adapter is selected with `runtime.gitAdapter: "git-cli"`. It requires the `git`
 executable to be available on `PATH`.
@@ -76,7 +85,7 @@ during traversal.
 
 ### CLI-backed operations
 
-The hybrid adapter uses Git CLI commands for traversal-oriented repository operations:
+The adapter uses Git CLI commands for repository and object operations:
 
 | Adapter operation             | Git CLI mechanism                                                  |
 | ----------------------------- | ------------------------------------------------------------------ |
@@ -87,21 +96,31 @@ The hybrid adapter uses Git CLI commands for traversal-oriented repository opera
 | Commit range traversal        | `git -C <repo> rev-list --topo-order <start> --not <exclude>`      |
 | Commit metadata batch reading | `git -C <repo> cat-file --batch` fed by streamed `rev-list` stdout |
 | Merge base lookup             | `git -C <repo> merge-base <oid...>`                                |
+| File-blob change discovery    | `git -C <repo> diff-tree --raw --no-abbrev -r -z --no-renames ...` |
+| File-blob content reading     | Repository-scoped persistent `git -C <repo> cat-file --batch`      |
 
 All commands are invoked with argv arrays rather than shell-interpolated command strings.
 
-### Hybrid file-change boundary
+### File-blob acquisition
 
-The first `git-cli` implementation is deliberately hybrid. It delegates `getFileChanges()` to the
-existing isomorphic-git file-change implementation. This preserves current binary detection,
-line-diff behavior, byte-size handling, and root/merge commit behavior while allowing `git-cli` to
-solve the traversal bottleneck that motivated the second adapter.
+`diff-tree` output is parsed as NUL-delimited raw A/M/D/T entries with rename detection disabled.
+Regular files (`100644`), executable files (`100755`), and symbolic links (`120000`) are
+file-backed blobs. Gitlinks/submodules (`160000`) are not blobs; transitions between a blob and a
+gitlink become an added or deleted blob fact as appropriate. A mode-only change remains a modified
+blob fact even when both sides have the same blob OID.
 
-This means `runtime.gitAdapter: "git-cli"` does not imply every Git operation is CLI-backed. The
-stable boundary is:
+Change discovery buffers only path/OID/mode descriptors. Blob content is then materialized one
+change at a time as the `AsyncIterable` consumer advances. Modified changes require both sides, but
+later changes are not read eagerly.
 
-- CLI-backed: ref/object-format/remote/traversal/commit-metadata/merge-base operations.
-- isomorphic-git-backed: file-change expansion.
+The adapter owns one reusable file-blob `cat-file --batch` session per repository path. Requests are
+serialized because batch responses are ordered and have no request IDs. The session remains alive
+for the adapter run and is closed through `GitAdapter` disposal. Commit traversal currently retains
+a separate walk-scoped batch process fed directly by `rev-list`; its bulk-streaming and cancellation
+model differs from the reusable random-object session.
+
+Both Git adapters stop at the same blob-fact boundary. `DefaultFileChangeExpander` performs binary,
+size, and line-diff processing independently of which adapter produced the blobs.
 
 ## Profiling and troubleshooting
 
@@ -117,7 +136,13 @@ Adapter-specific child spans are intentionally low-cardinality. Current `git-cli
 - `git.cli.get_remote_url`
 - `git.cli.rev_list`
 - `git.cli.cat_file_batch`
+- `git.cli.diff_tree`
+- `git.cli.file_blob_batch`
 - `git.cli.merge_base`
+
+Shared file-level spans include `git.file_blob_changes`, `git.blob_read`, `git.file_changes`, and
+`git.diff`. The long-lived batch spans measure process/session lifetime, not exclusive Git CPU time;
+use `git.blob_read` to inspect individual object-read work.
 
 When comparing adapters, focus on:
 
@@ -143,13 +168,15 @@ Useful scenarios:
 - `v9..v10` style release ranges where `reachable(v9)` is large and the delta is small.
 - Merge-heavy histories where the isomorphic-git certified-lazy walker falls back.
 - Commit-granularity extraction, which isolates traversal and commit metadata cost.
-- File-granularity extraction, which shows the hybrid boundary: traversal may improve, while file
-  expansion remains on the isomorphic-git path.
+- File-granularity extraction, comparing change discovery, blob reads, and shared diff cost as
+  separate profile rows.
 
 ## Current limitations and future work
 
-- File-change expansion remains isomorphic-git-backed. A full CLI file-change implementation can be
-  considered later if file-granularity performance becomes the next bottleneck.
+- The CLI file-change path currently starts one `diff-tree` process per commit. A planned follow-up
+  will investigate reading tree objects through persistent `cat-file --batch` transport and
+  comparing tree structure in TypeScript. Process-management and cancellation guidance is recorded
+  in [`../handoff/git-cli-adapter-plan.md`](../handoff/git-cli-adapter-plan.md).
 - Adapter selection is config-only. A CLI override remains out of scope unless future user workflows
   justify it.
 - gitlode still gates repository object formats through the supported object-format profile; this

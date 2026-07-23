@@ -154,6 +154,8 @@ Responsibilities:
 - Coordinate ref traversal through the adapter.
 - Apply differential behavior for `--state`, `--since-ref`, and `--since-date`.
 - Deduplicate commits across refs in one run.
+- Expand adapter-provided file-blob facts into file-change facts, applying size, binary, and
+  line-diff policy independently of the Git backend.
 - Map raw commit data to output schema objects.
 - Coordinate output writer lifecycle.
 - Produce v2 checkpoint state only after successful output completion and sink close.
@@ -164,11 +166,12 @@ Important behavior: for date filtering, Core skips old commits and continues tra
 
 Files:
 
-- `packages/gitlode/src/git/isomorphic-git-adapter.ts`
-- `packages/gitlode/src/git/diff-adapter.ts`
-- `packages/gitlode/src/git/errors.ts`
 - `packages/gitlode/src/git/types.ts`
+- `packages/gitlode/src/git/errors.ts`
 - `packages/gitlode/src/git/index.ts`
+- `packages/gitlode/src/git-impl/isomorphic-git-adapter.ts`
+- `packages/gitlode/src/git-impl/git-cli-adapter.ts`
+- `packages/gitlode/src/git-impl/js-diff-adapter.ts`
 
 Responsibilities:
 
@@ -179,20 +182,21 @@ Responsibilities:
 - Implement the commit DAG topology port used by the internal `src/dag` traversal subsystem.
 - Keep invocation-scoped commit object caching shared between topology reads and yielded-commit materialization.
 - Record adapter-level commit read/cache/yield telemetry and translate library/runtime failures into `GitAdapterError` codes.
-- Compute per-file line-level diff statistics via an internal `DiffAdapter` strategy.
+- Yield deterministic file-backed blob facts with path, OID, mode, and content; do not infer renames
+  or compute line-level diffs.
+- Act as a run-scoped `AsyncDisposable` resource whose construction owner closes backend resources.
 
 The default adapter uses isomorphic-git internally and keeps those details from leaking upward. Commit traversal uses the generic `src/dag` certified-lazy strategy as the production default, with a Git adapter-injected LIFO/preserve frontier. Git child timestamp scheduling hints and the timestamp-priority frontier experiment are owned by `packages/gitlode/src/git-impl/commit-traversal/`; phase-certified traversal remains an internal prototype, but `IsomorphicGitAdapter` can select it for internal experiments via `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. The
 config-only `runtime.gitAdapter` setting selects the Git implementation. The default value is
-`isomorphic-git`; `git-cli` uses the Git executable for traversal-oriented operations and delegates
-file-change expansion to the existing isomorphic-git implementation. Durable adapter-selection and
-implementation-boundary details live in `docs/design/git-adapters.md`.
+`isomorphic-git`; `git-cli` uses the Git executable for traversal and blob acquisition. Durable
+adapter-selection and implementation-boundary details live in `docs/design/git-adapters.md`.
 
-Line-diff computation is delegated to an internal `DiffAdapter` strategy interface defined in
-`diff-adapter.ts`. The default implementation (`JsDiffAdapter`) reproduces the original behavior
-using the `diff` package's `diffLines` function with UTF-8 decoding. Binary detection (NUL-byte
-heuristic on the first 8000 bytes) is owned by `IsomorphicGitAdapter` and bypasses `DiffAdapter`
-entirely — binary files always produce `additions: null` and `deletions: null`. The `DiffAdapter`
-interface is internal to the git adapter layer and is not exported through `src/git/index.ts`.
+Line-diff computation is delegated by `DefaultFileChangeExpander` to the `DiffAdapter` strategy
+interface. The default implementation (`JsDiffAdapter`) uses the `diff` package's `diffLines`
+function with UTF-8 decoding. Before invoking it, the expander applies `--max-diff-size` to both
+loaded contents, then applies the NUL-byte heuristic to the first 8,000 bytes. Either skip produces
+`additions: null` and `deletions: null`. This orchestration layer is the sole owner of derived
+file-change policy; Git adapters only provide repository facts.
 
 ### Output layer
 
@@ -326,8 +330,8 @@ while enabling profiling of adapter internals without mutable post-construction 
 is always present. The `--profile` flag controls stderr rendering of the aligned profile block and,
 via the current CLI wiring, enables the detailed stage profilers beneath the root entry.
 
-In commit-granularity mode (no `--per-file`), `elapsed/git/blob-read` and `elapsed/git/diff`
-remain at `0` because `getFileChanges()` is never called.
+In commit-granularity mode (no `--per-file`), file-expansion spans such as `git.blob_read` and
+`git.diff` are absent because `getFileBlobChanges()` is never called.
 
 `--quiet` suppresses the profile block together with the normal progress and summary output.
 

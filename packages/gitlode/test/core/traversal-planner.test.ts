@@ -31,6 +31,9 @@ function makeAdapter(options: {
   resolveRefError?: { ref: string; code: "REF_NOT_FOUND" };
 }): GitAdapter {
   return {
+    [Symbol.asyncDispose]() {
+      return Promise.resolve();
+    },
     supportedObjectFormats() {
       return ["sha1"];
     },
@@ -55,9 +58,7 @@ function makeAdapter(options: {
     async findMergeBase() {
       return options.mergeBase !== undefined ? options.mergeBase : null;
     },
-    async getFileChanges() {
-      return [];
-    },
+    async *getFileBlobChanges() {},
   };
 }
 

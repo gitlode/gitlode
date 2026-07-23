@@ -8,7 +8,6 @@ import {
   IsomorphicGitAdapter,
   projectCommitParentSuccessors,
 } from "../../src/git-impl/isomorphic-git-adapter.js";
-import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
 import { GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
@@ -25,7 +24,6 @@ function createAdapter(
 ): IsomorphicGitAdapter {
   return new IsomorphicGitAdapter({
     fs,
-    diffAdapter: overrides.diffAdapter ?? new JsDiffAdapter(),
     instrumentation: overrides.instrumentation ?? noopInstrumentation,
     commitTraversalStrategy: overrides.commitTraversalStrategy,
   });
@@ -722,193 +720,186 @@ function makeRepoExt() {
   return { ...base, removeCommit, addBinaryCommit };
 }
 
-describe("IsomorphicGitAdapter.getFileChanges – DiffAdapter substitution seam", () => {
-  it("uses injected adapter counts for text file changes", async () => {
+async function collectFileBlobChanges(
+  adapter: IsomorphicGitAdapter,
+  commitOid: string,
+  parentOid?: string,
+) {
+  const changes = [];
+  for await (const change of adapter.getFileBlobChanges(
+    "/",
+    commitOid as never,
+    parentOid as never,
+  )) {
+    changes.push(change);
+  }
+  return changes;
+}
+
+describe("IsomorphicGitAdapter.getFileBlobChanges", () => {
+  it("returns raw blob facts for a root commit", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
-    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
-    const sha2 = await addCommit("a.txt", "line1\nline3\nline4\n", "modify a.txt");
+    const root = await addCommit("a.txt", "line1\nline2\n", "root commit");
 
-    let callCount = 0;
-    const stubAdapter = {
-      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => {
-        callCount++;
-        return { additions: 99, deletions: 77 };
-      },
-    };
-
-    const adapter = createAdapter(fs, { diffAdapter: stubAdapter });
-    const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
+    const changes = await collectFileBlobChanges(createAdapter(fs), root);
 
     expect(changes).toHaveLength(1);
     expect(changes[0]).toMatchObject({
-      path: "a.txt",
-      status: "modified",
-      additions: 99,
-      deletions: 77,
-    });
-    expect(callCount).toBe(1);
-  });
-
-  it("does not invoke injected adapter when blob is binary", async () => {
-    const { fs, init, addBinaryCommit } = makeRepoExt();
-    await init();
-    const sha1 = await addBinaryCommit("binary.bin", "add binary file");
-
-    let callCount = 0;
-    const stubAdapter = {
-      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => {
-        callCount++;
-        return { additions: 1, deletions: 1 };
-      },
-    };
-
-    const adapter = createAdapter(fs, { diffAdapter: stubAdapter });
-    const changes = await adapter.getFileChanges("/", sha1 as never);
-
-    expect(callCount).toBe(0);
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({ additions: null, deletions: null });
-  });
-
-  it("throws when injected adapter returns negative additions", async () => {
-    const { fs, init, addCommit } = makeRepo();
-    await init();
-    const sha1 = await addCommit("a.txt", "line1\n", "root commit");
-
-    const badAdapter = {
-      computeLineDiff: (_before: Uint8Array, _after: Uint8Array) => ({
-        additions: -1,
-        deletions: 0,
-      }),
-    };
-
-    const adapter = createAdapter(fs, { diffAdapter: badAdapter });
-    const { GitAdapterError } = await import("../../src/git/index.js");
-    await expect(adapter.getFileChanges("/", sha1 as never)).rejects.toBeInstanceOf(
-      GitAdapterError,
-    );
-  });
-});
-
-describe("IsomorphicGitAdapter.getFileChanges", () => {
-  it("root commit: all files are 'added'", async () => {
-    const { fs, init, addCommit } = makeRepo();
-    await init();
-    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
-
-    const adapter = createAdapter(fs);
-    const changes = await adapter.getFileChanges("/", sha1 as never);
-
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({
-      path: "a.txt",
       status: "added",
-      additions: 2,
-      deletions: 0,
+      before: null,
+      after: {
+        path: "a.txt",
+        mode: "100644",
+        content: new TextEncoder().encode("line1\nline2\n"),
+      },
     });
+    expect(changes[0]?.after?.oid).toMatch(/^[0-9a-f]{40}$/);
   });
 
-  it("file added: correct addition count, deletions = 0", async () => {
-    const { fs, init, addCommit } = makeRepo();
-    await init();
-    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
-    const sha2 = await addCommit("b.txt", "new1\n", "add b.txt");
-
-    const adapter = createAdapter(fs);
-    const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
-
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({
-      path: "b.txt",
-      status: "added",
-      additions: 1,
-      deletions: 0,
-    });
-  });
-
-  it("file modified: correct addition and deletion counts", async () => {
-    const { fs, init, addCommit } = makeRepo();
-    await init();
-    const sha1 = await addCommit("a.txt", "line1\nline2\n", "root commit");
-    // Modify: remove line2, add line3 and line4
-    const sha2 = await addCommit("a.txt", "line1\nline3\nline4\n", "modify a.txt");
-
-    const adapter = createAdapter(fs);
-    const changes = await adapter.getFileChanges("/", sha2 as never, sha1 as never);
-
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({
-      path: "a.txt",
-      status: "modified",
-      additions: 2,
-      deletions: 1,
-    });
-  });
-
-  it("file deleted: additions = 0, correct deletion count", async () => {
+  it("returns added, modified, and deleted blob snapshots", async () => {
     const { fs, init, addCommit, removeCommit } = makeRepoExt();
     await init();
-    await addCommit("a.txt", "line1\nline2\n", "root commit");
-    const sha2 = await addCommit("b.txt", "x\n", "add b.txt");
-    const sha3 = await removeCommit("b.txt", "delete b.txt");
-
+    const root = await addCommit("a.txt", "one\n", "root");
+    const added = await addCommit("b.txt", "new\n", "add b");
+    const modified = await addCommit("a.txt", "two\n", "modify a");
+    const deleted = await removeCommit("b.txt", "delete b");
     const adapter = createAdapter(fs);
-    const changes = await adapter.getFileChanges("/", sha3 as never, sha2 as never);
 
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({
-      path: "b.txt",
-      status: "deleted",
-      additions: 0,
-      deletions: 1,
-    });
+    const addedChanges = await collectFileBlobChanges(adapter, added, root);
+    const modifiedChanges = await collectFileBlobChanges(adapter, modified, added);
+    const deletedChanges = await collectFileBlobChanges(adapter, deleted, modified);
+
+    expect(addedChanges).toEqual([
+      expect.objectContaining({
+        status: "added",
+        before: null,
+        after: expect.objectContaining({
+          path: "b.txt",
+          mode: "100644",
+          content: new TextEncoder().encode("new\n"),
+        }),
+      }),
+    ]);
+    expect(modifiedChanges).toEqual([
+      expect.objectContaining({
+        status: "modified",
+        before: expect.objectContaining({
+          path: "a.txt",
+          content: new TextEncoder().encode("one\n"),
+        }),
+        after: expect.objectContaining({
+          path: "a.txt",
+          content: new TextEncoder().encode("two\n"),
+        }),
+      }),
+    ]);
+    expect(deletedChanges).toEqual([
+      expect.objectContaining({
+        status: "deleted",
+        before: expect.objectContaining({
+          path: "b.txt",
+          content: new TextEncoder().encode("new\n"),
+        }),
+        after: null,
+      }),
+    ]);
   });
 
-  it("binary file: additions and deletions are null", async () => {
+  it("returns binary bytes without classifying or diffing them", async () => {
     const { fs, init, addBinaryCommit } = makeRepoExt();
     await init();
-    const sha1 = await addBinaryCommit("binary.bin", "add binary file");
+    const root = await addBinaryCommit("binary.bin", "add binary file");
 
-    const adapter = createAdapter(fs);
-    const changes = await adapter.getFileChanges("/", sha1 as never);
+    const changes = await collectFileBlobChanges(createAdapter(fs), root);
 
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({
-      path: "binary.bin",
-      status: "added",
-      additions: null,
-      deletions: null,
-    });
+    expect(changes[0]?.after?.content).toEqual(
+      new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x00, 0x57, 0x6f, 0x72, 0x6c, 0x64]),
+    );
   });
 
-  it("empty commit: returns empty array", async () => {
+  it("returns a modified blob fact when only the executable mode changes", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
-    const sha1 = await addCommit("a.txt", "line1\n", "root commit");
-
-    // Create a commit with same tree as sha1 (no file changes)
-    const { commit: parentCommit } = await git.readCommit({
+    const root = await addCommit("script.sh", "echo hello\n", "root");
+    fs.chmodSync("/script.sh", 0o755);
+    await git.add({ fs, dir: "/", filepath: "script.sh" });
+    const executable = await git.commit({
       fs,
       dir: "/",
-      oid: sha1,
+      message: "make executable",
+      author: AUTHOR,
     });
+
+    const changes = await collectFileBlobChanges(createAdapter(fs), executable, root);
+
+    expect(changes).toEqual([
+      expect.objectContaining({
+        status: "modified",
+        before: expect.objectContaining({
+          mode: "100644",
+          content: new TextEncoder().encode("echo hello\n"),
+        }),
+        after: expect.objectContaining({
+          mode: "100755",
+          content: new TextEncoder().encode("echo hello\n"),
+        }),
+      }),
+    ]);
+    expect(changes[0]?.before?.oid).toBe(changes[0]?.after?.oid);
+  });
+
+  it("returns no changes when the commit reuses its parent tree", async () => {
+    const { fs, init, addCommit } = makeRepo();
+    await init();
+    const root = await addCommit("a.txt", "line1\n", "root commit");
+    const { commit: parentCommit } = await git.readCommit({ fs, dir: "/", oid: root });
     const emptyCommit = await git.writeCommit({
       fs,
       dir: "/",
       commit: {
         tree: parentCommit.tree,
-        parent: [sha1],
+        parent: [root],
         message: "empty commit\n",
         author: { ...AUTHOR, timestamp: AUTHOR.timestamp + 1000 },
         committer: { ...AUTHOR, timestamp: AUTHOR.timestamp + 1000 },
       },
     });
 
-    const adapter = createAdapter(fs);
-    const changes = await adapter.getFileChanges("/", emptyCommit as never, sha1 as never);
+    const changes = await collectFileBlobChanges(createAdapter(fs), emptyCommit, root);
 
-    expect(changes).toHaveLength(0);
+    expect(changes).toEqual([]);
+  });
+
+  it("materializes blob contents one change at a time as the consumer advances", async () => {
+    const { fs, init } = makeRepo();
+    await init();
+    fs.writeFileSync("/a.txt", "a\n");
+    fs.writeFileSync("/b.txt", "b\n");
+    await git.add({ fs, dir: "/", filepath: "a.txt" });
+    await git.add({ fs, dir: "/", filepath: "b.txt" });
+    const root = await git.commit({
+      fs,
+      dir: "/",
+      message: "root",
+      author: AUTHOR,
+    });
+
+    const { LocalInstrumentationRecorder } = await import("../../src/instrumentation/index.js");
+    let time = 0;
+    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
+    const iterator = createAdapter(fs, { instrumentation })
+      .getFileBlobChanges("/", root as never)
+      [Symbol.asyncIterator]();
+    const blobReadCalls = () =>
+      instrumentation.summary().find((entry) => entry.name === "git.blob_read")?.calls ?? 0;
+
+    expect(blobReadCalls()).toBe(0);
+    expect((await iterator.next()).done).toBe(false);
+    expect(blobReadCalls()).toBe(1);
+    expect((await iterator.next()).done).toBe(false);
+    expect(blobReadCalls()).toBe(2);
+    expect((await iterator.next()).done).toBe(true);
   });
 });
 
@@ -987,7 +978,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
 });
 
 describe("IsomorphicGitAdapter instrumentation injection", () => {
-  it("adapter-level and file-change spans accumulate when instrumentation is passed to the constructor", async () => {
+  it("adapter-level and file-blob spans accumulate when instrumentation is passed to the constructor", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha1 = await addCommit("a.txt", "hello\nworld\n", "root commit");
@@ -1001,7 +992,7 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
 
     const adapter = createAdapter(fs, { instrumentation });
 
-    await adapter.getFileChanges("/", sha2 as never, sha1 as never);
+    await collectFileBlobChanges(adapter, sha2, sha1);
     // Also exercise resolve and merge-base paths so adapter-level buckets are populated.
     await adapter.resolveRef("/", "main");
     await adapter.findMergeBase("/", [sha2 as never, sha1 as never]);
@@ -1014,9 +1005,8 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
     const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
     const walkEntry = entries.find((e) => e.name === "git.walk_commits");
     const traversalEntry = entries.find((e) => e.name === "dag.traversal");
-    const fileChangesEntry = entries.find((e) => e.name === "git.file_changes");
+    const fileChangesEntry = entries.find((e) => e.name === "git.file_blob_changes");
     const blobEntry = entries.find((e) => e.name === "git.blob_read");
-    const diffEntry = entries.find((e) => e.name === "git.diff");
     expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
     expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
     expect(walkEntry?.totalMs).toBeGreaterThan(0);
@@ -1041,7 +1031,7 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
       }),
     );
     expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
+    expect(fileChangesEntry?.counters).toEqual({ blob_bytes: 27, modified: 1, yielded: 1 });
     expect(blobEntry?.totalMs).toBeGreaterThan(0);
-    expect(diffEntry?.totalMs).toBeGreaterThan(0);
   });
 });

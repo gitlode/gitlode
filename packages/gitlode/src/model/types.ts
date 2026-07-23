@@ -1,6 +1,7 @@
 import type { Brand } from "../type-utils/index.js";
 import type { REF_TYPES } from "./constants.js";
 export type CommitOid = Brand<string, "CommitOid">;
+export type BlobOid = Brand<string, "BlobOid">;
 
 export type OidProfile = "sha1" | "sha256";
 

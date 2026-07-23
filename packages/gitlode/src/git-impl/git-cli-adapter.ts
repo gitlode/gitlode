@@ -1,24 +1,41 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import type { Readable } from "node:stream";
+import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
   GitAdapterError,
-  type RawPerson,
-  type FileChange,
+  type FileBlobChange,
+  type FileBlobSnapshot,
   type GitAdapter,
   type RawCommit,
+  type RawPerson,
   type RepositoryObjectFormat,
 } from "../git/index.js";
-import type { Instrumentation, InstrumentationSpan } from "../instrumentation/index.js";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+  type InstrumentationSpan,
+} from "../instrumentation/index.js";
 import type { CommitOid, OidProfile, RefType } from "../model/index.js";
 import { isCommitOid } from "../model/index.js";
 import { captureGroupOrThrow } from "../support/index.js";
+import {
+  GitCatFileBatchSession,
+  parseBatchObjectStream,
+  processClosed,
+  type GitBatchObject,
+} from "./git-cli-cat-file-batch.js";
+import {
+  parseRawDiffTreeOutput,
+  type CliFileBlobChangeDescriptor,
+  type CliFileBlobSnapshotDescriptor,
+} from "./git-cli-raw-diff.js";
+
+export { parseBatchObjectStream } from "./git-cli-cat-file-batch.js";
+export { parseRawDiffTreeOutput } from "./git-cli-raw-diff.js";
 
 export interface GitCliAdapterDependencies {
   readonly instrumentation: Instrumentation;
-  readonly fileChangeAdapter: Pick<GitAdapter, "getFileChanges">;
   readonly gitExecutable?: string;
 }
 
@@ -28,22 +45,22 @@ interface GitCommandResult {
   readonly code: number;
 }
 
-interface BatchObject {
-  readonly oid: string;
-  readonly type: string;
-  readonly content: Buffer;
+interface GitCommandBufferResult {
+  readonly stdout: Buffer;
+  readonly stderr: Buffer;
+  readonly code: number;
 }
 
 const DEFAULT_GIT_EXECUTABLE = "git";
 
 export class GitCliAdapter implements GitAdapter {
   private readonly _instrumentation: Instrumentation;
-  private readonly _fileChangeAdapter: Pick<GitAdapter, "getFileChanges">;
   private readonly _gitExecutable: string;
+  private readonly _fileBlobBatchSessions = new Map<string, GitCatFileBatchSession>();
+  private _disposed = false;
 
   constructor(dependencies: GitCliAdapterDependencies) {
     this._instrumentation = dependencies.instrumentation;
-    this._fileChangeAdapter = dependencies.fileChangeAdapter;
     this._gitExecutable = dependencies.gitExecutable ?? DEFAULT_GIT_EXECUTABLE;
   }
 
@@ -200,12 +217,99 @@ export class GitCliAdapter implements GitAdapter {
     return line.length > 0 ? (line as CommitOid) : null;
   }
 
-  async getFileChanges(
+  async *getFileBlobChanges(
     repoPath: string,
     commitOid: CommitOid,
     parentOid?: CommitOid,
-  ): Promise<readonly FileChange[]> {
-    return await this._fileChangeAdapter.getFileChanges(repoPath, commitOid, parentOid);
+  ): AsyncIterable<FileBlobChange> {
+    this._throwIfDisposed();
+    yield* instrumentAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
+      this._materializeFileBlobChanges(repoPath, commitOid, parentOid, span),
+    );
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    if (this._disposed) return;
+    this._disposed = true;
+    const sessions = [...this._fileBlobBatchSessions.values()];
+    this._fileBlobBatchSessions.clear();
+    await Promise.all(sessions.map(async (session) => await session[Symbol.asyncDispose]()));
+  }
+
+  private async *_materializeFileBlobChanges(
+    repoPath: string,
+    commitOid: CommitOid,
+    parentOid: CommitOid | undefined,
+    span: InstrumentationSpan,
+  ): AsyncIterable<FileBlobChange> {
+    const descriptors = await this._readFileBlobChangeDescriptors(repoPath, commitOid, parentOid);
+    let session: GitCatFileBatchSession | undefined;
+
+    for (const descriptor of descriptors) {
+      session ??= this._fileBlobBatchSession(repoPath);
+      const change = await materializeCliFileBlobChange(descriptor, session, this._instrumentation);
+      span.incrementCounter("yielded");
+      span.incrementCounter(change.status);
+      span.incrementCounter(
+        "blob_bytes",
+        (change.before?.content.length ?? 0) + (change.after?.content.length ?? 0),
+      );
+      yield change;
+    }
+  }
+
+  private async _readFileBlobChangeDescriptors(
+    repoPath: string,
+    commitOid: CommitOid,
+    parentOid: CommitOid | undefined,
+  ): Promise<readonly CliFileBlobChangeDescriptor[]> {
+    const args = [
+      "diff-tree",
+      "--no-commit-id",
+      "--raw",
+      "--no-abbrev",
+      "-r",
+      "-z",
+      "--no-renames",
+    ];
+    if (parentOid === undefined) {
+      args.push("--root", commitOid);
+    } else {
+      args.push(parentOid, commitOid);
+    }
+
+    const result = await this._instrumentation.runAsync("git.cli.diff_tree", async () =>
+      this._runGitBuffer(repoPath, args),
+    );
+    if (result.code !== 0) {
+      const stderr = result.stderr.toString("utf8");
+      if (isNotRepositoryError(stderr)) {
+        throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
+      }
+      throw new GitAdapterError(
+        `Unexpected error reading file blob changes: ${formatBufferCommandFailure(result)}`,
+        "UNKNOWN",
+      );
+    }
+    return parseRawDiffTreeOutput(result.stdout);
+  }
+
+  private _fileBlobBatchSession(repoPath: string): GitCatFileBatchSession {
+    const existing = this._fileBlobBatchSessions.get(repoPath);
+    if (existing !== undefined) return existing;
+    const session = new GitCatFileBatchSession(
+      this._gitExecutable,
+      repoPath,
+      this._instrumentation,
+    );
+    this._fileBlobBatchSessions.set(repoPath, session);
+    return session;
+  }
+
+  private _throwIfDisposed(): void {
+    if (this._disposed) {
+      throw new GitAdapterError("Git CLI adapter has already been disposed", "UNKNOWN");
+    }
   }
 
   private async _runGit(
@@ -223,17 +327,54 @@ export class GitCliAdapter implements GitAdapter {
   private async _runGitRaw(args: readonly string[]): Promise<GitCommandResult> {
     return await runCommand(this._gitExecutable, args);
   }
+
+  private async _runGitBuffer(
+    repoPath: string,
+    args: readonly string[],
+  ): Promise<GitCommandBufferResult> {
+    return await runCommand(this._gitExecutable, ["-C", repoPath, ...args], {
+      encoding: "buffer",
+    });
+  }
 }
 
-type ProcessCloseResult =
-  | { readonly ok: true; readonly code: number }
-  | { readonly ok: false; readonly error: unknown };
+async function materializeCliFileBlobChange(
+  descriptor: CliFileBlobChangeDescriptor,
+  session: GitCatFileBatchSession,
+  instrumentation: Instrumentation,
+): Promise<FileBlobChange> {
+  switch (descriptor.status) {
+    case "added":
+      return {
+        status: "added",
+        before: null,
+        after: await materializeCliFileBlobSnapshot(descriptor.after, session, instrumentation),
+      };
+    case "modified": {
+      const [before, after] = await Promise.all([
+        materializeCliFileBlobSnapshot(descriptor.before, session, instrumentation),
+        materializeCliFileBlobSnapshot(descriptor.after, session, instrumentation),
+      ]);
+      return { status: "modified", before, after };
+    }
+    case "deleted":
+      return {
+        status: "deleted",
+        before: await materializeCliFileBlobSnapshot(descriptor.before, session, instrumentation),
+        after: null,
+      };
+  }
+}
 
-function processClosed(child: ChildProcess): Promise<ProcessCloseResult> {
-  return new Promise((resolve) => {
-    child.on("error", (error) => resolve({ ok: false, error }));
-    child.on("close", (code) => resolve({ ok: true, code: code ?? 1 }));
-  });
+async function materializeCliFileBlobSnapshot(
+  descriptor: CliFileBlobSnapshotDescriptor,
+  session: GitCatFileBatchSession,
+  instrumentation: Instrumentation,
+): Promise<FileBlobSnapshot> {
+  const content = await instrumentation.runAsync("git.blob_read", async () =>
+    session.readBlob(descriptor.oid),
+  );
+  return { ...descriptor, content };
 }
 
 async function* streamRevListBatchObjects(
@@ -242,7 +383,7 @@ async function* streamRevListBatchObjects(
   revListArgs: readonly string[],
   revListSpan: InstrumentationSpan,
   catFileSpan: InstrumentationSpan,
-): AsyncIterable<BatchObject> {
+): AsyncIterable<GitBatchObject> {
   const revList = spawn(command, ["-C", repoPath, ...revListArgs], {
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -339,60 +480,6 @@ async function* streamRevListBatchObjects(
   }
 }
 
-async function* parseBatchObjectStream(stream: Readable): AsyncIterable<BatchObject> {
-  let buffer = Buffer.alloc(0);
-  let expectedSize: number | undefined;
-  let currentOid = "";
-  let currentType = "";
-
-  for await (const chunk of stream) {
-    buffer = Buffer.concat([buffer, chunk as Buffer]);
-    while (true) {
-      if (expectedSize === undefined) {
-        const headerEnd = buffer.indexOf(0x0a);
-        if (headerEnd < 0) break;
-        const header = buffer.subarray(0, headerEnd).toString("utf8");
-        buffer = buffer.subarray(headerEnd + 1);
-        const missingMatch = /^([0-9a-f]+) missing$/.exec(header);
-        if (missingMatch) {
-          throw new GitAdapterError(
-            `Commit not found: ${captureGroupOrThrow(missingMatch, 1)}`,
-            "COMMIT_NOT_FOUND",
-          );
-        }
-        const match = /^([0-9a-f]+) (\S+) (\d+)$/.exec(header);
-        if (!match) {
-          throw new GitAdapterError(`Unexpected cat-file batch header: ${header}`, "UNKNOWN");
-        }
-        currentOid = captureGroupOrThrow(match, 1);
-        currentType = captureGroupOrThrow(match, 2);
-        expectedSize = Number(captureGroupOrThrow(match, 3));
-        if (!Number.isSafeInteger(expectedSize) || expectedSize < 0) {
-          throw new GitAdapterError(`Unexpected cat-file batch size for ${currentOid}`, "UNKNOWN");
-        }
-      }
-
-      if (buffer.length <= expectedSize) break;
-      if (buffer[expectedSize] !== 0x0a) {
-        throw new GitAdapterError(
-          `Unexpected cat-file batch delimiter for ${currentOid}`,
-          "UNKNOWN",
-        );
-      }
-      const content = buffer.subarray(0, expectedSize);
-      buffer = buffer.subarray(expectedSize + 1);
-      yield { oid: currentOid, type: currentType, content };
-      expectedSize = undefined;
-      currentOid = "";
-      currentType = "";
-    }
-  }
-
-  if (expectedSize !== undefined || buffer.length > 0) {
-    throw new GitAdapterError("Unexpected truncated cat-file batch output", "UNKNOWN");
-  }
-}
-
 function runCommand(
   command: string,
   args: readonly string[],
@@ -452,12 +539,17 @@ function formatCommandFailure(result: GitCommandResult): string {
   return stderr.length > 0 ? stderr : `exit code ${result.code}`;
 }
 
+function formatBufferCommandFailure(result: GitCommandBufferResult): string {
+  const stderr = result.stderr.toString("utf8").trim();
+  return stderr.length > 0 ? stderr : `exit code ${result.code}`;
+}
+
 function formatUnknownError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function parseRawCommit(oid: CommitOid, content: Buffer): RawCommit {
-  const raw = content.toString("utf8");
+function parseRawCommit(oid: CommitOid, content: Uint8Array): RawCommit {
+  const raw = Buffer.from(content.buffer, content.byteOffset, content.byteLength).toString("utf8");
   const separator = raw.indexOf("\n\n");
   const headerText = separator >= 0 ? raw.slice(0, separator) : raw;
   const message = separator >= 0 ? raw.slice(separator + 2) : "";

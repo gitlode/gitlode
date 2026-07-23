@@ -67,8 +67,10 @@ Useful span names include:
 | `gitlode.projection`                            | Fact-to-output-record mapping in the active projector                    |
 | `gitlode.output.write` / `gitlode.output.close` | `OutputSink.write()` and `OutputSink.close()`                            |
 | `git.walk_commits`                              | Adapter-level commit walk operation                                      |
-| `git.blob_read`                                 | Blob reads inside `IsomorphicGitAdapter.getFileChanges()`                |
-| `git.diff`                                      | Diff-stat computation inside `IsomorphicGitAdapter.getFileChanges()`     |
+| `git.file_changes`                              | Core file-change expansion for one commit                                |
+| `git.file_blob_changes`                         | Adapter blob-fact stream for one commit                                  |
+| `git.blob_read`                                 | Individual blob reads in either Git adapter                              |
+| `git.diff`                                      | `DiffAdapter` work owned by `DefaultFileChangeExpander`                  |
 | `git.*` children                                | Additional Git-internal operations such as ref resolution and merge-base |
 
 Span names are intentionally compact and dot-separated. A deeper name usually represents a local
@@ -114,17 +116,28 @@ strategies; they are not a stable machine-readable contract.
 Top-level reachable-set walks use `dag.reachable`. In normal commit extraction, reachable walks are
 usually part of a larger `dag.traversal` operation and are summarized there instead.
 
-For `runtime.gitAdapter: "git-cli"`, compare `git.cli.rev_list` and `git.cli.cat_file_batch`
-instead. For cross-adapter benchmarks, keep the repository snapshot and extraction request identical
-and compare final counts rather than JSONL line ordering. See
+For `runtime.gitAdapter: "git-cli"`, commit traversal uses `git.cli.rev_list` and
+`git.cli.cat_file_batch`. File-level extraction additionally records `git.cli.diff_tree` for raw
+change discovery and one `git.cli.file_blob_batch` span for the repository-scoped persistent blob
+session. Its `objects_read` and `blob_bytes` counters describe completed blob responses.
+
+Long-lived async-iterator and process spans measure wall-clock lifetime, including time suspended
+while downstream consumers work. For example, `git.cli.file_blob_batch` is not exclusive Git CPU
+time, and `git.file_blob_changes` can remain open while its consumer computes a line diff. Do not
+sum nested span totals as if they were disjoint. Use `git.blob_read`, `git.diff`, and
+`git.cli.diff_tree` for the narrower work categories.
+
+For cross-adapter benchmarks, keep the repository snapshot and extraction request identical and
+compare final counts rather than JSONL line ordering. See
 [`design/git-adapters.md`](design/git-adapters.md) for adapter-specific benchmarking guidance.
 
 ## File-Level Extraction
 
 In commit-granularity mode, file-expansion spans such as `git.blob_read` and `git.diff` do not
-appear because `getFileChanges()` is never called.
+appear because `getFileBlobChanges()` is never called.
 
 In file-level mode (`--per-file`), these spans can help separate Git blob-read cost from diff-stat
-cost. The `skipped_diffs` counter on `gitlode.extract` reports how many file-level diffs were
-emitted with `null` additions/deletions due to either binary content or the `--max-diff-size`
-guardrail.
+cost. `git.file_changes` records `changes`, `diffs`, `skipped_size`, and `skipped_binary` counters;
+adapter-level `git.file_blob_changes` records yielded A/M/D facts and blob bytes. The
+`skipped_diffs` counter on `gitlode.extract` reports how many file-level diffs were emitted with
+`null` additions/deletions due to either binary content or the `--max-diff-size` guardrail.

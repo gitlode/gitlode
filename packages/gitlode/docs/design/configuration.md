@@ -82,9 +82,9 @@ Included sections are also strict.
 
 - `profile`: optional default for `--profile`
 - `gitAdapter`: optional Git implementation selector. Supported values are `isomorphic-git` and
-  `git-cli`; default is `isomorphic-git`. The `git-cli` adapter uses the Git executable for
-  traversal-oriented operations and delegates file-change expansion to the existing isomorphic-git
-  implementation.
+  `git-cli`; default is `isomorphic-git`. The `git-cli` adapter uses the Git executable for commit
+  traversal, file-blob change discovery, and blob reads. Both implementations use the same Core
+  file-change and line-diff policy.
 
 ### extensions
 

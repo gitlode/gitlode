@@ -1,15 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DefaultFileChangeExpander } from "../../src/core/file-change-expander.js";
 import type { CommitFact } from "../../src/core/types.js";
-import type { FileChange, GitAdapter } from "../../src/git/types.js";
+import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
+import type {
+  DiffAdapter,
+  FileBlobChange,
+  FileBlobSnapshot,
+  GitAdapter,
+} from "../../src/git/index.js";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+} from "../../src/instrumentation/index.js";
+import type { BlobOid, CommitOid } from "../../src/model/index.js";
 
 const REPO_PATH = "/fake/repo";
+const encoder = new TextEncoder();
 
 function makeCommitFact(overrides: Partial<CommitFact> = {}): CommitFact {
   return {
     type: "commit",
-    oid: "a".repeat(40),
+    oid: "a".repeat(40) as CommitOid,
     message: "commit message",
     author: { name: "Author", email: "author@example.com", timestamp: 1000, timezoneOffset: 0 },
     committer: {
@@ -18,14 +30,27 @@ function makeCommitFact(overrides: Partial<CommitFact> = {}): CommitFact {
       timestamp: 1000,
       timezoneOffset: 0,
     },
-    parents: ["p".repeat(40)],
+    parents: ["b".repeat(40) as CommitOid],
     repository: { name: "repo", url: null },
     ...overrides,
   };
 }
 
-async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
-  for (const item of items) yield item;
+function snapshot(
+  path: string,
+  content: string | Uint8Array,
+  oid = "c".repeat(40),
+): FileBlobSnapshot {
+  return {
+    path,
+    oid: oid as BlobOid,
+    mode: "100644",
+    content: typeof content === "string" ? encoder.encode(content) : content,
+  };
+}
+
+async function* toAsyncIter<T>(items: readonly T[]): AsyncIterable<T> {
+  yield* items;
 }
 
 async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
@@ -34,296 +59,191 @@ async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
   return results;
 }
 
-function makeAdapter(fileChanges: FileChange[]): GitAdapter {
+function makeSource(
+  changes: readonly FileBlobChange[],
+  onRequest?: (commitOid: CommitOid, parentOid: CommitOid | undefined) => void,
+): Pick<GitAdapter, "getFileBlobChanges"> {
   return {
-    supportedObjectFormats: () => ["sha1"],
-    resolveRef: async () => "a".repeat(40),
-    getRepositoryObjectFormat: async () => "sha1",
-    classifyRefType: async () => "branch",
-    walkCommits: async function* () {},
-    getRemoteUrl: async () => null,
-    getFileChanges: async () => fileChanges,
-    findMergeBase: async () => null,
+    async *getFileBlobChanges(_repoPath, commitOid, parentOid) {
+      onRequest?.(commitOid, parentOid);
+      yield* changes;
+    },
   };
 }
 
+function makeExpander(
+  changes: readonly FileBlobChange[],
+  options: {
+    readonly diffAdapter?: DiffAdapter;
+    readonly maxDiffSize?: number;
+    readonly instrumentation?: ConstructorParameters<typeof DefaultFileChangeExpander>[2];
+  } = {},
+): DefaultFileChangeExpander {
+  return new DefaultFileChangeExpander(
+    makeSource(changes),
+    options.diffAdapter ?? new JsDiffAdapter(),
+    options.instrumentation ?? noopInstrumentation,
+    options.maxDiffSize,
+  );
+}
+
 describe("DefaultFileChangeExpander", () => {
-  it("yields no output for a commit with no file changes (empty commit)", async () => {
-    const expander = new DefaultFileChangeExpander(makeAdapter([]));
-    const commit = makeCommitFact();
-    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
-    expect(results).toHaveLength(0);
+  it("yields no output for an empty commit", async () => {
+    const results = await collect(
+      makeExpander([]).expand(toAsyncIter([makeCommitFact()]), REPO_PATH),
+    );
+    expect(results).toEqual([]);
   });
 
-  it("expands a commit with multiple file changes into multiple FileChangeFacts", async () => {
-    const fileChanges: FileChange[] = [
+  it("computes line diffs for added, modified, and deleted blobs", async () => {
+    const changes: FileBlobChange[] = [
       {
-        path: "src/a.ts",
         status: "added",
-        beforeSize: 0,
-        afterSize: 100,
-        additions: 5,
-        deletions: 0,
+        before: null,
+        after: snapshot("added.txt", "one\ntwo\n", "1".repeat(40)),
       },
       {
-        path: "src/b.ts",
         status: "modified",
-        beforeSize: 120,
-        afterSize: 140,
-        additions: 2,
-        deletions: 1,
+        before: snapshot("modified.txt", "one\ntwo\n", "2".repeat(40)),
+        after: snapshot("modified.txt", "one\nthree\nfour\n", "3".repeat(40)),
+      },
+      {
+        status: "deleted",
+        before: snapshot("deleted.txt", "gone\n", "4".repeat(40)),
+        after: null,
       },
     ];
-    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges));
-    const commit = makeCommitFact();
-    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
 
-    expect(results).toHaveLength(2);
-    expect(results[0]!.commit).toBe(commit);
-    expect(results[0]!.file.path).toBe("src/a.ts");
-    expect(results[0]!.file.status).toBe("added");
-    expect(results[0]!.file.additions).toBe(5);
-    expect(results[0]!.file.deletions).toBe(0);
-    expect(results[1]!.file.path).toBe("src/b.ts");
-  });
+    const results = await collect(
+      makeExpander(changes).expand(toAsyncIter([makeCommitFact()]), REPO_PATH),
+    );
 
-  it("calls getFileChanges with parentOid=undefined for a root commit (no parents)", async () => {
-    let capturedParentOid: string | undefined = "not-called";
-    const adapter: GitAdapter = {
-      supportedObjectFormats: () => ["sha1"],
-      resolveRef: async () => "a".repeat(40),
-      getRepositoryObjectFormat: async () => "sha1",
-      classifyRefType: async () => "branch",
-      walkCommits: async function* () {},
-      getRemoteUrl: async () => null,
-      getFileChanges: async (_repo, _oid, parentOid) => {
-        capturedParentOid = parentOid;
-        return [
-          {
-            path: "README.md",
-            status: "added",
-            beforeSize: 0,
-            afterSize: 24,
-            additions: 3,
-            deletions: 0,
-          },
-        ];
-      },
-      findMergeBase: async () => null,
-    };
-
-    const expander = new DefaultFileChangeExpander(adapter);
-    const rootCommit = makeCommitFact({ parents: [] });
-    await collect(expander.expand(toAsyncIter([rootCommit]), REPO_PATH));
-
-    expect(capturedParentOid).toBeUndefined();
-  });
-
-  it("uses only the first parent for a merge commit", async () => {
-    const firstParent = "1".repeat(40);
-    const secondParent = "2".repeat(40);
-    let capturedParentOid: string | undefined;
-    const adapter: GitAdapter = {
-      supportedObjectFormats: () => ["sha1"],
-      resolveRef: async () => "a".repeat(40),
-      getRepositoryObjectFormat: async () => "sha1",
-      classifyRefType: async () => "branch",
-      walkCommits: async function* () {},
-      getRemoteUrl: async () => null,
-      getFileChanges: async (_repo, _oid, parentOid) => {
-        capturedParentOid = parentOid;
-        return [];
-      },
-      findMergeBase: async () => null,
-    };
-
-    const expander = new DefaultFileChangeExpander(adapter);
-    const mergeCommit = makeCommitFact({ parents: [firstParent, secondParent] });
-    await collect(expander.expand(toAsyncIter([mergeCommit]), REPO_PATH));
-
-    expect(capturedParentOid).toBe(firstParent);
-  });
-
-  it("passes through null additions/deletions for binary files", async () => {
-    const binaryFileChange: FileChange = {
-      path: "assets/image.png",
-      status: "added",
-      beforeSize: 0,
-      afterSize: 4096,
-      additions: null,
-      deletions: null,
-    };
-    const expander = new DefaultFileChangeExpander(makeAdapter([binaryFileChange]));
-    const commit = makeCommitFact();
-    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
-
-    expect(results).toHaveLength(1);
-    expect(results[0]!.file.additions).toBeNull();
-    expect(results[0]!.file.deletions).toBeNull();
-  });
-
-  it("processes multiple commits in sequence", async () => {
-    const commit1 = makeCommitFact({ oid: "a".repeat(40) });
-    const commit2 = makeCommitFact({ oid: "b".repeat(40) });
-    const fileChangeMap = new Map<string, FileChange[]>([
-      [
-        "a".repeat(40),
-        [
-          {
-            path: "file1.ts",
-            status: "added",
-            beforeSize: 0,
-            afterSize: 20,
-            additions: 1,
-            deletions: 0,
-          },
-        ],
-      ],
-      [
-        "b".repeat(40),
-        [
-          {
-            path: "file2.ts",
-            status: "modified",
-            beforeSize: 50,
-            afterSize: 55,
-            additions: 2,
-            deletions: 1,
-          },
-          {
-            path: "file3.ts",
-            status: "deleted",
-            beforeSize: 70,
-            afterSize: 0,
-            additions: 0,
-            deletions: 4,
-          },
-        ],
-      ],
+    expect(results.map((result) => result.file)).toEqual([
+      { path: "added.txt", status: "added", additions: 2, deletions: 0 },
+      { path: "modified.txt", status: "modified", additions: 2, deletions: 1 },
+      { path: "deleted.txt", status: "deleted", additions: 0, deletions: 1 },
     ]);
-    const adapter: GitAdapter = {
-      supportedObjectFormats: () => ["sha1"],
-      resolveRef: async () => "a".repeat(40),
-      getRepositoryObjectFormat: async () => "sha1",
-      classifyRefType: async () => "branch",
-      walkCommits: async function* () {},
-      getRemoteUrl: async () => null,
-      getFileChanges: async (_repo, oid) => fileChangeMap.get(oid) ?? [],
-      findMergeBase: async () => null,
-    };
-
-    const expander = new DefaultFileChangeExpander(adapter);
-    const results = await collect(expander.expand(toAsyncIter([commit1, commit2]), REPO_PATH));
-
-    expect(results).toHaveLength(3);
-    expect(results[0]!.commit.oid).toBe("a".repeat(40));
-    expect(results[0]!.file.path).toBe("file1.ts");
-    expect(results[1]!.commit.oid).toBe("b".repeat(40));
-    expect(results[1]!.file.path).toBe("file2.ts");
-    expect(results[2]!.commit.oid).toBe("b".repeat(40));
-    expect(results[2]!.file.path).toBe("file3.ts");
   });
 
-  it("calls getFileChanges with the correct commitOid", async () => {
-    const commitOid = "c".repeat(40);
-    let capturedOid: string | undefined;
-    const adapter: GitAdapter = {
-      supportedObjectFormats: () => ["sha1"],
-      resolveRef: async () => "a".repeat(40),
-      getRepositoryObjectFormat: async () => "sha1",
-      classifyRefType: async () => "branch",
-      walkCommits: async function* () {},
-      getRemoteUrl: async () => null,
-      getFileChanges: async (_repo, oid) => {
-        capturedOid = oid;
-        return [];
-      },
-      findMergeBase: async () => null,
-    };
+  it("passes no parent for a root commit and only the first parent for a merge", async () => {
+    const requests: Array<[CommitOid, CommitOid | undefined]> = [];
+    const source = makeSource([], (commitOid, parentOid) => requests.push([commitOid, parentOid]));
+    const expander = new DefaultFileChangeExpander(
+      source,
+      new JsDiffAdapter(),
+      noopInstrumentation,
+    );
+    const root = makeCommitFact({ oid: "1".repeat(40) as CommitOid, parents: [] });
+    const firstParent = "2".repeat(40) as CommitOid;
+    const merge = makeCommitFact({
+      oid: "3".repeat(40) as CommitOid,
+      parents: [firstParent, "4".repeat(40) as CommitOid],
+    });
 
-    const expander = new DefaultFileChangeExpander(adapter);
-    const commit = makeCommitFact({ oid: commitOid });
-    await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+    await collect(expander.expand(toAsyncIter([root, merge]), REPO_PATH));
 
-    expect(capturedOid).toBe(commitOid);
+    expect(requests).toEqual([
+      [root.oid, undefined],
+      [merge.oid, firstParent],
+    ]);
   });
 
-  it("sets type: 'file-change' on all yielded FileChangeFact objects", async () => {
-    const fileChanges: FileChange[] = [
-      {
-        path: "src/a.ts",
-        status: "added",
-        beforeSize: 0,
-        afterSize: 16,
-        additions: 1,
-        deletions: 0,
-      },
-    ];
-    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges));
-    const commit = makeCommitFact();
-    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+  it("skips binary content without invoking DiffAdapter", async () => {
+    const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 1 }));
+    const binary = new Uint8Array([0x41, 0x00, 0x42]);
+    const expander = makeExpander(
+      [{ status: "added", before: null, after: snapshot("image.bin", binary) }],
+      { diffAdapter: { computeLineDiff } },
+    );
 
-    expect(results).toHaveLength(1);
-    expect(results[0]!.type).toBe("file-change");
-  });
+    const [result] = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
 
-  it("sets additions/deletions to null when either side exceeds maxDiffSize", async () => {
-    const fileChanges: FileChange[] = [
-      {
-        path: "generated.txt",
-        status: "modified",
-        beforeSize: 150_000,
-        afterSize: 2_000,
-        additions: 200,
-        deletions: 100,
-      },
-    ];
-    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges), 100_000);
-    const commit = makeCommitFact();
-    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
-
-    expect(results).toHaveLength(1);
-    expect(results[0]!.file.additions).toBeNull();
-    expect(results[0]!.file.deletions).toBeNull();
+    expect(result?.file).toMatchObject({ additions: null, deletions: null });
+    expect(computeLineDiff).not.toHaveBeenCalled();
     expect(expander.skippedDiffCount).toBe(1);
   });
 
-  it("keeps numeric additions/deletions when maxDiffSize is not exceeded", async () => {
-    const fileChanges: FileChange[] = [
-      {
-        path: "small.txt",
-        status: "modified",
-        beforeSize: 80,
-        afterSize: 90,
-        additions: 3,
-        deletions: 2,
-      },
-    ];
-    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges), 100_000);
-    const commit = makeCommitFact();
-    const results = await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+  it("only scans the first 8,000 bytes for a NUL byte", async () => {
+    const content = new Uint8Array(8_001).fill(0x61);
+    content[8_000] = 0;
+    const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 0 }));
+    const expander = makeExpander(
+      [{ status: "added", before: null, after: snapshot("data.txt", content) }],
+      { diffAdapter: { computeLineDiff } },
+    );
 
-    expect(results).toHaveLength(1);
-    expect(results[0]!.file.additions).toBe(3);
-    expect(results[0]!.file.deletions).toBe(2);
+    await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
+
+    expect(computeLineDiff).toHaveBeenCalledOnce();
     expect(expander.skippedDiffCount).toBe(0);
   });
 
-  it("counts binary diffs as skipped", async () => {
-    const fileChanges: FileChange[] = [
-      {
-        path: "assets/large.bin",
-        status: "added",
-        beforeSize: 0,
-        afterSize: 10_000,
-        additions: null,
-        deletions: null,
-      },
-    ];
-    const expander = new DefaultFileChangeExpander(makeAdapter(fileChanges), 100_000);
-    const commit = makeCommitFact();
-    await collect(expander.expand(toAsyncIter([commit]), REPO_PATH));
+  it("applies maxDiffSize before binary detection and line diff", async () => {
+    const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 1 }));
+    const content = new Uint8Array([0, 1, 2, 3]);
+    const recorder = new LocalInstrumentationRecorder(() => 1);
+    const expander = makeExpander(
+      [{ status: "added", before: null, after: snapshot("large.bin", content) }],
+      { diffAdapter: { computeLineDiff }, maxDiffSize: 3, instrumentation: recorder },
+    );
 
+    const [result] = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
+
+    expect(result?.file.additions).toBeNull();
+    expect(computeLineDiff).not.toHaveBeenCalled();
     expect(expander.skippedDiffCount).toBe(1);
+    expect(recorder.records()).toEqual([
+      expect.objectContaining({
+        name: "git.file_changes",
+        counters: { changes: 1, skipped_size: 1 },
+      }),
+    ]);
+  });
+
+  it("runs the diff when content size equals maxDiffSize", async () => {
+    const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 0 }));
+    const expander = makeExpander(
+      [{ status: "added", before: null, after: snapshot("exact.txt", "1234") }],
+      { diffAdapter: { computeLineDiff }, maxDiffSize: 4 },
+    );
+
+    const [result] = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
+
+    expect(result?.file.additions).toBe(1);
+    expect(computeLineDiff).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { additions: -1, deletions: 0 },
+    { additions: 0.5, deletions: 0 },
+    { additions: Number.NaN, deletions: 0 },
+    { additions: 0, deletions: Number.POSITIVE_INFINITY },
+  ])("rejects invalid DiffAdapter results: %o", async (diffResult) => {
+    const expander = makeExpander(
+      [{ status: "added", before: null, after: snapshot("file.txt", "text\n") }],
+      { diffAdapter: { computeLineDiff: () => diffResult } },
+    );
+
+    await expect(
+      collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH)),
+    ).rejects.toThrow("DiffAdapter returned invalid values");
+  });
+
+  it("propagates DiffAdapter errors as runtime errors", async () => {
+    const failure = new Error("diff failed");
+    const expander = makeExpander(
+      [{ status: "added", before: null, after: snapshot("file.txt", "text\n") }],
+      {
+        diffAdapter: {
+          computeLineDiff() {
+            throw failure;
+          },
+        },
+      },
+    );
+
+    await expect(collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH))).rejects.toBe(
+      failure,
+    );
   });
 });

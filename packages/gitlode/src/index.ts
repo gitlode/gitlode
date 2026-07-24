@@ -14,8 +14,8 @@ import {
 } from "./presentation/index.js";
 import { createStyling } from "./presentation/progress/index.js";
 import { dispatchWorkerRunRequest, type WorkerRunInput } from "./runtime/index.js";
-import { loadExtractionState, NodeStateStore } from "./state/index.js";
-import { createEmptyState } from "./state/state-store.js";
+import { NodeStateStore, loadStateFile } from "./state-impl/index.js";
+import { createEmptyState } from "./state/index.js";
 
 function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
   return {
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     if (!stateStore || !bootstrapInput.incremental) {
       priorState = createEmptyState(bootstrapInput.repositoryPath);
     } else {
-      const loadedState = await loadExtractionState(stateStore);
+      const loadedState = await loadStateFile(stateStore);
       if (loadedState === undefined) {
         if (bootstrapInput.missingState === "error") {
           throw new Error(`State file not found: ${bootstrapInput.stateFilePath}`);

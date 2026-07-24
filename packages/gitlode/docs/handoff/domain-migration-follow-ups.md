@@ -2,8 +2,9 @@
 
 ## Status
 
-Deferred until the domain migration is complete. These are candidates for separate behavior-changing
-tasks, not part of the current structure-preserving migration.
+Deferred until the domain migration is complete. These are candidates for separate tasks that
+change observable identifiers or require cross-boundary runtime refactoring, not part of the
+current structure-preserving migration.
 
 The migration intentionally preserves externally observable strings and profiling identifiers even
 when they retain vocabulary from the former ownership model. Evaluate each item independently after
@@ -62,6 +63,39 @@ examples in:
 - `docs/handoff/instrumentation-opentelemetry-migration.md`, if that work is still active;
 - tests that assert span names;
 - any known external profiling consumers.
+
+## State follow-ups
+
+### Separate extraction checkpoint data from the state document schema
+
+`ExtractionState` currently contains:
+
+```text
+version: 2
+```
+
+This version identifies the persisted state JSON schema. Extraction does not use it when planning or
+performing a run, so including it in the Core-owned extraction contract leaks a persistence concern
+into Core. Configuration already keeps the analogous document version in the config-owned
+`ProjectConfigurationV1` model rather than in Core; state should be reviewed using the same
+boundary.
+
+Candidate follow-up:
+
+- define a Core/extraction-api checkpoint model containing only information needed as extraction
+  input or result;
+- define a versioned state-document model in `state`, separate from the extraction checkpoint;
+- make the state boundary validate and convert the persisted document into the extraction model on
+  read;
+- convert the extraction result into the current versioned document on write;
+- keep version dispatch and unsupported-version diagnostics outside Core/extraction-api;
+- decide whether any other persisted metadata belongs only to the state document while performing
+  this review.
+
+The change should preserve the current state JSON shape and user-facing behavior unless a separate
+schema migration is explicitly approved. Review `StateStore` and `StateStoreValue`, state-file
+loading and writing, composition-root mapping, incremental extraction tests, state design
+documentation, and any future state JSON schema documentation together.
 
 ## Lifecycle
 

@@ -149,11 +149,6 @@ export interface ProgressReporter {
   emit(event: ProgressEvent): void;
 }
 
-export interface StateStore {
-  read(): Promise<ExtractionState | null>;
-  write(state: ExtractionState): Promise<void>;
-}
-
 export interface RefCheckpoint {
   readonly ref: string;
   readonly refType: RefType;

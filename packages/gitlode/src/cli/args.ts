@@ -12,7 +12,7 @@ import type {
 } from "../config/index.js";
 import { byteSizeString } from "../config/index.js";
 import type { RotationConfig } from "../core/index.js";
-import { MISSING_STATES } from "../core/index.js";
+import { MISSING_STATES, type MissingStatePolicy } from "../state/index.js";
 import {
   type AbsoluteDirectoryPath,
   type AbsolutePath,
@@ -34,7 +34,7 @@ export interface BootstrapInput {
   readonly outputPrefix?: string;
   readonly rotation: RotationConfig;
   readonly incremental: boolean;
-  readonly missingState?: (typeof MISSING_STATES)[number];
+  readonly missingState?: MissingStatePolicy;
   readonly range?: BootstrapInputRange;
   readonly stateFilePath?: AbsolutePath;
   readonly perFile: boolean;

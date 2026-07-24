@@ -246,8 +246,8 @@ between text contents.
 
 **Purpose:** Define the facts, records, and stage contracts of gitlode extraction.
 
-- Includes canonical extraction facts, projected records, stage ports, and extraction request and
-  result contracts.
+- Includes canonical extraction facts, projected records, stage ports, extraction request and
+  result contracts, and the checkpoint model carried by those contracts.
 - Excludes traversal, filtering, deduplication, expansion and projection implementations, Git
   backends, output mechanics, and plugin hosting.
 - Provides the stable vocabulary used by extraction consumers without exposing product-policy
@@ -295,10 +295,12 @@ between text contents.
 
 ### 2.15 `state`
 
-**Purpose:** Define incremental-extraction checkpoint state and its persistence contract.
+**Purpose:** Adapt persisted checkpoint information to and from the extraction contract.
 
-- Includes checkpoint models, ref checkpoints, pure validation, persistence ports, and state-side
-  missing-state concepts.
+- Includes pure validation and factories for persisted checkpoint information, persistence ports,
+  and state-side missing-state concepts.
+- Uses the checkpoint model defined by `extraction-api`; it does not define extraction input or
+  result vocabulary.
 - Excludes traversal-boundary selection, CLI option validation, extraction execution, and unrelated
   application state, as well as concrete filesystem persistence.
 - Uses the established user-facing term `state`; its charter prevents the name from becoming a
@@ -375,29 +377,29 @@ exchange for this global status, `type-utils` must preserve the stricter charter
 other domain is global. In particular, `support` remains explicit because its charter permits
 Node.js runtime APIs.
 
-| Domain            | Allowed direct domain dependencies                                                               |
-| ----------------- | ------------------------------------------------------------------------------------------------ |
-| `type-utils`      | None                                                                                             |
-| `support`         | None                                                                                             |
-| `model`           | None                                                                                             |
-| `instrumentation` | None                                                                                             |
-| `progress`        | None                                                                                             |
-| `dag`             | `instrumentation`, `support`                                                                     |
-| `git`             | `model`                                                                                          |
-| `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                              |
-| `line-diff`       | None                                                                                             |
-| `line-diff-impl`  | `line-diff`                                                                                      |
-| `state`           | `model`, `support`                                                                               |
-| `state-impl`      | `state`, `support`                                                                               |
-| `extraction-api`  | `model`, `progress`, `state`, `support`                                                          |
-| `extraction`      | `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `state`, `support` |
-| `plugin-api`      | `extraction-api`, `instrumentation`                                                              |
-| `plugin-runtime`  | `extraction-api`, `instrumentation`, `plugin-api`, `progress`, `support`                         |
-| `output`          | `extraction-api`                                                                                 |
-| `config`          | `plugin-api`, `support`                                                                          |
-| `cli`             | `config`, `state`, `support`                                                                     |
-| `presentation`    | `instrumentation`, `progress`, `support`                                                         |
-| `execution`       | Listed below because this composition domain has a larger direct dependency set.                 |
+| Domain            | Allowed direct domain dependencies                                                      |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| `type-utils`      | None                                                                                    |
+| `support`         | None                                                                                    |
+| `model`           | None                                                                                    |
+| `instrumentation` | None                                                                                    |
+| `progress`        | None                                                                                    |
+| `dag`             | `instrumentation`, `support`                                                            |
+| `git`             | `model`                                                                                 |
+| `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                     |
+| `line-diff`       | None                                                                                    |
+| `line-diff-impl`  | `line-diff`                                                                             |
+| `state`           | `extraction-api`, `model`, `support`                                                    |
+| `state-impl`      | `state`, `support`                                                                      |
+| `extraction-api`  | `model`, `progress`, `support`                                                          |
+| `extraction`      | `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `support` |
+| `plugin-api`      | `extraction-api`, `instrumentation`                                                     |
+| `plugin-runtime`  | `extraction-api`, `instrumentation`, `plugin-api`, `progress`, `support`                |
+| `output`          | `extraction-api`                                                                        |
+| `config`          | `plugin-api`, `support`                                                                 |
+| `cli`             | `config`, `state`, `support`                                                            |
+| `presentation`    | `instrumentation`, `progress`, `support`                                                |
+| `execution`       | Listed below because this composition domain has a larger direct dependency set.        |
 
 `execution` may directly depend on:
 

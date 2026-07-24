@@ -40,7 +40,7 @@ import {
   resolvePluginEntries,
 } from "../plugins/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
-import { validateExtractionState } from "../state/state-store.js";
+import { validatePriorState } from "../state/index.js";
 import { type AbsoluteDirectoryPath, type AbsolutePath, firstOrThrow } from "../support/index.js";
 import type { WorkerRunInput, WorkerRunRange, WorkerRunRequest } from "./types.js";
 import { deriveRepoName, resolveRepositoryObjectFormat } from "./utils.js";
@@ -361,7 +361,7 @@ export async function executeWorkerRunRequest(
     );
 
     instrumentation.run("gitlode.state.validate", () => {
-      validateExtractionState(priorState, resolvedRepoPath, repositoryObjectFormat);
+      validatePriorState(priorState, resolvedRepoPath, repositoryObjectFormat);
     });
 
     const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await instrumentation.runAsync(

@@ -133,8 +133,9 @@ Responsibilities:
 - Handle top-level process exit behavior and user-facing errors.
 
 In the current worker boundary design, state file reading and writing are main-process
-responsibilities in the runtime edge (`src/index.ts`) using `src/cli/runtime/state-store.ts`
-helpers.
+responsibilities in the runtime edge (`src/index.ts`). Core defines the checkpoint model carried by
+its request and result contracts. Persistence ports, state-file adaptation, and pure validation live
+in `src/state`; Node.js state-file loading and atomic replacement live in `src/state-impl`.
 
 ### Core layer
 
@@ -361,8 +362,9 @@ attach to the extraction process and add optional fields to output records.
 - **`src/cli/runtime/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
   stderr progress/success pipeline.
 - **`src/cli/runtime/success-report.ts`** — successful-run summary and profile rendering.
-- **`src/cli/runtime/state-store.ts`** — state persistence helpers and repository object-format
-  gating.
+- **`src/state`** — checkpoint persistence ports, adaptation factories, and pure validation for the
+  Core-owned checkpoint model.
+- **`src/state-impl`** — Node.js state-file loading, JSON decoding, and atomic replacement.
 - **`src/core/enriching-fact-projector.ts`** — `EnrichingFactProjector` wraps the default
   projector and calls each configured plugin's `project()` per fact in declaration order.
 - **`src/core/types.ts`** — all plugin contract types: `ProjectorPlugin`, `PluginEntry`,

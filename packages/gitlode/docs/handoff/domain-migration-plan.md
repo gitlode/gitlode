@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0 and 1 completed on 2026-07-24. Step 2 has not started.
+Steps 0–2 completed on 2026-07-24. Step 3 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -95,7 +95,8 @@ The following inventory covers every current source module. A directory wildcard
 | Remaining `git-impl/*`, including `commit-traversal/*`                                       | `git-impl`                                                   | unchanged; module-size review in Step 11   |
 | `core/types.ts` fact, record, range, stage, sink, and extraction contracts                   | `extraction-api`                                             | Step 4                                     |
 | `core/types.ts` progress contracts                                                           | `progress`                                                   | Step 3                                     |
-| `core/types.ts` checkpoint models and persistence port; `core/constants.ts` state constants  | `state`                                                      | Step 2                                     |
+| `core/types.ts` checkpoint models                                                            | `extraction-api`                                             | Step 4                                     |
+| `core/types.ts::StateStore` and `core/constants.ts` state constants                          | `state`                                                      | Step 2                                     |
 | `core/types.ts` plugin-author contracts                                                      | `plugin-api`                                                 | Step 5                                     |
 | `core/types.ts::PluginEntry` and plugin-host outcome types                                   | `plugin-runtime`                                             | Step 6                                     |
 | `core/types.ts::CoordinatorDependencies` and remaining implementation-construction contracts | `extraction`                                                 | Step 7                                     |
@@ -133,8 +134,8 @@ target architecture:
 
 | Temporary exception                                                                                                                | Expires                               |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `state` mixes pure checkpoint policy with Node.js filesystem persistence.                                                          | Step 2                                |
-| `core` owns progress, state, extraction, and plugin contracts as well as extraction implementation.                                | Steps 2–7, according to the inventory |
+| `core` owns progress, extraction, and plugin contracts as well as extraction implementation.                                       | Steps 3–7, according to the inventory |
+| `state` depends on checkpoint contracts in the legacy `core` domain until they move to `extraction-api`.                           | Step 4                                |
 | `plugins` is the plugin host domain and depends directly on config document types.                                                 | Step 6                                |
 | `config` imports CLI constants and termination types.                                                                              | Step 8                                |
 | `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9                                |
@@ -187,8 +188,9 @@ Review:
 
 ### Step 2: Migrate state boundaries
 
-Move checkpoint models, persistence ports, constants, and pure validation from `core` and `state`
-into the contract domain. Move filesystem persistence into `state-impl`.
+Keep checkpoint models in `core` as part of its request/result vocabulary until Step 4 moves them
+to `extraction-api`. Move persistence ports, state constants, factories, and pure validation into
+`state`. Move filesystem persistence into `state-impl`.
 
 Target shape:
 
@@ -208,6 +210,8 @@ state-impl/
 
 Review:
 
+- `core` owns the checkpoint model used by its request and result and does not depend on `state`.
+- `state` adapts persisted information to that model rather than defining extraction vocabulary.
 - Checkpoint semantics are separate from filesystem persistence.
 - State JSON and missing-state behavior are unchanged.
 - Atomic replacement remains intact.
@@ -215,6 +219,21 @@ Review:
 
 Resolve the current validation aliases into names that distinguish pure prior-state validation from
 state-file boundary validation.
+
+#### Step 2 results
+
+- Kept `ExtractionState` and `RefCheckpoint` in `core` as part of its request/result contract.
+- Moved `StateStore`, missing-state policy, factories, and pure validation into `state`.
+- Added `state-impl` for `NodeStateStore` and the state-file loading boundary.
+- Replaced the ambiguous `validateExtractionState` / `validateLoadedState` names with
+  `validatePriorState` and `validateStateFileContents`; the I/O boundary is named `loadStateFile`.
+- Removed the unused `PriorStateLoadOptions` type.
+- Kept state JSON, validation order and messages, missing-file behavior, and temporary-file rename
+  behavior unchanged.
+- Updated consumers, tests, and architecture documentation to use the new owners.
+- Recorded the temporary `state -> core` dependency; Step 4 replaces it with
+  `state -> extraction-api`.
+- Passed format, lint, build, and all 577 gitlode tests.
 
 ### Step 3: Migrate the progress contract
 
@@ -235,6 +254,7 @@ Move the dependency-light extraction vocabulary out of `core/types.ts`:
 - canonical facts and projected records;
 - fact/record pairing;
 - extraction ranges;
+- extraction checkpoint state and ref checkpoints;
 - stage, projector, and sink ports;
 - extraction request and result contracts.
 

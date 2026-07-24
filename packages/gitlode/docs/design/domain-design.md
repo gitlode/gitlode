@@ -138,9 +138,287 @@ If step 5 has no concrete answer, do not change the domain boundary yet.
 
 ## 2. gitlode Domain Definitions
 
-To be developed after the principles in Section 1 are accepted. Each domain definition will use the
-charter fields from Section 1.1 and will document its allowed incoming and outgoing dependency
-directions.
+This section defines the responsibility and scope of each top-level source domain. Dependency
+directions are added separately after the domain charters are accepted.
+
+Domains are not split in anticipation of a possible future need. A domain is reconsidered when a
+concrete change exposes a boundary described in Section 1.4.
+
+### 2.1 `type-utils`
+
+**Purpose:** Globally available TypeScript type utilities that complement the language's built-in
+utilities.
+
+- Includes generic type transformations such as `Brand<T, Name>`.
+- May use TypeScript language features and standard ECMAScript types.
+- Excludes product-specific types, runtime values, source imports, ambient augmentation, Node.js
+  types, and types from external packages.
+- Is type-only, runtime-free, and independent of every other source domain.
+
+Every domain may use `type-utils`; this is the sole global exception to the closed dependency
+allowlist in Section 2.22.
+
+### 2.2 `support`
+
+**Purpose:** Product-independent runtime utilities for the supported Node.js environment.
+
+- Includes collections, iterable operations, assertions, date formatting, and path utilities that
+  are meaningful without gitlode product context.
+- Excludes product policy, external-package-based implementations, import-time side effects, and
+  long-lived resource management.
+- May use JavaScript and Node.js standard APIs.
+
+Different utility topics do not require separate domains while they continue to satisfy this
+charter.
+
+### 2.3 `model`
+
+**Purpose:** Stable values and identities shared by multiple gitlode product domains.
+
+- Includes commit and blob OIDs, object-format profiles, ref types, person identities, and their
+  pure constants and guards.
+- Excludes repository access, extraction workflows, I/O, backend representations, and types that
+  exist only for CLI or output concerns.
+- Must remain a deliberately small common model rather than a general location for shared code.
+
+### 2.4 `instrumentation`
+
+**Purpose:** Record and summarize execution measurements.
+
+- Includes instrumentation contracts, spans, counters, attributes, noop behavior, local recording,
+  iterable instrumentation, and profile summary data.
+- Excludes progress reporting, user presentation, and product workflow decisions.
+- Owns measurement collection, not the interpretation or display of measurements.
+
+The contract and local implementation remain in one domain until a concrete need requires a
+separate implementation boundary.
+
+### 2.5 `dag`
+
+**Purpose:** Generic directed-acyclic-graph traversal algorithms and their internal state.
+
+- Includes topology and frontier contracts, reachable and difference traversal, certification
+  algorithms, algorithm state machines, scheduling extension points, and graph-work telemetry.
+- Excludes Git objects, refs, timestamps interpreted as Git policy, repository access, and
+  Git-specific strategy selection.
+- Must remain usable and explainable without Git concepts.
+
+### 2.6 `git`
+
+**Purpose:** Backend-independent Git repository access contracts.
+
+- Includes the Git adapter contract, raw commit and blob facts, repository object-format contracts,
+  adapter errors, and behavior shared by every backend.
+- Excludes backend libraries, executable invocation, process management, backend parsers, extraction
+  policy, and line-diff implementation.
+- Defines what repository access provides, not how a backend provides it.
+
+### 2.7 `git-impl`
+
+**Purpose:** Concrete implementations of Git repository access.
+
+- Includes isomorphic-git and Git CLI adapters, command protocols, cat-file sessions,
+  backend-specific parsing and caching, Git-specific traversal strategy selection, and Git-specific
+  scheduling policy.
+- Excludes backend-independent contracts, extraction filtering and projection, file-size and binary
+  policy, line-diff policy, and generic DAG algorithms.
+- May own backend resources and backend-specific error translation.
+
+### 2.8 `line-diff`
+
+**Purpose:** Define the contract for calculating line-level addition and deletion statistics
+between text contents.
+
+- Includes the calculation contract and invariants of the calculation result.
+- Excludes blob acquisition, binary detection, size limits, file-change classification, and Git tree
+  comparison, as well as any particular calculation implementation.
+- Is independent of repository semantics and concrete diff libraries.
+
+### 2.9 `line-diff-impl`
+
+**Purpose:** Implement the line-diff calculation contract.
+
+- Includes concrete calculators such as the `diff`-package-backed implementation.
+- Excludes binary and size policy, repository access, and file-change interpretation.
+- Owns implementation-specific package use without widening the line-diff contract.
+
+### 2.10 `extraction-api`
+
+**Purpose:** Define the facts, records, and stage contracts of gitlode extraction.
+
+- Includes canonical extraction facts, projected records, stage ports, and extraction request and
+  result contracts.
+- Excludes traversal, filtering, deduplication, expansion and projection implementations, Git
+  backends, output mechanics, and plugin hosting.
+- Provides the stable vocabulary used by extraction consumers without exposing product-policy
+  implementations.
+
+### 2.11 `extraction`
+
+**Purpose:** Execute gitlode's policy for transforming Git facts into analytical records.
+
+- Includes traversal planning, filtering, cross-ref deduplication, file-change expansion policy,
+  base projection, and extraction coordination.
+- Excludes Git backend implementation, JSONL filesystem output, CLI parsing, presentation, plugin
+  module loading, and checkpoint-file I/O.
+- Owns product extraction semantics independently of delivery mechanisms.
+
+### 2.12 `progress`
+
+**Purpose:** Describe the progress of one gitlode run independently of its presentation.
+
+- Includes progress phases, events, reporters, and neutral progress snapshots.
+- Excludes terminal control, spinners, stderr output, timing instrumentation, and the work being
+  reported.
+- Defines progress meaning but not how progress is rendered.
+
+### 2.13 `plugin-api`
+
+**Purpose:** Define the public contract between plugin authors and gitlode.
+
+- Includes plugin factories, plugin interfaces, projection contexts, initialization and projection
+  results, failure policies, namespaces, and plugin runtime context contracts.
+- Excludes module resolution, dynamic import, package compatibility checks, host registries, config
+  file parsing, and host-side invocation.
+- Is a stable public-facing contract even while identifier compatibility remains relaxed during
+  prerelease development.
+
+### 2.14 `plugin-runtime`
+
+**Purpose:** Host and execute configured plugins inside gitlode.
+
+- Includes entrypoint resolution, dynamic import, factory invocation, compatibility checks,
+  initialization, runtime registration, per-fact invocation, and plugin enrichment orchestration.
+- Excludes the public plugin contract, generic config parsing, base extraction projection, and
+  concrete diagnostic rendering.
+- Owns host-side plugin lifecycle and failure handling.
+
+### 2.15 `state`
+
+**Purpose:** Define incremental-extraction checkpoint state and its persistence contract.
+
+- Includes checkpoint models, ref checkpoints, pure validation, persistence ports, and state-side
+  missing-state concepts.
+- Excludes traversal-boundary selection, CLI option validation, extraction execution, and unrelated
+  application state, as well as concrete filesystem persistence.
+- Uses the established user-facing term `state`; its charter prevents the name from becoming a
+  general-purpose state bucket.
+
+### 2.16 `state-impl`
+
+**Purpose:** Persist checkpoint state in the supported Node.js environment.
+
+- Includes state-file reading and writing, JSON decoding, loaded-state validation at the I/O
+  boundary, and atomic file replacement.
+- Excludes checkpoint semantics, traversal policy, CLI validation, and unrelated persistence.
+- Owns filesystem and serialization details without widening the state contract.
+
+### 2.17 `output`
+
+**Purpose:** Persist projected records as JSON Lines files.
+
+- Includes JSON serialization, LF termination, output filename generation, line and byte rotation,
+  file-handle lifecycle, sink implementation, and output byte and file counts.
+- Excludes record semantics, fact projection, plugin enrichment, CLI output, and progress or summary
+  rendering.
+- Owns output mechanics rather than the meaning of the data being written.
+
+### 2.18 `config`
+
+**Purpose:** Define and load the versioned gitlode project configuration document.
+
+- Includes configuration types and schema, JSON loading and parsing, schema diagnostics, path
+  rebasing, and defaults that are part of the document format.
+- Excludes command-line parsing, CLI/config precedence, effective run input, plugin module loading,
+  and extraction execution.
+- Owns the configuration document independently of a particular invocation.
+
+### 2.19 `cli`
+
+**Purpose:** Convert command-line input and project configuration into validated invocation input.
+
+- Includes command definitions, CLI value schemas, CLI-specific validation, precedence resolution,
+  path-option resolution and preflight checks, termination results, and CLI-facing input types.
+- Excludes worker execution, extraction construction, repository traversal, presentation
+  implementation, state persistence, and plugin module loading.
+- Owns invocation semantics specific to the command-line interface.
+
+### 2.20 `presentation`
+
+**Purpose:** Present progress, diagnostics, and results to the user through stderr.
+
+- Includes terminal sinks, TTY and quiet modes, spinners, heartbeat scheduling, progress rendering,
+  diagnostic formatting, summary and profile formatting, and styling.
+- Excludes progress-event meaning, measurement collection, product error classification, extraction
+  execution, and CLI option parsing.
+- Owns rendering and terminal interaction, not the events or data being rendered.
+
+### 2.21 `execution`
+
+**Purpose:** Compose and execute one gitlode run across the main-process and worker boundary.
+
+- Includes run inputs and results, worker protocol and transport, concrete component construction,
+  repository preflight and metadata resolution, run-scoped resource ownership, and extraction
+  invocation.
+- Excludes CLI parsing, extraction policy, concrete presentation, adapter internals, and
+  configuration-document schema.
+- Acts as the application composition boundary for one run.
+
+### 2.22 Allowed domain dependencies
+
+The following table is a closed allowlist of direct domain dependencies. A domain may not directly
+depend on a domain absent from its row. Transitive dependencies do not grant permission for a direct
+import.
+
+`type-utils` is omitted from each domain's dependency list because every domain may depend on it. In
+exchange for this global status, `type-utils` must preserve the stricter charter in Section 2.1. No
+other domain is global. In particular, `support` remains explicit because its charter permits
+Node.js runtime APIs.
+
+| Domain            | Allowed direct domain dependencies                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| `type-utils`      | None                                                                                             |
+| `support`         | None                                                                                             |
+| `model`           | None                                                                                             |
+| `instrumentation` | None                                                                                             |
+| `progress`        | None                                                                                             |
+| `dag`             | `instrumentation`, `support`                                                                     |
+| `git`             | `model`                                                                                          |
+| `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                              |
+| `line-diff`       | None                                                                                             |
+| `line-diff-impl`  | `line-diff`                                                                                      |
+| `state`           | `model`, `support`                                                                               |
+| `state-impl`      | `state`, `support`                                                                               |
+| `extraction-api`  | `model`, `progress`, `state`, `support`                                                          |
+| `extraction`      | `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `state`, `support` |
+| `plugin-api`      | `extraction-api`, `instrumentation`                                                              |
+| `plugin-runtime`  | `extraction-api`, `instrumentation`, `plugin-api`, `progress`, `support`                         |
+| `output`          | `extraction-api`                                                                                 |
+| `config`          | `plugin-api`, `support`                                                                          |
+| `cli`             | `config`, `state`, `support`                                                                     |
+| `presentation`    | `instrumentation`, `progress`, `support`                                                         |
+| `execution`       | Listed below because this composition domain has a larger direct dependency set.                 |
+
+`execution` may directly depend on:
+
+- `extraction`
+- `extraction-api`
+- `git`
+- `git-impl`
+- `instrumentation`
+- `line-diff-impl`
+- `model`
+- `output`
+- `plugin-api`
+- `plugin-runtime`
+- `progress`
+- `state`
+- `state-impl`
+- `support`
+
+The allowlist applies to both type-only and runtime imports. The dependency kind remains relevant
+when reviewing a domain's dependency envelope, but `import type` does not bypass the domain
+boundary.
 
 ## 3. Supporting Guidance
 
@@ -157,3 +435,13 @@ directions.
 
 Architecture checks should distinguish type and runtime edges where practical and detect forbidden
 edges, cross-domain deep imports, cycles, and contract-to-implementation violations.
+
+### 3.3 Package and process entrypoints
+
+Root-level entrypoint modules are facades, not domains:
+
+- `src/index.ts` is the executable and top-level process boundary.
+- `src/plugin-api.ts` is the package export facade for `gitlode/plugin-api`.
+
+These modules connect external consumers to the owning domains and should not accumulate product
+policy or implementation details.

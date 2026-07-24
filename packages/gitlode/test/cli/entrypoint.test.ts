@@ -172,7 +172,10 @@ function mockEntrypointModules(
         return options.objectFormat ?? "sha1";
       }
     },
-    JsDiffAdapter: class {},
+  }));
+
+  vi.doMock("../../src/line-diff-impl/index.js", () => ({
+    JsLineDiffCalculator: class {},
   }));
 
   vi.doMock("../../src/runtime/index.js", () => ({

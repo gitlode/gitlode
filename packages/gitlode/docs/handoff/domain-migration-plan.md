@@ -2,11 +2,13 @@
 
 ## Status
 
-Step 0 completed on 2026-07-24. Step 1 has not started.
+Steps 0 and 1 completed on 2026-07-24. Step 2 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
 complete and all durable information has been integrated into the design documentation.
+Behavior-changing cleanup candidates intentionally deferred by this migration are tracked in
+[`domain-migration-follow-ups.md`](domain-migration-follow-ups.md).
 
 ## Scope and constraints
 
@@ -131,7 +133,6 @@ target architecture:
 
 | Temporary exception                                                                                                                | Expires                               |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `git` and `git-impl` own the line-diff port and implementation.                                                                    | Step 1                                |
 | `state` mixes pure checkpoint policy with Node.js filesystem persistence.                                                          | Step 2                                |
 | `core` owns progress, state, extraction, and plugin contracts as well as extraction implementation.                                | Steps 2–7, according to the inventory |
 | `plugins` is the plugin host domain and depends directly on config document types.                                                 | Step 6                                |
@@ -168,6 +169,21 @@ Review:
 - `line-diff` has no Git or repository semantics.
 - Only `line-diff-impl` uses the external `diff` package.
 - Addition and deletion results are unchanged.
+
+#### Step 1 results
+
+- Added the dependency-free `line-diff` contract domain and the `line-diff-impl` implementation
+  domain.
+- Renamed `DiffAdapter` to `LineDiffCalculator` and `JsDiffAdapter` to
+  `JsLineDiffCalculator`.
+- Removed the line-diff contract from `git` and the implementation from `git-impl`.
+- Kept size limits, binary detection, null-result policy, and result validation in the extraction
+  implementation.
+- Preserved the existing invalid-result error text because it can reach CLI output.
+- Recorded that error text and the legacy profiling span names as separate post-migration follow-up
+  candidates.
+- Updated affected tests and design documentation.
+- Passed format, lint, build, and all 577 gitlode tests.
 
 ### Step 2: Migrate state boundaries
 

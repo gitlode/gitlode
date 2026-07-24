@@ -52,9 +52,9 @@ same for the same repository snapshot and extraction request.
 
 `GitAdapter` does not compute line-diff statistics, classify binary content, enforce
 `--max-diff-size`, or infer renames. `DefaultFileChangeExpander` composes a `GitAdapter` with a
-`DiffAdapter`, applies the size guard before binary detection, applies the 8,000-byte NUL heuristic,
-and invokes the diff strategy only for eligible text content. Keeping these derived decisions above
-repository access gives both Git backends one file-level output policy.
+`LineDiffCalculator`, applies the size guard before binary detection, applies the 8,000-byte NUL
+heuristic, and invokes the calculator only for eligible text content. Keeping these derived
+decisions above repository access gives both Git backends one file-level output policy.
 
 ## `isomorphic-git` adapter
 

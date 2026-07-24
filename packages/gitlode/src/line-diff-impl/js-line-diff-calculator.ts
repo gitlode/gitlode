@@ -1,12 +1,9 @@
 import { diffLines } from "diff";
 
-import type { DiffAdapter } from "../git/index.js";
+import type { LineDiffCalculator } from "../line-diff/index.js";
 
-/**
- * Default DiffAdapter backed by the `diff` package's diffLines, using UTF-8
- * decoding.
- */
-export class JsDiffAdapter implements DiffAdapter {
+/** Line-diff calculator backed by the `diff` package's `diffLines`, using UTF-8 decoding. */
+export class JsLineDiffCalculator implements LineDiffCalculator {
   computeLineDiff(before: Uint8Array, after: Uint8Array): { additions: number; deletions: number } {
     const decoder = new TextDecoder("utf-8");
     const oldStr = decoder.decode(before);

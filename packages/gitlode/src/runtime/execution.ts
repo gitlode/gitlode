@@ -22,7 +22,6 @@ import {
   EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
   GitCliAdapter,
   IsomorphicGitAdapter,
-  JsDiffAdapter,
   createCommitTraversalStrategy,
   resolveCommitTraversalStrategyName,
 } from "../git-impl/index.js";
@@ -32,6 +31,7 @@ import {
   noopInstrumentation,
   type Instrumentation,
 } from "../instrumentation/index.js";
+import { JsLineDiffCalculator } from "../line-diff-impl/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
 import {
   checkPluginCompatibility,
@@ -397,7 +397,7 @@ export async function executeWorkerRunRequest(
     const traversalExtractor = new DefaultCommitTraversalExtractor(gitAdapter, instrumentation);
     const fileChangeExpander = new DefaultFileChangeExpander(
       gitAdapter,
-      new JsDiffAdapter(),
+      new JsLineDiffCalculator(),
       instrumentation,
       extractorConfig.maxDiffSize,
     );

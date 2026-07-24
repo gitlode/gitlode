@@ -2,17 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DefaultFileChangeExpander } from "../../src/core/file-change-expander.js";
 import type { CommitFact } from "../../src/core/types.js";
-import { JsDiffAdapter } from "../../src/git-impl/js-diff-adapter.js";
-import type {
-  DiffAdapter,
-  FileBlobChange,
-  FileBlobSnapshot,
-  GitAdapter,
-} from "../../src/git/index.js";
+import type { FileBlobChange, FileBlobSnapshot, GitAdapter } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
 } from "../../src/instrumentation/index.js";
+import { JsLineDiffCalculator } from "../../src/line-diff-impl/index.js";
+import type { LineDiffCalculator } from "../../src/line-diff/index.js";
 import type { BlobOid, CommitOid } from "../../src/model/index.js";
 
 const REPO_PATH = "/fake/repo";
@@ -74,14 +70,14 @@ function makeSource(
 function makeExpander(
   changes: readonly FileBlobChange[],
   options: {
-    readonly diffAdapter?: DiffAdapter;
+    readonly lineDiffCalculator?: LineDiffCalculator;
     readonly maxDiffSize?: number;
     readonly instrumentation?: ConstructorParameters<typeof DefaultFileChangeExpander>[2];
   } = {},
 ): DefaultFileChangeExpander {
   return new DefaultFileChangeExpander(
     makeSource(changes),
-    options.diffAdapter ?? new JsDiffAdapter(),
+    options.lineDiffCalculator ?? new JsLineDiffCalculator(),
     options.instrumentation ?? noopInstrumentation,
     options.maxDiffSize,
   );
@@ -130,7 +126,7 @@ describe("DefaultFileChangeExpander", () => {
     const source = makeSource([], (commitOid, parentOid) => requests.push([commitOid, parentOid]));
     const expander = new DefaultFileChangeExpander(
       source,
-      new JsDiffAdapter(),
+      new JsLineDiffCalculator(),
       noopInstrumentation,
     );
     const root = makeCommitFact({ oid: "1".repeat(40) as CommitOid, parents: [] });
@@ -148,12 +144,12 @@ describe("DefaultFileChangeExpander", () => {
     ]);
   });
 
-  it("skips binary content without invoking DiffAdapter", async () => {
+  it("skips binary content without invoking the line-diff calculator", async () => {
     const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 1 }));
     const binary = new Uint8Array([0x41, 0x00, 0x42]);
     const expander = makeExpander(
       [{ status: "added", before: null, after: snapshot("image.bin", binary) }],
-      { diffAdapter: { computeLineDiff } },
+      { lineDiffCalculator: { computeLineDiff } },
     );
 
     const [result] = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
@@ -169,7 +165,7 @@ describe("DefaultFileChangeExpander", () => {
     const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 0 }));
     const expander = makeExpander(
       [{ status: "added", before: null, after: snapshot("data.txt", content) }],
-      { diffAdapter: { computeLineDiff } },
+      { lineDiffCalculator: { computeLineDiff } },
     );
 
     await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
@@ -184,7 +180,7 @@ describe("DefaultFileChangeExpander", () => {
     const recorder = new LocalInstrumentationRecorder(() => 1);
     const expander = makeExpander(
       [{ status: "added", before: null, after: snapshot("large.bin", content) }],
-      { diffAdapter: { computeLineDiff }, maxDiffSize: 3, instrumentation: recorder },
+      { lineDiffCalculator: { computeLineDiff }, maxDiffSize: 3, instrumentation: recorder },
     );
 
     const [result] = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
@@ -204,7 +200,7 @@ describe("DefaultFileChangeExpander", () => {
     const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 0 }));
     const expander = makeExpander(
       [{ status: "added", before: null, after: snapshot("exact.txt", "1234") }],
-      { diffAdapter: { computeLineDiff }, maxDiffSize: 4 },
+      { lineDiffCalculator: { computeLineDiff }, maxDiffSize: 4 },
     );
 
     const [result] = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
@@ -218,10 +214,10 @@ describe("DefaultFileChangeExpander", () => {
     { additions: 0.5, deletions: 0 },
     { additions: Number.NaN, deletions: 0 },
     { additions: 0, deletions: Number.POSITIVE_INFINITY },
-  ])("rejects invalid DiffAdapter results: %o", async (diffResult) => {
+  ])("rejects invalid line-diff calculator results: %o", async (diffResult) => {
     const expander = makeExpander(
       [{ status: "added", before: null, after: snapshot("file.txt", "text\n") }],
-      { diffAdapter: { computeLineDiff: () => diffResult } },
+      { lineDiffCalculator: { computeLineDiff: () => diffResult } },
     );
 
     await expect(
@@ -229,12 +225,12 @@ describe("DefaultFileChangeExpander", () => {
     ).rejects.toThrow("DiffAdapter returned invalid values");
   });
 
-  it("propagates DiffAdapter errors as runtime errors", async () => {
+  it("propagates line-diff calculator errors as runtime errors", async () => {
     const failure = new Error("diff failed");
     const expander = makeExpander(
       [{ status: "added", before: null, after: snapshot("file.txt", "text\n") }],
       {
-        diffAdapter: {
+        lineDiffCalculator: {
           computeLineDiff() {
             throw failure;
           },

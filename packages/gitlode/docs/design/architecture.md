@@ -171,7 +171,6 @@ Files:
 - `packages/gitlode/src/git/index.ts`
 - `packages/gitlode/src/git-impl/isomorphic-git-adapter.ts`
 - `packages/gitlode/src/git-impl/git-cli-adapter.ts`
-- `packages/gitlode/src/git-impl/js-diff-adapter.ts`
 
 Responsibilities:
 
@@ -191,12 +190,13 @@ config-only `runtime.gitAdapter` setting selects the Git implementation. The def
 `isomorphic-git`; `git-cli` uses the Git executable for traversal and blob acquisition. Durable
 adapter-selection and implementation-boundary details live in `docs/design/git-adapters.md`.
 
-Line-diff computation is delegated by `DefaultFileChangeExpander` to the `DiffAdapter` strategy
-interface. The default implementation (`JsDiffAdapter`) uses the `diff` package's `diffLines`
-function with UTF-8 decoding. Before invoking it, the expander applies `--max-diff-size` to both
-loaded contents, then applies the NUL-byte heuristic to the first 8,000 bytes. Either skip produces
-`additions: null` and `deletions: null`. This orchestration layer is the sole owner of derived
-file-change policy; Git adapters only provide repository facts.
+Line-diff computation is defined independently of repository access in `src/line-diff` and
+implemented in `src/line-diff-impl`. `DefaultFileChangeExpander` delegates calculation to the
+`LineDiffCalculator` contract. The default implementation (`JsLineDiffCalculator`) uses the `diff`
+package's `diffLines` function with UTF-8 decoding. Before invoking it, the expander applies
+`--max-diff-size` to both loaded contents, then applies the NUL-byte heuristic to the first 8,000
+bytes. Either skip produces `additions: null` and `deletions: null`. This orchestration layer is the
+sole owner of derived file-change policy; Git adapters and line-diff calculators do not own it.
 
 ### Output layer
 

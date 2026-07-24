@@ -1,5 +1,4 @@
 export type {
-  DiffAdapter,
   FileBlobChange,
   FileBlobMode,
   FileBlobSnapshot,

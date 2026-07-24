@@ -48,26 +48,6 @@ export type FileBlobChange =
       readonly after: null;
     };
 
-/**
- * Interface for computing line-level diff statistics from
- * raw byte content.
- *
- * Contract invariants for any implementation:
- * - For identical byte inputs, computeLineDiff must return identical additions/deletions.
- * - additions and deletions must be finite non-negative integers.
- * - Binary detection and null-result responsibility belong to the caller;
- *   computeLineDiff is only invoked for text content.
- */
-export interface DiffAdapter {
-  computeLineDiff(
-    before: Uint8Array,
-    after: Uint8Array,
-  ): {
-    additions: number;
-    deletions: number;
-  };
-}
-
 /** Run-scoped repository access resource. Its construction owner disposes it after the run. */
 export interface GitAdapter extends AsyncDisposable {
   /** Object formats this adapter implementation can handle */

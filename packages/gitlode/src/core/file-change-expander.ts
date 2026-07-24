@@ -1,5 +1,6 @@
-import type { DiffAdapter, FileBlobChange, GitAdapter } from "../git/index.js";
+import type { FileBlobChange, GitAdapter } from "../git/index.js";
 import type { Instrumentation, InstrumentationSpan } from "../instrumentation/index.js";
+import type { LineDiffCalculator } from "../line-diff/index.js";
 import type { CommitFact, FileChangeExpander, FileChangeFact } from "./types.js";
 
 const EMPTY_CONTENT = new Uint8Array(0);
@@ -7,19 +8,19 @@ const BINARY_SCAN_LIMIT = 8_000;
 
 export class DefaultFileChangeExpander implements FileChangeExpander {
   private readonly adapter: Pick<GitAdapter, "getFileBlobChanges">;
-  private readonly diffAdapter: DiffAdapter;
+  private readonly lineDiffCalculator: LineDiffCalculator;
   private readonly instrumentation: Instrumentation;
   private readonly maxDiffSize: number | undefined;
   private _skippedDiffCount = 0;
 
   constructor(
     adapter: Pick<GitAdapter, "getFileBlobChanges">,
-    diffAdapter: DiffAdapter,
+    lineDiffCalculator: LineDiffCalculator,
     instrumentation: Instrumentation,
     maxDiffSize?: number,
   ) {
     this.adapter = adapter;
-    this.diffAdapter = diffAdapter;
+    this.lineDiffCalculator = lineDiffCalculator;
     this.instrumentation = instrumentation;
     this.maxDiffSize = maxDiffSize;
   }
@@ -75,7 +76,7 @@ export class DefaultFileChangeExpander implements FileChangeExpander {
     }
 
     const { additions, deletions } = this.instrumentation.run("git.diff", () =>
-      this.diffAdapter.computeLineDiff(beforeContent, afterContent),
+      this.lineDiffCalculator.computeLineDiff(beforeContent, afterContent),
     );
     validateDiffResult(additions, deletions);
     span.incrementCounter("diffs");

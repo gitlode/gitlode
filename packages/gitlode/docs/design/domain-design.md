@@ -157,7 +157,7 @@ utilities.
 - Is type-only, runtime-free, and independent of every other source domain.
 
 Every domain may use `type-utils`; this is the sole global exception to the closed dependency
-allowlist in Section 2.22.
+allowlist in Section 2.21.
 
 ### 2.2 `support`
 
@@ -296,26 +296,22 @@ between text contents.
 
 ### 2.15 `state`
 
-**Purpose:** Adapt persisted checkpoint information to and from the extraction contract.
+**Purpose:** Adapt and persist checkpoint information for the extraction contract.
 
-- Includes pure validation and factories for persisted checkpoint information and persistence ports.
+- Includes pure validation and factories for persisted checkpoint information, persistence ports,
+  Node.js state-file reading and writing, JSON decoding, and atomic file replacement.
 - Uses the checkpoint model defined by `extraction-api`; it does not define extraction input or
   result vocabulary.
 - Excludes missing-state policy, traversal-boundary selection, CLI option validation, extraction
-  execution, unrelated application state, and concrete filesystem persistence.
+  execution, and unrelated application state or persistence.
 - Uses the established user-facing term `state`; its charter prevents the name from becoming a
   general-purpose state bucket.
 
-### 2.16 `state-impl`
+Persistence contracts, pure state operations, and the Node.js implementation remain separate
+modules within this domain. A separate implementation domain becomes warranted only when it
+protects a concrete consumer from implementation dependencies.
 
-**Purpose:** Persist checkpoint state in the supported Node.js environment.
-
-- Includes state-file reading and writing, JSON decoding, loaded-state validation at the I/O
-  boundary, and atomic file replacement.
-- Excludes checkpoint semantics, traversal policy, CLI validation, and unrelated persistence.
-- Owns filesystem and serialization details without widening the state contract.
-
-### 2.17 `output`
+### 2.16 `output`
 
 **Purpose:** Persist projected records as JSON Lines files.
 
@@ -325,7 +321,7 @@ between text contents.
   rendering.
 - Owns output mechanics rather than the meaning of the data being written.
 
-### 2.18 `config`
+### 2.17 `config`
 
 **Purpose:** Define and load the versioned gitlode project configuration document.
 
@@ -335,7 +331,7 @@ between text contents.
   and extraction execution.
 - Owns the configuration document independently of a particular invocation.
 
-### 2.19 `cli`
+### 2.18 `cli`
 
 **Purpose:** Convert command-line input and project configuration into validated invocation input.
 
@@ -346,7 +342,7 @@ between text contents.
   implementation, state persistence, and plugin module loading.
 - Owns invocation semantics specific to the command-line interface.
 
-### 2.20 `presentation`
+### 2.19 `presentation`
 
 **Purpose:** Present progress, diagnostics, and results to the user through stderr.
 
@@ -356,7 +352,7 @@ between text contents.
   execution, and CLI option parsing.
 - Owns rendering and terminal interaction, not the events or data being rendered.
 
-### 2.21 `execution`
+### 2.20 `execution`
 
 **Purpose:** Compose and execute one gitlode run across the main-process and worker boundary.
 
@@ -367,7 +363,7 @@ between text contents.
   configuration-document schema.
 - Acts as the application composition boundary for one run.
 
-### 2.22 Allowed domain dependencies
+### 2.21 Allowed domain dependencies
 
 The following table is a closed allowlist of direct domain dependencies. A domain may not directly
 depend on a domain absent from its row. Transitive dependencies do not grant permission for a direct
@@ -391,7 +387,6 @@ Node.js runtime APIs.
 | `line-diff`       | None                                                                                    |
 | `line-diff-impl`  | `line-diff`                                                                             |
 | `state`           | `extraction-api`, `model`, `support`                                                    |
-| `state-impl`      | `state`, `support`                                                                      |
 | `extraction-api`  | `model`, `progress`, `support`                                                          |
 | `extraction`      | `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `support` |
 | `plugin-api`      | `extraction-api`, `instrumentation`                                                     |
@@ -416,7 +411,6 @@ Node.js runtime APIs.
 - `plugin-runtime`
 - `progress`
 - `state`
-- `state-impl`
 - `support`
 
 The allowlist applies to both type-only and runtime imports. The dependency kind remains relevant

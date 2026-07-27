@@ -138,8 +138,7 @@ Responsibilities:
 In the current worker boundary design, state file reading and writing are main-process
 responsibilities orchestrated by `src/execution/execute-run.ts`. `src/extraction-api` defines the
 checkpoint model carried by extraction request and result contracts. Persistence ports, state-file
-adaptation, and pure validation live in `src/state`; Node.js state-file loading and atomic
-replacement live in `src/state-impl`.
+adaptation, pure validation, Node.js state-file loading, and atomic replacement live in `src/state`.
 
 ### Execution layer
 
@@ -436,9 +435,9 @@ attach to the extraction process and add optional fields to output records.
 - **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
   stderr progress/success pipeline.
 - **`src/presentation/success-report.ts`** — successful-run summary and profile rendering.
-- **`src/state`** — checkpoint persistence ports, adaptation factories, and pure validation for the
-  `extraction-api` checkpoint model.
-- **`src/state-impl`** — Node.js state-file loading, JSON decoding, and atomic replacement.
+- **`src/state`** — checkpoint persistence ports, adaptation factories, pure validation, Node.js
+  state-file loading, JSON decoding, and atomic replacement for the `extraction-api` checkpoint
+  model.
 - **`src/plugin-runtime/module-loader.ts`** — entrypoint resolution, dynamic import, factory
   invocation, and host registry construction.
 - **`src/plugin-runtime/compatibility-checker.ts`** — package metadata discovery and warning-only

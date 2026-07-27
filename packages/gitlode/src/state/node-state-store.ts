@@ -1,6 +1,6 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 
-import type { StateStore, StateStoreValue } from "../state/index.js";
+import type { StateStore, StateStoreValue } from "./types.js";
 
 export class NodeStateStore implements StateStore {
   private readonly stateFilePath: string;

@@ -90,16 +90,6 @@
           ]
         },
         {
-          "name": "state-impl",
-          "pattern": "src/state-impl/**",
-          "allow": [
-            "src/state-impl/**",
-            "src/state/index.ts",
-            "src/support/index.ts",
-            "src/type-utils/index.ts"
-          ]
-        },
-        {
           "name": "extraction-api",
           "pattern": "src/extraction-api/**",
           "allow": [
@@ -201,7 +191,6 @@
             "src/plugin-runtime/index.ts",
             "src/progress/index.ts",
             "src/state/index.ts",
-            "src/state-impl/index.ts",
             "src/support/index.ts",
             "src/type-utils/index.ts"
           ]

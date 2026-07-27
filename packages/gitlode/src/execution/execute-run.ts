@@ -16,8 +16,13 @@ import {
 import { JsLineDiffCalculator } from "../line-diff-impl/index.js";
 import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
 import type { ProgressReporter } from "../progress/index.js";
-import { loadStateFile, NodeStateStore } from "../state-impl/index.js";
-import { createEmptyState, type StateStore, validatePriorState } from "../state/index.js";
+import {
+  createEmptyState,
+  loadStateFile,
+  NodeStateStore,
+  type StateStore,
+  validatePriorState,
+} from "../state/index.js";
 import type { AbsolutePath } from "../support/index.js";
 import { buildGitAdapter, type GitAdapterFactoryDependencies } from "./git-adapter-factory.js";
 import { buildPluginProjector, hasEffectivePluginDeclarations } from "./plugin-bootstrap.js";

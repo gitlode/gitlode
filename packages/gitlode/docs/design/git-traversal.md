@@ -244,7 +244,7 @@ incremental extraction.
 
 State persistence and extraction checkpoint policy have separate owners.
 
-Read phase (`state`, `state-impl`, and the execution boundary):
+Read phase (`state` and the execution boundary):
 
 - Parse state JSON.
 - Validate version (`2` only for incremental mode).

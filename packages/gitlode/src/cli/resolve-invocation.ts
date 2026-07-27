@@ -4,7 +4,6 @@ import {
   type GitAdapterName,
   type ProjectConfigurationV1,
 } from "../config/index.js";
-import type { MissingStatePolicy } from "../state/index.js";
 import {
   dirnameOfFilePath,
   type AbsoluteDirectoryPath,
@@ -15,6 +14,7 @@ import {
 import { program } from "./command-definition.js";
 import type { BootstrapResult } from "./errors.js";
 import { runFilesystemPreflight } from "./filesystem-preflight.js";
+import type { MissingStateOption } from "./missing-state-option.js";
 import type { ParsedCliOptions } from "./option-schema.js";
 import { isCliValueProvided, parseCliOptions } from "./parse-options.js";
 
@@ -34,7 +34,7 @@ export interface BootstrapInput {
   readonly outputPrefix?: string;
   readonly rotation: BootstrapOutputRotation;
   readonly incremental: boolean;
-  readonly missingState?: MissingStatePolicy;
+  readonly missingState?: MissingStateOption;
   readonly range?: BootstrapInputRange;
   readonly stateFilePath?: AbsolutePath;
   readonly perFile: boolean;

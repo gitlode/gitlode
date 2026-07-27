@@ -7,4 +7,5 @@ export type {
   ExecutionRuntimeError,
   ExecutionSuccessPayload,
   ExecutionUserError,
+  MissingStatePolicy,
 } from "./types.js";

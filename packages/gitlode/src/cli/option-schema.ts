@@ -5,8 +5,8 @@ import {
   ROTATION_SIZE_MAX_BYTES,
   ROTATION_SIZE_MIN_BYTES,
 } from "../config/index.js";
-import { MISSING_STATES } from "../state/index.js";
 import type { IsoDateTimeString } from "../support/index.js";
+import { MISSING_STATE_OPTION_VALUES } from "./missing-state-option.js";
 
 export function positiveIntegerString(error?: string) {
   return z
@@ -53,8 +53,8 @@ export const CommandArgsSchema = z.object({
   outputPrefix: z.string().min(1).optional(),
   state: z.string().min(1).optional(),
   missingState: z
-    .enum(MISSING_STATES, {
-      error: `--missing-states must be one of the following values: ${MISSING_STATES.join(", ")}`,
+    .enum(MISSING_STATE_OPTION_VALUES, {
+      error: `--missing-states must be one of the following values: ${MISSING_STATE_OPTION_VALUES.join(", ")}`,
     })
     .optional(),
   sinceRef: z.string().min(1).optional(),

@@ -1,15 +1,15 @@
 import { existsSync } from "node:fs";
 
-import type { MissingStatePolicy } from "../state/index.js";
 import { dirnameOfFilePath, type AbsolutePath, resolveFilePath } from "../support/index.js";
 import type { BootstrapResult } from "./errors.js";
+import type { MissingStateOption } from "./missing-state-option.js";
 
 export interface FilesystemPreflightInput {
   readonly repositoryPath: string | undefined;
   readonly outputDirectory: string;
   readonly statePath: string | undefined;
   readonly incremental: boolean;
-  readonly missingState: MissingStatePolicy | undefined;
+  readonly missingState: MissingStateOption | undefined;
 }
 
 export interface FilesystemPreflightResult {

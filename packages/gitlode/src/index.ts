@@ -8,6 +8,7 @@ import {
   executeRun,
   type ExecutionRunInput,
   type ExecutionSuccessPayload,
+  type MissingStatePolicy,
 } from "./execution/index.js";
 import { GitAdapterError } from "./git/index.js";
 import {
@@ -18,6 +19,21 @@ import {
   stderrSink,
   type SuccessReportData,
 } from "./presentation/index.js";
+
+function toExecutionMissingStatePolicy(
+  option: BootstrapInput["missingState"],
+): MissingStatePolicy | undefined {
+  switch (option) {
+    case undefined:
+      return undefined;
+    case "error":
+      return "error";
+    case "snapshot":
+      return "snapshot";
+    default:
+      return option satisfies never;
+  }
+}
 
 function toExecutionRunInput(bootstrapInput: BootstrapInput): ExecutionRunInput {
   return {
@@ -36,7 +52,7 @@ function toExecutionRunInput(bootstrapInput: BootstrapInput): ExecutionRunInput 
     pluginBaseDirectory: bootstrapInput.configBaseDir,
     pluginDeclarations: bootstrapInput.extensions,
     incremental: bootstrapInput.incremental,
-    missingState: bootstrapInput.missingState,
+    missingState: toExecutionMissingStatePolicy(bootstrapInput.missingState),
     stateFilePath: bootstrapInput.stateFilePath,
   };
 }

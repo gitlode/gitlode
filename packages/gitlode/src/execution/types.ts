@@ -2,10 +2,10 @@ import type { ExtractionState } from "../extraction-api/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { PluginDeclarations } from "../plugin-runtime/index.js";
 import type { ProgressEvent } from "../progress/index.js";
-import type { MissingStatePolicy } from "../state/index.js";
 import type { AbsoluteDirectoryPath, AbsolutePath, IsoDateTimeString } from "../support/index.js";
 
 export type ExecutionGitAdapterName = "isomorphic-git" | "git-cli";
+export type MissingStatePolicy = "error" | "snapshot";
 
 export type WorkerRunRange =
   | { readonly type: "ref"; readonly since: string }

@@ -169,7 +169,6 @@
           "allow": [
             "src/cli/**",
             "src/config/index.ts",
-            "src/state/index.ts",
             "src/support/index.ts",
             "src/type-utils/index.ts"
           ]

@@ -298,12 +298,11 @@ between text contents.
 
 **Purpose:** Adapt persisted checkpoint information to and from the extraction contract.
 
-- Includes pure validation and factories for persisted checkpoint information, persistence ports,
-  and state-side missing-state concepts.
+- Includes pure validation and factories for persisted checkpoint information and persistence ports.
 - Uses the checkpoint model defined by `extraction-api`; it does not define extraction input or
   result vocabulary.
-- Excludes traversal-boundary selection, CLI option validation, extraction execution, and unrelated
-  application state, as well as concrete filesystem persistence.
+- Excludes missing-state policy, traversal-boundary selection, CLI option validation, extraction
+  execution, unrelated application state, and concrete filesystem persistence.
 - Uses the established user-facing term `state`; its charter prevents the name from becoming a
   general-purpose state bucket.
 
@@ -341,7 +340,8 @@ between text contents.
 **Purpose:** Convert command-line input and project configuration into validated invocation input.
 
 - Includes command definitions, CLI value schemas, CLI-specific validation, precedence resolution,
-  path-option resolution and preflight checks, termination results, and CLI-facing input types.
+  path-option resolution and preflight checks, accepted missing-state option values, termination
+  results, and CLI-facing input types.
 - Excludes worker execution, extraction construction, repository traversal, presentation
   implementation, state persistence, and plugin module loading.
 - Owns invocation semantics specific to the command-line interface.
@@ -361,8 +361,8 @@ between text contents.
 **Purpose:** Compose and execute one gitlode run across the main-process and worker boundary.
 
 - Includes run inputs and results, worker protocol and transport, concrete component construction,
-  repository preflight and metadata resolution, run-scoped resource ownership, and extraction
-  invocation.
+  repository preflight and metadata resolution, missing-state execution policy, run-scoped resource
+  ownership, and extraction invocation.
 - Excludes CLI parsing, extraction policy, concrete presentation, adapter internals, and
   configuration-document schema.
 - Acts as the application composition boundary for one run.
@@ -398,7 +398,7 @@ Node.js runtime APIs.
 | `plugin-runtime`  | `extraction-api`, `instrumentation`, `plugin-api`, `progress`, `support`                |
 | `output`          | `extraction-api`                                                                        |
 | `config`          | `plugin-api`, `support`                                                                 |
-| `cli`             | `config`, `state`, `support`                                                            |
+| `cli`             | `config`, `support`                                                                     |
 | `presentation`    | `instrumentation`, `progress`, `support`                                                |
 | `execution`       | Listed below because this composition domain has a larger direct dependency set.        |
 

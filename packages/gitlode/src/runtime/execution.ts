@@ -8,7 +8,6 @@ import type {
   ExtractorConfig,
   ExtractionRange,
   FactProjector,
-  ProgressReporter,
 } from "../core/index.js";
 import {
   DefaultCommitTraversalExtractor,
@@ -40,6 +39,7 @@ import {
   resolvePluginEntries,
 } from "../plugins/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
+import type { ProgressReporter } from "../progress/index.js";
 import { validatePriorState } from "../state/index.js";
 import { type AbsoluteDirectoryPath, type AbsolutePath, firstOrThrow } from "../support/index.js";
 import type { WorkerRunInput, WorkerRunRange, WorkerRunRequest } from "./types.js";

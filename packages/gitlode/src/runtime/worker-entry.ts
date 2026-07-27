@@ -1,7 +1,7 @@
 import { parentPort } from "node:worker_threads";
 
-import type { ProgressReporter } from "../core/index.js";
 import { GitAdapterError } from "../git/index.js";
+import type { ProgressReporter } from "../progress/index.js";
 import { executeWorkerRunRequest } from "./execution.js";
 import type { WorkerRunMessage, WorkerRunRequest, WorkerRunResult } from "./types.js";
 

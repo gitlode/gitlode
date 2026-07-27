@@ -359,7 +359,8 @@ attach to the extraction process and add optional fields to output records.
   invocation, and parallel `init()` orchestration. All file I/O and dynamic imports happen here.
 - **`src/runtime/execution.ts`** — run-scoped plugin bootstrap orchestration and projector
   selection.
-- **`src/cli/runtime/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
+- **`src/progress`** — presentation-independent run phases, events, and reporter contract.
+- **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
   stderr progress/success pipeline.
 - **`src/cli/runtime/success-report.ts`** — successful-run summary and profile rendering.
 - **`src/state`** — checkpoint persistence ports, adaptation factories, and pure validation for the

@@ -41,9 +41,6 @@ export type {
   ProjectedRepository,
   ProjectionContext,
   ProjectorPlugin,
-  ProgressEvent,
-  ProgressPhase,
-  ProgressReporter,
   RefCheckpoint,
   RotationConfig,
 } from "./types.js";

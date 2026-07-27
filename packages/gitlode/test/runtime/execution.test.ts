@@ -6,7 +6,7 @@ import { join } from "node:path";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ProgressEvent } from "../../src/core/index.js";
+import type { ProgressEvent } from "../../src/progress/index.js";
 import { executeWorkerRunRequest } from "../../src/runtime/execution.js";
 import type { WorkerRunRequest } from "../../src/runtime/types.js";
 import type { AbsolutePath } from "../../src/support/index.js";

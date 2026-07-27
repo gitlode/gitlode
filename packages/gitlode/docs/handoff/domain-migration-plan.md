@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–2 completed on 2026-07-24. Step 3 has not started.
+Steps 0–3 completed on 2026-07-24. Step 4 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -134,7 +134,7 @@ target architecture:
 
 | Temporary exception                                                                                                                | Expires                               |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `core` owns progress, extraction, and plugin contracts as well as extraction implementation.                                       | Steps 3–7, according to the inventory |
+| `core` owns extraction and plugin contracts as well as extraction implementation.                                                  | Steps 4–7, according to the inventory |
 | `state` depends on checkpoint contracts in the legacy `core` domain until they move to `extraction-api`.                           | Step 4                                |
 | `plugins` is the plugin host domain and depends directly on config document types.                                                 | Step 6                                |
 | `config` imports CLI constants and termination types.                                                                              | Step 8                                |
@@ -246,6 +246,19 @@ Review:
 - Extraction and plugin initialization phases remain expressible.
 - Reconsider warning/diagnostic ownership if the implementation reveals that it does not belong in
   the progress contract.
+
+#### Step 3 results
+
+- Added the dependency-free top-level `progress` domain.
+- Moved `ProgressPhase`, `ProgressEvent`, and `ProgressReporter` out of `core`.
+- Updated extraction, plugin enrichment, worker transport, runtime, presentation, and tests to
+  depend on `progress` directly.
+- Kept terminal controller state, formatting, scheduling, TTY behavior, and rendering under
+  `presentation/progress`.
+- Preserved all event shapes and warning behavior.
+- Recorded the overlap between progress warnings and the worker diagnostic channel as a separate
+  follow-up rather than changing the protocol in this migration.
+- Passed format, lint, build, and all 577 gitlode tests.
 
 ### Step 4: Establish extraction-api
 

@@ -8,7 +8,6 @@ import type {
   FileChangeFact,
   PluginEntry,
   PluginProjectionResult,
-  ProgressReporter,
   ProjectionContext,
   ProjectorPlugin,
   ProjectedRecord,
@@ -16,6 +15,7 @@ import type {
 } from "../../src/core/types.js";
 import type { CommitOid } from "../../src/model/types.js";
 import { initializePlugins } from "../../src/plugins/plugins.js";
+import type { ProgressReporter } from "../../src/progress/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

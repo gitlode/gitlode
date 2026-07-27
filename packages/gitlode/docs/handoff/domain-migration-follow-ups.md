@@ -97,6 +97,34 @@ schema migration is explicitly approved. Review `StateStore` and `StateStoreValu
 loading and writing, composition-root mapping, incremental extraction tests, state design
 documentation, and any future state JSON schema documentation together.
 
+## Progress follow-ups
+
+### Separate warnings from progress events
+
+`ProgressEvent` currently includes:
+
+```text
+{ type: "warning"; message: string }
+```
+
+A warning is a diagnostic rather than a description of run progress. The worker protocol also has a
+separate diagnostic channel, so retaining warnings in `ProgressEvent` leaves two paths for similar
+messages and weakens the otherwise presentation-independent progress charter.
+
+Candidate follow-up:
+
+- define one host-facing diagnostic contract and ownership model;
+- route extraction and plugin warnings through that contract rather than through `ProgressEvent`;
+- decide whether the existing worker diagnostic channel can serve this role or needs a
+  dependency-light contract outside `runtime`;
+- keep progress limited to phases and quantitative progress if the separation is adopted;
+- preserve warning ordering, quiet/TTY rendering, text, and failure behavior unless separately
+  approved.
+
+Review extraction warning producers, plugin-runtime warnings, worker messages, `RunPresenter`,
+`ProgressController`, and their tests together. This is a protocol and presentation refactoring,
+not part of the mechanical Step 3 domain move.
+
 ## Lifecycle
 
 Add similar migration-deferred behavior or diagnostic changes here as they are discovered. Do not

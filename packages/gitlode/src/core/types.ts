@@ -1,5 +1,6 @@
 import type { Instrumentation, ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { CommitOid, PersonIdentity, RefType } from "../model/index.js";
+import type { ProgressReporter } from "../progress/index.js";
 import type { AbsolutePath } from "../support/index.js";
 import type { Brand } from "../type-utils/index.js";
 
@@ -127,26 +128,6 @@ export interface ExtractorConfig {
   readonly range?: ExtractionRange;
   readonly granularity: "commit" | "file";
   readonly maxDiffSize?: number;
-}
-
-export type ProgressPhase = "initializing-plugins" | "preparing" | "extracting" | "finalizing";
-
-export type ProgressEvent =
-  | { readonly type: "phase-start"; readonly phase: ProgressPhase }
-  | {
-      readonly type: "extracting-progress";
-      readonly phase: "extracting";
-      readonly refIndex: number;
-      readonly refCount: number;
-      readonly commitsTraversed: number;
-      readonly recordsWritten: number;
-      readonly bytesWritten: number;
-    }
-  | { readonly type: "phase-end"; readonly phase: ProgressPhase }
-  | { readonly type: "warning"; readonly message: string };
-
-export interface ProgressReporter {
-  emit(event: ProgressEvent): void;
 }
 
 export interface RefCheckpoint {

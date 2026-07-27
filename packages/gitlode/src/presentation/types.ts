@@ -1,5 +1,5 @@
-import type { ProgressReporter } from "../core/types.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
+import type { ProgressReporter } from "../progress/index.js";
 import type { RunPresenter } from "./presenter.js";
 import type { Clock, Scheduler, TerminalSink, UiMode } from "./progress/types.js";
 import type { Styling } from "./styling.js";

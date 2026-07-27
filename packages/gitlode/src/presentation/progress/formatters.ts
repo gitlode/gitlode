@@ -1,4 +1,4 @@
-import type { ProgressPhase } from "../../core/index.js";
+import type { ProgressPhase } from "../../progress/index.js";
 import {
   formatCount,
   formatElapsed,

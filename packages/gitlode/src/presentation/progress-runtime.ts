@@ -1,4 +1,4 @@
-import type { ProgressReporter } from "../core/index.js";
+import type { ProgressReporter } from "../progress/index.js";
 import { createRunPresenter } from "./presenter.js";
 import type { RunPresenter } from "./presenter.js";
 import { resolveUiMode } from "./progress/index.js";

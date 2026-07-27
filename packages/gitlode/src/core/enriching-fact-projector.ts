@@ -1,3 +1,4 @@
+import type { ProgressReporter } from "../progress/index.js";
 import { assertNever } from "../support/index.js";
 import { projectCommit, projectFileChange } from "./fact-projector.js";
 import type {
@@ -5,7 +6,6 @@ import type {
   FactProjector,
   PluginEntry,
   PluginProjectionResult,
-  ProgressReporter,
   ProjectedExtensions,
   ProjectedRecord,
   ProjectionContext,

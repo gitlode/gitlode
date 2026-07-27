@@ -13,8 +13,6 @@ import type {
   FileChangeExpander,
   FileChangeFact,
   OutputSink,
-  ProgressEvent,
-  ProgressReporter,
   ProjectedRecord,
   TraversalPlan,
   TraversalPlanner,
@@ -24,6 +22,7 @@ import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
 } from "../../src/instrumentation/index.js";
+import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 
-import type { ProgressEvent } from "../core/index.js";
+import type { ProgressEvent } from "../progress/index.js";
 import type {
   WorkerDiagnosticSeverity,
   WorkerRunMessage,

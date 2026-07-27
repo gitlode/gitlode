@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  CommitOid,
-  ProgressEvent,
-  ProgressReporter,
-  TraversalPlanningRequest,
-} from "../../src/core/index.js";
+import type { CommitOid, TraversalPlanningRequest } from "../../src/core/index.js";
 import { DefaultTraversalPlanner } from "../../src/core/traversal-planner.js";
 import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
+import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
 
 function makeHash(n: number): CommitOid {
   return n.toString(16).padStart(40, "0") as CommitOid;

@@ -1,4 +1,4 @@
-import type { ProgressEvent, ProgressPhase } from "../../core/index.js";
+import type { ProgressEvent, ProgressPhase } from "../../progress/index.js";
 import { cyclicAtOrThrow } from "../../support/index.js";
 import { formatDiagnosticLines, type DiagnosticSeverity } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";

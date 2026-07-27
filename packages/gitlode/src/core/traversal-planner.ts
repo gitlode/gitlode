@@ -2,6 +2,7 @@ import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { Instrumentation } from "../instrumentation/index.js";
 import type { CommitOid, RefType } from "../model/index.js";
+import type { ProgressReporter } from "../progress/index.js";
 import { assertNever, getOrThrow } from "../support/index.js";
 import type {
   TraversalPlan,
@@ -9,7 +10,6 @@ import type {
   TraversalPlanningRequest,
   ExtractionRange,
   RefCheckpoint,
-  ProgressReporter,
 } from "./types.js";
 
 function buildCheckpointKey(ref: string, refType: RefType): string {

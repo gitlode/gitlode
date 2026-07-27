@@ -1,13 +1,13 @@
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
+import type { ProgressReporter } from "../progress/index.js";
 import type {
   TraversalPlan,
   CommitFact,
   CommitTraversalExtractor,
   CommitTraversalRequest,
   ExtractionRange,
-  ProgressReporter,
 } from "./types.js";
 
 function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | null): CommitFact {

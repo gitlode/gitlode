@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–7 completed on 2026-07-27. Step 8 has not started.
+Steps 0–8 completed on 2026-07-27. Step 9 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -134,7 +134,6 @@ target architecture:
 
 | Temporary exception                                                                                                                | Expires    |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `config` imports CLI constants and termination types.                                                                              | Step 8     |
 | `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9     |
 | Existing cross-domain deep imports may remain until their owning step. No new cross-domain deep import may be introduced.          | Steps 2–10 |
 | The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced.                         | Step 12    |
@@ -431,6 +430,21 @@ Review:
 - Shared size grammar and rotation limits have a clear owner.
 
 Run the generated-schema check.
+
+#### Step 8 results
+
+- Replaced the former `cli/args.ts` aggregate with modules for command definition, option schema,
+  Commander parsing, invocation resolution, and filesystem preflight.
+- Gave config loading its own success/failure result and typed diagnostic codes; the CLI invocation
+  boundary now translates config failures into the unchanged bootstrap user-error result.
+- Removed all `config -> cli` imports.
+- Made config the owner of the shared byte-size grammar and rotation-size limits, which CLI option
+  validation consumes through the config barrel.
+- Moved the invocation-resolution test to match its source owner and added direct coverage for
+  config-owned missing-file and invalid-JSON diagnostics.
+- Preserved CLI/config precedence, config-relative path rebasing, help metadata, validation
+  messages, and exit codes.
+- Passed format, lint, the gitlode build, all 580 gitlode tests, and the generated-schema check.
 
 ### Step 9: Rename runtime to execution
 

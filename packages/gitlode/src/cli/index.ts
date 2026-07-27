@@ -1,3 +1,3 @@
-export { loadBootstrapInput } from "./args.js";
-export type { BootstrapInput, BootstrapInputRange } from "./args.js";
+export { loadBootstrapInput } from "./resolve-invocation.js";
+export type { BootstrapInput, BootstrapInputRange } from "./resolve-invocation.js";
 export type { BootstrapTermination } from "./errors.js";

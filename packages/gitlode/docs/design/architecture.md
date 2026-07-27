@@ -112,7 +112,12 @@ The phase-certified prototype remains internal and is reachable from production 
 Files:
 
 - `packages/gitlode/src/index.ts`
-- `packages/gitlode/src/cli/args.ts`
+- `packages/gitlode/src/cli/command-definition.ts`
+- `packages/gitlode/src/cli/option-schema.ts`
+- `packages/gitlode/src/cli/parse-options.ts`
+- `packages/gitlode/src/cli/resolve-invocation.ts`
+- `packages/gitlode/src/cli/filesystem-preflight.ts`
+- `packages/gitlode/src/cli/errors.ts`
 - `packages/gitlode/src/cli/index.ts`
 - `packages/gitlode/src/cli/runtime/*`
 - `packages/gitlode/src/runtime/types.ts`
@@ -123,6 +128,7 @@ Files:
 Responsibilities:
 
 - Parse and validate command arguments.
+- Translate config loading diagnostics into CLI termination results.
 - Enforce mutual exclusion rules for differential options.
 - Resolve effective settings from CLI/config precedence and derived defaults (for example output prefix).
 - Resolve config-only Git adapter selection from `runtime.gitAdapter`.

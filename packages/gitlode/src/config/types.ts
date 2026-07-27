@@ -50,3 +50,14 @@ export interface ProjectConfigurationV1 {
   readonly runtime?: ConfigRuntimeSection;
   readonly extensions?: ConfigExtensionsSection;
 }
+
+export type ConfigDiagnosticCode = "not-found" | "read-failed" | "invalid-json" | "invalid-schema";
+
+export interface ConfigDiagnostic {
+  readonly code: ConfigDiagnosticCode;
+  readonly message: string;
+}
+
+export type ConfigLoadResult =
+  | { readonly kind: "success"; readonly value: ProjectConfigurationV1 }
+  | { readonly kind: "failure"; readonly diagnostic: ConfigDiagnostic };

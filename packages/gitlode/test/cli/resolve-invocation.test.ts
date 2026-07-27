@@ -7,8 +7,9 @@ import * as git from "isomorphic-git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 
-import { loadBootstrapInput, type BootstrapInput, program } from "../../src/cli/args.js";
+import { program } from "../../src/cli/command-definition.js";
 import type { BootstrapResult } from "../../src/cli/errors.js";
+import { loadBootstrapInput, type BootstrapInput } from "../../src/cli/resolve-invocation.js";
 
 const AUTHOR = {
   name: "Tester",

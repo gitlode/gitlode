@@ -11,7 +11,6 @@ import type {
   ProjectConfigurationV1,
 } from "../config/index.js";
 import { byteSizeString } from "../config/index.js";
-import type { RotationConfig } from "../core/index.js";
 import { MISSING_STATES, type MissingStatePolicy } from "../state/index.js";
 import {
   type AbsoluteDirectoryPath,
@@ -27,12 +26,17 @@ export type BootstrapInputRange =
   | { readonly type: "ref"; readonly since: string }
   | { readonly type: "date"; readonly since: IsoDateTimeString };
 
+export interface BootstrapOutputRotation {
+  readonly maxLines?: number;
+  readonly maxBytes?: number;
+}
+
 export interface BootstrapInput {
   readonly repositoryPath: AbsolutePath;
   readonly refs: readonly string[];
   readonly outputDir: AbsolutePath;
   readonly outputPrefix?: string;
-  readonly rotation: RotationConfig;
+  readonly rotation: BootstrapOutputRotation;
   readonly incremental: boolean;
   readonly missingState?: MissingStatePolicy;
   readonly range?: BootstrapInputRange;

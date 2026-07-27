@@ -2,7 +2,12 @@ import { open } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ProjectedRecord, RotationConfig } from "../core/index.js";
+import type { ProjectedRecord } from "../extraction-api/index.js";
+
+interface RotationOptions {
+  readonly maxLines?: number;
+  readonly maxBytes?: number;
+}
 
 export class OutputWriter {
   private seq = 0;
@@ -13,8 +18,8 @@ export class OutputWriter {
 
   private readonly outputDir: string;
   private readonly filenameFor: (seq: number) => string;
-  private readonly rotation: RotationConfig;
-  constructor(outputDir: string, filenameFor: (seq: number) => string, rotation: RotationConfig) {
+  private readonly rotation: RotationOptions;
+  constructor(outputDir: string, filenameFor: (seq: number) => string, rotation: RotationOptions) {
     this.outputDir = outputDir;
     this.filenameFor = filenameFor;
     this.rotation = rotation;

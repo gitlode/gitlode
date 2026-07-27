@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { DefaultCommitTraversalExtractor } from "../../src/core/commit-traversal-extractor.js";
-import type { TraversalPlan, CommitFact, CommitTraversalRequest } from "../../src/core/index.js";
+import type {
+  CommitFact,
+  CommitTraversalRequest,
+  TraversalPlan,
+} from "../../src/extraction-api/index.js";
 import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { ExtractionState } from "../../src/core/index.js";
+import type { ExtractionState } from "../../src/extraction-api/index.js";
 import { loadStateFile, NodeStateStore } from "../../src/state-impl/index.js";
 import type { StateStore } from "../../src/state/index.js";
 import type { AbsolutePath } from "../../src/support/index.js";

@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import type { BootstrapInput } from "./cli/index.js";
 import { loadBootstrapInput } from "./cli/index.js";
-import type { ExtractionState } from "./core/index.js";
+import type { ExtractionState } from "./extraction-api/index.js";
 import { GitAdapterError } from "./git/index.js";
 import {
   createBootstrapRenderer,

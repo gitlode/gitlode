@@ -1,15 +1,13 @@
-import type { ProgressReporter } from "../progress/index.js";
-import { assertNever } from "../support/index.js";
-import { projectCommit, projectFileChange } from "./fact-projector.js";
 import type {
   Fact,
   FactProjector,
-  PluginEntry,
-  PluginProjectionResult,
   ProjectedExtensions,
   ProjectedRecord,
-  ProjectionContext,
-} from "./types.js";
+} from "../extraction-api/index.js";
+import type { ProgressReporter } from "../progress/index.js";
+import { assertNever } from "../support/index.js";
+import { projectCommit, projectFileChange } from "./fact-projector.js";
+import type { PluginEntry, PluginProjectionResult, ProjectionContext } from "./types.js";
 
 export class EnrichingFactProjector implements FactProjector {
   private readonly pluginEntries: readonly PluginEntry[];

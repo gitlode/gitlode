@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { DefaultExtractionCoordinator } from "../../src/core/extraction-coordinator.js";
+import type { CoordinatorDependencies } from "../../src/core/types.js";
 import type {
   CommitFact,
-  CommitOid,
   CommitTraversalExtractor,
   CommitTraversalRequest,
-  CoordinatorDependencies,
   ExtractionCoordinator,
   ExtractionState,
   Fact,
@@ -17,11 +16,12 @@ import type {
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-} from "../../src/core/types.js";
+} from "../../src/extraction-api/index.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
 } from "../../src/instrumentation/index.js";
+import type { CommitOid } from "../../src/model/index.js";
 import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
 
 // ---------------------------------------------------------------------------

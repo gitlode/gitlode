@@ -5,7 +5,7 @@ import {
   projectCommit,
   projectFileChange,
 } from "../../src/core/fact-projector.js";
-import type { CommitFact, Fact, FileChangeFact } from "../../src/core/types.js";
+import type { CommitFact, Fact, FileChangeFact } from "../../src/extraction-api/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {

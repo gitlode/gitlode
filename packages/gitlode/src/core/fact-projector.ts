@@ -1,5 +1,3 @@
-import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
-import { assertNever, formatUnixTimestampWithOffset } from "../support/index.js";
 import type {
   CommitFact,
   Fact,
@@ -8,7 +6,9 @@ import type {
   ProjectedCommit,
   ProjectedFileChange,
   ProjectedRecord,
-} from "./types.js";
+} from "../extraction-api/index.js";
+import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
+import { assertNever, formatUnixTimestampWithOffset } from "../support/index.js";
 
 export function projectCommit(
   fact: CommitFact,

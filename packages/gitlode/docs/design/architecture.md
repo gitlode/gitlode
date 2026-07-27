@@ -133,20 +133,41 @@ Responsibilities:
 - Handle top-level process exit behavior and user-facing errors.
 
 In the current worker boundary design, state file reading and writing are main-process
-responsibilities in the runtime edge (`src/index.ts`). Core defines the checkpoint model carried by
-its request and result contracts. Persistence ports, state-file adaptation, and pure validation live
-in `src/state`; Node.js state-file loading and atomic replacement live in `src/state-impl`.
+responsibilities in the runtime edge (`src/index.ts`). `src/extraction-api` defines the checkpoint
+model carried by extraction request and result contracts. Persistence ports, state-file adaptation,
+and pure validation live in `src/state`; Node.js state-file loading and atomic replacement live in
+`src/state-impl`.
+
+### Extraction API
+
+Files:
+
+- `packages/gitlode/src/extraction-api/facts.ts`
+- `packages/gitlode/src/extraction-api/records.ts`
+- `packages/gitlode/src/extraction-api/range.ts`
+- `packages/gitlode/src/extraction-api/stages.ts`
+- `packages/gitlode/src/extraction-api/extraction.ts`
+- `packages/gitlode/src/extraction-api/index.ts`
+
+Responsibilities:
+
+- Define canonical commit and file-change facts and their projected record counterparts.
+- Pair facts and records by fact type.
+- Define extraction ranges, checkpoints, requests, and results.
+- Define the traversal, expansion, projection, sink, and coordinator ports.
+- Expose extraction vocabulary without exposing policy implementations, plugin hosting, or
+  persistence mechanics.
 
 ### Core layer
 
 Files:
 
 - `packages/gitlode/src/core/extraction-coordinator.ts`
-- `packages/gitlode/src/core/branch-traversal-planner.ts`
+- `packages/gitlode/src/core/traversal-planner.ts`
 - `packages/gitlode/src/core/commit-traversal-extractor.ts`
 - `packages/gitlode/src/core/file-change-expander.ts`
-- `packages/gitlode/src/core/commit-record-projector.ts`
-- `packages/gitlode/src/core/file-change-record-projector.ts`
+- `packages/gitlode/src/core/fact-projector.ts`
+- `packages/gitlode/src/core/enriching-fact-projector.ts`
 - `packages/gitlode/src/core/types.ts`
 - `packages/gitlode/src/core/index.ts`
 
@@ -327,9 +348,10 @@ and passed to each stage constructor. `IsomorphicGitAdapter` accepts profiling t
 dependency object (not on the `GitAdapter` interface). This keeps the `GitAdapter` contract stable
 while enabling profiling of adapter internals without mutable post-construction wiring.
 
-`ExtractionResult.profilingEntries` is populated on every successful run. The root `elapsed` entry
-is always present. The `--profile` flag controls stderr rendering of the aligned profile block and,
-via the current CLI wiring, enables the detailed stage profilers beneath the root entry.
+The worker success payload includes the profiling summary on every successful run. The root
+`elapsed` entry is always present. The `--profile` flag controls stderr rendering of the aligned
+profile block and, via the current CLI wiring, enables the detailed stage profilers beneath the
+root entry.
 
 In commit-granularity mode (no `--per-file`), file-expansion spans such as `git.blob_read` and
 `git.diff` are absent because `getFileBlobChanges()` is never called.
@@ -364,16 +386,15 @@ attach to the extraction process and add optional fields to output records.
   stderr progress/success pipeline.
 - **`src/cli/runtime/success-report.ts`** — successful-run summary and profile rendering.
 - **`src/state`** — checkpoint persistence ports, adaptation factories, and pure validation for the
-  Core-owned checkpoint model.
+  `extraction-api` checkpoint model.
 - **`src/state-impl`** — Node.js state-file loading, JSON decoding, and atomic replacement.
 - **`src/core/enriching-fact-projector.ts`** — `EnrichingFactProjector` wraps the default
   projector and calls each configured plugin's `project()` per fact in declaration order.
 - **`src/core/types.ts`** — all plugin contract types: `ProjectorPlugin`, `PluginEntry`,
   `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`,
-  `ProjectionContext`, `PluginFailurePolicy`. Also defines the projection record shapes consumed
-  downstream: `ProjectedCommit`, `ProjectedFileChange`, `ProjectedRecord`, the
-  `ProjectedExtensionValue` type (`PluginProjectionValue | null`), and the `ProjectedExtensions`
-  type alias used for the optional `extensions` field on every projected record.
+  `ProjectionContext`, `PluginFailurePolicy`.
+- **`src/extraction-api/records.ts`** — projected record shapes and the serialized extension value,
+  including the host-owned `null` sentinel.
 
 ### Wiring at the runtime edge (`src/index.ts`)
 

@@ -310,4 +310,4 @@ Changes are computed against the **first parent only**.
 - `packages/gitlode/docs/design/architecture.md`
 - `src/output/utils.ts`
 - `src/output/writer.ts`
-- `src/core/types.ts`
+- `src/extraction-api/records.ts`

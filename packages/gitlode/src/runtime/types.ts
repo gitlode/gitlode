@@ -1,5 +1,5 @@
 import type { ConfigExtensionsSection, GitAdapterName } from "../config/index.js";
-import type { ExtractionState, RotationConfig } from "../core/index.js";
+import type { ExtractionState } from "../extraction-api/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { ProgressEvent } from "../progress/index.js";
 import type { AbsoluteDirectoryPath, AbsolutePath, IsoDateTimeString } from "../support/index.js";
@@ -8,12 +8,17 @@ export type WorkerRunRange =
   | { readonly type: "ref"; readonly since: string }
   | { readonly type: "date"; readonly since: IsoDateTimeString };
 
+export interface WorkerOutputRotation {
+  readonly maxLines?: number;
+  readonly maxBytes?: number;
+}
+
 export interface WorkerRunInput {
   readonly repositoryPath: AbsolutePath;
   readonly refs: readonly string[];
   readonly outputDir: AbsolutePath;
   readonly outputPrefix?: string;
-  readonly rotation: RotationConfig;
+  readonly rotation: WorkerOutputRotation;
   readonly range?: WorkerRunRange;
   readonly granularity: "commit" | "file";
   readonly maxDiffSize?: number;

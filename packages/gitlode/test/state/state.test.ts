@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ExtractionState } from "../../src/core/index.js";
+import type { ExtractionState } from "../../src/extraction-api/index.js";
 import { validatePriorState } from "../../src/state/index.js";
 import type { AbsolutePath } from "../../src/support/index.js";
 

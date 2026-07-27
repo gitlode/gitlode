@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–3 completed on 2026-07-24. Step 4 has not started.
+Steps 0–4 completed on 2026-07-27. Step 5 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -82,39 +82,39 @@ The worktree was clean before verification. The baseline passed:
 The following inventory covers every current source module. A directory wildcard includes its
 `index.ts` barrel. Rows that name individual modules override the directory-wide mapping.
 
-| Current module or group                                                                      | Target owner                                                 | Migration step                             |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
-| `type-utils/*`                                                                               | `type-utils`                                                 | unchanged                                  |
-| `support/*`                                                                                  | `support`                                                    | unchanged; module-size review in Step 11   |
-| `model/*`                                                                                    | `model`                                                      | unchanged                                  |
-| `instrumentation/*`                                                                          | `instrumentation`                                            | unchanged                                  |
-| `dag/*`                                                                                      | `dag`                                                        | unchanged; module-size review in Step 11   |
-| `git/*`, except `DiffAdapter`                                                                | `git`                                                        | unchanged                                  |
-| `git/types.ts::DiffAdapter`                                                                  | `line-diff`                                                  | Step 1                                     |
-| `git-impl/js-diff-adapter.ts`                                                                | `line-diff-impl`                                             | Step 1                                     |
-| Remaining `git-impl/*`, including `commit-traversal/*`                                       | `git-impl`                                                   | unchanged; module-size review in Step 11   |
-| `core/types.ts` fact, record, range, stage, sink, and extraction contracts                   | `extraction-api`                                             | Step 4                                     |
-| `core/types.ts` progress contracts                                                           | `progress`                                                   | Step 3                                     |
-| `core/types.ts` checkpoint models                                                            | `extraction-api`                                             | Step 4                                     |
-| `core/types.ts::StateStore` and `core/constants.ts` state constants                          | `state`                                                      | Step 2                                     |
-| `core/types.ts` plugin-author contracts                                                      | `plugin-api`                                                 | Step 5                                     |
-| `core/types.ts::PluginEntry` and plugin-host outcome types                                   | `plugin-runtime`                                             | Step 6                                     |
-| `core/types.ts::CoordinatorDependencies` and remaining implementation-construction contracts | `extraction`                                                 | Step 7                                     |
-| `core/types.ts::RotationConfig`                                                              | ownership resolved while correcting config/output boundaries | Step 8                                     |
-| Stale `core/types.ts` aggregates, including `ExtractorConfig` and `ExtractionResult`         | remove or relocate to their actual consumer                  | Steps 4 and 9                              |
-| `core/enriching-fact-projector.ts`                                                           | `plugin-runtime`                                             | Step 6                                     |
-| Remaining `core/*` implementations and barrel                                                | `extraction`                                                 | Step 7                                     |
-| `state/state-store.ts` pure factories and validation                                         | `state`                                                      | Step 2                                     |
-| `state/state-store.ts` filesystem loading and `NodeStateStore`; `state/index.ts` exports     | `state-impl`                                                 | Step 2                                     |
-| `plugins/*`                                                                                  | `plugin-runtime`                                             | Step 6                                     |
-| `output/*`                                                                                   | `output`                                                     | unchanged; naming review in Step 10        |
-| `config/*`                                                                                   | `config`                                                     | unchanged; dependency correction in Step 8 |
-| `cli/*`                                                                                      | `cli`                                                        | unchanged; module split in Step 8          |
-| `presentation/*`, except imported progress contracts                                         | `presentation`                                               | unchanged                                  |
-| Progress contracts currently imported by `presentation/*` from `core`                        | `progress`                                                   | Step 3                                     |
-| `runtime/*`                                                                                  | `execution`                                                  | Step 9                                     |
-| Root `plugin-api.ts`                                                                         | package-export facade over `plugin-api`                      | Step 5                                     |
-| Root `index.ts`                                                                              | composition-root facade                                      | Step 10                                    |
+| Current module or group                                                                      | Target owner                                                    | Migration step                             |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------ |
+| `type-utils/*`                                                                               | `type-utils`                                                    | unchanged                                  |
+| `support/*`                                                                                  | `support`                                                       | unchanged; module-size review in Step 11   |
+| `model/*`                                                                                    | `model`                                                         | unchanged                                  |
+| `instrumentation/*`                                                                          | `instrumentation`                                               | unchanged                                  |
+| `dag/*`                                                                                      | `dag`                                                           | unchanged; module-size review in Step 11   |
+| `git/*`, except `DiffAdapter`                                                                | `git`                                                           | unchanged                                  |
+| `git/types.ts::DiffAdapter`                                                                  | `line-diff`                                                     | Step 1                                     |
+| `git-impl/js-diff-adapter.ts`                                                                | `line-diff-impl`                                                | Step 1                                     |
+| Remaining `git-impl/*`, including `commit-traversal/*`                                       | `git-impl`                                                      | unchanged; module-size review in Step 11   |
+| `core/types.ts` fact, record, range, stage, sink, and extraction contracts                   | `extraction-api`                                                | Step 4                                     |
+| `core/types.ts` progress contracts                                                           | `progress`                                                      | Step 3                                     |
+| `core/types.ts` checkpoint models                                                            | `extraction-api`                                                | Step 4                                     |
+| `core/types.ts::StateStore` and `core/constants.ts` state constants                          | `state`                                                         | Step 2                                     |
+| `core/types.ts` plugin-author contracts                                                      | `plugin-api`                                                    | Step 5                                     |
+| `core/types.ts::PluginEntry` and plugin-host outcome types                                   | `plugin-runtime`                                                | Step 6                                     |
+| `core/types.ts::CoordinatorDependencies` and remaining implementation-construction contracts | `extraction`                                                    | Step 7                                     |
+| `core/types.ts::RotationConfig`                                                              | remove shared extraction aggregate; review final boundary names | Step 4 and Step 8                          |
+| Stale `core/types.ts` aggregates, including `ExtractorConfig` and `ExtractionResult`         | remove                                                          | Step 4                                     |
+| `core/enriching-fact-projector.ts`                                                           | `plugin-runtime`                                                | Step 6                                     |
+| Remaining `core/*` implementations and barrel                                                | `extraction`                                                    | Step 7                                     |
+| `state/state-store.ts` pure factories and validation                                         | `state`                                                         | Step 2                                     |
+| `state/state-store.ts` filesystem loading and `NodeStateStore`; `state/index.ts` exports     | `state-impl`                                                    | Step 2                                     |
+| `plugins/*`                                                                                  | `plugin-runtime`                                                | Step 6                                     |
+| `output/*`                                                                                   | `output`                                                        | unchanged; naming review in Step 10        |
+| `config/*`                                                                                   | `config`                                                        | unchanged; dependency correction in Step 8 |
+| `cli/*`                                                                                      | `cli`                                                           | unchanged; module split in Step 8          |
+| `presentation/*`, except imported progress contracts                                         | `presentation`                                                  | unchanged                                  |
+| Progress contracts currently imported by `presentation/*` from `core`                        | `progress`                                                      | Step 3                                     |
+| `runtime/*`                                                                                  | `execution`                                                     | Step 9                                     |
+| Root `plugin-api.ts`                                                                         | package-export facade over `plugin-api`                         | Step 5                                     |
+| Root `index.ts`                                                                              | composition-root facade                                         | Step 10                                    |
 
 Characterization coverage is adequate to begin the migration:
 
@@ -134,8 +134,7 @@ target architecture:
 
 | Temporary exception                                                                                                                | Expires                               |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `core` owns extraction and plugin contracts as well as extraction implementation.                                                  | Steps 4–7, according to the inventory |
-| `state` depends on checkpoint contracts in the legacy `core` domain until they move to `extraction-api`.                           | Step 4                                |
+| `core` owns plugin contracts and extraction implementation.                                                                        | Steps 5–7, according to the inventory |
 | `plugins` is the plugin host domain and depends directly on config document types.                                                 | Step 6                                |
 | `config` imports CLI constants and termination types.                                                                              | Step 8                                |
 | `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9                                |
@@ -291,6 +290,25 @@ Review:
 - Output and plugin consumers receive only the contracts they need.
 - No plugin API reverse dependency exists.
 - Record schema and declaration output remain compatible with the accepted design.
+
+#### Step 4 results
+
+- Added the six-module `extraction-api` domain for facts, projected records, ranges, stage ports,
+  checkpoints, and extraction request/result contracts.
+- Changed `core`, `state`, `output`, runtime composition, the root facade, and affected tests to
+  depend on `extraction-api` directly.
+- Kept implementation-construction dependencies and the transitional plugin-author contracts in
+  `core`; they move in Steps 5–7.
+- Defined serialized extension values in `extraction-api` and derived the transitional non-null
+  plugin value from that contract, preserving `plugin-api -> extraction-api` direction.
+- Removed the unused `ExtractionResult` and the composition-only `ExtractorConfig`.
+- Removed the shared extraction-level `RotationConfig`; CLI, worker transport, and output mechanics
+  now describe only the structural values they consume. Step 8 will review their final names and
+  ownership while correcting CLI/config boundaries.
+- Preserved extraction behavior, checkpoint shape, projected record shape, and plugin declaration
+  surface.
+- Passed format, lint, all-workspace builds, all 577 gitlode tests, and all 64 official plugin
+  tests.
 
 ### Step 5: Establish plugin-api
 

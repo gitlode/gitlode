@@ -3,12 +3,6 @@ import { basename } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import type { ConfigExtensionsSection } from "../config/index.js";
-import type {
-  ExtractionState,
-  ExtractorConfig,
-  ExtractionRange,
-  FactProjector,
-} from "../core/index.js";
 import {
   DefaultCommitTraversalExtractor,
   DefaultExtractionCoordinator,
@@ -17,6 +11,7 @@ import {
   DefaultTraversalPlanner,
   EnrichingFactProjector,
 } from "../core/index.js";
+import type { ExtractionRange, ExtractionState, FactProjector } from "../extraction-api/index.js";
 import {
   EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
   GitCliAdapter,
@@ -383,7 +378,7 @@ export async function executeWorkerRunRequest(
       resolvedRepoUrl,
       resolvedRepoPath,
     );
-    const extractorConfig: ExtractorConfig = {
+    const extractionSettings = {
       refs: input.refs,
       outputDir: input.outputDir,
       outputPrefix: resolvedOutputPrefix,
@@ -399,7 +394,7 @@ export async function executeWorkerRunRequest(
       gitAdapter,
       new JsLineDiffCalculator(),
       instrumentation,
-      extractorConfig.maxDiffSize,
+      extractionSettings.maxDiffSize,
     );
 
     let projector: FactProjector;
@@ -425,10 +420,10 @@ export async function executeWorkerRunRequest(
 
     const sink = new OutputWriterSink(
       new OutputWriter(
-        extractorConfig.outputDir,
+        extractionSettings.outputDir,
         (seq) =>
-          `${extractorConfig.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
-        extractorConfig.rotation,
+          `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
+        extractionSettings.rotation,
       ),
     );
 
@@ -443,14 +438,14 @@ export async function executeWorkerRunRequest(
     });
 
     const result = await instrumentation.runAsync("gitlode.extract", async (span) => {
-      span.incrementCounter("refs", extractorConfig.refs.length);
+      span.incrementCounter("refs", extractionSettings.refs.length);
       const coordinatorResult = await coordinator.run({
         repositoryPath: resolvedRepoPath,
         repoName: resolvedRepoName,
         repoUrl: resolvedRepoUrl,
-        refs: [...extractorConfig.refs],
-        granularity: extractorConfig.granularity,
-        range: extractorConfig.range,
+        refs: [...extractionSettings.refs],
+        granularity: extractionSettings.granularity,
+        range: extractionSettings.range,
         priorState,
         sessionTimestamp,
       });

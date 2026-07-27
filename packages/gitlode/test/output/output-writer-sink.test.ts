@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { ProjectedRecord } from "../../src/core/types.js";
+import type { ProjectedRecord } from "../../src/extraction-api/index.js";
 import { OutputWriterSink } from "../../src/output/output-writer-sink.js";
 import { OutputWriter } from "../../src/output/writer.js";
 

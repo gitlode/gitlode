@@ -1,10 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type {
-  PluginProjectionResult,
-  PluginProjectionValue,
-  ProjectedExtensionValue,
-} from "../../src/core/types.js";
+import type { PluginProjectionResult, PluginProjectionValue } from "../../src/core/types.js";
+import type { ProjectedExtensionValue } from "../../src/extraction-api/index.js";
 
 // ---------------------------------------------------------------------------
 // Plugin contract type assertions

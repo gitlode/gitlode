@@ -1,4 +1,4 @@
-import type { ExtractionState } from "../core/index.js";
+import type { ExtractionState } from "../extraction-api/index.js";
 import { isCommitOidForProfile, isRefType, type OidProfile } from "../model/index.js";
 import type { AbsolutePath } from "../support/index.js";
 

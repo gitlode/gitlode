@@ -1,15 +1,15 @@
-import type { Instrumentation } from "../instrumentation/index.js";
-import { atOrThrow } from "../support/index.js";
 import type {
   CommitFact,
-  CoordinatorDependencies,
   CoordinatorRequest,
   CoordinatorResult,
   ExtractionCoordinator,
   ExtractionState,
   Fact,
   RefCheckpoint,
-} from "./types.js";
+} from "../extraction-api/index.js";
+import type { Instrumentation } from "../instrumentation/index.js";
+import { atOrThrow } from "../support/index.js";
+import type { CoordinatorDependencies } from "./types.js";
 
 async function* deduplicateCommits(
   source: AsyncIterable<CommitFact>,

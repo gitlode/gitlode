@@ -200,7 +200,11 @@ When a plugin returns `fatal` or throws on a given fact:
 - **Core types define the plugin contract.** `ProjectorPlugin`, `PluginEntry`, `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`, `ProjectionContext`, `PluginFailurePolicy` are all in `src/core/types.ts`.
 - **Per-fact plugin profiling is plugin-controlled.** `EnrichingFactProjector` no longer wraps every `project()` call in host-owned timing. If a plugin wants projection profiling, it uses the optional profiler received during `init(runtime)`.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
-- **The `extensions` field is a Core projection concern.** `ProjectedExtensions` is defined in `src/core/types.ts` as `Record<string, ProjectedExtensionValue>` where `ProjectedExtensionValue = PluginProjectionValue | null`. The `null` sentinel is core-reserved: plugins produce it only indirectly via `skip` or `fatal`-with-`skip-fact` results, never by returning `null` directly in `success.data`.
+- **The `extensions` field is an extraction record concern.** `ProjectedExtensions` and
+  `ProjectedExtensionValue` are defined in `src/extraction-api/records.ts`. The latter contains the
+  serializable non-null plugin payload values plus a host-owned `null` sentinel. Plugins produce
+  that sentinel only indirectly through `skip` or `fatal` with `skip-fact`; they cannot return
+  `null` in `success.data`.
 - **gitlode guarantees the outer `extensions` contract only:** namespace key placement, omission when no plugins are active, declaration-order preservation, and the meaning of `null`. The inner shape of a plugin's non-null payload is owned jointly by the plugin author and the user's chosen namespace/config pairing.
 
 ---

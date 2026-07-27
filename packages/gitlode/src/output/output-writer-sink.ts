@@ -1,7 +1,7 @@
-import type { OutputSink, ProjectedRecord } from "../core/index.js";
+import type { OutputSink, ProjectedRecord } from "../extraction-api/index.js";
 import type { OutputWriter } from "./writer.js";
 
-/** Thin adapter that makes `OutputWriter` satisfy the Core-owned `OutputSink` interface. */
+/** Thin adapter that makes `OutputWriter` satisfy the extraction `OutputSink` contract. */
 export class OutputWriterSink implements OutputSink {
   private readonly writer: OutputWriter;
 

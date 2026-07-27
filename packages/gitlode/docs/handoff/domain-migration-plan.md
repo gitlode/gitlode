@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–11 completed on 2026-07-27. Step 12 has not started.
+Steps 0–12 completed on 2026-07-27. Step 13 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -134,7 +134,7 @@ target architecture:
 
 | Temporary exception                                                                                        | Expires |
 | ---------------------------------------------------------------------------------------------------------- | ------- |
-| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced. | Step 12 |
+| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced. | Step 13 |
 
 These exceptions permit only preservation of existing dependencies. They do not authorize new uses
 or expansion of a legacy domain. If a step needs an exception not listed here, stop and review the
@@ -561,30 +561,60 @@ Result:
 - Updated source-aligned tests and durable design references.
 - Passed format, lint, the gitlode build, and all 582 gitlode tests.
 
-### Step 12: Enforce architecture and finalize documentation
+### Step 12: Finalize documentation
 
-Add checks for:
+Finalize documentation:
+
+- keep `architecture.md` and `domain-design.md` independent, with explicit ownership and
+  cross-references;
+- add `domain-design.md` to the design index;
+- update paths in related design documents;
+- remove the working-draft status;
+- keep this handoff document until the separately scoped enforcement work is complete.
+
+Review:
+
+- `architecture.md` provides the system view without duplicating the normative domain rules.
+- `domain-design.md` is clearly the canonical domain design.
+- The design index routes readers to both documents.
+
+Result:
+
+- Made `domain-design.md` the canonical source for domain principles, charters, dependency rules,
+  and source import boundaries.
+- Kept `architecture.md` as the canonical system view and replaced duplicated source-layout rules
+  with a reference to `domain-design.md`.
+- Added the independent domain design document to the design index.
+- Removed the working-draft status.
+- Deferred library selection and mechanical enforcement to Step 13 after the initial
+  dependency-cruiser integration attempt exposed TypeScript 7 compatibility limitations.
+
+### Step 13: Add mechanical architecture enforcement
+
+Select and configure an architecture-checking approach for:
 
 - the closed domain allowlist;
 - contract-to-implementation reverse dependencies;
 - domain cycles;
 - cross-domain deep imports;
 - type-only versus runtime edges where practical;
-- the strict `type-utils` charter and its status as the only global domain.
+- the strict `type-utils` charter and its status as the only global domain; and
+- equality between registered domains and top-level directories under `src/`.
 
-Finalize documentation:
-
-- integrate accepted architecture into `architecture.md`;
-- add `domain-design.md` to the design index;
-- update paths in related design documents;
-- remove the working-draft status;
-- delete this handoff document when no migration work remains.
+The evaluation must account for the current TypeScript toolchain and syntax. In the Step 12
+investigation, dependency-cruiser 18.1 did not accept TypeScript 7 as its TypeScript parser, while
+its SWC parser failed on the `await using` declaration in `execution/execute-run.ts`. Re-evaluate a
+later dependency-cruiser release, Rev-dep, or a narrowly scoped alternative rather than accepting a
+check that silently analyzes no modules.
 
 Review:
 
+- The check analyzes every source module and fails rather than silently succeeding when parsing is
+  incomplete.
 - Implementation, dependency checks, and documentation agree.
 - No transitional allowlist exceptions remain.
 - Checks protect the architecture without preventing legitimate future changes.
+- Delete this handoff document when the migration and enforcement work are both complete.
 
 ## Dependency order
 
@@ -600,7 +630,8 @@ line-diff
   -> execution
   -> entrypoints / presentation / output
   -> local naming and module cleanup
-  -> enforcement and final documentation
+  -> final documentation
+  -> mechanical enforcement
 ```
 
 The sequence establishes low-level contracts before their consumers and delays composition-root

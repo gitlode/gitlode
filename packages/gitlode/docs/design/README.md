@@ -11,7 +11,8 @@ behavioral detail is useful.
 
 | Area                       | Document                                                         | Owns                                                                                              |
 | -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Architecture               | [`architecture.md`](architecture.md)                             | Layering, module ownership, dependency boundaries, runtime flow, and major trade-offs.            |
+| Architecture               | [`architecture.md`](architecture.md)                             | System layering, runtime flow, implementation responsibilities, and major trade-offs.             |
+| Domain design              | [`domain-design.md`](domain-design.md)                           | Domain principles, charters, allowed dependencies, source imports, and enforcement guidance.      |
 | CLI                        | [`cli.md`](cli.md)                                               | Command shape, options, validation, stderr behavior, exit codes, and CLI implementation notes.    |
 | Configuration              | [`configuration.md`](configuration.md)                           | Versioned configuration shape, path resolution, precedence, and validation pipeline.              |
 | Git adapters               | [`git-adapters.md`](git-adapters.md)                             | Git adapter selection, blob-fact boundaries, `git-cli` protocols, lifecycle, and benchmarking.    |

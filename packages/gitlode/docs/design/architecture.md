@@ -2,8 +2,12 @@
 
 ## Purpose
 
-This document is the canonical architecture design for gitlode. Use it to understand durable
-implementation boundaries, design intent, and trade-offs.
+This document is the canonical system architecture design for gitlode. Use it to understand durable
+implementation boundaries, runtime flow, design intent, and trade-offs.
+
+[`domain-design.md`](domain-design.md) is the canonical source for domain classification, domain
+charters, allowed dependencies, and source import boundaries. The layer descriptions here provide a
+runtime-oriented view of those domains rather than a second domain specification.
 
 Agent-specific entrypoints such as `AGENTS.md` and `.github/instructions/*.instructions.md` may
 summarize or route to this document, but they must not replace it as the durable architecture source
@@ -354,20 +358,15 @@ Trade-off:
 
 - Does not solve cross-run duplicates when new branches are introduced later.
 
-## File Layout Convention
+## Source Organization
 
-Each layer follows:
+Top-level source directories are the domains used by the layer descriptions above. Their normative
+charters, dependency allowlist, and barrel-import convention are defined in
+[`domain-design.md`](domain-design.md).
 
-- `types.ts` for interfaces/type aliases only.
-- `index.ts` as a re-export barrel.
-
-This improves type discoverability and keeps runtime modules focused.
-
-Source domains expose their supported in-repository import boundary through `index.ts`. Cross-domain
-imports must use the target domain barrel, while direct module imports are allowed within the same
-domain for implementation details that are not part of the supported boundary. Tests should mirror
-source ownership where practical; cross-domain integration tests live with the primary subject under
-test, and same-domain implementation tests may import the specific internal module they inspect.
+Tests should mirror source ownership where practical. Cross-domain integration tests live with the
+primary subject under test, while same-domain implementation tests may import the specific internal
+module they inspect.
 
 ## Profiling Instrumentation
 

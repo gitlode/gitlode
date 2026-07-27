@@ -1,14 +1,15 @@
 # Domain Design
 
-> Status: Working draft. This document is being developed section by section and is not yet a
-> canonical replacement for the domain descriptions in `architecture.md`.
-
 ## Purpose
 
 This document defines how gitlode divides its source code into domains and how those domains may
 depend on one another. Its purpose is to make future classification decisions repeatable: adding,
 splitting, merging, or renaming a domain should follow the same principles rather than depend on an
 ad hoc judgment about the files involved at the time.
+
+This document is the canonical source for domain charters, dependency rules, and source import
+boundaries. [`architecture.md`](architecture.md) describes the wider system architecture and uses
+these domains to explain runtime responsibilities.
 
 ## 1. Domain Design Principles
 
@@ -435,8 +436,14 @@ boundary.
 
 ### 3.2 Enforcement
 
-Architecture checks should distinguish type and runtime edges where practical and detect forbidden
-edges, cross-domain deep imports, cycles, and contract-to-implementation violations.
+Architecture reviews should compare source changes with the closed allowlist and import rules in
+this document. Mechanical enforcement is planned separately; until it is introduced, reviewers
+must check forbidden edges, cross-domain deep imports, cycles, contract-to-implementation
+violations, and the strict independence of `type-utils`.
+
+An enforcement configuration will be an executable representation of this document, not an
+independent source of architecture decisions. Intentional rule changes must update this document
+and the enforcement configuration together.
 
 ### 3.3 Package and process entrypoints
 

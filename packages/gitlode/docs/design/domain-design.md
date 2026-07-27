@@ -436,14 +436,23 @@ boundary.
 
 ### 3.2 Enforcement
 
-Architecture reviews should compare source changes with the closed allowlist and import rules in
-this document. Mechanical enforcement is planned separately; until it is introduced, reviewers
-must check forbidden edges, cross-domain deep imports, cycles, contract-to-implementation
-violations, and the strict independence of `type-utils`.
+Run `npm run architecture:check` from the repository root after changing source boundaries or
+dependencies. The check uses Rev-dep to:
 
-An enforcement configuration will be an executable representation of this document, not an
-independent source of architecture decisions. Intentional rule changes must update this document
-and the enforcement configuration together.
+- enforce the closed allowlist for both runtime and type-only imports;
+- allow same-domain module imports while requiring cross-domain imports to use `index.ts`;
+- detect source-level circular and unresolved imports; and
+- protect contract-to-implementation direction through the same allowlist.
+
+The repository-root `.rev-dep.config.json` is an executable representation of this document, not an
+independent source of architecture decisions. Its current rule targets `packages/gitlode`; future
+package-level rules belong in the same root configuration.
+
+Intentional rule changes must update this document and the configuration together. Reviewers must
+compare them in both directions: every accepted dependency must be representable, and the
+configuration must not grant dependencies absent from this document. Reviews must also preserve
+charter constraints that the dependency graph does not express directly, especially that
+`type-utils` has no external dependencies and emits no runtime code.
 
 ### 3.3 Package and process entrypoints
 

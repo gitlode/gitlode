@@ -16,7 +16,7 @@ const entrypointPath = fileURLToPath(new URL("../../src/index.ts", import.meta.u
 
 interface MockContext {
   readonly bootstrapRenderer: {
-    renderTermination: ReturnType<typeof vi.fn>;
+    renderUserError: ReturnType<typeof vi.fn>;
     renderRuntimeError: ReturnType<typeof vi.fn>;
   };
   readonly presenter: {
@@ -64,7 +64,7 @@ function mockEntrypointModules(
   } = {},
 ): MockContext {
   const bootstrapRenderer = {
-    renderTermination: vi.fn(),
+    renderUserError: vi.fn(),
     renderRuntimeError: vi.fn(),
   };
 
@@ -211,6 +211,41 @@ describe("CLI entrypoint orchestration", () => {
     });
     expect(context.createProgressRuntime).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(2);
+  });
+
+  it("maps bootstrap user errors to presentation without creating the progress runtime", async () => {
+    const context = mockEntrypointModules({
+      loadBootstrapInput: vi.fn(async () => ({
+        kind: "user-error",
+        message: "invalid invocation",
+        exitCode: 1,
+      })),
+    });
+
+    await importEntrypointAsCli();
+
+    await vi.waitFor(() => {
+      expect(context.bootstrapRenderer.renderUserError).toHaveBeenCalledWith("invalid invocation");
+    });
+    expect(context.createProgressRuntime).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("honors successful bootstrap termination without rendering", async () => {
+    const context = mockEntrypointModules({
+      loadBootstrapInput: vi.fn(async () => ({
+        kind: "success-terminate",
+        exitCode: 0,
+      })),
+    });
+
+    await importEntrypointAsCli();
+
+    await vi.waitFor(() => {
+      expect(process.exitCode).toBe(0);
+    });
+    expect(context.bootstrapRenderer.renderUserError).not.toHaveBeenCalled();
+    expect(context.createProgressRuntime).not.toHaveBeenCalled();
   });
 
   it("renders worker user-error through the progress presenter", async () => {

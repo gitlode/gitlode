@@ -1,0 +1,239 @@
+{
+  "configVersion": "1.12",
+  "$schema": "https://github.com/jayu/rev-dep/blob/master/config-schema/1.12.schema.json?raw=true",
+  "nodeModulesResolution": {
+    "resolutionType": "entry-package",
+    "includeDevDepsFromRoot": true
+  },
+  "ignoreFiles": [
+    "packages/gitlode/test/**",
+    "packages/gitlode/scripts/**",
+    "packages/gitlode/*.config.ts"
+  ],
+  "rules": [
+    {
+      "path": "packages/gitlode",
+      "prodEntryPoints": ["src/index.ts", "src/plugin-api.ts", "src/execution/worker-entry.ts"],
+      "moduleBoundaries": [
+        {
+          "name": "type-utils",
+          "pattern": "src/type-utils/**",
+          "allow": ["src/type-utils/**"]
+        },
+        {
+          "name": "support",
+          "pattern": "src/support/**",
+          "allow": ["src/support/**", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "model",
+          "pattern": "src/model/**",
+          "allow": ["src/model/**", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "instrumentation",
+          "pattern": "src/instrumentation/**",
+          "allow": ["src/instrumentation/**", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "progress",
+          "pattern": "src/progress/**",
+          "allow": ["src/progress/**", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "dag",
+          "pattern": "src/dag/**",
+          "allow": [
+            "src/dag/**",
+            "src/instrumentation/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "git",
+          "pattern": "src/git/**",
+          "allow": ["src/git/**", "src/model/index.ts", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "git-impl",
+          "pattern": "src/git-impl/**",
+          "allow": [
+            "src/git-impl/**",
+            "src/dag/index.ts",
+            "src/git/index.ts",
+            "src/instrumentation/index.ts",
+            "src/model/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "line-diff",
+          "pattern": "src/line-diff/**",
+          "allow": ["src/line-diff/**", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "line-diff-impl",
+          "pattern": "src/line-diff-impl/**",
+          "allow": ["src/line-diff-impl/**", "src/line-diff/index.ts", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "state",
+          "pattern": "src/state/**",
+          "allow": [
+            "src/state/**",
+            "src/extraction-api/index.ts",
+            "src/model/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "state-impl",
+          "pattern": "src/state-impl/**",
+          "allow": [
+            "src/state-impl/**",
+            "src/state/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "extraction-api",
+          "pattern": "src/extraction-api/**",
+          "allow": [
+            "src/extraction-api/**",
+            "src/model/index.ts",
+            "src/progress/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "extraction",
+          "pattern": "src/extraction/**",
+          "allow": [
+            "src/extraction/**",
+            "src/extraction-api/index.ts",
+            "src/git/index.ts",
+            "src/instrumentation/index.ts",
+            "src/line-diff/index.ts",
+            "src/model/index.ts",
+            "src/progress/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "plugin-api",
+          "pattern": "src/plugin-api/**",
+          "allow": [
+            "src/plugin-api/**",
+            "src/extraction-api/index.ts",
+            "src/instrumentation/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "plugin-runtime",
+          "pattern": "src/plugin-runtime/**",
+          "allow": [
+            "src/plugin-runtime/**",
+            "src/extraction-api/index.ts",
+            "src/instrumentation/index.ts",
+            "src/plugin-api/index.ts",
+            "src/progress/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "output",
+          "pattern": "src/output/**",
+          "allow": ["src/output/**", "src/extraction-api/index.ts", "src/type-utils/index.ts"]
+        },
+        {
+          "name": "config",
+          "pattern": "src/config/**",
+          "allow": [
+            "src/config/**",
+            "src/plugin-api/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "cli",
+          "pattern": "src/cli/**",
+          "allow": [
+            "src/cli/**",
+            "src/config/index.ts",
+            "src/state/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "presentation",
+          "pattern": "src/presentation/**",
+          "allow": [
+            "src/presentation/**",
+            "src/instrumentation/index.ts",
+            "src/progress/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "execution",
+          "pattern": "src/execution/**",
+          "allow": [
+            "src/execution/**",
+            "src/extraction/index.ts",
+            "src/extraction-api/index.ts",
+            "src/git/index.ts",
+            "src/git-impl/index.ts",
+            "src/instrumentation/index.ts",
+            "src/line-diff-impl/index.ts",
+            "src/model/index.ts",
+            "src/output/index.ts",
+            "src/plugin-api/index.ts",
+            "src/plugin-runtime/index.ts",
+            "src/progress/index.ts",
+            "src/state/index.ts",
+            "src/state-impl/index.ts",
+            "src/support/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        },
+        {
+          "name": "executable-entrypoint",
+          "pattern": "src/index.ts",
+          "allow": [
+            "src/cli/index.ts",
+            "src/execution/index.ts",
+            "src/git/index.ts",
+            "src/presentation/index.ts"
+          ]
+        },
+        {
+          "name": "plugin-api-entrypoint",
+          "pattern": "src/plugin-api.ts",
+          "allow": [
+            "src/extraction-api/index.ts",
+            "src/instrumentation/index.ts",
+            "src/model/index.ts",
+            "src/plugin-api/index.ts",
+            "src/type-utils/index.ts"
+          ]
+        }
+      ],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "unresolvedImportsDetection": true
+    }
+  ]
+}

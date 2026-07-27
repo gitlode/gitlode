@@ -1,10 +1,8 @@
-import type { BootstrapTermination } from "../cli/index.js";
 import { splitMessageLines } from "./diagnostics.js";
 import { normalizeUnknownError } from "./presenter.js";
 import type { TerminalSink } from "./progress/index.js";
 
 export interface BootstrapRenderer {
-  renderTermination(termination: BootstrapTermination): void;
   renderUserError(message: string): void;
   renderRuntimeError(error: unknown): void;
 }
@@ -17,11 +15,6 @@ export function createBootstrapRenderer(sink: Pick<TerminalSink, "writeLine">): 
   }
 
   return {
-    renderTermination(termination) {
-      if (termination.kind === "user-error") {
-        writeMessage(termination.message);
-      }
-    },
     renderUserError(message) {
       writeMessage(message);
     },

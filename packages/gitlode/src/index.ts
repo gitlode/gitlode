@@ -63,7 +63,9 @@ async function main(): Promise<void> {
   try {
     const parseResult = await loadBootstrapInput();
     if (parseResult.kind !== "success") {
-      bootstrapRenderer.renderTermination(parseResult);
+      if (parseResult.kind === "user-error") {
+        bootstrapRenderer.renderUserError(parseResult.message);
+      }
       process.exitCode = parseResult.exitCode;
       return;
     }

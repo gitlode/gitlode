@@ -1,6 +1,6 @@
 export type { CoordinatorDependencies } from "./types.js";
-export { DefaultTraversalPlanner } from "./traversal-planner.js";
-export { DefaultExtractionCoordinator } from "./extraction-coordinator.js";
-export { DefaultCommitTraversalExtractor } from "./commit-traversal-extractor.js";
-export { DefaultFileChangeExpander } from "./file-change-expander.js";
-export { DefaultFactProjector, projectCommit, projectFileChange } from "./fact-projector.js";
+export { RepositoryTraversalPlanner } from "./repository-traversal-planner.js";
+export { ExtractionPipeline } from "./extraction-pipeline.js";
+export { CommitFactExtractor } from "./commit-fact-extractor.js";
+export { FileChangeFactExpander } from "./file-change-fact-expander.js";
+export { BuiltInFactProjector } from "./built-in-fact-projector.js";

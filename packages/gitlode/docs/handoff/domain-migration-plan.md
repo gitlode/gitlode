@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–10 completed on 2026-07-27. Step 11 has not started.
+Steps 0–11 completed on 2026-07-27. Step 12 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -378,11 +378,11 @@ Review:
 Move the remaining product-policy implementations:
 
 ```text
-traversal-planner.ts
-commit-traversal-extractor.ts
-file-change-expander.ts
-fact-projector.ts
-extraction-coordinator.ts
+repository-traversal-planner.ts
+commit-fact-extractor.ts
+file-change-fact-expander.ts
+built-in-fact-projector.ts
+extraction-pipeline.ts
 ```
 
 Prioritize mechanical domain movement. Defer broad class and function renames to Step 11.
@@ -541,6 +541,25 @@ Review:
 - State machines remain understandable.
 - Public surfaces do not expand accidentally.
 - Obsolete comments and APIs from the former structure are removed.
+
+Result:
+
+- Replaced extraction implementation names based on `Default` with responsibility-bearing names:
+  `RepositoryTraversalPlanner`, `CommitFactExtractor`, `FileChangeFactExpander`,
+  `BuiltInFactProjector`, and `ExtractionPipeline`.
+- Renamed the presentation heartbeat implementation to `IntervalHeartbeatScheduler`. DAG traversal
+  now distinguishes the default-frontier selection policy from the concrete FIFO-frontier factory.
+- Split `support/work-queue.ts` into the `WorkQueue` contract, `priority-queue.ts`, and
+  `ordered-queue.ts`, while preserving the domain barrel.
+- Extracted Git commit-object parsing from `GitCliAdapter` into `git-cli-commit-parser.ts`. Existing
+  raw-diff and cat-file protocol modules already provide the other clear Git CLI helper boundaries.
+- Retained each DAG state machine as a complete unit in `dag/traversal.ts`: splitting the strategies
+  would introduce a new internal traversal protocol without giving any state an independent owner
+  or reason to change.
+- Retained the Git adapter facades and isomorphic-git tree-change implementation as cohesive
+  backend-specific units; code volume alone did not justify additional modules.
+- Updated source-aligned tests and durable design references.
+- Passed format, lint, the gitlode build, and all 582 gitlode tests.
 
 ### Step 12: Enforce architecture and finalize documentation
 

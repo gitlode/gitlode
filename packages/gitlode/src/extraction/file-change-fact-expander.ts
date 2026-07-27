@@ -6,7 +6,7 @@ import type { LineDiffCalculator } from "../line-diff/index.js";
 const EMPTY_CONTENT = new Uint8Array(0);
 const BINARY_SCAN_LIMIT = 8_000;
 
-export class DefaultFileChangeExpander implements FileChangeExpander {
+export class FileChangeFactExpander implements FileChangeExpander {
   private readonly adapter: Pick<GitAdapter, "getFileBlobChanges">;
   private readonly lineDiffCalculator: LineDiffCalculator;
   private readonly instrumentation: Instrumentation;

@@ -66,7 +66,7 @@ export function projectFileChange(
   };
 }
 
-export class DefaultFactProjector implements FactProjector {
+export class BuiltInFactProjector implements FactProjector {
   private readonly repoName: string;
   private readonly repoUrl: string | null;
   private readonly instrumentation: Instrumentation;

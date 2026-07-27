@@ -27,7 +27,7 @@ Candidate follow-up:
 
 - rename the subject to `LineDiffCalculator`;
 - explicitly review the resulting CLI diagnostic change;
-- update the assertion in `test/extraction/file-change-expander.test.ts`.
+- update the assertion in `test/extraction/file-change-fact-expander.test.ts`.
 
 ### Profiling span names
 

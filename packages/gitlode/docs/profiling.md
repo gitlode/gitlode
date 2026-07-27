@@ -70,7 +70,7 @@ Useful span names include:
 | `git.file_changes`                              | Core file-change expansion for one commit                                |
 | `git.file_blob_changes`                         | Adapter blob-fact stream for one commit                                  |
 | `git.blob_read`                                 | Individual blob reads in either Git adapter                              |
-| `git.diff`                                      | `LineDiffCalculator` work owned by `DefaultFileChangeExpander`           |
+| `git.diff`                                      | `LineDiffCalculator` work owned by `FileChangeFactExpander`              |
 | `git.*` children                                | Additional Git-internal operations such as ref resolution and merge-base |
 
 Span names are intentionally compact and dot-separated. A deeper name usually represents a local

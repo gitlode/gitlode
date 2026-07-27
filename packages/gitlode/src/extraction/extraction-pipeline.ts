@@ -33,7 +33,7 @@ async function* wrapCommitCounter(
   }
 }
 
-export class DefaultExtractionCoordinator implements ExtractionCoordinator {
+export class ExtractionPipeline implements ExtractionCoordinator {
   private readonly deps: CoordinatorDependencies;
 
   constructor(deps: CoordinatorDependencies) {

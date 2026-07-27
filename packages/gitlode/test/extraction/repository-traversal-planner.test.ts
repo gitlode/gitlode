@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TraversalPlanningRequest } from "../../src/extraction-api/index.js";
-import { DefaultTraversalPlanner } from "../../src/extraction/traversal-planner.js";
+import { RepositoryTraversalPlanner } from "../../src/extraction/repository-traversal-planner.js";
 import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
@@ -59,8 +59,8 @@ function makeAdapter(options: {
   };
 }
 
-function makePlanner(adapter: GitAdapter): DefaultTraversalPlanner {
-  return new DefaultTraversalPlanner(adapter, noopInstrumentation);
+function makePlanner(adapter: GitAdapter): RepositoryTraversalPlanner {
+  return new RepositoryTraversalPlanner(adapter, noopInstrumentation);
 }
 
 function baseRequest(overrides: Partial<TraversalPlanningRequest> = {}): TraversalPlanningRequest {
@@ -73,7 +73,7 @@ function baseRequest(overrides: Partial<TraversalPlanningRequest> = {}): Travers
   };
 }
 
-describe("DefaultTraversalPlanner", () => {
+describe("RepositoryTraversalPlanner planning", () => {
   it("resolves heads in declaration order", async () => {
     const headMain = makeHash(5);
     const headDevelop = makeHash(10);

@@ -1,6 +1,6 @@
 import type { HeartbeatScheduler, Scheduler } from "./types.js";
 
-export class DefaultHeartbeatScheduler implements HeartbeatScheduler {
+export class IntervalHeartbeatScheduler implements HeartbeatScheduler {
   private readonly scheduler: Scheduler;
   private cancelFn: (() => void) | null = null;
 

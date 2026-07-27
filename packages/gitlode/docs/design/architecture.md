@@ -185,11 +185,11 @@ Responsibilities:
 
 Files:
 
-- `packages/gitlode/src/extraction/extraction-coordinator.ts`
-- `packages/gitlode/src/extraction/traversal-planner.ts`
-- `packages/gitlode/src/extraction/commit-traversal-extractor.ts`
-- `packages/gitlode/src/extraction/file-change-expander.ts`
-- `packages/gitlode/src/extraction/fact-projector.ts`
+- `packages/gitlode/src/extraction/extraction-pipeline.ts`
+- `packages/gitlode/src/extraction/repository-traversal-planner.ts`
+- `packages/gitlode/src/extraction/commit-fact-extractor.ts`
+- `packages/gitlode/src/extraction/file-change-fact-expander.ts`
+- `packages/gitlode/src/extraction/built-in-fact-projector.ts`
 - `packages/gitlode/src/extraction/types.ts`
 - `packages/gitlode/src/extraction/index.ts`
 
@@ -234,6 +234,9 @@ Files:
 - `packages/gitlode/src/git/index.ts`
 - `packages/gitlode/src/git-impl/isomorphic-git-adapter.ts`
 - `packages/gitlode/src/git-impl/git-cli-adapter.ts`
+- `packages/gitlode/src/git-impl/git-cli-commit-parser.ts`
+- `packages/gitlode/src/git-impl/git-cli-raw-diff.ts`
+- `packages/gitlode/src/git-impl/git-cli-cat-file-batch.ts`
 
 Responsibilities:
 
@@ -246,6 +249,8 @@ Responsibilities:
 - Record adapter-level commit read/cache/yield telemetry and translate library/runtime failures into `GitAdapterError` codes.
 - Yield deterministic file-backed blob facts with path, OID, mode, and content; do not infer renames
   or compute line-level diffs.
+- Keep Git CLI commit parsing, raw-diff parsing, and cat-file batch protocol mechanics outside the
+  adapter facade.
 - Act as a run-scoped `AsyncDisposable` resource whose construction owner closes backend resources.
 
 The default adapter uses isomorphic-git internally and keeps those details from leaking upward. Commit traversal uses the generic `src/dag` certified-lazy strategy as the production default, with a Git adapter-injected LIFO/preserve frontier. Git child timestamp scheduling hints and the timestamp-priority frontier experiment are owned by `packages/gitlode/src/git-impl/commit-traversal/`; phase-certified traversal remains an internal prototype, but `IsomorphicGitAdapter` can select it for internal experiments via `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. The
@@ -254,7 +259,7 @@ config-only `runtime.gitAdapter` setting selects the Git implementation. The def
 adapter-selection and implementation-boundary details live in `docs/design/git-adapters.md`.
 
 Line-diff computation is defined independently of repository access in `src/line-diff` and
-implemented in `src/line-diff-impl`. `DefaultFileChangeExpander` delegates calculation to the
+implemented in `src/line-diff-impl`. `FileChangeFactExpander` delegates calculation to the
 `LineDiffCalculator` contract. The default implementation (`JsLineDiffCalculator`) uses the `diff`
 package's `diffLines` function with UTF-8 decoding. Before invoking it, the expander applies
 `--max-diff-size` to both loaded contents, then applies the NUL-byte heuristic to the first 8,000
@@ -290,7 +295,7 @@ settings, and their enforcement; it does not own the meaning of projected record
    `src/execution/worker-client.ts`.
 4. Worker entry (`src/execution/worker-entry.ts`) invokes worker-side composition in
    `src/execution/execute-run.ts`.
-5. Worker-side execution builds stage instances and calls `DefaultExtractionCoordinator.run()`.
+5. Worker-side execution builds stage instances and calls `ExtractionPipeline.run()`.
 6. For each requested ref:
    - Resolve ref head.
    - Classify runtime ref type.
@@ -464,11 +469,11 @@ When `--config` is provided:
 3. Plugin entries are resolved and instantiated from the validated `extensions` subsection (`resolvePluginEntries`).
 4. Per-entry profilers are attached if effective profiling is enabled.
 5. `init()` is called in parallel on all entries (`initializePlugins`). Any fatal result aborts.
-6. `EnrichingFactProjector` decorates the base `DefaultFactProjector`.
+6. `EnrichingFactProjector` decorates the base `BuiltInFactProjector`.
 7. Progress phase `"initializing-plugins"` runs before `"preparing"` only when `extensions` is present.
 
 When no `extensions` section is present, plugin loading and initialization are skipped,
-`DefaultFactProjector` is used directly, and `extensions` is omitted from output.
+`BuiltInFactProjector` is used directly, and `extensions` is omitted from output.
 
 ### Boundary rules
 

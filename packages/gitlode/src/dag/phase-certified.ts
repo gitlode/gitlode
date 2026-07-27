@@ -220,6 +220,10 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
 }
 
 function createDefaultPhaseCertifiedFrontier<T>(): DagFrontier<T> {
+  return createFifoPhaseCertifiedFrontier<T>();
+}
+
+function createFifoPhaseCertifiedFrontier<T>(): DagFrontier<T> {
   return new OrderedQueue<T>({
     dequeueOrder: "fifo",
     blockOrder: "preserve",

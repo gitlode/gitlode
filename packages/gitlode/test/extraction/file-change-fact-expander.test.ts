@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CommitFact } from "../../src/extraction-api/index.js";
-import { DefaultFileChangeExpander } from "../../src/extraction/file-change-expander.js";
+import { FileChangeFactExpander } from "../../src/extraction/file-change-fact-expander.js";
 import type { FileBlobChange, FileBlobSnapshot, GitAdapter } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,
@@ -72,10 +72,10 @@ function makeExpander(
   options: {
     readonly lineDiffCalculator?: LineDiffCalculator;
     readonly maxDiffSize?: number;
-    readonly instrumentation?: ConstructorParameters<typeof DefaultFileChangeExpander>[2];
+    readonly instrumentation?: ConstructorParameters<typeof FileChangeFactExpander>[2];
   } = {},
-): DefaultFileChangeExpander {
-  return new DefaultFileChangeExpander(
+): FileChangeFactExpander {
+  return new FileChangeFactExpander(
     makeSource(changes),
     options.lineDiffCalculator ?? new JsLineDiffCalculator(),
     options.instrumentation ?? noopInstrumentation,
@@ -83,7 +83,7 @@ function makeExpander(
   );
 }
 
-describe("DefaultFileChangeExpander", () => {
+describe("FileChangeFactExpander expansion", () => {
   it("yields no output for an empty commit", async () => {
     const results = await collect(
       makeExpander([]).expand(toAsyncIter([makeCommitFact()]), REPO_PATH),
@@ -124,7 +124,7 @@ describe("DefaultFileChangeExpander", () => {
   it("passes no parent for a root commit and only the first parent for a merge", async () => {
     const requests: Array<[CommitOid, CommitOid | undefined]> = [];
     const source = makeSource([], (commitOid, parentOid) => requests.push([commitOid, parentOid]));
-    const expander = new DefaultFileChangeExpander(
+    const expander = new FileChangeFactExpander(
       source,
       new JsLineDiffCalculator(),
       noopInstrumentation,

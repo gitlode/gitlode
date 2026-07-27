@@ -265,7 +265,7 @@ Rename detection is not performed. A renamed file appears as a `"deleted"` entry
 
 Line-level diff statistics. `null` when the file is binary (contains NUL bytes in the first 8000 bytes).
 
-Git adapters return the before/after blob facts; `DefaultFileChangeExpander` owns the derived output
+Git adapters return the before/after blob facts; `FileChangeFactExpander` owns the derived output
 policy. It applies the configured maximum-size guard, detects binary content using the first 8,000
 bytes, and delegates eligible text content to a `LineDiffCalculator`. The default
 `JsLineDiffCalculator` uses the `diff` package's `diffLines` function with UTF-8 decoding.

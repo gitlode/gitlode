@@ -33,7 +33,7 @@ function resolveExcludeHash(
   }
 }
 
-export class DefaultTraversalPlanner implements TraversalPlanner {
+export class RepositoryTraversalPlanner implements TraversalPlanner {
   private readonly adapter: GitAdapter;
   private readonly instrumentation: Instrumentation;
 

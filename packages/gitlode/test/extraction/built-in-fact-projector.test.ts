@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { CommitFact, Fact, FileChangeFact } from "../../src/extraction-api/index.js";
 import {
-  DefaultFactProjector,
+  BuiltInFactProjector,
   projectCommit,
   projectFileChange,
-} from "../../src/extraction/fact-projector.js";
+} from "../../src/extraction/built-in-fact-projector.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
@@ -60,15 +60,15 @@ function makeFileChangeFact(
   };
 }
 
-function makeProjector(repoName: string, repoUrl: string | null): DefaultFactProjector {
-  return new DefaultFactProjector(repoName, repoUrl, noopInstrumentation);
+function makeProjector(repoName: string, repoUrl: string | null): BuiltInFactProjector {
+  return new BuiltInFactProjector(repoName, repoUrl, noopInstrumentation);
 }
 
 // ---------------------------------------------------------------------------
 // Commit-mode projection
 // ---------------------------------------------------------------------------
 
-describe("DefaultFactProjector — commit mode", () => {
+describe("BuiltInFactProjector — built-in commit mode", () => {
   it("maps all ProjectedCommit fields from CommitFact", async () => {
     const projector = makeProjector("repo", "https://github.com/org/repo.git");
     const fact = makeCommitFact();
@@ -166,7 +166,7 @@ describe("DefaultFactProjector — commit mode", () => {
 // File-change-mode projection
 // ---------------------------------------------------------------------------
 
-describe("DefaultFactProjector — file-change mode", () => {
+describe("BuiltInFactProjector — file-change mode", () => {
   it("includes all ProjectedCommit fields denormalized into the file record", async () => {
     const projector = makeProjector("repo", "https://github.com/org/repo.git");
     const fact = makeFileChangeFact();
@@ -268,7 +268,7 @@ describe("DefaultFactProjector — file-change mode", () => {
   });
 });
 
-describe("DefaultFactProjector — exhaustive dispatch", () => {
+describe("BuiltInFactProjector — exhaustive dispatch", () => {
   it("dispatches commit and file-change facts correctly in separate project() calls", async () => {
     const projector = makeProjector("repo", null);
 
@@ -296,7 +296,7 @@ describe("DefaultFactProjector — exhaustive dispatch", () => {
 // ---------------------------------------------------------------------------
 
 describe("projectCommit — pure function", () => {
-  it("returns the same fields as DefaultFactProjector for a commit fact", () => {
+  it("returns the same fields as BuiltInFactProjector for a commit fact", () => {
     const fact = makeCommitFact();
     const record = projectCommit(fact, "my-repo", "https://github.com/org/my-repo");
     expect(record.oid).toBe(fact.oid);
@@ -314,7 +314,7 @@ describe("projectCommit — pure function", () => {
 });
 
 describe("projectFileChange — pure function", () => {
-  it("returns the same fields as DefaultFactProjector for a file-change fact", () => {
+  it("returns the same fields as BuiltInFactProjector for a file-change fact", () => {
     const fact = makeFileChangeFact();
     const record = projectFileChange(fact, "my-repo", "https://github.com/org/my-repo");
     expect(record.oid).toBe(fact.commit.oid);

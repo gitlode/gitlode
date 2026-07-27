@@ -447,3 +447,11 @@ Root-level entrypoint modules are facades, not domains:
 
 These modules connect external consumers to the owning domains and should not accumulate product
 policy or implementation details.
+
+### 3.4 Naming default selections
+
+Do not use `Default` as a substitute for describing an implementation. Use it at a selection
+boundary when several valid choices exist and one is selected if the caller does not specify one.
+When both meanings matter, give the selection policy and concrete implementation separate
+identifiers. For example, a default traversal-frontier factory may delegate to a FIFO-frontier
+factory, preserving both the fallback policy and the implementation's ordering semantics.

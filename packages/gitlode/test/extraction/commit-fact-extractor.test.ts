@@ -5,7 +5,7 @@ import type {
   CommitTraversalRequest,
   TraversalPlan,
 } from "../../src/extraction-api/index.js";
-import { DefaultCommitTraversalExtractor } from "../../src/extraction/commit-traversal-extractor.js";
+import { CommitFactExtractor } from "../../src/extraction/commit-fact-extractor.js";
 import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
@@ -81,8 +81,8 @@ function makeAdapter(
   };
 }
 
-function makeTraverser(adapter: GitAdapter): DefaultCommitTraversalExtractor {
-  return new DefaultCommitTraversalExtractor(adapter, noopInstrumentation);
+function makeTraverser(adapter: GitAdapter): CommitFactExtractor {
+  return new CommitFactExtractor(adapter, noopInstrumentation);
 }
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
@@ -113,7 +113,7 @@ function baseRequest(overrides: Partial<CommitTraversalRequest> = {}): CommitTra
   };
 }
 
-describe("DefaultCommitTraversalExtractor", () => {
+describe("CommitFactExtractor traversal", () => {
   it("yields all commits for the provided plan", async () => {
     const commits = [makeRawCommit(3, [2]), makeRawCommit(2, [1]), makeRawCommit(1)];
     const head = makeOid(3);

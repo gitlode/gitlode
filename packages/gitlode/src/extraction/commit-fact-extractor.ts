@@ -32,11 +32,7 @@ function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | 
   };
 }
 
-// ---------------------------------------------------------------------------
-// DefaultCommitTraversalExtractor
-// ---------------------------------------------------------------------------
-
-export class DefaultCommitTraversalExtractor implements CommitTraversalExtractor {
+export class CommitFactExtractor implements CommitTraversalExtractor {
   private readonly adapter: GitAdapter;
   private readonly instrumentation: Instrumentation;
 

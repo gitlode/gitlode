@@ -73,7 +73,7 @@ async function* walkDagNodeIdsEagerExcludeCore<NodeId extends PropertyKey, Domai
   );
   const frontier =
     options.createFrontier?.() ??
-    createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
+    createDefaultTraversalFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
   frontier.enqueue(factory.createStartItem(nodeId, "main"));
 
   while (!frontier.isEmpty()) {
@@ -181,7 +181,7 @@ async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, Doma
   );
   const includeFrontier =
     options.createFrontier?.() ??
-    createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
+    createDefaultTraversalFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
   includeFrontier.enqueue(factory.createStartItem(nodeId, "main"));
 
   while (!includeFrontier.isEmpty()) {
@@ -303,7 +303,7 @@ export async function* walkDagReachableNodeIdsCore<
   );
   const frontier =
     options.createFrontier?.() ??
-    createDefaultDagFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
+    createDefaultTraversalFrontier<NodeId, BasicDagSchedulingContext, DomainHint>();
   frontier.enqueueMany(factory.createStartItems(nodeIds, role));
 
   while (!frontier.isEmpty()) {
@@ -346,7 +346,21 @@ function recordYieldedNode<NodeId extends PropertyKey, DomainHint = undefined>(
   }
 }
 
-export function createDefaultDagFrontier<
+/**
+ * Selects the context-neutral frontier used when a traversal does not provide one.
+ *
+ * FIFO with preserved block order is the default because it imposes no
+ * domain-specific prioritization.
+ */
+function createDefaultTraversalFrontier<
+  NodeId extends PropertyKey,
+  DagSchedulingContext extends BasicDagSchedulingContext,
+  DomainHint = undefined,
+>(): DagFrontier<DagFrontierItem<NodeId, DagSchedulingContext, DomainHint>> {
+  return createFifoDagFrontier<NodeId, DagSchedulingContext, DomainHint>();
+}
+
+export function createFifoDagFrontier<
   NodeId extends PropertyKey,
   DagSchedulingContext extends BasicDagSchedulingContext,
   DomainHint = undefined,

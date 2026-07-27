@@ -299,7 +299,7 @@ This approach prioritizes successful extraction with explicit warnings in recove
 
 - `packages/gitlode/docs/design/architecture.md`
 - `packages/gitlode/docs/design/commit-traversal-internals.md`
-- `src/extraction/traversal-planner.ts`
-- `src/extraction/commit-traversal-extractor.ts`
-- `src/extraction/extraction-coordinator.ts`
+- `src/extraction/repository-traversal-planner.ts`
+- `src/extraction/commit-fact-extractor.ts`
+- `src/extraction/extraction-pipeline.ts`
 - `src/git-impl/isomorphic-git-adapter.ts`

@@ -2,11 +2,11 @@ import { performance } from "node:perf_hooks";
 
 import type { FactProjector } from "../extraction-api/index.js";
 import {
-  DefaultCommitTraversalExtractor,
-  DefaultExtractionCoordinator,
-  DefaultFactProjector,
-  DefaultFileChangeExpander,
-  DefaultTraversalPlanner,
+  CommitFactExtractor,
+  ExtractionPipeline,
+  BuiltInFactProjector,
+  FileChangeFactExpander,
+  RepositoryTraversalPlanner,
 } from "../extraction/index.js";
 import {
   LocalInstrumentationRecorder,
@@ -134,9 +134,9 @@ export async function executeWorkerRunRequest(
       maxDiffSize: input.maxDiffSize,
     };
 
-    const traversalPlanner = new DefaultTraversalPlanner(gitAdapter, instrumentation);
-    const traversalExtractor = new DefaultCommitTraversalExtractor(gitAdapter, instrumentation);
-    const fileChangeExpander = new DefaultFileChangeExpander(
+    const traversalPlanner = new RepositoryTraversalPlanner(gitAdapter, instrumentation);
+    const traversalExtractor = new CommitFactExtractor(gitAdapter, instrumentation);
+    const fileChangeExpander = new FileChangeFactExpander(
       gitAdapter,
       new JsLineDiffCalculator(),
       instrumentation,
@@ -146,11 +146,11 @@ export async function executeWorkerRunRequest(
     let projector: FactProjector;
     const { pluginBaseDirectory, pluginDeclarations } = input;
     if (!pluginBaseDirectory || !hasEffectivePluginDeclarations(pluginDeclarations)) {
-      projector = new DefaultFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
+      projector = new BuiltInFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
     } else {
       // Plugin-enabled projection historically omitted base-projection profiling.
       // Preserve that observable profile shape during this domain migration.
-      const baseProjector = new DefaultFactProjector(
+      const baseProjector = new BuiltInFactProjector(
         resolvedRepoName,
         resolvedRepoUrl,
         noopInstrumentation,
@@ -177,7 +177,7 @@ export async function executeWorkerRunRequest(
       ),
     );
 
-    const coordinator = new DefaultExtractionCoordinator({
+    const coordinator = new ExtractionPipeline({
       traversalPlanner,
       traversalExtractor,
       fileChangeExpander,

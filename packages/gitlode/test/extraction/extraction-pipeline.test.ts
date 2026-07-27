@@ -15,7 +15,7 @@ import type {
   TraversalPlanner,
   TraversalPlanningRequest,
 } from "../../src/extraction-api/index.js";
-import { DefaultExtractionCoordinator } from "../../src/extraction/extraction-coordinator.js";
+import { ExtractionPipeline } from "../../src/extraction/extraction-pipeline.js";
 import type { CoordinatorDependencies } from "../../src/extraction/types.js";
 import {
   LocalInstrumentationRecorder,
@@ -196,10 +196,10 @@ function baseRequest(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("DefaultExtractionCoordinator", () => {
+describe("ExtractionPipeline orchestration", () => {
   it("commit-mode: runs the commit pipeline and returns correct result", async () => {
     const deps = makeDeps({ oids: ["1".padStart(12, "0"), "2".padStart(12, "0")] });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ granularity: "commit" }));
 
     expect(result.recordsWritten).toBe(2);
@@ -211,7 +211,7 @@ describe("DefaultExtractionCoordinator", () => {
 
   it("file-mode: runs the file-change pipeline and returns correct result", async () => {
     const deps = makeDeps({ oids: ["1".padStart(12, "0"), "2".padStart(12, "0")] });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ granularity: "file" }));
 
     expect(result.recordsWritten).toBe(2);
@@ -237,7 +237,7 @@ describe("DefaultExtractionCoordinator", () => {
     };
 
     const deps = makeDeps({ oids: ["1".padStart(12, "0")], fileChangeExpander: customExpander });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ granularity: "file" }));
 
     expect(result.skippedDiffs).toBe(3);
@@ -246,7 +246,7 @@ describe("DefaultExtractionCoordinator", () => {
   it("commitsTraversed: result contains correct commit count", async () => {
     const oids = ["1".padStart(12, "0"), "2".padStart(12, "0"), "3".padStart(12, "0")];
     const deps = makeDeps({ oids });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest());
 
     expect(result.commitsTraversed).toBe(3);
@@ -258,7 +258,7 @@ describe("DefaultExtractionCoordinator", () => {
       reporter,
       oids: ["1".padStart(12, "0"), "2".padStart(12, "0"), "3".padStart(12, "0")],
     });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest());
 
     const progressEvents = reporter.events.filter((e) => e.type === "extracting-progress");
@@ -271,7 +271,7 @@ describe("DefaultExtractionCoordinator", () => {
   it("phase event sequence: emits prepare/extract/finalize in order", async () => {
     const reporter = makeProgressReporter();
     const deps = makeDeps({ reporter, oids: ["1".padStart(12, "0")] });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest());
 
     const phaseEvents = reporter.events
@@ -311,7 +311,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     };
     const deps = makeDeps({ reporter, plans, traversalExtractor: traverser });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["main", "develop"] }));
 
     const progressEvents = reporter.events.filter(
@@ -339,7 +339,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     };
     const deps = makeDeps({ reporter, sink: failingSink as never });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write failure");
 
     const phaseEndExtract = reporter.events.filter(
@@ -365,7 +365,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     };
     const deps = makeDeps({ sink: failingSink as never });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write failure");
 
     expect(closeCalled).toBe(true);
@@ -393,7 +393,7 @@ describe("DefaultExtractionCoordinator", () => {
       sink: trackingSink as never,
       oids: ["1".padStart(12, "0")],
     });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest());
 
     expect(closeOrder).toEqual(["close"]);
@@ -417,7 +417,7 @@ describe("DefaultExtractionCoordinator", () => {
       sink: closingFailSink as never,
       oids: ["1".padStart(12, "0")],
     });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("close failure");
   });
 
@@ -438,13 +438,13 @@ describe("DefaultExtractionCoordinator", () => {
       sink: failSink as never,
       oids: ["1".padStart(12, "0")],
     });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write fail");
   });
 
   it("returns state even when no state file persistence is active", async () => {
     const deps = makeDeps({ oids: ["1".padStart(12, "0")] });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest());
 
     expect(result.recordsWritten).toBe(1);
@@ -466,7 +466,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     };
     const deps = makeDeps({ plans, traversalExtractor: emptyTraverser });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest());
 
     expect(result.recordsWritten).toBe(0);
@@ -482,7 +482,7 @@ describe("DefaultExtractionCoordinator", () => {
       oids: [],
       reporter,
     });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest());
 
     expect(result.recordsWritten).toBe(0);
@@ -495,7 +495,7 @@ describe("DefaultExtractionCoordinator", () => {
       plans: [],
       oids: [],
     });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ refs: ["nonexistent"] }));
 
     expect(result.recordsWritten).toBe(0);
@@ -526,7 +526,7 @@ describe("DefaultExtractionCoordinator", () => {
       plans,
       traversalExtractor: traverser,
     });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ refs: ["main", "develop"] }));
 
     expect(result.refs).toEqual(["main", "develop"]);
@@ -553,7 +553,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     };
     const deps = makeDeps({ plans, traversalExtractor: traverser });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ refs: ["main", "v1.0"] }));
 
     // Both refs appear in the result (CoordinatorResult.refs)
@@ -588,7 +588,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     ];
     const deps = makeDeps({ plans, reporter, oids: ["1".padStart(12, "0")] });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["main", "v1.0-ann", "abc123", "v1.0"] }));
 
     expect(reporter.warnings).toHaveLength(3);
@@ -608,7 +608,7 @@ describe("DefaultExtractionCoordinator", () => {
       },
     ];
     const deps = makeDeps({ plans, reporter, oids: ["1".padStart(12, "0")] });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["v1.0-ann"] }));
 
     expect(reporter.warnings).toHaveLength(1);
@@ -618,7 +618,7 @@ describe("DefaultExtractionCoordinator", () => {
   it("state generatedAt uses request.sessionTimestamp", async () => {
     const ts = new Date("2025-06-15T12:00:00Z");
     const deps = makeDeps({ oids: ["1".padStart(12, "0")] });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ sessionTimestamp: ts }));
 
     expect(result.state.generatedAt).toBe("2025-06-15T12:00:00.000Z");
@@ -629,7 +629,7 @@ describe("DefaultExtractionCoordinator", () => {
     const instrumentation = new LocalInstrumentationRecorder(() => time++);
 
     const deps = makeDeps({ oids: ["1".padStart(12, "0")], instrumentation });
-    const coord = new DefaultExtractionCoordinator(deps);
+    const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest());
 
     expect(instrumentation.summary()).toEqual([

@@ -7,7 +7,7 @@ import type {
   FileChangeFact,
   ProjectedRecord,
 } from "../../src/extraction-api/index.js";
-import { DefaultFactProjector } from "../../src/extraction/fact-projector.js";
+import { BuiltInFactProjector } from "../../src/extraction/built-in-fact-projector.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/types.js";
 import type {
@@ -78,7 +78,7 @@ class EnrichingFactProjector extends PluginEnrichingFactProjector {
     repoName: string,
     repoUrl: string | null,
   ) {
-    super(new DefaultFactProjector(repoName, repoUrl, noopInstrumentation), entries, reporter);
+    super(new BuiltInFactProjector(repoName, repoUrl, noopInstrumentation), entries, reporter);
   }
 }
 
@@ -105,7 +105,7 @@ function makeEntry(
 
 describe("EnrichingFactProjector — basic enrichment", () => {
   it("invokes the injected base projector once for the complete fact stream", async () => {
-    const baseProjector = new DefaultFactProjector("repo", null, noopInstrumentation);
+    const baseProjector = new BuiltInFactProjector("repo", null, noopInstrumentation);
     const projectSpy = vi.spyOn(baseProjector, "project");
     const projector = new PluginEnrichingFactProjector(baseProjector, [], noopReporter);
 

@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
-import { DefaultFactProjector } from "../../src/core/fact-projector.js";
 import type {
   CommitFact,
   Fact,
   FileChangeFact,
   ProjectedRecord,
 } from "../../src/extraction-api/index.js";
+import { DefaultFactProjector } from "../../src/extraction/fact-projector.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/types.js";
 import type {

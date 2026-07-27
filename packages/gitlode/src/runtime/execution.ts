@@ -3,14 +3,14 @@ import { basename } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import type { ConfigExtensionsSection } from "../config/index.js";
+import type { ExtractionRange, ExtractionState, FactProjector } from "../extraction-api/index.js";
 import {
   DefaultCommitTraversalExtractor,
   DefaultExtractionCoordinator,
   DefaultFactProjector,
   DefaultFileChangeExpander,
   DefaultTraversalPlanner,
-} from "../core/index.js";
-import type { ExtractionRange, ExtractionState, FactProjector } from "../extraction-api/index.js";
+} from "../extraction/index.js";
 import {
   EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
   GitCliAdapter,

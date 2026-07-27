@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { CommitFact, Fact, FileChangeFact } from "../../src/extraction-api/index.js";
 import {
   DefaultFactProjector,
   projectCommit,
   projectFileChange,
-} from "../../src/core/fact-projector.js";
-import type { CommitFact, Fact, FileChangeFact } from "../../src/extraction-api/index.js";
+} from "../../src/extraction/fact-projector.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {

@@ -8,7 +8,7 @@ import type {
 import type { Instrumentation } from "../instrumentation/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 
-/** Constructor dependencies injected into `DefaultExtractionCoordinator`. */
+/** Constructor dependencies injected into the extraction coordinator. */
 export interface CoordinatorDependencies {
   readonly traversalPlanner: TraversalPlanner;
   readonly traversalExtractor: CommitTraversalExtractor;

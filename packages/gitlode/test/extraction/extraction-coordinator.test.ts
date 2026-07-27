@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { DefaultExtractionCoordinator } from "../../src/core/extraction-coordinator.js";
-import type { CoordinatorDependencies } from "../../src/core/types.js";
 import type {
   CommitFact,
   CommitTraversalExtractor,
@@ -17,6 +15,8 @@ import type {
   TraversalPlanner,
   TraversalPlanningRequest,
 } from "../../src/extraction-api/index.js";
+import { DefaultExtractionCoordinator } from "../../src/extraction/extraction-coordinator.js";
+import type { CoordinatorDependencies } from "../../src/extraction/types.js";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,

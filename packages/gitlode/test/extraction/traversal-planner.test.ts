@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DefaultTraversalPlanner } from "../../src/core/traversal-planner.js";
 import type { TraversalPlanningRequest } from "../../src/extraction-api/index.js";
+import { DefaultTraversalPlanner } from "../../src/extraction/traversal-planner.js";
 import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";

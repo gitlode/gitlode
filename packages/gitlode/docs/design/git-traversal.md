@@ -26,7 +26,7 @@ High-level steps:
 2. Select the internal commit traversal strategy.
 3. Traverse parent links from the head while applying the optional exclusion boundary.
 4. Skip commits already visited or proven excluded.
-5. Yield each remaining commit to Core exactly once.
+5. Yield each remaining commit to the extraction policy exactly once.
 
 The selected strategy may establish exclusion eagerly or incrementally, but it must produce the same
 reachable-set difference. Strategy selection and internal graph-work trade-offs are documented in
@@ -59,7 +59,7 @@ Representative traversal result list:
 
 With `--state`:
 
-- Core reads v2 checkpoints from `refs[]` entries.
+- Extraction consumes v2 checkpoints from `refs[]` entries.
 - A checkpoint is matched by exact `(ref, refType)` identity.
 - The matched `tipOid` is used as `excludeHash`.
 - Traversal yields only the set difference: commits reachable from current head but not from `excludeHash`.
@@ -96,7 +96,7 @@ Interpretation for state-based differential:
 With `--since-ref`:
 
 - CLI resolves the ref (tag, branch name, or full commit OID) to a commit OID via `resolveRef()`.
-- Core passes the resolved OID as `excludeHash`.
+- Extraction passes the resolved OID as `excludeHash`.
 
 Example traversal result list:
 
@@ -112,8 +112,8 @@ fast with:
 
 With `--since-date`:
 
-- Core traverses without `excludeHash`.
-- Core filters yielded commits by committer timestamp.
+- Extraction traverses without `excludeHash`.
+- Extraction filters yielded commits by committer timestamp.
 
 Important behavior:
 
@@ -159,7 +159,7 @@ while preserving new merged commits.
 
 ### Within one run
 
-Core keeps a global `visited` set across all configured branches.
+Extraction keeps a global `visited` set across all configured branches.
 
 Outcome:
 
@@ -242,16 +242,16 @@ incremental extraction.
 
 ## State file lifecycle
 
-Core owns state management.
+State persistence and extraction checkpoint policy have separate owners.
 
-Read phase:
+Read phase (`state`, `state-impl`, and the execution boundary):
 
 - Parse state JSON.
 - Validate version (`2` only for incremental mode).
 - Validate repository identity with resolved absolute paths.
 - Validate each `refs[]` entry (`refType`, `tipOid`).
 
-Write phase:
+Write phase (Extraction produces checkpoints; the execution boundary persists them):
 
 - Run completes output writing first.
 - Build candidate v2 checkpoints from successfully resolved refs.
@@ -299,5 +299,7 @@ This approach prioritizes successful extraction with explicit warnings in recove
 
 - `packages/gitlode/docs/design/architecture.md`
 - `packages/gitlode/docs/design/commit-traversal-internals.md`
-- `src/core/extractor.ts`
-- `src/git/isomorphic-git-adapter.ts`
+- `src/extraction/traversal-planner.ts`
+- `src/extraction/commit-traversal-extractor.ts`
+- `src/extraction/extraction-coordinator.ts`
+- `src/git-impl/isomorphic-git-adapter.ts`

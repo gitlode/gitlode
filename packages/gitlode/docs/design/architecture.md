@@ -37,15 +37,15 @@ A useful design lens for output schema decisions: fields act as either **aggrega
 A finer-grained axis is analytically useful only when the data also carries a measure that varies
 meaningfully at that granularity.
 
-Core output grains should therefore prefer entities that are both Git-native and analytically
+Base extraction output grains should therefore prefer entities that are both Git-native and analytically
 stable across repositories and tooling choices. Finer-grained structures derived from diff
 presentation may still be useful, but they are usually better treated as derived signals or
 pipeline enrichments than as default first-class output records unless they establish a reusable
 axis/measure pair with broad value.
 
-This separation is also an extensibility principle: gitlode's core should expose canonical Git
+This separation is also an extensibility principle: gitlode should expose canonical Git
 facts, while organization-specific interpretation or enrichment should be attachable at the
-pipeline boundary rather than embedded into the core extraction model.
+pipeline boundary rather than embedded into the base extraction model.
 
 ### What gitlode is not for
 
@@ -95,11 +95,11 @@ record per line as JSON Lines (commit-granularity by default, file-granularity w
 The architecture is layered:
 
 1. CLI layer parses arguments and builds a validated configuration.
-2. Core layer orchestrates traversal, filtering, mapping, deduplication, and checkpoint state production.
+2. Extraction layer orchestrates traversal, filtering, mapping, deduplication, and checkpoint state production.
 3. Git adapter layer isolates all repository access behind a small interface.
 4. Output layer owns JSONL serialization and file rotation.
 
-This layering keeps policy decisions in Core and implementation details in adapter/output modules.
+This layering keeps product policy in Extraction and implementation details in adapter/output modules.
 
 `packages/gitlode/src/dag/` is an internal generic DAG subsystem used below the Git adapter boundary. It owns node-ID-based traversal algorithms and graph-work instrumentation, but it is not part of the package public API. Git-specific code implements a topology port and calls the DAG subsystem; the DAG subsystem must not depend on Git commit objects, adapter caches, isomorphic-git errors, or Git-specific scheduling hints.
 
@@ -158,17 +158,17 @@ Responsibilities:
 - Expose extraction vocabulary without exposing policy implementations, plugin hosting, or
   persistence mechanics.
 
-### Core layer
+### Extraction layer
 
 Files:
 
-- `packages/gitlode/src/core/extraction-coordinator.ts`
-- `packages/gitlode/src/core/traversal-planner.ts`
-- `packages/gitlode/src/core/commit-traversal-extractor.ts`
-- `packages/gitlode/src/core/file-change-expander.ts`
-- `packages/gitlode/src/core/fact-projector.ts`
-- `packages/gitlode/src/core/types.ts`
-- `packages/gitlode/src/core/index.ts`
+- `packages/gitlode/src/extraction/extraction-coordinator.ts`
+- `packages/gitlode/src/extraction/traversal-planner.ts`
+- `packages/gitlode/src/extraction/commit-traversal-extractor.ts`
+- `packages/gitlode/src/extraction/file-change-expander.ts`
+- `packages/gitlode/src/extraction/fact-projector.ts`
+- `packages/gitlode/src/extraction/types.ts`
+- `packages/gitlode/src/extraction/index.ts`
 
 Responsibilities:
 
@@ -181,7 +181,8 @@ Responsibilities:
 - Coordinate output writer lifecycle.
 - Produce v2 checkpoint state only after successful output completion and sink close.
 
-Important behavior: for date filtering, Core skips old commits and continues traversal. It does not terminate early, because graph traversal order is not chronological.
+Important behavior: for date filtering, Extraction skips old commits and continues traversal. It
+does not terminate early, because graph traversal order is not chronological.
 
 ### Plugin API
 
@@ -253,7 +254,7 @@ Responsibilities:
 - Rotate output files when either threshold is reached.
 - Guarantee LF line endings.
 
-Core provides rotation settings, but Writer owns enforcement.
+Extraction receives a sink; Output owns rotation settings and their enforcement.
 
 ## End-to-End Runtime Flow
 
@@ -279,7 +280,7 @@ Core provides rotation settings, but Writer owns enforcement.
 
 Why:
 
-- Keeps Core testable with fakes.
+- Keeps Extraction testable with fakes.
 - Limits dependency blast radius if Git backend changes later.
 
 Trade-off:
@@ -383,8 +384,8 @@ In commit-granularity mode (no `--per-file`), file-expansion spans such as `git.
 
 Areas that can evolve with low coupling impact:
 
-- Additional output formats by adding new writers behind Core mapping.
-- Progress reporting and post-run summaries in CLI and/or Core return shape.
+- Additional output formats by adding new writers behind Extraction mapping.
+- Progress reporting and post-run summaries in CLI and/or extraction result shape.
 - Cross-run deduplication strategies using merge-base heuristics.
 
 ## Plugin Runtime

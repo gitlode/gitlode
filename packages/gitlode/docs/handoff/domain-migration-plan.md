@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–6 completed on 2026-07-27. Step 7 has not started.
+Steps 0–7 completed on 2026-07-27. Step 8 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -134,7 +134,6 @@ target architecture:
 
 | Temporary exception                                                                                                                | Expires    |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `core` owns extraction implementation.                                                                                             | Step 7     |
 | `config` imports CLI constants and termination types.                                                                              | Step 8     |
 | `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9     |
 | Existing cross-domain deep imports may remain until their owning step. No new cross-domain deep import may be introduced.          | Steps 2–10 |
@@ -396,6 +395,19 @@ Review:
 - The domain contains extraction policy, not Git backends, output I/O, plugin hosting, or state I/O.
 - Date filtering, fallback traversal, and cross-ref deduplication are unchanged.
 - Retry-local and cross-ref deduplication responsibilities remain distinct.
+
+#### Step 7 results
+
+- Renamed the remaining `core` source domain to `extraction` without renaming or repartitioning its
+  implementation modules.
+- Moved the five implementation tests from `test/core` to `test/extraction` and updated runtime and
+  plugin-runtime consumers to the new owner.
+- Confirmed that `extraction` directly imports only the domains allowed by the approved dependency
+  table and does not contain Git backends, output I/O, plugin hosting, or state I/O.
+- Preserved the separate deduplication scopes: traversal-local state protects fallback retries, while
+  coordinator state deduplicates across refs.
+- Updated architecture, traversal, and follow-up documentation to use the new domain name and paths.
+- Passed format, lint, the gitlode build, and all 578 gitlode tests.
 
 ### Step 8: Correct config and CLI boundaries
 

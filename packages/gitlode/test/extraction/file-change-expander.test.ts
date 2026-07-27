@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DefaultFileChangeExpander } from "../../src/core/file-change-expander.js";
 import type { CommitFact } from "../../src/extraction-api/index.js";
+import { DefaultFileChangeExpander } from "../../src/extraction/file-change-expander.js";
 import type { FileBlobChange, FileBlobSnapshot, GitAdapter } from "../../src/git/index.js";
 import {
   LocalInstrumentationRecorder,

@@ -14,7 +14,7 @@ import {
   type Instrumentation,
 } from "../instrumentation/index.js";
 import { JsLineDiffCalculator } from "../line-diff-impl/index.js";
-import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
+import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 import { loadStateFile, NodeStateStore } from "../state-impl/index.js";
 import { createEmptyState, type StateStore, validatePriorState } from "../state/index.js";
@@ -168,8 +168,8 @@ export async function executeWorkerRunRequest(
       projector = projectorResult.projector;
     }
 
-    const sink = new OutputWriterSink(
-      new OutputWriter(
+    const sink = new JsonlOutputSink(
+      new JsonlFileWriter(
         extractionSettings.outputDir,
         (seq) =>
           `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,

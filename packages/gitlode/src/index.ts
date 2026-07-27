@@ -4,15 +4,20 @@ import { pathToFileURL } from "node:url";
 
 import type { BootstrapInput } from "./cli/index.js";
 import { loadBootstrapInput } from "./cli/index.js";
-import { executeRun, type ExecutionRunInput } from "./execution/index.js";
+import {
+  executeRun,
+  type ExecutionRunInput,
+  type ExecutionSuccessPayload,
+} from "./execution/index.js";
 import { GitAdapterError } from "./git/index.js";
 import {
   createBootstrapRenderer,
   createProgressRuntime,
+  createStyling,
   renderSuccessReport,
   stderrSink,
+  type SuccessReportData,
 } from "./presentation/index.js";
-import { createStyling } from "./presentation/progress/index.js";
 
 function toExecutionRunInput(bootstrapInput: BootstrapInput): ExecutionRunInput {
   return {
@@ -33,6 +38,19 @@ function toExecutionRunInput(bootstrapInput: BootstrapInput): ExecutionRunInput 
     incremental: bootstrapInput.incremental,
     missingState: bootstrapInput.missingState,
     stateFilePath: bootstrapInput.stateFilePath,
+  };
+}
+
+function toSuccessReportData(success: ExecutionSuccessPayload): SuccessReportData {
+  return {
+    recordsWritten: success.recordsWritten,
+    commitsTraversed: success.commitsTraversed,
+    filesCreated: success.filesCreated,
+    bytesWritten: success.bytesWritten,
+    elapsedMs: success.elapsedMs,
+    refs: success.refs,
+    profileEntries: success.profileEntries,
+    skippedDiffs: success.skippedDiffs,
   };
 }
 
@@ -102,7 +120,7 @@ async function main(): Promise<void> {
       presenter: progressRuntime.presenter,
       quiet: bootstrapInput.quiet,
       profile: bootstrapInput.profile,
-      success: result.success,
+      data: toSuccessReportData(result.success),
     });
   } catch (error) {
     if (error instanceof GitAdapterError) {

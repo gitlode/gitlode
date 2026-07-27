@@ -2,9 +2,9 @@ import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
 import { type DagSuccessor, type DagTopologyPort } from "../dag/index.js";
-import { GitAdapterError } from "../git/errors.js";
 import {
   DEFAULT_REPOSITORY_OBJECT_FORMAT,
+  GitAdapterError,
   type FileBlobChange,
   type FileBlobMode,
   type FileBlobSnapshot,

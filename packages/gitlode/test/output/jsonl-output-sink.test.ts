@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ProjectedRecord } from "../../src/extraction-api/index.js";
-import { OutputWriterSink } from "../../src/output/output-writer-sink.js";
-import { OutputWriter } from "../../src/output/writer.js";
+import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
+import { JsonlOutputSink } from "../../src/output/jsonl-output-sink.js";
 
 function makeRecord(oid: string): ProjectedRecord {
   return {
@@ -20,7 +20,7 @@ function makeRecord(oid: string): ProjectedRecord {
   };
 }
 
-describe("OutputWriterSink", () => {
+describe("JsonlOutputSink", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -33,16 +33,16 @@ describe("OutputWriterSink", () => {
   });
 
   function makeSinkAndWriter() {
-    const writer = new OutputWriter(
+    const writer = new JsonlFileWriter(
       tmpDir,
       (seq) => `out-${String(seq).padStart(6, "0")}.jsonl`,
       {},
     );
-    const sink = new OutputWriterSink(writer);
+    const sink = new JsonlOutputSink(writer);
     return { writer, sink };
   }
 
-  it("delegates write() to the underlying OutputWriter", async () => {
+  it("delegates write() to the underlying JsonlFileWriter", async () => {
     const { sink } = makeSinkAndWriter();
     await sink.write(makeRecord("1".padStart(40, "0")));
     await sink.write(makeRecord("2".padStart(40, "0")));
@@ -68,7 +68,7 @@ describe("OutputWriterSink", () => {
     expect(sink.bytesWritten).toBeGreaterThan(0);
   });
 
-  it("delegates close() to the underlying OutputWriter (no error on empty)", async () => {
+  it("delegates close() to the underlying JsonlFileWriter (no error on empty)", async () => {
     const { sink } = makeSinkAndWriter();
     // close without any writes — should be a no-op (no file opened)
     await expect(sink.close()).resolves.toBeUndefined();

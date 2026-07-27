@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–9 completed on 2026-07-27. Step 10 has not started.
+Steps 0–10 completed on 2026-07-27. Step 11 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -132,10 +132,9 @@ tests when its review shows that an affected invariant is only indirectly covere
 Until the owning migration step completes, the following are explicit temporary exceptions to the
 target architecture:
 
-| Temporary exception                                                                                                       | Expires    |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| Existing cross-domain deep imports may remain until their owning step. No new cross-domain deep import may be introduced. | Steps 2–10 |
-| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced.                | Step 12    |
+| Temporary exception                                                                                        | Expires |
+| ---------------------------------------------------------------------------------------------------------- | ------- |
+| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced. | Step 12 |
 
 These exceptions permit only preservation of existing dependencies. They do not authorize new uses
 or expansion of a legacy domain. If a step needs an exception not listed here, stop and review the
@@ -508,6 +507,19 @@ Review:
 - Presentation and execution do not depend on one another.
 - Output owns mechanics, not record semantics.
 - CLI output, stderr, and exit codes are unchanged.
+
+Result:
+
+- Kept `src/index.ts` as the composition boundary, with explicit mappings from CLI input to
+  `ExecutionRunRequest` and from `ExecutionSuccessPayload` to presentation-owned
+  `SuccessReportData`.
+- Removed the duplicate success-payload identity and kept execution and presentation independent.
+- Renamed `OutputWriter` to `JsonlFileWriter` and `OutputWriterSink` to `JsonlOutputSink` so the
+  identifiers state the owned serialization and adaptation mechanics.
+- Replaced the remaining cross-domain deep imports with domain-barrel imports and moved
+  presentation tests out of the CLI test directory.
+- Updated architecture and schema references to the aligned output modules.
+- Passed format, lint, the gitlode build, and all gitlode tests.
 
 ### Step 11: Perform domain-local naming and module cleanup
 

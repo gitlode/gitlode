@@ -265,19 +265,21 @@ sole owner of derived file-change policy; Git adapters and line-diff calculators
 
 Files:
 
-- `packages/gitlode/src/output/writer.ts`
+- `packages/gitlode/src/output/jsonl-file-writer.ts`
+- `packages/gitlode/src/output/jsonl-output-sink.ts`
 - `packages/gitlode/src/output/utils.ts`
-- `packages/gitlode/src/output/types.ts`
 - `packages/gitlode/src/output/index.ts`
 
 Responsibilities:
 
-- Convert structured commits to JSONL lines.
+- Adapt projected records to the extraction output-sink contract.
+- Serialize projected records as JSONL lines.
 - Track line and byte thresholds.
 - Rotate output files when either threshold is reached.
 - Guarantee LF line endings.
 
-Extraction receives a sink; Output owns rotation settings and their enforcement.
+Extraction receives only the sink contract. Output owns JSONL serialization, file naming, rotation
+settings, and their enforcement; it does not own the meaning of projected records.
 
 ## End-to-End Runtime Flow
 
@@ -300,7 +302,8 @@ Extraction receives a sink; Output owns rotation settings and their enforcement.
 7. Worker posts typed progress, diagnostic, and result messages back to execution in the main
    process.
 8. On success, execution writes new v2 state (`refs[]`) atomically before returning.
-9. Root entrypoint maps the result to presentation and renders the summary/profile.
+9. Root entrypoint explicitly maps `ExecutionSuccessPayload` to presentation-owned
+   `SuccessReportData`, then renders the summary/profile.
 
 ## Design Decisions and Trade-offs
 
@@ -450,8 +453,9 @@ attach to the extraction process and add optional fields to output records.
 
 `src/index.ts` is the process boundary. It parses CLI input, creates presentation collaborators,
 maps CLI input to execution input, and maps execution results to stderr rendering and exit-code
-selection. `src/execution/execute-run.ts` owns prior-state loading, worker dispatch, and the final
-state write.
+selection. Execution and presentation do not depend on one another; their values meet only through
+the explicit mappings at this composition root. `src/execution/worker-client.ts` owns prior-state
+loading, worker dispatch, and the final state write.
 
 When `--config` is provided:
 

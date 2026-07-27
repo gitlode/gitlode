@@ -1,5 +1,5 @@
 import type { InstrumentAttributeValue, ProfileSummaryEntry } from "../../instrumentation/index.js";
-import { firstOrThrow } from "../../support/helpers.js";
+import { firstOrThrow } from "../../support/index.js";
 import { formatCount, formatElapsedRaw, formatMs, humanizeBytesRaw } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
 import type { SummaryData } from "./types.js";

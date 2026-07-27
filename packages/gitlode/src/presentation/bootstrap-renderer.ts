@@ -1,4 +1,4 @@
-import type { BootstrapTermination } from "../cli/errors.js";
+import type { BootstrapTermination } from "../cli/index.js";
 import { splitMessageLines } from "./diagnostics.js";
 import { normalizeUnknownError } from "./presenter.js";
 import type { TerminalSink } from "./progress/index.js";

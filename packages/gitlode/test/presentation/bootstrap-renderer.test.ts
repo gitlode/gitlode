@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createBootstrapRenderer } from "../../src/presentation/bootstrap-renderer.js";
 
-describe("createBootstrapRenderer", () => {
+describe("presentation createBootstrapRenderer", () => {
   it("renders user-error termination as plain message lines", () => {
     const lines: string[] = [];
     const renderer = createBootstrapRenderer({

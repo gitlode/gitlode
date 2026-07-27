@@ -309,5 +309,5 @@ Changes are computed against the **first parent only**.
 - `packages/gitlode/docs/design/cli.md`
 - `packages/gitlode/docs/design/architecture.md`
 - `src/output/utils.ts`
-- `src/output/writer.ts`
+- `src/output/jsonl-file-writer.ts`
 - `src/extraction-api/records.ts`

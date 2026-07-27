@@ -16,14 +16,14 @@ const styled: Styling = {
   refsValue: (text) => text,
 };
 
-describe("splitMessageLines", () => {
+describe("presentation splitMessageLines", () => {
   it("splits multi-line messages with LF and CRLF", () => {
     expect(splitMessageLines("line 1\nline 2")).toEqual(["line 1", "line 2"]);
     expect(splitMessageLines("line 1\r\nline 2")).toEqual(["line 1", "line 2"]);
   });
 });
 
-describe("formatDiagnosticLines", () => {
+describe("presentation formatDiagnosticLines", () => {
   it("formats warning lines with the warn badge", () => {
     expect(formatDiagnosticLines("warn", "warning message", styled)).toEqual([
       "<warn>[WARN]</warn> warning message",

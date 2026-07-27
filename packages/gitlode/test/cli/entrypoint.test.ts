@@ -122,16 +122,13 @@ function mockEntrypointModules(
   vi.doMock("../../src/presentation/index.js", () => ({
     createBootstrapRenderer: vi.fn(() => bootstrapRenderer),
     createProgressRuntime,
+    createStyling: vi.fn(() => ({ style: "plain" })),
     renderSuccessReport,
     stderrSink: {
       writeLine() {},
       rewriteLine() {},
       newline() {},
     },
-  }));
-
-  vi.doMock("../../src/presentation/progress/index.js", () => ({
-    createStyling: vi.fn(() => ({ style: "plain" })),
   }));
 
   vi.doMock("../../src/git/index.js", () => ({
@@ -288,6 +285,20 @@ describe("CLI entrypoint orchestration", () => {
       expect.objectContaining({
         onProgress: expect.any(Function),
         onDiagnostic: expect.any(Function),
+      }),
+    );
+    expect(context.renderSuccessReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          recordsWritten: 1,
+          commitsTraversed: 1,
+          filesCreated: 1,
+          bytesWritten: 100,
+          elapsedMs: 10,
+          refs: ["main"],
+          profileEntries: [],
+          skippedDiffs: 0,
+        },
       }),
     );
     expect(context.getSideEffects()).toEqual(["execute-run", "success-report"]);

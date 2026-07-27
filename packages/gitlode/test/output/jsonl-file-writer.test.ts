@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ProjectedCommit, ProjectedFileChange } from "../../src/extraction-api/index.js";
-import { OutputWriter } from "../../src/output/writer.js";
+import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
 
 function makeCommit(oid: string): ProjectedCommit {
   return {
@@ -31,7 +31,7 @@ function oid(n: number): string {
   return String(n).padStart(40, "0");
 }
 
-describe("OutputWriter", () => {
+describe("JsonlFileWriter", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -45,7 +45,7 @@ describe("OutputWriter", () => {
 
   it("writes all commits to a single file when no rotation is configured", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new OutputWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2)));
     await writer.write(makeCommit(oid(3)));
@@ -58,7 +58,7 @@ describe("OutputWriter", () => {
 
   it("rotates to a new file after maxLines — triggering line stays in file 1", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new OutputWriter(tmpDir, filenameFor, { maxLines: 2 });
+    const writer = new JsonlFileWriter(tmpDir, filenameFor, { maxLines: 2 });
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2))); // triggers rotation; this line is in file 1
     await writer.write(makeCommit(oid(3))); // goes to file 2
@@ -80,7 +80,7 @@ describe("OutputWriter", () => {
 
     // maxBytes = exactly one line: after first write byte count equals maxBytes → rotate
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new OutputWriter(tmpDir, filenameFor, { maxBytes: lineSize });
+    const writer = new JsonlFileWriter(tmpDir, filenameFor, { maxBytes: lineSize });
     await writer.write(makeCommit(oid(1))); // triggers rotation; stays in file 1
     await writer.write(makeCommit(oid(2))); // goes to file 2
     await writer.close();
@@ -97,7 +97,10 @@ describe("OutputWriter", () => {
 
   it("rotates when either threshold is reached first (lines wins)", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new OutputWriter(tmpDir, filenameFor, { maxLines: 2, maxBytes: 999_999 });
+    const writer = new JsonlFileWriter(tmpDir, filenameFor, {
+      maxLines: 2,
+      maxBytes: 999_999,
+    });
     for (let i = 1; i <= 3; i++) {
       await writer.write(makeCommit(oid(i)));
     }
@@ -116,7 +119,7 @@ describe("OutputWriter", () => {
   it("output is valid JSONL: each line parses as JSON and matches the written commit", async () => {
     const commit = makeCommit("a".repeat(40));
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new OutputWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
     await writer.write(commit);
     await writer.close();
 
@@ -131,7 +134,7 @@ describe("OutputWriter", () => {
 
   it("uses LF line endings only (no CRLF)", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new OutputWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2)));
     await writer.close();
@@ -160,7 +163,7 @@ describe("OutputWriter", () => {
       },
     };
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new OutputWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
     await writer.write(fileRecord);
     await writer.close();
 

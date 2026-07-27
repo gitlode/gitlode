@@ -9,7 +9,7 @@ interface RotationOptions {
   readonly maxBytes?: number;
 }
 
-export class OutputWriter {
+export class JsonlFileWriter {
   private seq = 0;
   private handle: FileHandle | null = null;
   private lineCount = 0;

@@ -64,7 +64,7 @@ const plainStyling: Styling = {
   refsValue: (text) => text,
 };
 
-describe("normalizeUnknownError", () => {
+describe("presentation normalizeUnknownError", () => {
   it("returns the same error if it's already an Error instance", () => {
     const error = new Error("original error");
     expect(normalizeUnknownError(error)).toBe(error);
@@ -85,7 +85,7 @@ describe("normalizeUnknownError", () => {
   });
 });
 
-describe("createRunPresenter", () => {
+describe("presentation createRunPresenter", () => {
   it("renders runtime user errors through the run presenter after aborting an active display", () => {
     const sink = makeSink();
     const scheduler = makeScheduler();

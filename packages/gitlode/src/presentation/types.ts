@@ -8,7 +8,7 @@ export interface RenderSuccessReportOptions {
   readonly presenter: RunPresenter;
   readonly quiet: boolean;
   readonly profile: boolean;
-  readonly success: RunSuccessPayload;
+  readonly data: SuccessReportData;
 }
 export interface ProgressRuntime {
   readonly uiMode: UiMode;
@@ -23,7 +23,7 @@ export interface CreateProgressRuntimeOptions {
   readonly isTTY: boolean;
   readonly styling: Styling;
 }
-export interface RunSuccessPayload {
+export interface SuccessReportData {
   readonly recordsWritten: number;
   readonly commitsTraversed: number;
   readonly filesCreated: number;

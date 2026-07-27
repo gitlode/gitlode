@@ -1,11 +1,11 @@
 import type { OutputSink, ProjectedRecord } from "../extraction-api/index.js";
-import type { OutputWriter } from "./writer.js";
+import type { JsonlFileWriter } from "./jsonl-file-writer.js";
 
-/** Thin adapter that makes `OutputWriter` satisfy the extraction `OutputSink` contract. */
-export class OutputWriterSink implements OutputSink {
-  private readonly writer: OutputWriter;
+/** Thin adapter that makes `JsonlFileWriter` satisfy the extraction `OutputSink` contract. */
+export class JsonlOutputSink implements OutputSink {
+  private readonly writer: JsonlFileWriter;
 
-  constructor(writer: OutputWriter) {
+  constructor(writer: JsonlFileWriter) {
     this.writer = writer;
   }
 

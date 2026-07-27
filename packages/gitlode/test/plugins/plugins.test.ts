@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigExtensionsSection } from "../../src/config/index.js";
+import type { PluginEntry } from "../../src/core/types.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type {
   Namespace,
-  PluginEntry,
   PluginInitResult,
   PluginRuntimeContext,
-} from "../../src/core/types.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
+} from "../../src/plugin-api/index.js";
 import {
   checkPluginCompatibility,
   initializePlugins,

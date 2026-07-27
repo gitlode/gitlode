@@ -1,12 +1,4 @@
-export type {
-  PluginFactory,
-  PluginInitResult,
-  PluginProjectionResult,
-  PluginProjectionValue,
-  PluginRuntimeContext,
-  ProjectionContext,
-  ProjectorPlugin,
-} from "./core/index.js";
+export type * from "./plugin-api/index.js";
 export type {
   CommitFact,
   FileChangeFact,

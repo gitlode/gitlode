@@ -1,4 +1,4 @@
-import type { Namespace, PluginFailurePolicy } from "../core/index.js";
+import type { Namespace, PluginFailurePolicy } from "../plugin-api/index.js";
 import type { IsoDateTimeString } from "../support/index.js";
 
 export interface ConfigExtractionRange {

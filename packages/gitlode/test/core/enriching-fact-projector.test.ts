@@ -2,13 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
 import { EnrichingFactProjector } from "../../src/core/enriching-fact-projector.js";
-import type {
-  Namespace,
-  PluginEntry,
-  PluginProjectionResult,
-  ProjectionContext,
-  ProjectorPlugin,
-} from "../../src/core/types.js";
+import type { PluginEntry } from "../../src/core/types.js";
 import type {
   CommitFact,
   Fact,
@@ -16,6 +10,12 @@ import type {
   ProjectedRecord,
 } from "../../src/extraction-api/index.js";
 import type { CommitOid } from "../../src/model/types.js";
+import type {
+  Namespace,
+  PluginProjectionResult,
+  ProjectionContext,
+  ProjectorPlugin,
+} from "../../src/plugin-api/index.js";
 import { initializePlugins } from "../../src/plugins/plugins.js";
 import type { ProgressReporter } from "../../src/progress/index.js";
 

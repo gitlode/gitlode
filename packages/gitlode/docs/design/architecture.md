@@ -184,6 +184,24 @@ Responsibilities:
 
 Important behavior: for date filtering, Core skips old commits and continues traversal. It does not terminate early, because graph traversal order is not chronological.
 
+### Plugin API
+
+Files:
+
+- `packages/gitlode/src/plugin-api/types.ts`
+- `packages/gitlode/src/plugin-api/index.ts`
+- `packages/gitlode/src/plugin-api.ts` (package-export facade)
+
+Responsibilities:
+
+- Define the contracts implemented and returned by plugin authors.
+- Define initialization and projection results, failure policies, namespaces, projection contexts,
+  and the runtime context available to plugins.
+- Depend on extraction facts and records without depending on extraction implementations or plugin
+  host machinery.
+- Keep module loading, compatibility checks, initialization orchestration, and host registries
+  outside the public API.
+
 ### Git adapter layer
 
 Files:
@@ -390,9 +408,10 @@ attach to the extraction process and add optional fields to output records.
 - **`src/state-impl`** — Node.js state-file loading, JSON decoding, and atomic replacement.
 - **`src/core/enriching-fact-projector.ts`** — `EnrichingFactProjector` wraps the default
   projector and calls each configured plugin's `project()` per fact in declaration order.
-- **`src/core/types.ts`** — all plugin contract types: `ProjectorPlugin`, `PluginEntry`,
-  `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`,
-  `ProjectionContext`, `PluginFailurePolicy`.
+- **`src/plugin-api`** — plugin-author contracts such as `ProjectorPlugin`, `PluginFactory`,
+  initialization and projection results, projection context, failure policy, and namespace.
+- **`src/core/types.ts`** — the transitional host-side `PluginEntry` registry shape; this is not
+  part of the package-exported plugin API.
 - **`src/extraction-api/records.ts`** — projected record shapes and the serialized extension value,
   including the host-owned `null` sentinel.
 

@@ -4,10 +4,11 @@ import type {
   ProjectedExtensions,
   ProjectedRecord,
 } from "../extraction-api/index.js";
+import type { PluginProjectionResult, ProjectionContext } from "../plugin-api/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 import { assertNever } from "../support/index.js";
 import { projectCommit, projectFileChange } from "./fact-projector.js";
-import type { PluginEntry, PluginProjectionResult, ProjectionContext } from "./types.js";
+import type { PluginEntry } from "./types.js";
 
 export class EnrichingFactProjector implements FactProjector {
   private readonly pluginEntries: readonly PluginEntry[];

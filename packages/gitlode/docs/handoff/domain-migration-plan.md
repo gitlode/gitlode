@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–4 completed on 2026-07-27. Step 5 has not started.
+Steps 0–5 completed on 2026-07-27. Step 6 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -134,7 +134,7 @@ target architecture:
 
 | Temporary exception                                                                                                                | Expires                               |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `core` owns plugin contracts and extraction implementation.                                                                        | Steps 5–7, according to the inventory |
+| `core` owns the plugin host registry and extraction implementation.                                                                | Steps 6–7, according to the inventory |
 | `plugins` is the plugin host domain and depends directly on config document types.                                                 | Step 6                                |
 | `config` imports CLI constants and termination types.                                                                              | Step 8                                |
 | `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9                                |
@@ -323,6 +323,19 @@ Review:
 - Dependency direction is `plugin-api -> extraction-api`.
 - Runtime loading and host implementation are absent from the public API.
 - Official plugin packages build and test successfully.
+
+#### Step 5 results
+
+- Added `plugin-api/types.ts` and its domain barrel for plugin-author contracts.
+- Moved plugin interfaces and factories, initialization and projection results, projection context,
+  runtime context, failure policy, diagnostics, and namespace out of `core`.
+- Kept the host-only `PluginEntry` registry in `core` until the Step 6 `plugin-runtime` migration.
+- Changed config and host-side consumers to depend on `plugin-api` directly.
+- Reduced root `src/plugin-api.ts` to a package-export facade over the owning domain and supporting
+  extraction, instrumentation, model, and type-utility contracts.
+- Moved the plugin contract type test from `test/core` to `test/plugin-api`.
+- Passed format, lint, all-workspace builds, all 577 gitlode tests, and all 64 official plugin
+  tests.
 
 ### Step 6: Migrate plugin-runtime
 

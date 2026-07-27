@@ -194,10 +194,18 @@ When a plugin returns `fatal` or throws on a given fact:
 
 ## Ownership and Boundaries
 
-- **Plugin runtime is a CLI boundary concern.** Config loading, module resolution, and factory invocation happen in `src/cli/plugins.ts`.
-- **Plugin initialization is a CLI boundary concern.** `src/cli/plugins.ts` constructs the runtime context, runs all `init(runtime)` calls in parallel, and aggregates init failures before extraction starts.
+- **Plugin runtime is a host boundary concern.** Module resolution and factory invocation currently
+  happen in `src/plugins/plugins.ts`.
+- **Plugin initialization is a host boundary concern.** `src/plugins/plugins.ts` receives runtime
+  contexts, runs all `init(runtime)` calls in parallel, and aggregates init failures before
+  extraction starts.
 - **Enrichment projection is a Core boundary concern.** `EnrichingFactProjector` (in `src/core/`) wraps the default projector and orchestrates per-fact plugin calls.
-- **Core types define the plugin contract.** `ProjectorPlugin`, `PluginEntry`, `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`, `ProjectionContext`, `PluginFailurePolicy` are all in `src/core/types.ts`.
+- **`plugin-api` defines the plugin-author contract.** `ProjectorPlugin`, `PluginFactory`,
+  initialization and projection results, projection values and contexts, failure policies, runtime
+  contexts, and namespaces live in `src/plugin-api/`. `src/plugin-api.ts` is only the package-export
+  facade.
+- **Host registries are not public API.** `PluginEntry` is an internal host record and is not
+  exported through `gitlode/plugin-api`.
 - **Per-fact plugin profiling is plugin-controlled.** `EnrichingFactProjector` no longer wraps every `project()` call in host-owned timing. If a plugin wants projection profiling, it uses the optional profiler received during `init(runtime)`.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
 - **The `extensions` field is an extraction record concern.** `ProjectedExtensions` and

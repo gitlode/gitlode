@@ -6,16 +6,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { satisfies, validRange } from "semver";
 
 import type { ConfigExtensionsSection } from "../config/index.js";
+import type { PluginEntry } from "../core/index.js";
 import type {
   DiagnosticReporter,
   Namespace,
-  PluginEntry,
   PluginFactory,
   PluginInitFatal,
   PluginInitSuccess,
   PluginRuntimeContext,
   ProjectorPlugin,
-} from "../core/index.js";
+} from "../plugin-api/index.js";
 import type { AbsoluteDirectoryPath } from "../support/index.js";
 
 export type PluginSetupTermination = { kind: "user-error"; message: string };

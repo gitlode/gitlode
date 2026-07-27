@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–8 completed on 2026-07-27. Step 9 has not started.
+Steps 0–9 completed on 2026-07-27. Step 10 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -132,11 +132,10 @@ tests when its review shows that an affected invariant is only indirectly covere
 Until the owning migration step completes, the following are explicit temporary exceptions to the
 target architecture:
 
-| Temporary exception                                                                                                                | Expires    |
-| ---------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9     |
-| Existing cross-domain deep imports may remain until their owning step. No new cross-domain deep import may be introduced.          | Steps 2–10 |
-| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced.                         | Step 12    |
+| Temporary exception                                                                                                       | Expires    |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Existing cross-domain deep imports may remain until their owning step. No new cross-domain deep import may be introduced. | Steps 2–10 |
+| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced.                | Step 12    |
 
 These exceptions permit only preservation of existing dependencies. They do not authorize new uses
 or expansion of a legacy domain. If a step needs an exception not listed here, stop and review the
@@ -473,6 +472,22 @@ Review:
 - Execution has no presentation dependency.
 
 The mechanical directory move and the large-module split may use separate review commits.
+
+#### Step 9 results
+
+- Replaced the `runtime` domain with the approved eight-module `execution` domain and moved its
+  three test modules to `test/execution`.
+- Split Git adapter construction, repository context resolution, plugin bootstrap, worker
+  transport, protocol types, worker entry, and run composition by responsibility.
+- Introduced execution-owned run input, result, Git-adapter selection, plugin declaration, and
+  success payload types; execution no longer imports config-document or presentation types.
+- Moved prior-state loading, missing-state fallback orchestration, worker dispatch, and successful
+  state persistence behind `executeRun()`.
+- Kept state persistence in the main process and added direct tests for load/dispatch/write ordering
+  and the existing fallback warning.
+- Preserved worker messages and error classification, run-scoped Git disposal before profiling
+  snapshot, plugin behavior, and extraction composition.
+- Passed format, lint, the gitlode build, and all 582 gitlode tests.
 
 ### Step 10: Thin entrypoints and align presentation/output
 

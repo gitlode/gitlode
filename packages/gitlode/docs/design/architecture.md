@@ -95,9 +95,10 @@ record per line as JSON Lines (commit-granularity by default, file-granularity w
 The architecture is layered:
 
 1. CLI layer parses arguments and builds a validated configuration.
-2. Extraction layer orchestrates traversal, filtering, mapping, deduplication, and checkpoint state production.
-3. Git adapter layer isolates all repository access behind a small interface.
-4. Output layer owns JSONL serialization and file rotation.
+2. Execution layer composes one run across state persistence and the worker boundary.
+3. Extraction layer orchestrates traversal, filtering, mapping, deduplication, and checkpoint state production.
+4. Git adapter layer isolates all repository access behind a small interface.
+5. Output layer owns JSONL serialization and file rotation.
 
 This layering keeps product policy in Extraction and implementation details in adapter/output modules.
 
@@ -119,11 +120,6 @@ Files:
 - `packages/gitlode/src/cli/filesystem-preflight.ts`
 - `packages/gitlode/src/cli/errors.ts`
 - `packages/gitlode/src/cli/index.ts`
-- `packages/gitlode/src/cli/runtime/*`
-- `packages/gitlode/src/runtime/types.ts`
-- `packages/gitlode/src/runtime/client.ts`
-- `packages/gitlode/src/runtime/worker-entry.ts`
-- `packages/gitlode/src/runtime/execution.ts`
 
 Responsibilities:
 
@@ -132,17 +128,38 @@ Responsibilities:
 - Enforce mutual exclusion rules for differential options.
 - Resolve effective settings from CLI/config precedence and derived defaults (for example output prefix).
 - Resolve config-only Git adapter selection from `runtime.gitAdapter`.
-- Convert validated args into worker-safe runtime extraction inputs.
-- Own the runtime helpers that wire main-process prior-state loading, progress presentation,
-  worker dispatch, plugin bootstrap, and successful-run rendering without widening
-  `src/index.ts` beyond the process boundary.
+- Convert validated args into invocation input that the root maps to execution input.
 - Handle top-level process exit behavior and user-facing errors.
 
 In the current worker boundary design, state file reading and writing are main-process
-responsibilities in the runtime edge (`src/index.ts`). `src/extraction-api` defines the checkpoint
-model carried by extraction request and result contracts. Persistence ports, state-file adaptation,
-and pure validation live in `src/state`; Node.js state-file loading and atomic replacement live in
-`src/state-impl`.
+responsibilities orchestrated by `src/execution/execute-run.ts`. `src/extraction-api` defines the
+checkpoint model carried by extraction request and result contracts. Persistence ports, state-file
+adaptation, and pure validation live in `src/state`; Node.js state-file loading and atomic
+replacement live in `src/state-impl`.
+
+### Execution layer
+
+Files:
+
+- `packages/gitlode/src/execution/types.ts`
+- `packages/gitlode/src/execution/worker-client.ts`
+- `packages/gitlode/src/execution/worker-entry.ts`
+- `packages/gitlode/src/execution/execute-run.ts`
+- `packages/gitlode/src/execution/git-adapter-factory.ts`
+- `packages/gitlode/src/execution/repository-context.ts`
+- `packages/gitlode/src/execution/plugin-bootstrap.ts`
+- `packages/gitlode/src/execution/index.ts`
+
+Responsibilities:
+
+- Define execution-owned run inputs, results, and worker protocol without config-document or
+  presentation types.
+- Load prior state, dispatch the worker, and persist returned checkpoint state before resolving a
+  successful run.
+- Construct concrete Git, extraction, line-diff, output, and plugin-runtime components inside the
+  worker.
+- Own run-scoped Git resource disposal and take the profiling snapshot only after disposal.
+- Resolve repository metadata and translate worker failures into the execution result contract.
 
 ### Extraction API
 
@@ -265,11 +282,14 @@ Extraction receives a sink; Output owns rotation settings and their enforcement.
 ## End-to-End Runtime Flow
 
 1. CLI parses args, validates rules, and resolves runtime extraction inputs.
-2. Runtime edge (`src/index.ts`) creates progress/presenter runtime and validates repository object format.
-3. Runtime edge loads prior state/checkpoint context when configured.
-4. Runtime edge dispatches one `WorkerRunRequest` to `src/runtime/worker-entry.ts` via `src/runtime/client.ts`.
-5. Worker-side runtime execution (`src/runtime/execution.ts`) builds stage instances and calls `DefaultExtractionCoordinator.run()`.
-6. For each requested ref in the worker:
+2. Root entrypoint (`src/index.ts`) creates the presentation runtime and maps CLI input to execution
+   input.
+3. Execution loads prior state when configured and dispatches one `WorkerRunRequest` through
+   `src/execution/worker-client.ts`.
+4. Worker entry (`src/execution/worker-entry.ts`) invokes worker-side composition in
+   `src/execution/execute-run.ts`.
+5. Worker-side execution builds stage instances and calls `DefaultExtractionCoordinator.run()`.
+6. For each requested ref:
    - Resolve ref head.
    - Classify runtime ref type.
    - Determine exclusion boundary (exact checkpoint match, or branch merge-base fallback for newly added branches).
@@ -277,8 +297,10 @@ Extraction receives a sink; Output owns rotation settings and their enforcement.
    - Deduplicate within this run.
    - Apply optional date filter.
    - Map and write output.
-7. Worker posts typed progress/diagnostic/result messages back to main.
-8. On success, main process writes new v2 state (`refs[]`) atomically, then renders summary/profile.
+7. Worker posts typed progress, diagnostic, and result messages back to execution in the main
+   process.
+8. On success, execution writes new v2 state (`refs[]`) atomically before returning.
+9. Root entrypoint maps the result to presentation and renders the summary/profile.
 
 ## Design Decisions and Trade-offs
 
@@ -356,18 +378,18 @@ Profile
 
 Profiling entries are accumulated by the stage that owns each operation:
 
-| Entry path                 | Owning stage                                              | What is measured                                                       |
-| -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `elapsed`                  | `packages/gitlode/src/runtime/execution.ts` root profiler | Total extraction wall/work duration                                    |
-| `elapsed/planning`         | `BranchTraversalPlanner`                                  | Branch-head resolution and exclude-hash planning                       |
-| `elapsed/traversal`        | `CommitTraversalExtractor`                                | Commit traversal and commit-fact materialization                       |
-| `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector`     | Fact-to-output-record mapping                                          |
-| `elapsed/write`            | `ExtractionCoordinator`                                   | `sink.write()` and `sink.close()` only (not checkpoint write)          |
-| `elapsed/git/blob-read`    | `IsomorphicGitAdapter`                                    | Time reading file content blobs from the Git object store              |
-| `elapsed/git/diff`         | `IsomorphicGitAdapter`                                    | Time computing line-level diff statistics per file                     |
-| `elapsed/git/...` children | `IsomorphicGitAdapter`                                    | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
+| Entry path                 | Owning stage                                                  | What is measured                                                       |
+| -------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `elapsed`                  | `packages/gitlode/src/execution/execute-run.ts` root profiler | Total extraction wall/work duration                                    |
+| `elapsed/planning`         | `BranchTraversalPlanner`                                      | Branch-head resolution and exclude-hash planning                       |
+| `elapsed/traversal`        | `CommitTraversalExtractor`                                    | Commit traversal and commit-fact materialization                       |
+| `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector`         | Fact-to-output-record mapping                                          |
+| `elapsed/write`            | `ExtractionCoordinator`                                       | `sink.write()` and `sink.close()` only (not checkpoint write)          |
+| `elapsed/git/blob-read`    | `IsomorphicGitAdapter`                                        | Time reading file content blobs from the Git object store              |
+| `elapsed/git/diff`         | `IsomorphicGitAdapter`                                        | Time computing line-level diff statistics per file                     |
+| `elapsed/git/...` children | `IsomorphicGitAdapter`                                        | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
 
-A `StageProfiler` object is created per run inside `packages/gitlode/src/runtime/execution.ts`
+A `StageProfiler` object is created per run inside `packages/gitlode/src/execution/execute-run.ts`
 and passed to each stage constructor. `IsomorphicGitAdapter` accepts profiling through its concrete
 dependency object (not on the `GitAdapter` interface). This keeps the `GitAdapter` contract stable
 while enabling profiling of adapter internals without mutable post-construction wiring.
@@ -401,7 +423,7 @@ attach to the extraction process and add optional fields to output records.
 
 ### Layer responsibilities
 
-- **`src/runtime/execution.ts`** — run-scoped plugin bootstrap orchestration and projector
+- **`src/execution/plugin-bootstrap.ts`** — run-scoped plugin bootstrap orchestration and projector
   selection.
 - **`src/progress`** — presentation-independent run phases, events, and reporter contract.
 - **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
@@ -424,11 +446,12 @@ attach to the extraction process and add optional fields to output records.
 - **`src/extraction-api/records.ts`** — projected record shapes and the serialized extension value,
   including the host-owned `null` sentinel.
 
-### Wiring at the runtime edge (`src/index.ts`)
+### Process and execution wiring
 
-`src/index.ts` is now the process boundary only. It parses CLI input, validates state preconditions,
-delegates one-run extraction execution to a worker through `src/runtime/client.ts`, and performs
-the final state write, stderr rendering, and exit-code selection.
+`src/index.ts` is the process boundary. It parses CLI input, creates presentation collaborators,
+maps CLI input to execution input, and maps execution results to stderr rendering and exit-code
+selection. `src/execution/execute-run.ts` owns prior-state loading, worker dispatch, and the final
+state write.
 
 When `--config` is provided:
 

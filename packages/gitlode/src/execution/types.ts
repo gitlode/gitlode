@@ -1,8 +1,11 @@
-import type { ConfigExtensionsSection, GitAdapterName } from "../config/index.js";
 import type { ExtractionState } from "../extraction-api/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
+import type { PluginDeclarations } from "../plugin-runtime/index.js";
 import type { ProgressEvent } from "../progress/index.js";
+import type { MissingStatePolicy } from "../state/index.js";
 import type { AbsoluteDirectoryPath, AbsolutePath, IsoDateTimeString } from "../support/index.js";
+
+export type ExecutionGitAdapterName = "isomorphic-git" | "git-cli";
 
 export type WorkerRunRange =
   | { readonly type: "ref"; readonly since: string }
@@ -23,11 +26,17 @@ export interface WorkerRunInput {
   readonly granularity: "commit" | "file";
   readonly maxDiffSize?: number;
   readonly profile: boolean;
-  readonly gitAdapter: GitAdapterName;
+  readonly gitAdapter: ExecutionGitAdapterName;
   readonly repoName?: string;
   readonly repoUrl?: string;
-  readonly configBaseDir?: AbsoluteDirectoryPath;
-  readonly extensions?: ConfigExtensionsSection;
+  readonly pluginBaseDirectory?: AbsoluteDirectoryPath;
+  readonly pluginDeclarations?: PluginDeclarations;
+}
+
+export interface ExecutionRunInput extends WorkerRunInput {
+  readonly incremental: boolean;
+  readonly missingState?: MissingStatePolicy;
+  readonly stateFilePath?: AbsolutePath;
 }
 
 export interface WorkerRunRequest {
@@ -35,7 +44,7 @@ export interface WorkerRunRequest {
   readonly priorState: ExtractionState;
 }
 
-export interface WorkerRunSuccessPayload {
+export interface ExecutionSuccessPayload {
   readonly recordsWritten: number;
   readonly commitsTraversed: number;
   readonly filesCreated: number;
@@ -48,24 +57,35 @@ export interface WorkerRunSuccessPayload {
 
 export interface WorkerRunSuccess {
   readonly kind: "success";
-  readonly success: WorkerRunSuccessPayload;
+  readonly success: ExecutionSuccessPayload;
   readonly state: ExtractionState;
 }
 
-export interface WorkerRunUserError {
+export interface ExecutionRunSuccess {
+  readonly kind: "success";
+  readonly success: ExecutionSuccessPayload;
+}
+
+export interface ExecutionUserError {
   readonly kind: "user-error";
   readonly message: string;
 }
 
-export interface WorkerRunRuntimeError {
+export interface ExecutionRuntimeError {
   readonly kind: "runtime-error";
   readonly message: string;
   readonly stack?: string;
 }
 
-export type WorkerRunResult = WorkerRunSuccess | WorkerRunUserError | WorkerRunRuntimeError;
+export type WorkerRunResult = WorkerRunSuccess | ExecutionUserError | ExecutionRuntimeError;
+export type ExecutionRunResult = ExecutionRunSuccess | ExecutionUserError | ExecutionRuntimeError;
 
 export type WorkerDiagnosticSeverity = "warn" | "error";
+
+export interface ExecutionRunHandlers {
+  readonly onProgress: (event: ProgressEvent) => void;
+  readonly onDiagnostic: (severity: WorkerDiagnosticSeverity, message: string) => void;
+}
 
 export type WorkerRunMessage =
   | { readonly type: "progress"; readonly event: ProgressEvent }

@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import type { BootstrapInput } from "./cli/index.js";
 import { loadBootstrapInput } from "./cli/index.js";
-import type { ExtractionState } from "./extraction-api/index.js";
+import { executeRun, type ExecutionRunInput } from "./execution/index.js";
 import { GitAdapterError } from "./git/index.js";
 import {
   createBootstrapRenderer,
@@ -13,11 +13,8 @@ import {
   stderrSink,
 } from "./presentation/index.js";
 import { createStyling } from "./presentation/progress/index.js";
-import { dispatchWorkerRunRequest, type WorkerRunInput } from "./runtime/index.js";
-import { NodeStateStore, loadStateFile } from "./state-impl/index.js";
-import { createEmptyState } from "./state/index.js";
 
-function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
+function toExecutionRunInput(bootstrapInput: BootstrapInput): ExecutionRunInput {
   return {
     repositoryPath: bootstrapInput.repositoryPath,
     refs: bootstrapInput.refs,
@@ -31,8 +28,11 @@ function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
     gitAdapter: bootstrapInput.gitAdapter,
     repoName: bootstrapInput.repoName,
     repoUrl: bootstrapInput.repoUrl,
-    configBaseDir: bootstrapInput.configBaseDir,
-    extensions: bootstrapInput.extensions,
+    pluginBaseDirectory: bootstrapInput.configBaseDir,
+    pluginDeclarations: bootstrapInput.extensions,
+    incremental: bootstrapInput.incremental,
+    missingState: bootstrapInput.missingState,
+    stateFilePath: bootstrapInput.stateFilePath,
   };
 }
 
@@ -75,43 +75,14 @@ async function main(): Promise<void> {
   });
 
   try {
-    const stateStore = bootstrapInput.stateFilePath
-      ? new NodeStateStore(bootstrapInput.stateFilePath)
-      : undefined;
-
-    let priorState: ExtractionState;
-    if (!stateStore || !bootstrapInput.incremental) {
-      priorState = createEmptyState(bootstrapInput.repositoryPath);
-    } else {
-      const loadedState = await loadStateFile(stateStore);
-      if (loadedState === undefined) {
-        if (bootstrapInput.missingState === "error") {
-          throw new Error(`State file not found: ${bootstrapInput.stateFilePath}`);
-        }
-        progressRuntime.reporter.emit({
-          type: "warning",
-          message: `State file not found: ${bootstrapInput.stateFilePath}. Falling back to full snapshot extraction.`,
-        });
-        priorState = createEmptyState(bootstrapInput.repositoryPath);
-      } else {
-        priorState = loadedState;
-      }
-    }
-
-    const result = await dispatchWorkerRunRequest(
-      {
-        input: toWorkerRunInput(bootstrapInput),
-        priorState,
+    const result = await executeRun(toExecutionRunInput(bootstrapInput), {
+      onProgress(event) {
+        progressRuntime.reporter.emit(event);
       },
-      {
-        onProgress(event) {
-          progressRuntime.reporter.emit(event);
-        },
-        onDiagnostic(severity, message) {
-          progressRuntime.presenter.renderDiagnostic(severity, message);
-        },
+      onDiagnostic(severity, message) {
+        progressRuntime.presenter.renderDiagnostic(severity, message);
       },
-    );
+    });
 
     if (result.kind === "runtime-error") {
       progressRuntime.presenter.renderRuntimeError(
@@ -125,10 +96,6 @@ async function main(): Promise<void> {
       progressRuntime.presenter.renderUserError(result.message);
       process.exitCode = 1;
       return;
-    }
-
-    if (stateStore !== undefined && result.state.refs.length > 0) {
-      await stateStore.write(result.state);
     }
 
     renderSuccessReport({

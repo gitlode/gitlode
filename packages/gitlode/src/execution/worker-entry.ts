@@ -2,7 +2,7 @@ import { parentPort } from "node:worker_threads";
 
 import { GitAdapterError } from "../git/index.js";
 import type { ProgressReporter } from "../progress/index.js";
-import { executeWorkerRunRequest } from "./execution.js";
+import { executeWorkerRunRequest } from "./execute-run.js";
 import type { WorkerRunMessage, WorkerRunRequest, WorkerRunResult } from "./types.js";
 
 function runtimeErrorResult(error: unknown): WorkerRunResult {

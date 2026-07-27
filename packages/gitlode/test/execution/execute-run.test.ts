@@ -4,11 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as git from "isomorphic-git";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  executeRun,
+  executeWorkerRunRequest,
+  type ExecuteRunDependencies,
+} from "../../src/execution/execute-run.js";
+import type { ExecutionRunInput, WorkerRunRequest } from "../../src/execution/types.js";
 import type { ProgressEvent } from "../../src/progress/index.js";
-import { executeWorkerRunRequest } from "../../src/runtime/execution.js";
-import type { WorkerRunRequest } from "../../src/runtime/types.js";
+import type { StateStore } from "../../src/state/index.js";
 import type { AbsolutePath } from "../../src/support/index.js";
 
 const tempDirs: string[] = [];
@@ -22,6 +27,126 @@ async function makeTempDir(prefix: string): Promise<string> {
   tempDirs.push(dir);
   return dir;
 }
+
+function makeExecutionRunInput(overrides: Partial<ExecutionRunInput> = {}): ExecutionRunInput {
+  return {
+    repositoryPath: "/repo",
+    refs: ["main"],
+    outputDir: "/out",
+    rotation: {},
+    granularity: "commit",
+    profile: false,
+    gitAdapter: "isomorphic-git",
+    incremental: true,
+    missingState: "error",
+    stateFilePath: "/state.json",
+    ...overrides,
+  };
+}
+
+describe("executeRun state orchestration", () => {
+  it("loads prior state and writes returned state before resolving success", async () => {
+    const sideEffects: string[] = [];
+    const priorState = {
+      version: 2 as const,
+      generatedAt: "prior",
+      repositoryPath: "/repo",
+      refs: [],
+    };
+    const returnedState = {
+      version: 2 as const,
+      generatedAt: "next",
+      repositoryPath: "/repo",
+      refs: [{ ref: "main", refType: "branch" as const, tipOid: "abc", updatedAt: "next" }],
+    };
+    const stateStore: StateStore = {
+      async read() {
+        throw new Error("loadStateFile dependency should own state loading");
+      },
+      async write(state) {
+        expect(state).toBe(returnedState);
+        sideEffects.push("state-write");
+      },
+    };
+    const dependencies: ExecuteRunDependencies = {
+      createStateStore(stateFilePath) {
+        expect(stateFilePath).toBe("/state.json");
+        return stateStore;
+      },
+      async loadStateFile(store) {
+        expect(store).toBe(stateStore);
+        sideEffects.push("state-load");
+        return priorState;
+      },
+      async dispatchWorkerRunRequest(request) {
+        expect(request.priorState).toBe(priorState);
+        sideEffects.push("worker-dispatch");
+        return {
+          kind: "success",
+          success: {
+            recordsWritten: 1,
+            commitsTraversed: 1,
+            filesCreated: 1,
+            bytesWritten: 100,
+            elapsedMs: 10,
+            refs: ["main"],
+            profileEntries: [],
+            skippedDiffs: 0,
+          },
+          state: returnedState,
+        };
+      },
+    };
+
+    const result = await executeRun(
+      makeExecutionRunInput(),
+      {
+        onProgress: vi.fn(),
+        onDiagnostic: vi.fn(),
+      },
+      dependencies,
+    );
+
+    expect(result.kind).toBe("success");
+    expect(sideEffects).toEqual(["state-load", "worker-dispatch", "state-write"]);
+  });
+
+  it("emits the existing fallback warning and dispatches with empty state", async () => {
+    const onProgress = vi.fn();
+    const stateStore: StateStore = {
+      async read() {
+        return null;
+      },
+      async write() {},
+    };
+    const dependencies: ExecuteRunDependencies = {
+      createStateStore() {
+        return stateStore;
+      },
+      async loadStateFile() {
+        return undefined;
+      },
+      async dispatchWorkerRunRequest(request) {
+        expect(request.priorState.refs).toEqual([]);
+        return { kind: "user-error", message: "stop after state setup" };
+      },
+    };
+
+    await executeRun(
+      makeExecutionRunInput({ missingState: "snapshot" }),
+      {
+        onProgress,
+        onDiagnostic: vi.fn(),
+      },
+      dependencies,
+    );
+
+    expect(onProgress).toHaveBeenCalledWith({
+      type: "warning",
+      message: "State file not found: /state.json. Falling back to full snapshot extraction.",
+    });
+  });
+});
 
 describe("executeWorkerRunRequest profiling", () => {
   it("includes git adapter walkCommits instrumentation in profile entries", async () => {

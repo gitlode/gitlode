@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { WorkerRunRequest, WorkerRunResult } from "../../src/runtime/types.js";
+import type { WorkerRunRequest, WorkerRunResult } from "../../src/execution/types.js";
 
 interface TestWorker extends EventEmitter {
   readonly postMessage: ReturnType<typeof vi.fn>;
@@ -25,7 +25,7 @@ vi.mock("node:worker_threads", () => ({
   },
 }));
 
-import { dispatchWorkerRunRequest } from "../../src/runtime/client.js";
+import { dispatchWorkerRunRequest } from "../../src/execution/worker-client.js";
 
 function makeRequest(): WorkerRunRequest {
   return {

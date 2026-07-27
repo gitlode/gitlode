@@ -82,13 +82,13 @@ boundary.
 
 Candidate follow-up:
 
-- define a Core/extraction-api checkpoint model containing only information needed as extraction
+- define an extraction-api checkpoint model containing only information needed as extraction
   input or result;
 - define a versioned state-document model in `state`, separate from the extraction checkpoint;
 - make the state boundary validate and convert the persisted document into the extraction model on
   read;
 - convert the extraction result into the current versioned document on write;
-- keep version dispatch and unsupported-version diagnostics outside Core/extraction-api;
+- keep version dispatch and unsupported-version diagnostics outside extraction-api;
 - decide whether any other persisted metadata belongs only to the state document while performing
   this review.
 
@@ -116,7 +116,7 @@ Candidate follow-up:
 - define one host-facing diagnostic contract and ownership model;
 - route extraction and plugin warnings through that contract rather than through `ProgressEvent`;
 - decide whether the existing worker diagnostic channel can serve this role or needs a
-  dependency-light contract outside `runtime`;
+  dependency-light contract outside `execution`;
 - keep progress limited to phases and quantitative progress if the separation is adopted;
 - preserve warning ordering, quiet/TTY rendering, text, and failure behavior unless separately
   approved.

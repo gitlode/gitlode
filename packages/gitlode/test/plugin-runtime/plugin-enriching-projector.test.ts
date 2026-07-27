@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
-import { EnrichingFactProjector } from "../../src/core/enriching-fact-projector.js";
-import type { PluginEntry } from "../../src/core/types.js";
+import { DefaultFactProjector } from "../../src/core/fact-projector.js";
 import type {
   CommitFact,
   Fact,
   FileChangeFact,
   ProjectedRecord,
 } from "../../src/extraction-api/index.js";
+import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/types.js";
 import type {
   Namespace,
@@ -16,7 +16,11 @@ import type {
   ProjectionContext,
   ProjectorPlugin,
 } from "../../src/plugin-api/index.js";
-import { initializePlugins } from "../../src/plugins/plugins.js";
+import {
+  EnrichingFactProjector as PluginEnrichingFactProjector,
+  initializePlugins,
+  type PluginEntry,
+} from "../../src/plugin-runtime/index.js";
 import type { ProgressReporter } from "../../src/progress/index.js";
 
 // ---------------------------------------------------------------------------
@@ -67,6 +71,17 @@ async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
 
 const noopReporter: ProgressReporter = { emit: () => {} };
 
+class EnrichingFactProjector extends PluginEnrichingFactProjector {
+  constructor(
+    entries: readonly PluginEntry[],
+    reporter: ProgressReporter,
+    repoName: string,
+    repoUrl: string | null,
+  ) {
+    super(new DefaultFactProjector(repoName, repoUrl, noopInstrumentation), entries, reporter);
+  }
+}
+
 function makePlugin(
   projectFn: (ctx: ProjectionContext) => Promise<PluginProjectionResult>,
 ): ProjectorPlugin {
@@ -89,6 +104,18 @@ function makeEntry(
 // ---------------------------------------------------------------------------
 
 describe("EnrichingFactProjector — basic enrichment", () => {
+  it("invokes the injected base projector once for the complete fact stream", async () => {
+    const baseProjector = new DefaultFactProjector("repo", null, noopInstrumentation);
+    const projectSpy = vi.spyOn(baseProjector, "project");
+    const projector = new PluginEnrichingFactProjector(baseProjector, [], noopReporter);
+
+    await collect(
+      projector.project(toAsyncIter([makeCommitFact(), makeCommitFact({ oid: "b".repeat(40) })])),
+    );
+
+    expect(projectSpy).toHaveBeenCalledOnce();
+  });
+
   it("emits extensions field with plugin data on success", async () => {
     const plugin = makePlugin(async () => ({
       type: "success",

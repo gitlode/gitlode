@@ -167,7 +167,6 @@ Files:
 - `packages/gitlode/src/core/commit-traversal-extractor.ts`
 - `packages/gitlode/src/core/file-change-expander.ts`
 - `packages/gitlode/src/core/fact-projector.ts`
-- `packages/gitlode/src/core/enriching-fact-projector.ts`
 - `packages/gitlode/src/core/types.ts`
 - `packages/gitlode/src/core/index.ts`
 
@@ -395,23 +394,26 @@ attach to the extraction process and add optional fields to output records.
 
 ### Layer responsibilities
 
-- **`src/cli/plugins.ts`** — config file loading and validation, module resolution, factory
-  invocation, and parallel `init()` orchestration. All file I/O and dynamic imports happen here.
 - **`src/runtime/execution.ts`** — run-scoped plugin bootstrap orchestration and projector
   selection.
 - **`src/progress`** — presentation-independent run phases, events, and reporter contract.
 - **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
   stderr progress/success pipeline.
-- **`src/cli/runtime/success-report.ts`** — successful-run summary and profile rendering.
+- **`src/presentation/success-report.ts`** — successful-run summary and profile rendering.
 - **`src/state`** — checkpoint persistence ports, adaptation factories, and pure validation for the
   `extraction-api` checkpoint model.
 - **`src/state-impl`** — Node.js state-file loading, JSON decoding, and atomic replacement.
-- **`src/core/enriching-fact-projector.ts`** — `EnrichingFactProjector` wraps the default
-  projector and calls each configured plugin's `project()` per fact in declaration order.
+- **`src/plugin-runtime/module-loader.ts`** — entrypoint resolution, dynamic import, factory
+  invocation, and host registry construction.
+- **`src/plugin-runtime/compatibility-checker.ts`** — package metadata discovery and warning-only
+  peer-version checks.
+- **`src/plugin-runtime/initializer.ts`** — parallel plugin initialization and normalized outcomes.
+- **`src/plugin-runtime/plugin-enriching-projector.ts`** — `EnrichingFactProjector` decorates an
+  injected base projector and calls each configured plugin per fact in declaration order.
 - **`src/plugin-api`** — plugin-author contracts such as `ProjectorPlugin`, `PluginFactory`,
   initialization and projection results, projection context, failure policy, and namespace.
-- **`src/core/types.ts`** — the transitional host-side `PluginEntry` registry shape; this is not
-  part of the package-exported plugin API.
+- **`src/plugin-runtime/types.ts`** — host-only declarations, registry records, setup results, and
+  initialization outcomes.
 - **`src/extraction-api/records.ts`** — projected record shapes and the serialized extension value,
   including the host-owned `null` sentinel.
 
@@ -428,7 +430,7 @@ When `--config` is provided:
 3. Plugin entries are resolved and instantiated from the validated `extensions` subsection (`resolvePluginEntries`).
 4. Per-entry profilers are attached if effective profiling is enabled.
 5. `init()` is called in parallel on all entries (`initializePlugins`). Any fatal result aborts.
-6. `EnrichingFactProjector` is used in place of `DefaultFactProjector`.
+6. `EnrichingFactProjector` decorates the base `DefaultFactProjector`.
 7. Progress phase `"initializing-plugins"` runs before `"preparing"` only when `extensions` is present.
 
 When no `extensions` section is present, plugin loading and initialization are skipped,
@@ -437,9 +439,12 @@ When no `extensions` section is present, plugin loading and initialization are s
 ### Boundary rules
 
 - Plugins must not be invoked from within the Git adapter or Output layer.
-- `EnrichingFactProjector` calls the pure `projectCommit` / `projectFileChange` functions directly
-  rather than delegating to the wrapped inner projector. This keeps the decorator self-contained.
-- Plugin `init()` is the CLI layer's responsibility; `EnrichingFactProjector` never calls it.
+- `EnrichingFactProjector` receives the base `FactProjector` contract and does not depend on the
+  extraction implementation.
+- Base projection remains the injected projector's responsibility and is not duplicated by the
+  plugin host.
+- Plugin initialization belongs to `plugin-runtime/initializer.ts`; `EnrichingFactProjector` never
+  calls `init()`.
 
 For the full plugin contract and example, see [docs/design/plugins.md](plugins.md).
 

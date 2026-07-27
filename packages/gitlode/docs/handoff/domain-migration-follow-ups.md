@@ -125,6 +125,26 @@ Review extraction warning producers, plugin-runtime warnings, worker messages, `
 `ProgressController`, and their tests together. This is a protocol and presentation refactoring,
 not part of the mechanical Step 3 domain move.
 
+## Plugin-runtime follow-ups
+
+### Normalize base-projection profiling with and without plugins
+
+Before the domain migration, `EnrichingFactProjector` called the pure projection functions directly.
+As a result, plugin-enabled runs omitted the base projector's `gitlode.projection` and
+`gitlode.projection.project` instrumentation even when profiling was enabled, while runs without
+plugins recorded those spans.
+
+Step 6 now injects the base projector but deliberately supplies it with no-op instrumentation for
+plugin-enabled runs, preserving the existing profile output.
+
+Candidate follow-up:
+
+- decide whether base projection should be instrumented consistently regardless of plugin use;
+- if so, pass the run instrumentation to the plugin-enabled base projector;
+- verify that projection spans and work duration are not double-counted by the decorator;
+- explicitly review the resulting profile-output change and update profiling tests and
+  documentation.
+
 ## Lifecycle
 
 Add similar migration-deferred behavior or diagnostic changes here as they are discovered. Do not

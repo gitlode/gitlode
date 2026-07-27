@@ -9,7 +9,6 @@ import {
   DefaultFactProjector,
   DefaultFileChangeExpander,
   DefaultTraversalPlanner,
-  EnrichingFactProjector,
 } from "../core/index.js";
 import type { ExtractionRange, ExtractionState, FactProjector } from "../extraction-api/index.js";
 import {
@@ -29,10 +28,11 @@ import { JsLineDiffCalculator } from "../line-diff-impl/index.js";
 import { OutputWriter, OutputWriterSink, formatSessionTimestamp } from "../output/index.js";
 import {
   checkPluginCompatibility,
+  EnrichingFactProjector,
   initializePlugins,
   type PluginInitializationFailure,
   resolvePluginEntries,
-} from "../plugins/index.js";
+} from "../plugin-runtime/index.js";
 import type { RunSuccessPayload } from "../presentation/types.js";
 import type { ProgressReporter } from "../progress/index.js";
 import { validatePriorState } from "../state/index.js";
@@ -228,11 +228,10 @@ function resolveOutputPrefix(
 
 async function buildCustomProjector(
   config: {
-    repoName: string;
-    repoUrl: string | null;
     baseDir: AbsoluteDirectoryPath;
     extensions: ConfigExtensionsSection;
   },
+  baseProjector: FactProjector,
   progress: RuntimeExecutionProgress,
   instrumentation: Instrumentation,
 ): Promise<BuildProjectorResult> {
@@ -288,12 +287,7 @@ async function buildCustomProjector(
   progress.reporter.emit({ type: "phase-end", phase: "initializing-plugins" });
   return {
     kind: "success",
-    projector: new EnrichingFactProjector(
-      pluginEntries,
-      progress.reporter,
-      config.repoName,
-      config.repoUrl,
-    ),
+    projector: new EnrichingFactProjector(baseProjector, pluginEntries, progress.reporter),
   };
 }
 
@@ -402,13 +396,19 @@ export async function executeWorkerRunRequest(
     if (!configPath || !hasEffectiveExtensionsConfig(extensions)) {
       projector = new DefaultFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
     } else {
+      // Plugin-enabled projection historically omitted base-projection profiling.
+      // Preserve that observable profile shape during this domain migration.
+      const baseProjector = new DefaultFactProjector(
+        resolvedRepoName,
+        resolvedRepoUrl,
+        noopInstrumentation,
+      );
       const projectorResult = await buildCustomProjector(
         {
-          repoName: resolvedRepoName,
-          repoUrl: resolvedRepoUrl,
           baseDir: configPath,
           extensions,
         },
+        baseProjector,
         progress,
         instrumentation,
       );

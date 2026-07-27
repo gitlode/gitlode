@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigExtensionsSection } from "../../src/config/index.js";
-import type { PluginEntry } from "../../src/core/types.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type {
   Namespace,
@@ -16,7 +15,8 @@ import {
   checkPluginCompatibility,
   initializePlugins,
   resolvePluginEntries,
-} from "../../src/plugins/plugins.js";
+  type PluginEntry,
+} from "../../src/plugin-runtime/index.js";
 import type { AbsoluteDirectoryPath } from "../../src/support/index.js";
 
 beforeEach(() => {

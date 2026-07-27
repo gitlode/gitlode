@@ -2,7 +2,7 @@
 
 ## Status
 
-Steps 0–5 completed on 2026-07-27. Step 6 has not started.
+Steps 0–6 completed on 2026-07-27. Step 7 has not started.
 
 This is a temporary continuation document. The durable domain charters and dependency rules live in
 [`../design/domain-design.md`](../design/domain-design.md). Delete this file when the migration is
@@ -132,14 +132,13 @@ tests when its review shows that an affected invariant is only indirectly covere
 Until the owning migration step completes, the following are explicit temporary exceptions to the
 target architecture:
 
-| Temporary exception                                                                                                                | Expires                               |
-| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `core` owns the plugin host registry and extraction implementation.                                                                | Steps 6–7, according to the inventory |
-| `plugins` is the plugin host domain and depends directly on config document types.                                                 | Step 6                                |
-| `config` imports CLI constants and termination types.                                                                              | Step 8                                |
-| `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9                                |
-| Existing cross-domain deep imports may remain until their owning step. No new cross-domain deep import may be introduced.          | Steps 2–10                            |
-| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced.                         | Step 12                               |
+| Temporary exception                                                                                                                | Expires    |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `core` owns extraction implementation.                                                                                             | Step 7     |
+| `config` imports CLI constants and termination types.                                                                              | Step 8     |
+| `runtime` mixes execution composition, worker transport, config types, presentation types, and direct state implementation access. | Step 9     |
+| Existing cross-domain deep imports may remain until their owning step. No new cross-domain deep import may be introduced.          | Steps 2–10 |
+| The dependency allowlist and `type-utils` charter are reviewed manually rather than mechanically enforced.                         | Step 12    |
 
 These exceptions permit only preservation of existing dependencies. They do not authorize new uses
 or expansion of a legacy domain. If a step needs an exception not listed here, stop and review the
@@ -359,6 +358,24 @@ Review:
 - `plugin-runtime` depends on `extraction-api`, not extraction implementation.
 - Base projection is not duplicated.
 - Plugin order, initialization, compatibility warnings, and failure policies are unchanged.
+
+#### Step 6 results
+
+- Replaced the former `plugins` domain with the approved six-module `plugin-runtime` domain.
+- Split module loading, compatibility checks, initialization, host types, and enrichment
+  orchestration by responsibility.
+- Moved `PluginEntry` and host outcomes out of `core`.
+- Changed `EnrichingFactProjector` into a decorator over an injected `FactProjector`; it executes
+  the base stream once and enriches the corresponding records without duplicating base projection.
+- Kept `plugin-runtime` independent of config document types by accepting its own structural plugin
+  declarations at the execution boundary.
+- Moved lifecycle and enriching-projector tests under `test/plugin-runtime`.
+- Preserved plugin declaration order, initialization concurrency and diagnostics, compatibility
+  warnings, projection values, failure policies, warning text, and fatal behavior.
+- Preserved the existing plugin-enabled profiling shape with no-op base-projection instrumentation;
+  recorded normalization of that behavior as a separate follow-up.
+- Passed format, lint, all-workspace builds, all 578 gitlode tests, and all 64 official plugin
+  tests.
 
 ### Step 7: Rename core to extraction
 

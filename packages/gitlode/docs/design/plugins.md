@@ -165,7 +165,8 @@ When at least one plugin is active, each output record gains an `extensions` obj
 1. **Config load** — `--config` path is read and validated against the JSON schema.
 2. **Entrypoint resolution** — Each plugin's module is resolved and imported. Factory functions are invoked with the declared `config` value.
 3. **Init** — All `init()` methods are called in parallel. If any return `fatal` or throw, the run aborts.
-4. **Extraction** — `EnrichingFactProjector` wraps the core projector and calls each plugin's `project()` for every fact, in declaration order.
+4. **Extraction** — `EnrichingFactProjector` decorates an injected base projector and calls each
+   plugin's `project()` for every fact, in declaration order.
 5. **Profiling** — When `--profile` is active, each plugin receives an optional profiler in
    `init(runtime)`. gitlode creates plugin profilers under
    `elapsed/projection/plugins/<namespace>`, but the plugin decides whether to use that profiler
@@ -194,18 +195,20 @@ When a plugin returns `fatal` or throws on a given fact:
 
 ## Ownership and Boundaries
 
-- **Plugin runtime is a host boundary concern.** Module resolution and factory invocation currently
-  happen in `src/plugins/plugins.ts`.
-- **Plugin initialization is a host boundary concern.** `src/plugins/plugins.ts` receives runtime
-  contexts, runs all `init(runtime)` calls in parallel, and aggregates init failures before
-  extraction starts.
-- **Enrichment projection is a Core boundary concern.** `EnrichingFactProjector` (in `src/core/`) wraps the default projector and orchestrates per-fact plugin calls.
+- **Plugin runtime is a host boundary concern.** Module resolution, compatibility checks, factory
+  invocation, initialization, host registration, and enrichment orchestration live in
+  `src/plugin-runtime/`.
+- **Plugin initialization is a host boundary concern.** `src/plugin-runtime/initializer.ts`
+  receives runtime contexts, runs all `init(runtime)` calls in parallel, and aggregates init
+  failures before extraction starts.
+- **Enrichment projection is a plugin-runtime concern.** `EnrichingFactProjector` decorates an
+  injected `FactProjector`; it does not import or reproduce the base extraction implementation.
 - **`plugin-api` defines the plugin-author contract.** `ProjectorPlugin`, `PluginFactory`,
   initialization and projection results, projection values and contexts, failure policies, runtime
   contexts, and namespaces live in `src/plugin-api/`. `src/plugin-api.ts` is only the package-export
   facade.
-- **Host registries are not public API.** `PluginEntry` is an internal host record and is not
-  exported through `gitlode/plugin-api`.
+- **Host registries are not public API.** `PluginEntry` lives in `src/plugin-runtime/types.ts` and is
+  not exported through `gitlode/plugin-api`.
 - **Per-fact plugin profiling is plugin-controlled.** `EnrichingFactProjector` no longer wraps every `project()` call in host-owned timing. If a plugin wants projection profiling, it uses the optional profiler received during `init(runtime)`.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
 - **The `extensions` field is an extraction record concern.** `ProjectedExtensions` and

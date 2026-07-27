@@ -419,7 +419,204 @@ boundary.
 
 ## 3. Supporting Guidance
 
-### 3.1 Source layout and imports
+### 3.1 Dependency views
+
+The diagrams in this section are views of the closed allowlist in Section 2.21, not independent
+rules. An arrow from `A` to `B` means that domain `A` may directly depend on domain `B`.
+
+#### 3.1.1 Complete domain graph
+
+This view shows every allowed direct domain dependency except dependencies on `type-utils`.
+`type-utils` is intentionally omitted because its global availability would add an edge from almost
+every domain without clarifying the product structure.
+
+Domain appearance indicates its primary architectural nature:
+
+- blue stadium: contract or API;
+- orange subroutine: concrete implementation;
+- green rounded rectangle: product policy or orchestration;
+- purple rectangle: application boundary or I/O; and
+- gray hexagon: shared or generic foundation.
+
+```mermaid
+flowchart TB
+  subgraph application["Application boundary and I/O"]
+    direction LR
+    cli["cli"]
+    config["config"]
+    execution("execution")
+    output["output"]
+    presentation["presentation"]
+    state["state"]
+  end
+
+  subgraph product["Product policy and extension"]
+    direction LR
+    extraction("extraction")
+    extractionApi(["extraction-api"])
+    pluginApi(["plugin-api"])
+    pluginRuntime("plugin-runtime")
+  end
+
+  subgraph adapters["Ports and implementations"]
+    direction LR
+    git(["git"])
+    gitImpl[["git-impl"]]
+    lineDiff(["line-diff"])
+    lineDiffImpl[["line-diff-impl"]]
+  end
+
+  subgraph foundations["Shared and generic foundations"]
+    direction LR
+    dag{{"dag"}}
+    instrumentation{{"instrumentation"}}
+    model{{"model"}}
+    progress{{"progress"}}
+    support{{"support"}}
+  end
+
+  classDef contract fill:#dbeafe,stroke:#2563eb,color:#172554
+  classDef implementation fill:#ffedd5,stroke:#ea580c,color:#431407
+  classDef policy fill:#dcfce7,stroke:#16a34a,color:#052e16
+  classDef boundary fill:#f3e8ff,stroke:#9333ea,color:#3b0764
+  classDef foundation fill:#f3f4f6,stroke:#6b7280,color:#111827
+
+  class extractionApi,git,lineDiff,pluginApi contract
+  class gitImpl,lineDiffImpl implementation
+  class execution,extraction,pluginRuntime policy
+  class cli,config,output,presentation,state boundary
+  class dag,instrumentation,model,progress,support foundation
+
+  cli --> config
+  cli --> support
+  config --> pluginApi
+  config --> support
+
+  execution --> extraction
+  execution --> extractionApi
+  execution --> git
+  execution --> gitImpl
+  execution --> instrumentation
+  execution --> lineDiffImpl
+  execution --> model
+  execution --> output
+  execution --> pluginApi
+  execution --> pluginRuntime
+  execution --> progress
+  execution --> state
+  execution --> support
+
+  presentation --> instrumentation
+  presentation --> progress
+  presentation --> support
+  output --> extractionApi
+  state --> extractionApi
+  state --> model
+  state --> support
+
+  extraction --> extractionApi
+  extraction --> git
+  extraction --> instrumentation
+  extraction --> lineDiff
+  extraction --> model
+  extraction --> progress
+  extraction --> support
+  extractionApi --> model
+  extractionApi --> progress
+  extractionApi --> support
+
+  pluginApi --> extractionApi
+  pluginApi --> instrumentation
+  pluginRuntime --> extractionApi
+  pluginRuntime --> instrumentation
+  pluginRuntime --> pluginApi
+  pluginRuntime --> progress
+  pluginRuntime --> support
+
+  git --> model
+  gitImpl --> dag
+  gitImpl --> git
+  gitImpl --> instrumentation
+  gitImpl --> model
+  gitImpl --> support
+  lineDiffImpl --> lineDiff
+
+  dag --> instrumentation
+  dag --> support
+```
+
+The grouping is explanatory rather than an additional layer model. In particular, a group does not
+grant dependencies between its members.
+
+#### 3.1.2 Extraction core
+
+This view removes CLI, configuration, presentation, and cross-cutting dependencies such as
+`type-utils`, `support`, `instrumentation`, and `progress`. It also suppresses direct composition
+edges from `execution` to lower-level contracts when the corresponding implementation relationship
+is already visible. Consult Section 2.21 for the complete rule.
+
+```mermaid
+flowchart LR
+  execution("execution")
+  extraction("extraction")
+  extractionApi(["extraction-api"])
+  model{{"model"}}
+
+  git(["git contract"])
+  gitImpl[["git-impl"]]
+  dag{{"dag"}}
+
+  lineDiff(["line-diff contract"])
+  lineDiffImpl[["line-diff-impl"]]
+
+  output["output"]
+  state["state"]
+  pluginApi(["plugin-api"])
+  pluginRuntime("plugin-runtime")
+
+  classDef contract fill:#dbeafe,stroke:#2563eb,color:#172554
+  classDef implementation fill:#ffedd5,stroke:#ea580c,color:#431407
+  classDef policy fill:#dcfce7,stroke:#16a34a,color:#052e16
+  classDef boundary fill:#f3e8ff,stroke:#9333ea,color:#3b0764
+  classDef foundation fill:#f3f4f6,stroke:#6b7280,color:#111827
+
+  class extractionApi,git,lineDiff,pluginApi contract
+  class gitImpl,lineDiffImpl implementation
+  class execution,extraction,pluginRuntime policy
+  class output,state boundary
+  class dag,model foundation
+
+  execution --> extraction
+  execution --> gitImpl
+  execution --> lineDiffImpl
+  execution --> output
+  execution --> state
+  execution --> pluginRuntime
+
+  extraction --> extractionApi
+  extraction --> git
+  extraction --> lineDiff
+  extraction --> model
+
+  gitImpl --> git
+  gitImpl --> dag
+  lineDiffImpl --> lineDiff
+
+  output --> extractionApi
+  state --> extractionApi
+  state --> model
+  pluginRuntime --> pluginApi
+  pluginRuntime --> extractionApi
+  pluginApi --> extractionApi
+  extractionApi --> model
+```
+
+The focused view highlights two deliberate contract–implementation seams: extraction depends on the
+`git` and `line-diff` contracts, while execution selects their implementations. State persistence
+remains one domain because no production consumer needs its contract without also accepting its
+Node.js implementation dependency.
+
+### 3.2 Source layout and imports
 
 - A top-level directory under `src/` represents a domain. Nested directories organize modules
   within that domain unless explicitly documented otherwise.
@@ -428,7 +625,7 @@ boundary.
 - A barrel represents the domain contract. If consumers require materially different dependency
   envelopes, reconsider the domain boundary instead of bypassing the barrel with deep imports.
 
-### 3.2 Enforcement
+### 3.3 Enforcement
 
 Run `npm run architecture:check` from the repository root after changing source boundaries or
 dependencies. The check uses Rev-dep to:
@@ -448,7 +645,7 @@ configuration must not grant dependencies absent from this document. Reviews mus
 charter constraints that the dependency graph does not express directly, especially that
 `type-utils` has no external dependencies and emits no runtime code.
 
-### 3.3 Package and process entrypoints
+### 3.4 Package and process entrypoints
 
 Root-level entrypoint modules are facades, not domains:
 
@@ -458,7 +655,7 @@ Root-level entrypoint modules are facades, not domains:
 These modules connect external consumers to the owning domains and should not accumulate product
 policy or implementation details.
 
-### 3.4 Naming default selections
+### 3.5 Naming default selections
 
 Do not use `Default` as a substitute for describing an implementation. Use it at a selection
 boundary when several valid choices exist and one is selected if the caller does not specify one.

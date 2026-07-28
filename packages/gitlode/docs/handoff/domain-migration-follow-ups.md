@@ -2,13 +2,23 @@
 
 ## Status
 
-Deferred until the domain migration is complete. These are candidates for separate tasks that
-change observable identifiers or require cross-boundary runtime refactoring, not part of the
-current structure-preserving migration.
+The domain migration is complete. None of the follow-ups in this document has been implemented;
+each remains a candidate for a separate task because it changes observable identifiers or requires
+cross-boundary runtime refactoring.
 
-The migration intentionally preserves externally observable strings and profiling identifiers even
-when they retain vocabulary from the former ownership model. Evaluate each item independently after
-the new domain structure has stabilized.
+The migration intentionally preserved externally observable strings and profiling identifiers even
+when they retained vocabulary from the former ownership model. The descriptions below record the
+resulting repository state, not a sequence of migration steps. Unless a path starts with
+`packages/`, it is relative to `packages/gitlode`.
+
+When resuming this work in another session:
+
+1. Treat each top-level follow-up as an independent task and confirm that its described current
+   state still matches the referenced source.
+2. Read the linked canonical design documentation before choosing a replacement contract.
+3. Obtain approval for any observable diagnostic, profiling, protocol, or file-format change.
+4. Update source, tests, and canonical documentation together; do not use this handoff document as
+   the final source of truth for an accepted contract.
 
 ## Line-diff follow-ups
 
@@ -20,14 +30,17 @@ Current text:
 DiffAdapter returned invalid values: additions=..., deletions=...
 ```
 
-The implementation contract is now named `LineDiffCalculator`, but this error can propagate to CLI
-diagnostics. Step 1 therefore retained the old text.
+The current implementation contract is named `LineDiffCalculator`, but
+`src/extraction/file-change-fact-expander.ts` still uses the former `DiffAdapter` name in an error
+that can propagate to CLI diagnostics. The domain migration retained that text to avoid combining a
+user-visible diagnostic change with structural code movement.
 
 Candidate follow-up:
 
 - rename the subject to `LineDiffCalculator`;
 - explicitly review the resulting CLI diagnostic change;
-- update the assertion in `test/extraction/file-change-fact-expander.test.ts`.
+- update the assertion in `test/extraction/file-change-fact-expander.test.ts`;
+- run the CLI and extraction test suites to confirm that only the intended text changes.
 
 ### Profiling span names
 
@@ -38,9 +51,10 @@ git.file_changes
 git.diff
 ```
 
-`git.diff` now measures `LineDiffCalculator` work and is no longer owned by the `git` or `git-impl`
-domains. `git.file_changes` measures extraction-side file-change expansion, although it includes
-calls into Git repository access. Their `git.*` prefix therefore no longer accurately communicates
+`src/extraction/file-change-fact-expander.ts` creates both spans. `git.diff` measures
+`LineDiffCalculator` work and is not owned by the `git` or `git-impl` domains.
+`git.file_changes` measures extraction-side file-change expansion, although it includes calls into
+Git repository access. Their `git.*` prefix therefore does not accurately communicate current
 ownership.
 
 Candidate follow-up:
@@ -68,17 +82,16 @@ examples in:
 
 ### Separate extraction checkpoint data from the state document schema
 
-`ExtractionState` currently contains:
+`src/extraction-api/extraction.ts` defines `ExtractionState` with:
 
 ```text
 version: 2
 ```
 
 This version identifies the persisted state JSON schema. Extraction does not use it when planning or
-performing a run, so including it in the Core-owned extraction contract leaks a persistence concern
-into Core. Configuration already keeps the analogous document version in the config-owned
-`ProjectConfigurationV1` model rather than in Core; state should be reviewed using the same
-boundary.
+performing a run, so including it in the `extraction-api` contract leaks a persistence concern into
+that domain. Configuration already keeps the analogous document version in the config-owned
+`ProjectConfigurationV1` model; state should be reviewed using the same separation.
 
 Candidate follow-up:
 
@@ -93,15 +106,16 @@ Candidate follow-up:
   this review.
 
 The change should preserve the current state JSON shape and user-facing behavior unless a separate
-schema migration is explicitly approved. Review `StateStore` and `StateStoreValue`, state-file
-loading and writing, composition-root mapping, incremental extraction tests, state design
-documentation, and any future state JSON schema documentation together.
+schema migration is explicitly approved. Review `src/state/types.ts`, `src/state/validation.ts`,
+`src/state/node-state-store.ts`, `src/state/state-file-loader.ts`, `src/state/factories.ts`,
+execution-side state mapping, incremental extraction tests, state design documentation, and any
+future state JSON schema documentation together.
 
 ## Progress follow-ups
 
 ### Separate warnings from progress events
 
-`ProgressEvent` currently includes:
+`src/progress/types.ts` currently includes:
 
 ```text
 { type: "warning"; message: string }
@@ -123,19 +137,24 @@ Candidate follow-up:
 
 Review extraction warning producers, plugin-runtime warnings, worker messages, `RunPresenter`,
 `ProgressController`, and their tests together. This is a protocol and presentation refactoring,
-not part of the mechanical Step 3 domain move.
+not a directory-only cleanup. Current producers can be found by searching for
+`type: "warning"` in `src/extraction`, `src/plugin-runtime`, and `src/execution`; the separate worker
+diagnostic message is defined in `src/execution/types.ts`.
 
 ## Plugin-runtime follow-ups
 
 ### Normalize base-projection profiling with and without plugins
 
-Before the domain migration, `EnrichingFactProjector` called the pure projection functions directly.
-As a result, plugin-enabled runs omitted the base projector's `gitlode.projection` and
-`gitlode.projection.project` instrumentation even when profiling was enabled, while runs without
-plugins recorded those spans.
+The current runtime deliberately preserves a profiling asymmetry that predates the domain
+migration. Runs without plugins construct `BuiltInFactProjector` with the run instrumentation and
+record `gitlode.projection` and `gitlode.projection.project`. When plugins are enabled,
+`src/execution/execute-run.ts` constructs the injected `BuiltInFactProjector` with
+`noopInstrumentation`, then `src/execution/plugin-bootstrap.ts` decorates it with
+`EnrichingFactProjector`. Plugin-enabled runs therefore omit the base-projection spans even when
+profiling is enabled.
 
-Step 6 now injects the base projector but deliberately supplies it with no-op instrumentation for
-plugin-enabled runs, preserving the existing profile output.
+The no-op instrumentation is intentional compatibility behavior, not an instrumentation
+requirement of `EnrichingFactProjector`.
 
 Candidate follow-up:
 
@@ -143,12 +162,14 @@ Candidate follow-up:
 - if so, pass the run instrumentation to the plugin-enabled base projector;
 - verify that projection spans and work duration are not double-counted by the decorator;
 - explicitly review the resulting profile-output change and update profiling tests and
-  documentation.
+  documentation;
+- exercise otherwise equivalent runs with and without plugins and compare their profiling entries.
 
 ## Lifecycle
 
-Add similar migration-deferred behavior or diagnostic changes here as they are discovered. Do not
-mix ordinary domain-migration tasks into this document.
+Add similar migration-deferred behavior or diagnostic changes here only when they need continuation
+context that does not yet belong in canonical documentation. Do not add ordinary maintenance tasks
+or completed migration history.
 
 When every item has been evaluated, move any accepted stable profiling or diagnostic contracts to
 their canonical documentation and delete this handoff document.

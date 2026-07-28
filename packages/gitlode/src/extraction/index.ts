@@ -1,4 +1,3 @@
-export type { CoordinatorDependencies } from "./types.js";
 export { RepositoryTraversalPlanner } from "./repository-traversal-planner.js";
 export { ExtractionPipeline } from "./extraction-pipeline.js";
 export { CommitFactExtractor } from "./commit-fact-extractor.js";

@@ -218,6 +218,8 @@
         "ignoreTypeImports": false,
         "algorithm": "SCC"
       },
+      "orphanFilesDetection": true,
+      "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
         "excludeModules": ["@types/*"],
         "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
@@ -237,6 +239,8 @@
         "ignoreTypeImports": false,
         "algorithm": "SCC"
       },
+      "orphanFilesDetection": true,
+      "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
         "excludeModules": ["gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
@@ -256,6 +260,8 @@
         "ignoreTypeImports": false,
         "algorithm": "SCC"
       },
+      "orphanFilesDetection": true,
+      "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
         "excludeModules": ["gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
@@ -275,6 +281,8 @@
         "ignoreTypeImports": false,
         "algorithm": "SCC"
       },
+      "orphanFilesDetection": true,
+      "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
         "excludeModules": ["gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
@@ -294,6 +302,8 @@
         "ignoreTypeImports": false,
         "algorithm": "SCC"
       },
+      "orphanFilesDetection": true,
+      "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
         "excludeModules": ["gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
@@ -313,6 +323,8 @@
         "ignoreTypeImports": false,
         "algorithm": "SCC"
       },
+      "orphanFilesDetection": true,
+      "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
         "excludeModules": ["gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]

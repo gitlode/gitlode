@@ -15,10 +15,8 @@ export type {
   ProjectedExtensionValue,
   ProjectedExtensions,
   ProjectedFileChange,
-  ProjectedPerson,
   ProjectedRecord,
   ProjectedRecordFor,
-  ProjectedRepository,
 } from "./records.js";
 export type {
   CommitTraversalExtractor,

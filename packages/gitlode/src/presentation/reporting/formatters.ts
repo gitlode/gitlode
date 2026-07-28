@@ -1,14 +1,14 @@
 import type { InstrumentAttributeValue, ProfileSummaryEntry } from "../../instrumentation/index.js";
 import { firstOrThrow } from "../../support/index.js";
-import { formatCount, formatElapsedRaw, formatMs, humanizeBytesRaw } from "../format-utils.js";
+import { formatCount, formatElapsed, formatMs, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
 import type { SummaryData } from "./types.js";
 
 export function formatSummaryLines(data: SummaryData, styling: Styling = plainStyling): string[] {
   const header = styling.summaryHeader("Extraction complete");
-  const { value: bytesVal, unit: bytesUnit } = humanizeBytesRaw(data.bytesWritten);
+  const { value: bytesVal, unit: bytesUnit } = humanizeBytes(data.bytesWritten);
   const bytesStr = styling.primaryValue(bytesVal) + styling.unitSuffix(bytesUnit);
-  const { value: elapsedVal, unit: elapsedUnit } = formatElapsedRaw(data.elapsedMs);
+  const { value: elapsedVal, unit: elapsedUnit } = formatElapsed(data.elapsedMs);
   const elapsedStr = styling.primaryValue(elapsedVal) + styling.unitSuffix(elapsedUnit);
   const refsStr = styling.refsValue(data.refs.join(", ") || "(none)");
 

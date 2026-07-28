@@ -13,7 +13,7 @@ export interface GitBatchObject {
   readonly content: Uint8Array;
 }
 
-export type ProcessCloseResult =
+type ProcessCloseResult =
   | { readonly ok: true; readonly code: number }
   | { readonly ok: false; readonly error: unknown };
 

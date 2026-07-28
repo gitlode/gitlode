@@ -2,7 +2,7 @@ import { atOrThrow } from "./helpers.js";
 import type { WorkQueue } from "./work-queue.js";
 
 /** Comparator with the same ordering semantics as `Array.prototype.sort()`. */
-export type Compare<T> = (a: T, b: T) => number;
+type Compare<T> = (a: T, b: T) => number;
 
 interface PriorityQueueNode<T> {
   readonly item: T;

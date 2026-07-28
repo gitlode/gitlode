@@ -2,7 +2,7 @@ import { splitMessageLines } from "./diagnostics.js";
 import { normalizeUnknownError } from "./presenter.js";
 import type { TerminalSink } from "./progress/index.js";
 
-export interface BootstrapRenderer {
+interface BootstrapRenderer {
   renderUserError(message: string): void;
   renderRuntimeError(error: unknown): void;
 }

@@ -11,7 +11,7 @@ export type WorkerRunRange =
   | { readonly type: "ref"; readonly since: string }
   | { readonly type: "date"; readonly since: IsoDateTimeString };
 
-export interface WorkerOutputRotation {
+interface WorkerOutputRotation {
   readonly maxLines?: number;
   readonly maxBytes?: number;
 }
@@ -55,23 +55,23 @@ export interface ExecutionSuccessPayload {
   readonly skippedDiffs: number;
 }
 
-export interface WorkerRunSuccess {
+interface WorkerRunSuccess {
   readonly kind: "success";
   readonly success: ExecutionSuccessPayload;
   readonly state: ExtractionState;
 }
 
-export interface ExecutionRunSuccess {
+interface ExecutionRunSuccess {
   readonly kind: "success";
   readonly success: ExecutionSuccessPayload;
 }
 
-export interface ExecutionUserError {
+interface ExecutionUserError {
   readonly kind: "user-error";
   readonly message: string;
 }
 
-export interface ExecutionRuntimeError {
+interface ExecutionRuntimeError {
   readonly kind: "runtime-error";
   readonly message: string;
   readonly stack?: string;

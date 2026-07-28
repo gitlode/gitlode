@@ -288,10 +288,7 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
   );
 }
 
-export async function* walkDagReachableNodeIdsCore<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
+async function* walkDagReachableNodeIdsCore<NodeId extends PropertyKey, DomainHint = undefined>(
   context: WalkDagCoreContext<NodeId, DomainHint>,
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
@@ -360,7 +357,7 @@ function createDefaultTraversalFrontier<
   return createFifoDagFrontier<NodeId, DagSchedulingContext, DomainHint>();
 }
 
-export function createFifoDagFrontier<
+function createFifoDagFrontier<
   NodeId extends PropertyKey,
   DagSchedulingContext extends BasicDagSchedulingContext,
   DomainHint = undefined,
@@ -371,7 +368,7 @@ export function createFifoDagFrontier<
   });
 }
 
-export function createDagFrontierItemFactory<
+function createDagFrontierItemFactory<
   NodeId extends PropertyKey,
   DagSchedulingContext extends BasicDagSchedulingContext,
   DomainHint = undefined,
@@ -441,7 +438,7 @@ export function createDagFrontierItemFactory<
   };
 }
 
-export function createFrontierItem<
+function createFrontierItem<
   NodeId extends PropertyKey,
   DagSchedulingContext extends BasicDagSchedulingContext,
   DomainHint = undefined,
@@ -457,7 +454,7 @@ export function createFrontierItem<
   };
 }
 
-export function createBasicDagSchedulingContext(
+function createBasicDagSchedulingContext(
   role: DagTraversalRole,
   depth: number,
   discoveredOrder: number,

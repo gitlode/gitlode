@@ -1,8 +1,8 @@
 import { atOrThrow } from "./helpers.js";
 import type { WorkQueue } from "./work-queue.js";
 
-export type DequeueOrder = "fifo" | "lifo";
-export type BlockOrder = "preserve" | "reverse";
+type DequeueOrder = "fifo" | "lifo";
+type BlockOrder = "preserve" | "reverse";
 
 export interface OrderedQueueOptions {
   readonly dequeueOrder: DequeueOrder;

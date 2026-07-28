@@ -15,7 +15,7 @@ export interface GitAdapterFactoryDependencies {
   readonly environment: Readonly<Record<string, string | undefined>>;
 }
 
-export type BuildGitAdapterResult =
+type BuildGitAdapterResult =
   | {
       readonly kind: "success";
       readonly adapter: GitAdapter;

@@ -33,7 +33,7 @@ import {
 export { parseBatchObjectStream } from "./git-cli-cat-file-batch.js";
 export { parseRawDiffTreeOutput } from "./git-cli-raw-diff.js";
 
-export interface GitCliAdapterDependencies {
+interface GitCliAdapterDependencies {
   readonly instrumentation: Instrumentation;
   readonly gitExecutable?: string;
 }

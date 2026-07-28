@@ -9,7 +9,7 @@ import type {
   UnknownPolicy,
 } from "./types.js";
 
-export type ConfigParseResult =
+type ConfigParseResult =
   | { readonly ok: true; readonly value: PreparedConfig }
   | { readonly ok: false; readonly message: string };
 

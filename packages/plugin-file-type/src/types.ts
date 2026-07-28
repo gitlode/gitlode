@@ -1,7 +1,7 @@
 import type { Brand } from "gitlode/plugin-api";
 
 export type RuleSetName = "common";
-export type MappingSource = "plugin-config" | RuleSetName;
+type MappingSource = "plugin-config" | RuleSetName;
 
 export type BasenameSignature = Brand<string, "BasenameSignature">;
 export type SuffixSignature = Brand<string, "SuffixSignature">;

@@ -18,11 +18,11 @@ import type { MissingStateOption } from "./missing-state-option.js";
 import type { ParsedCliOptions } from "./option-schema.js";
 import { isCliValueProvided, parseCliOptions } from "./parse-options.js";
 
-export type BootstrapInputRange =
+type BootstrapInputRange =
   | { readonly type: "ref"; readonly since: string }
   | { readonly type: "date"; readonly since: IsoDateTimeString };
 
-export interface BootstrapOutputRotation {
+interface BootstrapOutputRotation {
   readonly maxLines?: number;
   readonly maxBytes?: number;
 }

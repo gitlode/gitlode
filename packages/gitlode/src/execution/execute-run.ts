@@ -43,7 +43,7 @@ import type {
 } from "./types.js";
 import { dispatchWorkerRunRequest } from "./worker-client.js";
 
-export interface WorkerExecutionProgress {
+interface WorkerExecutionProgress {
   readonly reporter: ProgressReporter;
   readonly renderDiagnostic: (severity: "warn" | "error", message: string) => void;
 }

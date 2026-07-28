@@ -6,7 +6,7 @@ import type {
   ProjectorPlugin,
 } from "../plugin-api/index.js";
 
-export interface PluginDeclaration {
+interface PluginDeclaration {
   readonly entrypoint: string;
   readonly config?: unknown;
   readonly failurePolicy: PluginFailurePolicy;

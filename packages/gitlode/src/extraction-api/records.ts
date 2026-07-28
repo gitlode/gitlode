@@ -1,12 +1,12 @@
 import type { PersonIdentity } from "../model/index.js";
 import type { CommitFact, FileChangeFact } from "./facts.js";
 
-export interface ProjectedPerson extends PersonIdentity {
+interface ProjectedPerson extends PersonIdentity {
   /** ISO 8601 timestamp retaining the commit's own timezone offset. */
   readonly timestamp: string;
 }
 
-export interface ProjectedRepository {
+interface ProjectedRepository {
   readonly name: string;
   readonly url: string | null;
 }

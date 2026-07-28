@@ -1,40 +1,40 @@
 import type { Namespace, PluginFailurePolicy } from "../plugin-api/index.js";
 import type { IsoDateTimeString } from "../support/index.js";
 
-export interface ConfigExtractionRange {
+interface ConfigExtractionRange {
   readonly sinceRef?: string;
   readonly sinceDate?: IsoDateTimeString;
 }
 
-export interface ConfigExtractionSection {
+interface ConfigExtractionSection {
   readonly refs?: readonly string[];
   readonly range?: ConfigExtractionRange;
 }
 
-export interface ConfigRotationSection {
+interface ConfigRotationSection {
   readonly lines?: number;
   readonly size?: number;
 }
 
-export interface ConfigOutputSection {
+interface ConfigOutputSection {
   readonly directory?: string;
   readonly prefix?: string;
   readonly rotation?: ConfigRotationSection;
 }
 
-export interface ConfigRepositorySection {
+interface ConfigRepositorySection {
   readonly name?: string;
   readonly url?: string;
 }
 
 export type GitAdapterName = "isomorphic-git" | "git-cli";
 
-export interface ConfigRuntimeSection {
+interface ConfigRuntimeSection {
   readonly profile?: boolean;
   readonly gitAdapter?: GitAdapterName;
 }
 
-export interface ConfigExtensionEntry {
+interface ConfigExtensionEntry {
   readonly entrypoint: string;
   readonly config?: unknown;
   readonly failurePolicy: PluginFailurePolicy;
@@ -53,7 +53,7 @@ export interface ProjectConfigurationV1 {
 
 export type ConfigDiagnosticCode = "not-found" | "read-failed" | "invalid-json" | "invalid-schema";
 
-export interface ConfigDiagnostic {
+interface ConfigDiagnostic {
   readonly code: ConfigDiagnosticCode;
   readonly message: string;
 }

@@ -4,7 +4,7 @@ import { dirnameOfFilePath, type AbsolutePath, resolveFilePath } from "../suppor
 import type { BootstrapResult } from "./errors.js";
 import type { MissingStateOption } from "./missing-state-option.js";
 
-export interface FilesystemPreflightInput {
+interface FilesystemPreflightInput {
   readonly repositoryPath: string | undefined;
   readonly outputDirectory: string;
   readonly statePath: string | undefined;
@@ -12,7 +12,7 @@ export interface FilesystemPreflightInput {
   readonly missingState: MissingStateOption | undefined;
 }
 
-export interface FilesystemPreflightResult {
+interface FilesystemPreflightResult {
   readonly repositoryPath: AbsolutePath;
   readonly outputDirectory: AbsolutePath;
   readonly statePath: AbsolutePath | undefined;

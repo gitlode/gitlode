@@ -1,15 +1,7 @@
 import type { ProgressPhase } from "../../progress/index.js";
-import {
-  formatCount,
-  formatElapsed,
-  formatElapsedRaw,
-  humanizeBytes,
-  humanizeBytesRaw,
-} from "../format-utils.js";
+import { formatCount, formatElapsed, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
 import type { PhaseSnapshot } from "./types.js";
-
-export { formatElapsed, humanizeBytes };
 
 function phaseLabel(phase: ProgressPhase): string {
   switch (phase) {
@@ -31,13 +23,13 @@ export function formatActiveLine(
 ): string {
   const label = phaseLabel(snapshot.phase);
   const elapsedMs = snapshot.nowMs - snapshot.startMs;
-  const { value: elapsedVal, unit: elapsedUnit } = formatElapsedRaw(elapsedMs);
+  const { value: elapsedVal, unit: elapsedUnit } = formatElapsed(elapsedMs);
   const elapsedStr = styling.primaryValue(elapsedVal) + styling.unitSuffix(elapsedUnit);
 
   if (snapshot.phase === "extracting" && snapshot.refCount > 0) {
     const commits = formatCount(snapshot.commitsTraversed);
     const records = formatCount(snapshot.recordsWritten);
-    const { value: bytesVal, unit: bytesUnit } = humanizeBytesRaw(snapshot.bytesWritten);
+    const { value: bytesVal, unit: bytesUnit } = humanizeBytes(snapshot.bytesWritten);
     const bytesStr = styling.primaryValue(bytesVal) + styling.unitSuffix(bytesUnit);
 
     return (
@@ -59,13 +51,13 @@ export function formatActiveLine(
 export function formatDoneLine(snapshot: PhaseSnapshot, styling: Styling = plainStyling): string {
   const label = phaseLabel(snapshot.phase);
   const elapsedMs = snapshot.nowMs - snapshot.startMs;
-  const { value: elapsedVal, unit: elapsedUnit } = formatElapsedRaw(elapsedMs);
+  const { value: elapsedVal, unit: elapsedUnit } = formatElapsed(elapsedMs);
   const elapsedStr = styling.primaryValue(elapsedVal) + styling.unitSuffix(elapsedUnit);
 
   if (snapshot.phase === "extracting" && snapshot.refCount > 0) {
     const commits = formatCount(snapshot.commitsTraversed);
     const records = formatCount(snapshot.recordsWritten);
-    const { value: bytesVal, unit: bytesUnit } = humanizeBytesRaw(snapshot.bytesWritten);
+    const { value: bytesVal, unit: bytesUnit } = humanizeBytes(snapshot.bytesWritten);
     const bytesStr = styling.primaryValue(bytesVal) + styling.unitSuffix(bytesUnit);
 
     return (

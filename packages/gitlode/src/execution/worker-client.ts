@@ -8,7 +8,7 @@ import type {
   WorkerRunResult,
 } from "./types.js";
 
-export interface WorkerRunDispatchHandlers {
+interface WorkerRunDispatchHandlers {
   readonly onProgress: (event: ProgressEvent) => void;
   readonly onDiagnostic: (severity: WorkerDiagnosticSeverity, message: string) => void;
 }

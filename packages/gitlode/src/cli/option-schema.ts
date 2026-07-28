@@ -8,7 +8,7 @@ import {
 import type { IsoDateTimeString } from "../support/index.js";
 import { MISSING_STATE_OPTION_VALUES } from "./missing-state-option.js";
 
-export function positiveIntegerString(error?: string) {
+function positiveIntegerString(error?: string) {
   return z
     .string({
       error,

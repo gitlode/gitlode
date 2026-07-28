@@ -11,12 +11,12 @@ import {
 import type { ProgressReporter } from "../progress/index.js";
 import type { AbsoluteDirectoryPath } from "../support/index.js";
 
-export interface PluginBootstrapProgress {
+interface PluginBootstrapProgress {
   readonly reporter: ProgressReporter;
   readonly renderDiagnostic: (severity: "warn" | "error", message: string) => void;
 }
 
-export type BuildPluginProjectorResult =
+type BuildPluginProjectorResult =
   | {
       readonly kind: "success";
       readonly projector: FactProjector;

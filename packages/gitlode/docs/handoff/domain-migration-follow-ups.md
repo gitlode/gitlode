@@ -141,30 +141,6 @@ not a directory-only cleanup. Current producers can be found by searching for
 `type: "warning"` in `src/extraction`, `src/plugin-runtime`, and `src/execution`; the separate worker
 diagnostic message is defined in `src/execution/types.ts`.
 
-## Plugin-runtime follow-ups
-
-### Normalize base-projection profiling with and without plugins
-
-The current runtime deliberately preserves a profiling asymmetry that predates the domain
-migration. Runs without plugins construct `BuiltInFactProjector` with the run instrumentation and
-record `gitlode.projection` and `gitlode.projection.project`. When plugins are enabled,
-`src/execution/execute-run.ts` constructs the injected `BuiltInFactProjector` with
-`noopInstrumentation`, then `src/execution/plugin-bootstrap.ts` decorates it with
-`EnrichingFactProjector`. Plugin-enabled runs therefore omit the base-projection spans even when
-profiling is enabled.
-
-The no-op instrumentation is intentional compatibility behavior, not an instrumentation
-requirement of `EnrichingFactProjector`.
-
-Candidate follow-up:
-
-- decide whether base projection should be instrumented consistently regardless of plugin use;
-- if so, pass the run instrumentation to the plugin-enabled base projector;
-- verify that projection spans and work duration are not double-counted by the decorator;
-- explicitly review the resulting profile-output change and update profiling tests and
-  documentation;
-- exercise otherwise equivalent runs with and without plugins and compare their profiling entries.
-
 ## Lifecycle
 
 Add similar migration-deferred behavior or diagnostic changes here only when they need continuation

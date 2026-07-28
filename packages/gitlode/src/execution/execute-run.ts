@@ -153,12 +153,10 @@ export async function executeWorkerRunRequest(
     if (!pluginBaseDirectory || !hasEffectivePluginDeclarations(pluginDeclarations)) {
       projector = new BuiltInFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
     } else {
-      // Plugin-enabled projection historically omitted base-projection profiling.
-      // Preserve that observable profile shape during this domain migration.
       const baseProjector = new BuiltInFactProjector(
         resolvedRepoName,
         resolvedRepoUrl,
-        noopInstrumentation,
+        instrumentation,
       );
       const projectorResult = await buildPluginProjector(
         pluginDeclarations,

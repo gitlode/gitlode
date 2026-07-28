@@ -5,15 +5,12 @@
     "resolutionType": "entry-package",
     "includeDevDepsFromRoot": true
   },
-  "ignoreFiles": [
-    "packages/gitlode/test/**",
-    "packages/gitlode/scripts/**",
-    "packages/gitlode/*.config.ts"
-  ],
   "rules": [
     {
       "path": "packages/gitlode",
+      "followMonorepoPackages": true,
       "prodEntryPoints": ["src/index.ts", "src/plugin-api.ts", "src/execution/worker-entry.ts"],
+      "devEntryPoints": ["test/**", "scripts/**", "vitest.config.ts"],
       "moduleBoundaries": [
         {
           "name": "type-utils",
@@ -220,6 +217,109 @@
       "circularImportsDetection": {
         "ignoreTypeImports": false,
         "algorithm": "SCC"
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@types/*"],
+        "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-assay-metrics",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-conventional-commits",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-custom-field",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-file-type",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-identity-profile",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
       },
       "unresolvedImportsDetection": true
     }

@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  OrderedQueue,
-  type OrderedQueueOptions,
-  PriorityQueue,
-  type WorkQueue,
-} from "../../src/support/work-queue.js";
+import { OrderedQueue, type OrderedQueueOptions } from "../../src/support/ordered-queue.js";
+import { PriorityQueue } from "../../src/support/priority-queue.js";
+import type { WorkQueue } from "../../src/support/work-queue.js";
 
 function dequeueAll<T>(queue: WorkQueue<T>): T[] {
   const result: T[] = [];

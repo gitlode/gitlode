@@ -1,6 +1,5 @@
-export {
-  NodeStateStore,
-  loadExtractionState,
-  validateExtractionState as validateLoadedState,
-} from "./state-store.js";
-export type { PriorStateLoadOptions } from "./state-store.js";
+export { createEmptyState } from "./factories.js";
+export { NodeStateStore } from "./node-state-store.js";
+export { loadStateFile } from "./state-file-loader.js";
+export type { StateStore } from "./types.js";
+export { validatePriorState } from "./validation.js";

@@ -1,5 +1,5 @@
-import type { ProgressReporter } from "../core/types.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
+import type { ProgressReporter } from "../progress/index.js";
 import type { RunPresenter } from "./presenter.js";
 import type { Clock, Scheduler, TerminalSink, UiMode } from "./progress/types.js";
 import type { Styling } from "./styling.js";
@@ -8,7 +8,7 @@ export interface RenderSuccessReportOptions {
   readonly presenter: RunPresenter;
   readonly quiet: boolean;
   readonly profile: boolean;
-  readonly success: RunSuccessPayload;
+  readonly data: SuccessReportData;
 }
 export interface ProgressRuntime {
   readonly uiMode: UiMode;
@@ -23,7 +23,7 @@ export interface CreateProgressRuntimeOptions {
   readonly isTTY: boolean;
   readonly styling: Styling;
 }
-export interface RunSuccessPayload {
+export interface SuccessReportData {
   readonly recordsWritten: number;
   readonly commitsTraversed: number;
   readonly filesCreated: number;

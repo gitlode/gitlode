@@ -55,7 +55,7 @@ export interface WalkDagStrategyOptions<
   >;
 }
 
-export interface DagTraversalTelemetry {
+interface DagTraversalTelemetry {
   readonly span: InstrumentationSpan;
   readonly countYieldedNodes: boolean;
 }

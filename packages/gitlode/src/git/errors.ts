@@ -1,4 +1,4 @@
-export type GitAdapterErrorCode =
+type GitAdapterErrorCode =
   | "REF_NOT_FOUND"
   | "COMMIT_NOT_FOUND"
   | "NOT_A_REPOSITORY"

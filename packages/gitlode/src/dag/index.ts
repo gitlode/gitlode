@@ -5,7 +5,6 @@ export type {
   DagFrontierItem,
   DagSuccessor,
   DagTopologyPort,
-  DagTraversalRole,
   WalkDagContext,
   WalkDagStrategyOptions,
 } from "./types.js";

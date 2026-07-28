@@ -1,10 +1,10 @@
-import type { ProgressEvent, ProgressPhase } from "../../core/index.js";
+import type { ProgressEvent, ProgressPhase } from "../../progress/index.js";
 import { cyclicAtOrThrow } from "../../support/index.js";
 import { formatDiagnosticLines, type DiagnosticSeverity } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";
 import { HEARTBEAT_INTERVAL_MS, SPINNER_FRAMES } from "./constants.js";
 import { formatActiveLine, formatDoneLine } from "./formatters.js";
-import { DefaultHeartbeatScheduler } from "./heartbeat-scheduler.js";
+import { IntervalHeartbeatScheduler } from "./interval-heartbeat-scheduler.js";
 import type {
   Clock,
   HeartbeatScheduler,
@@ -42,7 +42,7 @@ export class ProgressController {
     this.clock = clock;
     this.mode = mode;
     this.styling = styling;
-    this.heartbeat = new DefaultHeartbeatScheduler(scheduler);
+    this.heartbeat = new IntervalHeartbeatScheduler(scheduler);
   }
 
   handleEvent(event: ProgressEvent): void {

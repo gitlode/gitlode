@@ -395,12 +395,21 @@ Edit-distance heuristics (suggesting the closest known option name) are **not im
 
 ## Implementation Notes
 
-### `program` export
+### Module responsibilities
 
-`src/cli/args.ts` exports a module-level `Command` instance named `program`. This object defines all option and argument metadata and is used in two places:
+- `src/cli/command-definition.ts` owns the module-level Commander `program` and all argument,
+  option, help-group, and help-text metadata.
+- `src/cli/option-schema.ts` validates Commander's parsed option shape and reuses the size grammar
+  and rotation limits exported by `config`.
+- `src/cli/parse-options.ts` invokes Commander and translates Commander/Zod failures and
+  help/version exits into bootstrap results.
+- `src/cli/resolve-invocation.ts` loads config, applies CLI/config precedence and conflict rules,
+  and produces the effective bootstrap input.
+- `src/cli/filesystem-preflight.ts` validates and resolves repository, output, and state paths after
+  effective settings are known.
 
-- `parseArgs()` — calls `program.parse(process.argv)`
-- `cmd-definition.test.ts` — inspects registered options and arguments without calling `parseArgs()`
+The config loader returns config-owned diagnostics. Only `resolve-invocation.ts` translates those
+diagnostics into CLI user-error termination results.
 
 ### `--ref` / `-r` repeatable option
 

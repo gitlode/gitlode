@@ -11,6 +11,7 @@
     "packages/plugin-identity-profile"
   ],
   "scripts": {
+    "architecture:check": "rev-dep config run --lint-config",
     "build": "npm run build --workspaces --if-present",
     "build:watch": "npm run build:watch -w packages/gitlode",
     "changeset": "changeset",
@@ -36,6 +37,7 @@
     "memfs": "^4.64.0",
     "oxfmt": "^0.58.0",
     "oxlint": "^1.73.0",
+    "rev-dep": "^2.19.1",
     "tsx": "^4.23.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"

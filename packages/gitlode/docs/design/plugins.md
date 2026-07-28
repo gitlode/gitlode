@@ -165,7 +165,8 @@ When at least one plugin is active, each output record gains an `extensions` obj
 1. **Config load** — `--config` path is read and validated against the JSON schema.
 2. **Entrypoint resolution** — Each plugin's module is resolved and imported. Factory functions are invoked with the declared `config` value.
 3. **Init** — All `init()` methods are called in parallel. If any return `fatal` or throw, the run aborts.
-4. **Extraction** — `EnrichingFactProjector` wraps the core projector and calls each plugin's `project()` for every fact, in declaration order.
+4. **Extraction** — `EnrichingFactProjector` decorates an injected base projector and calls each
+   plugin's `project()` for every fact, in declaration order.
 5. **Profiling** — When `--profile` is active, each plugin receives an optional profiler in
    `init(runtime)`. gitlode creates plugin profilers under
    `elapsed/projection/plugins/<namespace>`, but the plugin decides whether to use that profiler
@@ -194,13 +195,27 @@ When a plugin returns `fatal` or throws on a given fact:
 
 ## Ownership and Boundaries
 
-- **Plugin runtime is a CLI boundary concern.** Config loading, module resolution, and factory invocation happen in `src/cli/plugins.ts`.
-- **Plugin initialization is a CLI boundary concern.** `src/cli/plugins.ts` constructs the runtime context, runs all `init(runtime)` calls in parallel, and aggregates init failures before extraction starts.
-- **Enrichment projection is a Core boundary concern.** `EnrichingFactProjector` (in `src/core/`) wraps the default projector and orchestrates per-fact plugin calls.
-- **Core types define the plugin contract.** `ProjectorPlugin`, `PluginEntry`, `PluginFactory`, `PluginInitResult`, `PluginProjectionResult`, `PluginProjectionValue`, `ProjectionContext`, `PluginFailurePolicy` are all in `src/core/types.ts`.
+- **Plugin runtime is a host boundary concern.** Module resolution, compatibility checks, factory
+  invocation, initialization, host registration, and enrichment orchestration live in
+  `src/plugin-runtime/`.
+- **Plugin initialization is a host boundary concern.** `src/plugin-runtime/initializer.ts`
+  receives runtime contexts, runs all `init(runtime)` calls in parallel, and aggregates init
+  failures before extraction starts.
+- **Enrichment projection is a plugin-runtime concern.** `EnrichingFactProjector` decorates an
+  injected `FactProjector`; it does not import or reproduce the base extraction implementation.
+- **`plugin-api` defines the plugin-author contract.** `ProjectorPlugin`, `PluginFactory`,
+  initialization and projection results, projection values and contexts, failure policies, runtime
+  contexts, and namespaces live in `src/plugin-api/`. `src/plugin-api.ts` is only the package-export
+  facade.
+- **Host registries are not public API.** `PluginEntry` lives in `src/plugin-runtime/types.ts` and is
+  not exported through `gitlode/plugin-api`.
 - **Per-fact plugin profiling is plugin-controlled.** `EnrichingFactProjector` no longer wraps every `project()` call in host-owned timing. If a plugin wants projection profiling, it uses the optional profiler received during `init(runtime)`.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
-- **The `extensions` field is a Core projection concern.** `ProjectedExtensions` is defined in `src/core/types.ts` as `Record<string, ProjectedExtensionValue>` where `ProjectedExtensionValue = PluginProjectionValue | null`. The `null` sentinel is core-reserved: plugins produce it only indirectly via `skip` or `fatal`-with-`skip-fact` results, never by returning `null` directly in `success.data`.
+- **The `extensions` field is an extraction record concern.** `ProjectedExtensions` and
+  `ProjectedExtensionValue` are defined in `src/extraction-api/records.ts`. The latter contains the
+  serializable non-null plugin payload values plus a host-owned `null` sentinel. Plugins produce
+  that sentinel only indirectly through `skip` or `fatal` with `skip-fact`; they cannot return
+  `null` in `success.data`.
 - **gitlode guarantees the outer `extensions` contract only:** namespace key placement, omission when no plugins are active, declaration-order preservation, and the meaning of `null`. The inner shape of a plugin's non-null payload is owned jointly by the plugin author and the user's chosen namespace/config pairing.
 
 ---

@@ -16,7 +16,7 @@ const entrypointPath = fileURLToPath(new URL("../../src/index.ts", import.meta.u
 
 interface MockContext {
   readonly bootstrapRenderer: {
-    renderTermination: ReturnType<typeof vi.fn>;
+    renderUserError: ReturnType<typeof vi.fn>;
     renderRuntimeError: ReturnType<typeof vi.fn>;
   };
   readonly presenter: {
@@ -29,9 +29,7 @@ interface MockContext {
   };
   readonly createProgressRuntime: ReturnType<typeof vi.fn>;
   readonly renderSuccessReport: ReturnType<typeof vi.fn>;
-  readonly dispatchWorkerRunRequest: ReturnType<typeof vi.fn>;
-  readonly loadExtractionState: ReturnType<typeof vi.fn>;
-  readonly getStateStoreWrites: () => unknown[];
+  readonly executeRun: ReturnType<typeof vi.fn>;
   readonly getSideEffects: () => string[];
 }
 
@@ -61,13 +59,12 @@ function makeBootstrapInput(overrides: Record<string, unknown> = {}) {
 function mockEntrypointModules(
   options: {
     readonly loadBootstrapInput?: () => Promise<unknown>;
-    readonly loadExtractionState?: () => Promise<unknown>;
     readonly workerResult?: () => Promise<unknown>;
     readonly objectFormat?: string;
   } = {},
 ): MockContext {
   const bootstrapRenderer = {
-    renderTermination: vi.fn(),
+    renderUserError: vi.fn(),
     renderRuntimeError: vi.fn(),
   };
 
@@ -82,8 +79,6 @@ function mockEntrypointModules(
   };
 
   const sideEffects: string[] = [];
-  const stateStoreWrites: unknown[] = [];
-
   const createProgressRuntime = vi.fn(() => ({
     uiMode: "tty-interactive",
     presenter,
@@ -94,16 +89,7 @@ function mockEntrypointModules(
     sideEffects.push("success-report");
   });
 
-  const loadExtractionState =
-    options.loadExtractionState ??
-    vi.fn(async () => ({
-      version: 2,
-      generatedAt: "",
-      repositoryPath: "/repo",
-      refs: [],
-    }));
-
-  const dispatchWorkerRunRequest =
+  const executeRun =
     options.workerResult ??
     vi.fn(async () => ({
       kind: "success",
@@ -117,13 +103,12 @@ function mockEntrypointModules(
         profileEntries: [],
         skippedDiffs: 0,
       },
-      state: {
-        version: 2,
-        generatedAt: "2026-01-01T00:00:00.000Z",
-        repositoryPath: "/repo",
-        refs: [{ ref: "main", refType: "branch", tipOid: "abc123", updatedAt: "now" }],
-      },
     }));
+  const executeRunMock = vi.fn(async (..._args: unknown[]) => {
+    const result = await executeRun();
+    sideEffects.push("execute-run");
+    return result;
+  });
 
   vi.doMock("../../src/cli/index.js", () => ({
     loadBootstrapInput:
@@ -137,25 +122,12 @@ function mockEntrypointModules(
   vi.doMock("../../src/presentation/index.js", () => ({
     createBootstrapRenderer: vi.fn(() => bootstrapRenderer),
     createProgressRuntime,
+    createStyling: vi.fn(() => ({ style: "plain" })),
     renderSuccessReport,
     stderrSink: {
       writeLine() {},
       rewriteLine() {},
       newline() {},
-    },
-  }));
-
-  vi.doMock("../../src/presentation/progress/index.js", () => ({
-    createStyling: vi.fn(() => ({ style: "plain" })),
-  }));
-
-  vi.doMock("../../src/state/index.js", () => ({
-    loadExtractionState,
-    NodeStateStore: class {
-      async write(state: unknown): Promise<void> {
-        sideEffects.push("state-write");
-        stateStoreWrites.push(state);
-      }
     },
   }));
 
@@ -172,12 +144,14 @@ function mockEntrypointModules(
         return options.objectFormat ?? "sha1";
       }
     },
-    JsDiffAdapter: class {},
   }));
 
-  vi.doMock("../../src/runtime/index.js", () => ({
-    assertSupportedRepositoryObjectFormat: vi.fn(),
-    dispatchWorkerRunRequest,
+  vi.doMock("../../src/line-diff-impl/index.js", () => ({
+    JsLineDiffCalculator: class {},
+  }));
+
+  vi.doMock("../../src/execution/index.js", () => ({
+    executeRun: executeRunMock,
   }));
 
   return {
@@ -186,9 +160,7 @@ function mockEntrypointModules(
     reporter,
     createProgressRuntime,
     renderSuccessReport,
-    dispatchWorkerRunRequest,
-    loadExtractionState,
-    getStateStoreWrites: () => stateStoreWrites,
+    executeRun: executeRunMock,
     getSideEffects: () => sideEffects,
   };
 }
@@ -241,6 +213,41 @@ describe("CLI entrypoint orchestration", () => {
     expect(process.exitCode).toBe(2);
   });
 
+  it("maps bootstrap user errors to presentation without creating the progress runtime", async () => {
+    const context = mockEntrypointModules({
+      loadBootstrapInput: vi.fn(async () => ({
+        kind: "user-error",
+        message: "invalid invocation",
+        exitCode: 1,
+      })),
+    });
+
+    await importEntrypointAsCli();
+
+    await vi.waitFor(() => {
+      expect(context.bootstrapRenderer.renderUserError).toHaveBeenCalledWith("invalid invocation");
+    });
+    expect(context.createProgressRuntime).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("honors successful bootstrap termination without rendering", async () => {
+    const context = mockEntrypointModules({
+      loadBootstrapInput: vi.fn(async () => ({
+        kind: "success-terminate",
+        exitCode: 0,
+      })),
+    });
+
+    await importEntrypointAsCli();
+
+    await vi.waitFor(() => {
+      expect(process.exitCode).toBe(0);
+    });
+    expect(context.bootstrapRenderer.renderUserError).not.toHaveBeenCalled();
+    expect(context.createProgressRuntime).not.toHaveBeenCalled();
+  });
+
   it("renders worker user-error through the progress presenter", async () => {
     const context = mockEntrypointModules({
       workerResult: vi.fn(async () => ({
@@ -276,14 +283,7 @@ describe("CLI entrypoint orchestration", () => {
     expect(process.exitCode).toBe(2);
   });
 
-  it("writes returned state before rendering success report when state file is configured", async () => {
-    const returnedState = {
-      version: 2 as const,
-      generatedAt: "2026-01-01T00:00:00.000Z",
-      repositoryPath: "/repo",
-      refs: [{ ref: "main", refType: "branch", tipOid: "abc123", updatedAt: "now" }],
-    };
-
+  it("passes state settings to execution before rendering the success report", async () => {
     const context = mockEntrypointModules({
       loadBootstrapInput: vi.fn(async () => ({
         kind: "success",
@@ -304,7 +304,6 @@ describe("CLI entrypoint orchestration", () => {
           profileEntries: [],
           skippedDiffs: 0,
         },
-        state: returnedState,
       })),
     });
 
@@ -313,9 +312,31 @@ describe("CLI entrypoint orchestration", () => {
     await vi.waitFor(() => {
       expect(context.renderSuccessReport).toHaveBeenCalledTimes(1);
     });
-    expect(context.loadExtractionState).toHaveBeenCalledTimes(1);
-    expect(context.getStateStoreWrites()).toEqual([returnedState]);
-    expect(context.getSideEffects()).toEqual(["state-write", "success-report"]);
+    expect(context.executeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        incremental: true,
+        stateFilePath: "/tmp/gitlode-state.json",
+      }),
+      expect.objectContaining({
+        onProgress: expect.any(Function),
+        onDiagnostic: expect.any(Function),
+      }),
+    );
+    expect(context.renderSuccessReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          recordsWritten: 1,
+          commitsTraversed: 1,
+          filesCreated: 1,
+          bytesWritten: 100,
+          elapsedMs: 10,
+          refs: ["main"],
+          profileEntries: [],
+          skippedDiffs: 0,
+        },
+      }),
+    );
+    expect(context.getSideEffects()).toEqual(["execute-run", "success-report"]);
     expect(process.exitCode).toBeUndefined();
   });
 });

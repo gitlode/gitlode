@@ -1,4 +1,4 @@
-export interface BaseMetrics {
+interface BaseMetrics {
   additions: number | null;
   deletions: number | null;
 }

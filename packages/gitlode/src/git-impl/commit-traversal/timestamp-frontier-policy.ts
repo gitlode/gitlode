@@ -7,7 +7,7 @@ import type {
 import { PriorityQueue } from "../../support/index.js";
 import type { CommitPathSchedulingHint } from "./types.js";
 
-export function compareCommitTimestampHintedItems<
+function compareCommitTimestampHintedItems<
   T extends { readonly domainHint?: CommitPathSchedulingHint },
 >(left: T, right: T): number {
   const leftTimestamp = left.domainHint?.sourceCommitterTimestamp;

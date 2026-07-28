@@ -17,6 +17,35 @@ describe("loadConfigFile", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
+  it("reports a config-owned diagnostic when the file is missing", async () => {
+    const configPath = join(tmpDir, "missing.json");
+
+    const result = await loadConfigFile(configPath);
+
+    expect(result).toEqual({
+      kind: "failure",
+      diagnostic: {
+        code: "not-found",
+        message: `Config file not found: ${configPath}`,
+      },
+    });
+  });
+
+  it("reports a config-owned diagnostic for invalid JSON", async () => {
+    const configPath = join(tmpDir, "gitlode.config.json");
+    await writeFile(configPath, "{");
+
+    const result = await loadConfigFile(configPath);
+
+    expect(result).toEqual({
+      kind: "failure",
+      diagnostic: {
+        code: "invalid-json",
+        message: `Invalid config file: not valid JSON (${configPath})`,
+      },
+    });
+  });
+
   it("loads a valid version:1 config", async () => {
     const configPath = join(tmpDir, "gitlode.config.json");
     await writeFile(
@@ -70,7 +99,10 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
+    expect(result).toEqual({
+      kind: "failure",
+      diagnostic: expect.objectContaining({ code: "invalid-schema" }),
+    });
   });
 
   it("rejects unknown top-level keys", async () => {
@@ -84,7 +116,10 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
+    expect(result).toEqual({
+      kind: "failure",
+      diagnostic: expect.objectContaining({ code: "invalid-schema" }),
+    });
   });
 
   it("rejects unknown nested keys", async () => {
@@ -101,7 +136,10 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
+    expect(result).toEqual({
+      kind: "failure",
+      diagnostic: expect.objectContaining({ code: "invalid-schema" }),
+    });
   });
 
   it("rejects extraction.range with both sinceRef and sinceDate", async () => {
@@ -118,7 +156,10 @@ describe("loadConfigFile", () => {
     );
 
     const result = await loadConfigFile(configPath);
-    expect(result).toEqual(expect.objectContaining({ kind: "user-error" }));
+    expect(result).toEqual({
+      kind: "failure",
+      diagnostic: expect.objectContaining({ code: "invalid-schema" }),
+    });
   });
 
   it("rebases relative output.directory and extensions entrypoint from config directory", async () => {

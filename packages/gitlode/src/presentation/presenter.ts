@@ -1,5 +1,5 @@
-import type { ProgressEvent } from "../core/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
+import type { ProgressEvent } from "../progress/index.js";
 import { writeDiagnosticLines, splitMessageLines, type DiagnosticSeverity } from "./diagnostics.js";
 import {
   ProgressController,

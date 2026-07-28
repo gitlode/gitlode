@@ -265,11 +265,12 @@ Rename detection is not performed. A renamed file appears as a `"deleted"` entry
 
 Line-level diff statistics. `null` when the file is binary (contains NUL bytes in the first 8000 bytes).
 
-Git adapters return the before/after blob facts; `DefaultFileChangeExpander` owns the derived output
+Git adapters return the before/after blob facts; `FileChangeFactExpander` owns the derived output
 policy. It applies the configured maximum-size guard, detects binary content using the first 8,000
-bytes, and delegates eligible text content to a `DiffAdapter`. The default `JsDiffAdapter` uses the
-`diff` package's `diffLines` function with UTF-8 decoding. Size-skipped and binary changes both emit
-`null` additions/deletions without invoking the diff strategy.
+bytes, and delegates eligible text content to a `LineDiffCalculator`. The default
+`JsLineDiffCalculator` uses the `diff` package's `diffLines` function with UTF-8 decoding.
+Size-skipped and binary changes both emit `null` additions/deletions without invoking the
+calculator.
 
 For `"added"` files: `deletions` is `0`, `additions` is the total line count.
 For `"deleted"` files: `additions` is `0`, `deletions` is the total line count.
@@ -308,5 +309,5 @@ Changes are computed against the **first parent only**.
 - `packages/gitlode/docs/design/cli.md`
 - `packages/gitlode/docs/design/architecture.md`
 - `src/output/utils.ts`
-- `src/output/writer.ts`
-- `src/core/types.ts`
+- `src/output/jsonl-file-writer.ts`
+- `src/extraction-api/records.ts`

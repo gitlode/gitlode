@@ -4,20 +4,38 @@ import { pathToFileURL } from "node:url";
 
 import type { BootstrapInput } from "./cli/index.js";
 import { loadBootstrapInput } from "./cli/index.js";
-import type { ExtractionState } from "./core/index.js";
+import {
+  executeRun,
+  type ExecutionRunInput,
+  type ExecutionSuccessPayload,
+  type MissingStatePolicy,
+} from "./execution/index.js";
 import { GitAdapterError } from "./git/index.js";
 import {
   createBootstrapRenderer,
   createProgressRuntime,
+  createStyling,
   renderSuccessReport,
   stderrSink,
+  type SuccessReportData,
 } from "./presentation/index.js";
-import { createStyling } from "./presentation/progress/index.js";
-import { dispatchWorkerRunRequest, type WorkerRunInput } from "./runtime/index.js";
-import { loadExtractionState, NodeStateStore } from "./state/index.js";
-import { createEmptyState } from "./state/state-store.js";
 
-function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
+function toExecutionMissingStatePolicy(
+  option: BootstrapInput["missingState"],
+): MissingStatePolicy | undefined {
+  switch (option) {
+    case undefined:
+      return undefined;
+    case "error":
+      return "error";
+    case "snapshot":
+      return "snapshot";
+    default:
+      return option satisfies never;
+  }
+}
+
+function toExecutionRunInput(bootstrapInput: BootstrapInput): ExecutionRunInput {
   return {
     repositoryPath: bootstrapInput.repositoryPath,
     refs: bootstrapInput.refs,
@@ -31,8 +49,24 @@ function toWorkerRunInput(bootstrapInput: BootstrapInput): WorkerRunInput {
     gitAdapter: bootstrapInput.gitAdapter,
     repoName: bootstrapInput.repoName,
     repoUrl: bootstrapInput.repoUrl,
-    configBaseDir: bootstrapInput.configBaseDir,
-    extensions: bootstrapInput.extensions,
+    pluginBaseDirectory: bootstrapInput.configBaseDir,
+    pluginDeclarations: bootstrapInput.extensions,
+    incremental: bootstrapInput.incremental,
+    missingState: toExecutionMissingStatePolicy(bootstrapInput.missingState),
+    stateFilePath: bootstrapInput.stateFilePath,
+  };
+}
+
+function toSuccessReportData(success: ExecutionSuccessPayload): SuccessReportData {
+  return {
+    recordsWritten: success.recordsWritten,
+    commitsTraversed: success.commitsTraversed,
+    filesCreated: success.filesCreated,
+    bytesWritten: success.bytesWritten,
+    elapsedMs: success.elapsedMs,
+    refs: success.refs,
+    profileEntries: success.profileEntries,
+    skippedDiffs: success.skippedDiffs,
   };
 }
 
@@ -45,7 +79,9 @@ async function main(): Promise<void> {
   try {
     const parseResult = await loadBootstrapInput();
     if (parseResult.kind !== "success") {
-      bootstrapRenderer.renderTermination(parseResult);
+      if (parseResult.kind === "user-error") {
+        bootstrapRenderer.renderUserError(parseResult.message);
+      }
       process.exitCode = parseResult.exitCode;
       return;
     }
@@ -75,43 +111,14 @@ async function main(): Promise<void> {
   });
 
   try {
-    const stateStore = bootstrapInput.stateFilePath
-      ? new NodeStateStore(bootstrapInput.stateFilePath)
-      : undefined;
-
-    let priorState: ExtractionState;
-    if (!stateStore || !bootstrapInput.incremental) {
-      priorState = createEmptyState(bootstrapInput.repositoryPath);
-    } else {
-      const loadedState = await loadExtractionState(stateStore);
-      if (loadedState === undefined) {
-        if (bootstrapInput.missingState === "error") {
-          throw new Error(`State file not found: ${bootstrapInput.stateFilePath}`);
-        }
-        progressRuntime.reporter.emit({
-          type: "warning",
-          message: `State file not found: ${bootstrapInput.stateFilePath}. Falling back to full snapshot extraction.`,
-        });
-        priorState = createEmptyState(bootstrapInput.repositoryPath);
-      } else {
-        priorState = loadedState;
-      }
-    }
-
-    const result = await dispatchWorkerRunRequest(
-      {
-        input: toWorkerRunInput(bootstrapInput),
-        priorState,
+    const result = await executeRun(toExecutionRunInput(bootstrapInput), {
+      onProgress(event) {
+        progressRuntime.reporter.emit(event);
       },
-      {
-        onProgress(event) {
-          progressRuntime.reporter.emit(event);
-        },
-        onDiagnostic(severity, message) {
-          progressRuntime.presenter.renderDiagnostic(severity, message);
-        },
+      onDiagnostic(severity, message) {
+        progressRuntime.presenter.renderDiagnostic(severity, message);
       },
-    );
+    });
 
     if (result.kind === "runtime-error") {
       progressRuntime.presenter.renderRuntimeError(
@@ -127,15 +134,11 @@ async function main(): Promise<void> {
       return;
     }
 
-    if (stateStore !== undefined && result.state.refs.length > 0) {
-      await stateStore.write(result.state);
-    }
-
     renderSuccessReport({
       presenter: progressRuntime.presenter,
       quiet: bootstrapInput.quiet,
       profile: bootstrapInput.profile,
-      success: result.success,
+      data: toSuccessReportData(result.success),
     });
   } catch (error) {
     if (error instanceof GitAdapterError) {

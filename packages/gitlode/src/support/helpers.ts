@@ -20,16 +20,6 @@ export function firstOrThrow<T>(items: readonly T[], message = "Expected a non-e
   return atOrThrow(items, 0, message);
 }
 
-export function shiftOrThrow<T>(items: T[], message = "Expected a non-empty array."): T {
-  const item = items.shift();
-
-  if (item === undefined) {
-    throw new Error(message);
-  }
-
-  return item;
-}
-
 export function cyclicAtOrThrow<T>(
   items: readonly T[],
   index: number,

@@ -51,10 +51,10 @@ commits or file changes in different orders as long as the final commit set or f
 same for the same repository snapshot and extraction request.
 
 `GitAdapter` does not compute line-diff statistics, classify binary content, enforce
-`--max-diff-size`, or infer renames. `DefaultFileChangeExpander` composes a `GitAdapter` with a
-`DiffAdapter`, applies the size guard before binary detection, applies the 8,000-byte NUL heuristic,
-and invokes the diff strategy only for eligible text content. Keeping these derived decisions above
-repository access gives both Git backends one file-level output policy.
+`--max-diff-size`, or infer renames. `FileChangeFactExpander` composes a `GitAdapter` with a
+`LineDiffCalculator`, applies the size guard before binary detection, applies the 8,000-byte NUL
+heuristic, and invokes the calculator only for eligible text content. Keeping these derived
+decisions above repository access gives both Git backends one file-level output policy.
 
 ## `isomorphic-git` adapter
 
@@ -119,7 +119,7 @@ for the adapter run and is closed through `GitAdapter` disposal. Commit traversa
 a separate walk-scoped batch process fed directly by `rev-list`; its bulk-streaming and cancellation
 model differs from the reusable random-object session.
 
-Both Git adapters stop at the same blob-fact boundary. `DefaultFileChangeExpander` performs binary,
+Both Git adapters stop at the same blob-fact boundary. `FileChangeFactExpander` performs binary,
 size, and line-diff processing independently of which adapter produced the blobs.
 
 ## Profiling and troubleshooting

@@ -1,3 +1,3 @@
 export { formatSessionTimestamp } from "./utils.js";
-export { OutputWriter } from "./writer.js";
-export { OutputWriterSink } from "./output-writer-sink.js";
+export { JsonlFileWriter } from "./jsonl-file-writer.js";
+export { JsonlOutputSink } from "./jsonl-output-sink.js";

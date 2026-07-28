@@ -424,11 +424,14 @@ boundary.
 The diagrams in this section are views of the closed allowlist in Section 2.21, not independent
 rules. An arrow from `A` to `B` means that domain `A` may directly depend on domain `B`.
 
-#### 3.1.1 Complete domain graph
+#### 3.1.1 Structural domain graph
 
-This view shows every allowed direct domain dependency except dependencies on `type-utils`.
-`type-utils` is intentionally omitted because its global availability would add an edge from almost
-every domain without clarifying the product structure.
+This view shows the structural domain dependencies while omitting `type-utils`, `support`, and
+`instrumentation`, together with edges to them. `type-utils` is global. `support` and
+`instrumentation` are explicit dependencies, but their edges largely indicate whether current code
+happens to need a general utility or measurement hook rather than clarifying the product structure.
+Their omission does not make them global: adding either dependency still requires an intentional
+change to Section 2.21 and the Rev-dep configuration.
 
 Domain appearance indicates its primary architectural nature:
 
@@ -469,10 +472,8 @@ flowchart TB
   subgraph foundations["Shared and generic foundations"]
     direction LR
     dag{{"dag"}}
-    instrumentation{{"instrumentation"}}
     model{{"model"}}
     progress{{"progress"}}
-    support{{"support"}}
   end
 
   classDef contract fill:#dbeafe,stroke:#2563eb,color:#172554
@@ -485,18 +486,15 @@ flowchart TB
   class gitImpl,lineDiffImpl implementation
   class execution,extraction,pluginRuntime policy
   class cli,config,output,presentation,state boundary
-  class dag,instrumentation,model,progress,support foundation
+  class dag,model,progress foundation
 
   cli --> config
-  cli --> support
   config --> pluginApi
-  config --> support
 
   execution --> extraction
   execution --> extractionApi
   execution --> git
   execution --> gitImpl
-  execution --> instrumentation
   execution --> lineDiffImpl
   execution --> model
   execution --> output
@@ -504,45 +502,31 @@ flowchart TB
   execution --> pluginRuntime
   execution --> progress
   execution --> state
-  execution --> support
 
-  presentation --> instrumentation
   presentation --> progress
-  presentation --> support
   output --> extractionApi
   state --> extractionApi
   state --> model
-  state --> support
 
   extraction --> extractionApi
   extraction --> git
-  extraction --> instrumentation
   extraction --> lineDiff
   extraction --> model
   extraction --> progress
-  extraction --> support
   extractionApi --> model
   extractionApi --> progress
-  extractionApi --> support
 
   pluginApi --> extractionApi
-  pluginApi --> instrumentation
   pluginRuntime --> extractionApi
-  pluginRuntime --> instrumentation
   pluginRuntime --> pluginApi
   pluginRuntime --> progress
-  pluginRuntime --> support
 
   git --> model
   gitImpl --> dag
   gitImpl --> git
-  gitImpl --> instrumentation
   gitImpl --> model
-  gitImpl --> support
   lineDiffImpl --> lineDiff
 
-  dag --> instrumentation
-  dag --> support
 ```
 
 The grouping is explanatory rather than an additional layer model. In particular, a group does not
@@ -555,66 +539,70 @@ This view removes CLI, configuration, presentation, and cross-cutting dependenci
 edges from `execution` to lower-level contracts when the corresponding implementation relationship
 is already visible. Consult Section 2.21 for the complete rule.
 
+Arrow style in this focused view reflects the architectural relationship:
+
+- thick arrow (`==>`): execution wires the target into a run;
+- dashed arrow (`-.->`): the source implements a contract owned by the target; and
+- solid arrow (`-->`): any other direct dependency shown in this view.
+
 ```mermaid
-flowchart LR
+flowchart TB
   execution("execution")
-  extraction("extraction")
-  extractionApi(["extraction-api"])
-  model{{"model"}}
-
-  git(["git contract"])
-  gitImpl[["git-impl"]]
-  dag{{"dag"}}
-
-  lineDiff(["line-diff contract"])
-  lineDiffImpl[["line-diff-impl"]]
-
   output["output"]
   state["state"]
-  pluginApi(["plugin-api"])
-  pluginRuntime("plugin-runtime")
+
+  subgraph product["Product policy and extension"]
+    direction LR
+    extraction("extraction")
+    extractionApi(["extraction-api"])
+    pluginApi(["plugin-api"])
+    pluginRuntime("plugin-runtime")
+  end
+
+  subgraph adapters["Ports and implementations"]
+    direction LR
+    git(["git"])
+    gitImpl[["git-impl"]]
+    lineDiff(["line-diff"])
+    lineDiffImpl[["line-diff-impl"]]
+  end
 
   classDef contract fill:#dbeafe,stroke:#2563eb,color:#172554
   classDef implementation fill:#ffedd5,stroke:#ea580c,color:#431407
   classDef policy fill:#dcfce7,stroke:#16a34a,color:#052e16
   classDef boundary fill:#f3e8ff,stroke:#9333ea,color:#3b0764
-  classDef foundation fill:#f3f4f6,stroke:#6b7280,color:#111827
 
   class extractionApi,git,lineDiff,pluginApi contract
   class gitImpl,lineDiffImpl implementation
   class execution,extraction,pluginRuntime policy
   class output,state boundary
-  class dag,model foundation
 
-  execution --> extraction
-  execution --> gitImpl
-  execution --> lineDiffImpl
-  execution --> output
-  execution --> state
-  execution --> pluginRuntime
+  execution ==> extraction
+  execution ==> gitImpl
+  execution ==> lineDiffImpl
+  execution ==> output
+  execution ==> state
+  execution ==> pluginRuntime
 
-  extraction --> extractionApi
+  extraction -.-> extractionApi
   extraction --> git
   extraction --> lineDiff
-  extraction --> model
 
-  gitImpl --> git
-  gitImpl --> dag
-  lineDiffImpl --> lineDiff
+  gitImpl -.-> git
+  lineDiffImpl -.-> lineDiff
 
-  output --> extractionApi
+  output -.-> extractionApi
   state --> extractionApi
-  state --> model
   pluginRuntime --> pluginApi
-  pluginRuntime --> extractionApi
+  pluginRuntime -.-> extractionApi
   pluginApi --> extractionApi
-  extractionApi --> model
 ```
 
-The focused view highlights two deliberate contract–implementation seams: extraction depends on the
-`git` and `line-diff` contracts, while execution selects their implementations. State persistence
-remains one domain because no production consumer needs its contract without also accepting its
-Node.js implementation dependency.
+The focused view highlights implementation seams around `extraction-api`, `git`, and `line-diff`.
+Extraction uses the `git` and `line-diff` contracts, their implementation domains implement those
+contracts, and execution wires the concrete components into a run. State persistence remains one
+domain because no production consumer needs its contract without also accepting its Node.js
+implementation dependency.
 
 ### 3.2 Source layout and imports
 

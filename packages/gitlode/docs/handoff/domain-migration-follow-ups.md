@@ -74,7 +74,7 @@ examples in:
 - `docs/profiling.md`;
 - `docs/design/architecture.md`;
 - `docs/design/git-adapters.md`;
-- `docs/handoff/instrumentation-opentelemetry-migration.md`, if that work is still active;
+- `docs/handoff/instrumentation-opentelemetry-redesign-plan.md`, if that work is still active;
 - tests that assert span names;
 - any known external profiling consumers.
 

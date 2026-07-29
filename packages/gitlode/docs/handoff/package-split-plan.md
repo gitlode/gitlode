@@ -7,8 +7,8 @@ This document records the agreed direction and open implementation decisions for
 
 No package split has been implemented yet. The package topology and high-level build strategy in
 this document are accepted as the planning baseline. The private package manifest policy and export
-boundaries are also accepted. Detailed dependency classification, TypeScript project configuration,
-bundling, testing, and migration steps remain to be decided.
+boundaries and dependency classification are also accepted. Detailed TypeScript project
+configuration, bundling, testing, and migration steps remain to be decided.
 
 This is a continuation document rather than a durable source of truth. As implementation decisions
 become stable, migrate package and dependency contracts to `docs/design/`, update other affected
@@ -460,19 +460,100 @@ All packages must follow these export rules:
 - allow package-owned unit tests to import their internal source modules relatively;
 - require cross-package and integration tests to use supported package exports.
 
+## Accepted Dependency Classification
+
+Private workspace packages declare every direct package edge in `dependencies`, including edges
+required only by emitted declarations:
+
+- `@gitlode/internal-foundation`: no direct dependencies;
+- `@gitlode/internal-contracts`: `@gitlode/internal-foundation`;
+- `@gitlode/git-adapters`: `@gitlode/internal-contracts`, `@gitlode/internal-foundation`, and
+  `isomorphic-git`;
+- `@gitlode/line-diff-adapters`: `@gitlode/internal-contracts` and `diff`.
+
+Use the exact `"0.0.0"` specifier for dependencies on private workspace packages. Do not use the
+`workspace:`, `file:`, or wildcard protocols.
+
+The `gitlode` workspace declares all four private packages in `devDependencies`. They are
+development and release-build inputs because their code is bundled into the public artifact. Their
+entries may remain in the published manifest's `devDependencies`; do not add a release-only
+manifest rewrite merely to remove them. Validation must instead prove that private packages do not
+appear in production, peer, optional, or npm bundle dependency fields and are not required by
+published JavaScript or declarations.
+
+Keep all current third-party runtime packages external to the public tsdown bundle:
+
+```text
+chalk
+commander
+diff
+isomorphic-git
+semver
+zod
+```
+
+Consequently, `diff` and `isomorphic-git` remain direct `gitlode` production dependencies as well as
+dependencies of their owning adapter workspaces. The duplicate manifest entries describe the
+runtime closure of two different artifacts and must use the same version specifier. Node built-ins
+are always external.
+
+Do not introduce `peerDependencies`, `optionalDependencies`, or npm `bundleDependencies` for the
+private packages at this stage. Reconsider contract peer dependencies only if an adapter package is
+independently published. Reconsider bundling third-party packages only when measurements or a
+concrete distribution requirement justify it.
+
+### Development dependency ownership
+
+Every workspace must declare:
+
+- packages imported by its source, tests, and configuration;
+- ambient type packages required by its TypeScript project;
+- tools directly invoked by its scripts;
+- package-specific build and test helpers.
+
+Apply this policy to `gitlode`, every existing plugin, and every new private workspace. Shared
+dependency versions do not imply root ownership. The root package owns only tools directly used by
+root-level repository workflows. A tool may correctly appear in both root and workspace manifests
+when both directly invoke it.
+
+This policy includes:
+
+- `vitest` in every workspace whose tests or Vitest configuration import it;
+- `@vitest/coverage-v8` in every workspace that provides the coverage script;
+- `typescript`, `oxlint`, and `oxfmt` in workspaces whose scripts invoke them;
+- `@types/node` in projects that inherit the Node type requirement;
+- `tsx` and tsdown in `gitlode` when its scripts invoke them;
+- `memfs` in whichever workspace owns tests that import it after test migration.
+
+After this audit, set Rev-dep's `nodeModulesResolution.includeDevDepsFromRoot` to `false`.
+`missingNodeModulesDetection` and `unresolvedImportsDetection` must then enforce that each workspace
+declares its own imported development dependencies.
+
+### Repository-wide version consistency
+
+The same dependency must use the same version number and semver range in every workspace and
+dependency field. No package-specific version exceptions are currently permitted.
+
+Adopt Syncpack as a root-owned repository tool:
+
+- use `syncpack lint` as a CI check for manifest version consistency;
+- use `syncpack fix` to apply the accepted policy;
+- use caret ranges for normal registry dependencies;
+- use exact `"0.0.0"` for private workspace dependencies;
+- keep `vitest` and `@vitest/coverage-v8` on the same version through a Syncpack dependency group;
+- update shared dependencies repository-wide and regenerate the root lockfile.
+
+Do not use npm `overrides` for normal direct-dependency synchronization. Reserve overrides for a
+specific transitive compatibility or security constraint. If different direct versions ever become
+necessary, add a documented Syncpack policy rather than an ad hoc ignore.
+
+Manifest presence and source permission remain separate concerns. A dependency listed for final
+release resolution does not grant every source domain permission to import it. Rev-dep must continue
+to enforce the narrower domain ownership of `isomorphic-git`, `diff`, and private package subpaths.
+
 ## Open Decisions
 
-### 1. Dependency classification
-
-Decide:
-
-- private package `dependencies` and `devDependencies`;
-- how `gitlode` classifies private packages that are bundled for release;
-- how adapter-owned external dependencies appear in the public release closure;
-- internal dependency version specifiers;
-- Rev-dep treatment of build-time bundled dependencies.
-
-### 2. TypeScript project graph
+### 1. TypeScript project graph
 
 Decide:
 
@@ -482,7 +563,7 @@ Decide:
 - whether gitlode tests resolve source or built workspace exports;
 - how architecture checks map package imports back to domain allowlists.
 
-### 3. Public release bundle
+### 2. Public release bundle
 
 Decide how the public `gitlode` artifact incorporates private workspace packages.
 
@@ -500,7 +581,7 @@ The design must cover:
 Use tsdown backed by Rolldown for this release bundle. A focused build spike must validate the
 required entrypoints and runtime behaviors before the full source migration.
 
-### 4. Test ownership and integration coverage
+### 3. Test ownership and integration coverage
 
 Decide which tests move with each domain and which remain application-level integration tests.
 
@@ -516,7 +597,7 @@ Known affected areas include:
 The final validation strategy should include installing the packed `gitlode` tarball into a clean
 temporary project and exercising the CLI, worker, both Git adapters, and plugin loading.
 
-### 5. Migration sequence
+### 4. Migration sequence
 
 Decide whether to:
 
@@ -528,7 +609,7 @@ Decide whether to:
 Each intermediate state should build, test, and satisfy architecture checks. Avoid a migration plan
 that requires weakening dependency rules or leaving two authoritative copies of a contract.
 
-### 6. Durable documentation updates
+### 5. Durable documentation updates
 
 Implementation will require coordinated updates to at least:
 
@@ -544,9 +625,9 @@ author workflows change observably.
 
 ## Recommended Next Discussion
 
-Classify private package dependencies and external runtime dependencies. This establishes how npm
-manifests, the TypeScript project graph, Rev-dep, and the final public release bundle represent each
-accepted package edge.
+Define the TypeScript project-reference graph, development output layout, and workspace-level build
+and watch commands. This must make the accepted package graph incrementally buildable without
+source-path aliases or duplicated runtime modules.
 
 ## Completion Criteria
 

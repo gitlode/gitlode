@@ -2,9 +2,9 @@
 
 ## Status
 
-The domain migration is complete. None of the follow-ups in this document has been implemented;
-each remains a candidate for a separate task because it changes observable identifiers or requires
-cross-boundary runtime refactoring.
+The domain migration is complete. Each follow-up remaining in this document is a candidate for a
+separate task because it changes observable identifiers or requires cross-boundary runtime
+refactoring.
 
 The migration intentionally preserved externally observable strings and profiling identifiers even
 when they retained vocabulary from the former ownership model. The descriptions below record the
@@ -21,26 +21,6 @@ When resuming this work in another session:
    the final source of truth for an accepted contract.
 
 ## Line-diff follow-ups
-
-### Invalid-result error text
-
-Current text:
-
-```text
-DiffAdapter returned invalid values: additions=..., deletions=...
-```
-
-The current implementation contract is named `LineDiffCalculator`, but
-`src/extraction/file-change-fact-expander.ts` still uses the former `DiffAdapter` name in an error
-that can propagate to CLI diagnostics. The domain migration retained that text to avoid combining a
-user-visible diagnostic change with structural code movement.
-
-Candidate follow-up:
-
-- rename the subject to `LineDiffCalculator`;
-- explicitly review the resulting CLI diagnostic change;
-- update the assertion in `test/extraction/file-change-fact-expander.test.ts`;
-- run the CLI and extraction test suites to confirm that only the intended text changes.
 
 ### Profiling span names
 

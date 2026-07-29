@@ -120,7 +120,7 @@ function validateDiffResult(additions: number, deletions: number): void {
     deletions < 0
   ) {
     throw new Error(
-      `DiffAdapter returned invalid values: additions=${String(additions)}, deletions=${String(deletions)}`,
+      `LineDiffCalculator returned invalid values: additions=${String(additions)}, deletions=${String(deletions)}`,
     );
   }
 }

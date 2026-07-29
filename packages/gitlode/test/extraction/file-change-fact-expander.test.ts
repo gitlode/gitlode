@@ -210,20 +210,36 @@ describe("FileChangeFactExpander expansion", () => {
   });
 
   it.each([
-    { additions: -1, deletions: 0 },
-    { additions: 0.5, deletions: 0 },
-    { additions: Number.NaN, deletions: 0 },
-    { additions: 0, deletions: Number.POSITIVE_INFINITY },
-  ])("rejects invalid line-diff calculator results: %o", async (diffResult) => {
-    const expander = makeExpander(
-      [{ status: "added", before: null, after: snapshot("file.txt", "text\n") }],
-      { lineDiffCalculator: { computeLineDiff: () => diffResult } },
-    );
+    {
+      diffResult: { additions: -1, deletions: 0 },
+      expectedMessage: "LineDiffCalculator returned invalid values: additions=-1, deletions=0",
+    },
+    {
+      diffResult: { additions: 0.5, deletions: 0 },
+      expectedMessage: "LineDiffCalculator returned invalid values: additions=0.5, deletions=0",
+    },
+    {
+      diffResult: { additions: Number.NaN, deletions: 0 },
+      expectedMessage: "LineDiffCalculator returned invalid values: additions=NaN, deletions=0",
+    },
+    {
+      diffResult: { additions: 0, deletions: Number.POSITIVE_INFINITY },
+      expectedMessage:
+        "LineDiffCalculator returned invalid values: additions=0, deletions=Infinity",
+    },
+  ])(
+    "rejects invalid line-diff calculator results: %o",
+    async ({ diffResult, expectedMessage }) => {
+      const expander = makeExpander(
+        [{ status: "added", before: null, after: snapshot("file.txt", "text\n") }],
+        { lineDiffCalculator: { computeLineDiff: () => diffResult } },
+      );
 
-    await expect(
-      collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH)),
-    ).rejects.toThrow("DiffAdapter returned invalid values");
-  });
+      await expect(
+        collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH)),
+      ).rejects.toThrow(expectedMessage);
+    },
+  );
 
   it("propagates line-diff calculator errors as runtime errors", async () => {
     const failure = new Error("diff failed");

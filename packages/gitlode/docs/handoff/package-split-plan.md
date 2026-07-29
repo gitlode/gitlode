@@ -5,8 +5,10 @@
 This document records the agreed direction and open implementation decisions for splitting selected
 `packages/gitlode` source domains into private monorepo packages.
 
-No package split has been implemented yet. The package topology in this document is accepted as the
-planning baseline. Build, bundling, testing, versioning, and migration details remain to be decided.
+No package split has been implemented yet. The package topology and high-level build strategy in
+this document are accepted as the planning baseline. The private package manifest policy and export
+boundaries are also accepted. Detailed dependency classification, TypeScript project configuration,
+bundling, testing, and migration steps remain to be decided.
 
 This is a continuation document rather than a durable source of truth. As implementation decisions
 become stable, migrate package and dependency contracts to `docs/design/`, update other affected
@@ -16,10 +18,32 @@ When continuing this work:
 
 1. Preserve the accepted dependency direction and the contract-to-implementation boundary.
 2. Record newly accepted decisions in this document when they are made.
-3. Keep unresolved alternatives explicitly marked as open; do not present candidates as decisions.
-4. Do not begin source movement until the development-build and release-bundle strategy is agreed.
+3. Keep the remaining work visible as a section-level outline, but do not preserve every rejected
+   alternative or the full discussion history.
+4. Do not present candidates as accepted decisions.
 
 Unless a path starts with `packages/`, it is relative to `packages/gitlode`.
+
+## Documentation Policy
+
+Use this handoff document to record:
+
+- decisions accepted during package-split planning;
+- constraints that future implementation must preserve;
+- the section-level outline of remaining planning and implementation work;
+- deferred tasks that still require continuation context.
+
+Do not record every candidate, comparison, or intermediate argument from planning discussions.
+Rejected alternatives belong in chat history unless they contain exceptional information needed to
+resume the work safely.
+
+Do not update durable documents under `docs/design/` merely because a future package design has been
+accepted in planning. Those documents describe the current source tree and implemented behavior.
+Update them together with the corresponding source and package changes during implementation.
+
+When the package split is complete, all stable package and dependency design must live in the
+appropriate durable design documents. Delete this handoff document unless unfinished or deferred
+work still requires it.
 
 ## Motivation
 
@@ -275,145 +299,10 @@ instrumentation types, and generic branded types. Its declaration output therefo
 new private foundation packages. The release build must bundle or rewrite these type dependencies
 so plugin authors only need the public `gitlode` package.
 
-The exact build and bundling mechanism is not yet decided.
+## Accepted Build Strategy
 
-## Build Strategy Candidates
-
-The following candidates have been evaluated. None is accepted yet.
-
-### Candidate A: TypeScript project builds plus a gitlode release bundle
-
-Development:
-
-- model each workspace as a TypeScript composite project;
-- connect package dependencies with project references;
-- use a solution `tsconfig.json` and `tsc -b` for ordered incremental builds;
-- emit unbundled ESM, declarations, declaration maps, and source maps per private package;
-- use `tsc -b -w` when cross-package runtime output must remain current.
-
-Release:
-
-- run a separate tsdown build only for the public `gitlode` package;
-- bundle the private workspace packages into the public JavaScript and declaration outputs;
-- keep selected public third-party runtime dependencies external;
-- validate the packed result independently of the development outputs.
-
-Characteristics:
-
-- TypeScript remains the authority for type checking, declarations, project ordering, and package
-  boundaries during development.
-- Project references provide incremental ordered builds and editor source redirects without
-  requiring a custom hot-deployment layer.
-- Each private package produces conventional output that can support future independent
-  publication.
-- The release-only bundler has one focused responsibility: turn the private package graph into the
-  public `gitlode` artifact.
-- Development output and release output differ, so both require explicit validation.
-- The public package must intentionally classify private workspaces as build-time bundle inputs or
-  produce a release-specific manifest that removes them from runtime dependencies.
-
-This is the current provisional recommendation.
-
-References:
-
-- [TypeScript project references](https://www.typescriptlang.org/docs/handbook/project-references)
-- [tsdown dependency handling](https://tsdown.dev/options/dependencies)
-- [tsdown declaration generation](https://tsdown.dev/options/dts)
-
-### Candidate B: tsdown for both workspace development and release
-
-Development:
-
-- use tsdown workspace mode;
-- use unbundle mode for private package development outputs;
-- use watch mode for rebuilding;
-- generate declarations and package exports through tsdown.
-
-Release:
-
-- use a bundled tsdown configuration for `gitlode`.
-
-Characteristics:
-
-- one tool can cover transpilation, declarations, bundling, workspace discovery, cleaning, package
-  export generation, publint, and `attw`.
-- unbundle mode can preserve a source-like module layout for private packages.
-- it is the most unified and forward-looking option.
-- tsdown workspace mode is currently marked experimental.
-- tsdown development exports rely on publish-time manifest overrides that npm does not support, so
-  this repository cannot depend on that mechanism while it uses npm workspaces.
-- declaration generation and workspace build ordering move away from the TypeScript compiler's
-  native project-build model.
-- adopting tsdown for every workspace expands the migration and tool-specific configuration
-  surface before gitlode has demonstrated a need for it.
-
-This remains a viable future simplification if workspace mode stabilizes or if a focused spike
-shows clear benefits.
-
-References:
-
-- [tsdown unbundle mode](https://tsdown.dev/options/unbundle)
-- [tsdown package exports and development exports](https://tsdown.dev/options/package-exports)
-- [tsdown package validation](https://tsdown.dev/options/lint)
-
-### Candidate C: TypeScript builds plus npm bundled dependencies
-
-Development and release:
-
-- use project references and unbundled TypeScript output;
-- declare private workspace packages as dependencies of `gitlode`;
-- include them in the published tarball through npm `bundleDependencies`;
-- do not introduce a JavaScript bundler.
-
-Characteristics:
-
-- this is the smallest change from the current build.
-- development and release execute substantially the same module graph.
-- worker paths, dynamic plugin imports, and declaration imports remain structurally unchanged.
-- the public tarball contains nested internal packages and their metadata rather than one integrated
-  gitlode artifact.
-- public declaration files may expose private package specifiers.
-- package contents, transitive dependencies, duplication, and workspace symlink packing require
-  careful tarball verification.
-- the result preserves the internal deployment topology even though those packages are not intended
-  as public install-time units.
-
-This is a valid fallback but does not best match the accepted goal of private source packages
-combined into one public application artifact.
-
-Reference:
-
-- [npm `bundleDependencies`](https://docs.npmjs.com/cli/configuring-npm/package-json/#bundledependencies)
-
-### Candidate D: Direct Rolldown integration
-
-Development and release:
-
-- configure Rolldown directly for workspace resolution, bundling, watch mode, code splitting,
-  externals, and entrypoint output;
-- combine it with TypeScript or another declaration-generation step.
-
-Characteristics:
-
-- this provides maximum control and earliest access to Rolldown capabilities.
-- it avoids wrapper limitations when gitlode needs specialized worker or chunk behavior.
-- it requires gitlode to own declaration generation, package validation, dependency policy, and
-  release-manifest integration that tsdown already coordinates.
-- direct handling of `new URL("./worker-entry.js", import.meta.url)` still requires care; Rolldown
-  does not automatically compile and bundle referenced JavaScript or TypeScript worker files as a
-  worker graph.
-
-This is not recommended unless a tsdown spike identifies a concrete blocker that requires direct
-Rolldown configuration.
-
-References:
-
-- [Rolldown configuration](https://rolldown.rs/reference/)
-- [Rolldown `new URL` asset behavior](https://rolldown.rs/reference/Interface.RolldownOptions)
-
-## Provisional Recommendation
-
-Prefer Candidate A:
+Use TypeScript project references for development package builds and use tsdown only for the public
+`gitlode` release bundle:
 
 ```text
 Development package build
@@ -428,48 +317,172 @@ Public release build
   public declarations bundled
 ```
 
-This recommendation reflects the current development profile:
+Development requirements:
 
-- contract and implementation changes are now usually independent;
-- simultaneous contract and adapter edits still occur but do not require zero-build source
-  hot-deployment;
-- `tsc -b -w` is sufficient when live cross-package output is useful;
-- conventional private-package outputs retain a straightforward path to future publication;
-- tsdown is adopted where its modern bundling and package-validation features provide direct value,
-  without depending on its experimental workspace orchestration.
+- model each workspace as a TypeScript composite project;
+- connect package dependencies with project references;
+- provide a solution `tsconfig.json` and use `tsc -b` for ordered incremental builds;
+- emit unbundled ESM, declarations, declaration maps, and source maps per private package;
+- support `tsc -b -w` when cross-package runtime output must remain current;
+- keep each private package's development output structurally suitable for future independent
+  publication.
 
-The first implementation step should still be a build spike rather than a full migration. It must
-prove:
+Release requirements:
 
-- project-reference builds and watch rebuilds across the accepted package graph;
-- tests against workspace package exports;
-- a three-entry gitlode bundle for CLI, public plugin API, and worker;
-- stable worker resolution;
-- preserved dynamic plugin loading;
-- one `GitAdapterError` runtime identity;
-- no private package imports in public JavaScript or declarations;
-- an installable clean tarball.
+- apply tsdown to the public `gitlode` package rather than using its workspace mode to build every
+  package;
+- bundle private workspace packages into the public JavaScript and declaration outputs;
+- keep approved public third-party runtime dependencies external unless separately decided;
+- preserve the CLI, public plugin API, and worker entrypoints;
+- validate the packed release independently of development outputs.
+
+The development and release artifacts intentionally differ and both require explicit validation.
+The detailed output directories, dependency classification, project configuration, and tsdown
+configuration remain open.
+
+## Accepted Private Package Manifest Policy
+
+Use the following package directories and names:
+
+| Directory                      | Package name                   |
+| ------------------------------ | ------------------------------ |
+| `packages/internal-foundation` | `@gitlode/internal-foundation` |
+| `packages/internal-contracts`  | `@gitlode/internal-contracts`  |
+| `packages/git-adapters`        | `@gitlode/git-adapters`        |
+| `packages/line-diff-adapters`  | `@gitlode/line-diff-adapters`  |
+
+Add each directory explicitly to the root npm `workspaces` array rather than replacing the current
+explicit list with a wildcard.
+
+All four packages must:
+
+- set `"private": true`;
+- use the fixed private version `"0.0.0"`;
+- set `"type": "module"`;
+- require Node.js 22 or later;
+- include only `dist` through the `files` field;
+- set `"sideEffects": false`;
+- use the repository's existing homepage, MIT license, and repository metadata;
+- use the existing workspace script names for build, watch, format, lint, and test operations;
+- omit `publishConfig` and publish scripts while private;
+- omit discoverability keywords until publication is planned.
+
+Use these descriptions:
+
+| Package                        | Description                                                         |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `@gitlode/internal-foundation` | `Private shared foundations for gitlode packages`                   |
+| `@gitlode/internal-contracts`  | `Private implementation-independent contracts for gitlode packages` |
+| `@gitlode/git-adapters`        | `Private Git adapter implementations for gitlode`                   |
+| `@gitlode/line-diff-adapters`  | `Private line-diff adapter implementations for gitlode`             |
+
+Each package must contain a short README even while private. It does not need to be a complete
+public-package guide. It must:
+
+- identify the package as a private implementation detail of the gitlode monorepo;
+- direct readers to the main gitlode README or the most relevant durable design document;
+- avoid presenting the package as independently supported or installable.
+
+Configure Changesets not to version or tag private packages:
+
+```json
+{
+  "privatePackages": {
+    "version": false,
+    "tag": false
+  }
+}
+```
+
+Changes to bundled private code use a `gitlode` changeset when they affect the public artifact or
+observable behavior. Private package versions do not advance. If a package is published in the
+future, remove `private`, choose its initial public version, add publication documentation and
+metadata, and bring it into normal Changesets management at that time.
+
+## Accepted Export Boundaries
+
+`internal-foundation` and `internal-contracts` must not provide package-root `"."` exports. They
+expose only these explicit domain subpaths:
+
+```text
+@gitlode/internal-foundation/type-utils
+@gitlode/internal-foundation/support
+@gitlode/internal-foundation/instrumentation
+@gitlode/internal-foundation/dag
+
+@gitlode/internal-contracts/model
+@gitlode/internal-contracts/progress
+@gitlode/internal-contracts/extraction
+@gitlode/internal-contracts/git
+@gitlode/internal-contracts/line-diff
+```
+
+The `extraction` package subpath maps to the existing `extraction-api` source domain. Package
+exports must use explicit entries with the `types` condition before the `default` condition. Apply
+the same form to type-only domains so all supported entrypoints have consistent ESM and declaration
+resolution.
+
+Both adapter packages provide cohesive package-root exports:
+
+```text
+@gitlode/git-adapters
+@gitlode/line-diff-adapters
+```
+
+The Git adapter root exports the concrete adapter constructors and the dependency types required to
+construct them. This includes making `GitCliAdapterDependencies` exportable alongside
+`IsomorphicGitAdapterDependencies`.
+
+Git commit-traversal selection is an explicitly unstable configuration surface and is exported
+separately:
+
+```text
+@gitlode/git-adapters/experimental
+```
+
+This subpath contains the traversal environment constant, strategy creation and name-resolution
+functions, and the related strategy types required by their declarations. The exact closure of
+supporting types must be verified during migration.
+
+Do not add implementation-specific Git adapter subpaths at this stage. Reconsider them if future
+independent publication creates a concrete need to separate dependency or module-loading
+boundaries.
+
+All packages must follow these export rules:
+
+- use explicit export-map entries rather than wildcard exports;
+- export built ESM and declarations, never source files;
+- do not export `package.json`, tests, or generic `internal` entrypoints;
+- do not introduce development-only export conditions;
+- require cross-package imports to use supported package exports;
+- prohibit relative imports into another package's `src` or `dist`;
+- allow same-package domains to use relative imports through the target domain barrel;
+- allow package-owned unit tests to import their internal source modules relatively;
+- require cross-package and integration tests to use supported package exports.
 
 ## Open Decisions
 
-### 1. Development build and module-resolution model
+### 1. Dependency classification
 
-Decide how private packages are type-checked, built, watched, and resolved during repository
-development.
+Decide:
 
-Questions include:
+- private package `dependencies` and `devDependencies`;
+- how `gitlode` classifies private packages that are bundled for release;
+- how adapter-owned external dependencies appear in the public release closure;
+- internal dependency version specifiers;
+- Rev-dep treatment of build-time bundled dependencies.
 
-- whether to use TypeScript project references and `tsc -b`;
-- whether each private package emits unbundled `dist` output;
-- whether tests resolve workspace source or built package exports;
-- how watch mode rebuilds dependents;
-- how npm workspace script order is made deterministic;
-- whether development and production exports differ.
+### 2. TypeScript project graph
 
-This decision should precede source movement because it determines package manifests, tsconfig
-structure, imports, test execution, and build order.
+Decide:
 
-### 2. Public release bundle
+- project-reference edges and the solution `tsconfig.json` structure;
+- development output and `.tsbuildinfo` locations;
+- package-level build, watch, and clean commands;
+- whether gitlode tests resolve source or built workspace exports;
+- how architecture checks map package imports back to domain allowlists.
+
+### 3. Public release bundle
 
 Decide how the public `gitlode` artifact incorporates private workspace packages.
 
@@ -484,31 +497,10 @@ The design must cover:
 - removal of unpublished private dependencies from the published manifest;
 - clean output and tarball validation.
 
-`tsdown` backed by Rolldown is the current leading candidate, but it has not been adopted. A focused
-build spike should validate the required entrypoints and runtime behaviors before committing to it.
+Use tsdown backed by Rolldown for this release bundle. A focused build spike must validate the
+required entrypoints and runtime behaviors before the full source migration.
 
-### 3. External dependency policy
-
-Decide whether `diff` and `isomorphic-git` remain external runtime dependencies of the published
-`gitlode` package or are included in its bundle.
-
-If they remain external, decide how the public manifest receives the complete external dependency
-closure even though source ownership moves to adapter packages.
-
-### 4. Private package versioning and Changesets
-
-Decide:
-
-- whether private package versions advance;
-- whether Changesets should use `privatePackages.version`;
-- which changes require a `gitlode` changeset;
-- how a change in bundled private code is represented in the public changelog;
-- whether internal dependency ranges use exact versions or another repository convention.
-
-An implementation change in a private adapter changes the public `gitlode` artifact, so the release
-workflow must not treat it as publication-neutral.
-
-### 5. Test ownership and integration coverage
+### 4. Test ownership and integration coverage
 
 Decide which tests move with each domain and which remain application-level integration tests.
 
@@ -524,7 +516,7 @@ Known affected areas include:
 The final validation strategy should include installing the packed `gitlode` tarball into a clean
 temporary project and exercising the CLI, worker, both Git adapters, and plugin loading.
 
-### 6. Migration sequence
+### 5. Migration sequence
 
 Decide whether to:
 
@@ -536,7 +528,7 @@ Decide whether to:
 Each intermediate state should build, test, and satisfy architecture checks. Avoid a migration plan
 that requires weakening dependency rules or leaving two authoritative copies of a contract.
 
-### 7. Durable documentation updates
+### 6. Durable documentation updates
 
 Implementation will require coordinated updates to at least:
 
@@ -552,16 +544,9 @@ author workflows change observably.
 
 ## Recommended Next Discussion
 
-Discuss the development-build and final-release-build architecture next.
-
-The package graph is now accepted, but source movement cannot be planned safely until the following
-distinction is explicit:
-
-- **development artifacts:** how private workspaces reference, build, watch, and test one another;
-- **release artifact:** how those private packages become one installable public `gitlode` package.
-
-The next discussion should compare a small number of concrete build models and select one before
-deciding the detailed migration sequence.
+Classify private package dependencies and external runtime dependencies. This establishes how npm
+manifests, the TypeScript project graph, Rev-dep, and the final public release bundle represent each
+accepted package edge.
 
 ## Completion Criteria
 

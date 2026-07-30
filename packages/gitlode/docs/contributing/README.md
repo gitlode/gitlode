@@ -11,3 +11,5 @@ and coding agents need while changing the codebase.
 
 - [`lint-policy.md`](lint-policy.md): oxlint rule adoption policy, including rule category handling,
   LLM autonomy boundaries, severity, and review cadence.
+
+- [Build and test workflows](./build-and-test.md)

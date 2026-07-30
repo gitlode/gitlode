@@ -4,3 +4,5 @@ dist/
 out/
 *.jsonl
 *.tmp
+
+.cache/

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/syncpackrc",
+  "versionGroups": [
+    { "label": "Use one version of every dependency", "dependencies": ["**"], "packages": ["**"], "dependencyTypes": ["dependencies", "devDependencies", "peerDependencies"] },
+    { "label": "Keep Vitest packages aligned", "dependencies": ["vitest", "@vitest/coverage-v8"], "packages": ["**"], "dependencyTypes": ["devDependencies"] }
+  ],
+  "semverGroups": [
+    { "label": "Registry dependencies use caret ranges", "range": "^", "dependencies": ["**"], "packages": ["**"], "dependencyTypes": ["dependencies", "devDependencies"] },
+    { "label": "Future private packages are exact", "range": "", "dependencies": ["@gitlode/internal-foundation", "@gitlode/internal-contracts", "@gitlode/git-adapters", "@gitlode/line-diff-adapters"], "packages": ["**"], "dependencyTypes": ["dependencies", "devDependencies"] }
+  ]
+}

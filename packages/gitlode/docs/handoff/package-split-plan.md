@@ -2,29 +2,19 @@
 
 ## Status
 
-This document records the agreed direction and open implementation decisions for splitting selected
-`packages/gitlode` source domains into private monorepo packages.
+Phase A infrastructure is implemented. The monolithic source layout is intentionally unchanged.
+The repository now uses the root `tsconfig.json` project graph for development builds,
+`packages/gitlode/tsdown.config.ts` for the public release bundle, root Vitest projects, Syncpack,
+and explicit release and packed-artifact validation scripts. The release path invalidates only
+`.cache/tsc/gitlode.tsbuildinfo`. Package metadata is embedded through
+`src/package-metadata.ts` instead of being found relative to a generated chunk.
 
-No package split has been implemented yet. The package topology and high-level build strategy in
-this document are accepted as the planning baseline. The private package manifest policy and export
-boundaries and dependency classification are also accepted. Detailed TypeScript project
-configuration, the public release bundle, test ownership, and the migration sequence are accepted
-as well. No package-split design decision remains open; implementation has not started. Test-code
-type checking remains a separate deferred task.
+The planned private-package `noExternal` allowlist is not active because those packages do not yet
+exist; Phase B must enable the four accepted package names when their workspaces are introduced.
+No compatibility facade, paths alias, source export condition, or test-code typecheck was added.
 
-This is a continuation document rather than a durable source of truth. As implementation decisions
-become stable, migrate package and dependency contracts to `docs/design/`, update other affected
-canonical documentation, and remove completed material from this document.
-
-When continuing this work:
-
-1. Preserve the accepted dependency direction and the contract-to-implementation boundary.
-2. Record newly accepted decisions in this document when they are made.
-3. Keep the remaining work visible as a section-level outline, but do not preserve every rejected
-   alternative or the full discussion history.
-4. Do not present candidates as accepted decisions.
-
-Unless a path starts with `packages/`, it is relative to `packages/gitlode`.
+The next implementation step is Phase B1's vertical slice. Test-code type checking remains a
+separate deferred task.
 
 ## Documentation Policy
 

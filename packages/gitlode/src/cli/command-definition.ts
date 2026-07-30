@@ -1,6 +1,6 @@
 import { Argument, Command, Option } from "commander";
 
-import packageJson from "../../package.json" with { type: "json" };
+import { packageVersion } from "../package-metadata.js";
 
 export const program = new Command()
   .name("gitlode")
@@ -13,7 +13,7 @@ export const program = new Command()
       // forwarding the raw Commander output from here.
     },
   })
-  .version(packageJson.version, "-v, --version", "output the current version")
+  .version(packageVersion, "-v, --version", "output the current version")
   .addArgument(new Argument("<repository-path>", "Local path to the Git repository"))
   .addHelpOption(new Option("-h, --help", "display help for command").hideHelp())
   .addOption(

@@ -12,8 +12,8 @@
   ],
   "scripts": {
     "architecture:check": "rev-dep config run --lint-config",
-    "build": "npm run build --workspaces --if-present",
-    "build:watch": "npm run build:watch -w packages/gitlode",
+    "build": "npm run build:release",
+    "build:watch": "tsc -b -w",
     "changeset": "changeset",
     "changeset:publish": "changeset publish",
     "changeset:status": "changeset status",
@@ -24,11 +24,17 @@
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "lockfile:sync": "npm install --package-lock-only --ignore-scripts",
-    "release": "npm run build && npm run changeset:publish",
-    "test": "npm test --workspaces --if-present",
-    "test:watch": "npm run test:watch -w packages/gitlode",
-    "test:coverage": "npm run test:coverage -w packages/gitlode",
-    "version-packages": "npm run changeset:version && npm run lockfile:sync"
+    "release": "npm run release:validate && npm run changeset:publish",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "version-packages": "npm run changeset:version && npm run lockfile:sync",
+    "build:dev": "tsc -b",
+    "build:clean": "tsc -b --clean",
+    "build:release": "npm run build:dev && npm run release:invalidate -w gitlode && npm run build:release -w gitlode && npm run validate:release -w gitlode",
+    "deps:check": "syncpack lint",
+    "test:package": "npm run test:package -w gitlode",
+    "release:validate": "npm run deps:check && npm run format:check && npm run lint && npm run architecture:check && npm run build:dev && npm run schema:check -w gitlode && npm test && npm run test:coverage && npm run build:release && npm run test:package"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
@@ -40,6 +46,7 @@
     "rev-dep": "^2.19.1",
     "tsx": "^4.23.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "syncpack": "^13.0.4"
   }
 }

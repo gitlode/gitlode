@@ -505,3 +505,15 @@ For the full plugin contract and example, see [docs/design/plugins.md](plugins.m
 - `packages/gitlode/docs/design/git-traversal.md`
 - `packages/gitlode/docs/design/schema.md`
 - `packages/gitlode/docs/design/plugins.md`
+
+### Development and release artifacts
+
+The repository solution `tsconfig.json` models every production workspace as a composite TypeScript
+project. `npm run build:dev` emits unbundled ESM, declarations, declaration maps, and source maps in
+project-reference order; this output is for local development and is not publishable.
+
+The public `gitlode` release is produced separately by `npm run build:release`. tsdown bundles the
+three runtime entrypoints (`index`, `plugin-api`, and the non-exported `worker-entry`) while leaving
+the package's declared third-party runtime dependencies external. Only `index.d.ts` and
+`plugin-api.d.ts` are public declarations. Release validation and a test of the packed tarball must
+complete before publication.

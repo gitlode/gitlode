@@ -3,44 +3,68 @@
   "$schema": "https://github.com/jayu/rev-dep/blob/master/config-schema/1.12.schema.json?raw=true",
   "nodeModulesResolution": {
     "resolutionType": "entry-package",
-    "includeDevDepsFromRoot": true
+    "includeDevDepsFromRoot": false
   },
   "rules": [
     {
       "path": "packages/gitlode",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts", "src/plugin-api.ts", "src/execution/worker-entry.ts"],
-      "devEntryPoints": ["test/**", "scripts/**", "vitest.config.ts"],
+      "prodEntryPoints": [
+        "src/index.ts",
+        "src/plugin-api.ts",
+        "src/execution/worker-entry.ts"
+      ],
+      "devEntryPoints": [
+        "test/**",
+        "scripts/**",
+        "vitest.config.ts"
+      ],
       "moduleBoundaries": [
         {
           "name": "type-utils",
           "pattern": "src/type-utils/**",
-          "allow": ["src/type-utils/**"]
+          "allow": [
+            "src/type-utils/**"
+          ]
         },
         {
           "name": "support",
           "pattern": "src/support/**",
-          "allow": ["src/support/**", "src/type-utils/index.ts"]
+          "allow": [
+            "src/support/**",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "model",
           "pattern": "src/model/**",
-          "allow": ["src/model/**", "src/type-utils/index.ts"]
+          "allow": [
+            "src/model/**",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "instrumentation",
           "pattern": "src/instrumentation/**",
-          "allow": ["src/instrumentation/**", "src/type-utils/index.ts"]
+          "allow": [
+            "src/instrumentation/**",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "diagnostics",
           "pattern": "src/diagnostics/**",
-          "allow": ["src/diagnostics/**"]
+          "allow": [
+            "src/diagnostics/**"
+          ]
         },
         {
           "name": "progress",
           "pattern": "src/progress/**",
-          "allow": ["src/progress/**", "src/type-utils/index.ts"]
+          "allow": [
+            "src/progress/**",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "dag",
@@ -55,7 +79,11 @@
         {
           "name": "git",
           "pattern": "src/git/**",
-          "allow": ["src/git/**", "src/model/index.ts", "src/type-utils/index.ts"]
+          "allow": [
+            "src/git/**",
+            "src/model/index.ts",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "git-impl",
@@ -73,7 +101,10 @@
         {
           "name": "line-diff",
           "pattern": "src/line-diff/**",
-          "allow": ["src/line-diff/**", "src/type-utils/index.ts"]
+          "allow": [
+            "src/line-diff/**",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "line-diff-impl",
@@ -149,7 +180,11 @@
         {
           "name": "output",
           "pattern": "src/output/**",
-          "allow": ["src/output/**", "src/extraction-api/index.ts", "src/type-utils/index.ts"]
+          "allow": [
+            "src/output/**",
+            "src/extraction-api/index.ts",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "config",
@@ -234,8 +269,13 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["@types/*"],
-        "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
+        "excludeModules": [
+          "@types/*"
+        ],
+        "pkgJsonFieldsWithBinaries": [
+          "scripts",
+          "bin"
+        ]
       },
       "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {
@@ -246,8 +286,13 @@
     {
       "path": "packages/plugin-assay-metrics",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts"],
-      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "prodEntryPoints": [
+        "src/index.ts"
+      ],
+      "devEntryPoints": [
+        "test/**",
+        "vitest.config.ts"
+      ],
       "circularImportsDetection": {
         "ignoreTypeImports": false,
         "algorithm": "SCC"
@@ -255,8 +300,12 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
-        "pkgJsonFieldsWithBinaries": ["scripts"]
+        "excludeModules": [
+          "gitlode"
+        ],
+        "pkgJsonFieldsWithBinaries": [
+          "scripts"
+        ]
       },
       "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {
@@ -267,8 +316,13 @@
     {
       "path": "packages/plugin-conventional-commits",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts"],
-      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "prodEntryPoints": [
+        "src/index.ts"
+      ],
+      "devEntryPoints": [
+        "test/**",
+        "vitest.config.ts"
+      ],
       "circularImportsDetection": {
         "ignoreTypeImports": false,
         "algorithm": "SCC"
@@ -276,8 +330,12 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
-        "pkgJsonFieldsWithBinaries": ["scripts"]
+        "excludeModules": [
+          "gitlode"
+        ],
+        "pkgJsonFieldsWithBinaries": [
+          "scripts"
+        ]
       },
       "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {
@@ -288,8 +346,13 @@
     {
       "path": "packages/plugin-custom-field",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts"],
-      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "prodEntryPoints": [
+        "src/index.ts"
+      ],
+      "devEntryPoints": [
+        "test/**",
+        "vitest.config.ts"
+      ],
       "circularImportsDetection": {
         "ignoreTypeImports": false,
         "algorithm": "SCC"
@@ -297,8 +360,12 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
-        "pkgJsonFieldsWithBinaries": ["scripts"]
+        "excludeModules": [
+          "gitlode"
+        ],
+        "pkgJsonFieldsWithBinaries": [
+          "scripts"
+        ]
       },
       "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {
@@ -309,8 +376,13 @@
     {
       "path": "packages/plugin-file-type",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts"],
-      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "prodEntryPoints": [
+        "src/index.ts"
+      ],
+      "devEntryPoints": [
+        "test/**",
+        "vitest.config.ts"
+      ],
       "circularImportsDetection": {
         "ignoreTypeImports": false,
         "algorithm": "SCC"
@@ -318,8 +390,12 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
-        "pkgJsonFieldsWithBinaries": ["scripts"]
+        "excludeModules": [
+          "gitlode"
+        ],
+        "pkgJsonFieldsWithBinaries": [
+          "scripts"
+        ]
       },
       "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {
@@ -330,8 +406,13 @@
     {
       "path": "packages/plugin-identity-profile",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts"],
-      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "prodEntryPoints": [
+        "src/index.ts"
+      ],
+      "devEntryPoints": [
+        "test/**",
+        "vitest.config.ts"
+      ],
       "circularImportsDetection": {
         "ignoreTypeImports": false,
         "algorithm": "SCC"
@@ -339,8 +420,12 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
-        "pkgJsonFieldsWithBinaries": ["scripts"]
+        "excludeModules": [
+          "gitlode"
+        ],
+        "pkgJsonFieldsWithBinaries": [
+          "scripts"
+        ]
       },
       "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {

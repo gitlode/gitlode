@@ -8,7 +8,8 @@ This document records the agreed direction and open implementation decisions for
 No package split has been implemented yet. The package topology and high-level build strategy in
 this document are accepted as the planning baseline. The private package manifest policy and export
 boundaries and dependency classification are also accepted. Detailed TypeScript project
-configuration, bundling, testing, and migration steps remain to be decided.
+configuration is accepted as well. Detailed release bundling, testing, and migration steps remain
+to be decided.
 
 This is a continuation document rather than a durable source of truth. As implementation decisions
 become stable, migrate package and dependency contracts to `docs/design/`, update other affected
@@ -551,19 +552,106 @@ Manifest presence and source permission remain separate concerns. A dependency l
 release resolution does not grant every source domain permission to import it. Rev-dep must continue
 to enforce the narrower domain ownership of `isomorphic-git`, `diff`, and private package subpaths.
 
+## Accepted TypeScript Project Graph
+
+Make every production workspace a TypeScript composite project. Project references follow the same
+consumer-to-dependency direction as the accepted package graph:
+
+```text
+@gitlode/internal-foundation
+  → no references
+
+@gitlode/internal-contracts
+  → @gitlode/internal-foundation
+
+@gitlode/git-adapters
+  → @gitlode/internal-foundation
+  → @gitlode/internal-contracts
+
+@gitlode/line-diff-adapters
+  → @gitlode/internal-contracts
+
+gitlode
+  → all four private workspaces
+
+each @gitlode/plugin-*
+  → gitlode
+```
+
+Turn the root `tsconfig.json` into a solution project with an empty `files` array and references to
+the four private packages, `gitlode`, and every plugin package. It does not extend
+`tsconfig.base.json`. Keep the references listed in topological order for readability, while relying
+on `tsc -b` to determine the actual build order.
+
+Set `composite: true` in the shared compiler options. Keep NodeNext ESM, declarations, declaration
+maps, and source maps. Each package explicitly sets `rootDir` to `src`, `outDir` to `dist`, includes
+only production source, and declares its direct project references. Do not introduce `baseUrl`,
+`paths`, source aliases, custom development export conditions, `emitDeclarationOnly`,
+`isolatedDeclarations`, or `disableSourceOfProjectReferenceRedirect` as part of this split.
+
+Development builds emit unbundled ESM and declarations to each package's `dist` directory so
+runtime and TypeScript resolution exercise the accepted package export maps. Store incremental
+metadata outside publishable output:
+
+```text
+.cache/tsc/<workspace-name>.tsbuildinfo
+```
+
+Ignore `.cache/` in Git. Use a distinct `tsBuildInfoFile` for every workspace.
+
+Provide these development commands at the root and in relevant workspaces:
+
+```text
+build:dev    → tsc -b
+build:watch  → tsc -b -w
+build:clean  → tsc -b --clean
+```
+
+The root commands operate on the solution graph. A workspace command builds or watches that project
+and its references. Do not use `npm run build --workspaces` as the development build orchestrator.
+Reserve `build` for the final artifact of each workspace: it may delegate to `build:dev` for private
+packages and plugins, while public `gitlode` uses the release bundle decided separately.
+
+### Development test resolution
+
+Package-owned unit tests import their own source relatively, including non-exported implementation
+modules. Cross-package tests import only supported package exports, which resolve built `dist`
+output. Test, test-watch, and coverage commands must perform an initial `build:dev` so they work from
+a clean checkout. Repeated builds are incremental.
+
+For changes contained within one package, Vitest watches that package's source directly. When
+contracts and consumers are edited together, run the root `build:watch` process alongside the
+relevant package's `test:watch` process. Do not add source-resolution aliases merely to make
+cross-package watch mode implicit.
+
+Keep test source out of production composite projects and out of `dist`. Decide whether to add
+separate non-emitting test typecheck projects only after test ownership and integration placement
+are settled.
+
+Existing gitlode tests that import plugin source must not create a production project-reference
+cycle:
+
+```text
+gitlode → plugin → gitlode
+```
+
+Move such coverage to a root-level or dedicated integration-test context that runs after production
+projects are built and imports plugin package exports. The exact placement belongs to the later test
+ownership decision.
+
+Run the development solution build before schema scripts and tests in CI because source scripts and
+cross-package imports resolve private package output from `dist`.
+
+### Development and release output coexistence
+
+The gitlode development compiler and public release bundler both use `packages/gitlode/dist`.
+Release builds must clean that directory before writing bundled output and invalidate gitlode's
+development `.tsbuildinfo`. Otherwise a later `tsc -b` could treat release-bundled files as current
+development output. Define the exact clean sequence as part of the public release bundle.
+
 ## Open Decisions
 
-### 1. TypeScript project graph
-
-Decide:
-
-- project-reference edges and the solution `tsconfig.json` structure;
-- development output and `.tsbuildinfo` locations;
-- package-level build, watch, and clean commands;
-- whether gitlode tests resolve source or built workspace exports;
-- how architecture checks map package imports back to domain allowlists.
-
-### 2. Public release bundle
+### 1. Public release bundle
 
 Decide how the public `gitlode` artifact incorporates private workspace packages.
 
@@ -581,7 +669,7 @@ The design must cover:
 Use tsdown backed by Rolldown for this release bundle. A focused build spike must validate the
 required entrypoints and runtime behaviors before the full source migration.
 
-### 3. Test ownership and integration coverage
+### 2. Test ownership and integration coverage
 
 Decide which tests move with each domain and which remain application-level integration tests.
 
@@ -597,7 +685,7 @@ Known affected areas include:
 The final validation strategy should include installing the packed `gitlode` tarball into a clean
 temporary project and exercising the CLI, worker, both Git adapters, and plugin loading.
 
-### 4. Migration sequence
+### 3. Migration sequence
 
 Decide whether to:
 
@@ -609,7 +697,7 @@ Decide whether to:
 Each intermediate state should build, test, and satisfy architecture checks. Avoid a migration plan
 that requires weakening dependency rules or leaving two authoritative copies of a contract.
 
-### 5. Durable documentation updates
+### 4. Durable documentation updates
 
 Implementation will require coordinated updates to at least:
 
@@ -625,9 +713,9 @@ author workflows change observably.
 
 ## Recommended Next Discussion
 
-Define the TypeScript project-reference graph, development output layout, and workspace-level build
-and watch commands. This must make the accepted package graph incrementally buildable without
-source-path aliases or duplicated runtime modules.
+Define the public tsdown release bundle, including entrypoints, externalization, output cleaning,
+worker and plugin behavior, declaration bundling, published manifest validation, and clean tarball
+installation.
 
 ## Completion Criteria
 

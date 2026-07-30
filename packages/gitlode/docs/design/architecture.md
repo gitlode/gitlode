@@ -263,8 +263,13 @@ adapter-selection and implementation-boundary details live in `docs/design/git-a
 
 Line-diff computation is defined independently of repository access in `src/line-diff` and
 implemented in `src/line-diff-impl`. `FileChangeFactExpander` delegates calculation to the
-`LineDiffCalculator` contract. The default implementation (`JsLineDiffCalculator`) uses the `diff`
-package's `diffLines` function with UTF-8 decoding. Before invoking it, the expander applies
+`LineDiffCalculator` contract. The default implementation (`JsLineDiffCalculator`) receives the
+run-scoped instrumentation instance and owns `line_diff.compute` around its complete concrete
+calculation, including UTF-8 decoding, `diffLines`, aggregation, and result construction. The
+contract remains independent of instrumentation, so alternate implementations own any measurement
+they require. `FileChangeFactExpander` owns `gitlode.file_change_expansion` around one commit's
+complete expansion, including adapter iteration, guards, calculation calls, validation, and fact
+construction. Before invoking the calculator, the expander applies
 `--max-diff-size` to both loaded contents, then applies the NUL-byte heuristic to the first 8,000
 bytes. Either skip produces `additions: null` and `deletions: null`. This orchestration layer is the
 sole owner of derived file-change policy; Git adapters and line-diff calculators do not own it.
@@ -406,7 +411,7 @@ profile block and, via the current CLI wiring, enables the detailed stage profil
 root entry.
 
 In commit-granularity mode (no `--per-file`), file-expansion spans such as `git.blob_read` and
-`git.diff` are absent because `getFileBlobChanges()` is never called.
+`line_diff.compute` are absent because `getFileBlobChanges()` is never called.
 
 `--quiet` suppresses the profile block together with the normal progress and summary output.
 

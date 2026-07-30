@@ -77,7 +77,8 @@ function makeExpander(
 ): FileChangeFactExpander {
   return new FileChangeFactExpander(
     makeSource(changes),
-    options.lineDiffCalculator ?? new JsLineDiffCalculator(),
+    options.lineDiffCalculator ??
+      new JsLineDiffCalculator({ instrumentation: noopInstrumentation }),
     options.instrumentation ?? noopInstrumentation,
     options.maxDiffSize,
   );
@@ -126,7 +127,7 @@ describe("FileChangeFactExpander expansion", () => {
     const source = makeSource([], (commitOid, parentOid) => requests.push([commitOid, parentOid]));
     const expander = new FileChangeFactExpander(
       source,
-      new JsLineDiffCalculator(),
+      new JsLineDiffCalculator({ instrumentation: noopInstrumentation }),
       noopInstrumentation,
     );
     const root = makeCommitFact({ oid: "1".repeat(40) as CommitOid, parents: [] });
@@ -190,10 +191,58 @@ describe("FileChangeFactExpander expansion", () => {
     expect(expander.skippedDiffCount).toBe(1);
     expect(recorder.records()).toEqual([
       expect.objectContaining({
-        name: "git.file_changes",
+        name: "gitlode.file_change_expansion",
         counters: { changes: 1, skipped_size: 1 },
       }),
     ]);
+  });
+
+  it("records owned spans and counters for mixed file changes", async () => {
+    const instrumentation = new LocalInstrumentationRecorder(() => 1);
+    const changes: FileBlobChange[] = [
+      {
+        status: "modified",
+        before: snapshot("text.txt", "old\n"),
+        after: snapshot("text.txt", "new\n"),
+      },
+      { status: "added", before: null, after: snapshot("large.txt", "12345") },
+      { status: "added", before: null, after: snapshot("binary.bin", new Uint8Array([0, 1])) },
+    ];
+    const expander = makeExpander(changes, {
+      lineDiffCalculator: new JsLineDiffCalculator({ instrumentation }),
+      maxDiffSize: 4,
+      instrumentation,
+    });
+
+    const results = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
+    expect(results.map(({ file }) => file)).toEqual([
+      { path: "text.txt", status: "modified", additions: 1, deletions: 1 },
+      { path: "large.txt", status: "added", additions: null, deletions: null },
+      { path: "binary.bin", status: "added", additions: null, deletions: null },
+    ]);
+    expect(expander.skippedDiffCount).toBe(2);
+    const expansion = instrumentation
+      .records()
+      .find(({ name }) => name === "gitlode.file_change_expansion");
+    expect(expansion?.counters).toEqual({
+      changes: 3,
+      diffs: 1,
+      skipped_size: 1,
+      skipped_binary: 1,
+    });
+    expect(
+      instrumentation.records().filter(({ name }) => name === "gitlode.file_change_expansion"),
+    ).toHaveLength(1);
+    expect(
+      instrumentation.records().filter(({ name }) => name === "line_diff.compute"),
+    ).toHaveLength(1);
+    for (const rejectedName of [
+      ["git", "file_changes"],
+      ["git", "diff"],
+      ["gitlode", "line_diff"],
+    ].map((parts) => parts.join("."))) {
+      expect(instrumentation.records().some(({ name }) => name === rejectedName)).toBe(false);
+    }
   });
 
   it("runs the diff when content size equals maxDiffSize", async () => {

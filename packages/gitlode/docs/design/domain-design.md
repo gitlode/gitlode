@@ -239,9 +239,9 @@ between text contents.
 
 **Purpose:** Implement the line-diff calculation contract.
 
-- Includes concrete calculators such as the `diff`-package-backed implementation.
+- Includes concrete calculators such as the `diff`-package-backed implementation and allows each implementation to own its execution instrumentation.
 - Excludes binary and size policy, repository access, and file-change interpretation.
-- Owns implementation-specific package use without widening the line-diff contract.
+- Owns implementation-specific package use and instrumentation without widening the line-diff contract, which remains independent of instrumentation.
 
 ### 2.10 `extraction-api`
 
@@ -395,7 +395,7 @@ Node.js runtime APIs.
 | `git`             | `model`                                                                                                |
 | `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                                    |
 | `line-diff`       | None                                                                                                   |
-| `line-diff-impl`  | `line-diff`                                                                                            |
+| `line-diff-impl`  | `instrumentation`, `line-diff`                                                                         |
 | `state`           | `extraction-api`, `model`, `support`                                                                   |
 | `extraction-api`  | `diagnostics`, `model`, `support`                                                                      |
 | `extraction`      | `diagnostics`, `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `support` |
@@ -540,6 +540,7 @@ flowchart TB
   gitImpl --> dag
   gitImpl --> git
   gitImpl --> model
+  lineDiffImpl --> instrumentation
   lineDiffImpl --> lineDiff
 
 ```

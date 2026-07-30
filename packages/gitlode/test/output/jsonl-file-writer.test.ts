@@ -3,9 +3,9 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { ProjectedCommit, ProjectedFileChange } from "@gitlode/internal-contracts/extraction";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { ProjectedCommit, ProjectedFileChange } from "../../src/extraction-api/index.js";
 import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
 
 function makeCommit(oid: string): ProjectedCommit {

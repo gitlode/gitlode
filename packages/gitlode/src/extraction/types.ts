@@ -1,13 +1,13 @@
-import type { DiagnosticReporter } from "../diagnostics/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type {
   CommitTraversalExtractor,
   FactProjector,
   FileChangeExpander,
   OutputSink,
   TraversalPlanner,
-} from "../extraction-api/index.js";
-import type { Instrumentation } from "../instrumentation/index.js";
-import type { ProgressReporter } from "../progress/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
 
 /** Constructor dependencies injected into the extraction coordinator. */
 export interface CoordinatorDependencies {

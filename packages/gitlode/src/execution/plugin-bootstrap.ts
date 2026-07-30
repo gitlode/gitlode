@@ -1,6 +1,9 @@
-import type { DiagnosticReporter } from "../diagnostics/index.js";
-import type { FactProjector } from "../extraction-api/index.js";
-import type { Instrumentation } from "../instrumentation/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { FactProjector } from "@gitlode/internal-contracts/extraction";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
+
 import {
   checkPluginCompatibility,
   EnrichingFactProjector,
@@ -9,8 +12,6 @@ import {
   type PluginInitializationFailure,
   resolvePluginEntries,
 } from "../plugin-runtime/index.js";
-import type { ProgressReporter } from "../progress/index.js";
-import type { AbsoluteDirectoryPath } from "../support/index.js";
 
 interface PluginBootstrapReporters {
   readonly progressReporter: ProgressReporter;

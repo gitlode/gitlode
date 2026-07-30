@@ -1,6 +1,6 @@
+import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
 import { describe, expect, it } from "vitest";
 
-import type { ProfileSummaryEntry } from "../../../src/instrumentation/index.js";
 import { formatProfileLines } from "../../../src/presentation/reporting/formatters.js";
 
 describe("formatProfileLines", () => {

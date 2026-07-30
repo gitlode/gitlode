@@ -1,14 +1,17 @@
-import type { DiagnosticReporter } from "../diagnostics/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type {
   CommitFact,
   CommitTraversalExtractor,
   CommitTraversalRequest,
   ExtractionRange,
   TraversalPlan,
-} from "../extraction-api/index.js";
-import type { GitAdapter, RawCommit } from "../git/index.js";
-import { GitAdapterError } from "../git/index.js";
-import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import type { GitAdapter, RawCommit } from "@gitlode/internal-contracts/git";
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+} from "@gitlode/internal-foundation/instrumentation";
 
 function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | null): CommitFact {
   return {

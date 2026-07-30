@@ -1,6 +1,7 @@
-import type { Diagnostic } from "../diagnostics/index.js";
-import type { ProfileSummaryEntry } from "../instrumentation/index.js";
-import type { ProgressEvent } from "../progress/index.js";
+import type { Diagnostic } from "@gitlode/internal-contracts/diagnostics";
+import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
+import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
+
 import { writeDiagnosticLines, splitMessageLines } from "./diagnostics.js";
 import {
   ProgressController,

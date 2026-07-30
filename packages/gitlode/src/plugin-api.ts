@@ -4,7 +4,10 @@ export type {
   FileChangeFact,
   ProjectedCommit,
   ProjectedFileChange,
-} from "./extraction-api/index.js";
-export type { Instrumentation, InstrumentationSpan } from "./instrumentation/index.js";
-export type { CommitOid } from "./model/index.js";
-export type * from "./type-utils/index.js";
+} from "@gitlode/internal-contracts/extraction";
+export type {
+  Instrumentation,
+  InstrumentationSpan,
+} from "@gitlode/internal-foundation/instrumentation";
+export type { CommitOid } from "@gitlode/internal-contracts/model";
+export type * from "@gitlode/internal-foundation/type-utils";

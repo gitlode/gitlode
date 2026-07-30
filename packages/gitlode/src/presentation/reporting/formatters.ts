@@ -1,5 +1,9 @@
-import type { InstrumentAttributeValue, ProfileSummaryEntry } from "../../instrumentation/index.js";
-import { firstOrThrow } from "../../support/index.js";
+import type {
+  InstrumentAttributeValue,
+  ProfileSummaryEntry,
+} from "@gitlode/internal-foundation/instrumentation";
+import { firstOrThrow } from "@gitlode/internal-foundation/support";
+
 import { formatCount, formatElapsed, formatMs, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
 import type { SummaryData } from "./types.js";

@@ -1,5 +1,5 @@
-import type { RefType } from "../model/index.js";
-import type { AbsolutePath } from "../support/index.js";
+import type { RefType } from "@gitlode/internal-contracts/model";
+import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 
 interface StateDocumentRefV2 {
   readonly ref: string;

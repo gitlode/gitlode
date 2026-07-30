@@ -1,6 +1,7 @@
-import type { DiagnosticReporter } from "../diagnostics/index.js";
-import type { ProfileSummaryEntry } from "../instrumentation/index.js";
-import type { ProgressReporter } from "../progress/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
+
 import type { RunPresenter } from "./presenter.js";
 import type { Clock, Scheduler, TerminalSink, UiMode } from "./progress/types.js";
 import type { Styling } from "./styling.js";

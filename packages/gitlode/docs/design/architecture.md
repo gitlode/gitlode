@@ -106,7 +106,7 @@ The architecture is layered:
 
 This layering keeps product policy in Extraction and implementation details in adapter/output modules.
 
-`packages/gitlode/src/dag/` is an internal generic DAG subsystem used below the Git adapter boundary. It owns node-ID-based traversal algorithms and graph-work instrumentation, but it is not part of the package public API. Git-specific code implements a topology port and calls the DAG subsystem; the DAG subsystem must not depend on Git commit objects, adapter caches, isomorphic-git errors, or Git-specific scheduling hints.
+`packages/internal-foundation/src/dag/` is an internal generic DAG subsystem used below the Git adapter boundary. It owns node-ID-based traversal algorithms and graph-work instrumentation, but it is not part of the package public API. Git-specific code implements a topology port and calls the DAG subsystem; the DAG subsystem must not depend on Git commit objects, adapter caches, isomorphic-git errors, or Git-specific scheduling hints.
 
 The phase-certified prototype remains internal and is reachable from production commit walking only through an internal experimental strategy seam. Its module ownership is split so `phase-certified.ts` owns facade orchestration, instrumentation boundaries, default FIFO/preserve frontier creation, and the difference/closure frontier loops; `certified-closure.ts` owns the closure state machine for split, branch, join, terminal, and closed-boundary resolution; `phase-certified-difference-state.ts` owns include-side graph state, certified exclude integration, certified-hit classification, and final drain; and `phase-certified-types.ts` owns shared generic contracts used by those modules. Telemetry counter names and meanings, scheduling semantics, and Git-specific timestamp policy ownership remain unchanged.
 
@@ -136,7 +136,7 @@ Responsibilities:
 - Handle top-level process exit behavior and user-facing errors.
 
 In the current worker boundary design, state file reading and writing are main-process
-responsibilities orchestrated by `src/execution/execute-run.ts`. `src/extraction-api` defines the
+responsibilities orchestrated by `src/execution/execute-run.ts`. `packages/internal-contracts/src/extraction-api` defines the
 checkpoint model carried by extraction request and result contracts. Persistence ports, state-file
 adaptation, pure validation, Node.js state-file loading, and atomic replacement live in `src/state`.
 
@@ -156,7 +156,7 @@ Files:
 Responsibilities:
 
 - Define execution-owned run inputs, results, reporter wiring, and a worker protocol that carries
-  foundation-domain progress and nested diagnostic values without config-document or presentation types.
+  contract-domain progress and nested diagnostic values without config-document or presentation types.
 - Compose state-document loading and saving around worker dispatch, carrying only version-independent
   checkpoints across the main/worker boundary.
 - Construct concrete Git, extraction, line-diff, output, and plugin-runtime components inside the
@@ -168,12 +168,12 @@ Responsibilities:
 
 Files:
 
-- `packages/gitlode/src/extraction-api/facts.ts`
-- `packages/gitlode/src/extraction-api/records.ts`
-- `packages/gitlode/src/extraction-api/range.ts`
-- `packages/gitlode/src/extraction-api/stages.ts`
-- `packages/gitlode/src/extraction-api/extraction.ts`
-- `packages/gitlode/src/extraction-api/index.ts`
+- `packages/internal-contracts/src/extraction-api/facts.ts`
+- `packages/internal-contracts/src/extraction-api/records.ts`
+- `packages/internal-contracts/src/extraction-api/range.ts`
+- `packages/internal-contracts/src/extraction-api/stages.ts`
+- `packages/internal-contracts/src/extraction-api/extraction.ts`
+- `packages/internal-contracts/src/extraction-api/index.ts`
 
 Responsibilities:
 
@@ -232,14 +232,14 @@ Responsibilities:
 
 Files:
 
-- `packages/gitlode/src/git/types.ts`
-- `packages/gitlode/src/git/errors.ts`
-- `packages/gitlode/src/git/index.ts`
-- `packages/gitlode/src/git-impl/isomorphic-git-adapter.ts`
-- `packages/gitlode/src/git-impl/git-cli-adapter.ts`
-- `packages/gitlode/src/git-impl/git-cli-commit-parser.ts`
-- `packages/gitlode/src/git-impl/git-cli-raw-diff.ts`
-- `packages/gitlode/src/git-impl/git-cli-cat-file-batch.ts`
+- `packages/internal-contracts/src/git/types.ts`
+- `packages/internal-contracts/src/git/errors.ts`
+- `packages/internal-contracts/src/git/index.ts`
+- `packages/git-adapters/src/git-impl/isomorphic-git-adapter.ts`
+- `packages/git-adapters/src/git-impl/git-cli-adapter.ts`
+- `packages/git-adapters/src/git-impl/git-cli-commit-parser.ts`
+- `packages/git-adapters/src/git-impl/git-cli-raw-diff.ts`
+- `packages/git-adapters/src/git-impl/git-cli-cat-file-batch.ts`
 
 Responsibilities:
 
@@ -247,7 +247,7 @@ Responsibilities:
 - Detect repository object format (defaulting to `sha1` when unset).
 - Read origin URL when available.
 - Traverse commits reachable from a head commit, optionally excluding history reachable from `excludeHash`.
-- Implement the commit DAG topology port used by the internal `src/dag` traversal subsystem.
+- Implement the commit DAG topology port used by the internal `packages/internal-foundation/src/dag` traversal subsystem.
 - Keep invocation-scoped commit object caching shared between topology reads and yielded-commit materialization.
 - Record adapter-level commit read/cache/yield telemetry and translate library/runtime failures into `GitAdapterError` codes.
 - Yield deterministic file-backed blob facts with path, OID, mode, and content; do not infer renames
@@ -256,13 +256,13 @@ Responsibilities:
   adapter facade.
 - Act as a run-scoped `AsyncDisposable` resource whose construction owner closes backend resources.
 
-The default adapter uses isomorphic-git internally and keeps those details from leaking upward. Commit traversal uses the generic `src/dag` certified-lazy strategy as the production default, with a Git adapter-injected LIFO/preserve frontier. Git child timestamp scheduling hints and the timestamp-priority frontier experiment are owned by `packages/gitlode/src/git-impl/commit-traversal/`; phase-certified traversal remains an internal prototype, but `IsomorphicGitAdapter` can select it for internal experiments via `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. The
+The default adapter uses isomorphic-git internally and keeps those details from leaking upward. Commit traversal uses the generic `packages/internal-foundation/src/dag` certified-lazy strategy as the production default, with a Git adapter-injected LIFO/preserve frontier. Git child timestamp scheduling hints and the timestamp-priority frontier experiment are owned by `packages/git-adapters/src/git-impl/commit-traversal/`; phase-certified traversal remains an internal prototype, but `IsomorphicGitAdapter` can select it for internal experiments via `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. The
 config-only `runtime.gitAdapter` setting selects the Git implementation. The default value is
 `isomorphic-git`; `git-cli` uses the Git executable for traversal and blob acquisition. Durable
 adapter-selection and implementation-boundary details live in `docs/design/git-adapters.md`.
 
-Line-diff computation is defined independently of repository access in `src/line-diff` and
-implemented in `src/line-diff-impl`. `FileChangeFactExpander` delegates calculation to the
+Line-diff computation is defined independently of repository access in `packages/internal-contracts/src/line-diff` and
+implemented in `packages/line-diff-adapters/src/line-diff-impl`. `FileChangeFactExpander` delegates calculation to the
 `LineDiffCalculator` contract. The default implementation (`JsLineDiffCalculator`) receives the
 run-scoped instrumentation instance and owns `line_diff.compute` around its complete concrete
 calculation, including UTF-8 decoding, `diffLines`, aggregation, and result construction. The
@@ -377,15 +377,17 @@ module they inspect.
 The current monorepo has two deliberately distinct build forms.
 
 The development build uses the root TypeScript solution and project references. It emits unbundled
-NodeNext ESM, declarations, declaration maps, and source maps for `gitlode` and each plugin
-workspace. TypeScript owns dependency ordering and stores incremental state outside published output
-under `.cache/tsc/`.
+NodeNext ESM, declarations, declaration maps, and source maps for the four private workspaces,
+`gitlode`, and each plugin workspace. TypeScript owns dependency ordering and stores incremental
+state outside published output under `.cache/tsc/`.
 
-The public `gitlode` release uses tsdown after a successful development graph build. It emits the
-CLI, plugin API, worker entry, and shared chunks directly under `packages/gitlode/dist`. Public
-third-party runtime dependencies remain external. The worker entry is a runtime asset resolved
-relative to the bundle and is not a package export. Public declarations exist only for the package
-root and `gitlode/plugin-api`.
+The public `gitlode` release uses tsdown after a successful development graph build. It bundles
+`@gitlode/internal-foundation`, `@gitlode/internal-contracts`, `@gitlode/git-adapters`, and
+`@gitlode/line-diff-adapters`, while public third-party runtime dependencies remain external. It
+emits the CLI, plugin API, worker entry, and shared chunks directly under `packages/gitlode/dist`.
+The worker entry is a runtime asset resolved relative to the bundle and is not a package export.
+Public declarations exist only for the package root and `gitlode/plugin-api`, with private types
+inlined.
 
 Both builds currently use `packages/gitlode/dist`. Before tsdown cleans that directory, the release
 hook invalidates only gitlode's TypeScript build metadata. This prevents a later `tsc -b` from
@@ -460,8 +462,8 @@ attach to the extraction process and add optional fields to output records.
 
 - **`src/execution/plugin-bootstrap.ts`** — run-scoped plugin bootstrap orchestration and projector
   selection.
-- **`src/diagnostics`** — dependency-free host-facing diagnostic value and synchronous reporter contract.
-- **`src/progress`** — presentation-independent phase and quantitative-progress events and reporter contract.
+- **`packages/internal-contracts/src/diagnostics`** — dependency-free host-facing diagnostic value and synchronous reporter contract.
+- **`packages/internal-contracts/src/progress`** — presentation-independent phase and quantitative-progress events and reporter contract.
 - **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
   stderr progress/success pipeline.
 - **`src/presentation/success-report.ts`** — successful-run summary and profile rendering.
@@ -480,7 +482,7 @@ attach to the extraction process and add optional fields to output records.
   initialization and projection results, projection context, failure policy, and namespace.
 - **`src/plugin-runtime/types.ts`** — host-only declarations, registry records, setup results, and
   initialization outcomes.
-- **`src/extraction-api/records.ts`** — projected record shapes and the serialized extension value,
+- **`packages/internal-contracts/src/extraction-api/records.ts`** — projected record shapes and the serialized extension value,
   including the host-owned `null` sentinel.
 
 ### Process and execution wiring

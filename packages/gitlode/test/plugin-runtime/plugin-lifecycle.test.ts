@@ -2,10 +2,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
+import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigExtensionsSection } from "../../src/config/index.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type {
   Namespace,
   PluginInitResult,
@@ -17,7 +18,6 @@ import {
   resolvePluginEntries,
   type PluginEntry,
 } from "../../src/plugin-runtime/index.js";
-import type { AbsoluteDirectoryPath } from "../../src/support/index.js";
 
 beforeEach(() => {
   vi.restoreAllMocks();

@@ -1,7 +1,19 @@
 import { performance } from "node:perf_hooks";
 
-import type { DiagnosticReporter } from "../diagnostics/index.js";
-import type { FactProjector } from "../extraction-api/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { FactProjector } from "@gitlode/internal-contracts/extraction";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+  type Instrumentation,
+} from "@gitlode/internal-foundation/instrumentation";
+import type { AbsolutePath } from "@gitlode/internal-foundation/support";
+import {
+  JsLineDiffCalculator,
+  type JsLineDiffCalculatorDependencies,
+} from "@gitlode/line-diff-adapters";
+
 import {
   CommitFactExtractor,
   ExtractionPipeline,
@@ -9,17 +21,7 @@ import {
   FileChangeFactExpander,
   RepositoryTraversalPlanner,
 } from "../extraction/index.js";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-  type Instrumentation,
-} from "../instrumentation/index.js";
-import {
-  JsLineDiffCalculator,
-  type JsLineDiffCalculatorDependencies,
-} from "../line-diff-impl/index.js";
 import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
-import type { ProgressReporter } from "../progress/index.js";
 import {
   createEmptyCheckpoint,
   loadStateFile,
@@ -28,7 +30,6 @@ import {
   type StateStore,
   validatePriorCheckpoint,
 } from "../state/index.js";
-import type { AbsolutePath } from "../support/index.js";
 import { buildGitAdapter, type GitAdapterFactoryDependencies } from "./git-adapter-factory.js";
 import { buildPluginProjector, hasEffectivePluginDeclarations } from "./plugin-bootstrap.js";
 import {

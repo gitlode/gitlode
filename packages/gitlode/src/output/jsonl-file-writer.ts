@@ -2,7 +2,7 @@ import { open } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ProjectedRecord } from "../extraction-api/index.js";
+import type { ProjectedRecord } from "@gitlode/internal-contracts/extraction";
 
 interface RotationOptions {
   readonly maxLines?: number;

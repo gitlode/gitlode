@@ -145,6 +145,20 @@ directions are added separately after the domain charters are accepted.
 Domains are not split in anticipation of a possible future need. A domain is reconsidered when a
 concrete change exposes a boundary described in Section 1.4.
 
+The domains are owned by these production workspaces:
+
+| Workspace                      | Domains                                                                                                               |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `@gitlode/internal-foundation` | `type-utils`, `support`, `instrumentation`, `dag`                                                                     |
+| `@gitlode/internal-contracts`  | `diagnostics`, `model`, `progress`, `extraction-api`, `git`, `line-diff`                                              |
+| `@gitlode/git-adapters`        | `git-impl`                                                                                                            |
+| `@gitlode/line-diff-adapters`  | `line-diff-impl`                                                                                                      |
+| `gitlode`                      | application, composition, extraction implementation, CLI, config, output, state, presentation, and plugin API/runtime |
+
+The four scoped workspaces are private implementation details fixed at version `0.0.0`. Foundation
+and contract packages expose only explicit domain subpaths; adapter packages expose their cohesive
+roots, with Git traversal selection isolated under `@gitlode/git-adapters/experimental`.
+
 ### 2.1 `type-utils`
 
 **Purpose:** Globally available TypeScript type utilities that complement the language's built-in
@@ -622,10 +636,12 @@ implementation dependency.
 
 ### 3.2 Source layout and imports
 
-- A top-level directory under `src/` represents a domain. Nested directories organize modules
-  within that domain unless explicitly documented otherwise.
+- A top-level directory under a production workspace's `src/` represents a domain. Nested
+  directories organize modules within that domain unless explicitly documented otherwise.
 - Cross-domain imports use the target domain's supported barrel. Direct module imports are allowed
   within a domain.
+- Cross-workspace imports use only package exports. Relative imports into another workspace's
+  `src`, `test`, or `dist` are forbidden.
 - A barrel represents the domain contract. If consumers require materially different dependency
   envelopes, reconsider the domain boundary instead of bypassing the barrel with deep imports.
 
@@ -640,8 +656,18 @@ dependencies. The check uses Rev-dep to:
 - protect contract-to-implementation direction through the same allowlist.
 
 The repository-root `.rev-dep.config.json` is an executable representation of this document, not an
-independent source of architecture decisions. Its current rule targets `packages/gitlode`; future
-package-level rules belong in the same root configuration.
+independent source of architecture decisions. It contains package and domain rules for every
+production workspace. Private package exports expose only built declarations and JavaScript through
+their normal `types` and `default` conditions. The repository-wide rule processes generated
+workspace `dist` files and pairs each built export barrel with its owning source-domain barrel in
+the closed allowlist, so official package specifiers remain subject to the source-domain
+architecture without changing TypeScript or package resolution. The repository-wide rule owns
+domain-boundary enforcement. Package-local rules retain circular, missing-module,
+unresolved-import, and production dev-dependency checks; their orphan and unused-export/module
+checks exclude generated `dist` files while continuing to analyze package source.
+Workspace-level boundaries let package-owned tests import their own source and test support while
+requiring cross-workspace test imports to use official exports. Plugin source and tests likewise
+reach gitlode only through the official `gitlode/plugin-api` export.
 
 Intentional rule changes must update this document and the configuration together. Reviewers must
 compare them in both directions: every accepted dependency must be representable, and the
@@ -650,6 +676,35 @@ charter constraints that the dependency graph does not express directly, especia
 `type-utils` has no external dependencies and emits no runtime code.
 
 ### 3.4 Package and process entrypoints
+
+The direct production package dependency envelope is:
+
+- `@gitlode/internal-foundation` has no production package dependencies.
+- `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation`.
+- `@gitlode/git-adapters` depends on `@gitlode/internal-contracts`,
+  `@gitlode/internal-foundation`, and `isomorphic-git`.
+- `@gitlode/line-diff-adapters` depends on `@gitlode/internal-contracts` and `diff`.
+- `gitlode` uses all four private packages as development and release-build inputs. Its release
+  bundles their JavaScript and declarations, while public runtime dependencies including `diff`
+  and `isomorphic-git` remain external.
+
+This package graph limits which workspaces can be reached; it does not grant permission to every
+domain in a dependency. Every import must also satisfy the domain allowlist in Section 2.22.
+
+The official private-package exports are:
+
+- `@gitlode/internal-foundation/type-utils`, `/support`, `/instrumentation`, and `/dag`; the package
+  root has no export.
+- `@gitlode/internal-contracts/diagnostics`, `/model`, `/progress`, `/extraction`, `/git`, and
+  `/line-diff`; the package root has no export. The source domain named `extraction-api` maps to the
+  package export `@gitlode/internal-contracts/extraction`.
+- `@gitlode/git-adapters` and `@gitlode/git-adapters/experimental`. The `experimental` subpath is
+  the unstable Git traversal-selection surface.
+- `@gitlode/line-diff-adapters`.
+
+These four packages are private repository implementation details fixed at version `0.0.0`, not
+public APIs. Public `gitlode` JavaScript and declarations bundle their implementations and types, so
+consumers do not need or observe private package specifiers.
 
 Root-level entrypoint modules are facades, not domains:
 

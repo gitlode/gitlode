@@ -1,9 +1,14 @@
-import type { Diagnostic, DiagnosticReporter } from "../diagnostics/index.js";
-import type { ExtractionCheckpoint } from "../extraction-api/index.js";
-import type { ProfileSummaryEntry } from "../instrumentation/index.js";
+import type { Diagnostic, DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extraction";
+import type { ProgressEvent, ProgressReporter } from "@gitlode/internal-contracts/progress";
+import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
+import type {
+  AbsoluteDirectoryPath,
+  AbsolutePath,
+  IsoDateTimeString,
+} from "@gitlode/internal-foundation/support";
+
 import type { PluginDeclarations } from "../plugin-runtime/index.js";
-import type { ProgressEvent, ProgressReporter } from "../progress/index.js";
-import type { AbsoluteDirectoryPath, AbsolutePath, IsoDateTimeString } from "../support/index.js";
 
 export type ExecutionGitAdapterName = "isomorphic-git" | "git-cli";
 export type MissingStatePolicy = "error" | "snapshot";

@@ -1,14 +1,14 @@
 import nodeFs from "node:fs";
 
+import { GitCliAdapter, IsomorphicGitAdapter } from "@gitlode/git-adapters";
 import {
   EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
-  GitCliAdapter,
-  IsomorphicGitAdapter,
   createCommitTraversalStrategy,
   resolveCommitTraversalStrategyName,
-} from "../git-impl/index.js";
-import type { GitAdapter } from "../git/index.js";
-import type { Instrumentation } from "../instrumentation/index.js";
+} from "@gitlode/git-adapters/experimental";
+import type { GitAdapter } from "@gitlode/internal-contracts/git";
+import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+
 import type { ExecutionGitAdapterName } from "./types.js";
 
 export interface GitAdapterFactoryDependencies {

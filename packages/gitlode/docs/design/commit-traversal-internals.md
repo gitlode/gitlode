@@ -5,6 +5,10 @@
 This document describes the internal traversal strategies used to implement
 `GitAdapter.walkCommits()`.
 
+The generic algorithms are owned by `@gitlode/internal-foundation/dag`. Git-specific strategy
+selection and scheduling are owned by `@gitlode/git-adapters` and exposed only through its private
+`experimental` subpath.
+
 It focuses on implementation structure, correctness constraints, performance trade-offs, and test
 coverage. It intentionally does not replace `git-traversal.md`, which is the canonical document for
 traversal behavior that affects gitlode's final output.
@@ -33,7 +37,7 @@ design documents, especially `git-traversal.md`.
 
 ## Strategy boundary
 
-`packages/gitlode/src/dag/` is the internal generic DAG traversal subsystem rather than a Git-object-specific walker.
+`packages/internal-foundation/src/dag/` is the internal generic DAG traversal subsystem rather than a Git-object-specific walker.
 
 The DAG core depends on topology only and does not depend on Git commit objects, adapter caches, adapter error translation, isomorphic-git, or `CommitPathSchedulingHint`:
 
@@ -75,7 +79,7 @@ The current production Git frontier is still the injected LIFO/preserve frontier
 does not inspect them for priority, so timestamps do not affect result membership and do not make
 yield order contractual.
 
-The Git-specific timestamp-priority frontier policy is owned by `packages/gitlode/src/git-impl/commit-traversal/` and is an explicit domain policy for prototype experiments. Its comparator only reads `domainHint?.sourceCommitterTimestamp` from queued frontier
+The Git-specific timestamp-priority frontier policy is owned by `packages/git-adapters/src/git-impl/commit-traversal/` and is an explicit domain policy for prototype experiments. Its comparator only reads `domainHint?.sourceCommitterTimestamp` from queued frontier
 items:
 
 - hintless items sort before hinted items, so include/exclude starts and standalone closure roots can
@@ -326,7 +330,7 @@ descriptor and must not pre-read the boundary node's own metadata.
 
 ## Phase-certified prototype frontier injection
 
-`packages/gitlode/src/dag/phase-certified.ts` is the facade for separate injectable frontier factories in the experimental
+`packages/internal-foundation/src/dag/phase-certified.ts` is the facade for separate injectable frontier factories in the experimental
 phase-certified prototype:
 
 - the difference coordinator frontier schedules include-side work items and exclude closure-phase
@@ -365,9 +369,9 @@ callers explicitly inject the Git-specific policy. The phase-certified strategie
 
 ## Phase-certified prototype telemetry
 
-`packages/gitlode/src/dag/phase-certified.ts` keeps the facade for a prototype strategy with the same difference contract,
+`packages/internal-foundation/src/dag/phase-certified.ts` keeps the facade for a prototype strategy with the same difference contract,
 `reachable(includeStart) - reachable(excludeStart)`. The facade coordinates include work, exclude
-closure phases, frontier lifecycle, result-finality termination, and operation-level telemetry. `packages/gitlode/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/gitlode/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/gitlode/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is wired only through the internal experiment seam; its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO and timestamp-priority runs can be compared with certified-lazy.
+closure phases, frontier lifecycle, result-finality termination, and operation-level telemetry. `packages/internal-foundation/src/dag/certified-closure.ts` owns split/branch/join and closed-boundary state, `packages/internal-foundation/src/dag/phase-certified-difference-state.ts` owns include graph plus certified-exclude integration, and `packages/internal-foundation/src/dag/phase-certified-types.ts` owns shared generic contracts. The prototype is wired only through the internal experiment seam; its instrumentation follows the same operation-level boundary as production DAG traversal so FIFO and timestamp-priority runs can be compared with certified-lazy.
 
 `walkDagNodeIdsPhaseCertifiedDifference()` records one `dag.traversal` span with
 `strategy=phaseCertified`. Internal closure phases do not create child `dag.certified_closure` spans;
@@ -525,7 +529,7 @@ operational use. Default production adoption remains a separate design and valid
 
 ## Internal Git strategy selection seam
 
-`packages/gitlode/src/git-impl/commit-traversal/strategy.ts` defines the Git-domain strategy descriptor used by `IsomorphicGitAdapter`. The only supported internal mode names are:
+`packages/git-adapters/src/git-impl/commit-traversal/strategy.ts` defines the Git-domain strategy descriptor used by `IsomorphicGitAdapter`. The only supported internal mode names are:
 
 - `certified-lazy` — production default, `walkDagNodeIdsCertifiedLazy()` with the existing LIFO/preserve frontier.
 - `phase-certified-fifo` — `walkDagNodeIdsPhaseCertifiedDifference()` with the generic FIFO/preserve defaults.

@@ -1,6 +1,11 @@
 import { existsSync } from "node:fs";
 
-import { dirnameOfFilePath, type AbsolutePath, resolveFilePath } from "../support/index.js";
+import {
+  dirnameOfFilePath,
+  type AbsolutePath,
+  resolveFilePath,
+} from "@gitlode/internal-foundation/support";
+
 import type { BootstrapResult } from "./errors.js";
 import type { MissingStateOption } from "./missing-state-option.js";
 

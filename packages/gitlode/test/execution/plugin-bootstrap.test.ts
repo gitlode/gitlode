@@ -1,11 +1,11 @@
+import type { Diagnostic } from "@gitlode/internal-contracts/diagnostics";
+import type { FactProjector } from "@gitlode/internal-contracts/extraction";
+import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
+import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
+import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Diagnostic } from "../../src/diagnostics/index.js";
-import type { FactProjector } from "../../src/extraction-api/index.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { Namespace } from "../../src/plugin-api/index.js";
-import type { ProgressEvent } from "../../src/progress/index.js";
-import type { AbsoluteDirectoryPath } from "../../src/support/index.js";
 
 const pluginRuntime = vi.hoisted(() => ({
   checkPluginCompatibility: vi.fn(),

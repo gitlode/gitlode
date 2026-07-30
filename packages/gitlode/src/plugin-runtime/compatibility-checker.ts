@@ -3,11 +3,11 @@ import { createRequire } from "node:module";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
 import { satisfies, validRange } from "semver";
 
 import { packageVersion } from "../package-metadata.js";
 import type { DiagnosticReporter } from "../plugin-api/index.js";
-import type { AbsoluteDirectoryPath } from "../support/index.js";
 import type { PluginDeclarations, PluginEntry } from "./types.js";
 
 const MAX_WALK_STEPS = 20;

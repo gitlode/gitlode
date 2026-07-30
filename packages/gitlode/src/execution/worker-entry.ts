@@ -1,8 +1,9 @@
 import { parentPort } from "node:worker_threads";
 
-import type { DiagnosticReporter } from "../diagnostics/index.js";
-import { GitAdapterError } from "../git/index.js";
-import type { ProgressReporter } from "../progress/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+
 import { executeWorkerRunRequest } from "./execute-run.js";
 import type { WorkerRunMessage, WorkerRunRequest, WorkerRunResult } from "./types.js";
 

@@ -2,8 +2,9 @@ import { createRequire } from "node:module";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
+
 import type { Namespace, PluginFactory, ProjectorPlugin } from "../plugin-api/index.js";
-import type { AbsoluteDirectoryPath } from "../support/index.js";
 import type {
   PluginDeclarations,
   PluginSetupTermination,

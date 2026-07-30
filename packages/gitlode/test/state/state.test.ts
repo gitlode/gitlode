@@ -1,8 +1,8 @@
+import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extraction";
+import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import { describe, expect, it } from "vitest";
 
-import type { ExtractionCheckpoint } from "../../src/extraction-api/index.js";
 import { validatePriorCheckpoint } from "../../src/state/index.js";
-import type { AbsolutePath } from "../../src/support/index.js";
 
 describe("validatePriorCheckpoint", () => {
   it("returns the prior state when the repository path and OID profile are valid", () => {

@@ -130,11 +130,11 @@ function mockEntrypointModules(
     },
   }));
 
-  vi.doMock("../../src/git/index.js", () => ({
+  vi.doMock("@gitlode/internal-contracts/git", () => ({
     GitAdapterError: MockGitAdapterError,
   }));
 
-  vi.doMock("../../src/git-impl/index.js", () => ({
+  vi.doMock("@gitlode/git-adapters", () => ({
     IsomorphicGitAdapter: class {
       supportedObjectFormats(): readonly string[] {
         return ["sha1"];
@@ -145,7 +145,7 @@ function mockEntrypointModules(
     },
   }));
 
-  vi.doMock("../../src/line-diff-impl/index.js", () => ({
+  vi.doMock("@gitlode/line-diff-adapters", () => ({
     JsLineDiffCalculator: class {},
   }));
 

@@ -1,14 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 
-import { z } from "zod";
-
 import {
   dirnameOfFilePath,
   type IsoDateTimeString,
   type AbsoluteDirectoryPath,
   type AbsolutePath,
-} from "../support/index.js";
+} from "@gitlode/internal-foundation/support";
+import { z } from "zod";
+
 import {
   byteSizeString,
   ROTATION_SIZE_MAX_BYTES,

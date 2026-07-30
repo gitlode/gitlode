@@ -1,4 +1,5 @@
-import type { ExtractionCheckpoint } from "../extraction-api/index.js";
+import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extraction";
+
 import type { StateDocumentV2, StateStore } from "./types.js";
 import { validateStateFileContents } from "./validation.js";
 

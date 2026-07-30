@@ -1,11 +1,11 @@
+import type { Diagnostic, DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { TraversalPlanningRequest } from "@gitlode/internal-contracts/extraction";
+import { type GitAdapter, GitAdapterError } from "@gitlode/internal-contracts/git";
+import type { CommitOid } from "@gitlode/internal-contracts/model";
+import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { describe, expect, it } from "vitest";
 
-import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
-import type { TraversalPlanningRequest } from "../../src/extraction-api/index.js";
 import { RepositoryTraversalPlanner } from "../../src/extraction/repository-traversal-planner.js";
-import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
-import type { CommitOid } from "../../src/model/index.js";
 
 function makeHash(n: number): CommitOid {
   return n.toString(16).padStart(40, "0") as CommitOid;

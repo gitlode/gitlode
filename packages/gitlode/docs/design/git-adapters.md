@@ -7,6 +7,10 @@ selection behavior. It complements `git-traversal.md`, which defines the user-vi
 semantics, and `commit-traversal-internals.md`, which documents the isomorphic-git adapter's internal
 DAG traversal strategies.
 
+The backend-independent contract is exported from `@gitlode/internal-contracts/git`. Concrete
+constructors and their dependency types are exported from the private `@gitlode/git-adapters`
+package; unstable traversal selection is isolated under `@gitlode/git-adapters/experimental`.
+
 ## Adapter selection
 
 Git adapter selection is config-only:

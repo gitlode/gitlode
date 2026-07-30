@@ -1,9 +1,14 @@
 import { basename } from "node:path";
 
-import type { ExtractionRange } from "../extraction-api/index.js";
-import { type GitAdapter, GitAdapterError, type RepositoryObjectFormat } from "../git/index.js";
-import type { OidProfile } from "../model/index.js";
-import { type AbsolutePath, firstOrThrow } from "../support/index.js";
+import type { ExtractionRange } from "@gitlode/internal-contracts/extraction";
+import {
+  type GitAdapter,
+  GitAdapterError,
+  type RepositoryObjectFormat,
+} from "@gitlode/internal-contracts/git";
+import type { OidProfile } from "@gitlode/internal-contracts/model";
+import { type AbsolutePath, firstOrThrow } from "@gitlode/internal-foundation/support";
+
 import type { WorkerRunInput, WorkerRunRange } from "./types.js";
 
 export async function validateRepositoryAccess(

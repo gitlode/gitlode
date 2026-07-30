@@ -6,9 +6,12 @@ import type {
   ProjectedCommit,
   ProjectedFileChange,
   ProjectedRecord,
-} from "../extraction-api/index.js";
-import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
-import { assertNever, formatUnixTimestampWithOffset } from "../support/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import {
+  instrumentAsyncIterable,
+  type Instrumentation,
+} from "@gitlode/internal-foundation/instrumentation";
+import { assertNever, formatUnixTimestampWithOffset } from "@gitlode/internal-foundation/support";
 
 export function projectCommit(
   fact: CommitFact,

@@ -3,6 +3,8 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
+import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,9 +14,7 @@ import {
   type ExecuteRunDependencies,
 } from "../../src/execution/execute-run.js";
 import type { ExecutionRunInput, WorkerRunRequest } from "../../src/execution/types.js";
-import type { ProgressEvent } from "../../src/progress/index.js";
 import type { StateStore } from "../../src/state/index.js";
-import type { AbsolutePath } from "../../src/support/index.js";
 
 const tempDirs: string[] = [];
 

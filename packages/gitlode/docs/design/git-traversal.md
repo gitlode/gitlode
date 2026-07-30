@@ -6,6 +6,10 @@ This document is the canonical design contract for how gitlode traverses Git his
 differential extraction in the current implementation. Agent-specific entrypoints may summarize or
 route to this document, but they must not replace it as the durable traversal source of truth.
 
+The Git traversal contract belongs to `@gitlode/internal-contracts/git`, generic DAG algorithms
+belong to `@gitlode/internal-foundation/dag`, and Git-specific traversal policy and adapter
+implementation belong to `@gitlode/git-adapters`.
+
 ## Why traversal is graph-based
 
 Git history is a DAG, not a single list.
@@ -302,4 +306,4 @@ This approach prioritizes successful extraction with explicit warnings in recove
 - `src/extraction/repository-traversal-planner.ts`
 - `src/extraction/commit-fact-extractor.ts`
 - `src/extraction/extraction-pipeline.ts`
-- `src/git-impl/isomorphic-git-adapter.ts`
+- `packages/git-adapters/src/git-impl/isomorphic-git-adapter.ts`

@@ -1,6 +1,6 @@
+import type { ProjectedExtensionValue } from "@gitlode/internal-contracts/extraction";
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { ProjectedExtensionValue } from "../../src/extraction-api/index.js";
 import type { PluginProjectionResult, PluginProjectionValue } from "../../src/plugin-api/index.js";
 
 // ---------------------------------------------------------------------------

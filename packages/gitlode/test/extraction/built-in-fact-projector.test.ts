@@ -1,12 +1,12 @@
+import type { CommitFact, Fact, FileChangeFact } from "@gitlode/internal-contracts/extraction";
+import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { describe, expect, it } from "vitest";
 
-import type { CommitFact, Fact, FileChangeFact } from "../../src/extraction-api/index.js";
 import {
   BuiltInFactProjector,
   projectCommit,
   projectFileChange,
 } from "../../src/extraction/built-in-fact-projector.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) yield item;

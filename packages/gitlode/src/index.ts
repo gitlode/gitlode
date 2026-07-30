@@ -2,6 +2,8 @@
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
+
 import type { BootstrapInput } from "./cli/index.js";
 import { loadBootstrapInput } from "./cli/index.js";
 import {
@@ -10,7 +12,6 @@ import {
   type ExecutionSuccessPayload,
   type MissingStatePolicy,
 } from "./execution/index.js";
-import { GitAdapterError } from "./git/index.js";
 import {
   createBootstrapRenderer,
   createProgressRuntime,

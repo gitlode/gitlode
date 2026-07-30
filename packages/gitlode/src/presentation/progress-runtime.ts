@@ -1,5 +1,6 @@
-import type { DiagnosticReporter } from "../diagnostics/index.js";
-import type { ProgressReporter } from "../progress/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+
 import { createRunPresenter } from "./presenter.js";
 import type { RunPresenter } from "./presenter.js";
 import { resolveUiMode } from "./progress/index.js";

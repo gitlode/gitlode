@@ -1,5 +1,6 @@
+import type { IsoDateTimeString } from "@gitlode/internal-foundation/support";
+
 import type { Namespace, PluginFailurePolicy } from "../plugin-api/index.js";
-import type { IsoDateTimeString } from "../support/index.js";
 
 interface ConfigExtractionRange {
   readonly sinceRef?: string;

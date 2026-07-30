@@ -3,9 +3,9 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { ProjectedRecord } from "@gitlode/internal-contracts/extraction";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { ProjectedRecord } from "../../src/extraction-api/index.js";
 import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
 import { JsonlOutputSink } from "../../src/output/jsonl-output-sink.js";
 

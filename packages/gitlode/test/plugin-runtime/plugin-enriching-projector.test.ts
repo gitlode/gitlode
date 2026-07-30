@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
 import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type {
   CommitFact,
@@ -99,6 +98,54 @@ function makeEntry(
   return { namespace: namespace as Namespace, plugin, failurePolicy };
 }
 
+// Inline factory implementing identity-mapping behavior for plugin framework integration tests.
+// The actual @gitlode/plugin-identity-profile logic is tested in its own test suite.
+async function makeIdentityMapPlugin(rawConfig: unknown): Promise<ProjectorPlugin> {
+  type Mapping = {
+    matchEmail?: string;
+    matchName?: string;
+    name: string;
+    email: string;
+    [key: string]: unknown;
+  };
+  const cfg = rawConfig as {
+    attributeFields?: readonly string[];
+    profileMappings: readonly Mapping[];
+  };
+  const attrFields = cfg.attributeFields ?? [];
+  const emailIndex = new Map<string, Mapping>();
+  const nameIndex = new Map<string, Mapping>();
+  return {
+    async init() {
+      for (const row of cfg.profileMappings) {
+        if (row.matchEmail) emailIndex.set(row.matchEmail, row);
+        if (row.matchName) nameIndex.set(row.matchName, row);
+      }
+      return { type: "ready" };
+    },
+    async project(ctx) {
+      const resolveIdentity = (person: { readonly name: string; readonly email: string }) => {
+        const row = emailIndex.get(person.email) ?? nameIndex.get(person.name);
+        if (!row) return { name: person.name, email: person.email };
+        const attributes: Record<string, unknown> = {};
+        for (const f of attrFields) {
+          if (row[f] !== undefined) attributes[f] = row[f];
+        }
+        const result: Record<string, unknown> = { name: row.name, email: row.email };
+        if (Object.keys(attributes).length > 0) result["attributes"] = attributes;
+        return result;
+      };
+      return {
+        type: "success",
+        data: {
+          author: resolveIdentity(ctx.baseRecord.author),
+          committer: resolveIdentity(ctx.baseRecord.committer),
+        },
+      };
+    },
+  } satisfies ProjectorPlugin;
+}
+
 // ---------------------------------------------------------------------------
 // Basic enrichment
 // ---------------------------------------------------------------------------
@@ -167,10 +214,10 @@ describe("EnrichingFactProjector — basic enrichment", () => {
     expect(records[1]!.extensions?.["p"]).toEqual({ id: "bbbb" });
   });
 
-  it("integrates with @gitlode/plugin-identity-profile through init and projection", async () => {
+  it("integrates a stateful plugin (with identity-mapping logic) through init and projection", async () => {
     const warnings: string[] = [];
     const errors: string[] = [];
-    const plugin = await identityProfileFactory({
+    const plugin = await makeIdentityMapPlugin({
       attributeFields: ["team", "costCenter"],
       profileMappings: [
         {

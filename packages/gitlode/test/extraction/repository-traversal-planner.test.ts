@@ -11,12 +11,12 @@ function makeHash(n: number): CommitOid {
   return n.toString(16).padStart(40, "0") as CommitOid;
 }
 
-function makeReporter(): DiagnosticReporter & { warnings: string[] } {
-  const warnings: string[] = [];
+function makeReporter(): DiagnosticReporter & { diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
   return {
-    warnings,
+    diagnostics,
     report(diagnostic: Diagnostic) {
-      warnings.push(diagnostic.message);
+      diagnostics.push(diagnostic);
     },
   };
 }
@@ -99,8 +99,12 @@ describe("RepositoryTraversalPlanner planning", () => {
 
     const plans = await planner.plan(baseRequest({ refs: ["main", "gone"] }), reporter);
 
-    expect(reporter.warnings).toHaveLength(1);
-    expect(reporter.warnings[0]).toContain("gone");
+    expect(reporter.diagnostics).toEqual([
+      {
+        severity: "warn",
+        message: 'Warning: Ref "gone" no longer exists in the repository. Skipping.',
+      },
+    ]);
     expect(plans).toEqual([{ name: "main", refType: "branch", head, excludeHash: undefined }]);
   });
 

@@ -108,7 +108,8 @@ describe("executeRun state orchestration", () => {
   });
 
   it("emits the existing fallback warning and dispatches with an empty checkpoint", async () => {
-    const reportDiagnostic = vi.fn();
+    const sideEffects: string[] = [];
+    const reportDiagnostic = vi.fn(() => sideEffects.push("diagnostic"));
     const stateStore: StateStore = {
       async read() {
         return null;
@@ -123,6 +124,7 @@ describe("executeRun state orchestration", () => {
         return undefined;
       },
       async dispatchWorkerRunRequest(request) {
+        sideEffects.push("worker-dispatch");
         expect(request.priorCheckpoint.refs).toEqual([]);
         return { kind: "user-error", message: "stop after state setup" };
       },
@@ -134,6 +136,7 @@ describe("executeRun state orchestration", () => {
       dependencies,
     );
 
+    expect(sideEffects).toEqual(["diagnostic", "worker-dispatch"]);
     expect(reportDiagnostic).toHaveBeenCalledWith({
       severity: "warn",
       message: "State file not found: /state.json. Falling back to full snapshot extraction.",

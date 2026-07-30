@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
-import type { DiagnosticReporter } from "../../src/diagnostics/index.js";
+import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type {
   CommitFact,
   Fact,
@@ -289,24 +289,24 @@ describe("EnrichingFactProjector — declaration order", () => {
 
 describe("EnrichingFactProjector — skip result", () => {
   it("sets namespace to null", async () => {
-    const warnedMessages: string[] = [];
+    const diagnostics: Diagnostic[] = [];
     const reporter: DiagnosticReporter = {
       report: (diagnostic) => {
-        warnedMessages.push(diagnostic.message);
+        diagnostics.push(diagnostic);
       },
     };
     const plugin = makePlugin(async () => ({ type: "skip" }));
     const projector = new EnrichingFactProjector([makeEntry("p", plugin)], reporter, "repo", null);
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
-    expect(warnedMessages).toHaveLength(0);
+    expect(diagnostics).toEqual([]);
   });
 
   it("sets namespace to null and emits warning when plugin throws Error", async () => {
-    const warnedMessages: string[] = [];
+    const diagnostics: Diagnostic[] = [];
     const reporter: DiagnosticReporter = {
       report: (diagnostic) => {
-        warnedMessages.push(diagnostic.message);
+        diagnostics.push(diagnostic);
       },
     };
     const plugin = makePlugin(async () => {
@@ -315,9 +315,16 @@ describe("EnrichingFactProjector — skip result", () => {
     const projector = new EnrichingFactProjector([makeEntry("p", plugin)], reporter, "repo", null);
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
-    expect(warnedMessages).toHaveLength(2);
-    expect(warnedMessages[0]).toContain("something went wrong");
-    expect(warnedMessages[1]).toContain("skipped fact");
+    expect(diagnostics).toEqual([
+      {
+        severity: "warn",
+        message: `Plugin "p" threw an error on fact ${"a".repeat(40)}: something went wrong`,
+      },
+      {
+        severity: "warn",
+        message: `Plugin "p" skipped fact ${"a".repeat(40)}`,
+      },
+    ]);
   });
 
   it("continues to next plugin after skip", async () => {
@@ -341,10 +348,10 @@ describe("EnrichingFactProjector — skip result", () => {
 
 describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
   it("sets namespace to null and emits warning when policy is skip-fact", async () => {
-    const warnedMessages: string[] = [];
+    const diagnostics: Diagnostic[] = [];
     const reporter: DiagnosticReporter = {
       report: (diagnostic) => {
-        warnedMessages.push(diagnostic.message);
+        diagnostics.push(diagnostic);
       },
     };
     const plugin = makePlugin(async () => ({ type: "fatal" }));
@@ -356,8 +363,12 @@ describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
     );
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
-    expect(warnedMessages).toHaveLength(1);
-    expect(warnedMessages[0]).toContain("skipped fact");
+    expect(diagnostics).toEqual([
+      {
+        severity: "warn",
+        message: `Plugin "p" skipped fact ${"a".repeat(40)}`,
+      },
+    ]);
   });
 
   it("does not throw when plugin returns fatal with skip-fact policy", async () => {

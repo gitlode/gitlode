@@ -530,7 +530,6 @@ flowchart TB
   extraction --> progress
   extractionApi --> diagnostics
   extractionApi --> model
-  extractionApi --> progress
 
   pluginApi --> extractionApi
   pluginRuntime --> diagnostics

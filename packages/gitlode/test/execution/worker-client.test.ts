@@ -86,8 +86,9 @@ describe("dispatchWorkerRunRequest", () => {
   });
 
   it("forwards progress/diagnostic messages and resolves with result", async () => {
-    const onProgress = vi.fn();
-    const onDiagnostic = vi.fn();
+    const received: string[] = [];
+    const onProgress = vi.fn(() => received.push("progress"));
+    const onDiagnostic = vi.fn(() => received.push("diagnostic"));
 
     const promise = dispatchWorkerRunRequest(makeRequest(), {
       progressReporter: { emit: onProgress },
@@ -111,7 +112,13 @@ describe("dispatchWorkerRunRequest", () => {
       result: expected,
     });
 
-    await expect(promise).resolves.toEqual(expected);
+    await expect(
+      promise.then((result) => {
+        received.push("result");
+        return result;
+      }),
+    ).resolves.toEqual(expected);
+    expect(received).toEqual(["progress", "diagnostic", "result"]);
     expect(onProgress).toHaveBeenCalledTimes(1);
     expect(onDiagnostic).toHaveBeenCalledWith({ severity: "warn", message: "warning" });
     expect(worker.terminate).toHaveBeenCalledTimes(1);

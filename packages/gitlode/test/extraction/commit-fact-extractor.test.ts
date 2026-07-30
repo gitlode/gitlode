@@ -25,12 +25,12 @@ function makeRawCommit(n: number, parents: number[] = []): RawCommit {
   };
 }
 
-function makeReporter(): DiagnosticReporter & { warnings: string[] } {
-  const warnings: string[] = [];
+function makeReporter(): DiagnosticReporter & { diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
   return {
-    warnings,
+    diagnostics,
     report(diagnostic: Diagnostic) {
-      warnings.push(diagnostic.message);
+      diagnostics.push(diagnostic);
     },
   };
 }
@@ -366,8 +366,13 @@ describe("CommitFactExtractor traversal", () => {
       traverser.extract(baseRequest({ plans: [makePlan("main", head, staleExclude)] }), reporter),
     );
 
-    expect(reporter.warnings).toHaveLength(1);
-    expect(reporter.warnings[0]).toContain("main");
+    expect(reporter.diagnostics).toEqual([
+      {
+        severity: "warn",
+        message:
+          'Warning: Last commit hash for branch "main" no longer exists. Falling back to full extraction.',
+      },
+    ]);
     expect(facts).toHaveLength(2);
   });
 

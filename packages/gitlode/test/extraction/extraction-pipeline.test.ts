@@ -73,14 +73,10 @@ function makeProgressReporter(): ProgressReporter & {
 
 function makeDiagnosticReporter(): DiagnosticReporter & {
   diagnostics: Diagnostic[];
-  warnings: string[];
 } {
   const diagnostics: Diagnostic[] = [];
   return {
     diagnostics,
-    get warnings() {
-      return diagnostics.map((diagnostic) => diagnostic.message);
-    },
     report(diagnostic) {
       diagnostics.push(diagnostic);
     },
@@ -605,10 +601,12 @@ describe("ExtractionPipeline orchestration", () => {
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["main", "v1.0-ann", "abc123", "v1.0"] }));
 
-    expect(reporter.warnings).toHaveLength(3);
-    expect(reporter.warnings[0]).toContain("v1.0-ann");
-    expect(reporter.warnings[1]).toContain("abc123");
-    expect(reporter.warnings[2]).toContain("v1.0");
+    expect(reporter.diagnostics).toEqual(
+      plans.slice(1).map((plan) => ({
+        severity: "warn",
+        message: `Warning: Ref "${plan.name}" (${plan.refType}) is included in checkpoint state, but future incremental runs usually produce no new records unless the ref target changes.`,
+      })),
+    );
   });
 
   it("emits static-ref warning for checkpoint candidates", async () => {
@@ -625,8 +623,13 @@ describe("ExtractionPipeline orchestration", () => {
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["v1.0-ann"] }));
 
-    expect(reporter.warnings).toHaveLength(1);
-    expect(reporter.warnings[0]).toContain("v1.0-ann");
+    expect(reporter.diagnostics).toEqual([
+      {
+        severity: "warn",
+        message:
+          'Warning: Ref "v1.0-ann" (tag-annotated) is included in checkpoint state, but future incremental runs usually produce no new records unless the ref target changes.',
+      },
+    ]);
   });
 
   it("checkpoint generatedAt uses request.sessionTimestamp", async () => {

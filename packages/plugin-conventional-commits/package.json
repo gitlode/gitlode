@@ -11,7 +11,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gitlode/gitlode.git"
+    "url": "git+https://github.com/gitlode/gitlode.git"
   },
   "files": [
     "dist"
@@ -21,21 +21,29 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
+    "build": "npm run build:dev",
+    "build:clean": "tsc -b --clean",
+    "build:dev": "tsc -b",
+    "build:watch": "tsc -b -w",
     "format:check": "oxfmt --check",
     "format:write": "oxfmt",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test": "npm run build:dev && vitest run",
+    "test:watch": "npm run build:dev && vitest",
+    "test:coverage": "npm run build:dev && vitest run --coverage"
   },
   "dependencies": {
     "conventional-commits-parser": "^6.4.0"
   },
   "devDependencies": {
-    "gitlode": "^0.11.0"
+    "@types/node": "^22.13.14",
+    "@vitest/coverage-v8": "^4.1.10",
+    "gitlode": "^0.11.0",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "gitlode": "^0.11.0"

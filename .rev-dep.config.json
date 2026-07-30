@@ -3,15 +3,20 @@
   "$schema": "https://github.com/jayu/rev-dep/blob/master/config-schema/1.12.schema.json?raw=true",
   "nodeModulesResolution": {
     "resolutionType": "entry-package",
-    "includeDevDepsFromRoot": true
+    "includeDevDepsFromRoot": false
   },
   "rules": [
     {
       "path": "packages/gitlode",
       "followMonorepoPackages": true,
       "prodEntryPoints": ["src/index.ts", "src/plugin-api.ts", "src/execution/worker-entry.ts"],
-      "devEntryPoints": ["test/**", "scripts/**", "vitest.config.ts"],
+      "devEntryPoints": ["test/**", "scripts/**", "tsdown.config.ts", "vitest.config.ts"],
       "moduleBoundaries": [
+        {
+          "name": "package-metadata",
+          "pattern": "src/package-metadata.ts",
+          "allow": ["src/package-metadata.ts"]
+        },
         {
           "name": "type-utils",
           "pattern": "src/type-utils/**",
@@ -141,6 +146,7 @@
             "src/diagnostics/index.ts",
             "src/extraction-api/index.ts",
             "src/instrumentation/index.ts",
+            "src/package-metadata.ts",
             "src/plugin-api/index.ts",
             "src/support/index.ts",
             "src/type-utils/index.ts"
@@ -167,6 +173,7 @@
           "allow": [
             "src/cli/**",
             "src/config/index.ts",
+            "src/package-metadata.ts",
             "src/support/index.ts",
             "src/type-utils/index.ts"
           ]
@@ -234,7 +241,7 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["@types/*"],
+        "excludeModules": ["@types/*", "@vitest/coverage-v8"],
         "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
       },
       "missingNodeModulesDetection": true,
@@ -255,7 +262,7 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
       "missingNodeModulesDetection": true,
@@ -276,7 +283,7 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
       "missingNodeModulesDetection": true,
@@ -297,7 +304,7 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
       "missingNodeModulesDetection": true,
@@ -318,7 +325,7 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
       "missingNodeModulesDetection": true,
@@ -339,7 +346,7 @@
       "orphanFilesDetection": true,
       "unusedExportsDetection": true,
       "unusedNodeModulesDetection": {
-        "excludeModules": ["gitlode"],
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
       "missingNodeModulesDetection": true,

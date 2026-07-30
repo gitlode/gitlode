@@ -8,8 +8,8 @@ This document records the agreed direction and open implementation decisions for
 No package split has been implemented yet. The package topology and high-level build strategy in
 this document are accepted as the planning baseline. The private package manifest policy and export
 boundaries and dependency classification are also accepted. Detailed TypeScript project
-configuration is accepted as well. Detailed release bundling, testing, and migration steps remain
-to be decided.
+configuration and the public release bundle are accepted as well. Test ownership and migration
+steps remain to be decided.
 
 This is a continuation document rather than a durable source of truth. As implementation decisions
 become stable, migrate package and dependency contracts to `docs/design/`, update other affected
@@ -649,27 +649,116 @@ Release builds must clean that directory before writing bundled output and inval
 development `.tsbuildinfo`. Otherwise a later `tsc -b` could treat release-bundled files as current
 development output. Define the exact clean sequence as part of the public release bundle.
 
+## Accepted Public Release Bundle
+
+Use tsdown, backed by Rolldown, only for the public `gitlode` release artifact. Development builds
+remain unbundled TypeScript project-reference builds.
+
+### Build inputs and entrypoints
+
+Run the TypeScript solution build before tsdown. The release bundle must resolve private packages
+through their built `dist` output and official package exports, never through source aliases.
+
+Use explicit entrypoint names:
+
+- `index` from `src/index.ts`;
+- `plugin-api` from `src/plugin-api.ts`;
+- `worker-entry` from `src/execution/worker-entry.ts`.
+
+Emit the stable runtime paths `dist/index.js`, `dist/plugin-api.js`, and `dist/worker-entry.js`.
+`worker-entry` is a runtime asset and must not be exposed through the public package exports.
+
+### JavaScript output
+
+Produce ESM for Node.js, targeting the package's `engines.node` floor. Enable tree-shaking and
+source maps, keep minification disabled, and do not produce CJS, IIFE, UMD, SEA, or compatibility
+shims.
+
+Keep automatic code splitting enabled. All entry files and shared chunks must remain directly under
+`dist`, using entry names such as `[name].js` and chunk names such as `[name]-[hash].js`. This is
+required because `new URL("./worker-entry.js", import.meta.url)` can execute from a shared chunk;
+placing shared chunks in a nested directory would change that relative URL. The packed-artifact
+integration test must launch the worker and therefore verify this invariant.
+
+### Dependency bundling policy
+
+Use explicit allowlists rather than relying only on package-manifest inference:
+
+- always bundle and permit bundling only for `@gitlode/internal-foundation`,
+  `@gitlode/internal-contracts`, `@gitlode/git-adapters`, and
+  `@gitlode/line-diff-adapters`;
+- keep `chalk`, `commander`, `diff`, `isomorphic-git`, `semver`, and `zod` as external runtime
+  imports;
+- permit Node.js built-ins as external imports;
+- bundle private-package types into public declarations while keeping public dependency types
+  external.
+
+Dynamic user-plugin imports such as `import(resolvedSpecifier)` must remain runtime imports and must
+be covered by the packed-artifact tests.
+
+The private workspace packages remain in `gitlode`'s `devDependencies` in the published manifest.
+No publish-time manifest rewrite is added solely to remove them.
+
+### Bundle-safe package metadata
+
+The current relative runtime lookup of `../../package.json` is not safe after bundling. During the
+implementation, introduce a shared bundle-safe package-metadata module, based on a JSON import of
+the package manifest, and have both the CLI and compatibility checker consume its exported version.
+
+### Declaration output
+
+Generate bundled declarations only for the public `index` and `plugin-api` entrypoints. Do not
+publish declarations for `worker-entry`, and fail validation if a private package specifier remains
+in public declaration output.
+
+Use the TypeScript declaration resolver without a separate declaration build inside tsdown. A
+release-specific TypeScript configuration may disable `composite`, `incremental`, and declaration
+maps. Public declaration maps remain disabled because the published artifact does not contain the
+corresponding source files; development declaration maps remain available in private workspace
+output.
+
+Keep the package's exports and bin mappings explicit in `package.json`; do not generate them from
+the tsdown configuration. Preserve the existing root export, plugin API export, CLI bin, and CLI
+shebang.
+
+### Cleaning and cache invalidation
+
+The release order is:
+
+1. build the TypeScript project graph;
+2. invalidate only `gitlode`'s `.cache/tsc/gitlode.tsbuildinfo`;
+3. let tsdown clean and rebuild `packages/gitlode/dist`;
+4. validate the output and packed artifact.
+
+Keep private-package `dist` output and their build caches because they are release-bundle inputs.
+Implement the targeted invalidation with a small cross-platform script or build hook, not a broad
+cache deletion.
+
+### Release validation
+
+Add `publint` and `@arethetypeswrong/core` as `gitlode` development dependencies. Treat tsdown
+configuration warnings as errors and run Are the Types Wrong in ESM-only mode.
+
+Validate both emitted files and an actual `npm pack` tarball. Checks must cover:
+
+- the three stable JavaScript entry files, their source maps, the expected declarations, and the
+  absence of stale development output;
+- the absence of private package imports from emitted JavaScript and declarations;
+- allowed external runtime imports and successful resolution from a declaration consumer;
+- installation of the tarball outside the monorepo;
+- CLI help and version, the CLI shebang, both Git adapters, line-diff behavior, schemas, worker
+  execution, dynamic plugin loading and compatibility checks, plugin API TypeScript consumption,
+  and usable source maps;
+- the absence of any runtime requirement for unpublished private packages.
+
+Before migrating the full source tree, perform a focused build spike that proves private-package
+bundling, public dependency externalization, declaration inlining, worker resolution from a common
+chunk, dynamic plugin loading, bundle-safe version access, shebang and exports preservation, clean
+output, and tarball installation.
+
 ## Open Decisions
 
-### 1. Public release bundle
-
-Decide how the public `gitlode` artifact incorporates private workspace packages.
-
-The design must cover:
-
-- the CLI entrypoint;
-- the public plugin API entrypoint and declaration bundle;
-- the worker entrypoint and its stable relative path;
-- dynamic plugin imports;
-- source maps and stack traces;
-- externalization or bundling of `diff` and `isomorphic-git`;
-- removal of unpublished private dependencies from the published manifest;
-- clean output and tarball validation.
-
-Use tsdown backed by Rolldown for this release bundle. A focused build spike must validate the
-required entrypoints and runtime behaviors before the full source migration.
-
-### 2. Test ownership and integration coverage
+### 1. Test ownership and integration coverage
 
 Decide which tests move with each domain and which remain application-level integration tests.
 
@@ -685,7 +774,7 @@ Known affected areas include:
 The final validation strategy should include installing the packed `gitlode` tarball into a clean
 temporary project and exercising the CLI, worker, both Git adapters, and plugin loading.
 
-### 3. Migration sequence
+### 2. Migration sequence
 
 Decide whether to:
 
@@ -697,7 +786,7 @@ Decide whether to:
 Each intermediate state should build, test, and satisfy architecture checks. Avoid a migration plan
 that requires weakening dependency rules or leaving two authoritative copies of a contract.
 
-### 4. Durable documentation updates
+### 3. Durable documentation updates
 
 Implementation will require coordinated updates to at least:
 
@@ -713,9 +802,9 @@ author workflows change observably.
 
 ## Recommended Next Discussion
 
-Define the public tsdown release bundle, including entrypoints, externalization, output cleaning,
-worker and plugin behavior, declaration bundling, published manifest validation, and clean tarball
-installation.
+Define test ownership and integration coverage, including which tests move with each extracted
+domain, which remain application-level tests, and how packed-artifact behavior is covered without
+duplicating lower-level tests.
 
 ## Completion Criteria
 

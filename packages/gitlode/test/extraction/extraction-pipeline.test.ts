@@ -1,6 +1,4 @@
-import { describe, expect, it } from "vitest";
-
-import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
+import type { Diagnostic, DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type {
   CommitFact,
   CommitTraversalExtractor,
@@ -15,15 +13,17 @@ import type {
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-} from "../../src/extraction-api/index.js";
-import { ExtractionPipeline } from "../../src/extraction/extraction-pipeline.js";
-import type { CoordinatorDependencies } from "../../src/extraction/types.js";
+} from "@gitlode/internal-contracts/extraction";
+import type { CommitOid } from "@gitlode/internal-contracts/model";
+import type { ProgressEvent, ProgressReporter } from "@gitlode/internal-contracts/progress";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
-} from "../../src/instrumentation/index.js";
-import type { CommitOid } from "../../src/model/index.js";
-import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
+} from "@gitlode/internal-foundation/instrumentation";
+import { describe, expect, it } from "vitest";
+
+import { ExtractionPipeline } from "../../src/extraction/extraction-pipeline.js";
+import type { CoordinatorDependencies } from "../../src/extraction/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

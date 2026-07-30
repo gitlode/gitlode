@@ -1,6 +1,5 @@
+import { captureGroupOrThrow } from "@gitlode/internal-foundation/support";
 import { z } from "zod";
-
-import { captureGroupOrThrow } from "../support/index.js";
 
 export const ROTATION_SIZE_MIN_BYTES = 1_048_576n; // 1 MiB
 export const ROTATION_SIZE_MAX_BYTES = 68_719_476_736n; // 64 GiB

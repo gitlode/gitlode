@@ -1,16 +1,16 @@
-import type { DiagnosticReporter } from "../diagnostics/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type {
   ExtractionRange,
   RefCheckpoint,
   TraversalPlan,
   TraversalPlanner,
   TraversalPlanningRequest,
-} from "../extraction-api/index.js";
-import type { GitAdapter } from "../git/index.js";
-import { GitAdapterError } from "../git/index.js";
-import type { Instrumentation } from "../instrumentation/index.js";
-import type { CommitOid, RefType } from "../model/index.js";
-import { assertNever, getOrThrow } from "../support/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import type { GitAdapter } from "@gitlode/internal-contracts/git";
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
+import type { CommitOid, RefType } from "@gitlode/internal-contracts/model";
+import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { assertNever, getOrThrow } from "@gitlode/internal-foundation/support";
 
 function buildCheckpointKey(ref: string, refType: RefType): string {
   return `${refType}:${ref}`;

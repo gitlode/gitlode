@@ -3,9 +3,9 @@ import type {
   FactType,
   ProjectedExtensionValue,
   ProjectedRecordFor,
-} from "../extraction-api/index.js";
-import type { Instrumentation } from "../instrumentation/index.js";
-import type { Brand } from "../type-utils/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import type { Brand } from "@gitlode/internal-foundation/type-utils";
 
 export interface DiagnosticReporter {
   warn(message: string): void;

@@ -1,7 +1,14 @@
-import type { CommitFact, FileChangeExpander, FileChangeFact } from "../extraction-api/index.js";
-import type { FileBlobChange, GitAdapter } from "../git/index.js";
-import type { Instrumentation, InstrumentationSpan } from "../instrumentation/index.js";
-import type { LineDiffCalculator } from "../line-diff/index.js";
+import type {
+  CommitFact,
+  FileChangeExpander,
+  FileChangeFact,
+} from "@gitlode/internal-contracts/extraction";
+import type { FileBlobChange, GitAdapter } from "@gitlode/internal-contracts/git";
+import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
+import type {
+  Instrumentation,
+  InstrumentationSpan,
+} from "@gitlode/internal-foundation/instrumentation";
 
 const EMPTY_CONTENT = new Uint8Array(0);
 const BINARY_SCAN_LIMIT = 8_000;

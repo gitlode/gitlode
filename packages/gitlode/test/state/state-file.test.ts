@@ -2,9 +2,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extraction";
+import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ExtractionCheckpoint } from "../../src/extraction-api/index.js";
 import {
   loadStateFile,
   NodeStateStore,
@@ -12,7 +13,6 @@ import {
   type StateDocumentV2,
   type StateStore,
 } from "../../src/state/index.js";
-import type { AbsolutePath } from "../../src/support/index.js";
 
 function makeStateStore(value: unknown | null): StateStore {
   return {

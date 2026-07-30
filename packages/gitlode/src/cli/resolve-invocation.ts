@@ -1,16 +1,17 @@
 import {
-  loadConfigFile,
-  type ConfigExtensionsSection,
-  type GitAdapterName,
-  type ProjectConfigurationV1,
-} from "../config/index.js";
-import {
   dirnameOfFilePath,
   type AbsoluteDirectoryPath,
   type AbsolutePath,
   type IsoDateTimeString,
   resolveFilePath,
-} from "../support/index.js";
+} from "@gitlode/internal-foundation/support";
+
+import {
+  loadConfigFile,
+  type ConfigExtensionsSection,
+  type GitAdapterName,
+  type ProjectConfigurationV1,
+} from "../config/index.js";
 import { program } from "./command-definition.js";
 import type { BootstrapResult } from "./errors.js";
 import { runFilesystemPreflight } from "./filesystem-preflight.js";

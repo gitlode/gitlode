@@ -1,4 +1,5 @@
-import type { ProgressPhase } from "../../progress/index.js";
+import type { ProgressPhase } from "@gitlode/internal-contracts/progress";
+
 import { formatCount, formatElapsed, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
 import type { PhaseSnapshot } from "./types.js";

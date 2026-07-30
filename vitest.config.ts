@@ -3,6 +3,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     projects: [
+      "./packages/internal-foundation/vitest.config.ts",
+      "./packages/internal-contracts/vitest.config.ts",
+      "./packages/git-adapters/vitest.config.ts",
+      "./packages/line-diff-adapters/vitest.config.ts",
       "./packages/gitlode/vitest.config.ts",
       "./packages/plugin-assay-metrics/vitest.config.ts",
       "./packages/plugin-conventional-commits/vitest.config.ts",

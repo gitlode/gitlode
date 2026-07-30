@@ -110,7 +110,7 @@ The exact measurements and presentation may evolve, but this diagnostic purpose 
 
 ## Current Implementation
 
-The current `packages/gitlode/src/instrumentation` domain contains both contracts and
+The current `packages/internal-foundation/src/instrumentation` domain contains both contracts and
 implementations:
 
 - `type.ts` defines `Instrumentation`, `InstrumentationSpan`,

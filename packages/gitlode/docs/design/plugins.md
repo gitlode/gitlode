@@ -7,6 +7,10 @@ package policy. It covers the contract between gitlode and external plugins, the
 format, the lifecycle model, the enrichment pipeline, and first-party `@gitlode/plugin-*` package
 requirements.
 
+The public plugin-author surface remains `gitlode/plugin-api`. Its release declarations inline the
+private foundation and contract types they expose; plugin authors do not install or import the
+private `@gitlode/internal-*` workspaces.
+
 ---
 
 ## Motivation
@@ -212,7 +216,7 @@ When a plugin returns `fatal` or throws on a given fact:
 - **Per-fact plugin profiling is plugin-controlled.** `EnrichingFactProjector` no longer wraps every `project()` call in host-owned timing. If a plugin wants projection profiling, it uses the optional profiler received during `init(runtime)`.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
 - **The `extensions` field is an extraction record concern.** `ProjectedExtensions` and
-  `ProjectedExtensionValue` are defined in `src/extraction-api/records.ts`. The latter contains the
+  `ProjectedExtensionValue` are defined in `packages/internal-contracts/src/extraction-api/records.ts`. The latter contains the
   serializable non-null plugin payload values plus a host-owned `null` sentinel. Plugins produce
   that sentinel only indirectly through `skip` or `fatal` with `skip-fact`; they cannot return
   `null` in `success.data`.

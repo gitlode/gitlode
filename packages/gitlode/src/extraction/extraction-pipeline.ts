@@ -6,9 +6,10 @@ import type {
   ExtractionCheckpoint,
   Fact,
   RefCheckpoint,
-} from "../extraction-api/index.js";
-import type { Instrumentation } from "../instrumentation/index.js";
-import { atOrThrow } from "../support/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { atOrThrow } from "@gitlode/internal-foundation/support";
+
 import type { CoordinatorDependencies } from "./types.js";
 
 async function* deduplicateCommits(

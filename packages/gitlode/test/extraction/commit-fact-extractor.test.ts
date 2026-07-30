@@ -1,15 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
-
-import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
+import type { Diagnostic, DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type {
   CommitFact,
   CommitTraversalRequest,
   TraversalPlan,
-} from "../../src/extraction-api/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import { type GitAdapter, GitAdapterError, type RawCommit } from "@gitlode/internal-contracts/git";
+import type { CommitOid } from "@gitlode/internal-contracts/model";
+import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { describe, expect, it, vi } from "vitest";
+
 import { CommitFactExtractor } from "../../src/extraction/commit-fact-extractor.js";
-import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
-import { noopInstrumentation } from "../../src/instrumentation/index.js";
-import type { CommitOid } from "../../src/model/index.js";
 
 function makeOid(n: number): CommitOid {
   return n.toString(16).padStart(12, "0") as CommitOid;

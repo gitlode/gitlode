@@ -1,3 +1,4 @@
+import type { IsoDateTimeString } from "@gitlode/internal-foundation/support";
 import { z } from "zod";
 
 import {
@@ -5,7 +6,6 @@ import {
   ROTATION_SIZE_MAX_BYTES,
   ROTATION_SIZE_MIN_BYTES,
 } from "../config/index.js";
-import type { IsoDateTimeString } from "../support/index.js";
 import { MISSING_STATE_OPTION_VALUES } from "./missing-state-option.js";
 
 function positiveIntegerString(error?: string) {

@@ -18,6 +18,10 @@ Development builds emit unbundled ESM, declarations, declaration maps, and sourc
 workspace's `dist` directory. Incremental metadata is stored under `.cache/tsc/`. The output is for
 repository development and is not the public `gitlode` release artifact.
 
+The production graph builds in dependency order from the private foundation and contract
+workspaces, through the private adapter workspaces, into `gitlode`, and finally the plugin
+workspaces. Cross-workspace development imports resolve official package exports from built output.
+
 ## Source tests and coverage
 
 The root Vitest configuration runs every workspace project in one process:
@@ -50,8 +54,9 @@ The release contains three ESM runtime entries at stable paths:
 - `dist/plugin-api.js`
 - `dist/worker-entry.js`
 
-Only `dist/index.d.ts` and `dist/plugin-api.d.ts` are public declarations. Runtime dependencies stay
-external. Shared application code may be emitted as hashed chunks directly under `dist`.
+Only `dist/index.d.ts` and `dist/plugin-api.d.ts` are public declarations. The four private
+workspaces are bundled and their public-facing types are inlined; third-party runtime dependencies
+stay external. Shared application code may be emitted as hashed chunks directly under `dist`.
 
 The `plugin-api.js` entry is intentionally runtime-empty because the current plugin API exports only
 types. Rolldown therefore does not emit a meaningless source map for that empty file. Executable

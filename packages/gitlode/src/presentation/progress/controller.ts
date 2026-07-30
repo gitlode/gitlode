@@ -1,6 +1,7 @@
-import type { Diagnostic } from "../../diagnostics/index.js";
-import type { ProgressEvent, ProgressPhase } from "../../progress/index.js";
-import { cyclicAtOrThrow } from "../../support/index.js";
+import type { Diagnostic } from "@gitlode/internal-contracts/diagnostics";
+import type { ProgressEvent, ProgressPhase } from "@gitlode/internal-contracts/progress";
+import { cyclicAtOrThrow } from "@gitlode/internal-foundation/support";
+
 import { formatDiagnosticLines } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";
 import { HEARTBEAT_INTERVAL_MS, SPINNER_FRAMES } from "./constants.js";

@@ -1,13 +1,14 @@
-import type { DiagnosticReporter } from "../diagnostics/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type {
   Fact,
   FactProjector,
   ProjectedExtensions,
   ProjectedFileChange,
   ProjectedRecord,
-} from "../extraction-api/index.js";
+} from "@gitlode/internal-contracts/extraction";
+import { assertNever } from "@gitlode/internal-foundation/support";
+
 import type { PluginProjectionResult, ProjectionContext } from "../plugin-api/index.js";
-import { assertNever } from "../support/index.js";
 import type { PluginEntry } from "./types.js";
 
 async function* trackFacts(

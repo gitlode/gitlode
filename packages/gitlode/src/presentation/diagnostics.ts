@@ -1,4 +1,5 @@
-import type { Diagnostic, DiagnosticSeverity } from "../diagnostics/index.js";
+import type { Diagnostic, DiagnosticSeverity } from "@gitlode/internal-contracts/diagnostics";
+
 import { plainStyling, type Styling } from "./styling.js";
 
 export function splitMessageLines(message: string): readonly string[] {

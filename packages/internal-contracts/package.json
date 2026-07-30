@@ -1,0 +1,70 @@
+{
+  "name": "@gitlode/internal-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Private implementation-independent contracts for gitlode packages",
+  "homepage": "https://github.com/gitlode/gitlode#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gitlode/gitlode.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./diagnostics": {
+      "types": "./dist/diagnostics/index.d.ts",
+      "default": "./dist/diagnostics/index.js"
+    },
+    "./model": {
+      "types": "./dist/model/index.d.ts",
+      "default": "./dist/model/index.js"
+    },
+    "./progress": {
+      "types": "./dist/progress/index.d.ts",
+      "default": "./dist/progress/index.js"
+    },
+    "./extraction": {
+      "types": "./dist/extraction-api/index.d.ts",
+      "default": "./dist/extraction-api/index.js"
+    },
+    "./git": {
+      "types": "./dist/git/index.d.ts",
+      "default": "./dist/git/index.js"
+    },
+    "./line-diff": {
+      "types": "./dist/line-diff/index.d.ts",
+      "default": "./dist/line-diff/index.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:dev",
+    "build:clean": "tsc -b --clean",
+    "build:dev": "tsc -b",
+    "build:watch": "tsc -b -w",
+    "format:check": "oxfmt --check",
+    "format:write": "oxfmt",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "npm run build:dev && vitest run",
+    "test:watch": "npm run build:dev && vitest",
+    "test:coverage": "npm run build:dev && vitest run --coverage"
+  },
+  "dependencies": {
+    "@gitlode/internal-foundation": "0.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "@vitest/coverage-v8": "^4.1.10",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

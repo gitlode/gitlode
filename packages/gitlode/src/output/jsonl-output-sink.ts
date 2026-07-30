@@ -1,4 +1,5 @@
-import type { OutputSink, ProjectedRecord } from "../extraction-api/index.js";
+import type { OutputSink, ProjectedRecord } from "@gitlode/internal-contracts/extraction";
+
 import type { JsonlFileWriter } from "./jsonl-file-writer.js";
 
 /** Thin adapter that makes `JsonlFileWriter` satisfy the extraction `OutputSink` contract. */

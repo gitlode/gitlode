@@ -1,6 +1,10 @@
-import type { ExtractionCheckpoint, RefCheckpoint } from "../extraction-api/index.js";
-import { isCommitOidForProfile, isRefType, type OidProfile } from "../model/index.js";
-import type { AbsolutePath } from "../support/index.js";
+import type { ExtractionCheckpoint, RefCheckpoint } from "@gitlode/internal-contracts/extraction";
+import {
+  isCommitOidForProfile,
+  isRefType,
+  type OidProfile,
+} from "@gitlode/internal-contracts/model";
+import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 
 const INVALID_CONTENTS = "Invalid state file contents.";
 

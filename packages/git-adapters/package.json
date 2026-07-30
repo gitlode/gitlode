@@ -1,0 +1,57 @@
+{
+  "name": "@gitlode/git-adapters",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Private Git adapter implementations for gitlode",
+  "homepage": "https://github.com/gitlode/gitlode#readme",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gitlode/gitlode.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/git-impl/index.d.ts",
+      "default": "./dist/git-impl/index.js"
+    },
+    "./experimental": {
+      "types": "./dist/git-impl/commit-traversal/index.d.ts",
+      "default": "./dist/git-impl/commit-traversal/index.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:dev",
+    "build:clean": "tsc -b --clean",
+    "build:dev": "tsc -b",
+    "build:watch": "tsc -b -w",
+    "format:check": "oxfmt --check",
+    "format:write": "oxfmt",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "npm run build:dev && vitest run",
+    "test:watch": "npm run build:dev && vitest",
+    "test:coverage": "npm run build:dev && vitest run --coverage"
+  },
+  "dependencies": {
+    "@gitlode/internal-contracts": "0.0.0",
+    "@gitlode/internal-foundation": "0.0.0",
+    "isomorphic-git": "^1.38.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "@vitest/coverage-v8": "^4.1.10",
+    "memfs": "^4.64.0",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

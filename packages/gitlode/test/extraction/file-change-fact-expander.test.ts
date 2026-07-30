@@ -1,18 +1,30 @@
-import { describe, expect, it, vi } from "vitest";
-
-import type { CommitFact } from "../../src/extraction-api/index.js";
-import { FileChangeFactExpander } from "../../src/extraction/file-change-fact-expander.js";
-import type { FileBlobChange, FileBlobSnapshot, GitAdapter } from "../../src/git/index.js";
+import type { CommitFact } from "@gitlode/internal-contracts/extraction";
+import type { FileBlobChange, FileBlobSnapshot, GitAdapter } from "@gitlode/internal-contracts/git";
+import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
+import type { BlobOid, CommitOid } from "@gitlode/internal-contracts/model";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
-} from "../../src/instrumentation/index.js";
-import { JsLineDiffCalculator } from "../../src/line-diff-impl/index.js";
-import type { LineDiffCalculator } from "../../src/line-diff/index.js";
-import type { BlobOid, CommitOid } from "../../src/model/index.js";
+} from "@gitlode/internal-foundation/instrumentation";
+import { describe, expect, it, vi } from "vitest";
+
+import { FileChangeFactExpander } from "../../src/extraction/file-change-fact-expander.js";
 
 const REPO_PATH = "/fake/repo";
 const encoder = new TextEncoder();
+
+const fakeLineDiffCalculator: LineDiffCalculator = {
+  computeLineDiff(before, after) {
+    const lines = (content: Uint8Array): string[] =>
+      new TextDecoder().decode(content).split("\n").filter(Boolean);
+    const beforeLines = lines(before);
+    const afterLines = lines(after);
+    return {
+      additions: afterLines.filter((line) => !beforeLines.includes(line)).length,
+      deletions: beforeLines.filter((line) => !afterLines.includes(line)).length,
+    };
+  },
+};
 
 function makeCommitFact(overrides: Partial<CommitFact> = {}): CommitFact {
   return {
@@ -77,8 +89,7 @@ function makeExpander(
 ): FileChangeFactExpander {
   return new FileChangeFactExpander(
     makeSource(changes),
-    options.lineDiffCalculator ??
-      new JsLineDiffCalculator({ instrumentation: noopInstrumentation }),
+    options.lineDiffCalculator ?? fakeLineDiffCalculator,
     options.instrumentation ?? noopInstrumentation,
     options.maxDiffSize,
   );
@@ -127,7 +138,7 @@ describe("FileChangeFactExpander expansion", () => {
     const source = makeSource([], (commitOid, parentOid) => requests.push([commitOid, parentOid]));
     const expander = new FileChangeFactExpander(
       source,
-      new JsLineDiffCalculator({ instrumentation: noopInstrumentation }),
+      fakeLineDiffCalculator,
       noopInstrumentation,
     );
     const root = makeCommitFact({ oid: "1".repeat(40) as CommitOid, parents: [] });
@@ -209,7 +220,7 @@ describe("FileChangeFactExpander expansion", () => {
       { status: "added", before: null, after: snapshot("binary.bin", new Uint8Array([0, 1])) },
     ];
     const expander = makeExpander(changes, {
-      lineDiffCalculator: new JsLineDiffCalculator({ instrumentation }),
+      lineDiffCalculator: fakeLineDiffCalculator,
       maxDiffSize: 4,
       instrumentation,
     });
@@ -232,9 +243,6 @@ describe("FileChangeFactExpander expansion", () => {
     });
     expect(
       instrumentation.records().filter(({ name }) => name === "gitlode.file_change_expansion"),
-    ).toHaveLength(1);
-    expect(
-      instrumentation.records().filter(({ name }) => name === "line_diff.compute"),
     ).toHaveLength(1);
     for (const rejectedName of [
       ["git", "file_changes"],

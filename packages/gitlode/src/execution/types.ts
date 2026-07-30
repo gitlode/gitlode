@@ -1,4 +1,4 @@
-import type { ExtractionState } from "../extraction-api/index.js";
+import type { ExtractionCheckpoint } from "../extraction-api/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { PluginDeclarations } from "../plugin-runtime/index.js";
 import type { ProgressEvent } from "../progress/index.js";
@@ -41,7 +41,7 @@ export interface ExecutionRunInput extends WorkerRunInput {
 
 export interface WorkerRunRequest {
   readonly input: WorkerRunInput;
-  readonly priorState: ExtractionState;
+  readonly priorCheckpoint: ExtractionCheckpoint;
 }
 
 export interface ExecutionSuccessPayload {
@@ -58,7 +58,7 @@ export interface ExecutionSuccessPayload {
 interface WorkerRunSuccess {
   readonly kind: "success";
   readonly success: ExecutionSuccessPayload;
-  readonly state: ExtractionState;
+  readonly checkpoint: ExtractionCheckpoint;
 }
 
 interface ExecutionRunSuccess {

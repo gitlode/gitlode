@@ -5,7 +5,7 @@ import type {
   CommitTraversalExtractor,
   CommitTraversalRequest,
   ExtractionCoordinator,
-  ExtractionState,
+  ExtractionCheckpoint,
   Fact,
   FileChangeExpander,
   FileChangeFact,
@@ -54,8 +54,8 @@ function makeOutputRecord(oid: string): ProjectedRecord {
   };
 }
 
-function emptyState(repositoryPath = "/repo"): ExtractionState {
-  return { version: 2, generatedAt: "", repositoryPath, refs: [] };
+function emptyState(repositoryPath = "/repo"): ExtractionCheckpoint {
+  return { generatedAt: "", repositoryPath, refs: [] };
 }
 
 function makeProgressReporter(): ProgressReporter & {
@@ -186,7 +186,7 @@ function baseRequest(
     remoteUrl: null,
     refs: ["main"],
     granularity: "commit",
-    priorState: emptyState(),
+    priorCheckpoint: emptyState(),
     sessionTimestamp: new Date("2024-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -397,7 +397,7 @@ describe("ExtractionPipeline orchestration", () => {
     const result = await coord.run(baseRequest());
 
     expect(closeOrder).toEqual(["close"]);
-    expect(result.state.refs).toHaveLength(1);
+    expect(result.checkpoint.refs).toHaveLength(1);
   });
 
   it("state NOT returned when sink.close() throws", async () => {
@@ -448,7 +448,7 @@ describe("ExtractionPipeline orchestration", () => {
     const result = await coord.run(baseRequest());
 
     expect(result.recordsWritten).toBe(1);
-    expect(result.state.refs).toHaveLength(1);
+    expect(result.checkpoint.refs).toHaveLength(1);
   });
 
   it("boundary-equals-head: traverser yields 0 commits, close() called, state returned", async () => {
@@ -471,8 +471,8 @@ describe("ExtractionPipeline orchestration", () => {
 
     expect(result.recordsWritten).toBe(0);
     expect(deps.sink.closeCalls).toBe(1);
-    expect(result.state.refs).toHaveLength(1);
-    expect(result.state.refs[0]?.ref).toBe("main");
+    expect(result.checkpoint.refs).toHaveLength(1);
+    expect(result.checkpoint.refs[0]?.ref).toBe("main");
   });
 
   it("zero-record run: close() called; returns empty state when empty branches", async () => {
@@ -487,7 +487,7 @@ describe("ExtractionPipeline orchestration", () => {
 
     expect(result.recordsWritten).toBe(0);
     expect(result.refs).toEqual([]);
-    expect(result.state.refs).toEqual([]);
+    expect(result.checkpoint.refs).toEqual([]);
   });
 
   it("no-branch-head case: planner returns empty plans, zero records, empty state", async () => {
@@ -499,7 +499,7 @@ describe("ExtractionPipeline orchestration", () => {
     const result = await coord.run(baseRequest({ refs: ["nonexistent"] }));
 
     expect(result.recordsWritten).toBe(0);
-    expect(result.state.refs).toEqual([]);
+    expect(result.checkpoint.refs).toEqual([]);
   });
 
   it("state refs contain only resolved ref names", async () => {
@@ -530,7 +530,7 @@ describe("ExtractionPipeline orchestration", () => {
     const result = await coord.run(baseRequest({ refs: ["main", "develop"] }));
 
     expect(result.refs).toEqual(["main", "develop"]);
-    expect(result.state.refs.map((r) => r.ref)).toEqual(["main", "develop"]);
+    expect(result.checkpoint.refs.map((r) => r.ref)).toEqual(["main", "develop"]);
   });
 
   it("non-branch refs are recorded in state.refs with their refType", async () => {
@@ -558,7 +558,7 @@ describe("ExtractionPipeline orchestration", () => {
 
     // Both refs appear in the result (CoordinatorResult.refs)
     expect(result.refs).toEqual(["main", "v1.0"]);
-    expect(result.state.refs.map((r) => [r.ref, r.refType])).toEqual([
+    expect(result.checkpoint.refs.map((r) => [r.ref, r.refType])).toEqual([
       ["main", "branch"],
       ["v1.0", "tag-lightweight"],
     ]);
@@ -621,7 +621,7 @@ describe("ExtractionPipeline orchestration", () => {
     const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest({ sessionTimestamp: ts }));
 
-    expect(result.state.generatedAt).toBe("2025-06-15T12:00:00.000Z");
+    expect(result.checkpoint.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
   it("instruments write and close spans", async () => {

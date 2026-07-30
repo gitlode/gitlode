@@ -38,8 +38,7 @@ function makeRequest(): WorkerRunRequest {
       profile: false,
       gitAdapter: "isomorphic-git",
     },
-    priorState: {
-      version: 2,
+    priorCheckpoint: {
       generatedAt: "",
       repositoryPath: "/repo",
       refs: [],
@@ -60,8 +59,7 @@ function successResult(): WorkerRunResult {
       profileEntries: [],
       skippedDiffs: 0,
     },
-    state: {
-      version: 2,
+    checkpoint: {
       generatedAt: "2026-01-01T00:00:00.000Z",
       repositoryPath: "/repo",
       refs: [],

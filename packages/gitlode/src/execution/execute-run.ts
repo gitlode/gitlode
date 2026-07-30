@@ -17,11 +17,12 @@ import { JsLineDiffCalculator } from "../line-diff-impl/index.js";
 import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 import {
-  createEmptyState,
+  createEmptyCheckpoint,
   loadStateFile,
   NodeStateStore,
+  saveStateFile,
   type StateStore,
-  validatePriorState,
+  validatePriorCheckpoint,
 } from "../state/index.js";
 import type { AbsolutePath } from "../support/index.js";
 import { buildGitAdapter, type GitAdapterFactoryDependencies } from "./git-adapter-factory.js";
@@ -65,7 +66,7 @@ export async function executeWorkerRunRequest(
   progress: WorkerExecutionProgress,
   dependencies: GitAdapterFactoryDependencies = { environment: process.env },
 ): Promise<WorkerRunResult> {
-  const { input, priorState } = request;
+  const { input, priorCheckpoint } = request;
   const recorder = input.profile
     ? new LocalInstrumentationRecorder(() => performance.now())
     : undefined;
@@ -107,7 +108,7 @@ export async function executeWorkerRunRequest(
     );
 
     instrumentation.run("gitlode.state.validate", () => {
-      validatePriorState(priorState, resolvedRepoPath, repositoryObjectFormat);
+      validatePriorCheckpoint(priorCheckpoint, resolvedRepoPath, repositoryObjectFormat);
     });
 
     const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await instrumentation.runAsync(
@@ -199,7 +200,7 @@ export async function executeWorkerRunRequest(
         refs: [...extractionSettings.refs],
         granularity: extractionSettings.granularity,
         range: extractionSettings.range,
-        priorState,
+        priorCheckpoint,
         sessionTimestamp,
       });
       span.incrementCounter("records", coordinatorResult.recordsWritten);
@@ -231,7 +232,7 @@ export async function executeWorkerRunRequest(
     return {
       kind: "success",
       success,
-      state: result.state,
+      checkpoint: result.checkpoint,
     };
   } catch (error) {
     runSpan.end(error);
@@ -243,6 +244,7 @@ export interface ExecuteRunDependencies {
   readonly dispatchWorkerRunRequest: typeof dispatchWorkerRunRequest;
   readonly createStateStore: (stateFilePath: AbsolutePath) => StateStore;
   readonly loadStateFile: typeof loadStateFile;
+  readonly saveStateFile?: typeof saveStateFile;
 }
 
 const defaultExecuteRunDependencies: ExecuteRunDependencies = {
@@ -251,6 +253,7 @@ const defaultExecuteRunDependencies: ExecuteRunDependencies = {
     return new NodeStateStore(stateFilePath);
   },
   loadStateFile,
+  saveStateFile,
 };
 
 export async function executeRun(
@@ -261,9 +264,9 @@ export async function executeRun(
   const { incremental, missingState, stateFilePath, ...workerInput } = input;
   const stateStore = stateFilePath ? dependencies.createStateStore(stateFilePath) : undefined;
 
-  let priorState;
+  let priorCheckpoint;
   if (!stateStore || !incremental) {
-    priorState = createEmptyState(input.repositoryPath);
+    priorCheckpoint = createEmptyCheckpoint(input.repositoryPath);
   } else {
     const loadedState = await dependencies.loadStateFile(stateStore);
     if (loadedState === undefined) {
@@ -274,16 +277,16 @@ export async function executeRun(
         type: "warning",
         message: `State file not found: ${stateFilePath}. Falling back to full snapshot extraction.`,
       });
-      priorState = createEmptyState(input.repositoryPath);
+      priorCheckpoint = createEmptyCheckpoint(input.repositoryPath);
     } else {
-      priorState = loadedState;
+      priorCheckpoint = loadedState;
     }
   }
 
   const result = await dependencies.dispatchWorkerRunRequest(
     {
       input: workerInput,
-      priorState,
+      priorCheckpoint,
     },
     handlers,
   );
@@ -292,8 +295,8 @@ export async function executeRun(
     return result;
   }
 
-  if (stateStore !== undefined && result.state.refs.length > 0) {
-    await stateStore.write(result.state);
+  if (stateStore !== undefined && result.checkpoint.refs.length > 0) {
+    await (dependencies.saveStateFile ?? saveStateFile)(stateStore, result.checkpoint);
   }
 
   return {

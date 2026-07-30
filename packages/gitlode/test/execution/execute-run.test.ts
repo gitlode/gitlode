@@ -47,14 +47,12 @@ function makeExecutionRunInput(overrides: Partial<ExecutionRunInput> = {}): Exec
 describe("executeRun state orchestration", () => {
   it("loads prior state and writes returned state before resolving success", async () => {
     const sideEffects: string[] = [];
-    const priorState = {
-      version: 2 as const,
+    const priorCheckpoint = {
       generatedAt: "prior",
       repositoryPath: "/repo",
       refs: [],
     };
     const returnedState = {
-      version: 2 as const,
       generatedAt: "next",
       repositoryPath: "/repo",
       refs: [{ ref: "main", refType: "branch" as const, tipOid: "abc", updatedAt: "next" }],
@@ -64,7 +62,8 @@ describe("executeRun state orchestration", () => {
         throw new Error("loadStateFile dependency should own state loading");
       },
       async write(state) {
-        expect(state).toBe(returnedState);
+        expect(state).toEqual({ version: 2, ...returnedState });
+        expect(state).not.toBe(returnedState);
         sideEffects.push("state-write");
       },
     };
@@ -76,10 +75,10 @@ describe("executeRun state orchestration", () => {
       async loadStateFile(store) {
         expect(store).toBe(stateStore);
         sideEffects.push("state-load");
-        return priorState;
+        return priorCheckpoint;
       },
       async dispatchWorkerRunRequest(request) {
-        expect(request.priorState).toBe(priorState);
+        expect(request.priorCheckpoint).toBe(priorCheckpoint);
         sideEffects.push("worker-dispatch");
         return {
           kind: "success",
@@ -93,7 +92,7 @@ describe("executeRun state orchestration", () => {
             profileEntries: [],
             skippedDiffs: 0,
           },
-          state: returnedState,
+          checkpoint: returnedState,
         };
       },
     };
@@ -127,7 +126,7 @@ describe("executeRun state orchestration", () => {
         return undefined;
       },
       async dispatchWorkerRunRequest(request) {
-        expect(request.priorState.refs).toEqual([]);
+        expect(request.priorCheckpoint.refs).toEqual([]);
         return { kind: "user-error", message: "stop after state setup" };
       },
     };
@@ -185,8 +184,7 @@ describe("executeWorkerRunRequest profiling", () => {
         profile: true,
         gitAdapter: "isomorphic-git",
       },
-      priorState: {
-        version: 2,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],
@@ -268,8 +266,7 @@ describe("executeWorkerRunRequest profiling", () => {
         profile: true,
         gitAdapter: "git-cli",
       },
-      priorState: {
-        version: 2,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],
@@ -348,8 +345,7 @@ describe("executeWorkerRunRequest profiling", () => {
         profile: true,
         gitAdapter: "git-cli",
       },
-      priorState: {
-        version: 2,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],
@@ -405,8 +401,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
         profile: true,
         gitAdapter,
       },
-      priorState: {
-        version: 2 as const,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],

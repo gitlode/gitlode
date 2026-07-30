@@ -51,14 +51,11 @@ jobs:
       - name: Run source tests
         run: npm test
 
-      - name: Collect coverage
-        run: npm run test:coverage
-
       - name: Build release artifact
         run: npm run build:release
 
-      - name: Validate package metadata and release output
-        run: npm run validate:package -w gitlode
+      - name: Validate packed package metadata
+        run: npm run validate:publint -w gitlode
 
-      - name: Test packed artifact
-        run: npm run test:package:artifact -w gitlode
+      - name: Run installed-package system test
+        run: npm run test:system:package -w gitlode

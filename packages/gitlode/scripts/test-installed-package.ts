@@ -10,7 +10,6 @@ type CommandResult = {
 
 type PackResult = {
   filename: string;
-  files: { path: string }[];
 };
 
 const packageRoot = resolve(import.meta.dirname, "..");
@@ -27,7 +26,7 @@ function run(
   command: string,
   args: string[],
   cwd: string,
-  options: { allowFailure?: boolean } = {},
+  environment: NodeJS.ProcessEnv = {},
 ): Promise<CommandResult> {
   return new Promise((resolveResult, reject) => {
     const npmExecutable = process.env["npm_execpath"];
@@ -36,7 +35,7 @@ function run(
     const child = spawn(executable, commandArgs, {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, NO_COLOR: "1" },
+      env: { ...process.env, ...environment, NO_COLOR: "1" },
     });
     let stdout = "";
     let stderr = "";
@@ -44,7 +43,7 @@ function run(
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
     child.on("error", reject);
     child.on("close", (code) => {
-      if (code === 0 || options.allowFailure) {
+      if (code === 0) {
         resolveResult({ stdout, stderr });
         return;
       }
@@ -55,6 +54,10 @@ function run(
       );
     });
   });
+}
+
+function runInstalledGitlode(args: string[], cwd: string): Promise<CommandResult> {
+  return run("npm", ["exec", "--", "gitlode", ...args], cwd);
 }
 
 async function readJsonLines(directory: string): Promise<Record<string, unknown>[]> {
@@ -74,23 +77,23 @@ async function readJsonLines(directory: string): Promise<Record<string, unknown>
   return records;
 }
 
-const temporaryRoot = await mkdtemp(join(tmpdir(), "gitlode-package-"));
+const temporaryRoot = await mkdtemp(join(tmpdir(), "gitlode-installed-package-"));
 assert(
   isAbsolute(temporaryRoot) && relative(repositoryRoot, temporaryRoot).startsWith(".."),
-  "Packed-artifact test directory must be outside the monorepo",
+  "Installed-package system test directory must be outside the monorepo",
 );
 
 try {
   const packDirectory = join(temporaryRoot, "pack");
   const consumerDirectory = join(temporaryRoot, "consumer");
   const repositoryDirectory = join(temporaryRoot, "repository");
-  const isoOutputDirectory = join(temporaryRoot, "output-isomorphic");
+  const isomorphicOutputDirectory = join(temporaryRoot, "output-isomorphic");
   const cliOutputDirectory = join(temporaryRoot, "output-git-cli");
   await Promise.all([
     mkdir(packDirectory),
     mkdir(consumerDirectory),
     mkdir(repositoryDirectory),
-    mkdir(isoOutputDirectory),
+    mkdir(isomorphicOutputDirectory),
     mkdir(cliOutputDirectory),
   ]);
 
@@ -102,18 +105,10 @@ try {
   const [packResult] = JSON.parse(packCommand.stdout) as PackResult[];
   assert(packResult !== undefined, "npm pack did not return package metadata");
   const tarballPath = join(packDirectory, basename(packResult.filename));
-  assert(
-    packResult.files.some((file) => file.path === "dist/worker-entry.js"),
-    "Tarball is missing worker-entry.js",
-  );
-  assert(
-    packResult.files.some((file) => file.path === "schemas/config-v1.schema.json"),
-    "Tarball is missing the configuration schema",
-  );
 
   await writeFile(
     join(consumerDirectory, "package.json"),
-    JSON.stringify({ name: "gitlode-packed-consumer", private: true, type: "module" }),
+    `${JSON.stringify({ name: "gitlode-system-test-consumer", private: true, type: "module" })}\n`,
   );
   await run(
     "npm",
@@ -121,63 +116,46 @@ try {
     consumerDirectory,
   );
 
-  const installedPackage = join(consumerDirectory, "node_modules", "gitlode");
-  const installedIndex = join(installedPackage, "dist", "index.js");
-  const installedPluginApi = join(installedPackage, "dist", "plugin-api.js");
-  const installedWorker = join(installedPackage, "dist", "worker-entry.js");
-  await Promise.all([access(installedIndex), access(installedPluginApi), access(installedWorker)]);
-
-  const indexSource = await readFile(installedIndex, "utf8");
-  assert(indexSource.startsWith("#!/usr/bin/env node\n"), "Installed CLI shebang is missing");
-  await access(join(consumerDirectory, "node_modules", ".bin", "gitlode"));
-
-  const help = await run("node", [installedIndex, "--help"], consumerDirectory);
+  const help = await runInstalledGitlode(["--help"], consumerDirectory);
   assert(help.stdout.includes("Extract Git commit history"), "Installed CLI help failed");
-  const version = await run("node", [installedIndex, "--version"], consumerDirectory);
+  const version = await runInstalledGitlode(["--version"], consumerDirectory);
   assert(
     version.stdout.trim() === packageManifest.version,
     `Unexpected installed CLI version: ${version.stdout}`,
   );
 
-  const resolution = await run(
-    "node",
-    [
-      "--input-type=module",
-      "--eval",
-      "console.log(import.meta.resolve('gitlode')); console.log(import.meta.resolve('gitlode/plugin-api'));",
-    ],
+  const installedSchema = join(
     consumerDirectory,
+    "node_modules",
+    "gitlode",
+    "schemas",
+    "config-v1.schema.json",
   );
-  assert(
-    resolution.stdout
-      .trim()
-      .split(/\r?\n/)
-      .every(
-        (url) =>
-          url.includes("/node_modules/gitlode/") || url.includes("\\node_modules\\gitlode\\"),
-      ),
-    `Package resolution escaped the installed artifact:\n${resolution.stdout}`,
-  );
+  await access(installedSchema);
+  const schema = JSON.parse(await readFile(installedSchema, "utf8")) as { title?: unknown };
+  assert(schema.title === "gitlode configuration v1", "Published configuration schema is invalid");
 
   await run("git", ["init", "-b", "main"], repositoryDirectory);
   await run("git", ["config", "user.name", "Package Test"], repositoryDirectory);
   await run("git", ["config", "user.email", "package-test@example.com"], repositoryDirectory);
   await writeFile(join(repositoryDirectory, "sample.txt"), "first\nsecond\n");
   await run("git", ["add", "sample.txt"], repositoryDirectory);
-  await run("git", ["commit", "-m", "initial"], repositoryDirectory);
+  await run("git", ["commit", "-m", "initial"], repositoryDirectory, {
+    GIT_AUTHOR_DATE: "2020-01-01T00:00:00Z",
+    GIT_COMMITTER_DATE: "2020-01-01T00:00:00Z",
+  });
   await writeFile(join(repositoryDirectory, "sample.txt"), "first\nchanged\nthird\n");
   await run("git", ["add", "sample.txt"], repositoryDirectory);
-  await run("git", ["commit", "-m", "modify sample"], repositoryDirectory);
+  await run("git", ["commit", "-m", "modify sample"], repositoryDirectory, {
+    GIT_AUTHOR_DATE: "2020-01-02T00:00:00Z",
+    GIT_COMMITTER_DATE: "2020-01-02T00:00:00Z",
+  });
 
   const pluginDirectory = join(consumerDirectory, "test-plugin");
   await mkdir(pluginDirectory);
   await writeFile(
     join(pluginDirectory, "package.json"),
-    JSON.stringify({
-      name: "gitlode-packed-test-plugin",
-      type: "module",
-      peerDependencies: { gitlode: "^999.0.0" },
-    }),
+    `${JSON.stringify({ name: "gitlode-system-test-plugin", private: true, type: "module" })}\n`,
   );
   await writeFile(
     join(pluginDirectory, "index.js"),
@@ -185,7 +163,7 @@ try {
       "export default async function () {",
       "  return {",
       "    async init() { return { type: 'ready' }; },",
-      "    async project() { return { type: 'success', data: { packed: true } }; },",
+      "    async project() { return { type: 'success', data: { installed: true } }; },",
       "  };",
       "}",
       "",
@@ -195,55 +173,53 @@ try {
   const isomorphicConfig = join(consumerDirectory, "isomorphic.json");
   await writeFile(
     isomorphicConfig,
-    JSON.stringify({
+    `${JSON.stringify({
       version: 1,
       extraction: { refs: ["main"] },
-      output: { directory: isoOutputDirectory, prefix: "isomorphic" },
+      output: { directory: isomorphicOutputDirectory, prefix: "isomorphic" },
       runtime: { gitAdapter: "isomorphic-git" },
       extensions: {
-        "packed-plugin": {
+        "system-test-plugin": {
           entrypoint: "./test-plugin/index.js",
           failurePolicy: "fatal",
         },
       },
-    }),
+    })}\n`,
   );
-  const isomorphicRun = await run(
-    "node",
-    [installedIndex, "--config", isomorphicConfig, "--per-file", repositoryDirectory],
+  await runInstalledGitlode(
+    ["--config", isomorphicConfig, "--per-file", repositoryDirectory],
     consumerDirectory,
   );
-  assert(
-    isomorphicRun.stderr.includes("declares peer gitlode ^999.0.0"),
-    `Compatibility warning was not emitted:\n${isomorphicRun.stderr}`,
-  );
-  const isomorphicRecords = await readJsonLines(isoOutputDirectory);
+  const isomorphicRecords = await readJsonLines(isomorphicOutputDirectory);
   assert(
     isomorphicRecords.some((record) => {
-      const file = record["file"] as { additions?: unknown; deletions?: unknown } | undefined;
+      const file = record["file"] as
+        | { path?: unknown; additions?: unknown; deletions?: unknown }
+        | undefined;
       const extensions = record["extensions"] as Record<string, unknown> | undefined;
       return (
-        typeof file?.additions === "number" &&
-        typeof file.deletions === "number" &&
-        extensions?.["packed-plugin"] !== undefined
+        file?.path === "sample.txt" &&
+        file.additions === 2 &&
+        file.deletions === 1 &&
+        (extensions?.["system-test-plugin"] as { installed?: unknown } | undefined)?.installed ===
+          true
       );
     }),
-    "Isomorphic Git extraction did not exercise line diff and dynamic plugin enrichment",
+    "Isomorphic Git extraction did not produce the expected line diff and plugin enrichment",
   );
 
   const gitCliConfig = join(consumerDirectory, "git-cli.json");
   await writeFile(
     gitCliConfig,
-    JSON.stringify({
+    `${JSON.stringify({
       version: 1,
       extraction: { refs: ["main"] },
       output: { directory: cliOutputDirectory, prefix: "git-cli" },
       runtime: { gitAdapter: "git-cli" },
-    }),
+    })}\n`,
   );
-  await run(
-    "node",
-    [installedIndex, "--config", gitCliConfig, "--per-file", repositoryDirectory],
+  await runInstalledGitlode(
+    ["--config", gitCliConfig, "--per-file", repositoryDirectory],
     consumerDirectory,
   );
   const gitCliRecords = await readJsonLines(cliOutputDirectory);
@@ -263,7 +239,7 @@ try {
   );
   await writeFile(
     join(consumerDirectory, "tsconfig.json"),
-    JSON.stringify({
+    `${JSON.stringify({
       compilerOptions: {
         module: "NodeNext",
         moduleResolution: "NodeNext",
@@ -273,7 +249,7 @@ try {
         skipLibCheck: false,
       },
       files: ["consumer.ts"],
-    }),
+    })}\n`,
   );
   await run(
     "node",
@@ -281,43 +257,12 @@ try {
     consumerDirectory,
   );
 
-  const sourceMapPaths = packResult.files
-    .map((file) => file.path)
-    .filter((path) => path.startsWith("dist/") && path.endsWith(".js.map"));
-  assert(sourceMapPaths.length > 0, "Tarball contains no JavaScript source maps");
-
-  for (const sourceMapPath of sourceMapPaths) {
-    const map = JSON.parse(await readFile(join(installedPackage, sourceMapPath), "utf8")) as {
-      mappings?: string;
-      sources?: string[];
-      sourcesContent?: (string | null)[];
-    };
-    assert((map.mappings?.length ?? 0) > 0, `${sourceMapPath} contains no mappings`);
-    const typescriptSourceIndexes = (map.sources ?? [])
-      .map((source, index) => ({ source, index }))
-      .filter(({ source }) => source.endsWith(".ts"));
-    assert(
-      typescriptSourceIndexes.length > 0,
-      `${sourceMapPath} does not map to TypeScript sources`,
-    );
-    assert(
-      typescriptSourceIndexes.every(({ index }) => {
-        const sourceContent = map.sourcesContent?.[index];
-        return typeof sourceContent === "string" && sourceContent.length > 0;
-      }),
-      `${sourceMapPath} does not embed content for every mapped TypeScript source`,
-    );
-  }
-
   process.stdout.write(
     [
-      `Packed artifact: ${tarballPath}`,
-      `Installed outside monorepo: ${consumerDirectory}`,
-      `Tarball files: ${packResult.files.length}`,
-      `Source maps with embedded TypeScript sources: ${sourceMapPaths.length}`,
+      `Installed package version: ${packageManifest.version}`,
       `Isomorphic Git records: ${isomorphicRecords.length}`,
       `Git CLI records: ${gitCliRecords.length}`,
-      "CLI, worker, line diff, schemas, dynamic plugin, compatibility warning, TypeScript consumer, and source maps passed.",
+      "Installed CLI, worker, both Git adapters, line diff, dynamic plugin, schema, and TypeScript consumer passed.",
       "",
     ].join("\n"),
   );

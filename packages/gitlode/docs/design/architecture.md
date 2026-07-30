@@ -393,9 +393,12 @@ Both builds currently use `packages/gitlode/dist`. Before tsdown cleans that dir
 hook invalidates only gitlode's TypeScript build metadata. This prevents a later `tsc -b` from
 treating bundled output as current development output without deleting plugin build caches.
 
-Release validation checks emitted output and package metadata, then installs an npm tarball outside
-the monorepo and exercises the installed CLI, worker, adapters, plugin loading, schemas, and public
-types. Contributor commands and the publish gate are documented in
+Release validation separates three responsibilities: tsdown produces the public artifact, standard
+publint validates packed package metadata, and a product-focused system test installs an npm
+tarball outside the monorepo. The system test exercises the installed CLI, worker, both Git
+adapters, representative line diff output, plugin loading, the published schema, and public
+NodeNext TypeScript types. It does not custom-validate source maps or tsdown's internal output
+structure. Contributor commands and the publish gate are documented in
 [`../contributing/build-test-release.md`](../contributing/build-test-release.md).
 
 ## Profiling Instrumentation

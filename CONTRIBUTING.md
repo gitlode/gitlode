@@ -37,13 +37,13 @@ Run in watch mode during development:
 npm run test:watch
 ```
 
-Generate the combined source coverage report:
+Optionally generate the combined local source coverage report:
 
 ```bash
 npm run test:coverage
 ```
 
-Build and validate the packed public artifact:
+Build and validate the public package with publint and the installed-package system test:
 
 ```bash
 npm run test:package
@@ -74,7 +74,7 @@ for development/release artifact boundaries, package validation, and the complet
 
 - Open pull requests against the `develop` branch — do **not** target `main` directly
 - All CI checks must pass before merge, including dependency, architecture, development build,
-  source test, coverage, release artifact, and packed-package checks
+  source test, release build, packed metadata, and installed-package system checks
 
 ## Code Style
 

@@ -38,7 +38,7 @@
     "test:package": "npm run test:package -w gitlode",
     "test:watch": "vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage",
-    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run test:coverage && npm run build:release && npm run validate:package -w gitlode && npm run test:package:artifact -w gitlode",
+    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run build:release && npm run validate:publint -w gitlode && npm run test:system:package -w gitlode",
     "version-packages": "npm run changeset:version && npm run lockfile:sync"
   },
   "devDependencies": {

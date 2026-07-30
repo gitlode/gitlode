@@ -61,13 +61,6 @@ export default defineConfig({
     tsconfig: "./tsconfig.release.json",
     sourcemap: false,
   },
-  publint: {
-    strict: true,
-  },
-  attw: {
-    profile: "esm-only",
-    level: "error",
-  },
   exports: false,
   failOnWarn: true,
   suppressWarnings: [

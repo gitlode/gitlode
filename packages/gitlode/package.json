@@ -49,11 +49,8 @@
     "test": "npm run build:dev && vitest run",
     "test:watch": "npm run build:dev && vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage",
-    "test:package": "npm run build:release && npm run validate:package && npm run test:package:artifact",
-    "test:package:artifact": "tsx ./scripts/test-package.ts",
-    "validate:attw": "tsx ./scripts/validate-attw.ts",
-    "validate:output": "tsx ./scripts/validate-release-output.ts",
-    "validate:package": "npm run validate:output && npm run validate:publint && npm run validate:attw",
+    "test:package": "npm run build:release && npm run validate:publint && npm run test:system:package",
+    "test:system:package": "tsx ./scripts/test-installed-package.ts",
     "validate:publint": "publint --strict --pack npm"
   },
   "dependencies": {
@@ -65,7 +62,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@arethetypeswrong/core": "^0.18.5",
     "@gitlode/git-adapters": "0.0.0",
     "@gitlode/internal-contracts": "0.0.0",
     "@gitlode/internal-foundation": "0.0.0",

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { performance } from "node:perf_hooks";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 
@@ -154,7 +155,12 @@ function shouldRunAsCli(): boolean {
   if (!argvEntry) {
     return false;
   }
-  return pathToFileURL(argvEntry).href === import.meta.url;
+
+  try {
+    return realpathSync(argvEntry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
 }
 
 if (shouldRunAsCli()) {

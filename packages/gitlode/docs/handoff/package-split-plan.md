@@ -8,8 +8,9 @@ This document records the agreed direction and open implementation decisions for
 No package split has been implemented yet. The package topology and high-level build strategy in
 this document are accepted as the planning baseline. The private package manifest policy and export
 boundaries and dependency classification are also accepted. Detailed TypeScript project
-configuration, the public release bundle, and test ownership are accepted as well. Migration steps
-remain to be decided.
+configuration, the public release bundle, test ownership, and the migration sequence are accepted
+as well. No package-split design decision remains open; implementation has not started. Test-code
+type checking remains a separate deferred task.
 
 This is a continuation document rather than a durable source of truth. As implementation decisions
 become stable, migrate package and dependency contracts to `docs/design/`, update other affected
@@ -858,38 +859,174 @@ After the package split is complete and stable, handle the following as a separa
 This deferred work does not relax the package import, dependency ownership, Rev-dep, or runtime test
 requirements accepted for the split.
 
-## Open Decisions
+## Accepted Migration Sequence
 
-### 1. Migration sequence
+Use two coordinated review units:
 
-Decide whether to:
+1. a prerequisite build, release, and test-infrastructure change that does not move source domains;
+2. one coordinated package-split change, organized into reviewable and verifiable commits.
 
-- establish package infrastructure and build tooling first;
-- move foundation and contract domains before adapters;
-- perform the split in one coordinated change or in buildable phases;
-- temporarily support compatibility facades at old source paths.
+Do not merge a long sequence of partially split product architectures into the main branch. The
+source-migration commits should remain independently buildable where practical, but the coordinated
+split is merged only after the final package graph, release artifact, tests, enforcement, and
+durable documentation are complete.
 
-Each intermediate state should build, test, and satisfy architecture checks. Avoid a migration plan
-that requires weakening dependency rules or leaving two authoritative copies of a contract.
+### Phase A: build and release infrastructure
 
-### 2. Durable documentation updates
+Before moving any domain, establish and validate:
 
-Implementation will require coordinated updates to at least:
+- TypeScript project-reference infrastructure, root solution orchestration, development build
+  scripts, `.cache/tsc`, and targeted cache invalidation;
+- the tsdown release bundle over the current monolithic source tree, including the accepted
+  entrypoints, output layout, source maps, shebang, package metadata access, exports, and worker
+  path;
+- `publint`, Are the Types Wrong, emitted-output checks, `npm pack`, and installation outside the
+  monorepo;
+- root Vitest 4 `projects` orchestration;
+- workspace-owned development dependencies, Syncpack enforcement, and the Rev-dep transition to
+  `includeDevDepsFromRoot: false`;
+- Changesets configuration capable of excluding private packages from versioning and tagging.
+
+This phase resolves release risks that do not require private packages. Because it changes how the
+published `gitlode` artifact is built, include a patch changeset for `gitlode`.
+
+### Phase B1: private-package vertical slice
+
+Begin the coordinated source migration with:
+
+```text
+type-utils
+  → @gitlode/internal-foundation/type-utils
+
+model
+  → @gitlode/internal-contracts/model
+```
+
+This slice must prove the final private-package mechanism before the wider move:
+
+- private runtime code is bundled into `gitlode`;
+- private types are inlined into public plugin API declarations;
+- development resolution uses built package exports and project references;
+- public runtime dependencies remain external;
+- worker and common-chunk placement remains valid;
+- the packed tarball installs and runs without private packages being available.
+
+Stop the wider source migration if this spike does not validate all required behaviors.
+
+### Phase B2: complete foundation
+
+Move `support`, `instrumentation`, and `dag` into `@gitlode/internal-foundation`. Move their tests at
+the same time, make foundation DAG fixtures domain-neutral, update every consumer to official
+foundation subpaths, update Rev-dep, and delete the old source directories.
+
+### Phase B3: complete contracts
+
+After foundation is complete, move `progress`, `extraction-api`, `git`, and `line-diff` into
+`@gitlode/internal-contracts`. Map the source `extraction-api` domain to the package export
+`@gitlode/internal-contracts/extraction`.
+
+Update all application and plugin API imports, move contract runtime tests, update dependency
+enforcement, and revalidate the bundled public declarations before moving implementations.
+
+### Phase B4: move adapters
+
+Move the smaller line-diff implementation first:
+
+```text
+line-diff-impl
+  → @gitlode/line-diff-adapters
+```
+
+Add focused `JsLineDiffCalculator` tests, replace its direct use in extraction tests with a fake,
+update execution composition, and validate the packed integration path.
+
+Then move the more complex Git implementation:
+
+```text
+git-impl
+  → @gitlode/git-adapters
+```
+
+Move both adapters, commit-traversal code, adapter tests, `commit-dag.ts`, and `memfs` ownership
+together. Update execution composition, CLI package mocks, the experimental subpath export, and the
+packed tests for both Git implementations.
+
+### No compatibility facades or duplicate ownership
+
+Do not leave re-export facades at old `packages/gitlode/src` paths. For each domain, move its source
+and tests, update every consumer, and delete its old directory in the same logical commit.
+
+At every intermediate step:
+
+- a domain has exactly one authoritative location;
+- contracts are never copied or declared twice;
+- only already-migrated package subpaths may be exported;
+- TypeScript `paths`, development-only export conditions, and source aliases remain forbidden;
+- tests cannot reach across a workspace boundary into source or test internals.
+
+Use file moves where practical to preserve history, and separate mechanical moves from later
+content edits when that materially improves reviewability.
+
+### Manifest and enforcement updates
+
+When a workspace or subpath first becomes real, update its complete supporting graph in the same
+logical commit:
+
+- root workspaces and TypeScript references;
+- package manifests, dependencies, exports, scripts, README, and Vitest project;
+- the root lockfile;
+- Syncpack and Changesets configuration;
+- Rev-dep package and domain rules.
+
+Private packages remain at `0.0.0` and outside Changesets versioning. Later private implementation
+changes require a `gitlode` changeset only when they alter the public artifact or observable
+behavior.
+
+### Validation gates
+
+Every migration stage must pass:
+
+- formatting and linting;
+- architecture checks;
+- the development build;
+- schema validation;
+- all source tests.
+
+From the first private-package vertical slice onward, every stage must also pass:
+
+- the release build;
+- `publint` and Are the Types Wrong;
+- emitted-output and private-specifier checks;
+- the packed-artifact suite and installation outside the monorepo.
+
+The final validation must start from clean generated output and cover dependency installation, the
+complete development graph, all workspace tests and coverage, the release bundle, tarball
+installation, CLI, worker, both Git adapters, line-diff, plugin loading, and Changesets status.
+Deferred test-code type checking is not part of these migration gates.
+
+### Durable documentation and handoff cleanup
+
+Phase A updates only durable build, release, and contributor documentation affected by its actual
+tooling changes. The coordinated source-migration change updates the durable design documents to
+the final package layout, including:
 
 - `docs/design/domain-design.md`;
 - `docs/design/architecture.md`;
-- Git traversal and adapter design documents;
-- plugin design documentation where source/package locations are described;
-- the root Rev-dep configuration;
-- contributor or release documentation if build and Changesets workflows change.
+- Git adapter and traversal design documents;
+- plugin documentation that describes source or package locations;
+- contributor build, test, and release documentation.
 
-User-facing documentation should change only if installation, packaging, CLI behavior, or plugin
-author workflows change observably.
+Do not document transient vertical-slice states as durable design. Update user-facing documentation
+only if installation, packaging, CLI behavior, or plugin-author workflows change observably.
 
-## Recommended Next Discussion
+At completion, move the deferred test-code type-checking task into a focused follow-up handoff or
+issue. Once every stable package-split decision exists in durable documentation and no other split
+work remains, delete this package-split handoff.
 
-Define the migration sequence, including buildable phases, package infrastructure ordering,
-contract and implementation moves, and whether temporary compatibility facades are warranted.
+## Recommended Next Step
+
+The planning baseline is complete. The next step, when implementation is authorized, is Phase A:
+establish and validate the build, release, and test infrastructure without moving source domains.
 
 ## Completion Criteria
 

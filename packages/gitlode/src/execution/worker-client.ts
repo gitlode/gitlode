@@ -1,17 +1,11 @@
 import { Worker } from "node:worker_threads";
 
-import type { ProgressEvent } from "../progress/index.js";
 import type {
-  WorkerDiagnosticSeverity,
+  ExecutionRunReporters,
   WorkerRunMessage,
   WorkerRunRequest,
   WorkerRunResult,
 } from "./types.js";
-
-interface WorkerRunDispatchHandlers {
-  readonly onProgress: (event: ProgressEvent) => void;
-  readonly onDiagnostic: (severity: WorkerDiagnosticSeverity, message: string) => void;
-}
 
 function runtimeErrorResult(message: string, stack?: string): WorkerRunResult {
   return {
@@ -32,7 +26,7 @@ function isWorkerRunMessage(value: unknown): value is WorkerRunMessage {
 
 export async function dispatchWorkerRunRequest(
   request: WorkerRunRequest,
-  handlers: WorkerRunDispatchHandlers,
+  reporters: ExecutionRunReporters,
 ): Promise<WorkerRunResult> {
   return await new Promise<WorkerRunResult>((resolve) => {
     const worker = new Worker(new URL("./worker-entry.js", import.meta.url));
@@ -56,12 +50,12 @@ export async function dispatchWorkerRunRequest(
       }
 
       if (value.type === "progress") {
-        handlers.onProgress(value.event);
+        reporters.progressReporter.emit(value.event);
         return;
       }
 
       if (value.type === "diagnostic") {
-        handlers.onDiagnostic(value.severity, value.message);
+        reporters.diagnosticReporter.report(value.diagnostic);
         return;
       }
 

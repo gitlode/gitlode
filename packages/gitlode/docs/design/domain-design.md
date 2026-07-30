@@ -157,7 +157,7 @@ utilities.
 - Is type-only, runtime-free, and independent of every other source domain.
 
 Every domain may use `type-utils`; this is the sole global exception to the closed dependency
-allowlist in Section 2.21.
+allowlist in Section 2.22.
 
 ### 2.2 `support`
 
@@ -264,7 +264,15 @@ between text contents.
   module loading, and checkpoint-file I/O.
 - Owns product extraction semantics independently of delivery mechanisms.
 
-### 2.12 `progress`
+### 2.12 `diagnostics`
+
+**Purpose:** Define the dependency-free, host-facing contract for reporting diagnostics.
+
+- Includes diagnostic messages, `warn` and `error` severity classification, and the synchronous reporter port.
+- Reporting a diagnostic does not determine run termination, failure, or exit codes; existing result and error paths retain those responsibilities.
+- Excludes message-generation policy, terminal and TTY rendering, worker transport, buffering, and run lifecycle decisions, which belong to higher-level domains.
+
+### 2.13 `progress`
 
 **Purpose:** Describe the progress of one gitlode run independently of its presentation.
 
@@ -273,7 +281,7 @@ between text contents.
   reported.
 - Defines progress meaning but not how progress is rendered.
 
-### 2.13 `plugin-api`
+### 2.14 `plugin-api`
 
 **Purpose:** Define the public contract between plugin authors and gitlode.
 
@@ -284,7 +292,7 @@ between text contents.
 - Is a stable public-facing contract even while identifier compatibility remains relaxed during
   prerelease development.
 
-### 2.14 `plugin-runtime`
+### 2.15 `plugin-runtime`
 
 **Purpose:** Host and execute configured plugins inside gitlode.
 
@@ -294,7 +302,7 @@ between text contents.
   concrete diagnostic rendering.
 - Owns host-side plugin lifecycle and failure handling.
 
-### 2.15 `state`
+### 2.16 `state`
 
 **Purpose:** Adapt and persist checkpoint information for the extraction contract.
 
@@ -312,7 +320,7 @@ Persistence contracts, pure state operations, and the Node.js implementation rem
 modules within this domain. A separate implementation domain becomes warranted only when it
 protects a concrete consumer from implementation dependencies.
 
-### 2.16 `output`
+### 2.17 `output`
 
 **Purpose:** Persist projected records as JSON Lines files.
 
@@ -322,7 +330,7 @@ protects a concrete consumer from implementation dependencies.
   rendering.
 - Owns output mechanics rather than the meaning of the data being written.
 
-### 2.17 `config`
+### 2.18 `config`
 
 **Purpose:** Define and load the versioned gitlode project configuration document.
 
@@ -332,7 +340,7 @@ protects a concrete consumer from implementation dependencies.
   and extraction execution.
 - Owns the configuration document independently of a particular invocation.
 
-### 2.18 `cli`
+### 2.19 `cli`
 
 **Purpose:** Convert command-line input and project configuration into validated invocation input.
 
@@ -343,7 +351,7 @@ protects a concrete consumer from implementation dependencies.
   implementation, state persistence, and plugin module loading.
 - Owns invocation semantics specific to the command-line interface.
 
-### 2.19 `presentation`
+### 2.20 `presentation`
 
 **Purpose:** Present progress, diagnostics, and results to the user through stderr.
 
@@ -353,7 +361,7 @@ protects a concrete consumer from implementation dependencies.
   execution, and CLI option parsing.
 - Owns rendering and terminal interaction, not the events or data being rendered.
 
-### 2.20 `execution`
+### 2.21 `execution`
 
 **Purpose:** Compose and execute one gitlode run across the main-process and worker boundary.
 
@@ -364,7 +372,7 @@ protects a concrete consumer from implementation dependencies.
   configuration-document schema.
 - Acts as the application composition boundary for one run.
 
-### 2.21 Allowed domain dependencies
+### 2.22 Allowed domain dependencies
 
 The following table is a closed allowlist of direct domain dependencies. A domain may not directly
 depend on a domain absent from its row. Transitive dependencies do not grant permission for a direct
@@ -375,31 +383,33 @@ exchange for this global status, `type-utils` must preserve the stricter charter
 other domain is global. In particular, `support` remains explicit because its charter permits
 Node.js runtime APIs.
 
-| Domain            | Allowed direct domain dependencies                                                      |
-| ----------------- | --------------------------------------------------------------------------------------- |
-| `type-utils`      | None                                                                                    |
-| `support`         | None                                                                                    |
-| `model`           | None                                                                                    |
-| `instrumentation` | None                                                                                    |
-| `progress`        | None                                                                                    |
-| `dag`             | `instrumentation`, `support`                                                            |
-| `git`             | `model`                                                                                 |
-| `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                     |
-| `line-diff`       | None                                                                                    |
-| `line-diff-impl`  | `line-diff`                                                                             |
-| `state`           | `extraction-api`, `model`, `support`                                                    |
-| `extraction-api`  | `model`, `progress`, `support`                                                          |
-| `extraction`      | `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `support` |
-| `plugin-api`      | `extraction-api`, `instrumentation`                                                     |
-| `plugin-runtime`  | `extraction-api`, `instrumentation`, `plugin-api`, `progress`, `support`                |
-| `output`          | `extraction-api`                                                                        |
-| `config`          | `plugin-api`, `support`                                                                 |
-| `cli`             | `config`, `support`                                                                     |
-| `presentation`    | `instrumentation`, `progress`, `support`                                                |
-| `execution`       | Listed below because this composition domain has a larger direct dependency set.        |
+| Domain            | Allowed direct domain dependencies                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| `type-utils`      | None                                                                                                   |
+| `support`         | None                                                                                                   |
+| `model`           | None                                                                                                   |
+| `instrumentation` | None                                                                                                   |
+| `diagnostics`     | None                                                                                                   |
+| `progress`        | None                                                                                                   |
+| `dag`             | `instrumentation`, `support`                                                                           |
+| `git`             | `model`                                                                                                |
+| `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                                    |
+| `line-diff`       | None                                                                                                   |
+| `line-diff-impl`  | `line-diff`                                                                                            |
+| `state`           | `extraction-api`, `model`, `support`                                                                   |
+| `extraction-api`  | `diagnostics`, `model`, `support`                                                                      |
+| `extraction`      | `diagnostics`, `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `support` |
+| `plugin-api`      | `extraction-api`, `instrumentation`                                                                    |
+| `plugin-runtime`  | `diagnostics`, `extraction-api`, `instrumentation`, `plugin-api`, `support`                            |
+| `output`          | `extraction-api`                                                                                       |
+| `config`          | `plugin-api`, `support`                                                                                |
+| `cli`             | `config`, `support`                                                                                    |
+| `presentation`    | `diagnostics`, `instrumentation`, `progress`, `support`                                                |
+| `execution`       | Listed below because this composition domain has a larger direct dependency set.                       |
 
 `execution` may directly depend on:
 
+- `diagnostics`
 - `extraction`
 - `extraction-api`
 - `git`
@@ -422,7 +432,7 @@ boundary.
 
 ### 3.1 Dependency views
 
-The diagrams in this section are views of the closed allowlist in Section 2.21, not independent
+The diagrams in this section are views of the closed allowlist in Section 2.22, not independent
 rules. An arrow from `A` to `B` means that domain `A` may directly depend on domain `B`.
 
 #### 3.1.1 Structural domain graph
@@ -432,7 +442,7 @@ This view shows the structural domain dependencies while omitting `type-utils`, 
 `instrumentation` are explicit dependencies, but their edges largely indicate whether current code
 happens to need a general utility or measurement hook rather than clarifying the product structure.
 Their omission does not make them global: adding either dependency still requires an intentional
-change to Section 2.21 and the Rev-dep configuration.
+change to Section 2.22 and the Rev-dep configuration.
 
 Domain appearance indicates its primary architectural nature:
 
@@ -474,6 +484,7 @@ flowchart TB
     direction LR
     dag{{"dag"}}
     model{{"model"}}
+    diagnostics{{"diagnostics"}}
     progress{{"progress"}}
   end
 
@@ -487,11 +498,12 @@ flowchart TB
   class gitImpl,lineDiffImpl implementation
   class execution,extraction,pluginRuntime policy
   class cli,config,output,presentation,state boundary
-  class dag,model,progress foundation
+  class dag,diagnostics,model,progress foundation
 
   cli --> config
   config --> pluginApi
 
+  execution --> diagnostics
   execution --> extraction
   execution --> extractionApi
   execution --> git
@@ -504,23 +516,26 @@ flowchart TB
   execution --> progress
   execution --> state
 
+  presentation --> diagnostics
   presentation --> progress
   output --> extractionApi
   state --> extractionApi
   state --> model
 
+  extraction --> diagnostics
   extraction --> extractionApi
   extraction --> git
   extraction --> lineDiff
   extraction --> model
   extraction --> progress
+  extractionApi --> diagnostics
   extractionApi --> model
   extractionApi --> progress
 
   pluginApi --> extractionApi
+  pluginRuntime --> diagnostics
   pluginRuntime --> extractionApi
   pluginRuntime --> pluginApi
-  pluginRuntime --> progress
 
   git --> model
   gitImpl --> dag
@@ -536,9 +551,9 @@ grant dependencies between its members.
 #### 3.1.2 Extraction core
 
 This view removes CLI, configuration, presentation, and cross-cutting dependencies such as
-`type-utils`, `support`, `instrumentation`, and `progress`. It also suppresses direct composition
+`type-utils`, `support`, `instrumentation`, `diagnostics`, and `progress`. It also suppresses direct composition
 edges from `execution` to lower-level contracts when the corresponding implementation relationship
-is already visible. Consult Section 2.21 for the complete rule.
+is already visible. Consult Section 2.22 for the complete rule.
 
 Arrow style in this focused view reflects the architectural relationship:
 

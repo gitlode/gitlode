@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type {
   CommitFact,
   CommitTraversalRequest,
@@ -9,7 +10,6 @@ import { CommitFactExtractor } from "../../src/extraction/commit-fact-extractor.
 import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
-import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
 
 function makeOid(n: number): CommitOid {
   return n.toString(16).padStart(12, "0") as CommitOid;
@@ -25,12 +25,12 @@ function makeRawCommit(n: number, parents: number[] = []): RawCommit {
   };
 }
 
-function makeReporter(): ProgressReporter & { warnings: string[] } {
+function makeReporter(): DiagnosticReporter & { warnings: string[] } {
   const warnings: string[] = [];
   return {
     warnings,
-    emit(event: ProgressEvent) {
-      if (event.type === "warning") warnings.push(event.message);
+    report(diagnostic: Diagnostic) {
+      warnings.push(diagnostic.message);
     },
   };
 }

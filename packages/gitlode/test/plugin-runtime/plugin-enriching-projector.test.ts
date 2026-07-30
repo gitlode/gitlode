@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
+import type { DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type {
   CommitFact,
   Fact,
@@ -21,7 +22,6 @@ import {
   initializePlugins,
   type PluginEntry,
 } from "../../src/plugin-runtime/index.js";
-import type { ProgressReporter } from "../../src/progress/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -69,12 +69,12 @@ async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
   return results;
 }
 
-const noopReporter: ProgressReporter = { emit: () => {} };
+const noopReporter: DiagnosticReporter = { report: () => {} };
 
 class EnrichingFactProjector extends PluginEnrichingFactProjector {
   constructor(
     entries: readonly PluginEntry[],
-    reporter: ProgressReporter,
+    reporter: DiagnosticReporter,
     repoName: string,
     repoUrl: string | null,
   ) {
@@ -290,9 +290,9 @@ describe("EnrichingFactProjector — declaration order", () => {
 describe("EnrichingFactProjector — skip result", () => {
   it("sets namespace to null", async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => ({ type: "skip" }));
@@ -304,9 +304,9 @@ describe("EnrichingFactProjector — skip result", () => {
 
   it("sets namespace to null and emits warning when plugin throws Error", async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => {
@@ -342,9 +342,9 @@ describe("EnrichingFactProjector — skip result", () => {
 describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
   it("sets namespace to null and emits warning when policy is skip-fact", async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => ({ type: "fatal" }));
@@ -400,9 +400,9 @@ describe("EnrichingFactProjector — fatal + fatal policy", () => {
 describe("EnrichingFactProjector — throw handling", () => {
   it("converts thrown error to fatal and applies skip-fact policy", async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => {
@@ -483,9 +483,9 @@ describe("EnrichingFactProjector — ProjectionContext", () => {
 describe("EnrichingFactProjector — warning format", () => {
   it('formats warning as Plugin "<ns>" skipped fact <oid>: <message> for commit', async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => {
@@ -509,9 +509,9 @@ describe("EnrichingFactProjector — warning format", () => {
 
   it("formats warning with <oid>/<path> for file-change facts", async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => {

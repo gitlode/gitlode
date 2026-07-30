@@ -1,5 +1,6 @@
 import { parentPort } from "node:worker_threads";
 
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 import { executeWorkerRunRequest } from "./execute-run.js";
@@ -36,20 +37,22 @@ if (parentPort === null) {
 }
 
 parentPort.once("message", async (request: WorkerRunRequest) => {
-  const reporter: ProgressReporter = {
+  const progressReporter: ProgressReporter = {
     emit(event) {
       postMessage({ type: "progress", event });
     },
   };
 
-  const renderDiagnostic = (severity: "warn" | "error", message: string): void => {
-    postMessage({ type: "diagnostic", severity, message });
+  const diagnosticReporter: DiagnosticReporter = {
+    report(diagnostic) {
+      postMessage({ type: "diagnostic", diagnostic });
+    },
   };
 
   try {
     const result = await executeWorkerRunRequest(request, {
-      reporter,
-      renderDiagnostic,
+      progressReporter,
+      diagnosticReporter,
     });
     postMessage({ type: "result", result });
   } catch (error) {

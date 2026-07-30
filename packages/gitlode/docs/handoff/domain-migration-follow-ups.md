@@ -2,9 +2,7 @@
 
 ## Status
 
-The domain migration is complete. Each follow-up remaining in this document is a candidate for a
-separate task because it changes observable identifiers or requires cross-boundary runtime
-refactoring.
+The domain migration is complete. The remaining profiling follow-up is a candidate for a separate task because it changes observable identifiers.
 
 The migration intentionally preserved externally observable strings and profiling identifiers even
 when they retained vocabulary from the former ownership model. The descriptions below record the
@@ -57,36 +55,6 @@ examples in:
 - `docs/handoff/instrumentation-opentelemetry-redesign-plan.md`, if that work is still active;
 - tests that assert span names;
 - any known external profiling consumers.
-
-## Progress follow-ups
-
-### Separate warnings from progress events
-
-`src/progress/types.ts` currently includes:
-
-```text
-{ type: "warning"; message: string }
-```
-
-A warning is a diagnostic rather than a description of run progress. The worker protocol also has a
-separate diagnostic channel, so retaining warnings in `ProgressEvent` leaves two paths for similar
-messages and weakens the otherwise presentation-independent progress charter.
-
-Candidate follow-up:
-
-- define one host-facing diagnostic contract and ownership model;
-- route extraction and plugin warnings through that contract rather than through `ProgressEvent`;
-- decide whether the existing worker diagnostic channel can serve this role or needs a
-  dependency-light contract outside `execution`;
-- keep progress limited to phases and quantitative progress if the separation is adopted;
-- preserve warning ordering, quiet/TTY rendering, text, and failure behavior unless separately
-  approved.
-
-Review extraction warning producers, plugin-runtime warnings, worker messages, `RunPresenter`,
-`ProgressController`, and their tests together. This is a protocol and presentation refactoring,
-not a directory-only cleanup. Current producers can be found by searching for
-`type: "warning"` in `src/extraction`, `src/plugin-runtime`, and `src/execution`; the separate worker
-diagnostic message is defined in `src/execution/types.ts`.
 
 ## Lifecycle
 

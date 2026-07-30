@@ -24,9 +24,8 @@ interface MockContext {
     renderUserError: ReturnType<typeof vi.fn>;
     renderRuntimeError: ReturnType<typeof vi.fn>;
   };
-  readonly reporter: {
-    emit: ReturnType<typeof vi.fn>;
-  };
+  readonly progressReporter: { emit: ReturnType<typeof vi.fn> };
+  readonly diagnosticReporter: { report: ReturnType<typeof vi.fn> };
   readonly createProgressRuntime: ReturnType<typeof vi.fn>;
   readonly renderSuccessReport: ReturnType<typeof vi.fn>;
   readonly executeRun: ReturnType<typeof vi.fn>;
@@ -74,15 +73,15 @@ function mockEntrypointModules(
     renderRuntimeError: vi.fn(),
   };
 
-  const reporter = {
-    emit: vi.fn(),
-  };
+  const progressReporter = { emit: vi.fn() };
+  const diagnosticReporter = { report: vi.fn() };
 
   const sideEffects: string[] = [];
   const createProgressRuntime = vi.fn(() => ({
     uiMode: "tty-interactive",
     presenter,
-    reporter,
+    progressReporter,
+    diagnosticReporter,
   }));
 
   const renderSuccessReport = vi.fn(() => {
@@ -157,7 +156,8 @@ function mockEntrypointModules(
   return {
     bootstrapRenderer,
     presenter,
-    reporter,
+    progressReporter,
+    diagnosticReporter,
     createProgressRuntime,
     renderSuccessReport,
     executeRun: executeRunMock,
@@ -318,8 +318,8 @@ describe("CLI entrypoint orchestration", () => {
         stateFilePath: "/tmp/gitlode-state.json",
       }),
       expect.objectContaining({
-        onProgress: expect.any(Function),
-        onDiagnostic: expect.any(Function),
+        progressReporter: context.progressReporter,
+        diagnosticReporter: context.diagnosticReporter,
       }),
     );
     expect(context.renderSuccessReport).toHaveBeenCalledWith(

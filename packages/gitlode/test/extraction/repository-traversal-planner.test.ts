@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
 
+import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type { TraversalPlanningRequest } from "../../src/extraction-api/index.js";
 import { RepositoryTraversalPlanner } from "../../src/extraction/repository-traversal-planner.js";
 import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
-import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
 
 function makeHash(n: number): CommitOid {
   return n.toString(16).padStart(40, "0") as CommitOid;
 }
 
-function makeReporter(): ProgressReporter & { warnings: string[] } {
+function makeReporter(): DiagnosticReporter & { warnings: string[] } {
   const warnings: string[] = [];
   return {
     warnings,
-    emit(event: ProgressEvent) {
-      if (event.type === "warning") warnings.push(event.message);
+    report(diagnostic: Diagnostic) {
+      warnings.push(diagnostic.message);
     },
   };
 }

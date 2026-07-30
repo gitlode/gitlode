@@ -150,7 +150,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
     reporter.emit({ type: "phase-end", phase: "extracting" });
 
     // -----------------------------------------------------------------------
-    // 3. Finalizing phase: persist state.
+    // 3. Finalizing phase: complete the checkpoint.
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "finalizing" });
 

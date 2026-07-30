@@ -54,7 +54,7 @@ function makeOutputRecord(oid: string): ProjectedRecord {
   };
 }
 
-function emptyState(repositoryPath = "/repo"): ExtractionCheckpoint {
+function emptyCheckpoint(repositoryPath = "/repo"): ExtractionCheckpoint {
   return { generatedAt: "", repositoryPath, refs: [] };
 }
 
@@ -186,7 +186,7 @@ function baseRequest(
     remoteUrl: null,
     refs: ["main"],
     granularity: "commit",
-    priorCheckpoint: emptyState(),
+    priorCheckpoint: emptyCheckpoint(),
     sessionTimestamp: new Date("2024-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -371,7 +371,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(closeCalled).toBe(true);
   });
 
-  it("returns state only after sink.close() succeeds", async () => {
+  it("returns checkpoint only after sink.close() succeeds", async () => {
     const closeOrder: string[] = [];
 
     const trackingSink: OutputSink & { records: ProjectedRecord[] } = {
@@ -400,7 +400,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.refs).toHaveLength(1);
   });
 
-  it("state NOT returned when sink.close() throws", async () => {
+  it("checkpoint NOT returned when sink.close() throws", async () => {
     const closingFailSink: OutputSink = {
       async write() {},
       async close() {
@@ -421,7 +421,7 @@ describe("ExtractionPipeline orchestration", () => {
     await expect(coord.run(baseRequest())).rejects.toThrow("close failure");
   });
 
-  it("state NOT returned when sink.write() throws", async () => {
+  it("checkpoint NOT returned when sink.write() throws", async () => {
     const failSink: OutputSink = {
       async write() {
         throw new Error("write fail");
@@ -442,7 +442,7 @@ describe("ExtractionPipeline orchestration", () => {
     await expect(coord.run(baseRequest())).rejects.toThrow("write fail");
   });
 
-  it("returns state even when no state file persistence is active", async () => {
+  it("returns checkpoint even when no state file persistence is active", async () => {
     const deps = makeDeps({ oids: ["1".padStart(12, "0")] });
     const coord = new ExtractionPipeline(deps);
     const result = await coord.run(baseRequest());
@@ -451,7 +451,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.refs).toHaveLength(1);
   });
 
-  it("boundary-equals-head: traverser yields 0 commits, close() called, state returned", async () => {
+  it("boundary-equals-head: traverser yields 0 commits, close() called, checkpoint returned", async () => {
     const plans: readonly TraversalPlan[] = [
       {
         name: "main",
@@ -475,7 +475,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.refs[0]?.ref).toBe("main");
   });
 
-  it("zero-record run: close() called; returns empty state when empty branches", async () => {
+  it("zero-record run: close() called; returns empty checkpoint when empty branches", async () => {
     const reporter = makeProgressReporter();
     const deps = makeDeps({
       plans: [], // no branches resolved
@@ -490,7 +490,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.refs).toEqual([]);
   });
 
-  it("no-branch-head case: planner returns empty plans, zero records, empty state", async () => {
+  it("no-branch-head case: planner returns empty plans, zero records, empty checkpoint", async () => {
     const deps = makeDeps({
       plans: [],
       oids: [],
@@ -502,7 +502,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.refs).toEqual([]);
   });
 
-  it("state refs contain only resolved ref names", async () => {
+  it("checkpoint refs contain only resolved ref names", async () => {
     const plans: readonly TraversalPlan[] = [
       { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
       {
@@ -533,7 +533,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.refs.map((r) => r.ref)).toEqual(["main", "develop"]);
   });
 
-  it("non-branch refs are recorded in state.refs with their refType", async () => {
+  it("non-branch refs are recorded in checkpoint.refs with their refType", async () => {
     const plans: readonly TraversalPlan[] = [
       { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
       {
@@ -597,7 +597,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(reporter.warnings[2]).toContain("v1.0");
   });
 
-  it("emits static-ref warning for checkpoint state candidates", async () => {
+  it("emits static-ref warning for checkpoint candidates", async () => {
     const reporter = makeProgressReporter();
     const plans: readonly TraversalPlan[] = [
       {
@@ -615,7 +615,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(reporter.warnings[0]).toContain("v1.0-ann");
   });
 
-  it("state generatedAt uses request.sessionTimestamp", async () => {
+  it("checkpoint generatedAt uses request.sessionTimestamp", async () => {
     const ts = new Date("2025-06-15T12:00:00Z");
     const deps = makeDeps({ oids: ["1".padStart(12, "0")] });
     const coord = new ExtractionPipeline(deps);

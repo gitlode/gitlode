@@ -268,8 +268,8 @@ export async function executeRun(
   if (!stateStore || !incremental) {
     priorCheckpoint = createEmptyCheckpoint(input.repositoryPath);
   } else {
-    const loadedState = await dependencies.loadStateFile(stateStore);
-    if (loadedState === undefined) {
+    const loadedCheckpoint = await dependencies.loadStateFile(stateStore);
+    if (loadedCheckpoint === undefined) {
       if (missingState === "error") {
         throw new Error(`State file not found: ${stateFilePath}`);
       }
@@ -279,7 +279,7 @@ export async function executeRun(
       });
       priorCheckpoint = createEmptyCheckpoint(input.repositoryPath);
     } else {
-      priorCheckpoint = loadedState;
+      priorCheckpoint = loadedCheckpoint;
     }
   }
 

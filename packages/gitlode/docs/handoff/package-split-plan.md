@@ -8,8 +8,8 @@ This document records the agreed direction and open implementation decisions for
 No package split has been implemented yet. The package topology and high-level build strategy in
 this document are accepted as the planning baseline. The private package manifest policy and export
 boundaries and dependency classification are also accepted. Detailed TypeScript project
-configuration and the public release bundle are accepted as well. Test ownership and migration
-steps remain to be decided.
+configuration, the public release bundle, and test ownership are accepted as well. Migration steps
+remain to be decided.
 
 This is a continuation document rather than a durable source of truth. As implementation decisions
 become stable, migrate package and dependency contracts to `docs/design/`, update other affected
@@ -756,25 +756,111 @@ bundling, public dependency externalization, declaration inlining, worker resolu
 chunk, dynamic plugin loading, bundle-safe version access, shebang and exports preservation, clean
 output, and tarball installation.
 
+## Accepted Test Ownership and Integration Coverage
+
+Use three test layers:
+
+1. workspace-owned tests for domain and package-local component behavior;
+2. `gitlode` tests for application composition and integration behavior;
+3. packed-artifact tests for the public release and bundle boundary.
+
+### Workspace ownership
+
+Move tests with the production code they verify:
+
+- `support`, `instrumentation`, and `dag` tests move to `@gitlode/internal-foundation`;
+- `model` runtime tests and Git contract error tests move to `@gitlode/internal-contracts`;
+- all `git-impl` tests move to `@gitlode/git-adapters`;
+- `@gitlode/line-diff-adapters` gains focused tests for `JsLineDiffCalculator`;
+- extraction, execution, CLI, state, output, presentation, plugin runtime, plugin API, and
+  application-entrypoint tests remain in `gitlode`.
+
+Do not create nominal runtime tests for type-only contracts. Production compilation verifies those
+contracts; runtime guards and error classes continue to receive runtime tests.
+
+Tests may import their own workspace source through relative paths. Cross-workspace test imports
+must use official package exports and must never reach into another workspace's `src`, `test`, or
+unexported subpaths. Test helpers remain private to tests and must not be added to production export
+maps. Rev-dep must check these rules for test code as well as production code.
+
+Move `test/support/commit-dag.ts` to test support owned by `@gitlode/git-adapters`, because it uses
+Git adapter dependencies and Git contract types. Make foundation DAG fixtures domain-neutral so
+foundation tests do not introduce a reverse dependency on contracts. Do not create a shared
+test-utility package unless stable cross-package fixture sharing later demonstrates a concrete need.
+
+### Line-diff and application boundaries
+
+Move line-diff algorithm semantics out of extraction tests and into focused
+`@gitlode/line-diff-adapters` tests. Extraction tests should normally inject a fake
+`LineDiffCalculator` and verify invocation policy and result handling. Verify the real adapter's
+application wiring with a representative packed-artifact scenario rather than duplicating the
+adapter's semantic test matrix.
+
+Update CLI entrypoint tests to mock official package specifiers such as `@gitlode/git-adapters` and
+`@gitlode/line-diff-adapters`, not their former source-relative modules. Do not require a broader
+dependency-injection refactor solely for this split.
+
+Worker-client behavior remains covered by source-level `gitlode` tests. Actual worker-thread startup
+and its bundled relative path are verified by the packed-artifact suite.
+
+Plugin lifecycle, dynamic loading, and plugin API type tests remain owned by `gitlode`. Existing
+plugin workspace builds and tests continue to act as real consumers of `gitlode/plugin-api`.
+
+### Vitest orchestration and coverage
+
+Keep a `vitest.config.ts` and test scripts in every test-owning workspace, so each workspace remains
+independently testable. Add a root Vitest configuration using Vitest 4 `projects` to run and watch
+all workspace projects in one process. Give every project a unique package-based name and use
+`defineProject` for project configurations.
+
+Run normal root tests only after `build:dev`, because cross-workspace tests resolve official exports
+from dependency `dist` output. Keep TypeScript build watch and root Vitest watch as separate
+development processes.
+
+Produce combined monorepo coverage from the root projects configuration. Include production source
+from all workspaces, but do not add new uniform coverage thresholds as part of the package split.
+Type-only contract packages and implementation packages do not have equivalent runtime coverage
+profiles; package-specific thresholds may be introduced later if justified.
+
+### Packed-artifact test ownership
+
+Keep packed-artifact validation separate from normal source tests:
+
+```text
+test
+  → build:dev
+  → source tests for all Vitest projects
+
+test:package
+  → build:release
+  → npm pack
+  → install and test outside the monorepo
+```
+
+`test:package` is owned by `gitlode` and is required by CI and release validation, but it need not
+run on every local unit-test invocation. It verifies representative cross-boundary paths rather than
+repeating detailed domain test matrices. Its accepted scenarios are defined in the public release
+bundle section above.
+
+### Deferred test-code type checking
+
+Do not make test-code type checking part of the package-split implementation or completion
+criteria. Vitest continues to transpile and execute TypeScript tests, while production composite
+projects continue to exclude tests.
+
+After the package split is complete and stable, handle the following as a separate deferred task:
+
+- add a `tsconfig.test.json` and `typecheck:test` script to each test-owning workspace;
+- inventory and fix existing test-code type errors;
+- orchestrate test type checking from the root;
+- make the check mandatory in CI only after every workspace passes.
+
+This deferred work does not relax the package import, dependency ownership, Rev-dep, or runtime test
+requirements accepted for the split.
+
 ## Open Decisions
 
-### 1. Test ownership and integration coverage
-
-Decide which tests move with each domain and which remain application-level integration tests.
-
-Known affected areas include:
-
-- `test/git-impl`;
-- line-diff implementation use in extraction tests;
-- `test/support/commit-dag.ts`;
-- CLI tests that mock source-relative adapter modules;
-- worker tests;
-- plugin loading and plugin API type tests.
-
-The final validation strategy should include installing the packed `gitlode` tarball into a clean
-temporary project and exercising the CLI, worker, both Git adapters, and plugin loading.
-
-### 2. Migration sequence
+### 1. Migration sequence
 
 Decide whether to:
 
@@ -786,7 +872,7 @@ Decide whether to:
 Each intermediate state should build, test, and satisfy architecture checks. Avoid a migration plan
 that requires weakening dependency rules or leaving two authoritative copies of a contract.
 
-### 3. Durable documentation updates
+### 2. Durable documentation updates
 
 Implementation will require coordinated updates to at least:
 
@@ -802,9 +888,8 @@ author workflows change observably.
 
 ## Recommended Next Discussion
 
-Define test ownership and integration coverage, including which tests move with each extracted
-domain, which remain application-level tests, and how packed-artifact behavior is covered without
-duplicating lower-level tests.
+Define the migration sequence, including buildable phases, package infrastructure ordering,
+contract and implementation moves, and whether temporary compatibility facades are warranted.
 
 ## Completion Criteria
 

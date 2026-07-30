@@ -86,12 +86,13 @@ describe("dispatchWorkerRunRequest", () => {
   });
 
   it("forwards progress/diagnostic messages and resolves with result", async () => {
-    const onProgress = vi.fn();
-    const onDiagnostic = vi.fn();
+    const received: string[] = [];
+    const onProgress = vi.fn(() => received.push("progress"));
+    const onDiagnostic = vi.fn(() => received.push("diagnostic"));
 
     const promise = dispatchWorkerRunRequest(makeRequest(), {
-      onProgress,
-      onDiagnostic,
+      progressReporter: { emit: onProgress },
+      diagnosticReporter: { report: onDiagnostic },
     });
 
     const worker = lastWorker();
@@ -102,8 +103,7 @@ describe("dispatchWorkerRunRequest", () => {
     });
     worker.emit("message", {
       type: "diagnostic",
-      severity: "warn",
-      message: "warning",
+      diagnostic: { severity: "warn", message: "warning" },
     });
 
     const expected = successResult();
@@ -112,16 +112,22 @@ describe("dispatchWorkerRunRequest", () => {
       result: expected,
     });
 
-    await expect(promise).resolves.toEqual(expected);
+    await expect(
+      promise.then((result) => {
+        received.push("result");
+        return result;
+      }),
+    ).resolves.toEqual(expected);
+    expect(received).toEqual(["progress", "diagnostic", "result"]);
     expect(onProgress).toHaveBeenCalledTimes(1);
-    expect(onDiagnostic).toHaveBeenCalledWith("warn", "warning");
+    expect(onDiagnostic).toHaveBeenCalledWith({ severity: "warn", message: "warning" });
     expect(worker.terminate).toHaveBeenCalledTimes(1);
   });
 
   it("returns runtime-error when worker sends invalid payload", async () => {
     const promise = dispatchWorkerRunRequest(makeRequest(), {
-      onProgress: vi.fn(),
-      onDiagnostic: vi.fn(),
+      progressReporter: { emit: vi.fn() },
+      diagnosticReporter: { report: vi.fn() },
     });
 
     const worker = lastWorker();
@@ -136,8 +142,8 @@ describe("dispatchWorkerRunRequest", () => {
 
   it("returns runtime-error when worker emits error", async () => {
     const promise = dispatchWorkerRunRequest(makeRequest(), {
-      onProgress: vi.fn(),
-      onDiagnostic: vi.fn(),
+      progressReporter: { emit: vi.fn() },
+      diagnosticReporter: { report: vi.fn() },
     });
 
     const worker = lastWorker();
@@ -151,8 +157,8 @@ describe("dispatchWorkerRunRequest", () => {
 
   it("returns runtime-error when worker exits non-zero before result", async () => {
     const promise = dispatchWorkerRunRequest(makeRequest(), {
-      onProgress: vi.fn(),
-      onDiagnostic: vi.fn(),
+      progressReporter: { emit: vi.fn() },
+      diagnosticReporter: { report: vi.fn() },
     });
 
     const worker = lastWorker();
@@ -167,8 +173,8 @@ describe("dispatchWorkerRunRequest", () => {
 
   it("returns runtime-error when worker exits zero without result", async () => {
     const promise = dispatchWorkerRunRequest(makeRequest(), {
-      onProgress: vi.fn(),
-      onDiagnostic: vi.fn(),
+      progressReporter: { emit: vi.fn() },
+      diagnosticReporter: { report: vi.fn() },
     });
 
     const worker = lastWorker();

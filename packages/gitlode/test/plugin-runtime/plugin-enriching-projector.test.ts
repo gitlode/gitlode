@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import identityProfileFactory from "../../../plugin-identity-profile/src/index.js";
+import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type {
   CommitFact,
   Fact,
@@ -21,7 +22,6 @@ import {
   initializePlugins,
   type PluginEntry,
 } from "../../src/plugin-runtime/index.js";
-import type { ProgressReporter } from "../../src/progress/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -69,12 +69,12 @@ async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
   return results;
 }
 
-const noopReporter: ProgressReporter = { emit: () => {} };
+const noopReporter: DiagnosticReporter = { report: () => {} };
 
 class EnrichingFactProjector extends PluginEnrichingFactProjector {
   constructor(
     entries: readonly PluginEntry[],
-    reporter: ProgressReporter,
+    reporter: DiagnosticReporter,
     repoName: string,
     repoUrl: string | null,
   ) {
@@ -289,24 +289,24 @@ describe("EnrichingFactProjector — declaration order", () => {
 
 describe("EnrichingFactProjector — skip result", () => {
   it("sets namespace to null", async () => {
-    const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const diagnostics: Diagnostic[] = [];
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        diagnostics.push(diagnostic);
       },
     };
     const plugin = makePlugin(async () => ({ type: "skip" }));
     const projector = new EnrichingFactProjector([makeEntry("p", plugin)], reporter, "repo", null);
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
-    expect(warnedMessages).toHaveLength(0);
+    expect(diagnostics).toEqual([]);
   });
 
   it("sets namespace to null and emits warning when plugin throws Error", async () => {
-    const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const diagnostics: Diagnostic[] = [];
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        diagnostics.push(diagnostic);
       },
     };
     const plugin = makePlugin(async () => {
@@ -315,9 +315,16 @@ describe("EnrichingFactProjector — skip result", () => {
     const projector = new EnrichingFactProjector([makeEntry("p", plugin)], reporter, "repo", null);
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
-    expect(warnedMessages).toHaveLength(2);
-    expect(warnedMessages[0]).toContain("something went wrong");
-    expect(warnedMessages[1]).toContain("skipped fact");
+    expect(diagnostics).toEqual([
+      {
+        severity: "warn",
+        message: `Plugin "p" threw an error on fact ${"a".repeat(40)}: something went wrong`,
+      },
+      {
+        severity: "warn",
+        message: `Plugin "p" skipped fact ${"a".repeat(40)}`,
+      },
+    ]);
   });
 
   it("continues to next plugin after skip", async () => {
@@ -341,10 +348,10 @@ describe("EnrichingFactProjector — skip result", () => {
 
 describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
   it("sets namespace to null and emits warning when policy is skip-fact", async () => {
-    const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const diagnostics: Diagnostic[] = [];
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        diagnostics.push(diagnostic);
       },
     };
     const plugin = makePlugin(async () => ({ type: "fatal" }));
@@ -356,8 +363,12 @@ describe("EnrichingFactProjector — fatal + skip-fact policy", () => {
     );
     const [record] = await collect(projector.project(toAsyncIter([makeCommitFact()])));
     expect(record!.extensions?.["p"]).toBeNull();
-    expect(warnedMessages).toHaveLength(1);
-    expect(warnedMessages[0]).toContain("skipped fact");
+    expect(diagnostics).toEqual([
+      {
+        severity: "warn",
+        message: `Plugin "p" skipped fact ${"a".repeat(40)}`,
+      },
+    ]);
   });
 
   it("does not throw when plugin returns fatal with skip-fact policy", async () => {
@@ -400,9 +411,9 @@ describe("EnrichingFactProjector — fatal + fatal policy", () => {
 describe("EnrichingFactProjector — throw handling", () => {
   it("converts thrown error to fatal and applies skip-fact policy", async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => {
@@ -483,9 +494,9 @@ describe("EnrichingFactProjector — ProjectionContext", () => {
 describe("EnrichingFactProjector — warning format", () => {
   it('formats warning as Plugin "<ns>" skipped fact <oid>: <message> for commit', async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => {
@@ -509,9 +520,9 @@ describe("EnrichingFactProjector — warning format", () => {
 
   it("formats warning with <oid>/<path> for file-change facts", async () => {
     const warnedMessages: string[] = [];
-    const reporter: ProgressReporter = {
-      emit: (e) => {
-        if (e.type === "warning") warnedMessages.push(e.message);
+    const reporter: DiagnosticReporter = {
+      report: (diagnostic) => {
+        warnedMessages.push(diagnostic.message);
       },
     };
     const plugin = makePlugin(async () => {

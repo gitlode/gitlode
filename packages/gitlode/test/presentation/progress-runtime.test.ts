@@ -59,8 +59,8 @@ describe("createProgressRuntime", () => {
       styling: createStyling(false),
     });
 
-    runtime.reporter.emit({ type: "phase-start", phase: "preparing" });
-    runtime.reporter.emit({ type: "warning", message: "quiet warning" });
+    runtime.progressReporter.emit({ type: "phase-start", phase: "preparing" });
+    runtime.diagnosticReporter.report({ severity: "warn", message: "quiet warning" });
 
     expect(runtime.uiMode).toBe("quiet");
     expect(sink.records).toEqual([{ type: "writeLine", text: "[WARN] quiet warning" }]);
@@ -77,7 +77,7 @@ describe("createProgressRuntime", () => {
       styling: createStyling(true),
     });
 
-    runtime.reporter.emit({ type: "phase-start", phase: "preparing" });
+    runtime.progressReporter.emit({ type: "phase-start", phase: "preparing" });
 
     expect(runtime.uiMode).toBe("tty-interactive");
     expect(sink.records.some((record) => record.type === "rewriteLine")).toBe(true);
@@ -94,8 +94,8 @@ describe("createProgressRuntime", () => {
       styling: createStyling(false),
     });
 
-    runtime.reporter.emit({ type: "phase-start", phase: "preparing" });
-    runtime.reporter.emit({ type: "warning", message: "visible warning" });
+    runtime.progressReporter.emit({ type: "phase-start", phase: "preparing" });
+    runtime.diagnosticReporter.report({ severity: "warn", message: "visible warning" });
 
     expect(runtime.uiMode).toBe("non-tty-summary");
     expect(sink.records.some((record) => record.type === "rewriteLine")).toBe(false);

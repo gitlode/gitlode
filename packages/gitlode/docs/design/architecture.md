@@ -155,8 +155,8 @@ Files:
 
 Responsibilities:
 
-- Define execution-owned run inputs, results, and worker protocol without config-document or
-  presentation types.
+- Define execution-owned run inputs, results, reporter wiring, and a worker protocol that carries
+  foundation-domain progress and nested diagnostic values without config-document or presentation types.
 - Compose state-document loading and saving around worker dispatch, carrying only version-independent
   checkpoints across the main/worker boundary.
 - Construct concrete Git, extraction, line-diff, output, and plugin-runtime components inside the
@@ -307,7 +307,7 @@ settings, and their enforcement; it does not own the meaning of projected record
    - Deduplicate within this run.
    - Apply optional date filter.
    - Map and write output.
-7. Worker posts typed progress, diagnostic, and result messages back to execution in the main
+7. Worker posts typed progress, nested `Diagnostic`, and result messages back to execution in the main
    process.
 8. On success, execution writes new v2 state (`refs[]`) atomically before returning.
 9. Root entrypoint explicitly maps `ExecutionSuccessPayload` to presentation-owned
@@ -431,7 +431,8 @@ attach to the extraction process and add optional fields to output records.
 
 - **`src/execution/plugin-bootstrap.ts`** — run-scoped plugin bootstrap orchestration and projector
   selection.
-- **`src/progress`** — presentation-independent run phases, events, and reporter contract.
+- **`src/diagnostics`** — dependency-free host-facing diagnostic value and synchronous reporter contract.
+- **`src/progress`** — presentation-independent phase and quantitative-progress events and reporter contract.
 - **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
   stderr progress/success pipeline.
 - **`src/presentation/success-report.ts`** — successful-run summary and profile rendering.

@@ -1,3 +1,4 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 import { createRunPresenter } from "./presenter.js";
 import type { RunPresenter } from "./presenter.js";
@@ -16,10 +17,18 @@ export const stderrSink: TerminalSink = {
   },
 };
 
-function createReporter(presenter: RunPresenter): ProgressReporter {
+function createProgressReporter(presenter: RunPresenter): ProgressReporter {
   return {
     emit(event) {
       presenter.handleProgressEvent(event);
+    },
+  };
+}
+
+function createDiagnosticReporter(presenter: RunPresenter): DiagnosticReporter {
+  return {
+    report(diagnostic) {
+      presenter.renderDiagnostic(diagnostic);
     },
   };
 }
@@ -37,6 +46,7 @@ export function createProgressRuntime(options: CreateProgressRuntimeOptions): Pr
   return {
     uiMode,
     presenter,
-    reporter: createReporter(presenter),
+    progressReporter: createProgressReporter(presenter),
+    diagnosticReporter: createDiagnosticReporter(presenter),
   };
 }

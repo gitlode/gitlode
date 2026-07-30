@@ -1,3 +1,4 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 import type { RunPresenter } from "./presenter.js";
@@ -13,7 +14,8 @@ export interface RenderSuccessReportOptions {
 export interface ProgressRuntime {
   readonly uiMode: UiMode;
   readonly presenter: RunPresenter;
-  readonly reporter: ProgressReporter;
+  readonly progressReporter: ProgressReporter;
+  readonly diagnosticReporter: DiagnosticReporter;
 }
 export interface CreateProgressRuntimeOptions {
   readonly sink: TerminalSink;

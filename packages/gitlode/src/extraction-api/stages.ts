@@ -1,5 +1,5 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type { CommitOid, RefType } from "../model/index.js";
-import type { ProgressReporter } from "../progress/index.js";
 import type { RefCheckpoint } from "./extraction.js";
 import type { CommitFact, FileChangeFact } from "./facts.js";
 import type { ExtractionRange } from "./range.js";
@@ -28,7 +28,7 @@ export interface TraversalPlanningRequest {
 export interface TraversalPlanner {
   plan(
     request: TraversalPlanningRequest,
-    reporter: ProgressReporter,
+    diagnosticReporter: DiagnosticReporter,
   ): Promise<readonly TraversalPlan[]>;
 }
 
@@ -42,7 +42,10 @@ export interface CommitTraversalRequest {
 }
 
 export interface CommitTraversalExtractor {
-  extract(request: CommitTraversalRequest, reporter: ProgressReporter): AsyncIterable<CommitFact>;
+  extract(
+    request: CommitTraversalRequest,
+    diagnosticReporter: DiagnosticReporter,
+  ): AsyncIterable<CommitFact>;
 }
 
 export interface FileChangeExpander {

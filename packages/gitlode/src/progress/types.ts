@@ -11,8 +11,7 @@ export type ProgressEvent =
       readonly recordsWritten: number;
       readonly bytesWritten: number;
     }
-  | { readonly type: "phase-end"; readonly phase: ProgressPhase }
-  | { readonly type: "warning"; readonly message: string };
+  | { readonly type: "phase-end"; readonly phase: ProgressPhase };
 
 export interface ProgressReporter {
   emit(event: ProgressEvent): void;

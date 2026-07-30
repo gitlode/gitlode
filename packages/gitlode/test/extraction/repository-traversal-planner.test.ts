@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
 
+import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type { TraversalPlanningRequest } from "../../src/extraction-api/index.js";
 import { RepositoryTraversalPlanner } from "../../src/extraction/repository-traversal-planner.js";
 import { type GitAdapter, GitAdapterError } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
-import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
 
 function makeHash(n: number): CommitOid {
   return n.toString(16).padStart(40, "0") as CommitOid;
 }
 
-function makeReporter(): ProgressReporter & { warnings: string[] } {
-  const warnings: string[] = [];
+function makeReporter(): DiagnosticReporter & { diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
   return {
-    warnings,
-    emit(event: ProgressEvent) {
-      if (event.type === "warning") warnings.push(event.message);
+    diagnostics,
+    report(diagnostic: Diagnostic) {
+      diagnostics.push(diagnostic);
     },
   };
 }
@@ -99,8 +99,12 @@ describe("RepositoryTraversalPlanner planning", () => {
 
     const plans = await planner.plan(baseRequest({ refs: ["main", "gone"] }), reporter);
 
-    expect(reporter.warnings).toHaveLength(1);
-    expect(reporter.warnings[0]).toContain("gone");
+    expect(reporter.diagnostics).toEqual([
+      {
+        severity: "warn",
+        message: 'Warning: Ref "gone" no longer exists in the repository. Skipping.',
+      },
+    ]);
     expect(plans).toEqual([{ name: "main", refType: "branch", head, excludeHash: undefined }]);
   });
 

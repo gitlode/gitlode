@@ -1,6 +1,5 @@
+import type { Diagnostic, DiagnosticSeverity } from "../diagnostics/index.js";
 import { plainStyling, type Styling } from "./styling.js";
-
-export type DiagnosticSeverity = "warn" | "error";
 
 export function splitMessageLines(message: string): readonly string[] {
   return message.split(/\r?\n/);
@@ -17,11 +16,10 @@ export function formatDiagnosticLines(
 
 export function writeDiagnosticLines(
   writeLine: (line: string) => void,
-  severity: DiagnosticSeverity,
-  message: string,
+  diagnostic: Diagnostic,
   styling: Styling = plainStyling,
 ): void {
-  for (const line of formatDiagnosticLines(severity, message, styling)) {
+  for (const line of formatDiagnosticLines(diagnostic.severity, diagnostic.message, styling)) {
     writeLine(line);
   }
 }

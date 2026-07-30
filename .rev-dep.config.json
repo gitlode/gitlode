@@ -33,6 +33,11 @@
           "allow": ["src/instrumentation/**", "src/type-utils/index.ts"]
         },
         {
+          "name": "diagnostics",
+          "pattern": "src/diagnostics/**",
+          "allow": ["src/diagnostics/**"]
+        },
+        {
           "name": "progress",
           "pattern": "src/progress/**",
           "allow": ["src/progress/**", "src/type-utils/index.ts"]
@@ -91,8 +96,8 @@
           "pattern": "src/extraction-api/**",
           "allow": [
             "src/extraction-api/**",
+            "src/diagnostics/index.ts",
             "src/model/index.ts",
-            "src/progress/index.ts",
             "src/support/index.ts",
             "src/type-utils/index.ts"
           ]
@@ -102,6 +107,7 @@
           "pattern": "src/extraction/**",
           "allow": [
             "src/extraction/**",
+            "src/diagnostics/index.ts",
             "src/extraction-api/index.ts",
             "src/git/index.ts",
             "src/instrumentation/index.ts",
@@ -127,10 +133,10 @@
           "pattern": "src/plugin-runtime/**",
           "allow": [
             "src/plugin-runtime/**",
+            "src/diagnostics/index.ts",
             "src/extraction-api/index.ts",
             "src/instrumentation/index.ts",
             "src/plugin-api/index.ts",
-            "src/progress/index.ts",
             "src/support/index.ts",
             "src/type-utils/index.ts"
           ]
@@ -165,6 +171,7 @@
           "pattern": "src/presentation/**",
           "allow": [
             "src/presentation/**",
+            "src/diagnostics/index.ts",
             "src/instrumentation/index.ts",
             "src/progress/index.ts",
             "src/support/index.ts",
@@ -176,6 +183,7 @@
           "pattern": "src/execution/**",
           "allow": [
             "src/execution/**",
+            "src/diagnostics/index.ts",
             "src/extraction/index.ts",
             "src/extraction-api/index.ts",
             "src/git/index.ts",

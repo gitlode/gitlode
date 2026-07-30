@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type { FactProjector } from "../extraction-api/index.js";
 import {
   CommitFactExtractor,
@@ -35,7 +36,7 @@ import {
   validateRepositoryAccess,
 } from "./repository-context.js";
 import type {
-  ExecutionRunHandlers,
+  ExecutionRunReporters,
   ExecutionRunInput,
   ExecutionRunResult,
   ExecutionSuccessPayload,
@@ -44,9 +45,9 @@ import type {
 } from "./types.js";
 import { dispatchWorkerRunRequest } from "./worker-client.js";
 
-interface WorkerExecutionProgress {
-  readonly reporter: ProgressReporter;
-  readonly renderDiagnostic: (severity: "warn" | "error", message: string) => void;
+interface WorkerExecutionReporters {
+  readonly progressReporter: ProgressReporter;
+  readonly diagnosticReporter: DiagnosticReporter;
 }
 
 async function finishUserError(
@@ -63,7 +64,7 @@ async function finishUserError(
 
 export async function executeWorkerRunRequest(
   request: WorkerRunRequest,
-  progress: WorkerExecutionProgress,
+  reporters: WorkerExecutionReporters,
   dependencies: GitAdapterFactoryDependencies = { environment: process.env },
 ): Promise<WorkerRunResult> {
   const { input, priorCheckpoint } = request;
@@ -163,7 +164,7 @@ export async function executeWorkerRunRequest(
         pluginDeclarations,
         pluginBaseDirectory,
         baseProjector,
-        progress,
+        reporters,
         instrumentation,
       );
       if (projectorResult.kind === "termination") {
@@ -187,7 +188,8 @@ export async function executeWorkerRunRequest(
       fileChangeExpander,
       projector,
       sink,
-      reporter: progress.reporter,
+      progressReporter: reporters.progressReporter,
+      diagnosticReporter: reporters.diagnosticReporter,
       instrumentation,
     });
 
@@ -258,7 +260,7 @@ const defaultExecuteRunDependencies: ExecuteRunDependencies = {
 
 export async function executeRun(
   input: ExecutionRunInput,
-  handlers: ExecutionRunHandlers,
+  reporters: ExecutionRunReporters,
   dependencies: ExecuteRunDependencies = defaultExecuteRunDependencies,
 ): Promise<ExecutionRunResult> {
   const { incremental, missingState, stateFilePath, ...workerInput } = input;
@@ -273,8 +275,8 @@ export async function executeRun(
       if (missingState === "error") {
         throw new Error(`State file not found: ${stateFilePath}`);
       }
-      handlers.onProgress({
-        type: "warning",
+      reporters.diagnosticReporter.report({
+        severity: "warn",
         message: `State file not found: ${stateFilePath}. Falling back to full snapshot extraction.`,
       });
       priorCheckpoint = createEmptyCheckpoint(input.repositoryPath);
@@ -288,7 +290,7 @@ export async function executeRun(
       input: workerInput,
       priorCheckpoint,
     },
-    handlers,
+    reporters,
   );
 
   if (result.kind !== "success") {

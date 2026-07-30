@@ -80,6 +80,7 @@ Adopt the following package layout:
   └─ dag
 
 @gitlode/internal-contracts
+  ├─ diagnostics
   ├─ model
   ├─ progress
   ├─ extraction-api
@@ -128,20 +129,27 @@ Purpose:
 
 It contains:
 
+- `diagnostics`;
 - `model`;
 - `progress`;
 - `extraction-api`;
 - `git`;
 - `line-diff`.
 
-`progress` belongs here because `extraction-api` uses `ProgressReporter` in its stage contracts.
-Leaving `progress` in the `gitlode` package would create a package cycle:
+`diagnostics` belongs here because `extraction-api` uses the host-facing `DiagnosticReporter` in its
+stage contracts. Leaving `diagnostics` in the `gitlode` package would create a package cycle:
 
 ```text
 gitlode
   → @gitlode/internal-contracts
-      → gitlode/progress
+      → gitlode/diagnostics
 ```
+
+`progress` no longer participates in `extraction-api` after diagnostics were separated from
+progress reporting. It remains in `internal-contracts` because it is still
+implementation-independent product vocabulary shared by extraction, execution, and presentation.
+Keeping both host-facing reporting contracts in the contract package avoids making package
+placement depend on their current set of consumers.
 
 The package must not acquire extraction implementations, adapter implementations, persistence I/O,
 output implementations, plugin hosting, CLI/configuration behavior, or product-neutral helpers.
@@ -235,11 +243,13 @@ dependency does not grant every domain in the consuming package access to every 
 
 The split must satisfy all of the following conditions.
 
-### Include `progress` in `internal-contracts`
+### Include `diagnostics` and `progress` in `internal-contracts`
 
-`extraction-api` currently exposes `ProgressReporter` in traversal and extraction stage ports.
-`progress` is product-specific contract vocabulary, so it belongs in `internal-contracts`, not in
-the product-neutral foundation package.
+`extraction-api` exposes the host-facing `DiagnosticReporter` in its stage contracts, so
+`diagnostics` must be available without depending back on the `gitlode` application package.
+`progress` is likewise implementation-independent product contract vocabulary even though it is no
+longer referenced by `extraction-api`. Both belong in `internal-contracts`, not in the
+product-neutral foundation package.
 
 ### Preserve domain boundaries with subpath exports
 
@@ -251,6 +261,7 @@ import type { GitAdapter } from "@gitlode/internal-contracts/git";
 import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
 import type { ExtractionCoordinator } from "@gitlode/internal-contracts/extraction";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
 import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
 ```
@@ -300,6 +311,11 @@ The final published `gitlode` package must:
 instrumentation types, and generic branded types. Its declaration output therefore crosses both
 new private foundation packages. The release build must bundle or rewrite these type dependencies
 so plugin authors only need the public `gitlode` package.
+
+The host-facing `@gitlode/internal-contracts/diagnostics` contract is distinct from the public
+plugin-author `DiagnosticReporter` exported by `gitlode/plugin-api`. The former reports structured
+`Diagnostic` values through `report`; the latter exposes plugin-scoped `warn` and `error` methods.
+Do not merge, alias, or substitute these contracts during the package split.
 
 ## Accepted Build Strategy
 
@@ -412,6 +428,7 @@ expose only these explicit domain subpaths:
 @gitlode/internal-foundation/instrumentation
 @gitlode/internal-foundation/dag
 
+@gitlode/internal-contracts/diagnostics
 @gitlode/internal-contracts/model
 @gitlode/internal-contracts/progress
 @gitlode/internal-contracts/extraction
@@ -777,7 +794,8 @@ Move tests with the production code they verify:
   application-entrypoint tests remain in `gitlode`.
 
 Do not create nominal runtime tests for type-only contracts. Production compilation verifies those
-contracts; runtime guards and error classes continue to receive runtime tests.
+contracts, including `diagnostics`; runtime guards and error classes continue to receive runtime
+tests.
 
 Tests may import their own workspace source through relative paths. Cross-workspace test imports
 must use official package exports and must never reach into another workspace's `src`, `test`, or
@@ -921,12 +939,14 @@ foundation subpaths, update Rev-dep, and delete the old source directories.
 
 ### Phase B3: complete contracts
 
-After foundation is complete, move `progress`, `extraction-api`, `git`, and `line-diff` into
-`@gitlode/internal-contracts`. Map the source `extraction-api` domain to the package export
-`@gitlode/internal-contracts/extraction`.
+After foundation is complete, move `diagnostics`, `progress`, `extraction-api`, `git`, and
+`line-diff` into `@gitlode/internal-contracts`. Map the source `extraction-api` domain to the package
+export `@gitlode/internal-contracts/extraction`.
 
 Update all application and plugin API imports, move contract runtime tests, update dependency
-enforcement, and revalidate the bundled public declarations before moving implementations.
+enforcement, and revalidate the bundled public declarations before moving implementations. The
+declaration check must reject private diagnostics specifiers while preserving the distinct public
+plugin API diagnostic reporter contract.
 
 ### Phase B4: move adapters
 

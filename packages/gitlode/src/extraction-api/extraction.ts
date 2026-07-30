@@ -9,8 +9,7 @@ export interface RefCheckpoint {
   readonly updatedAt: string;
 }
 
-export interface ExtractionState {
-  readonly version: 2;
+export interface ExtractionCheckpoint {
   readonly generatedAt: string;
   readonly repositoryPath: AbsolutePath;
   readonly refs: readonly RefCheckpoint[];
@@ -23,7 +22,7 @@ export interface CoordinatorRequest {
   readonly refs: readonly string[];
   readonly granularity: "commit" | "file";
   readonly range?: ExtractionRange;
-  readonly priorState: ExtractionState;
+  readonly priorCheckpoint: ExtractionCheckpoint;
   /** Wall-clock time at which this extraction session started. */
   readonly sessionTimestamp: Date;
 }
@@ -33,8 +32,8 @@ export interface CoordinatorResult {
   readonly commitsTraversed: number;
   /** Refs whose heads were resolved successfully; skipped refs are omitted. */
   readonly refs: readonly string[];
-  /** Checkpoint state produced only after output completion and sink close. */
-  readonly state: ExtractionState;
+  /** Checkpoint produced only after output completion and sink close. */
+  readonly checkpoint: ExtractionCheckpoint;
   readonly skippedDiffs: number;
 }
 

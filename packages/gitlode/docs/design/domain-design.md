@@ -248,7 +248,7 @@ between text contents.
 **Purpose:** Define the facts, records, and stage contracts of gitlode extraction.
 
 - Includes canonical extraction facts, projected records, stage ports, extraction request and
-  result contracts, and the checkpoint model carried by those contracts.
+  result contracts, and the version-independent checkpoint model carried by those contracts.
 - Excludes traversal, filtering, deduplication, expansion and projection implementations, Git
   backends, output mechanics, and plugin hosting.
 - Provides the stable vocabulary used by extraction consumers without exposing product-policy
@@ -298,10 +298,11 @@ between text contents.
 
 **Purpose:** Adapt and persist checkpoint information for the extraction contract.
 
-- Includes pure validation and factories for persisted checkpoint information, persistence ports,
-  Node.js state-file reading and writing, JSON decoding, and atomic file replacement.
+- Includes the versioned state-document model, version dispatch, document validation, conversion to
+  and from the checkpoint model, persistence ports, Node.js state-file reading and writing, JSON
+  decoding, and atomic file replacement.
 - Uses the checkpoint model defined by `extraction-api`; it does not define extraction input or
-  result vocabulary.
+  result vocabulary, and persisted schema versions remain owned by this domain.
 - Excludes missing-state policy, traversal-boundary selection, CLI option validation, extraction
   execution, and unrelated application state or persistence.
 - Uses the established user-facing term `state`; its charter prevents the name from becoming a

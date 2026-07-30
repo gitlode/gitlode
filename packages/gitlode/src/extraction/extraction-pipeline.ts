@@ -3,7 +3,7 @@ import type {
   CoordinatorRequest,
   CoordinatorResult,
   ExtractionCoordinator,
-  ExtractionState,
+  ExtractionCheckpoint,
   Fact,
   RefCheckpoint,
 } from "../extraction-api/index.js";
@@ -50,7 +50,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "preparing" });
 
-    const priorRefs = request.priorState.refs;
+    const priorRefs = request.priorCheckpoint.refs;
 
     const plans = await traversalPlanner.plan(
       {
@@ -65,7 +65,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
 
     reporter.emit({ type: "phase-end", phase: "preparing" });
 
-    // Static refs (non-branch) are tracked in v2 state, but they usually produce no
+    // Static refs (non-branch) are tracked in the checkpoint, but they usually produce no
     // incremental delta unless the ref target itself changes between runs.
     for (const plan of plans) {
       if (plan.refType !== "branch") {
@@ -76,9 +76,8 @@ export class ExtractionPipeline implements ExtractionCoordinator {
       }
     }
 
-    // Build the candidate state from successfully resolved ref heads.
-    const candidateState: ExtractionState = {
-      version: 2,
+    // Build the candidate checkpoint from successfully resolved ref heads.
+    const candidateCheckpoint: ExtractionCheckpoint = {
       generatedAt: request.sessionTimestamp.toISOString(),
       repositoryPath: request.repositoryPath,
       refs: plans.map(
@@ -151,7 +150,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
     reporter.emit({ type: "phase-end", phase: "extracting" });
 
     // -----------------------------------------------------------------------
-    // 3. Finalizing phase: persist state.
+    // 3. Finalizing phase: complete the checkpoint.
     // -----------------------------------------------------------------------
     reporter.emit({ type: "phase-start", phase: "finalizing" });
 
@@ -161,7 +160,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
       recordsWritten,
       commitsTraversed,
       refs: plans.map((p) => p.name),
-      state: candidateState,
+      checkpoint: candidateCheckpoint,
       skippedDiffs: request.granularity === "file" ? fileChangeExpander.skippedDiffCount : 0,
     };
   }

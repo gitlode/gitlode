@@ -1,85 +1,121 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ExtractionState } from "../../src/extraction-api/index.js";
-import { loadStateFile, NodeStateStore, type StateStore } from "../../src/state/index.js";
+import type { ExtractionCheckpoint } from "../../src/extraction-api/index.js";
+import {
+  loadStateFile,
+  NodeStateStore,
+  saveStateFile,
+  type StateDocumentV2,
+  type StateStore,
+} from "../../src/state/index.js";
 import type { AbsolutePath } from "../../src/support/index.js";
 
-function makeStateStore(state: ExtractionState | null): StateStore {
+function makeStateStore(value: unknown | null): StateStore {
   return {
     async read() {
-      return state;
+      return value;
     },
     async write() {},
   };
 }
+const path = process.cwd() as AbsolutePath;
+const document: StateDocumentV2 = {
+  version: 2,
+  generatedAt: "2026-01-01T00:00:00.000Z",
+  repositoryPath: path,
+  refs: [{ ref: "main", refType: "branch", tipOid: "abc", updatedAt: "now" }],
+};
 
 describe("NodeStateStore", () => {
   let tmpDir: string;
-
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "gitlode-state-store-"));
   });
-
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("writes and reads state via a temp file rename", async () => {
+  it("writes and reads a v2 document with the existing JSON shape and property order", async () => {
     const stateFilePath = join(tmpDir, "state.json");
     const store = new NodeStateStore(stateFilePath);
-    const state: ExtractionState = {
-      version: 2,
-      generatedAt: "2026-01-01T00:00:00.000Z",
-      repositoryPath: process.cwd() as AbsolutePath,
-      refs: [],
-    };
-
-    await store.write(state);
-    await expect(store.read()).resolves.toEqual(state);
+    await store.write(document);
+    await expect(store.read()).resolves.toEqual(document);
+    expect(await readFile(stateFilePath, "utf8")).toBe(JSON.stringify(document, null, 2));
   });
 });
 
-describe("loadStateFile", () => {
-  it("returns an empty state when state file is missing", async () => {
-    const state = await loadStateFile(makeStateStore(null));
-
-    expect(state).toBeUndefined();
+describe("state file adaptation", () => {
+  it("returns undefined when the state file is missing", async () => {
+    await expect(loadStateFile(makeStateStore(null))).resolves.toBeUndefined();
   });
 
-  it("rejects incompatible state versions", async () => {
-    const store = makeStateStore({
-      version: 1,
-      generatedAt: "",
-      repositoryPath: process.cwd() as AbsolutePath,
-      refs: [],
+  it("loads v2 into fresh version-independent checkpoint objects and accepts unknown fields", async () => {
+    const input = { ...document, unknown: true, refs: [{ ...document.refs[0], unknown: true }] };
+    const checkpoint = await loadStateFile(makeStateStore(input));
+    expect(checkpoint).toEqual({
+      generatedAt: document.generatedAt,
+      repositoryPath: path,
+      refs: document.refs,
     });
+    expect(checkpoint).not.toBe(input);
+    expect(checkpoint?.refs).not.toBe(input.refs);
+    expect(checkpoint?.refs[0]).not.toBe(input.refs[0]);
+    expect(checkpoint).not.toHaveProperty("version");
+  });
 
-    await expect(loadStateFile(store)).rejects.toThrow(
-      "Unsupported state file version: 1. Supported version: 2.",
+  it("saves a fresh v2 document and fresh ref entries", async () => {
+    const write = vi.fn();
+    const checkpoint: ExtractionCheckpoint = {
+      generatedAt: document.generatedAt,
+      repositoryPath: path,
+      refs: [{ ref: "main", refType: "branch", tipOid: "abc", updatedAt: "now" }],
+    };
+    await saveStateFile(
+      {
+        async read() {
+          return null;
+        },
+        write,
+      },
+      checkpoint,
+    );
+    const saved = write.mock.calls[0]?.[0];
+    expect(saved).toEqual(document);
+    expect(saved).not.toBe(checkpoint);
+    expect(saved.refs[0]).not.toBe(checkpoint.refs[0]);
+  });
+
+  it("preserves the unsupported version diagnostic including missing versions", async () => {
+    await expect(loadStateFile(makeStateStore({ version: 1 }))).rejects.toThrow(
+      "Unsupported state file version: 1. Supported version: 2. Reinitialize the state file (for example, run without --incremental once with --state).",
+    );
+    await expect(loadStateFile(makeStateStore({}))).rejects.toThrow(
+      "Unsupported state file version: undefined.",
     );
   });
 
-  it("rejects invalid ref type", async () => {
-    const store = makeStateStore({
-      version: 2,
-      generatedAt: "",
-      repositoryPath: process.cwd() as AbsolutePath,
-      refs: [
-        {
-          ref: "main",
-          refType: "invalid-type",
-          tipOid: "845f01ac537d34adaae8ee77e83e1cceb73fdce7",
-          updatedAt: "2026-06-11T02:15:23.125Z",
-        },
-      ],
-    });
+  it("preserves the invalid ref type diagnostic", async () => {
+    await expect(
+      loadStateFile(
+        makeStateStore({ ...document, refs: [{ ...document.refs[0], refType: "invalid-type" }] }),
+      ),
+    ).rejects.toThrow('Invalid ref type in state file for ref "main": invalid-type');
+  });
 
-    await expect(loadStateFile(store)).rejects.toThrow(
-      'Invalid ref type in state file for ref "main": invalid-type',
+  it.each([
+    "bad",
+    1,
+    [],
+    { version: 2 },
+    { ...document, refs: [null] },
+    { ...document, refs: [{}] },
+  ])("rejects malformed document %#", async (value) => {
+    await expect(loadStateFile(makeStateStore(value))).rejects.toThrow(
+      "Invalid state file contents.",
     );
   });
 });

@@ -45,16 +45,14 @@ function makeExecutionRunInput(overrides: Partial<ExecutionRunInput> = {}): Exec
 }
 
 describe("executeRun state orchestration", () => {
-  it("loads prior state and writes returned state before resolving success", async () => {
+  it("loads a state document and saves the checkpoint returned by the worker before resolving success", async () => {
     const sideEffects: string[] = [];
-    const priorState = {
-      version: 2 as const,
+    const priorCheckpoint = {
       generatedAt: "prior",
       repositoryPath: "/repo",
       refs: [],
     };
-    const returnedState = {
-      version: 2 as const,
+    const returnedCheckpoint = {
       generatedAt: "next",
       repositoryPath: "/repo",
       refs: [{ ref: "main", refType: "branch" as const, tipOid: "abc", updatedAt: "next" }],
@@ -63,8 +61,9 @@ describe("executeRun state orchestration", () => {
       async read() {
         throw new Error("loadStateFile dependency should own state loading");
       },
-      async write(state) {
-        expect(state).toBe(returnedState);
+      async write(document) {
+        expect(document).toEqual({ version: 2, ...returnedCheckpoint });
+        expect(document).not.toBe(returnedCheckpoint);
         sideEffects.push("state-write");
       },
     };
@@ -76,10 +75,10 @@ describe("executeRun state orchestration", () => {
       async loadStateFile(store) {
         expect(store).toBe(stateStore);
         sideEffects.push("state-load");
-        return priorState;
+        return priorCheckpoint;
       },
       async dispatchWorkerRunRequest(request) {
-        expect(request.priorState).toBe(priorState);
+        expect(request.priorCheckpoint).toBe(priorCheckpoint);
         sideEffects.push("worker-dispatch");
         return {
           kind: "success",
@@ -93,7 +92,7 @@ describe("executeRun state orchestration", () => {
             profileEntries: [],
             skippedDiffs: 0,
           },
-          state: returnedState,
+          checkpoint: returnedCheckpoint,
         };
       },
     };
@@ -111,7 +110,7 @@ describe("executeRun state orchestration", () => {
     expect(sideEffects).toEqual(["state-load", "worker-dispatch", "state-write"]);
   });
 
-  it("emits the existing fallback warning and dispatches with empty state", async () => {
+  it("emits the existing fallback warning and dispatches with an empty checkpoint", async () => {
     const onProgress = vi.fn();
     const stateStore: StateStore = {
       async read() {
@@ -127,7 +126,7 @@ describe("executeRun state orchestration", () => {
         return undefined;
       },
       async dispatchWorkerRunRequest(request) {
-        expect(request.priorState.refs).toEqual([]);
+        expect(request.priorCheckpoint.refs).toEqual([]);
         return { kind: "user-error", message: "stop after state setup" };
       },
     };
@@ -145,6 +144,50 @@ describe("executeRun state orchestration", () => {
       type: "warning",
       message: "State file not found: /state.json. Falling back to full snapshot extraction.",
     });
+  });
+
+  it("does not save a successful worker checkpoint with no refs", async () => {
+    const saveStateFile = vi.fn();
+    const stateStore: StateStore = {
+      async read() {
+        return null;
+      },
+      async write() {},
+    };
+    const dependencies: ExecuteRunDependencies = {
+      createStateStore() {
+        return stateStore;
+      },
+      async loadStateFile() {
+        return { generatedAt: "prior", repositoryPath: "/repo", refs: [] };
+      },
+      async dispatchWorkerRunRequest() {
+        return {
+          kind: "success",
+          success: {
+            recordsWritten: 0,
+            commitsTraversed: 0,
+            filesCreated: 0,
+            bytesWritten: 0,
+            elapsedMs: 10,
+            refs: [],
+            profileEntries: [],
+            skippedDiffs: 0,
+          },
+          checkpoint: { generatedAt: "next", repositoryPath: "/repo", refs: [] },
+        };
+      },
+      saveStateFile,
+    };
+
+    const result = await executeRun(
+      makeExecutionRunInput(),
+      { onProgress: vi.fn(), onDiagnostic: vi.fn() },
+      dependencies,
+    );
+
+    expect(result.kind).toBe("success");
+    expect(saveStateFile).not.toHaveBeenCalled();
   });
 });
 
@@ -185,8 +228,7 @@ describe("executeWorkerRunRequest profiling", () => {
         profile: true,
         gitAdapter: "isomorphic-git",
       },
-      priorState: {
-        version: 2,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],
@@ -268,8 +310,7 @@ describe("executeWorkerRunRequest profiling", () => {
         profile: true,
         gitAdapter: "git-cli",
       },
-      priorState: {
-        version: 2,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],
@@ -348,8 +389,7 @@ describe("executeWorkerRunRequest profiling", () => {
         profile: true,
         gitAdapter: "git-cli",
       },
-      priorState: {
-        version: 2,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],
@@ -405,8 +445,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
         profile: true,
         gitAdapter,
       },
-      priorState: {
-        version: 2 as const,
+      priorCheckpoint: {
         generatedAt: "2026-01-01T00:00:00.000Z",
         repositoryPath: repoDir as AbsolutePath,
         refs: [],

@@ -3,7 +3,7 @@ export type {
   CoordinatorRequest,
   CoordinatorResult,
   ExtractionCoordinator,
-  ExtractionState,
+  ExtractionCheckpoint,
   RefCheckpoint,
 } from "./extraction.js";
 export type { ExtractionRange } from "./range.js";

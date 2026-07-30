@@ -1,4 +1,4 @@
-# CI workflow: runs generated artifact checks, format, lint, tests, and build.
+# CI workflow: validates dependencies, source, development output, and release artifacts.
 name: CI
 
 on:
@@ -30,8 +30,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check generated artifacts are up to date
-        run: npm run schema:check -w gitlode
+      - name: Check dependency versions
+        run: npm run syncpack:check
 
       - name: Format check
         run: npm run format:check
@@ -39,8 +39,26 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
+      - name: Check architecture
+        run: npm run architecture:check
+
+      - name: Build development projects
+        run: npm run build:dev
+
+      - name: Check generated artifacts are up to date
+        run: npm run schema:check -w gitlode
+
+      - name: Run source tests
         run: npm test
 
-      - name: Build
-        run: npm run build
+      - name: Collect coverage
+        run: npm run test:coverage
+
+      - name: Build release artifact
+        run: npm run build:release
+
+      - name: Validate package metadata and release output
+        run: npm run validate:package -w gitlode
+
+      - name: Test packed artifact
+        run: npm run test:package:artifact -w gitlode

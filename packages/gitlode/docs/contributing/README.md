@@ -9,5 +9,7 @@ and coding agents need while changing the codebase.
 
 ## Policies
 
+- [`build-test-release.md`](build-test-release.md): development build, root test orchestration,
+  release bundle, package validation, and publish-gate workflow.
 - [`lint-policy.md`](lint-policy.md): oxlint rule adoption policy, including rule category handling,
   LLM autonomy boundaries, severity, and review cadence.

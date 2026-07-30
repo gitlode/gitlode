@@ -296,7 +296,7 @@ export async function executeRun(
   }
 
   if (stateStore !== undefined && result.checkpoint.refs.length > 0) {
-    await dependencies?.saveStateFile?.(stateStore, result.checkpoint);
+    await (dependencies.saveStateFile ?? saveStateFile)(stateStore, result.checkpoint);
   }
 
   return {

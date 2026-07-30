@@ -59,19 +59,19 @@ for quick comparison between runs, not as a stable machine-readable export forma
 
 Useful span names include:
 
-| Span name                                       | What it measures                                                         |
-| ----------------------------------------------- | ------------------------------------------------------------------------ |
-| `gitlode.run`                                   | Overall extraction request                                               |
-| `gitlode.planning`                              | Branch-planning work before traversal begins                             |
-| `gitlode.traversal`                             | Commit traversal and commit-fact materialization                         |
-| `gitlode.projection`                            | Fact-to-output-record mapping in the active projector                    |
-| `gitlode.output.write` / `gitlode.output.close` | `OutputSink.write()` and `OutputSink.close()`                            |
-| `git.walk_commits`                              | Adapter-level commit walk operation                                      |
-| `git.file_changes`                              | Core file-change expansion for one commit                                |
-| `git.file_blob_changes`                         | Adapter blob-fact stream for one commit                                  |
-| `git.blob_read`                                 | Individual blob reads in either Git adapter                              |
-| `git.diff`                                      | `LineDiffCalculator` work owned by `FileChangeFactExpander`              |
-| `git.*` children                                | Additional Git-internal operations such as ref resolution and merge-base |
+| Span name                                       | What it measures                                                                   |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `gitlode.run`                                   | Overall extraction request                                                         |
+| `gitlode.planning`                              | Branch-planning work before traversal begins                                       |
+| `gitlode.traversal`                             | Commit traversal and commit-fact materialization                                   |
+| `gitlode.projection`                            | Fact-to-output-record mapping in the active projector                              |
+| `gitlode.output.write` / `gitlode.output.close` | `OutputSink.write()` and `OutputSink.close()`                                      |
+| `git.walk_commits`                              | Adapter-level commit walk operation                                                |
+| `gitlode.file_change_expansion`                 | Extraction-side file-change expansion for one commit                               |
+| `git.file_blob_changes`                         | Adapter blob-fact stream for one commit                                            |
+| `git.blob_read`                                 | Individual blob reads in either Git adapter                                        |
+| `line_diff.compute`                             | Concrete calculation in the default production `LineDiffCalculator` implementation |
+| `git.*` children                                | Additional Git-internal operations such as ref resolution and merge-base           |
 
 Span names are intentionally compact and dot-separated. A deeper name usually represents a local
 sub-operation that only exists as part of the parent operation.
@@ -124,7 +124,7 @@ session. Its `objects_read` and `blob_bytes` counters describe completed blob re
 Long-lived async-iterator and process spans measure wall-clock lifetime, including time suspended
 while downstream consumers work. For example, `git.cli.file_blob_batch` is not exclusive Git CPU
 time, and `git.file_blob_changes` can remain open while its consumer computes a line diff. Do not
-sum nested span totals as if they were disjoint. Use `git.blob_read`, `git.diff`, and
+sum nested span totals as if they were disjoint. Use `git.blob_read`, `line_diff.compute`, and
 `git.cli.diff_tree` for the narrower work categories.
 
 For cross-adapter benchmarks, keep the repository snapshot and extraction request identical and
@@ -133,11 +133,15 @@ compare final counts rather than JSONL line ordering. See
 
 ## File-Level Extraction
 
-In commit-granularity mode, file-expansion spans such as `git.blob_read` and `git.diff` do not
+In commit-granularity mode, file-expansion spans such as `git.blob_read` and `line_diff.compute` do not
 appear because `getFileBlobChanges()` is never called.
 
 In file-level mode (`--per-file`), these spans can help separate Git blob-read cost from diff-stat
-cost. `git.file_changes` records `changes`, `diffs`, `skipped_size`, and `skipped_binary` counters;
-adapter-level `git.file_blob_changes` records yielded A/M/D facts and blob bytes. The
+cost. `gitlode.file_change_expansion` records `changes` for processed adapter changes, `diffs` for
+valid calculations after the guards, `skipped_size` for the maximum-size guard, and
+`skipped_binary` for the binary heuristic. The default production calculator records
+`line_diff.compute`; the `LineDiffCalculator` contract does not require alternate or test
+implementations to create that span. Adapter-level `git.file_blob_changes` records yielded A/M/D
+facts and blob bytes. The
 `skipped_diffs` counter on `gitlode.extract` reports how many file-level diffs were emitted with
 `null` additions/deletions due to either binary content or the `--max-diff-size` guardrail.

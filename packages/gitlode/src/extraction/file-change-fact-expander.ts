@@ -34,7 +34,7 @@ export class FileChangeFactExpander implements FileChangeExpander {
     repositoryPath: string,
   ): AsyncIterable<FileChangeFact> {
     for await (const commit of commits) {
-      const span = this.instrumentation.startSpan("git.file_changes");
+      const span = this.instrumentation.startSpan("gitlode.file_change_expansion");
       const facts: FileChangeFact[] = [];
       let spanError: unknown;
       try {
@@ -75,8 +75,9 @@ export class FileChangeFactExpander implements FileChangeExpander {
       return { path, status: change.status, additions: null, deletions: null };
     }
 
-    const { additions, deletions } = this.instrumentation.run("git.diff", () =>
-      this.lineDiffCalculator.computeLineDiff(beforeContent, afterContent),
+    const { additions, deletions } = this.lineDiffCalculator.computeLineDiff(
+      beforeContent,
+      afterContent,
     );
     validateDiffResult(additions, deletions);
     span.incrementCounter("diffs");

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type {
   CommitFact,
   CommitTraversalRequest,
@@ -9,7 +10,6 @@ import { CommitFactExtractor } from "../../src/extraction/commit-fact-extractor.
 import { type GitAdapter, GitAdapterError, type RawCommit } from "../../src/git/index.js";
 import { noopInstrumentation } from "../../src/instrumentation/index.js";
 import type { CommitOid } from "../../src/model/index.js";
-import type { ProgressEvent, ProgressReporter } from "../../src/progress/index.js";
 
 function makeOid(n: number): CommitOid {
   return n.toString(16).padStart(12, "0") as CommitOid;
@@ -25,12 +25,12 @@ function makeRawCommit(n: number, parents: number[] = []): RawCommit {
   };
 }
 
-function makeReporter(): ProgressReporter & { warnings: string[] } {
-  const warnings: string[] = [];
+function makeReporter(): DiagnosticReporter & { diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
   return {
-    warnings,
-    emit(event: ProgressEvent) {
-      if (event.type === "warning") warnings.push(event.message);
+    diagnostics,
+    report(diagnostic: Diagnostic) {
+      diagnostics.push(diagnostic);
     },
   };
 }
@@ -366,8 +366,13 @@ describe("CommitFactExtractor traversal", () => {
       traverser.extract(baseRequest({ plans: [makePlan("main", head, staleExclude)] }), reporter),
     );
 
-    expect(reporter.warnings).toHaveLength(1);
-    expect(reporter.warnings[0]).toContain("main");
+    expect(reporter.diagnostics).toEqual([
+      {
+        severity: "warn",
+        message:
+          'Warning: Last commit hash for branch "main" no longer exists. Falling back to full extraction.',
+      },
+    ]);
     expect(facts).toHaveLength(2);
   });
 

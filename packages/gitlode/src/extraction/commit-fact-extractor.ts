@@ -1,3 +1,4 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type {
   CommitFact,
   CommitTraversalExtractor,
@@ -8,7 +9,6 @@ import type {
 import type { GitAdapter, RawCommit } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import { instrumentAsyncIterable, type Instrumentation } from "../instrumentation/index.js";
-import type { ProgressReporter } from "../progress/index.js";
 
 function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | null): CommitFact {
   return {
@@ -41,12 +41,22 @@ export class CommitFactExtractor implements CommitTraversalExtractor {
     this.instrumentation = instrumentation;
   }
 
-  extract(request: CommitTraversalRequest, reporter: ProgressReporter): AsyncIterable<CommitFact> {
+  extract(
+    request: CommitTraversalRequest,
+    diagnosticReporter: DiagnosticReporter,
+  ): AsyncIterable<CommitFact> {
     const { repositoryPath, repoName, repoUrl, plans, range } = request;
     return instrumentAsyncIterable(this.instrumentation, "gitlode.traversal", (span) => {
       span.incrementCounter("plans", plans.length);
       span.setAttribute("gitlode.range.kind", range?.type ?? "none");
-      return this.iterateCommitFacts(plans, repositoryPath, repoName, repoUrl, range, reporter);
+      return this.iterateCommitFacts(
+        plans,
+        repositoryPath,
+        repoName,
+        repoUrl,
+        range,
+        diagnosticReporter,
+      );
     });
   }
 
@@ -56,13 +66,21 @@ export class CommitFactExtractor implements CommitTraversalExtractor {
     repoName: string,
     repoUrl: string | null,
     range: ExtractionRange | undefined,
-    reporter: ProgressReporter,
+    diagnosticReporter: DiagnosticReporter,
   ): AsyncIterable<CommitFact> {
     // Run-scoped visited set shared across all branches for cross-branch deduplication.
     const visited = new Set<string>();
 
     for (const plan of plans) {
-      yield* this.traverseBranch(plan, repositoryPath, repoName, repoUrl, range, visited, reporter);
+      yield* this.traverseBranch(
+        plan,
+        repositoryPath,
+        repoName,
+        repoUrl,
+        range,
+        visited,
+        diagnosticReporter,
+      );
     }
   }
 
@@ -73,7 +91,7 @@ export class CommitFactExtractor implements CommitTraversalExtractor {
     repoUrl: string | null,
     range: ExtractionRange | undefined,
     visited: Set<string>,
-    reporter: ProgressReporter,
+    diagnosticReporter: DiagnosticReporter,
   ): AsyncIterable<CommitFact> {
     // Process a single raw commit: deduplication + --since-date skip-and-continue filter.
     // Returns null to signal "skip this commit" without aborting traversal.
@@ -102,8 +120,8 @@ export class CommitFactExtractor implements CommitTraversalExtractor {
       }
     } catch (err) {
       if (err instanceof GitAdapterError && err.code === "COMMIT_NOT_FOUND") {
-        reporter.emit({
-          type: "warning",
+        diagnosticReporter.report({
+          severity: "warn",
           message: `Warning: Last commit hash for branch "${plan.name}" no longer exists. Falling back to full extraction.`,
         });
         // Full traversal without excludeHash; already-visited commits are skipped via deduplication.

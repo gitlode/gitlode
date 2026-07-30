@@ -1,6 +1,7 @@
+import type { Diagnostic } from "../../diagnostics/index.js";
 import type { ProgressEvent, ProgressPhase } from "../../progress/index.js";
 import { cyclicAtOrThrow } from "../../support/index.js";
-import { formatDiagnosticLines, type DiagnosticSeverity } from "../diagnostics.js";
+import { formatDiagnosticLines } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";
 import { HEARTBEAT_INTERVAL_MS, SPINNER_FRAMES } from "./constants.js";
 import { formatActiveLine, formatDoneLine } from "./formatters.js";
@@ -62,14 +63,11 @@ export class ProgressController {
       case "phase-end":
         this.onPhaseEnd(event.phase);
         break;
-      case "warning":
-        this.renderDiagnostic("warn", event.message);
-        break;
     }
   }
 
-  renderDiagnostic(severity: DiagnosticSeverity, message: string): void {
-    const lines = formatDiagnosticLines(severity, message, this.styling);
+  renderDiagnostic(diagnostic: Diagnostic): void {
+    const lines = formatDiagnosticLines(diagnostic.severity, diagnostic.message, this.styling);
     if (this.mode === "tty-interactive" && this.currentPhase !== null) {
       this.sink.newline();
       for (const line of lines) {

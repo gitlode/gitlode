@@ -41,14 +41,21 @@ export class ExtractionPipeline implements ExtractionCoordinator {
   }
 
   async run(request: CoordinatorRequest): Promise<CoordinatorResult> {
-    const { traversalPlanner, traversalExtractor, fileChangeExpander, projector, sink, reporter } =
-      this.deps;
+    const {
+      traversalPlanner,
+      traversalExtractor,
+      fileChangeExpander,
+      projector,
+      sink,
+      progressReporter,
+      diagnosticReporter,
+    } = this.deps;
     const instrumentation: Instrumentation = this.deps.instrumentation;
 
     // -----------------------------------------------------------------------
     // 1. Preparing phase: plan branch traversal boundaries.
     // -----------------------------------------------------------------------
-    reporter.emit({ type: "phase-start", phase: "preparing" });
+    progressReporter.emit({ type: "phase-start", phase: "preparing" });
 
     const priorRefs = request.priorCheckpoint.refs;
 
@@ -60,17 +67,17 @@ export class ExtractionPipeline implements ExtractionCoordinator {
         priorRefs,
         range: request.range,
       },
-      reporter,
+      diagnosticReporter,
     );
 
-    reporter.emit({ type: "phase-end", phase: "preparing" });
+    progressReporter.emit({ type: "phase-end", phase: "preparing" });
 
     // Static refs (non-branch) are tracked in the checkpoint, but they usually produce no
     // incremental delta unless the ref target itself changes between runs.
     for (const plan of plans) {
       if (plan.refType !== "branch") {
-        reporter.emit({
-          type: "warning",
+        diagnosticReporter.report({
+          severity: "warn",
           message: `Warning: Ref "${plan.name}" (${plan.refType}) is included in checkpoint state, but future incremental runs usually produce no new records unless the ref target changes.`,
         });
       }
@@ -93,7 +100,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
     // -----------------------------------------------------------------------
     // 2. Extracting phase: per-branch extraction with coordinator-level dedupe.
     // -----------------------------------------------------------------------
-    reporter.emit({ type: "phase-start", phase: "extracting" });
+    progressReporter.emit({ type: "phase-start", phase: "extracting" });
 
     const allVisited = new Set<string>();
     let commitsTraversed = 0;
@@ -113,7 +120,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
             plans: [plan],
             range: request.range,
           },
-          reporter,
+          diagnosticReporter,
         );
 
         const dedupedStream = deduplicateCommits(rawStream, allVisited);
@@ -132,7 +139,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
             async () => await sink.write(record),
           );
           recordsWritten++;
-          reporter.emit({
+          progressReporter.emit({
             type: "extracting-progress",
             phase: "extracting",
             refIndex,
@@ -147,14 +154,14 @@ export class ExtractionPipeline implements ExtractionCoordinator {
       await instrumentation.runAsync("gitlode.output.close", async () => await sink.close());
     }
 
-    reporter.emit({ type: "phase-end", phase: "extracting" });
+    progressReporter.emit({ type: "phase-end", phase: "extracting" });
 
     // -----------------------------------------------------------------------
     // 3. Finalizing phase: complete the checkpoint.
     // -----------------------------------------------------------------------
-    reporter.emit({ type: "phase-start", phase: "finalizing" });
+    progressReporter.emit({ type: "phase-start", phase: "finalizing" });
 
-    reporter.emit({ type: "phase-end", phase: "finalizing" });
+    progressReporter.emit({ type: "phase-end", phase: "finalizing" });
 
     return {
       recordsWritten,

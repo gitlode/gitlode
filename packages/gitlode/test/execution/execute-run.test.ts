@@ -99,10 +99,7 @@ describe("executeRun state orchestration", () => {
 
     const result = await executeRun(
       makeExecutionRunInput(),
-      {
-        onProgress: vi.fn(),
-        onDiagnostic: vi.fn(),
-      },
+      { progressReporter: { emit: vi.fn() }, diagnosticReporter: { report: vi.fn() } },
       dependencies,
     );
 
@@ -111,7 +108,8 @@ describe("executeRun state orchestration", () => {
   });
 
   it("emits the existing fallback warning and dispatches with an empty checkpoint", async () => {
-    const onProgress = vi.fn();
+    const sideEffects: string[] = [];
+    const reportDiagnostic = vi.fn(() => sideEffects.push("diagnostic"));
     const stateStore: StateStore = {
       async read() {
         return null;
@@ -126,6 +124,7 @@ describe("executeRun state orchestration", () => {
         return undefined;
       },
       async dispatchWorkerRunRequest(request) {
+        sideEffects.push("worker-dispatch");
         expect(request.priorCheckpoint.refs).toEqual([]);
         return { kind: "user-error", message: "stop after state setup" };
       },
@@ -133,15 +132,13 @@ describe("executeRun state orchestration", () => {
 
     await executeRun(
       makeExecutionRunInput({ missingState: "snapshot" }),
-      {
-        onProgress,
-        onDiagnostic: vi.fn(),
-      },
+      { progressReporter: { emit: vi.fn() }, diagnosticReporter: { report: reportDiagnostic } },
       dependencies,
     );
 
-    expect(onProgress).toHaveBeenCalledWith({
-      type: "warning",
+    expect(sideEffects).toEqual(["diagnostic", "worker-dispatch"]);
+    expect(reportDiagnostic).toHaveBeenCalledWith({
+      severity: "warn",
       message: "State file not found: /state.json. Falling back to full snapshot extraction.",
     });
   });
@@ -182,7 +179,7 @@ describe("executeRun state orchestration", () => {
 
     const result = await executeRun(
       makeExecutionRunInput(),
-      { onProgress: vi.fn(), onDiagnostic: vi.fn() },
+      { progressReporter: { emit: vi.fn() }, diagnosticReporter: { report: vi.fn() } },
       dependencies,
     );
 
@@ -238,8 +235,8 @@ describe("executeWorkerRunRequest profiling", () => {
     const result = await executeWorkerRunRequest(
       request,
       {
-        reporter: { emit(_event: ProgressEvent) {} },
-        renderDiagnostic() {},
+        progressReporter: { emit(_event: ProgressEvent) {} },
+        diagnosticReporter: { report() {} },
       },
       { environment: {} },
     );
@@ -318,8 +315,8 @@ describe("executeWorkerRunRequest profiling", () => {
     };
 
     const result = await executeWorkerRunRequest(request, {
-      reporter: { emit(_event: ProgressEvent) {} },
-      renderDiagnostic() {},
+      progressReporter: { emit(_event: ProgressEvent) {} },
+      diagnosticReporter: { report() {} },
     });
 
     expect(result.kind).toBe("success");
@@ -397,8 +394,8 @@ describe("executeWorkerRunRequest profiling", () => {
     };
 
     const result = await executeWorkerRunRequest(request, {
-      reporter: { emit(_event: ProgressEvent) {} },
-      renderDiagnostic() {},
+      progressReporter: { emit(_event: ProgressEvent) {} },
+      diagnosticReporter: { report() {} },
     });
 
     expect(result.kind).toBe("success");
@@ -459,7 +456,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
   ) {
     return await executeWorkerRunRequest(
       await createOneCommitRequest(gitAdapter),
-      { reporter: { emit(_event: ProgressEvent) {} }, renderDiagnostic() {} },
+      { progressReporter: { emit(_event: ProgressEvent) {} }, diagnosticReporter: { report() {} } },
       { environment },
     );
   }

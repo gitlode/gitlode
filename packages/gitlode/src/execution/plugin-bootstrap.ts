@@ -1,3 +1,4 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type { FactProjector } from "../extraction-api/index.js";
 import type { Instrumentation } from "../instrumentation/index.js";
 import {
@@ -11,9 +12,9 @@ import {
 import type { ProgressReporter } from "../progress/index.js";
 import type { AbsoluteDirectoryPath } from "../support/index.js";
 
-interface PluginBootstrapProgress {
-  readonly reporter: ProgressReporter;
-  readonly renderDiagnostic: (severity: "warn" | "error", message: string) => void;
+interface PluginBootstrapReporters {
+  readonly progressReporter: ProgressReporter;
+  readonly diagnosticReporter: DiagnosticReporter;
 }
 
 type BuildPluginProjectorResult =
@@ -40,10 +41,10 @@ export async function buildPluginProjector(
   declarations: PluginDeclarations,
   baseDirectory: AbsoluteDirectoryPath,
   baseProjector: FactProjector,
-  progress: PluginBootstrapProgress,
+  reporters: PluginBootstrapReporters,
   instrumentation: Instrumentation,
 ): Promise<BuildPluginProjectorResult> {
-  progress.reporter.emit({ type: "phase-start", phase: "initializing-plugins" });
+  reporters.progressReporter.emit({ type: "phase-start", phase: "initializing-plugins" });
 
   const pluginEntriesResult = await instrumentation.runAsync(
     "gitlode.plugins.resolve_entries",
@@ -61,7 +62,7 @@ export async function buildPluginProjector(
   await instrumentation.runAsync("gitlode.plugins.check_compatibility", async () => {
     await checkPluginCompatibility(pluginEntries, declarations, baseDirectory, {
       warn(message) {
-        progress.renderDiagnostic("warn", message);
+        reporters.diagnosticReporter.report({ severity: "warn", message });
       },
     });
   });
@@ -72,10 +73,16 @@ export async function buildPluginProjector(
       span.incrementCounter("plugins", pluginEntries.length);
       return await initializePlugins(pluginEntries, (entry) => ({
         warn(message) {
-          progress.renderDiagnostic("warn", `Plugin "${entry.namespace}": ${message}`);
+          reporters.diagnosticReporter.report({
+            severity: "warn",
+            message: `Plugin "${entry.namespace}": ${message}`,
+          });
         },
         error(message) {
-          progress.renderDiagnostic("error", `Plugin "${entry.namespace}": ${message}`);
+          reporters.diagnosticReporter.report({
+            severity: "error",
+            message: `Plugin "${entry.namespace}": ${message}`,
+          });
         },
         instrumentation,
       }));
@@ -92,9 +99,13 @@ export async function buildPluginProjector(
     };
   }
 
-  progress.reporter.emit({ type: "phase-end", phase: "initializing-plugins" });
+  reporters.progressReporter.emit({ type: "phase-end", phase: "initializing-plugins" });
   return {
     kind: "success",
-    projector: new EnrichingFactProjector(baseProjector, pluginEntries, progress.reporter),
+    projector: new EnrichingFactProjector(
+      baseProjector,
+      pluginEntries,
+      reporters.diagnosticReporter,
+    ),
   };
 }

@@ -1,3 +1,4 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type {
   ExtractionRange,
   RefCheckpoint,
@@ -9,7 +10,6 @@ import type { GitAdapter } from "../git/index.js";
 import { GitAdapterError } from "../git/index.js";
 import type { Instrumentation } from "../instrumentation/index.js";
 import type { CommitOid, RefType } from "../model/index.js";
-import type { ProgressReporter } from "../progress/index.js";
 import { assertNever, getOrThrow } from "../support/index.js";
 
 function buildCheckpointKey(ref: string, refType: RefType): string {
@@ -44,7 +44,7 @@ export class RepositoryTraversalPlanner implements TraversalPlanner {
 
   async plan(
     request: TraversalPlanningRequest,
-    reporter: ProgressReporter,
+    diagnosticReporter: DiagnosticReporter,
   ): Promise<readonly TraversalPlan[]> {
     return await this.instrumentation.runAsync("gitlode.planning", async (span) => {
       const { repositoryPath, refs, mode, priorRefs, range } = request;
@@ -92,8 +92,8 @@ export class RepositoryTraversalPlanner implements TraversalPlanner {
           head = await this.adapter.resolveRef(repositoryPath, ref);
         } catch (err) {
           if (err instanceof GitAdapterError && err.code === "REF_NOT_FOUND") {
-            reporter.emit({
-              type: "warning",
+            diagnosticReporter.report({
+              severity: "warn",
               message: `Warning: Ref "${ref}" no longer exists in the repository. Skipping.`,
             });
             continue;

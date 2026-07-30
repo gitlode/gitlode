@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { Diagnostic, DiagnosticReporter } from "../../src/diagnostics/index.js";
 import type {
   CommitFact,
   CommitTraversalExtractor,
@@ -60,16 +61,24 @@ function emptyCheckpoint(repositoryPath = "/repo"): ExtractionCheckpoint {
 
 function makeProgressReporter(): ProgressReporter & {
   events: ProgressEvent[];
-  warnings: string[];
 } {
   const events: ProgressEvent[] = [];
-  const warnings: string[] = [];
   return {
     events,
-    warnings,
     emit(event: ProgressEvent) {
       events.push(event);
-      if (event.type === "warning") warnings.push(event.message);
+    },
+  };
+}
+
+function makeDiagnosticReporter(): DiagnosticReporter & {
+  diagnostics: Diagnostic[];
+} {
+  const diagnostics: Diagnostic[] = [];
+  return {
+    diagnostics,
+    report(diagnostic) {
+      diagnostics.push(diagnostic);
     },
   };
 }
@@ -172,7 +181,8 @@ function makeDeps(
     fileChangeExpander: overrides.fileChangeExpander ?? fileChangeExpander,
     projector: overrides.projector ?? projector,
     sink,
-    reporter: overrides.reporter ?? makeProgressReporter(),
+    progressReporter: overrides.progressReporter ?? makeProgressReporter(),
+    diagnosticReporter: overrides.diagnosticReporter ?? makeDiagnosticReporter(),
     instrumentation: overrides.instrumentation ?? noopInstrumentation,
   };
 }
@@ -255,7 +265,7 @@ describe("ExtractionPipeline orchestration", () => {
   it("extracting-progress events: one event emitted per record written", async () => {
     const reporter = makeProgressReporter();
     const deps = makeDeps({
-      reporter,
+      progressReporter: reporter,
       oids: ["1".padStart(12, "0"), "2".padStart(12, "0"), "3".padStart(12, "0")],
     });
     const coord = new ExtractionPipeline(deps);
@@ -270,7 +280,7 @@ describe("ExtractionPipeline orchestration", () => {
 
   it("phase event sequence: emits prepare/extract/finalize in order", async () => {
     const reporter = makeProgressReporter();
-    const deps = makeDeps({ reporter, oids: ["1".padStart(12, "0")] });
+    const deps = makeDeps({ progressReporter: reporter, oids: ["1".padStart(12, "0")] });
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest());
 
@@ -310,7 +320,7 @@ describe("ExtractionPipeline orchestration", () => {
         })();
       },
     };
-    const deps = makeDeps({ reporter, plans, traversalExtractor: traverser });
+    const deps = makeDeps({ progressReporter: reporter, plans, traversalExtractor: traverser });
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["main", "develop"] }));
 
@@ -338,7 +348,7 @@ describe("ExtractionPipeline orchestration", () => {
         return 0;
       },
     };
-    const deps = makeDeps({ reporter, sink: failingSink as never });
+    const deps = makeDeps({ progressReporter: reporter, sink: failingSink as never });
     const coord = new ExtractionPipeline(deps);
     await expect(coord.run(baseRequest())).rejects.toThrow("write failure");
 
@@ -565,7 +575,7 @@ describe("ExtractionPipeline orchestration", () => {
   });
 
   it("emits static-ref warnings for all non-branch refs (commit-oid, tag-annotated, tag-lightweight)", async () => {
-    const reporter = makeProgressReporter();
+    const reporter = makeDiagnosticReporter();
     const plans: readonly TraversalPlan[] = [
       { name: "main", refType: "branch", head: FAKE_HEAD as never, excludeHash: undefined },
       {
@@ -587,18 +597,20 @@ describe("ExtractionPipeline orchestration", () => {
         excludeHash: undefined,
       },
     ];
-    const deps = makeDeps({ plans, reporter, oids: ["1".padStart(12, "0")] });
+    const deps = makeDeps({ plans, diagnosticReporter: reporter, oids: ["1".padStart(12, "0")] });
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["main", "v1.0-ann", "abc123", "v1.0"] }));
 
-    expect(reporter.warnings).toHaveLength(3);
-    expect(reporter.warnings[0]).toContain("v1.0-ann");
-    expect(reporter.warnings[1]).toContain("abc123");
-    expect(reporter.warnings[2]).toContain("v1.0");
+    expect(reporter.diagnostics).toEqual(
+      plans.slice(1).map((plan) => ({
+        severity: "warn",
+        message: `Warning: Ref "${plan.name}" (${plan.refType}) is included in checkpoint state, but future incremental runs usually produce no new records unless the ref target changes.`,
+      })),
+    );
   });
 
   it("emits static-ref warning for checkpoint candidates", async () => {
-    const reporter = makeProgressReporter();
+    const reporter = makeDiagnosticReporter();
     const plans: readonly TraversalPlan[] = [
       {
         name: "v1.0-ann",
@@ -607,12 +619,17 @@ describe("ExtractionPipeline orchestration", () => {
         excludeHash: undefined,
       },
     ];
-    const deps = makeDeps({ plans, reporter, oids: ["1".padStart(12, "0")] });
+    const deps = makeDeps({ plans, diagnosticReporter: reporter, oids: ["1".padStart(12, "0")] });
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest({ refs: ["v1.0-ann"] }));
 
-    expect(reporter.warnings).toHaveLength(1);
-    expect(reporter.warnings[0]).toContain("v1.0-ann");
+    expect(reporter.diagnostics).toEqual([
+      {
+        severity: "warn",
+        message:
+          'Warning: Ref "v1.0-ann" (tag-annotated) is included in checkpoint state, but future incremental runs usually produce no new records unless the ref target changes.',
+      },
+    ]);
   });
 
   it("checkpoint generatedAt uses request.sessionTimestamp", async () => {

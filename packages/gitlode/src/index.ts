@@ -112,12 +112,8 @@ async function main(): Promise<void> {
 
   try {
     const result = await executeRun(toExecutionRunInput(bootstrapInput), {
-      onProgress(event) {
-        progressRuntime.reporter.emit(event);
-      },
-      onDiagnostic(severity, message) {
-        progressRuntime.presenter.renderDiagnostic(severity, message);
-      },
+      progressReporter: progressRuntime.progressReporter,
+      diagnosticReporter: progressRuntime.diagnosticReporter,
     });
 
     if (result.kind === "runtime-error") {

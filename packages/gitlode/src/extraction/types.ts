@@ -1,3 +1,4 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type {
   CommitTraversalExtractor,
   FactProjector,
@@ -16,7 +17,8 @@ export interface CoordinatorDependencies {
   /** Projector producing records accepted by the configured sink. */
   readonly projector: FactProjector;
   readonly sink: OutputSink;
-  readonly reporter: ProgressReporter;
+  readonly progressReporter: ProgressReporter;
+  readonly diagnosticReporter: DiagnosticReporter;
   /** Accumulates write spans across sink writes and close. */
   readonly instrumentation: Instrumentation;
 }

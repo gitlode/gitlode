@@ -119,7 +119,7 @@ describe("presentation createRunPresenter", () => {
       styling: plainStyling,
     });
 
-    presenter.handleProgressEvent({ type: "warning", message: "warning message" });
+    presenter.renderDiagnostic({ severity: "warn", message: "warning message" });
 
     expect(sink.records).toEqual([{ type: "writeLine", text: "[WARN] warning message" }]);
   });
@@ -135,7 +135,7 @@ describe("presentation createRunPresenter", () => {
     });
 
     presenter.handleProgressEvent({ type: "phase-start", phase: "extracting" });
-    presenter.renderDiagnostic("error", "line 1\nline 2");
+    presenter.renderDiagnostic({ severity: "error", message: "line 1\nline 2" });
 
     expect(sink.records.map((record) => record.type)).toEqual([
       "rewriteLine",

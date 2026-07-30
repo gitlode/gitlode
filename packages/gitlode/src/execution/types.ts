@@ -1,7 +1,8 @@
+import type { Diagnostic, DiagnosticReporter } from "../diagnostics/index.js";
 import type { ExtractionCheckpoint } from "../extraction-api/index.js";
 import type { ProfileSummaryEntry } from "../instrumentation/index.js";
 import type { PluginDeclarations } from "../plugin-runtime/index.js";
-import type { ProgressEvent } from "../progress/index.js";
+import type { ProgressEvent, ProgressReporter } from "../progress/index.js";
 import type { AbsoluteDirectoryPath, AbsolutePath, IsoDateTimeString } from "../support/index.js";
 
 export type ExecutionGitAdapterName = "isomorphic-git" | "git-cli";
@@ -80,18 +81,12 @@ interface ExecutionRuntimeError {
 export type WorkerRunResult = WorkerRunSuccess | ExecutionUserError | ExecutionRuntimeError;
 export type ExecutionRunResult = ExecutionRunSuccess | ExecutionUserError | ExecutionRuntimeError;
 
-export type WorkerDiagnosticSeverity = "warn" | "error";
-
-export interface ExecutionRunHandlers {
-  readonly onProgress: (event: ProgressEvent) => void;
-  readonly onDiagnostic: (severity: WorkerDiagnosticSeverity, message: string) => void;
+export interface ExecutionRunReporters {
+  readonly progressReporter: ProgressReporter;
+  readonly diagnosticReporter: DiagnosticReporter;
 }
 
 export type WorkerRunMessage =
   | { readonly type: "progress"; readonly event: ProgressEvent }
-  | {
-      readonly type: "diagnostic";
-      readonly severity: WorkerDiagnosticSeverity;
-      readonly message: string;
-    }
+  | { readonly type: "diagnostic"; readonly diagnostic: Diagnostic }
   | { readonly type: "result"; readonly result: WorkerRunResult };

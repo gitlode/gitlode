@@ -1,3 +1,4 @@
+import type { DiagnosticReporter } from "../diagnostics/index.js";
 import type {
   Fact,
   FactProjector,
@@ -6,7 +7,6 @@ import type {
   ProjectedRecord,
 } from "../extraction-api/index.js";
 import type { PluginProjectionResult, ProjectionContext } from "../plugin-api/index.js";
-import type { ProgressReporter } from "../progress/index.js";
 import { assertNever } from "../support/index.js";
 import type { PluginEntry } from "./types.js";
 
@@ -28,16 +28,16 @@ function isProjectedFileChange(record: ProjectedRecord): record is ProjectedFile
 export class EnrichingFactProjector implements FactProjector {
   private readonly baseProjector: FactProjector;
   private readonly pluginEntries: readonly PluginEntry[];
-  private readonly reporter: ProgressReporter;
+  private readonly diagnosticReporter: DiagnosticReporter;
 
   constructor(
     baseProjector: FactProjector,
     pluginEntries: readonly PluginEntry[],
-    reporter: ProgressReporter,
+    diagnosticReporter: DiagnosticReporter,
   ) {
     this.baseProjector = baseProjector;
     this.pluginEntries = pluginEntries;
-    this.reporter = reporter;
+    this.diagnosticReporter = diagnosticReporter;
   }
 
   async *project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
@@ -104,8 +104,8 @@ export class EnrichingFactProjector implements FactProjector {
       try {
         result = await plugin.project(context);
       } catch (error) {
-        this.reporter.emit({
-          type: "warning",
+        this.diagnosticReporter.report({
+          severity: "warn",
           message: `Plugin "${namespace}" threw an error on fact ${this.factId(fact)}: ${error instanceof Error ? error.message : String(error)}`,
         });
         result = { type: "fatal" };
@@ -123,8 +123,8 @@ export class EnrichingFactProjector implements FactProjector {
             throw new Error(`Plugin "${namespace}" fatal error on fact ${this.factId(fact)}`);
           }
           extensions[namespace] = null;
-          this.reporter.emit({
-            type: "warning",
+          this.diagnosticReporter.report({
+            severity: "warn",
             message: `Plugin "${namespace}" skipped fact ${this.factId(fact)}`,
           });
           break;

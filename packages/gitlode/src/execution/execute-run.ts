@@ -14,7 +14,10 @@ import {
   noopInstrumentation,
   type Instrumentation,
 } from "../instrumentation/index.js";
-import { JsLineDiffCalculator } from "../line-diff-impl/index.js";
+import {
+  JsLineDiffCalculator,
+  type JsLineDiffCalculatorDependencies,
+} from "../line-diff-impl/index.js";
 import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
 import type { ProgressReporter } from "../progress/index.js";
 import {
@@ -145,7 +148,7 @@ export async function executeWorkerRunRequest(
     const traversalExtractor = new CommitFactExtractor(gitAdapter, instrumentation);
     const fileChangeExpander = new FileChangeFactExpander(
       gitAdapter,
-      new JsLineDiffCalculator({ instrumentation }),
+      new JsLineDiffCalculator({ instrumentation } satisfies JsLineDiffCalculatorDependencies),
       instrumentation,
       extractionSettings.maxDiffSize,
     );

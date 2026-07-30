@@ -2,15 +2,12 @@
 
 ## Status
 
-This document records the agreed direction and open implementation decisions for splitting selected
+This document records the agreed direction and continuation context for splitting selected
 `packages/gitlode` source domains into private monorepo packages.
 
-No package split has been implemented yet. The package topology and high-level build strategy in
-this document are accepted as the planning baseline. The private package manifest policy and export
-boundaries and dependency classification are also accepted. Detailed TypeScript project
-configuration, the public release bundle, test ownership, and the migration sequence are accepted
-as well. No package-split design decision remains open; implementation has not started. Test-code
-type checking remains a separate deferred task.
+Phase A infrastructure is complete. No source domain or private package has been moved or created.
+The next implementation step is the Phase B1 `type-utils` and `model` vertical slice. Test-code type
+checking remains a separate deferred task.
 
 This is a continuation document rather than a durable source of truth. As implementation decisions
 become stable, migrate package and dependency contracts to `docs/design/`, update other affected
@@ -891,7 +888,7 @@ durable documentation are complete.
 
 ### Phase A: build and release infrastructure
 
-Before moving any domain, establish and validate:
+Completed before moving any domain:
 
 - TypeScript project-reference infrastructure, root solution orchestration, development build
   scripts, `.cache/tsc`, and targeted cache invalidation;
@@ -905,8 +902,24 @@ Before moving any domain, establish and validate:
   `includeDevDepsFromRoot: false`;
 - Changesets configuration capable of excluding private packages from versioning and tagging.
 
-This phase resolves release risks that do not require private packages. Because it changes how the
-published `gitlode` artifact is built, include a patch changeset for `gitlode`.
+The implementation uses the root `tsconfig.json` solution, workspace composite projects,
+`.cache/tsc/*.tsbuildinfo`, root `vitest.config.ts`, `packages/gitlode/tsdown.config.ts`,
+`tsconfig.release.json`, targeted cache invalidation, emitted-output/ATTW/package-test scripts,
+`.syncpackrc.json`, and explicit CI/release validation.
+
+Differences and implementation notes:
+
+- The future private-package bundle allowlist is present but activates a package only after its
+  manifest exists. Passing nonexistent names to the bundler is avoided until Phase B1.
+- TypeScript 7 makes tsdown select its experimental tsgo declaration path. The known upstream
+  stability notice is suppressed by exact text; every other tsdown warning fails the build.
+- `plugin-api.js` is runtime-empty because the facade currently exports only types, so Rolldown does
+  not emit a source map for that empty file. Runtime entries and shared chunks do have source maps.
+- Per-workspace `@vitest/coverage-v8` ownership is retained because each workspace exposes a
+  coverage script; Rev-dep records it as an intentional indirect Vitest provider.
+
+This phase changes the published `gitlode` build and warrants a patch changeset. The Phase A session
+intentionally did not create that changeset; the release owner must add it before release.
 
 ### Phase B1: private-package vertical slice
 
@@ -1045,8 +1058,9 @@ work remains, delete this package-split handoff.
 
 ## Recommended Next Step
 
-The planning baseline is complete. The next step, when implementation is authorized, is Phase A:
-establish and validate the build, release, and test infrastructure without moving source domains.
+Phase A is complete. The next step is Phase B1: move `type-utils` and `model` as the first
+private-package vertical slice and re-run the established development, release, declaration,
+worker, and packed-artifact gates.
 
 ## Completion Criteria
 

@@ -372,6 +372,30 @@ Tests should mirror source ownership where practical. Cross-domain integration t
 primary subject under test, while same-domain implementation tests may import the specific internal
 module they inspect.
 
+## Build and Runtime Artifacts
+
+The current monorepo has two deliberately distinct build forms.
+
+The development build uses the root TypeScript solution and project references. It emits unbundled
+NodeNext ESM, declarations, declaration maps, and source maps for `gitlode` and each plugin
+workspace. TypeScript owns dependency ordering and stores incremental state outside published output
+under `.cache/tsc/`.
+
+The public `gitlode` release uses tsdown after a successful development graph build. It emits the
+CLI, plugin API, worker entry, and shared chunks directly under `packages/gitlode/dist`. Public
+third-party runtime dependencies remain external. The worker entry is a runtime asset resolved
+relative to the bundle and is not a package export. Public declarations exist only for the package
+root and `gitlode/plugin-api`.
+
+Both builds currently use `packages/gitlode/dist`. Before tsdown cleans that directory, the release
+hook invalidates only gitlode's TypeScript build metadata. This prevents a later `tsc -b` from
+treating bundled output as current development output without deleting plugin build caches.
+
+Release validation checks emitted output and package metadata, then installs an npm tarball outside
+the monorepo and exercises the installed CLI, worker, adapters, plugin loading, schemas, and public
+types. Contributor commands and the publish gate are documented in
+[`../contributing/build-test-release.md`](../contributing/build-test-release.md).
+
 ## Profiling Instrumentation
 
 When `--profile` is set and extraction succeeds, gitlode emits per-stage timing to stderr:

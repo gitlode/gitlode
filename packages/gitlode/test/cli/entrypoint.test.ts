@@ -248,6 +248,26 @@ describe("CLI entrypoint orchestration", () => {
     expect(context.createProgressRuntime).not.toHaveBeenCalled();
   });
 
+  it("runs when the CLI entrypoint is invoked through a symbolic link", async () => {
+    const symbolicLinkPath = `${entrypointPath}.symlink`;
+    const loadBootstrapInput = vi.fn(async () => ({
+      kind: "success-terminate",
+      exitCode: 0,
+    }));
+    vi.doMock("node:fs", () => ({
+      realpathSync: vi.fn((path: string) => (path === symbolicLinkPath ? entrypointPath : path)),
+    }));
+    mockEntrypointModules({ loadBootstrapInput });
+    process.argv[1] = symbolicLinkPath;
+
+    await import("../../src/index.js");
+
+    await vi.waitFor(() => {
+      expect(loadBootstrapInput).toHaveBeenCalledTimes(1);
+    });
+    expect(process.exitCode).toBe(0);
+  });
+
   it("renders worker user-error through the progress presenter", async () => {
     const context = mockEntrypointModules({
       workerResult: vi.fn(async () => ({

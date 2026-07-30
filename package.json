@@ -11,7 +11,7 @@
     "packages/plugin-identity-profile"
   ],
   "scripts": {
-    "architecture:check": "rev-dep config run --lint-config",
+    "architecture:check": "npm run build:dev && rev-dep config run --lint-config",
     "build": "npm run build:release",
     "build:clean": "tsc -b --clean",
     "build:dev": "tsc -b",

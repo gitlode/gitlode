@@ -145,7 +145,7 @@ export async function executeWorkerRunRequest(
     const traversalExtractor = new CommitFactExtractor(gitAdapter, instrumentation);
     const fileChangeExpander = new FileChangeFactExpander(
       gitAdapter,
-      new JsLineDiffCalculator(),
+      new JsLineDiffCalculator({ instrumentation }),
       instrumentation,
       extractionSettings.maxDiffSize,
     );

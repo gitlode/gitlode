@@ -78,7 +78,12 @@
         {
           "name": "line-diff-impl",
           "pattern": "src/line-diff-impl/**",
-          "allow": ["src/line-diff-impl/**", "src/line-diff/index.ts", "src/type-utils/index.ts"]
+          "allow": [
+            "src/line-diff-impl/**",
+            "src/instrumentation/index.ts",
+            "src/line-diff/index.ts",
+            "src/type-utils/index.ts"
+          ]
         },
         {
           "name": "state",

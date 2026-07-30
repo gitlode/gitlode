@@ -140,9 +140,12 @@ Adapter-specific child spans are intentionally low-cardinality. Current `git-cli
 - `git.cli.file_blob_batch`
 - `git.cli.merge_base`
 
-Shared file-level spans include `git.file_blob_changes`, `git.blob_read`, `git.file_changes`, and
-`git.diff`. The long-lived batch spans measure process/session lifetime, not exclusive Git CPU time;
-use `git.blob_read` to inspect individual object-read work.
+File-level spans are separated by owner. Git adapters own `git.file_blob_changes` for the blob-fact
+stream and `git.blob_read` for individual reads. Extraction owns
+`gitlode.file_change_expansion` for one commit's expansion, while the default line-diff
+implementation owns `line_diff.compute` for its concrete calculation. The long-lived batch spans
+measure process/session lifetime, not exclusive Git CPU time; use `git.blob_read` to inspect
+individual object-read work.
 
 When comparing adapters, focus on:
 

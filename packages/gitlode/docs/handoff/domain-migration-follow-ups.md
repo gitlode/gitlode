@@ -58,39 +58,6 @@ examples in:
 - tests that assert span names;
 - any known external profiling consumers.
 
-## State follow-ups
-
-### Separate extraction checkpoint data from the state document schema
-
-`src/extraction-api/extraction.ts` defines `ExtractionState` with:
-
-```text
-version: 2
-```
-
-This version identifies the persisted state JSON schema. Extraction does not use it when planning or
-performing a run, so including it in the `extraction-api` contract leaks a persistence concern into
-that domain. Configuration already keeps the analogous document version in the config-owned
-`ProjectConfigurationV1` model; state should be reviewed using the same separation.
-
-Candidate follow-up:
-
-- define an extraction-api checkpoint model containing only information needed as extraction
-  input or result;
-- define a versioned state-document model in `state`, separate from the extraction checkpoint;
-- make the state boundary validate and convert the persisted document into the extraction model on
-  read;
-- convert the extraction result into the current versioned document on write;
-- keep version dispatch and unsupported-version diagnostics outside extraction-api;
-- decide whether any other persisted metadata belongs only to the state document while performing
-  this review.
-
-The change should preserve the current state JSON shape and user-facing behavior unless a separate
-schema migration is explicitly approved. Review `src/state/types.ts`, `src/state/validation.ts`,
-`src/state/node-state-store.ts`, `src/state/state-file-loader.ts`, `src/state/factories.ts`,
-execution-side state mapping, incremental extraction tests, state design documentation, and any
-future state JSON schema documentation together.
-
 ## Progress follow-ups
 
 ### Separate warnings from progress events

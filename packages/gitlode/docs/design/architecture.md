@@ -157,8 +157,8 @@ Responsibilities:
 
 - Define execution-owned run inputs, results, and worker protocol without config-document or
   presentation types.
-- Load prior state, dispatch the worker, and persist returned checkpoint state before resolving a
-  successful run.
+- Compose state-document loading and saving around worker dispatch, carrying only version-independent
+  checkpoints across the main/worker boundary.
 - Construct concrete Git, extraction, line-diff, output, and plugin-runtime components inside the
   worker.
 - Own run-scoped Git resource disposal and take the profiling snapshot only after disposal.
@@ -179,7 +179,7 @@ Responsibilities:
 
 - Define canonical commit and file-change facts and their projected record counterparts.
 - Pair facts and records by fact type.
-- Define extraction ranges, checkpoints, requests, and results.
+- Define extraction ranges, the version-independent `ExtractionCheckpoint`, requests, and results.
 - Define the traversal, expansion, projection, sink, and coordinator ports.
 - Expose extraction vocabulary without exposing policy implementations, plugin hosting, or
   persistence mechanics.
@@ -205,7 +205,7 @@ Responsibilities:
   line-diff policy independently of the Git backend.
 - Map raw commit data to output schema objects.
 - Coordinate output writer lifecycle.
-- Produce v2 checkpoint state only after successful output completion and sink close.
+- Produce a version-independent checkpoint only after successful output completion and sink close.
 
 Important behavior: for date filtering, Extraction skips old commits and continues traversal. It
 does not terminate early, because graph traversal order is not chronological.
@@ -435,9 +435,10 @@ attach to the extraction process and add optional fields to output records.
 - **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
   stderr progress/success pipeline.
 - **`src/presentation/success-report.ts`** — successful-run summary and profile rendering.
-- **`src/state`** — checkpoint persistence ports, adaptation factories, pure validation, Node.js
-  state-file loading, JSON decoding, and atomic replacement for the `extraction-api` checkpoint
-  model.
+- **`src/state`** — the versioned `StateDocumentV2` persistence model, version dispatch, structural
+  validation, read/write conversion to the `extraction-api` checkpoint, Node.js state-file loading,
+  JSON decoding, and atomic replacement. State JSON schema versions never cross into worker or
+  extraction contracts.
 - **`src/plugin-runtime/module-loader.ts`** — entrypoint resolution, dynamic import, factory
   invocation, and host registry construction.
 - **`src/plugin-runtime/compatibility-checker.ts`** — package metadata discovery and warning-only

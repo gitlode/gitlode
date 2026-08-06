@@ -88,14 +88,12 @@ export class ExtractionPipeline implements ExtractionCoordinator {
     const candidateCheckpoint: ExtractionCheckpoint = {
       generatedAt: request.sessionTimestamp.toISOString(),
       repositoryPath: request.repositoryPath,
-      refs: plans.map(
-        (plan): RefCheckpoint => ({
-          ref: plan.name,
-          refType: plan.refType,
-          tipOid: plan.head,
-          updatedAt: request.sessionTimestamp.toISOString(),
-        }),
-      ),
+      refs: plans.map((plan): RefCheckpoint => ({
+        ref: plan.name,
+        refType: plan.refType,
+        tipOid: plan.head,
+        updatedAt: request.sessionTimestamp.toISOString(),
+      })),
     };
 
     // -----------------------------------------------------------------------

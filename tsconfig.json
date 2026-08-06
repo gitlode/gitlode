@@ -6,6 +6,7 @@
     { "path": "./packages/git-adapters" },
     { "path": "./packages/line-diff-adapters" },
     { "path": "./packages/gitlode" },
+    { "path": "./packages/gitlode/tsconfig.tooling.json" },
     { "path": "./packages/plugin-assay-metrics" },
     { "path": "./packages/plugin-conventional-commits" },
     { "path": "./packages/plugin-custom-field" },

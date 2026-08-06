@@ -381,6 +381,12 @@ NodeNext ESM, declarations, declaration maps, and source maps for the four priva
 `gitlode`, and each plugin workspace. TypeScript owns dependency ordering and stores incremental
 state outside published output under `.cache/tsc/`.
 
+The root solution also registers a non-emitting gitlode tooling project for `test/`, `scripts/`,
+and package-level TypeScript configuration files. Its purpose is editor project ownership and
+consistent Node.js/tooling type resolution. It uses `noCheck` until the separately tracked
+repository-wide test-code type-checking migration fixes the existing test fixture type errors;
+production projects remain fully checked.
+
 The public `gitlode` release uses tsdown after a successful development graph build. It bundles
 `@gitlode/internal-foundation`, `@gitlode/internal-contracts`, `@gitlode/git-adapters`, and
 `@gitlode/line-diff-adapters`, while public third-party runtime dependencies remain external. It

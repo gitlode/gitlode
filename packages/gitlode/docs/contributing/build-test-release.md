@@ -8,6 +8,12 @@ artifact validation. Run commands from the repository root unless a workspace co
 All production workspaces are TypeScript composite projects. The root `tsconfig.json` is a solution
 project, and TypeScript project references determine build order.
 
+The solution also references `packages/gitlode/tsconfig.tooling.json`. This non-emitting project
+owns gitlode's tests, scripts, and TypeScript configuration files so editors use the repository's
+Node.js types and compiler settings instead of an inferred project. It currently uses `noCheck`
+because repository-wide test-code type checking remains a deferred migration; production projects
+continue to perform full type checking.
+
 ```bash
 npm run build:dev
 npm run build:watch

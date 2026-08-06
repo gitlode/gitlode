@@ -42,10 +42,10 @@
     "version-packages": "npm run changeset:version && npm run lockfile:sync"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0",
+    "@changesets/cli": "^2.31.1",
     "@vitest/coverage-v8": "^4.1.10",
-    "oxfmt": "^0.58.0",
-    "oxlint": "^1.73.0",
+    "oxfmt": "^0.62.0",
+    "oxlint": "^1.77.0",
     "rev-dep": "^2.19.1",
     "syncpack": "^15.3.2",
     "typescript": "^7.0.2",

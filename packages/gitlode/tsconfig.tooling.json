@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noCheck": true,
+    "noEmit": true,
+    "rootDir": ".",
+    "tsBuildInfoFile": "../../.cache/tsc/gitlode-tooling.tsbuildinfo"
+  },
+  "include": ["test/**/*.ts", "scripts/**/*.ts", "*.config.ts"],
+  "references": [{ "path": "./tsconfig.json" }]
+}

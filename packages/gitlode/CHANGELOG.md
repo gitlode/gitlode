@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.12.0
+
+### Minor Changes
+
+- a483d96: [Added] Added -v/--version support to the CLI to print the current gitlode version.
+- 0e54d85: [Changed] Extended the config-selectable `git-cli` adapter to discover file changes and read blob content through the system Git executable instead of delegating file extraction to isomorphic-git. File-size guards, binary detection, and line-diff computation now use shared adapter-independent orchestration, and oversized files no longer invoke the line-diff engine. The default adapter, configuration shape, and file-level output contract remain unchanged.
+
+### Patch Changes
+
+- 8761a8d: [Changed] Renamed file-level profiling spans to reflect their owning components: `git.file_changes` is now `gitlode.file_change_expansion`, and `git.diff` is now `line_diff.compute`.
+- 86af125: [Fixed] Updated invalid line-diff result diagnostics to identify the current `LineDiffCalculator` contract instead of the former `DiffAdapter` name.
+- 19c1fc4: [Fixed] Improved validation for malformed version 2 state files while preserving existing incremental state compatibility.
+- e012e96: [Fixed] Fix the installed CLI failing to start on Unix-like systems when invoked through npm's bin symlink.
+- b248d26: [Changed] Update dependencies
+- f267f21: [Fixed] Base projection profiling is now emitted for plugin-enabled runs, making profiling output consistent with non-plugin runs.
+- ac26423: [Changed] Build the public package as a validated ESM bundle while preserving the existing CLI and plugin API. Release validation now verifies the installed CLI, worker, Git adapters, plugin loading, source maps, and public TypeScript declarations from the packed artifact.
+
 ## 0.11.0
 
 ### Minor Changes

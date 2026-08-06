@@ -34,7 +34,7 @@
     "test:coverage": "npm run build:dev && vitest run --coverage"
   },
   "dependencies": {
-    "conventional-commits-parser": "^6.4.0"
+    "conventional-commits-parser": "^7.1.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.14",

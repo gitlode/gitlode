@@ -1,542 +1,325 @@
 # gitlode Architecture
 
-## Purpose
+## Purpose and scope
 
-This document is the canonical system architecture design for gitlode. Use it to understand durable
-implementation boundaries, runtime flow, design intent, and trade-offs.
+This document is the canonical software architecture design for gitlode. It describes the logical
+layers, runtime boundaries, dependency direction, execution flow, and durable design trade-offs.
+These concepts should remain valid when source domains move or repository packages are reorganized.
 
-[`domain-design.md`](domain-design.md) is the canonical source for domain classification, domain
-charters, allowed dependencies, and source import boundaries. The layer descriptions here provide a
-runtime-oriented view of those domains rather than a second domain specification.
+The physical implementation structure is documented separately:
 
-Agent-specific entrypoints such as `AGENTS.md` and `.github/instructions/*.instructions.md` may
-summarize or route to this document, but they must not replace it as the durable architecture source
-of truth.
+- [`domain-design.md`](domain-design.md) defines domain charters, package ownership, allowed
+  dependencies, import boundaries, and their enforcement.
+- [`../contributing/build-test-release.md`](../contributing/build-test-release.md) defines the
+  TypeScript build graph, development workflow, release bundling, and validation commands.
 
-## Product Context
+Specialized design documents describe individual capabilities in more detail and are linked from
+the relevant sections below. Agent-specific entrypoints may summarize or route to this document,
+but they must not replace it as the durable architecture source of truth.
+
+## Product context
 
 ### What gitlode is for
 
-gitlode is an ETL bridge between Git repositories and analytical systems (data warehouses, BI
-tools, metrics pipelines). It converts Git's graph-structured commit history into a flat,
+gitlode is an ETL bridge between Git repositories and analytical systems such as data warehouses,
+BI tools, and metrics pipelines. It converts Git's graph-structured commit history into a flat,
 streaming-friendly format that analytical systems can ingest without understanding Git internals.
 
-The analytical value gitlode targets is **aggregation**: grouping and counting commit events
-across dimensions such as author, time period, or changed file area. This kind of analysis
-requires loading the full history into a queryable system and cannot be done efficiently with
-standard git tooling.
-
-Two broad categories of aggregation motivate extraction:
+The analytical value gitlode targets is aggregation: grouping and counting commit events across
+dimensions such as author, time period, or changed file area. Two broad categories motivate
+extraction:
 
 - **People dimension**: developer activity patterns, authorship, commit frequency, team velocity,
-  review and collaboration signals.
-- **Product dimension**: release cadence, codebase evolution, branch lifecycle, technical debt
-  indicators, change velocity by area.
+  and collaboration signals.
+- **Product dimension**: release cadence, codebase evolution, branch lifecycle, technical-debt
+  indicators, and change velocity by area.
 
-gitlode's responsibility is faithful extraction. Interpretation — deriving metrics, aggregations,
-or insights from the data — belongs to the downstream system.
+gitlode is responsible for faithful extraction. Interpretation—deriving metrics, aggregations, or
+insights from the data—belongs to downstream systems.
 
-A useful design lens for output schema decisions: fields act as either **aggregation axes**
-(dimensions — who, when, what area) or **quantitative targets** (measures — how many, how much).
-A finer-grained axis is analytically useful only when the data also carries a measure that varies
-meaningfully at that granularity.
+Output fields act as either aggregation axes (who, when, or what area) or quantitative measures
+(how many or how much). Base output grains should prefer entities that are Git-native and
+analytically stable across repositories and tooling choices. Finer-grained structures derived from
+diff presentation are better treated as derived signals or pipeline enrichments unless they form a
+broadly reusable axis-and-measure pair.
 
-Base extraction output grains should therefore prefer entities that are both Git-native and analytically
-stable across repositories and tooling choices. Finer-grained structures derived from diff
-presentation may still be useful, but they are usually better treated as derived signals or
-pipeline enrichments than as default first-class output records unless they establish a reusable
-axis/measure pair with broad value.
-
-This separation is also an extensibility principle: gitlode should expose canonical Git
-facts, while organization-specific interpretation or enrichment should be attachable at the
-pipeline boundary rather than embedded into the base extraction model.
+This is also an extensibility principle: gitlode exposes canonical Git facts, while
+organization-specific interpretation and enrichment attach at the pipeline boundary rather than
+becoming part of the extraction core.
 
 ### What gitlode is not for
 
-Individual history inspection — "what commits touched this file?", "who last changed this
-line?" — is handled well by git clients and IDEs. If an analysis can be answered efficiently
-with `git log` or a standard git GUI, it is not a target use case for gitlode.
+Individual history inspection—such as finding which commits touched a file or who last changed a
+line—is already served well by Git clients and IDEs. If an analysis can be answered efficiently
+with `git log` or a standard Git GUI, it is not a target use case for gitlode.
 
 ### When incremental extraction matters
 
-Snapshot extraction (re-extracting all history on every run) is sufficient for one-time analyses
-or small repositories. Incremental extraction becomes necessary when:
+Snapshot extraction is sufficient for one-time analyses or small repositories. Incremental
+extraction becomes important when repositories change continuously, full-history reprocessing is
+too costly, or downstream ingestion is append-only or event-sourced. In those cases, state-backed
+extraction provides a durable checkpoint between successful runs.
 
-- The repository is continuously updated and the downstream system needs to stay in sync.
-- Re-processing full history on every run is too slow or too costly.
-- The downstream system uses an append-only or event-sourced ingestion model.
+### Constraints inherited from Git
 
-In these cases, `--incremental` with a state file provides a reliable checkpoint mechanism.
+Several Git properties directly constrain gitlode's guarantees:
 
-### Key implications of Git's data model
+- **Output order is not chronological or otherwise stable.** Commit DAG traversal order can differ
+  from timestamp order across merge branches. Consumers must sort by `committer.timestamp` when
+  chronological order is required.
+- **Commits carry no branch information.** A branch selects a traversal head; it is not an attribute
+  stored in the commit object. The same commit may be reachable from multiple branches.
+- **Branch refs are mutable.** Extracted data is a snapshot of reachability at extraction time, and
+  later force-pushes can invalidate inferred branch attribution.
 
-Several properties of Git's data model directly constrain what gitlode can and cannot guarantee.
-These are not limitations of gitlode — they are fundamental properties of Git objects:
+Within a single run, gitlode guarantees that every commit reachable from the requested refs and
+within the requested range appears exactly once.
 
-**Output order is not chronological or otherwise stable.** gitlode traverses the commit DAG by
-walking parent links. Across merge branches, graph traversal order does not match commit timestamp
-order. Downstream systems must sort by
-`committer.timestamp` if chronological order is required; they must not rely on line order in
-`.jsonl` output files.
+## Architectural principles
 
-**Commits carry no branch information.** A Git commit object stores only tree, parents, author,
-committer, and message. There is no branch field. "Extracting branch X" means "walk the DAG from
-the commit that ref X currently points to." The same commit can be reachable from multiple
-branches simultaneously.
+### Product policy depends on ports
 
-**Branch refs are mutable.** A branch pointer moves forward with new commits and can be rewritten
-by a force-push. Extracted data represents a snapshot of the repository at extraction time. Branch
-attribution inferred at extraction time may not hold after the repository changes.
+Extraction policy depends on contracts for repository access, line-diff calculation, output, and
+extension points. It does not depend on concrete Git backends or other infrastructure mechanics.
+This keeps policy testable and allows implementations to evolve independently.
 
-**gitlode's correctness guarantee:** every commit reachable from the specified refs, within the
-specified range, appears exactly once in a single run's output.
+### Composition depends inward
 
-## System Overview
+Concrete implementations are selected and wired at the execution boundary. Lower layers neither
+discover implementations nor depend back on orchestration. Contracts contain stable vocabulary and
+ports; implementations depend on those contracts, never the reverse.
 
-gitlode is a Node.js CLI that extracts commit history from a local Git repository and writes one
-record per line as JSON Lines (commit-granularity by default, file-granularity with `--per-file`).
+### Facts are separate from interpretation
 
-The architecture is layered:
+Repository-native facts and built-in records belong to the extraction model. Optional,
+organization-specific meaning is added through plugins after facts are extracted, rather than
+being embedded in Git adapters or base extraction policy.
 
-1. CLI layer parses arguments and builds a validated configuration.
-2. Execution layer composes one run across state persistence and the worker boundary.
-3. Extraction layer orchestrates traversal, filtering, mapping, deduplication, and checkpoint state production.
-4. Git adapter layer isolates all repository access behind a small interface.
-5. Output layer owns JSONL serialization and file rotation.
+### Work is streamed
 
-This layering keeps product policy in Extraction and implementation details in adapter/output modules.
+Commit traversal, fact production, projection, and output are streaming operations. The design
+avoids retaining a repository's complete history in memory and accepts graph traversal order as the
+corresponding trade-off.
 
-`packages/internal-foundation/src/dag/` is an internal generic DAG subsystem used below the Git adapter boundary. It owns node-ID-based traversal algorithms and graph-work instrumentation, but it is not part of the package public API. Git-specific code implements a topology port and calls the DAG subsystem; the DAG subsystem must not depend on Git commit objects, adapter caches, isomorphic-git errors, or Git-specific scheduling hints.
+### Persistence advances only after success
 
-The phase-certified prototype remains internal and is reachable from production commit walking only through an internal experimental strategy seam. Its module ownership is split so `phase-certified.ts` owns facade orchestration, instrumentation boundaries, default FIFO/preserve frontier creation, and the difference/closure frontier loops; `certified-closure.ts` owns the closure state machine for split, branch, join, terminal, and closed-boundary resolution; `phase-certified-difference-state.ts` owns include-side graph state, certified exclude integration, certified-hit classification, and final drain; and `phase-certified-types.ts` owns shared generic contracts used by those modules. Telemetry counter names and meanings, scheduling semantics, and Git-specific timestamp policy ownership remain unchanged.
+Checkpoint persistence is outside the extraction policy and occurs only after output completes
+successfully. Versioned storage documents do not cross into the worker or extraction contracts;
+those boundaries carry a version-independent checkpoint model.
 
-## Layer Responsibilities
+## Logical architecture
 
-### CLI layer
+gitlode is a Node.js CLI with five logical areas. These are responsibilities rather than package or
+directory classifications; a physical domain may support part of a layer, and a layer may be
+implemented by several domains.
 
-Files:
+```mermaid
+flowchart TB
+  boundary["Application boundary\nCLI · configuration · presentation"]
+  execution["Execution and composition\nrun lifecycle · worker boundary · state coordination"]
+  core["Product core\nextraction policy · traversal planning · projection"]
+  ports["Ports and contracts\nGit · line diff · extraction stages · output · plugins"]
+  infrastructure["Infrastructure and adapters\nGit backends · diff engine · JSONL · persistence · plugin host"]
 
-- `packages/gitlode/src/index.ts`
-- `packages/gitlode/src/cli/command-definition.ts`
-- `packages/gitlode/src/cli/option-schema.ts`
-- `packages/gitlode/src/cli/parse-options.ts`
-- `packages/gitlode/src/cli/resolve-invocation.ts`
-- `packages/gitlode/src/cli/filesystem-preflight.ts`
-- `packages/gitlode/src/cli/errors.ts`
-- `packages/gitlode/src/cli/index.ts`
+  boundary --> execution
+  execution --> core
+  execution --> infrastructure
+  core --> ports
+  infrastructure -. implements .-> ports
+```
 
-Responsibilities:
+The diagram shows dependency intent, not source ownership. The normative mapping to domains and
+packages is in [`domain-design.md`](domain-design.md).
 
-- Parse and validate command arguments.
-- Translate config loading diagnostics into CLI termination results.
-- Enforce mutual exclusion rules for differential options.
-- Resolve effective settings from CLI/config precedence and derived defaults (for example output prefix).
-- Resolve config-only Git adapter selection from `runtime.gitAdapter`.
-- Convert validated args into invocation input that the root maps to execution input.
-- Handle top-level process exit behavior and user-facing errors.
+### Application boundary
 
-In the current worker boundary design, state file reading and writing are main-process
-responsibilities orchestrated by `src/execution/execute-run.ts`. `packages/internal-contracts/src/extraction-api` defines the
-checkpoint model carried by extraction request and result contracts. Persistence ports, state-file
-adaptation, pure validation, Node.js state-file loading, and atomic replacement live in `src/state`.
+The application boundary:
 
-### Execution layer
+- parses and validates CLI input and configuration;
+- resolves precedence and derived defaults;
+- maps external input into execution-owned values;
+- selects exit behavior and renders diagnostics, progress, summaries, and profiles; and
+- keeps presentation types out of execution and product policy.
 
-Files:
+The process entrypoint is the composition point where execution results are explicitly mapped to
+presentation data. Execution and presentation do not depend on one another.
 
-- `packages/gitlode/src/execution/types.ts`
-- `packages/gitlode/src/execution/worker-client.ts`
-- `packages/gitlode/src/execution/worker-entry.ts`
-- `packages/gitlode/src/execution/execute-run.ts`
-- `packages/gitlode/src/execution/git-adapter-factory.ts`
-- `packages/gitlode/src/execution/repository-context.ts`
-- `packages/gitlode/src/execution/plugin-bootstrap.ts`
-- `packages/gitlode/src/execution/index.ts`
+### Execution and composition
 
-Responsibilities:
+Execution owns one run's lifecycle across the main process and worker boundary. It:
 
-- Define execution-owned run inputs, results, reporter wiring, and a worker protocol that carries
-  contract-domain progress and nested diagnostic values without config-document or presentation types.
-- Compose state-document loading and saving around worker dispatch, carrying only version-independent
-  checkpoints across the main/worker boundary.
-- Construct concrete Git, extraction, line-diff, output, and plugin-runtime components inside the
-  worker.
-- Own run-scoped Git resource disposal and take the profiling snapshot only after disposal.
-- Resolve repository metadata and translate worker failures into the execution result contract.
+- coordinates state loading, worker dispatch, and successful state replacement;
+- constructs concrete repository, line-diff, extraction, output, and plugin components;
+- owns run-scoped resource disposal;
+- transports presentation-independent diagnostics and progress; and
+- translates worker failures into an application-level result.
 
-### Extraction API
+Execution may know both contracts and concrete implementations because it is the composition
+layer. That exception does not grant product domains the same dependency direction.
 
-Files:
+### Product core
 
-- `packages/internal-contracts/src/extraction-api/facts.ts`
-- `packages/internal-contracts/src/extraction-api/records.ts`
-- `packages/internal-contracts/src/extraction-api/range.ts`
-- `packages/internal-contracts/src/extraction-api/stages.ts`
-- `packages/internal-contracts/src/extraction-api/extraction.ts`
-- `packages/internal-contracts/src/extraction-api/index.ts`
+The extraction core owns product policy. It:
 
-Responsibilities:
+- plans traversal for requested refs and incremental ranges;
+- traverses and deduplicates commits within a run;
+- applies date and exclusion policies without assuming chronological traversal;
+- expands repository file facts and decides when line diff is applicable;
+- projects canonical facts into records;
+- coordinates the output sink lifecycle; and
+- produces a version-independent checkpoint only after successful output completion.
 
-- Define canonical commit and file-change facts and their projected record counterparts.
-- Pair facts and records by fact type.
-- Define extraction ranges, the version-independent `ExtractionCheckpoint`, requests, and results.
-- Define the traversal, expansion, projection, sink, and coordinator ports.
-- Expose extraction vocabulary without exposing policy implementations, plugin hosting, or
-  persistence mechanics.
+For date filtering, old commits are skipped but traversal continues because commit graph order is
+not chronological.
 
-### Extraction layer
+### Ports and contracts
 
-Files:
+Ports define the vocabulary exchanged across architecture boundaries:
 
-- `packages/gitlode/src/extraction/extraction-pipeline.ts`
-- `packages/gitlode/src/extraction/repository-traversal-planner.ts`
-- `packages/gitlode/src/extraction/commit-fact-extractor.ts`
-- `packages/gitlode/src/extraction/file-change-fact-expander.ts`
-- `packages/gitlode/src/extraction/built-in-fact-projector.ts`
-- `packages/gitlode/src/extraction/types.ts`
-- `packages/gitlode/src/extraction/index.ts`
+- canonical commit and file-change facts and their projected records;
+- extraction ranges, checkpoints, requests, results, and stage contracts;
+- Git repository access and typed operational failures;
+- line-based diff calculation;
+- output sinks; and
+- plugin initialization and projection contracts.
 
-Responsibilities:
+Contracts expose no concrete backend selection, plugin-host machinery, storage-document version,
+or presentation policy.
 
-- Coordinate ref traversal through the adapter.
-- Apply differential behavior for `--state`, `--since-ref`, and `--since-date`.
-- Deduplicate commits across refs in one run.
-- Expand adapter-provided file-blob facts into file-change facts, applying size, binary, and
-  line-diff policy independently of the Git backend.
-- Map raw commit data to output schema objects.
-- Coordinate output writer lifecycle.
-- Produce a version-independent checkpoint only after successful output completion and sink close.
+### Infrastructure and adapters
 
-Important behavior: for date filtering, Extraction skips old commits and continues traversal. It
-does not terminate early, because graph traversal order is not chronological.
+Infrastructure implements ports and owns technology-specific behavior:
 
-### Plugin API
+- Git backends resolve refs, traverse commits, and read object data;
+- the generic DAG subsystem supplies Git-neutral traversal algorithms below the Git adapter;
+- line-diff implementations calculate additions and deletions without owning extraction policy;
+- output infrastructure serializes JSONL and rotates files;
+- state infrastructure validates and atomically replaces versioned state documents; and
+- the plugin host resolves modules, checks compatibility, initializes plugins, and decorates
+  projection.
 
-Files:
+Git adapters yield repository-native file and blob facts. They do not infer rename semantics or
+own line-diff eligibility. The extraction core owns size and binary guards before invoking the
+line-diff port. Detailed Git implementation choices are documented in
+[`git-adapters.md`](git-adapters.md).
 
-- `packages/gitlode/src/plugin-api/types.ts`
-- `packages/gitlode/src/plugin-api/index.ts`
-- `packages/gitlode/src/plugin-api.ts` (package-export facade)
+## End-to-end runtime flow
 
-Responsibilities:
-
-- Define the contracts implemented and returned by plugin authors.
-- Define initialization and projection results, failure policies, namespaces, projection contexts,
-  and the runtime context available to plugins.
-- Depend on extraction facts and records without depending on extraction implementations or plugin
-  host machinery.
-- Keep module loading, compatibility checks, initialization orchestration, and host registries
-  outside the public API.
-
-### Git adapter layer
-
-Files:
-
-- `packages/internal-contracts/src/git/types.ts`
-- `packages/internal-contracts/src/git/errors.ts`
-- `packages/internal-contracts/src/git/index.ts`
-- `packages/git-adapters/src/git-impl/isomorphic-git-adapter.ts`
-- `packages/git-adapters/src/git-impl/git-cli-adapter.ts`
-- `packages/git-adapters/src/git-impl/git-cli-commit-parser.ts`
-- `packages/git-adapters/src/git-impl/git-cli-raw-diff.ts`
-- `packages/git-adapters/src/git-impl/git-cli-cat-file-batch.ts`
-
-Responsibilities:
-
-- Resolve refs to commit object IDs (OIDs).
-- Detect repository object format (defaulting to `sha1` when unset).
-- Read origin URL when available.
-- Traverse commits reachable from a head commit, optionally excluding history reachable from `excludeHash`.
-- Implement the commit DAG topology port used by the internal `packages/internal-foundation/src/dag` traversal subsystem.
-- Keep invocation-scoped commit object caching shared between topology reads and yielded-commit materialization.
-- Record adapter-level commit read/cache/yield telemetry and translate library/runtime failures into `GitAdapterError` codes.
-- Yield deterministic file-backed blob facts with path, OID, mode, and content; do not infer renames
-  or compute line-level diffs.
-- Keep Git CLI commit parsing, raw-diff parsing, and cat-file batch protocol mechanics outside the
-  adapter facade.
-- Act as a run-scoped `AsyncDisposable` resource whose construction owner closes backend resources.
-
-The default adapter uses isomorphic-git internally and keeps those details from leaking upward. Commit traversal uses the generic `packages/internal-foundation/src/dag` certified-lazy strategy as the production default, with a Git adapter-injected LIFO/preserve frontier. Git child timestamp scheduling hints and the timestamp-priority frontier experiment are owned by `packages/git-adapters/src/git-impl/commit-traversal/`; phase-certified traversal remains an internal prototype, but `IsomorphicGitAdapter` can select it for internal experiments via `GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL`. The
-config-only `runtime.gitAdapter` setting selects the Git implementation. The default value is
-`isomorphic-git`; `git-cli` uses the Git executable for traversal and blob acquisition. Durable
-adapter-selection and implementation-boundary details live in `docs/design/git-adapters.md`.
-
-Line-diff computation is defined independently of repository access in `packages/internal-contracts/src/line-diff` and
-implemented in `packages/line-diff-adapters/src/line-diff-impl`. `FileChangeFactExpander` delegates calculation to the
-`LineDiffCalculator` contract. The default implementation (`JsLineDiffCalculator`) receives the
-run-scoped instrumentation instance and owns `line_diff.compute` around its complete concrete
-calculation, including UTF-8 decoding, `diffLines`, aggregation, and result construction. The
-contract remains independent of instrumentation, so alternate implementations own any measurement
-they require. `FileChangeFactExpander` owns `gitlode.file_change_expansion` around one commit's
-complete expansion, including adapter iteration, guards, calculation calls, validation, and fact
-construction. Before invoking the calculator, the expander applies
-`--max-diff-size` to both loaded contents, then applies the NUL-byte heuristic to the first 8,000
-bytes. Either skip produces `additions: null` and `deletions: null`. This orchestration layer is the
-sole owner of derived file-change policy; Git adapters and line-diff calculators do not own it.
-
-### Output layer
-
-Files:
-
-- `packages/gitlode/src/output/jsonl-file-writer.ts`
-- `packages/gitlode/src/output/jsonl-output-sink.ts`
-- `packages/gitlode/src/output/utils.ts`
-- `packages/gitlode/src/output/index.ts`
-
-Responsibilities:
-
-- Adapt projected records to the extraction output-sink contract.
-- Serialize projected records as JSONL lines.
-- Track line and byte thresholds.
-- Rotate output files when either threshold is reached.
-- Guarantee LF line endings.
-
-Extraction receives only the sink contract. Output owns JSONL serialization, file naming, rotation
-settings, and their enforcement; it does not own the meaning of projected records.
-
-## End-to-End Runtime Flow
-
-1. CLI parses args, validates rules, and resolves runtime extraction inputs.
-2. Root entrypoint (`src/index.ts`) creates the presentation runtime and maps CLI input to execution
-   input.
-3. Execution loads prior state when configured and dispatches one `WorkerRunRequest` through
-   `src/execution/worker-client.ts`.
-4. Worker entry (`src/execution/worker-entry.ts`) invokes worker-side composition in
-   `src/execution/execute-run.ts`.
-5. Worker-side execution builds stage instances and calls `ExtractionPipeline.run()`.
-6. For each requested ref:
-   - Resolve ref head.
-   - Classify runtime ref type.
-   - Determine exclusion boundary (exact checkpoint match, or branch merge-base fallback for newly added branches).
-   - Traverse commits from adapter.
-   - Deduplicate within this run.
-   - Apply optional date filter.
-   - Map and write output.
-7. Worker posts typed progress, nested `Diagnostic`, and result messages back to execution in the main
+1. The application boundary parses arguments, loads configuration, and resolves an invocation.
+2. The process composition root creates presentation collaborators and maps the invocation to an
+   execution request.
+3. Execution loads prior state when configured and dispatches a worker request carrying only
+   version-independent values.
+4. Worker-side execution constructs concrete adapters, the extraction pipeline, output, and plugin
+   runtime.
+5. Plugins are loaded and initialized when configured, and their projector decorates the built-in
+   projector.
+6. For each requested ref, extraction resolves the head and exclusion boundary, traverses commits,
+   deduplicates them, applies filters, expands facts when required, projects records, and streams
+   them to the sink.
+7. The worker returns progress, diagnostics, the extraction result, and profiling data to the main
    process.
-8. On success, execution writes new v2 state (`refs[]`) atomically before returning.
-9. Root entrypoint explicitly maps `ExecutionSuccessPayload` to presentation-owned
-   `SuccessReportData`, then renders the summary/profile.
+8. After successful output completion, execution atomically persists the new checkpoint.
+9. The process boundary maps the execution result to presentation data and determines the exit
+   behavior.
 
-## Design Decisions and Trade-offs
+## Cross-cutting concerns
+
+### Diagnostics, progress, and presentation
+
+Diagnostics and progress are presentation-independent values that may cross the worker boundary.
+Lower layers report structured information but do not select terminal UI, formatting, or exit
+behavior. Presentation owns rendering, and the application boundary performs explicit mappings
+between execution and presentation models.
+
+### Profiling and instrumentation
+
+Instrumentation is run-scoped and follows operation ownership: the component performing an
+operation records its measurement. Execution owns the total run measurement, product stages own
+planning, traversal, projection, and write measurements, and concrete adapters may report their
+internal work without adding instrumentation to stable product ports.
+
+Profiling summaries cross the worker boundary as data. The `--profile` option controls detailed
+measurement and rendering, while `--quiet` suppresses presentation. Operations that do not occur in
+a mode—for example file expansion during commit-granularity extraction—produce no corresponding
+measurement.
+
+### Plugin extension boundary
+
+Plugins attach at projection, after canonical facts have been extracted. The plugin host decorates
+an injected base projector; it does not duplicate base projection or invoke plugins from Git or
+output infrastructure. Initialization is a host responsibility and precedes extraction.
+
+This placement preserves the base output model while allowing optional enrichment. The public
+contract, compatibility behavior, and examples are documented in [`plugins.md`](plugins.md).
+
+### Public and repository-internal boundaries
+
+Logical architecture does not require repository domains to be independently published. Private
+workspace packages enforce source ownership during development, while the public release presents
+one `gitlode` runtime and its plugin API. The exact package topology belongs to
+[`domain-design.md`](domain-design.md); build and bundling mechanics belong to
+[`../contributing/build-test-release.md`](../contributing/build-test-release.md).
+
+## Design decisions and trade-offs
 
 ### Adapter boundary over direct library calls
 
-Why:
-
-- Keeps Extraction testable with fakes.
-- Limits dependency blast radius if Git backend changes later.
-
-Trade-off:
-
-- Requires explicit error mapping and adapter maintenance.
+Depending on ports keeps extraction testable and limits the impact of replacing a Git or line-diff
+implementation. The cost is explicit contract design, error translation, and adapter maintenance.
 
 ### Streaming traversal and writing
 
-Why:
-
-- Supports repositories with large history.
-- Avoids loading all commits into memory.
-
-Trade-off:
-
-- Output ordering is graph traversal order, not chronological order.
+Streaming supports repositories with large histories without loading all commits into memory. The
+trade-off is graph traversal order rather than chronological output order.
 
 ### State write after successful output only
 
-Why:
-
-- Prevents advancing checkpoints on partial failures.
-
-Trade-off:
-
-- Failed runs may redo already-traversed work on retry.
+Delaying checkpoint replacement prevents partial runs from advancing durable state. Failed runs
+may consequently repeat already completed traversal on retry.
 
 ### Session-level deduplication
 
-Why:
+Deduplicating within one run prevents duplicates when requested refs share history. It does not by
+itself eliminate duplicates across independent runs when reachability changes or new branches are
+introduced.
 
-- Avoids duplicates when branches share history in one execution.
+### Worker isolation
 
-Trade-off:
+Repository extraction runs behind a worker boundary so the main process retains ownership of
+application lifecycle, presentation, and durable state coordination. This requires explicit,
+serializable protocols and keeps storage-document and UI-specific types out of worker contracts.
 
-- Does not solve cross-run duplicates when new branches are introduced later.
+### Private implementation packages
 
-## Source Organization
+Repository packages make ownership and dependency direction enforceable without turning those
+boundaries into public compatibility promises. The public release bundles private implementation
+code, at the cost of maintaining distinct development and release build forms.
 
-Top-level source directories are the domains used by the layer descriptions above. Their normative
-charters, dependency allowlist, and barrel-import convention are defined in
-[`domain-design.md`](domain-design.md).
+## Extensibility
 
-Tests should mirror source ownership where practical. Cross-domain integration tests live with the
-primary subject under test, while same-domain implementation tests may import the specific internal
-module they inspect.
+The architecture deliberately leaves the following seams open:
 
-## Build and Runtime Artifacts
+- additional Git and line-diff implementations behind existing ports;
+- additional output formats behind the output-sink boundary;
+- organization-specific record enrichment through plugins;
+- alternative cross-run deduplication and incremental-range policies; and
+- changes to progress or presentation without coupling them to execution policy.
 
-The current monorepo has two deliberately distinct build forms.
-
-The development build uses the root TypeScript solution and project references. It emits unbundled
-NodeNext ESM, declarations, declaration maps, and source maps for the four private workspaces,
-`gitlode`, and each plugin workspace. TypeScript owns dependency ordering and stores incremental
-state outside published output under `.cache/tsc/`.
-
-The root solution also registers a non-emitting gitlode tooling project for `test/`, `scripts/`,
-and package-level TypeScript configuration files. Its purpose is editor project ownership and
-consistent Node.js/tooling type resolution. It uses `noCheck` until the separately tracked
-repository-wide test-code type-checking migration fixes the existing test fixture type errors;
-production projects remain fully checked.
-
-The public `gitlode` release uses tsdown after a successful development graph build. It bundles
-`@gitlode/internal-foundation`, `@gitlode/internal-contracts`, `@gitlode/git-adapters`, and
-`@gitlode/line-diff-adapters`, while public third-party runtime dependencies remain external. It
-emits the CLI, plugin API, worker entry, and shared chunks directly under `packages/gitlode/dist`.
-The worker entry is a runtime asset resolved relative to the bundle and is not a package export.
-Public declarations exist only for the package root and `gitlode/plugin-api`, with private types
-inlined.
-
-Both builds currently use `packages/gitlode/dist`. Before tsdown cleans that directory, the release
-hook invalidates only gitlode's TypeScript build metadata. This prevents a later `tsc -b` from
-treating bundled output as current development output without deleting plugin build caches.
-
-Release validation separates three responsibilities: tsdown produces the public artifact, standard
-publint validates packed package metadata, and a product-focused system test installs an npm
-tarball outside the monorepo. The system test exercises the installed CLI, worker, both Git
-adapters, representative line diff output, plugin loading, the published schema, and public
-NodeNext TypeScript types. It does not custom-validate source maps or tsdown's internal output
-structure. Contributor commands and the publish gate are documented in
-[`../contributing/build-test-release.md`](../contributing/build-test-release.md).
-
-## Profiling Instrumentation
-
-When `--profile` is set and extraction succeeds, gitlode emits per-stage timing to stderr:
-
-```
-Profile
-  elapsed                      : wall=  18.40ms  work=  18.40ms
-  elapsed/planning             : wall=   1.10ms  work=   1.10ms
-  elapsed/traversal            : wall=   8.25ms  work=   8.25ms
-  elapsed/projection           : wall=   3.75ms  work=   3.75ms
-  elapsed/write                : wall=   2.10ms  work=   2.10ms
-  elapsed/git/blob-read        : wall=   0.80ms  work=   0.80ms
-  elapsed/git/diff             : wall=   1.45ms  work=   1.45ms
-```
-
-Profiling entries are accumulated by the stage that owns each operation:
-
-| Entry path                 | Owning stage                                                  | What is measured                                                       |
-| -------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `elapsed`                  | `packages/gitlode/src/execution/execute-run.ts` root profiler | Total extraction wall/work duration                                    |
-| `elapsed/planning`         | `BranchTraversalPlanner`                                      | Branch-head resolution and exclude-hash planning                       |
-| `elapsed/traversal`        | `CommitTraversalExtractor`                                    | Commit traversal and commit-fact materialization                       |
-| `elapsed/projection`       | `CommitRecordProjector` / `FileChangeRecordProjector`         | Fact-to-output-record mapping                                          |
-| `elapsed/write`            | `ExtractionCoordinator`                                       | `sink.write()` and `sink.close()` only (not checkpoint write)          |
-| `elapsed/git/blob-read`    | `IsomorphicGitAdapter`                                        | Time reading file content blobs from the Git object store              |
-| `elapsed/git/diff`         | `IsomorphicGitAdapter`                                        | Time computing line-level diff statistics per file                     |
-| `elapsed/git/...` children | `IsomorphicGitAdapter`                                        | Additional Git-internal sub-stages such as `resolve-ref` and traversal |
-
-A `StageProfiler` object is created per run inside `packages/gitlode/src/execution/execute-run.ts`
-and passed to each stage constructor. `IsomorphicGitAdapter` accepts profiling through its concrete
-dependency object (not on the `GitAdapter` interface). This keeps the `GitAdapter` contract stable
-while enabling profiling of adapter internals without mutable post-construction wiring.
-
-The worker success payload includes the profiling summary on every successful run. The root
-`elapsed` entry is always present. The `--profile` flag controls stderr rendering of the aligned
-profile block and, via the current CLI wiring, enables the detailed stage profilers beneath the
-root entry.
-
-In commit-granularity mode (no `--per-file`), file-expansion spans such as `git.blob_read` and
-`line_diff.compute` are absent because `getFileBlobChanges()` is never called.
-
-`--quiet` suppresses the profile block together with the normal progress and summary output.
-
-- User input and validation errors are surfaced with clear single-line messages.
-- Adapter operational failures are represented as typed `GitAdapterError` values.
-- Runtime failures preserve debugging detail at the top level.
-
-## Extensibility Notes
-
-Areas that can evolve with low coupling impact:
-
-- Additional output formats by adding new writers behind Extraction mapping.
-- Progress reporting and post-run summaries in CLI and/or extraction result shape.
-- Cross-run deduplication strategies using merge-base heuristics.
-
-## Plugin Runtime
-
-The plugin system (introduced in v0.7.0) provides a structured boundary at which custom logic can
-attach to the extraction process and add optional fields to output records.
-
-### Layer responsibilities
-
-- **`src/execution/plugin-bootstrap.ts`** — run-scoped plugin bootstrap orchestration and projector
-  selection.
-- **`packages/internal-contracts/src/diagnostics`** — dependency-free host-facing diagnostic value and synchronous reporter contract.
-- **`packages/internal-contracts/src/progress`** — presentation-independent phase and quantitative-progress events and reporter contract.
-- **`src/presentation/progress-runtime.ts`** — UI-mode selection and presenter wiring for the
-  stderr progress/success pipeline.
-- **`src/presentation/success-report.ts`** — successful-run summary and profile rendering.
-- **`src/state`** — the versioned `StateDocumentV2` persistence model, version dispatch, structural
-  validation, read/write conversion to the `extraction-api` checkpoint, Node.js state-file loading,
-  JSON decoding, and atomic replacement. State JSON schema versions never cross into worker or
-  extraction contracts.
-- **`src/plugin-runtime/module-loader.ts`** — entrypoint resolution, dynamic import, factory
-  invocation, and host registry construction.
-- **`src/plugin-runtime/compatibility-checker.ts`** — package metadata discovery and warning-only
-  peer-version checks.
-- **`src/plugin-runtime/initializer.ts`** — parallel plugin initialization and normalized outcomes.
-- **`src/plugin-runtime/plugin-enriching-projector.ts`** — `EnrichingFactProjector` decorates an
-  injected base projector and calls each configured plugin per fact in declaration order.
-- **`src/plugin-api`** — plugin-author contracts such as `ProjectorPlugin`, `PluginFactory`,
-  initialization and projection results, projection context, failure policy, and namespace.
-- **`src/plugin-runtime/types.ts`** — host-only declarations, registry records, setup results, and
-  initialization outcomes.
-- **`packages/internal-contracts/src/extraction-api/records.ts`** — projected record shapes and the serialized extension value,
-  including the host-owned `null` sentinel.
-
-### Process and execution wiring
-
-`src/index.ts` is the process boundary. It parses CLI input, creates presentation collaborators,
-maps CLI input to execution input, and maps execution results to stderr rendering and exit-code
-selection. Execution and presentation do not depend on one another; their values meet only through
-the explicit mappings at this composition root. `src/execution/worker-client.ts` owns prior-state
-loading, worker dispatch, and the final state write.
-
-When `--config` is provided:
-
-1. Config is loaded and validated by the generic loader (`src/cli/config/loader.ts`).
-2. Effective settings are merged (refs/range/output/repository/profile) using CLI-over-config precedence.
-3. Plugin entries are resolved and instantiated from the validated `extensions` subsection (`resolvePluginEntries`).
-4. Per-entry profilers are attached if effective profiling is enabled.
-5. `init()` is called in parallel on all entries (`initializePlugins`). Any fatal result aborts.
-6. `EnrichingFactProjector` decorates the base `BuiltInFactProjector`.
-7. Progress phase `"initializing-plugins"` runs before `"preparing"` only when `extensions` is present.
-
-When no `extensions` section is present, plugin loading and initialization are skipped,
-`BuiltInFactProjector` is used directly, and `extensions` is omitted from output.
-
-### Boundary rules
-
-- Plugins must not be invoked from within the Git adapter or Output layer.
-- `EnrichingFactProjector` receives the base `FactProjector` contract and does not depend on the
-  extraction implementation.
-- Base projection remains the injected projector's responsibility and is not duplicated by the
-  plugin host.
-- Plugin initialization belongs to `plugin-runtime/initializer.ts`; `EnrichingFactProjector` never
-  calls `init()`.
-
-For the full plugin contract and example, see [docs/design/plugins.md](plugins.md).
-
-## Non-goals in current design
+## Non-goals
 
 - Chronological ordering guarantees in output line sequence.
 - Global deduplication across independent runs.
 - Branch metadata embedded into commit objects.
+- Public compatibility guarantees for private repository packages.
 
-## References
+## Related design documents
 
-- `README.md`
-- `packages/gitlode/docs/design/cli.md`
-- `packages/gitlode/docs/design/git-traversal.md`
-- `packages/gitlode/docs/design/schema.md`
-- `packages/gitlode/docs/design/plugins.md`
+- [`domain-design.md`](domain-design.md) — domains, package topology, imports, and enforcement.
+- [`git-adapters.md`](git-adapters.md) — Git backend selection and implementation boundaries.
+- [`git-traversal.md`](git-traversal.md) — commit DAG traversal design.
+- [`plugins.md`](plugins.md) — plugin contract and runtime behavior.
+- [`cli.md`](cli.md) — CLI behavior and configuration boundary.
+- [`schema.md`](schema.md) — output schema design.
+- [`../contributing/build-test-release.md`](../contributing/build-test-release.md) — development,
+  test, bundle, and release validation workflow.

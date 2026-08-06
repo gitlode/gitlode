@@ -2,14 +2,17 @@
 
 ## Purpose
 
-This document defines how gitlode divides its source code into domains and how those domains may
-depend on one another. Its purpose is to make future classification decisions repeatable: adding,
-splitting, merging, or renaming a domain should follow the same principles rather than depend on an
-ad hoc judgment about the files involved at the time.
+This document defines how gitlode divides its source code into domains and packages and how those
+units may depend on one another. Its purpose is to make future classification decisions repeatable:
+adding, splitting, merging, moving, or renaming a domain should follow the same principles rather
+than depend on an ad hoc judgment about the files involved at the time.
 
-This document is the canonical source for domain charters, dependency rules, and source import
-boundaries. [`architecture.md`](architecture.md) describes the wider system architecture and uses
-these domains to explain runtime responsibilities.
+This document is the canonical source for domain charters, package ownership, dependency rules,
+official package surfaces, source import boundaries, and architecture enforcement.
+[`architecture.md`](architecture.md) describes the logical software architecture without making
+the current domain or package arrangement part of that architecture. Build order, TypeScript
+projects, release bundling, and validation commands are documented in
+[`../contributing/build-test-release.md`](../contributing/build-test-release.md).
 
 ## 1. Domain Design Principles
 
@@ -144,20 +147,6 @@ directions are added separately after the domain charters are accepted.
 
 Domains are not split in anticipation of a possible future need. A domain is reconsidered when a
 concrete change exposes a boundary described in Section 1.4.
-
-The domains are owned by these production workspaces:
-
-| Workspace                      | Domains                                                                                                               |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `@gitlode/internal-foundation` | `type-utils`, `support`, `instrumentation`, `dag`                                                                     |
-| `@gitlode/internal-contracts`  | `diagnostics`, `model`, `progress`, `extraction-api`, `git`, `line-diff`                                              |
-| `@gitlode/git-adapters`        | `git-impl`                                                                                                            |
-| `@gitlode/line-diff-adapters`  | `line-diff-impl`                                                                                                      |
-| `gitlode`                      | application, composition, extraction implementation, CLI, config, output, state, presentation, and plugin API/runtime |
-
-The four scoped workspaces are private implementation details fixed at version `0.0.0`. Foundation
-and contract packages expose only explicit domain subpaths; adapter packages expose their cohesive
-roots, with Git traversal selection isolated under `@gitlode/git-adapters/experimental`.
 
 ### 2.1 `type-utils`
 
@@ -442,14 +431,84 @@ The allowlist applies to both type-only and runtime imports. The dependency kind
 when reviewing a domain's dependency envelope, but `import type` does not bypass the domain
 boundary.
 
-## 3. Supporting Guidance
+## 3. Package Topology
 
-### 3.1 Dependency views
+Domains are logical units of source ownership. Packages are repository and build units that group
+those domains. Moving a domain between packages does not by itself change its charter or its place
+in the software architecture.
+
+### 3.1 Package ownership
+
+The production workspaces own these domains and application responsibilities:
+
+| Workspace                      | Owned source                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `@gitlode/internal-foundation` | `type-utils`, `support`, `instrumentation`, `dag`                                                            |
+| `@gitlode/internal-contracts`  | `diagnostics`, `model`, `progress`, `extraction-api`, `git`, `line-diff`                                     |
+| `@gitlode/git-adapters`        | `git-impl`                                                                                                   |
+| `@gitlode/line-diff-adapters`  | `line-diff-impl`                                                                                             |
+| `gitlode`                      | application composition, extraction policy, CLI, config, output, state, presentation, and plugin API/runtime |
+
+The four scoped workspaces are private repository implementation details fixed at version `0.0.0`.
+They create enforceable development boundaries without establishing public compatibility
+contracts. The public `gitlode` release bundles their JavaScript and declarations, so consumers do
+not install them or observe private package specifiers. Build and bundling mechanics are defined in
+[`../contributing/build-test-release.md`](../contributing/build-test-release.md).
+
+### 3.2 Package dependency envelope
+
+The direct production package dependency envelope is:
+
+- `@gitlode/internal-foundation` has no production package dependencies.
+- `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation`.
+- `@gitlode/git-adapters` depends on `@gitlode/internal-contracts`,
+  `@gitlode/internal-foundation`, and `isomorphic-git`.
+- `@gitlode/line-diff-adapters` depends on `@gitlode/internal-contracts` and `diff`.
+- `gitlode` uses all four private packages as development and release-build inputs.
+
+A package dependency makes another workspace reachable; it does not grant permission to every
+domain in that workspace. Each import must independently satisfy the closed domain allowlist in
+Section 2.22. Conversely, the domain allowlist cannot authorize an import when the importing
+package has no package-level dependency path to its target.
+
+### 3.3 Official package surfaces
+
+The official private-package exports are:
+
+- `@gitlode/internal-foundation/type-utils`, `/support`, `/instrumentation`, and `/dag`; the package
+  root has no export.
+- `@gitlode/internal-contracts/diagnostics`, `/model`, `/progress`, `/extraction`, `/git`, and
+  `/line-diff`; the package root has no export. The source domain named `extraction-api` maps to the
+  package export `@gitlode/internal-contracts/extraction`.
+- `@gitlode/git-adapters` and `@gitlode/git-adapters/experimental`. The `experimental` subpath is
+  the unstable Git traversal-selection surface.
+- `@gitlode/line-diff-adapters`.
+
+Foundation and contract packages expose explicit domain subpaths rather than a broad root barrel.
+The cohesive adapter packages expose their implementation root, with unstable selection mechanics
+isolated from the normal Git adapter surface.
+
+Cross-workspace production and test imports must use these official exports. Relative imports into
+another workspace's `src`, `test`, or `dist` do not form supported repository boundaries.
+
+### 3.4 Process entrypoints
+
+Root-level entrypoint modules in the public package are facades, not domains:
+
+- `src/index.ts` is the executable and top-level process boundary.
+- `src/plugin-api.ts` is the package export facade for `gitlode/plugin-api`.
+
+These modules connect external consumers to the owning domains and should not accumulate product
+policy or implementation details.
+
+## 4. Supporting Guidance
+
+### 4.1 Dependency views
 
 The diagrams in this section are views of the closed allowlist in Section 2.22, not independent
 rules. An arrow from `A` to `B` means that domain `A` may directly depend on domain `B`.
 
-#### 3.1.1 Structural domain graph
+#### 4.1.1 Structural domain graph
 
 This view shows the structural domain dependencies while omitting `type-utils`, `support`, and
 `instrumentation`, together with edges to them. `type-utils` is global. `support` and
@@ -562,7 +621,7 @@ flowchart TB
 The grouping is explanatory rather than an additional layer model. In particular, a group does not
 grant dependencies between its members.
 
-#### 3.1.2 Extraction core
+#### 4.1.2 Extraction core
 
 This view removes CLI, configuration, presentation, and cross-cutting dependencies such as
 `type-utils`, `support`, `instrumentation`, `diagnostics`, and `progress`. It also suppresses direct composition
@@ -634,7 +693,7 @@ contracts, and execution wires the concrete components into a run. State persist
 domain because no production consumer needs its contract without also accepting its Node.js
 implementation dependency.
 
-### 3.2 Source layout and imports
+### 4.2 Source layout and imports
 
 - A top-level directory under a production workspace's `src/` represents a domain. Nested
   directories organize modules within that domain unless explicitly documented otherwise.
@@ -645,7 +704,7 @@ implementation dependency.
 - A barrel represents the domain contract. If consumers require materially different dependency
   envelopes, reconsider the domain boundary instead of bypassing the barrel with deep imports.
 
-### 3.3 Enforcement
+### 4.3 Enforcement
 
 Run `npm run architecture:check` from the repository root after changing source boundaries or
 dependencies. The check uses Rev-dep to:
@@ -674,50 +733,3 @@ compare them in both directions: every accepted dependency must be representable
 configuration must not grant dependencies absent from this document. Reviews must also preserve
 charter constraints that the dependency graph does not express directly, especially that
 `type-utils` has no external dependencies and emits no runtime code.
-
-### 3.4 Package and process entrypoints
-
-The direct production package dependency envelope is:
-
-- `@gitlode/internal-foundation` has no production package dependencies.
-- `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation`.
-- `@gitlode/git-adapters` depends on `@gitlode/internal-contracts`,
-  `@gitlode/internal-foundation`, and `isomorphic-git`.
-- `@gitlode/line-diff-adapters` depends on `@gitlode/internal-contracts` and `diff`.
-- `gitlode` uses all four private packages as development and release-build inputs. Its release
-  bundles their JavaScript and declarations, while public runtime dependencies including `diff`
-  and `isomorphic-git` remain external.
-
-This package graph limits which workspaces can be reached; it does not grant permission to every
-domain in a dependency. Every import must also satisfy the domain allowlist in Section 2.22.
-
-The official private-package exports are:
-
-- `@gitlode/internal-foundation/type-utils`, `/support`, `/instrumentation`, and `/dag`; the package
-  root has no export.
-- `@gitlode/internal-contracts/diagnostics`, `/model`, `/progress`, `/extraction`, `/git`, and
-  `/line-diff`; the package root has no export. The source domain named `extraction-api` maps to the
-  package export `@gitlode/internal-contracts/extraction`.
-- `@gitlode/git-adapters` and `@gitlode/git-adapters/experimental`. The `experimental` subpath is
-  the unstable Git traversal-selection surface.
-- `@gitlode/line-diff-adapters`.
-
-These four packages are private repository implementation details fixed at version `0.0.0`, not
-public APIs. Public `gitlode` JavaScript and declarations bundle their implementations and types, so
-consumers do not need or observe private package specifiers.
-
-Root-level entrypoint modules are facades, not domains:
-
-- `src/index.ts` is the executable and top-level process boundary.
-- `src/plugin-api.ts` is the package export facade for `gitlode/plugin-api`.
-
-These modules connect external consumers to the owning domains and should not accumulate product
-policy or implementation details.
-
-### 3.5 Naming default selections
-
-Do not use `Default` as a substitute for describing an implementation. Use it at a selection
-boundary when several valid choices exist and one is selected if the caller does not specify one.
-When both meanings matter, give the selection policy and concrete implementation separate
-identifiers. For example, a default traversal-frontier factory may delegate to a FIFO-frontier
-factory, preserving both the fallback policy and the implementation's ordering semantics.

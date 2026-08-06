@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { program } from "../../src/cli/args.js";
+import { program } from "../../src/cli/command-definition.js";
 
 describe("program – help output wiring", () => {
   it("has a name and description", () => {

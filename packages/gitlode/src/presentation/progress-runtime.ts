@@ -1,4 +1,6 @@
-import type { ProgressReporter } from "../core/index.js";
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+
 import { createRunPresenter } from "./presenter.js";
 import type { RunPresenter } from "./presenter.js";
 import { resolveUiMode } from "./progress/index.js";
@@ -16,10 +18,18 @@ export const stderrSink: TerminalSink = {
   },
 };
 
-function createReporter(presenter: RunPresenter): ProgressReporter {
+function createProgressReporter(presenter: RunPresenter): ProgressReporter {
   return {
     emit(event) {
       presenter.handleProgressEvent(event);
+    },
+  };
+}
+
+function createDiagnosticReporter(presenter: RunPresenter): DiagnosticReporter {
+  return {
+    report(diagnostic) {
+      presenter.renderDiagnostic(diagnostic);
     },
   };
 }
@@ -37,6 +47,7 @@ export function createProgressRuntime(options: CreateProgressRuntimeOptions): Pr
   return {
     uiMode,
     presenter,
-    reporter: createReporter(presenter),
+    progressReporter: createProgressReporter(presenter),
+    diagnosticReporter: createDiagnosticReporter(presenter),
   };
 }

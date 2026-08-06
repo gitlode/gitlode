@@ -18,7 +18,11 @@ The repository uses npm workspaces. `npm install` at the root installs and links
 ## Build
 
 ```bash
-npm run build
+# Incremental, unbundled workspace output
+npm run build:dev
+
+# Public release artifact
+npm run build:release
 ```
 
 ## Test
@@ -31,6 +35,18 @@ Run in watch mode during development:
 
 ```bash
 npm run test:watch
+```
+
+Optionally generate the combined local source coverage report:
+
+```bash
+npm run test:coverage
+```
+
+Build and validate the public package with publint and the installed-package system test:
+
+```bash
+npm run test:package
 ```
 
 ## Lint and Format
@@ -46,14 +62,19 @@ npm run format:write
 npm run format:check
 ```
 
-All commands above run from the repository root and are forwarded to all workspace packages.
-To run commands in a specific package only, use `-w packages/gitlode`, for example:
-`npm run build -w packages/gitlode`.
+All commands above run from the repository root. TypeScript and Vitest use their project graphs
+rather than npm workspace execution order. To run a workspace test independently, use its package
+name, for example `npm test -w gitlode`.
+
+See
+[`packages/gitlode/docs/contributing/build-test-release.md`](packages/gitlode/docs/contributing/build-test-release.md)
+for development/release artifact boundaries, package validation, and the complete release gate.
 
 ## Submitting Changes
 
 - Open pull requests against the `develop` branch — do **not** target `main` directly
-- All CI checks must pass before merge: build, lint, format:check, and all unit tests
+- All CI checks must pass before merge, including dependency, architecture, development build,
+  source test, release build, packed metadata, and installed-package system checks
 
 ## Code Style
 

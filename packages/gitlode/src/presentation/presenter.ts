@@ -1,6 +1,8 @@
-import type { ProgressEvent } from "../core/index.js";
-import type { ProfileSummaryEntry } from "../instrumentation/index.js";
-import { writeDiagnosticLines, splitMessageLines, type DiagnosticSeverity } from "./diagnostics.js";
+import type { Diagnostic } from "@gitlode/internal-contracts/diagnostics";
+import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
+import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
+
+import { writeDiagnosticLines, splitMessageLines } from "./diagnostics.js";
 import {
   ProgressController,
   type Clock,
@@ -13,7 +15,7 @@ import { formatProfileLines, formatSummaryLines, type SummaryData } from "./repo
 
 export interface RunPresenter {
   handleProgressEvent(event: ProgressEvent): void;
-  renderDiagnostic(severity: DiagnosticSeverity, message: string): void;
+  renderDiagnostic(diagnostic: Diagnostic): void;
   renderUserError(message: string): void;
   renderRuntimeError(error: unknown): void;
   renderSummary(data: SummaryData): void;
@@ -51,22 +53,17 @@ export function createRunPresenter(options: CreateRunPresenterOptions): RunPrese
     }
   }
 
-  function renderDiagnostic(severity: DiagnosticSeverity, message: string): void {
+  function renderDiagnostic(diagnostic: Diagnostic): void {
     if (progressController) {
-      progressController.renderDiagnostic(severity, message);
+      progressController.renderDiagnostic(diagnostic);
       return;
     }
 
-    writeDiagnosticLines(sink.writeLine, severity, message, styling);
+    writeDiagnosticLines(sink.writeLine, diagnostic, styling);
   }
 
   return {
     handleProgressEvent(event) {
-      if (event.type === "warning") {
-        renderDiagnostic("warn", event.message);
-        return;
-      }
-
       if (progressController) {
         progressController.handleEvent(event);
       }

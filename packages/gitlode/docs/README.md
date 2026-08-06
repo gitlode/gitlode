@@ -45,8 +45,8 @@ back to the canonical document instead of becoming independent specifications.
 - [`profiling.md`](profiling.md): guide to the developer-oriented `--profile` diagnostics output.
 - [`design/`](design/): durable implementation design documents for human developers and coding
   agents.
-- [`contributing/`](contributing/): contributor-facing repository maintenance policies, such as
-  lint rule adoption.
+- [`contributing/`](contributing/): contributor-facing build, test, release-validation, and
+  repository maintenance policies.
 - [`agents/`](agents/): durable collaboration and working-principle documents for coding agents.
 - [`handoff/`](handoff/): continuation notes for in-progress or future work. Handoff documents are
   not durable source-of-truth design documents.

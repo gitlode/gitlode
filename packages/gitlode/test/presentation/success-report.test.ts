@@ -23,7 +23,7 @@ describe("renderSuccessReport", () => {
       presenter: presenter as never,
       quiet: true,
       profile: true,
-      success: {
+      data: {
         recordsWritten: 1,
         commitsTraversed: 1,
         filesCreated: 1,
@@ -45,7 +45,7 @@ describe("renderSuccessReport", () => {
       presenter: presenter as never,
       quiet: false,
       profile: false,
-      success: {
+      data: {
         recordsWritten: 2,
         commitsTraversed: 3,
         filesCreated: 4,
@@ -67,7 +67,7 @@ describe("renderSuccessReport", () => {
       presenter: presenter as never,
       quiet: false,
       profile: true,
-      success: {
+      data: {
         recordsWritten: 2,
         commitsTraversed: 3,
         filesCreated: 4,

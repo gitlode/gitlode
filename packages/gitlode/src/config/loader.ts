@@ -1,18 +1,20 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 
-import { z } from "zod";
-
-import { ROTATE_SIZE_MAX, ROTATE_SIZE_MIN } from "../cli/constants.js";
-import type { BootstrapResult, BootstrapTermination } from "../cli/errors.js";
 import {
   dirnameOfFilePath,
   type IsoDateTimeString,
   type AbsoluteDirectoryPath,
   type AbsolutePath,
-} from "../support/index.js";
-import { byteSizeString } from "./schema-helpers.js";
-import type { ConfigExtensionsSection } from "./types.js";
+} from "@gitlode/internal-foundation/support";
+import { z } from "zod";
+
+import {
+  byteSizeString,
+  ROTATION_SIZE_MAX_BYTES,
+  ROTATION_SIZE_MIN_BYTES,
+} from "./schema-helpers.js";
+import type { ConfigDiagnosticCode, ConfigExtensionsSection, ConfigLoadResult } from "./types.js";
 
 const NAMESPACE_PATTERN = /^[a-z0-9-]+$/;
 
@@ -43,7 +45,10 @@ const ConfigOutputSchema = z
     rotation: z
       .object({
         lines: z.number().int().min(1).optional(),
-        size: byteSizeString({ minBytes: ROTATE_SIZE_MIN, maxBytes: ROTATE_SIZE_MAX }).optional(),
+        size: byteSizeString({
+          minBytes: ROTATION_SIZE_MIN_BYTES,
+          maxBytes: ROTATION_SIZE_MAX_BYTES,
+        }).optional(),
       })
       .strict()
       .optional(),
@@ -90,11 +95,10 @@ export const ProjectConfigSchema = z
 
 type ProjectConfig = z.Infer<typeof ProjectConfigSchema>;
 
-function toUserError(message: string): BootstrapTermination {
+function failure(code: ConfigDiagnosticCode, message: string): ConfigLoadResult {
   return {
-    kind: "user-error",
-    message,
-    exitCode: 1,
+    kind: "failure",
+    diagnostic: { code, message },
   };
 }
 
@@ -136,9 +140,7 @@ function rebaseConfigPaths(
     extensions,
   };
 }
-export async function loadConfigFile(
-  configPath: AbsolutePath,
-): Promise<BootstrapResult<ProjectConfig>> {
+export async function loadConfigFile(configPath: AbsolutePath): Promise<ConfigLoadResult> {
   let raw: string;
   try {
     raw = await readFile(configPath, "utf8");
@@ -146,21 +148,21 @@ export async function loadConfigFile(
     const code =
       error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined;
     if (code === "ENOENT") {
-      return toUserError(`Config file not found: ${configPath}`);
+      return failure("not-found", `Config file not found: ${configPath}`);
     }
-    return toUserError(`Failed to read config file: ${configPath}`);
+    return failure("read-failed", `Failed to read config file: ${configPath}`);
   }
 
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(raw);
   } catch {
-    return toUserError(`Invalid config file: not valid JSON (${configPath})`);
+    return failure("invalid-json", `Invalid config file: not valid JSON (${configPath})`);
   }
 
   const parsed = ProjectConfigSchema.safeParse(parsedJson);
   if (!parsed.success) {
-    return toUserError(formatZodIssues(parsed.error, configPath));
+    return failure("invalid-schema", formatZodIssues(parsed.error, configPath));
   }
 
   const configDirectory: AbsoluteDirectoryPath = dirnameOfFilePath(configPath);

@@ -1,4 +1,4 @@
-import type { ProgressPhase } from "../../core/index.js";
+import type { ProgressPhase } from "@gitlode/internal-contracts/progress";
 
 export interface TerminalSink {
   /** Write a line followed by a newline. */

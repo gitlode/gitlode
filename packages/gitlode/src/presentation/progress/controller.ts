@@ -1,10 +1,12 @@
-import type { ProgressEvent, ProgressPhase } from "../../core/index.js";
-import { cyclicAtOrThrow } from "../../support/index.js";
-import { formatDiagnosticLines, type DiagnosticSeverity } from "../diagnostics.js";
+import type { Diagnostic } from "@gitlode/internal-contracts/diagnostics";
+import type { ProgressEvent, ProgressPhase } from "@gitlode/internal-contracts/progress";
+import { cyclicAtOrThrow } from "@gitlode/internal-foundation/support";
+
+import { formatDiagnosticLines } from "../diagnostics.js";
 import { plainStyling, type Styling } from "../styling.js";
 import { HEARTBEAT_INTERVAL_MS, SPINNER_FRAMES } from "./constants.js";
 import { formatActiveLine, formatDoneLine } from "./formatters.js";
-import { DefaultHeartbeatScheduler } from "./heartbeat-scheduler.js";
+import { IntervalHeartbeatScheduler } from "./interval-heartbeat-scheduler.js";
 import type {
   Clock,
   HeartbeatScheduler,
@@ -42,7 +44,7 @@ export class ProgressController {
     this.clock = clock;
     this.mode = mode;
     this.styling = styling;
-    this.heartbeat = new DefaultHeartbeatScheduler(scheduler);
+    this.heartbeat = new IntervalHeartbeatScheduler(scheduler);
   }
 
   handleEvent(event: ProgressEvent): void {
@@ -62,14 +64,11 @@ export class ProgressController {
       case "phase-end":
         this.onPhaseEnd(event.phase);
         break;
-      case "warning":
-        this.renderDiagnostic("warn", event.message);
-        break;
     }
   }
 
-  renderDiagnostic(severity: DiagnosticSeverity, message: string): void {
-    const lines = formatDiagnosticLines(severity, message, this.styling);
+  renderDiagnostic(diagnostic: Diagnostic): void {
+    const lines = formatDiagnosticLines(diagnostic.severity, diagnostic.message, this.styling);
     if (this.mode === "tty-interactive" && this.currentPhase !== null) {
       this.sink.newline();
       for (const line of lines) {

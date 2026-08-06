@@ -1,0 +1,312 @@
+import { performance } from "node:perf_hooks";
+
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type { FactProjector } from "@gitlode/internal-contracts/extraction";
+import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+import {
+  LocalInstrumentationRecorder,
+  noopInstrumentation,
+  type Instrumentation,
+} from "@gitlode/internal-foundation/instrumentation";
+import type { AbsolutePath } from "@gitlode/internal-foundation/support";
+import {
+  JsLineDiffCalculator,
+  type JsLineDiffCalculatorDependencies,
+} from "@gitlode/line-diff-adapters";
+
+import {
+  CommitFactExtractor,
+  ExtractionPipeline,
+  BuiltInFactProjector,
+  FileChangeFactExpander,
+  RepositoryTraversalPlanner,
+} from "../extraction/index.js";
+import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
+import {
+  createEmptyCheckpoint,
+  loadStateFile,
+  NodeStateStore,
+  saveStateFile,
+  type StateStore,
+  validatePriorCheckpoint,
+} from "../state/index.js";
+import { buildGitAdapter, type GitAdapterFactoryDependencies } from "./git-adapter-factory.js";
+import { buildPluginProjector, hasEffectivePluginDeclarations } from "./plugin-bootstrap.js";
+import {
+  resolveExtractionRange,
+  resolveOutputPrefix,
+  resolveRepositoryObjectFormat,
+  resolveRepositoryBasics,
+  validateRepositoryAccess,
+} from "./repository-context.js";
+import type {
+  ExecutionRunReporters,
+  ExecutionRunInput,
+  ExecutionRunResult,
+  ExecutionSuccessPayload,
+  WorkerRunRequest,
+  WorkerRunResult,
+} from "./types.js";
+import { dispatchWorkerRunRequest } from "./worker-client.js";
+
+interface WorkerExecutionReporters {
+  readonly progressReporter: ProgressReporter;
+  readonly diagnosticReporter: DiagnosticReporter;
+}
+
+async function finishUserError(
+  runSpan: ReturnType<Instrumentation["startSpan"]>,
+  message: string,
+): Promise<WorkerRunResult> {
+  runSpan.setAttribute("gitlode.result", "user-error");
+  runSpan.end();
+  return {
+    kind: "user-error",
+    message,
+  };
+}
+
+export async function executeWorkerRunRequest(
+  request: WorkerRunRequest,
+  reporters: WorkerExecutionReporters,
+  dependencies: GitAdapterFactoryDependencies = { environment: process.env },
+): Promise<WorkerRunResult> {
+  const { input, priorCheckpoint } = request;
+  const recorder = input.profile
+    ? new LocalInstrumentationRecorder(() => performance.now())
+    : undefined;
+  const instrumentation = recorder ?? noopInstrumentation;
+
+  const sessionTimestamp = new Date();
+  const startMs = performance.now();
+  const resolvedRepoPath: AbsolutePath = input.repositoryPath;
+  const runSpan = instrumentation.startSpan("gitlode.run", {
+    attributes: {
+      "gitlode.granularity": input.granularity,
+      "gitlode.profile": input.profile,
+      "git.adapter": input.gitAdapter,
+    },
+  });
+
+  try {
+    const gitAdapterResult = await buildGitAdapter(input.gitAdapter, instrumentation, dependencies);
+    if (gitAdapterResult.kind === "user-error") {
+      return await finishUserError(runSpan, gitAdapterResult.message);
+    }
+    if (gitAdapterResult.gitVersion !== undefined) {
+      runSpan.setAttribute("git.cli.version", gitAdapterResult.gitVersion);
+    }
+    await using gitAdapter = gitAdapterResult.adapter;
+
+    await instrumentation.runAsync(
+      "gitlode.validate_repository_access",
+      async () => await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter),
+    );
+
+    const repositoryObjectFormat = await instrumentation.runAsync(
+      "gitlode.resolve_object_format",
+      async (span) => {
+        const objectFormat = await resolveRepositoryObjectFormat(resolvedRepoPath, gitAdapter);
+        span.setAttribute("git.object_format", objectFormat);
+        return objectFormat;
+      },
+    );
+
+    instrumentation.run("gitlode.state.validate", () => {
+      validatePriorCheckpoint(priorCheckpoint, resolvedRepoPath, repositoryObjectFormat);
+    });
+
+    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await instrumentation.runAsync(
+      "gitlode.repository_basics",
+      async () =>
+        await resolveRepositoryBasics(resolvedRepoPath, gitAdapter, input.repoName, input.repoUrl),
+    );
+
+    const resolvedRange = await instrumentation.runAsync(
+      "gitlode.resolve_extraction_range",
+      async (span) => {
+        span.setAttribute("gitlode.range.kind", input.range?.type ?? "none");
+        return await resolveExtractionRange(input.range, resolvedRepoPath, gitAdapter);
+      },
+    );
+
+    const resolvedOutputPrefix = resolveOutputPrefix(
+      input.outputPrefix,
+      resolvedRepoUrl,
+      resolvedRepoPath,
+    );
+    const extractionSettings = {
+      refs: input.refs,
+      outputDir: input.outputDir,
+      outputPrefix: resolvedOutputPrefix,
+      rotation: input.rotation,
+      range: resolvedRange,
+      granularity: input.granularity,
+      maxDiffSize: input.maxDiffSize,
+    };
+
+    const traversalPlanner = new RepositoryTraversalPlanner(gitAdapter, instrumentation);
+    const traversalExtractor = new CommitFactExtractor(gitAdapter, instrumentation);
+    const fileChangeExpander = new FileChangeFactExpander(
+      gitAdapter,
+      new JsLineDiffCalculator({ instrumentation } satisfies JsLineDiffCalculatorDependencies),
+      instrumentation,
+      extractionSettings.maxDiffSize,
+    );
+
+    let projector: FactProjector;
+    const { pluginBaseDirectory, pluginDeclarations } = input;
+    if (!pluginBaseDirectory || !hasEffectivePluginDeclarations(pluginDeclarations)) {
+      projector = new BuiltInFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
+    } else {
+      const baseProjector = new BuiltInFactProjector(
+        resolvedRepoName,
+        resolvedRepoUrl,
+        instrumentation,
+      );
+      const projectorResult = await buildPluginProjector(
+        pluginDeclarations,
+        pluginBaseDirectory,
+        baseProjector,
+        reporters,
+        instrumentation,
+      );
+      if (projectorResult.kind === "termination") {
+        return await finishUserError(runSpan, projectorResult.message);
+      }
+      projector = projectorResult.projector;
+    }
+
+    const sink = new JsonlOutputSink(
+      new JsonlFileWriter(
+        extractionSettings.outputDir,
+        (seq) =>
+          `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
+        extractionSettings.rotation,
+      ),
+    );
+
+    const coordinator = new ExtractionPipeline({
+      traversalPlanner,
+      traversalExtractor,
+      fileChangeExpander,
+      projector,
+      sink,
+      progressReporter: reporters.progressReporter,
+      diagnosticReporter: reporters.diagnosticReporter,
+      instrumentation,
+    });
+
+    const result = await instrumentation.runAsync("gitlode.extract", async (span) => {
+      span.incrementCounter("refs", extractionSettings.refs.length);
+      const coordinatorResult = await coordinator.run({
+        repositoryPath: resolvedRepoPath,
+        repoName: resolvedRepoName,
+        repoUrl: resolvedRepoUrl,
+        refs: [...extractionSettings.refs],
+        granularity: extractionSettings.granularity,
+        range: extractionSettings.range,
+        priorCheckpoint,
+        sessionTimestamp,
+      });
+      span.incrementCounter("records", coordinatorResult.recordsWritten);
+      span.incrementCounter("commits", coordinatorResult.commitsTraversed);
+      span.incrementCounter("skipped_diffs", coordinatorResult.skippedDiffs);
+      return coordinatorResult;
+    });
+
+    // End run-scoped Git processes before taking the profiling snapshot. The
+    // await-using declaration still guarantees cleanup on every earlier exit.
+    await gitAdapter[Symbol.asyncDispose]();
+
+    runSpan.incrementCounter("records", result.recordsWritten);
+    runSpan.incrementCounter("commits", result.commitsTraversed);
+    runSpan.setAttribute("gitlode.result", "success");
+    runSpan.end();
+
+    const success: ExecutionSuccessPayload = {
+      recordsWritten: result.recordsWritten,
+      commitsTraversed: result.commitsTraversed,
+      filesCreated: sink.filesCreated,
+      bytesWritten: sink.bytesWritten,
+      elapsedMs: performance.now() - startMs,
+      refs: result.refs,
+      profileEntries: recorder?.summary() ?? [],
+      skippedDiffs: result.skippedDiffs,
+    };
+
+    return {
+      kind: "success",
+      success,
+      checkpoint: result.checkpoint,
+    };
+  } catch (error) {
+    runSpan.end(error);
+    throw error;
+  }
+}
+
+export interface ExecuteRunDependencies {
+  readonly dispatchWorkerRunRequest: typeof dispatchWorkerRunRequest;
+  readonly createStateStore: (stateFilePath: AbsolutePath) => StateStore;
+  readonly loadStateFile: typeof loadStateFile;
+  readonly saveStateFile?: typeof saveStateFile;
+}
+
+const defaultExecuteRunDependencies: ExecuteRunDependencies = {
+  dispatchWorkerRunRequest,
+  createStateStore(stateFilePath) {
+    return new NodeStateStore(stateFilePath);
+  },
+  loadStateFile,
+  saveStateFile,
+};
+
+export async function executeRun(
+  input: ExecutionRunInput,
+  reporters: ExecutionRunReporters,
+  dependencies: ExecuteRunDependencies = defaultExecuteRunDependencies,
+): Promise<ExecutionRunResult> {
+  const { incremental, missingState, stateFilePath, ...workerInput } = input;
+  const stateStore = stateFilePath ? dependencies.createStateStore(stateFilePath) : undefined;
+
+  let priorCheckpoint;
+  if (!stateStore || !incremental) {
+    priorCheckpoint = createEmptyCheckpoint(input.repositoryPath);
+  } else {
+    const loadedCheckpoint = await dependencies.loadStateFile(stateStore);
+    if (loadedCheckpoint === undefined) {
+      if (missingState === "error") {
+        throw new Error(`State file not found: ${stateFilePath}`);
+      }
+      reporters.diagnosticReporter.report({
+        severity: "warn",
+        message: `State file not found: ${stateFilePath}. Falling back to full snapshot extraction.`,
+      });
+      priorCheckpoint = createEmptyCheckpoint(input.repositoryPath);
+    } else {
+      priorCheckpoint = loadedCheckpoint;
+    }
+  }
+
+  const result = await dependencies.dispatchWorkerRunRequest(
+    {
+      input: workerInput,
+      priorCheckpoint,
+    },
+    reporters,
+  );
+
+  if (result.kind !== "success") {
+    return result;
+  }
+
+  if (stateStore !== undefined && result.checkpoint.refs.length > 0) {
+    await (dependencies.saveStateFile ?? saveStateFile)(stateStore, result.checkpoint);
+  }
+
+  return {
+    kind: "success",
+    success: result.success,
+  };
+}

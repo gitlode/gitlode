@@ -1,0 +1,767 @@
+{
+  "configVersion": "1.12",
+  "$schema": "https://github.com/jayu/rev-dep/blob/master/config-schema/1.12.schema.json?raw=true",
+  "nodeModulesResolution": {
+    "resolutionType": "entry-package",
+    "includeDevDepsFromRoot": false
+  },
+  "rules": [
+    {
+      "path": ".",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": [
+        "packages/internal-foundation/src/**/index.ts",
+        "packages/internal-contracts/src/**/index.ts",
+        "packages/git-adapters/src/git-impl/index.ts",
+        "packages/git-adapters/src/git-impl/commit-traversal/index.ts",
+        "packages/line-diff-adapters/src/line-diff-impl/index.ts",
+        "packages/gitlode/src/index.ts",
+        "packages/gitlode/src/plugin-api.ts",
+        "packages/gitlode/src/execution/worker-entry.ts"
+      ],
+      "moduleBoundaries": [
+        {
+          "name": "type-utils",
+          "pattern": "packages/internal-foundation/src/type-utils/**",
+          "allow": ["packages/internal-foundation/src/type-utils/**"]
+        },
+        {
+          "name": "support",
+          "pattern": "packages/internal-foundation/src/support/**",
+          "allow": [
+            "packages/internal-foundation/src/support/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js"
+          ]
+        },
+        {
+          "name": "instrumentation",
+          "pattern": "packages/internal-foundation/src/instrumentation/**",
+          "allow": [
+            "packages/internal-foundation/src/instrumentation/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js"
+          ]
+        },
+        {
+          "name": "dag",
+          "pattern": "packages/internal-foundation/src/dag/**",
+          "allow": [
+            "packages/internal-foundation/src/dag/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js"
+          ]
+        },
+        {
+          "name": "diagnostics",
+          "pattern": "packages/internal-contracts/src/diagnostics/**",
+          "allow": ["packages/internal-contracts/src/diagnostics/**"]
+        },
+        {
+          "name": "model",
+          "pattern": "packages/internal-contracts/src/model/**",
+          "allow": [
+            "packages/internal-contracts/src/model/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js"
+          ]
+        },
+        {
+          "name": "progress",
+          "pattern": "packages/internal-contracts/src/progress/**",
+          "allow": [
+            "packages/internal-contracts/src/progress/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js"
+          ]
+        },
+        {
+          "name": "extraction-api",
+          "pattern": "packages/internal-contracts/src/extraction-api/**",
+          "allow": [
+            "packages/internal-contracts/src/extraction-api/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-contracts/src/diagnostics/index.ts",
+            "packages/internal-contracts/dist/diagnostics/index.js",
+            "packages/internal-contracts/src/model/index.ts",
+            "packages/internal-contracts/dist/model/index.js"
+          ]
+        },
+        {
+          "name": "git",
+          "pattern": "packages/internal-contracts/src/git/**",
+          "allow": [
+            "packages/internal-contracts/src/git/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-contracts/src/model/index.ts",
+            "packages/internal-contracts/dist/model/index.js"
+          ]
+        },
+        {
+          "name": "line-diff",
+          "pattern": "packages/internal-contracts/src/line-diff/**",
+          "allow": [
+            "packages/internal-contracts/src/line-diff/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js"
+          ]
+        },
+        {
+          "name": "git-impl",
+          "pattern": "packages/git-adapters/src/git-impl/**",
+          "allow": [
+            "packages/git-adapters/src/git-impl/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/dag/index.ts",
+            "packages/internal-foundation/dist/dag/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-contracts/src/git/index.ts",
+            "packages/internal-contracts/dist/git/index.js",
+            "packages/internal-contracts/src/model/index.ts",
+            "packages/internal-contracts/dist/model/index.js"
+          ]
+        },
+        {
+          "name": "line-diff-impl",
+          "pattern": "packages/line-diff-adapters/src/line-diff-impl/**",
+          "allow": [
+            "packages/line-diff-adapters/src/line-diff-impl/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/src/line-diff/index.ts",
+            "packages/internal-contracts/dist/line-diff/index.js"
+          ]
+        },
+        {
+          "name": "package-metadata",
+          "pattern": "packages/gitlode/src/package-metadata.ts",
+          "allow": ["packages/gitlode/src/package-metadata.ts"]
+        },
+        {
+          "name": "state",
+          "pattern": "packages/gitlode/src/state/**",
+          "allow": [
+            "packages/gitlode/src/state/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-contracts/src/extraction-api/index.ts",
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/src/model/index.ts",
+            "packages/internal-contracts/dist/model/index.js"
+          ]
+        },
+        {
+          "name": "extraction",
+          "pattern": "packages/gitlode/src/extraction/**",
+          "allow": [
+            "packages/gitlode/src/extraction/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/src/diagnostics/index.ts",
+            "packages/internal-contracts/dist/diagnostics/index.js",
+            "packages/internal-contracts/src/extraction-api/index.ts",
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/src/git/index.ts",
+            "packages/internal-contracts/dist/git/index.js",
+            "packages/internal-contracts/src/line-diff/index.ts",
+            "packages/internal-contracts/dist/line-diff/index.js",
+            "packages/internal-contracts/src/model/index.ts",
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/progress/index.ts",
+            "packages/internal-contracts/dist/progress/index.js"
+          ]
+        },
+        {
+          "name": "plugin-api",
+          "pattern": "packages/gitlode/src/plugin-api/**",
+          "allow": [
+            "packages/gitlode/src/plugin-api/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/src/extraction-api/index.ts",
+            "packages/internal-contracts/dist/extraction-api/index.js"
+          ]
+        },
+        {
+          "name": "plugin-runtime",
+          "pattern": "packages/gitlode/src/plugin-runtime/**",
+          "allow": [
+            "packages/gitlode/src/plugin-runtime/**",
+            "packages/gitlode/src/package-metadata.ts",
+            "packages/gitlode/src/plugin-api/index.ts",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/src/diagnostics/index.ts",
+            "packages/internal-contracts/dist/diagnostics/index.js",
+            "packages/internal-contracts/src/extraction-api/index.ts",
+            "packages/internal-contracts/dist/extraction-api/index.js"
+          ]
+        },
+        {
+          "name": "output",
+          "pattern": "packages/gitlode/src/output/**",
+          "allow": [
+            "packages/gitlode/src/output/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-contracts/src/extraction-api/index.ts",
+            "packages/internal-contracts/dist/extraction-api/index.js"
+          ]
+        },
+        {
+          "name": "config",
+          "pattern": "packages/gitlode/src/config/**",
+          "allow": [
+            "packages/gitlode/src/config/**",
+            "packages/gitlode/src/plugin-api/index.ts",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js"
+          ]
+        },
+        {
+          "name": "cli",
+          "pattern": "packages/gitlode/src/cli/**",
+          "allow": [
+            "packages/gitlode/src/cli/**",
+            "packages/gitlode/src/config/index.ts",
+            "packages/gitlode/src/package-metadata.ts",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js"
+          ]
+        },
+        {
+          "name": "presentation",
+          "pattern": "packages/gitlode/src/presentation/**",
+          "allow": [
+            "packages/gitlode/src/presentation/**",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/src/diagnostics/index.ts",
+            "packages/internal-contracts/dist/diagnostics/index.js",
+            "packages/internal-contracts/src/progress/index.ts",
+            "packages/internal-contracts/dist/progress/index.js"
+          ]
+        },
+        {
+          "name": "execution",
+          "pattern": "packages/gitlode/src/execution/**",
+          "allow": [
+            "packages/gitlode/src/execution/**",
+            "packages/gitlode/src/extraction/index.ts",
+            "packages/gitlode/src/output/index.ts",
+            "packages/gitlode/src/plugin-api/index.ts",
+            "packages/gitlode/src/plugin-runtime/index.ts",
+            "packages/gitlode/src/state/index.ts",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/support/index.ts",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/src/diagnostics/index.ts",
+            "packages/internal-contracts/dist/diagnostics/index.js",
+            "packages/internal-contracts/src/extraction-api/index.ts",
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/src/git/index.ts",
+            "packages/internal-contracts/dist/git/index.js",
+            "packages/internal-contracts/src/model/index.ts",
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/progress/index.ts",
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/git-adapters/src/git-impl/index.ts",
+            "packages/git-adapters/dist/git-impl/index.js",
+            "packages/git-adapters/src/git-impl/commit-traversal/index.ts",
+            "packages/git-adapters/dist/git-impl/commit-traversal/index.js",
+            "packages/line-diff-adapters/src/line-diff-impl/index.ts",
+            "packages/line-diff-adapters/dist/line-diff-impl/index.js"
+          ]
+        },
+        {
+          "name": "executable-entrypoint",
+          "pattern": "packages/gitlode/src/index.ts",
+          "allow": [
+            "packages/gitlode/src/cli/index.ts",
+            "packages/gitlode/src/execution/index.ts",
+            "packages/gitlode/src/presentation/index.ts",
+            "packages/internal-contracts/src/git/index.ts",
+            "packages/internal-contracts/dist/git/index.js"
+          ]
+        },
+        {
+          "name": "plugin-api-entrypoint",
+          "pattern": "packages/gitlode/src/plugin-api.ts",
+          "allow": [
+            "packages/gitlode/src/plugin-api/index.ts",
+            "packages/internal-foundation/src/type-utils/index.ts",
+            "packages/internal-foundation/dist/type-utils/index.js",
+            "packages/internal-foundation/src/instrumentation/index.ts",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/src/model/index.ts",
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/extraction-api/index.ts",
+            "packages/internal-contracts/dist/extraction-api/index.js"
+          ]
+        },
+        {
+          "name": "internal-foundation-tests",
+          "pattern": "packages/internal-foundation/test/**",
+          "allow": ["packages/internal-foundation/src/**", "packages/internal-foundation/test/**"]
+        },
+        {
+          "name": "internal-contracts-tests",
+          "pattern": "packages/internal-contracts/test/**",
+          "allow": ["packages/internal-contracts/src/**", "packages/internal-contracts/test/**"]
+        },
+        {
+          "name": "git-adapters-tests",
+          "pattern": "packages/git-adapters/test/**",
+          "allow": [
+            "packages/git-adapters/src/**",
+            "packages/git-adapters/test/**",
+            "packages/internal-foundation/dist/dag/index.js",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-contracts/dist/git/index.js",
+            "packages/internal-contracts/dist/model/index.js"
+          ]
+        },
+        {
+          "name": "line-diff-adapters-tests",
+          "pattern": "packages/line-diff-adapters/test/**",
+          "allow": [
+            "packages/line-diff-adapters/src/**",
+            "packages/line-diff-adapters/test/**",
+            "packages/internal-foundation/dist/instrumentation/index.js"
+          ]
+        },
+        {
+          "name": "gitlode-tests",
+          "pattern": "packages/gitlode/test/**",
+          "allow": [
+            "packages/gitlode/src/**",
+            "packages/gitlode/test/**",
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-foundation/dist/support/index.js",
+            "packages/internal-contracts/dist/diagnostics/index.js",
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/git/index.js",
+            "packages/internal-contracts/dist/line-diff/index.js",
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/dist/progress/index.js"
+          ]
+        },
+        {
+          "name": "plugin-assay-metrics",
+          "pattern": "packages/plugin-assay-metrics/src/**",
+          "allow": [
+            "packages/plugin-assay-metrics/src/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-assay-metrics-tests",
+          "pattern": "packages/plugin-assay-metrics/test/**",
+          "allow": [
+            "packages/plugin-assay-metrics/src/**",
+            "packages/plugin-assay-metrics/test/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-conventional-commits",
+          "pattern": "packages/plugin-conventional-commits/src/**",
+          "allow": [
+            "packages/plugin-conventional-commits/src/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-conventional-commits-tests",
+          "pattern": "packages/plugin-conventional-commits/test/**",
+          "allow": [
+            "packages/plugin-conventional-commits/src/**",
+            "packages/plugin-conventional-commits/test/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-custom-field",
+          "pattern": "packages/plugin-custom-field/src/**",
+          "allow": [
+            "packages/plugin-custom-field/src/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-custom-field-tests",
+          "pattern": "packages/plugin-custom-field/test/**",
+          "allow": [
+            "packages/plugin-custom-field/src/**",
+            "packages/plugin-custom-field/test/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-file-type",
+          "pattern": "packages/plugin-file-type/src/**",
+          "allow": [
+            "packages/plugin-file-type/src/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-file-type-tests",
+          "pattern": "packages/plugin-file-type/test/**",
+          "allow": [
+            "packages/plugin-file-type/src/**",
+            "packages/plugin-file-type/test/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-identity-profile",
+          "pattern": "packages/plugin-identity-profile/src/**",
+          "allow": [
+            "packages/plugin-identity-profile/src/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        },
+        {
+          "name": "plugin-identity-profile-tests",
+          "pattern": "packages/plugin-identity-profile/test/**",
+          "allow": [
+            "packages/plugin-identity-profile/src/**",
+            "packages/plugin-identity-profile/test/**",
+            "packages/gitlode/dist/plugin-api.d.ts",
+            "packages/gitlode/dist/plugin-api.js"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "packages/internal-foundation",
+      "followMonorepoPackages": true,
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@types/*", "@vitest/coverage-v8"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true,
+      "prodEntryPoints": [
+        "src/type-utils/index.ts",
+        "src/support/index.ts",
+        "src/instrumentation/index.ts",
+        "src/dag/index.ts"
+      ],
+      "devEntryPoints": ["test/**", "vitest.config.ts"]
+    },
+    {
+      "path": "packages/internal-contracts",
+      "followMonorepoPackages": true,
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@types/*", "@vitest/coverage-v8", "@gitlode/internal-foundation"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true,
+      "prodEntryPoints": [
+        "src/model/index.ts",
+        "src/diagnostics/index.ts",
+        "src/progress/index.ts",
+        "src/extraction-api/index.ts",
+        "src/git/index.ts",
+        "src/line-diff/index.ts"
+      ],
+      "devEntryPoints": ["test/**", "vitest.config.ts"]
+    },
+    {
+      "path": "packages/line-diff-adapters",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/line-diff-impl/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": [
+          "@types/*",
+          "@vitest/coverage-v8",
+          "@gitlode/internal-contracts",
+          "@gitlode/internal-foundation"
+        ],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/git-adapters",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/git-impl/index.ts", "src/git-impl/commit-traversal/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": [
+          "@types/*",
+          "@vitest/coverage-v8",
+          "@gitlode/internal-contracts",
+          "@gitlode/internal-foundation"
+        ],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/gitlode",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts", "src/plugin-api.ts", "src/execution/worker-entry.ts"],
+      "devEntryPoints": ["test/**", "scripts/**", "tsdown.config.ts", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": [
+          "@types/*",
+          "@vitest/coverage-v8",
+          "@gitlode/internal-contracts",
+          "@gitlode/internal-foundation",
+          "@gitlode/line-diff-adapters",
+          "diff",
+          "@gitlode/git-adapters",
+          "isomorphic-git"
+        ],
+        "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-assay-metrics",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-conventional-commits",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-custom-field",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-file-type",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    },
+    {
+      "path": "packages/plugin-identity-profile",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": ["src/index.ts"],
+      "devEntryPoints": ["test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false,
+        "algorithm": "SCC"
+      },
+      "orphanFilesDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"]
+      },
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@vitest/coverage-v8", "gitlode"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      },
+      "missingNodeModulesDetection": true,
+      "devDepsUsageOnProdDetection": {
+        "ignoreTypeImports": true
+      },
+      "unresolvedImportsDetection": true
+    }
+  ],
+  "processIgnoredFiles": ["packages/*/dist/**"]
+}

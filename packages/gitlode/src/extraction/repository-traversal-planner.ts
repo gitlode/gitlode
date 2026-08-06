@@ -1,0 +1,121 @@
+import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
+import type {
+  ExtractionRange,
+  RefCheckpoint,
+  TraversalPlan,
+  TraversalPlanner,
+  TraversalPlanningRequest,
+} from "@gitlode/internal-contracts/extraction";
+import type { GitAdapter } from "@gitlode/internal-contracts/git";
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
+import type { CommitOid, RefType } from "@gitlode/internal-contracts/model";
+import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { assertNever, getOrThrow } from "@gitlode/internal-foundation/support";
+
+function buildCheckpointKey(ref: string, refType: RefType): string {
+  return `${refType}:${ref}`;
+}
+
+function resolveExcludeHash(
+  checkpointTipOid: CommitOid | undefined,
+  mergeBaseExclude: CommitOid | undefined,
+  range: ExtractionRange | undefined,
+): CommitOid | undefined {
+  if (range === undefined) {
+    return checkpointTipOid ?? mergeBaseExclude;
+  }
+  if (range.type === "ref") {
+    return range.since;
+  } else if (range.type === "date") {
+    return undefined;
+  } else {
+    assertNever(range);
+  }
+}
+
+export class RepositoryTraversalPlanner implements TraversalPlanner {
+  private readonly adapter: GitAdapter;
+  private readonly instrumentation: Instrumentation;
+
+  constructor(adapter: GitAdapter, instrumentation: Instrumentation) {
+    this.adapter = adapter;
+    this.instrumentation = instrumentation;
+  }
+
+  async plan(
+    request: TraversalPlanningRequest,
+    diagnosticReporter: DiagnosticReporter,
+  ): Promise<readonly TraversalPlan[]> {
+    return await this.instrumentation.runAsync("gitlode.planning", async (span) => {
+      const { repositoryPath, refs, mode, priorRefs, range } = request;
+      span.setAttribute("gitlode.refs", refs.length);
+      span.setAttribute("gitlode.mode", mode);
+      span.setAttribute("gitlode.range.kind", range?.type ?? "none");
+
+      const priorCheckpointByIdentity = new Map<string, RefCheckpoint>(
+        priorRefs.map((entry) => [buildCheckpointKey(entry.ref, entry.refType), entry]),
+      );
+
+      const priorBranchTips = priorRefs
+        .filter((entry) => entry.refType === "branch")
+        .map((entry) => entry.tipOid);
+
+      const requestedRefMetadata: Array<{ name: string; refType: RefType }> = [];
+      for (const ref of refs) {
+        const refType = await this.adapter.classifyRefType(repositoryPath, ref);
+        requestedRefMetadata.push({ name: ref, refType });
+      }
+
+      const hasNewBranchRefs =
+        mode === "incremental" &&
+        requestedRefMetadata.some(
+          (entry) =>
+            entry.refType === "branch" &&
+            !priorCheckpointByIdentity.has(buildCheckpointKey(entry.name, entry.refType)),
+        );
+
+      let mergeBaseForNewBranches: CommitOid | undefined;
+      if (hasNewBranchRefs && priorBranchTips.length > 0) {
+        const mergeBase = await this.adapter.findMergeBase(repositoryPath, priorBranchTips);
+        mergeBaseForNewBranches = mergeBase ?? undefined;
+      }
+
+      const requestedRefTypeByName = new Map<string, RefType>(
+        requestedRefMetadata.map((entry) => [entry.name, entry.refType]),
+      );
+
+      const plans: TraversalPlan[] = [];
+      for (const ref of refs) {
+        let head: CommitOid;
+        const refType = getOrThrow(requestedRefTypeByName, ref);
+        try {
+          head = await this.adapter.resolveRef(repositoryPath, ref);
+        } catch (err) {
+          if (err instanceof GitAdapterError && err.code === "REF_NOT_FOUND") {
+            diagnosticReporter.report({
+              severity: "warn",
+              message: `Warning: Ref "${ref}" no longer exists in the repository. Skipping.`,
+            });
+            continue;
+          }
+          throw err;
+        }
+
+        const checkpoint = priorCheckpointByIdentity.get(buildCheckpointKey(ref, refType));
+        const mergeBaseExclude =
+          mode === "incremental" && refType === "branch" && checkpoint === undefined
+            ? mergeBaseForNewBranches
+            : undefined;
+
+        plans.push({
+          name: ref,
+          refType,
+          head,
+          excludeHash: resolveExcludeHash(checkpoint?.tipOid, mergeBaseExclude, range),
+        });
+      }
+
+      return plans;
+    });
+  }
+}

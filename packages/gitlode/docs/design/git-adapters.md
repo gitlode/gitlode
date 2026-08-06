@@ -7,6 +7,10 @@ selection behavior. It complements `git-traversal.md`, which defines the user-vi
 semantics, and `commit-traversal-internals.md`, which documents the isomorphic-git adapter's internal
 DAG traversal strategies.
 
+The backend-independent contract is exported from `@gitlode/internal-contracts/git`. Concrete
+constructors and their dependency types are exported from the private `@gitlode/git-adapters`
+package; unstable traversal selection is isolated under `@gitlode/git-adapters/experimental`.
+
 ## Adapter selection
 
 Git adapter selection is config-only:
@@ -51,10 +55,10 @@ commits or file changes in different orders as long as the final commit set or f
 same for the same repository snapshot and extraction request.
 
 `GitAdapter` does not compute line-diff statistics, classify binary content, enforce
-`--max-diff-size`, or infer renames. `DefaultFileChangeExpander` composes a `GitAdapter` with a
-`DiffAdapter`, applies the size guard before binary detection, applies the 8,000-byte NUL heuristic,
-and invokes the diff strategy only for eligible text content. Keeping these derived decisions above
-repository access gives both Git backends one file-level output policy.
+`--max-diff-size`, or infer renames. `FileChangeFactExpander` composes a `GitAdapter` with a
+`LineDiffCalculator`, applies the size guard before binary detection, applies the 8,000-byte NUL
+heuristic, and invokes the calculator only for eligible text content. Keeping these derived
+decisions above repository access gives both Git backends one file-level output policy.
 
 ## `isomorphic-git` adapter
 
@@ -119,7 +123,7 @@ for the adapter run and is closed through `GitAdapter` disposal. Commit traversa
 a separate walk-scoped batch process fed directly by `rev-list`; its bulk-streaming and cancellation
 model differs from the reusable random-object session.
 
-Both Git adapters stop at the same blob-fact boundary. `DefaultFileChangeExpander` performs binary,
+Both Git adapters stop at the same blob-fact boundary. `FileChangeFactExpander` performs binary,
 size, and line-diff processing independently of which adapter produced the blobs.
 
 ## Profiling and troubleshooting
@@ -140,9 +144,12 @@ Adapter-specific child spans are intentionally low-cardinality. Current `git-cli
 - `git.cli.file_blob_batch`
 - `git.cli.merge_base`
 
-Shared file-level spans include `git.file_blob_changes`, `git.blob_read`, `git.file_changes`, and
-`git.diff`. The long-lived batch spans measure process/session lifetime, not exclusive Git CPU time;
-use `git.blob_read` to inspect individual object-read work.
+File-level spans are separated by owner. Git adapters own `git.file_blob_changes` for the blob-fact
+stream and `git.blob_read` for individual reads. Extraction owns
+`gitlode.file_change_expansion` for one commit's expansion, while the default line-diff
+implementation owns `line_diff.compute` for its concrete calculation. The long-lived batch spans
+measure process/session lifetime, not exclusive Git CPU time; use `git.blob_read` to inspect
+individual object-read work.
 
 When comparing adapters, focus on:
 

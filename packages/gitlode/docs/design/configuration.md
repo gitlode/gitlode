@@ -83,7 +83,7 @@ Included sections are also strict.
 - `profile`: optional default for `--profile`
 - `gitAdapter`: optional Git implementation selector. Supported values are `isomorphic-git` and
   `git-cli`; default is `isomorphic-git`. The `git-cli` adapter uses the Git executable for commit
-  traversal, file-blob change discovery, and blob reads. Both implementations use the same Core
+  traversal, file-blob change discovery, and blob reads. Both implementations use the same Extraction
   file-change and line-diff policy.
 
 ### extensions
@@ -156,6 +156,15 @@ user error before Git traversal.
 3. CLI/config merge and conflict checks
 4. Filesystem validation with effective settings
 5. Git validation with effective refs/range
+
+The config loader returns a config-owned result: either a validated `ProjectConfigurationV1` or a
+diagnostic with one of `not-found`, `read-failed`, `invalid-json`, or `invalid-schema`. It does not
+return CLI termination types. The CLI converts a config diagnostic into the existing user-error
+result at the invocation boundary.
+
+The config domain owns the shared byte-size grammar and the 1 MiB–64 GiB rotation-size bounds
+because they are part of the versioned configuration schema. CLI option validation reuses those
+exports so config and CLI values cannot drift.
 
 ## Out of Scope (v1)
 

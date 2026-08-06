@@ -1,7 +1,8 @@
-import { defineConfig } from "vitest/config";
+import { defineProject } from "vitest/config";
 
-export default defineConfig({
+export default defineProject({
   test: {
+    name: "@gitlode/plugin-identity-profile",
     environment: "node",
     include: ["test/**/*.test.ts"],
   },

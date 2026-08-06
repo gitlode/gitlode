@@ -32,4 +32,7 @@
 
   // Formatter
   "editor.defaultFormatter": "oxc.oxc-vscode"
+
+  // experimental
+  "js/ts.experimental.useTsgo": true
 }

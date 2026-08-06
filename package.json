@@ -46,7 +46,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.77.0",
-    "rev-dep": "^2.19.1",
+    "rev-dep": "^3.0.0",
     "syncpack": "^15.3.2",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"

@@ -11,6 +11,11 @@ The public plugin-author surface remains `gitlode/plugin-api`. Its release decla
 private foundation and contract types they expose; plugin authors do not install or import the
 private `@gitlode/internal-*` workspaces.
 
+> **Telemetry migration status:** The `Tracer` and `Meter` runtime context below are the accepted
+> target contract and are not yet implemented. Current releases may still expose the transitional
+> profiler contract. Implementation work must follow this target and the canonical
+> [telemetry design](telemetry.md).
+
 ---
 
 ## Motivation
@@ -79,8 +84,11 @@ export default async function factory(config: unknown): Promise<ProjectorPlugin>
 The returned object must implement `ProjectorPlugin`:
 
 ```typescript
+import type { Meter, Tracer } from "@opentelemetry/api";
+
 interface PluginRuntimeContext extends DiagnosticReporter {
-  readonly profiler?: StageProfiler;
+  readonly tracer: Tracer;
+  readonly meter: Meter;
 }
 
 interface ProjectorPlugin {
@@ -99,9 +107,10 @@ type PluginInitResult = { type: "ready" } | { type: "fatal"; message: string };
 ```
 
 `init(runtime)` is required. The runtime context carries plugin-scoped diagnostics (`warn`,
-`error`) and, when `--profile` is active, an optional plugin-scoped profiler. If `init(runtime)`
-returns `{ type: "fatal" }` or throws, the run aborts with exit code 1 before any extraction
-begins. Multiple plugin failures are all reported before exiting.
+`error`) and plugin-scoped OpenTelemetry API `Tracer` and `Meter` values. These values are always
+present; they use no-op behavior when profiling is disabled. If `init(runtime)` returns
+`{ type: "fatal" }` or throws, the run aborts with exit code 1 before any extraction begins.
+Multiple plugin failures are all reported before exiting.
 
 ### `ProjectionContext`
 
@@ -171,10 +180,9 @@ When at least one plugin is active, each output record gains an `extensions` obj
 3. **Init** — All `init()` methods are called in parallel. If any return `fatal` or throw, the run aborts.
 4. **Extraction** — `EnrichingFactProjector` decorates an injected base projector and calls each
    plugin's `project()` for every fact, in declaration order.
-5. **Profiling** — When `--profile` is active, each plugin receives an optional profiler in
-   `init(runtime)`. gitlode creates plugin profilers under
-   `elapsed/projection/plugins/<namespace>`, but the plugin decides whether to use that profiler
-   for whole-project timing, finer internal steps, or not at all.
+5. **Telemetry** — Each plugin receives a tracer and meter whose instrumentation scope is derived
+   from the plugin package name and version when available, with a bounded namespace-based fallback.
+   Plugins may create bounded spans and pre-created metrics without branching on `--profile`.
 
 ---
 
@@ -213,7 +221,15 @@ When a plugin returns `fatal` or throws on a given fact:
   facade.
 - **Host registries are not public API.** `PluginEntry` lives in `src/plugin-runtime/types.ts` and is
   not exported through `gitlode/plugin-api`.
-- **Per-fact plugin profiling is plugin-controlled.** `EnrichingFactProjector` no longer wraps every `project()` call in host-owned timing. If a plugin wants projection profiling, it uses the optional profiler received during `init(runtime)`.
+- **Per-fact host tracing is prohibited by default.** `EnrichingFactProjector` does not create a
+  span for every plugin/fact call. The host records bounded projection outcome counts and duration
+  histograms, while a plugin may create its own bounded internal spans and metrics.
+- **Plugin telemetry uses plugin scopes.** The package name and version identify the scope when they
+  can be resolved. Registering one package under multiple output namespaces does not add namespace
+  as a metric attribute.
+- **Local profile applies a bounded plugin policy.** Plugin spans contribute calls, duration, and
+  errors without arbitrary plugin attributes. Plugin-created metrics are not included in the local
+  profile initially.
 - **Plugins must not be called from inside the Git adapter or Output layer.** Cross-layer calls violate the architecture boundary.
 - **The `extensions` field is an extraction record concern.** `ProjectedExtensions` and
   `ProjectedExtensionValue` are defined in `packages/internal-contracts/src/extraction-api/records.ts`. The latter contains the

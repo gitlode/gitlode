@@ -234,15 +234,22 @@ between execution and presentation models.
 
 ### Profiling and instrumentation
 
-Instrumentation is run-scoped and follows operation ownership: the component performing an
-operation records its measurement. Execution owns the total run measurement, product stages own
-planning, traversal, projection, and write measurements, and concrete adapters may report their
-internal work without adding instrumentation to stable product ports.
+The accepted telemetry target uses OpenTelemetry API contracts directly. Instrumentation is
+run-scoped and follows operation ownership: execution owns the total run observation, product stages
+own their phase and work measurements, and concrete adapters report implementation work without
+adding telemetry to stable product ports. High-frequency work uses metrics rather than creating a
+span per commit, file, record, blob, or diff.
 
-Profiling summaries cross the worker boundary as data. The `--profile` option controls detailed
-measurement and rendering, while `--quiet` suppresses presentation. Operations that do not occur in
-a mode—for example file expansion during commit-granularity extraction—produce no corresponding
-measurement.
+Worker-side execution owns SDK composition, active context, local collection, and finalization.
+Profiling results cross the worker boundary only as an SDK-independent report. Presentation owns
+labels, grouping, preferred reading order, and terminal formatting; collectors do not contain
+pipeline-specific display knowledge.
+
+`--profile` enables local collection of the normal observation catalog. It does not enable a
+different extraction path or a detailed per-item span mode. Local profiling and a possible future
+external destination are mutually exclusive; external export is not part of the current redesign.
+The complete target contract and its implementation status are documented in
+[`telemetry.md`](telemetry.md).
 
 ### Plugin extension boundary
 
@@ -319,6 +326,7 @@ The architecture deliberately leaves the following seams open:
 - [`git-adapters.md`](git-adapters.md) — Git backend selection and implementation boundaries.
 - [`git-traversal.md`](git-traversal.md) — commit DAG traversal design.
 - [`plugins.md`](plugins.md) — plugin contract and runtime behavior.
+- [`telemetry.md`](telemetry.md) — OpenTelemetry-based instrumentation and local profiling design.
 - [`cli.md`](cli.md) — CLI behavior and configuration boundary.
 - [`schema.md`](schema.md) — output schema design.
 - [`../contributing/build-test-release.md`](../contributing/build-test-release.md) — development,

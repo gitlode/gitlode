@@ -187,15 +187,19 @@ charter.
 
 ### 2.4 `instrumentation`
 
-**Purpose:** Record and summarize execution measurements.
+**Purpose:** Define SDK-independent, OpenTelemetry API-based support for gitlode observations.
 
-- Includes instrumentation contracts, spans, counters, attributes, noop behavior, local recording,
-  iterable instrumentation, and profile summary data.
-- Excludes progress reporting, user presentation, and product workflow decisions.
-- Owns measurement collection, not the interpretation or display of measurements.
+- Includes tracing and async-iterable helpers, observation identifiers and catalogs, collection
+  policies, and the structured-clone-safe profile report model.
+- Depends on `@opentelemetry/api` types and semantics rather than defining gitlode replacements for
+  tracers, spans, meters, attributes, context, status, or no-op behavior.
+- Excludes SDK providers, processors, readers, exporters, context-manager implementations, worker
+  lifecycle, product workflow decisions, and presentation policy.
+- Owns shared observation definitions and transport-neutral report vocabulary, not operation
+  recording points or display order.
 
-The contract and local implementation remain in one domain until a concrete need requires a
-separate implementation boundary.
+Operation-specific metric recorders live with the domain that owns the operation. Local SDK
+collection is an execution implementation concern. See [`telemetry.md`](telemetry.md).
 
 ### 2.5 `dag`
 
@@ -289,7 +293,8 @@ between text contents.
 **Purpose:** Define the public contract between plugin authors and gitlode.
 
 - Includes plugin factories, plugin interfaces, projection contexts, initialization and projection
-  results, failure policies, namespaces, and plugin runtime context contracts.
+  results, failure policies, namespaces, and plugin runtime context contracts, including
+  plugin-scoped OpenTelemetry API `Tracer` and `Meter` values.
 - Excludes module resolution, dynamic import, package compatibility checks, host registries, config
   file parsing, and host-side invocation.
 - Is a stable public-facing contract even while identifier compatibility remains relaxed during
@@ -303,7 +308,8 @@ between text contents.
   initialization, runtime registration, per-fact invocation, and plugin enrichment orchestration.
 - Excludes the public plugin contract, generic config parsing, base extraction projection, and
   concrete diagnostic rendering.
-- Owns host-side plugin lifecycle and failure handling.
+- Owns host-side plugin lifecycle, failure handling, scoped telemetry construction, and host-owned
+  plugin projection measurements.
 
 ### 2.16 `state`
 
@@ -359,10 +365,11 @@ protects a concrete consumer from implementation dependencies.
 **Purpose:** Present progress, diagnostics, and results to the user through stderr.
 
 - Includes terminal sinks, TTY and quiet modes, spinners, heartbeat scheduling, progress rendering,
-  diagnostic formatting, summary and profile formatting, and styling.
+  diagnostic formatting, summary and profile formatting, telemetry view catalogs, and styling.
 - Excludes progress-event meaning, measurement collection, product error classification, extraction
   execution, and CLI option parsing.
-- Owns rendering and terminal interaction, not the events or data being rendered.
+- Owns profile grouping, labels, preferred reading order, rendering, and terminal interaction, not
+  observation collection or canonical telemetry identifiers.
 
 ### 2.21 `execution`
 
@@ -370,7 +377,8 @@ protects a concrete consumer from implementation dependencies.
 
 - Includes run inputs and results, worker protocol and transport, concrete component construction,
   repository preflight and metadata resolution, missing-state execution policy, run-scoped resource
-  ownership, and extraction invocation.
+  ownership, extraction invocation, and worker-scoped OpenTelemetry SDK composition and
+  finalization.
 - Excludes CLI parsing, extraction policy, concrete presentation, adapter internals, and
   configuration-document schema.
 - Acts as the application composition boundary for one run.
@@ -457,14 +465,23 @@ not install them or observe private package specifiers. Build and bundling mecha
 
 ### 3.2 Package dependency envelope
 
-The direct production package dependency envelope is:
+The accepted post-migration production package dependency envelope is:
 
-- `@gitlode/internal-foundation` has no production package dependencies.
+- `@gitlode/internal-foundation` depends on `@opentelemetry/api`.
 - `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation`.
 - `@gitlode/git-adapters` depends on `@gitlode/internal-contracts`,
-  `@gitlode/internal-foundation`, and `isomorphic-git`.
-- `@gitlode/line-diff-adapters` depends on `@gitlode/internal-contracts` and `diff`.
-- `gitlode` uses all four private packages as development and release-build inputs.
+  `@gitlode/internal-foundation`, `@opentelemetry/api`, and `isomorphic-git`.
+- `@gitlode/line-diff-adapters` depends on `@gitlode/internal-contracts`,
+  `@gitlode/internal-foundation`, `@opentelemetry/api`, and `diff`.
+- `gitlode` uses all four private packages as development and release-build inputs, depends on
+  `@opentelemetry/api` for its core and public plugin contracts, and owns SDK dependencies used by
+  worker-side local profiling.
+
+This envelope describes the accepted telemetry target. Until the migration is complete, package
+manifests may still reflect the current custom instrumentation implementation. A workspace that
+directly imports `@opentelemetry/api` must declare it directly; transitive reachability is not
+sufficient. OpenTelemetry SDK packages must not become dependencies of private foundation,
+contract, or adapter packages.
 
 A package dependency makes another workspace reachable; it does not grant permission to every
 domain in that workspace. Each import must independently satisfy the closed domain allowlist in

@@ -84,9 +84,12 @@ Read:
 
 Read:
 
-1. `packages/gitlode/docs/profiling.md`
-2. `packages/gitlode/docs/design/architecture.md` when instrumentation boundaries are affected
-3. Relevant notes in `packages/gitlode/docs/handoff/` only when continuing unfinished work
+1. `packages/gitlode/docs/design/telemetry.md` for instrumentation, collection, and profile-report
+   contracts
+2. `packages/gitlode/docs/profiling.md` for the currently implemented profile output
+3. `packages/gitlode/docs/design/architecture.md` and `packages/gitlode/docs/design/domain-design.md`
+   when instrumentation boundaries are affected
+4. Relevant notes in `packages/gitlode/docs/handoff/` only when continuing unfinished work
 
 ## Guardrails
 

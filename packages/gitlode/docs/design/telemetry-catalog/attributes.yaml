@@ -1,0 +1,431 @@
+schema_version: 1
+status: accepted_target
+
+attributes:
+  - id: extraction_granularity
+    key: gitlode.extraction.granularity
+    type: string
+    description: Extraction fact granularity selected for the run.
+    values:
+      - commit
+      - file
+    profile:
+      reducer: single
+
+  - id: extraction_range_kind
+    key: gitlode.extraction.range.kind
+    type: string
+    description: Kind of explicit extraction range supplied to the run.
+    values:
+      - none
+      - ref
+      - date
+    profile:
+      reducer: single
+
+  - id: git_adapter
+    key: gitlode.git.adapter
+    type: string
+    description: Concrete Git adapter selected for the run.
+    values:
+      - isomorphic-git
+      - git-cli
+    profile:
+      reducer: single
+
+  - id: git_object_format
+    key: gitlode.git.object_format
+    type: string
+    description: Object format resolved for the repository.
+    values:
+      - sha1
+      - sha256
+    profile:
+      reducer: single
+
+  - id: git_cli_version
+    key: gitlode.git.cli.version
+    type: string
+    description: Sanitized Git CLI version returned by successful executable validation.
+    value_policy: sanitized_version
+    profile:
+      reducer: single
+
+  - id: git_ref_type
+    key: gitlode.git.ref.type
+    type: string
+    description: Semantic classification of a successfully classified Git ref.
+    values:
+      - branch
+      - tag-annotated
+      - tag-lightweight
+      - commit-oid
+    profile:
+      reducer: distinct
+
+  - id: git_remote_url_result
+    key: gitlode.git.remote_url.result
+    type: string
+    description: Whether remote URL resolution found a configured URL.
+    values:
+      - found
+      - missing
+    profile:
+      reducer: distinct
+
+  - id: git_merge_base_input_count
+    key: gitlode.git.merge_base.input.count
+    type: integer
+    minimum: 0
+    value_unit: "{commit}"
+    description: Number of commit OIDs supplied to merge-base computation.
+    profile:
+      reducer: min_max
+
+  - id: git_merge_base_result
+    key: gitlode.git.merge_base.result
+    type: string
+    description: Whether merge-base computation found a common ancestor.
+    values:
+      - found
+      - missing
+    profile:
+      reducer: distinct
+
+  - id: git_commit_walk_strategy
+    key: gitlode.git.commit.walk.strategy
+    type: string
+    description: Bounded implementation strategy selected for commit traversal.
+    values:
+      - git-cli-rev-list-stream
+      - certified-lazy
+      - phase-certified-fifo
+      - phase-certified-timestamp
+    profile:
+      reducer: distinct
+
+  - id: git_commit_walk_has_exclusion
+    key: gitlode.git.commit.walk.has_exclusion
+    type: boolean
+    description: Whether the commit walk was supplied an exclusion boundary.
+    profile:
+      reducer: distinct
+
+  - id: git_cli_process_completion
+    key: gitlode.git.cli.process.completion
+    type: string
+    description: Terminal completion mode of an instrumented Git CLI process or session.
+    values:
+      - exited
+      - cancelled
+      - error
+    profile:
+      reducer: distinct
+
+  - id: git_diff_mode
+    key: gitlode.git.diff.mode
+    type: string
+    description: Whether diff-tree compared a commit with the empty tree or with a parent.
+    values:
+      - root
+      - parent
+    profile:
+      reducer: distinct
+
+  - id: git_object_read_count
+    key: gitlode.git.object.read.count
+    type: integer
+    minimum: 0
+    value_unit: "{object}"
+    description: Number of object responses completed by a persistent Git CLI batch session.
+    profile:
+      reducer: min_max
+
+  - id: git_blob_read_size
+    key: gitlode.git.blob.read.size
+    type: integer
+    minimum: 0
+    value_unit: By
+    description: Total blob bytes returned by a persistent Git CLI batch session.
+    profile:
+      reducer: min_max
+
+  - id: dag_strategy
+    key: gitlode.dag.strategy
+    type: string
+    description: Generic DAG difference algorithm selected for the traversal.
+    values:
+      - eager-exclude
+      - certified-lazy
+      - phase-certified
+    profile:
+      reducer: distinct
+
+  - id: dag_has_exclusion
+    key: gitlode.dag.has_exclusion
+    type: boolean
+    description: Whether a DAG difference traversal was supplied an exclusion start node.
+    profile:
+      reducer: distinct
+
+  - id: dag_certification_result
+    key: gitlode.dag.certification.result
+    type: string
+    description: Outcome of a certified-lazy traversal that attempted path certification.
+    values:
+      - certified
+      - fallback
+    profile:
+      reducer: distinct
+
+  - id: dag_fallback_reason
+    key: gitlode.dag.fallback.reason
+    type: string
+    description: Bounded reason that certified-lazy traversal selected conservative fallback.
+    values:
+      - open-include-path
+      - exclude-path-split
+      - no-stop-points
+      - uncertified-stop-point
+    profile:
+      reducer: distinct
+
+  - id: dag_termination_reason
+    key: gitlode.dag.termination.reason
+    type: string
+    description: Normal termination condition of a completed phase-certified difference traversal.
+    values:
+      - frontier-exhausted
+      - include-resolved
+    profile:
+      reducer: distinct
+
+  - id: dag_start_count
+    key: gitlode.dag.start.count
+    type: integer
+    minimum: 0
+    value_unit: "{node}"
+    description: Number of start nodes supplied to a standalone reachable-set traversal.
+    profile:
+      reducer: min_max
+
+  - id: dag_certified_closure_result
+    key: gitlode.dag.certified_closure.result
+    type: string
+    description: Terminal outcome of a standalone certified-closure resolution.
+    values:
+      - closed-boundary
+      - exhausted
+    profile:
+      reducer: distinct
+
+  - id: run_result
+    key: gitlode.run.result
+    type: string
+    description: Terminal application result classification for the worker run.
+    values:
+      - success
+      - user_error
+      - runtime_error
+    profile:
+      reducer: single
+
+  - id: unique_commit_count
+    key: gitlode.commit.unique.count
+    type: integer
+    minimum: 0
+    value_unit: "{commit}"
+    description: Number of commits retained after pipeline-level run deduplication.
+    profile:
+      reducer: min_max
+
+  - id: output_record_count
+    key: gitlode.output.record.count
+    type: integer
+    minimum: 0
+    value_unit: "{record}"
+    description: Number of output records whose sink write completed successfully.
+    profile:
+      reducer: min_max
+
+  - id: output_file_count
+    key: gitlode.output.file.count
+    type: integer
+    minimum: 0
+    value_unit: "{file}"
+    description: Number of output files created by the concrete writer.
+    profile:
+      reducer: min_max
+
+  - id: output_size
+    key: gitlode.output.size
+    type: integer
+    minimum: 0
+    value_unit: By
+    description: Number of bytes written by the concrete output writer.
+    profile:
+      reducer: min_max
+
+  - id: requested_ref_count
+    key: gitlode.ref.requested.count
+    type: integer
+    minimum: 0
+    value_unit: "{ref}"
+    description: Number of refs supplied to an extraction or planning request.
+    profile:
+      reducer: min_max
+
+  - id: skipped_diff_count
+    key: gitlode.diff.skipped.count
+    type: integer
+    minimum: 0
+    value_unit: "{change}"
+    description: Number of file changes whose line diff was intentionally skipped.
+    profile:
+      reducer: min_max
+
+  - id: extraction_mode
+    key: gitlode.extraction.mode
+    type: string
+    description: Snapshot or incremental planning mode.
+    values:
+      - snapshot
+      - incremental
+    profile:
+      reducer: single
+
+  - id: prior_ref_count
+    key: gitlode.ref.prior.count
+    type: integer
+    minimum: 0
+    value_unit: "{ref}"
+    description: Number of refs present in the prior checkpoint supplied to planning.
+    profile:
+      reducer: min_max
+
+  - id: traversal_plan_count
+    key: gitlode.traversal.plan.count
+    type: integer
+    minimum: 0
+    value_unit: "{plan}"
+    description: Number of traversal plans produced by or supplied to an operation.
+    profile:
+      reducer: min_max
+
+  - id: skipped_ref_count
+    key: gitlode.ref.skipped.count
+    type: integer
+    minimum: 0
+    value_unit: "{ref}"
+    description: Number of requested refs omitted because they could not be resolved.
+    profile:
+      reducer: min_max
+
+  - id: stream_completion
+    key: gitlode.stream.completion
+    type: string
+    description: Terminal completion mode of an instrumented async iterable.
+    values:
+      - exhausted
+      - cancelled
+      - handled_throw
+      - error
+    profile:
+      reducer: distinct
+
+  - id: projection_mode
+    key: gitlode.projection.mode
+    type: string
+    description: Projection composition used by the outer logical projection stream.
+    values:
+      - built_in
+      - plugin_enriched
+    profile:
+      reducer: single
+
+  - id: repository_name_source
+    key: gitlode.repository.name.source
+    type: string
+    description: Source from which the effective repository name was obtained.
+    values:
+      - explicit
+      - remote_url
+      - path
+    profile:
+      reducer: single
+
+  - id: repository_url_source
+    key: gitlode.repository.url.source
+    type: string
+    description: Source from which the effective repository URL was obtained.
+    values:
+      - explicit
+      - remote
+      - missing
+    profile:
+      reducer: single
+
+  - id: plugin_configured_count
+    key: gitlode.plugin.configured.count
+    type: integer
+    minimum: 0
+    value_unit: "{plugin}"
+    description: Number of plugin declarations supplied to host bootstrap.
+    profile:
+      reducer: min_max
+
+  - id: plugin_resolved_count
+    key: gitlode.plugin.resolved.count
+    type: integer
+    minimum: 0
+    value_unit: "{plugin}"
+    description: Number of plugin entries resolved successfully by the host.
+    profile:
+      reducer: min_max
+
+  - id: plugin_ready_count
+    key: gitlode.plugin.ready.count
+    type: integer
+    minimum: 0
+    value_unit: "{plugin}"
+    description: Number of resolved plugins whose initialization completed ready.
+    profile:
+      reducer: min_max
+
+  - id: plugin_failed_count
+    key: gitlode.plugin.failed.count
+    type: integer
+    minimum: 0
+    value_unit: "{plugin}"
+    description: Number of resolved plugins whose initialization completed fatally.
+    profile:
+      reducer: min_max
+
+  - id: plugin_compatibility_warning_count
+    key: gitlode.plugin.compatibility.warning.count
+    type: integer
+    minimum: 0
+    value_unit: "{warning}"
+    description: Number of compatibility warnings emitted while checking resolved plugins.
+    profile:
+      reducer: min_max
+
+  - id: plugin_init_result
+    key: gitlode.plugin.init.result
+    type: string
+    description: Terminal result returned or normalized for one plugin initialization callback.
+    values:
+      - ready
+      - fatal
+    profile:
+      reducer: distinct
+
+  - id: plugin_init_failure_source
+    key: gitlode.plugin.init.failure.source
+    type: string
+    description: Whether a fatal plugin initialization outcome was returned or thrown.
+    values:
+      - returned
+      - thrown
+    profile:
+      reducer: distinct

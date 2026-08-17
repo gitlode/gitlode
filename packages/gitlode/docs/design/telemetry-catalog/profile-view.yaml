@@ -1,0 +1,129 @@
+schema_version: 1
+status: incomplete
+
+span_groups:
+  - id: overview
+    label: Overview
+    observations:
+      - ref: run
+        label: Run
+
+  - id: setup
+    label: Setup
+    observations:
+      - ref: repository_access_validate
+        label: Repository access
+      - ref: repository_object_format_resolve
+        label: Object format
+      - ref: state_validate
+        label: State validation
+      - ref: repository_metadata_resolve
+        label: Repository metadata
+      - ref: extraction_range_resolve
+        label: Extraction range
+      - ref: plugin_bootstrap
+        label: Plugin bootstrap
+      - ref: plugin_resolve
+        label: Plugin resolution
+      - ref: plugin_compatibility_check
+        label: Plugin compatibility
+
+  - id: pipeline
+    label: Pipeline
+    observations:
+      - ref: extract
+        label: Extraction
+      - ref: planning
+        label: Planning
+      - ref: traversal
+        label: Traversal
+      - ref: projection
+        label: Projection
+      - ref: output_close
+        label: Output close
+
+  - id: git_operations
+    label: Git operations
+    observations:
+      - ref: git_cli_version_check
+        label: CLI version check
+      - ref: git_resolve_ref
+        label: Resolve ref
+      - ref: git_classify_ref
+        label: Classify ref
+      - ref: git_repository_object_format
+        label: Repository object format
+      - ref: git_remote_url_resolve
+        label: Resolve remote URL
+      - ref: git_merge_base
+        label: Merge base
+
+  - id: git_traversal
+    label: Git traversal
+    observations:
+      - ref: git_commit_walk
+        label: Commit walk
+      - ref: git_cli_rev_list
+        label: CLI rev-list
+      - ref: git_cli_commit_batch
+        label: CLI commit batch
+
+  - id: git_file_access
+    label: Git file access
+    observations:
+      - ref: git_cli_diff_tree
+        label: CLI diff-tree
+      - ref: git_cli_file_blob_batch
+        label: CLI file blob batch
+
+  - id: dag
+    label: DAG
+    observations:
+      - ref: dag_traversal
+        label: DAG traversal
+      - ref: dag_reachable
+        label: Reachable traversal
+      - ref: dag_certified_closure
+        label: Certified closure
+
+  - id: plugins
+    label: Plugins
+    match:
+      scope_class: resolved_plugin_scope
+    observations:
+      - ref: plugin_init
+        label: Initialization
+    remainder:
+      include: true
+      description: Plugin-created spans not otherwise listed in this catalog.
+      order:
+        - scope
+        - name
+    notes:
+      - Scope identity includes its optional version.
+      - Multiple registrations using the same package scope and span name aggregate into one row.
+
+metric_groups:
+  - id: pipeline_metrics
+    label: Pipeline
+    observations:
+      - ref: extraction_commit_accepted
+        label: Unique commits
+
+  - id: output_metrics
+    label: Output
+    observations:
+      - ref: output_write_record
+        label: Records written
+
+fallback:
+  include_unknown: true
+  spans:
+    order:
+      - scope
+      - name
+  metrics:
+    order:
+      - scope
+      - name
+      - attributes

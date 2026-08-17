@@ -1,0 +1,926 @@
+schema_version: 1
+status: accepted_target
+
+spans:
+  - id: run
+    name: gitlode.run
+    scope: gitlode.execution
+    kind: internal
+    owner: WorkerTelemetrySession
+    parent:
+      type: root
+    cardinality:
+      maximum_per_worker_run: 1
+    lifetime:
+      start: after telemetry initialization and before application setup
+      end: after application work and application resource disposal
+      excludes:
+        - telemetry flush, collection, snapshot, and shutdown
+        - main-process checkpoint persistence
+    attributes:
+      initial:
+        - ref: extraction_granularity
+          required: true
+        - ref: extraction_range_kind
+          required: true
+        - ref: git_adapter
+          required: true
+      resolved:
+        - ref: git_object_format
+          condition: repository object format resolved successfully
+        - ref: git_cli_version
+          condition: Git CLI adapter validation succeeded
+      terminal:
+        - ref: run_result
+          required: true
+        - ref: unique_commit_count
+          condition: successful run
+        - ref: output_record_count
+          condition: successful run
+        - ref: output_file_count
+          condition: successful run
+        - ref: output_size
+          condition: successful run
+    status:
+      success: unset
+      typed_user_error: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - The profile-enabled flag is intentionally not recorded.
+      - Unknown partial counts on failed runs are omitted rather than recorded as zero.
+
+  - id: extract
+    name: gitlode.extract
+    scope: gitlode.extraction
+    kind: internal
+    owner: ExtractionPipeline.run
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+    lifetime:
+      start: immediately before traversal planning
+      end: after output close and extraction result and checkpoint-model construction
+      excludes:
+        - application resource disposal
+        - main-process checkpoint persistence
+    attributes:
+      initial:
+        - ref: extraction_granularity
+          required: true
+        - ref: extraction_range_kind
+          required: true
+        - ref: requested_ref_count
+          required: true
+      terminal:
+        - ref: unique_commit_count
+          condition: value is known, including a partial value on failure
+        - ref: output_record_count
+          condition: value is known, including a partial value on failure
+        - ref: skipped_diff_count
+          condition: file extraction and value is known
+    status:
+      success: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Generic span-local refs, records, commits, and skipped_diffs counters are removed.
+
+  - id: planning
+    name: gitlode.planning
+    scope: gitlode.extraction
+    kind: internal
+    owner: RepositoryTraversalPlanner.plan
+    parent:
+      type: span
+      ref: extract
+    cardinality:
+      maximum_per_extraction: 1
+    lifetime:
+      start: before processing the traversal planning request
+      end: after the final traversal plan list is produced or planning fails
+      excludes: []
+    attributes:
+      initial:
+        - ref: extraction_mode
+          required: true
+        - ref: extraction_range_kind
+          required: true
+        - ref: requested_ref_count
+          required: true
+        - ref: prior_ref_count
+          required: true
+      terminal:
+        - ref: traversal_plan_count
+          condition: value is known
+        - ref: skipped_ref_count
+          condition: value is known
+    status:
+      success: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Ref names and dynamically generated ref-type attributes are forbidden.
+
+  - id: traversal
+    name: gitlode.traversal
+    scope: gitlode.extraction
+    kind: internal
+    owner: CommitFactExtractor.extract
+    parent:
+      type: explicit_span_context
+      ref: extract
+    cardinality:
+      per: extractor invocation
+      current_bound: traversal plan count
+    lifetime:
+      start: first source next operation that begins logical consumption
+      end: terminal async-iterator completion
+      includes:
+        - wall-clock waits between iterator operations
+      excludes:
+        - downstream consumer work as active child context
+    attributes:
+      initial:
+        - ref: traversal_plan_count
+          required: true
+        - ref: extraction_range_kind
+          required: true
+      terminal:
+        - ref: stream_completion
+          required: true
+    status:
+      success: unset
+      expected_fallback: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Commit counts belong to adapter and extraction metrics, not this span.
+      - Fallback event and metric details are defined by the Git catalog.
+
+  - id: projection
+    name: gitlode.projection
+    scope: gitlode.extraction
+    kind: internal
+    owner: outer active FactProjector
+    implementations:
+      built_in: BuiltInFactProjector
+      plugin_enriched: EnrichingFactProjector
+    parent:
+      type: explicit_span_context
+      ref: extract
+    cardinality:
+      per: outer projector invocation
+      current_bound: traversal plan count
+    lifetime:
+      start: first source next operation that begins logical consumption
+      end: terminal async-iterator completion
+      includes:
+        - wall-clock waits between iterator operations
+      excludes:
+        - downstream consumer work as active child context
+    attributes:
+      initial:
+        - ref: projection_mode
+          required: true
+      terminal:
+        - ref: stream_completion
+          required: true
+    status:
+      success: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Plugin enrichment does not change this span's instrumentation scope.
+      - The built-in projector does not create a nested projection stream span when wrapped.
+      - Per-record projection duration is a histogram, not a child span.
+
+  - id: output_close
+    name: gitlode.output.close
+    scope: gitlode.extraction
+    kind: internal
+    owner: ExtractionPipeline
+    parent:
+      type: span
+      ref: extract
+    cardinality:
+      maximum_per_extraction: 1
+    lifetime:
+      start: immediately before OutputSink.close
+      end: after OutputSink.close resolves or rejects
+      excludes: []
+    attributes: {}
+    status:
+      success: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - A preceding extraction failure does not make a successful close span erroneous.
+
+  - id: repository_access_validate
+    name: gitlode.repository.access.validate
+    scope: gitlode.execution
+    kind: internal
+    owner: worker execution preflight
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+    lifetime:
+      start: immediately before repository access validation
+      end: after validation succeeds or fails
+      excludes: []
+    attributes: {}
+    status:
+      success: unset
+      typed_user_error: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - A tolerated REF_NOT_FOUND result is successful for this validation span.
+      - The validation ref name and its position in the request are not recorded.
+
+  - id: repository_object_format_resolve
+    name: gitlode.repository.object_format.resolve
+    scope: gitlode.execution
+    kind: internal
+    owner: worker repository setup
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+    lifetime:
+      start: before requesting the repository object format
+      end: after supported-format validation succeeds or fails
+      excludes: []
+    attributes:
+      terminal:
+        - ref: git_object_format
+          condition: object format was resolved
+    status:
+      success: unset
+      typed_user_error: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - The resolved format also appears on the run span as repository context.
+
+  - id: state_validate
+    name: gitlode.state.validate
+    scope: gitlode.execution
+    kind: internal
+    owner: worker state setup
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+    lifetime:
+      start: before validating the prior checkpoint against repository context
+      end: after validation succeeds or fails
+      excludes: []
+    attributes:
+      initial:
+        - ref: prior_ref_count
+          required: true
+    status:
+      success: unset
+      typed_user_error: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Repository paths, ref names, and OIDs are not recorded.
+      - If a future execution path skips validation entirely, it does not emit this span.
+
+  - id: repository_metadata_resolve
+    name: gitlode.repository.metadata.resolve
+    scope: gitlode.execution
+    kind: internal
+    owner: worker repository setup
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+    lifetime:
+      start: before selecting or resolving repository name and URL sources
+      end: after effective metadata is available or resolution fails
+      excludes: []
+    attributes:
+      terminal:
+        - ref: repository_name_source
+          condition: effective repository name was resolved
+        - ref: repository_url_source
+          condition: repository URL resolution completed
+    status:
+      success: unset
+      typed_user_error: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Repository name, URL, path, and remote name are not recorded.
+      - Name and URL sources are independent decisions.
+
+  - id: extraction_range_resolve
+    name: gitlode.extraction.range.resolve
+    scope: gitlode.execution
+    kind: internal
+    owner: worker extraction setup
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+    lifetime:
+      start: before converting the external range input
+      end: after the internal extraction range is produced or resolution fails
+      excludes: []
+    attributes:
+      initial:
+        - ref: extraction_range_kind
+          required: true
+    status:
+      success: unset
+      typed_user_error: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Range values, ref names, date strings, and resolved OIDs are not recorded.
+      - The span is emitted for none, date, and ref range kinds when resolution is invoked.
+
+  - id: plugin_bootstrap
+    name: gitlode.plugin.bootstrap
+    scope: gitlode.plugin_runtime
+    kind: internal
+    owner: host buildPluginProjector
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+      condition: effective plugin declarations are present
+    lifetime:
+      start: before resolving plugin entries
+      end: after projector construction or typed termination is determined
+      excludes: []
+    attributes:
+      initial:
+        - ref: plugin_configured_count
+          required: true
+      terminal:
+        - ref: plugin_resolved_count
+          condition: value is known
+        - ref: plugin_ready_count
+          condition: value is known
+        - ref: plugin_failed_count
+          condition: value is known
+    status:
+      success: unset
+      typed_termination: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Plugin namespaces, entrypoints, configuration, and package paths are not recorded.
+      - Per-plugin initialization spans are direct children and are defined separately.
+      - No aggregate plugin-initialize child span is emitted.
+
+  - id: plugin_resolve
+    name: gitlode.plugin.resolve
+    scope: gitlode.plugin_runtime
+    kind: internal
+    owner: plugin host resolver
+    parent:
+      type: span
+      ref: plugin_bootstrap
+    cardinality:
+      maximum_per_bootstrap: 1
+    lifetime:
+      start: before plugin module resolution
+      end: after dynamic imports and factory invocations complete or terminate
+      includes:
+        - module resolution
+        - dynamic import
+        - plugin factory invocation
+      excludes:
+        - plugin init calls
+    attributes:
+      initial:
+        - ref: plugin_configured_count
+          required: true
+      terminal:
+        - ref: plugin_resolved_count
+          condition: value is known
+    status:
+      success: unset
+      typed_termination: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Individual plugin identity remains in structured diagnostics, not host span attributes.
+
+  - id: plugin_compatibility_check
+    name: gitlode.plugin.compatibility.check
+    scope: gitlode.plugin_runtime
+    kind: internal
+    owner: plugin compatibility checker
+    parent:
+      type: span
+      ref: plugin_bootstrap
+    cardinality:
+      maximum_per_bootstrap: 1
+    lifetime:
+      start: before checking package metadata for resolved plugins
+      end: after all compatibility checks and warnings complete
+      excludes: []
+    attributes:
+      initial:
+        - ref: plugin_resolved_count
+          required: true
+      terminal:
+        - ref: plugin_compatibility_warning_count
+          required: true
+    status:
+      success_with_warnings: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Compatibility mismatches and unreadable metadata are warnings, not span errors.
+
+  - id: git_resolve_ref
+    name: gitlode.git.resolve_ref
+    scope: gitlode.git
+    kind: internal
+    owner: GitAdapter.resolveRef
+    parent:
+      type: active_caller
+    cardinality:
+      per: public port invocation
+    lifetime:
+      start: on entry to the public Git adapter operation
+      end: after ref resolution, result validation, and error translation complete
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+    status:
+      success: unset
+      typed_failure: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Ref names and resolved OIDs are not recorded.
+      - Internal CLI probes and annotated-tag peeling remain inside this semantic operation.
+
+  - id: git_classify_ref
+    name: gitlode.git.classify_ref
+    scope: gitlode.git
+    kind: internal
+    owner: GitAdapter.classifyRefType
+    parent:
+      type: active_caller
+    cardinality:
+      per: public port invocation
+    lifetime:
+      start: on entry to the public Git adapter operation
+      end: after classification, tag peeling, result validation, and error translation complete
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+      terminal:
+        - ref: git_ref_type
+          condition: classification succeeded
+    status:
+      success: unset
+      typed_failure: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Ref names and resolved OIDs are not recorded.
+
+  - id: git_repository_object_format
+    name: gitlode.git.repository_object_format
+    scope: gitlode.git
+    kind: internal
+    owner: GitAdapter.getRepositoryObjectFormat
+    parent:
+      type: active_caller
+    cardinality:
+      per: public port invocation
+    lifetime:
+      start: on entry to the public Git adapter operation
+      end: after format resolution, result validation, and error translation complete
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+      terminal:
+        - ref: git_object_format
+          condition: object format was resolved
+    status:
+      success: unset
+      typed_failure: error_without_exception
+      runtime_exception: record_exception_and_error
+
+  - id: git_remote_url_resolve
+    name: gitlode.git.remote_url.resolve
+    scope: gitlode.git
+    kind: internal
+    owner: GitAdapter.getRemoteUrl
+    parent:
+      type: active_caller
+    cardinality:
+      per: public port invocation
+    lifetime:
+      start: on entry to the public Git adapter operation
+      end: after remote URL resolution and error translation complete
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+      terminal:
+        - ref: git_remote_url_result
+          required: true
+    status:
+      found: unset
+      missing: unset
+      typed_failure: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Remote URL values and remote names are not recorded.
+      - A valid missing result is successful and records the missing result attribute.
+
+  - id: git_merge_base
+    name: gitlode.git.merge_base
+    scope: gitlode.git
+    kind: internal
+    owner: GitAdapter.findMergeBase
+    parent:
+      type: active_caller
+    cardinality:
+      per: public port invocation
+    lifetime:
+      start: on entry to the public Git adapter operation
+      end: after merge-base computation, result validation, and error translation complete
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+        - ref: git_merge_base_input_count
+          required: true
+      terminal:
+        - ref: git_merge_base_result
+          required: true
+    status:
+      found: unset
+      missing: unset
+      typed_failure: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Input and result OIDs are not recorded.
+      - A valid missing result is successful and records the missing result attribute.
+
+  - id: git_commit_walk
+    name: gitlode.git.commit.walk
+    scope: gitlode.git
+    kind: internal
+    owner: GitAdapter.walkCommits
+    parent:
+      type: explicit_span_context
+      ref: traversal
+    cardinality:
+      per: adapter walk invocation
+      current_bound: traversal plan count
+    lifetime:
+      start: first source next operation that begins logical consumption
+      end: terminal async-iterator completion
+      includes:
+        - wall-clock waits between iterator operations
+      excludes:
+        - downstream consumer work as active child context
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+        - ref: git_commit_walk_strategy
+          required: true
+        - ref: git_commit_walk_has_exclusion
+          required: true
+      terminal:
+        - ref: stream_completion
+          required: true
+    status:
+      success: unset
+      cancellation: unset
+      typed_failure: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Raw commits yielded are a metric and are not recorded as a span-local counter.
+      - Adapter-specific traversal spans are children of this common logical operation.
+
+  - id: git_cli_version_check
+    name: gitlode.git.cli.version.check
+    scope: gitlode.git
+    kind: internal
+    owner: Git CLI adapter validation
+    parent:
+      type: span
+      ref: run
+    cardinality:
+      maximum_per_worker_run: 1
+      condition: Git CLI adapter is selected
+    lifetime:
+      start: before launching the Git executable version check
+      end: after version parsing and validation succeed or fail
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+      terminal:
+        - ref: git_cli_version
+          condition: executable validation succeeded
+    status:
+      success: unset
+      typed_failure: error_without_exception
+      runtime_exception: record_exception_and_error
+    notes:
+      - Command arguments, executable paths, and process output are not recorded.
+
+  - id: git_cli_rev_list
+    name: gitlode.git.cli.rev_list
+    scope: gitlode.git
+    kind: internal
+    owner: GitCliAdapter.walkCommits rev-list process
+    parent:
+      type: span
+      ref: git_commit_walk
+    cardinality:
+      per: Git CLI commit walk
+      maximum_per_walk: 1
+    lifetime:
+      start: before starting the rev-list process
+      end: after process exit, cancellation, or failure
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+      terminal:
+        - ref: git_cli_process_completion
+          required: true
+    status:
+      exited: unset
+      cancellation: unset
+      own_runtime_exception: record_exception_and_error
+    notes:
+      - Ref names, OIDs, command arguments, executable paths, and process output are not recorded.
+      - A combined pipeline failure is recorded on the outer walk unless this process is its owner.
+
+  - id: git_cli_commit_batch
+    name: gitlode.git.cli.commit_batch
+    scope: gitlode.git
+    kind: internal
+    owner: GitCliAdapter.walkCommits commit batch process
+    parent:
+      type: span
+      ref: git_commit_walk
+    cardinality:
+      per: Git CLI commit walk
+      maximum_per_walk: 1
+    lifetime:
+      start: before starting the commit-object batch process
+      end: after process exit, cancellation, or failure
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+      terminal:
+        - ref: git_cli_process_completion
+          required: true
+    status:
+      exited: unset
+      cancellation: unset
+      own_runtime_exception: record_exception_and_error
+    notes:
+      - OIDs, command arguments, executable paths, and process output are not recorded.
+      - A combined pipeline failure is recorded on the outer walk unless this process is its owner.
+
+  - id: git_cli_diff_tree
+    name: gitlode.git.cli.diff_tree
+    scope: gitlode.git
+    kind: internal
+    owner: GitCliAdapter file-change discovery
+    parent:
+      type: explicit_span_context
+      ref: extract
+    cardinality:
+      per: file-level commit expansion
+    lifetime:
+      start: before starting the diff-tree process
+      end: after process completion, exit validation, and raw descriptor parsing
+      excludes:
+        - blob reads
+        - line-diff computation
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+        - ref: git_diff_mode
+          required: true
+      terminal:
+        - ref: git_cli_process_completion
+          required: true
+    status:
+      exited: unset
+      cancellation: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - This is an explicit volume-tested exception to the normal no-high-frequency-span rule.
+      - Commit OIDs, paths, command arguments, and process output are not recorded.
+      - The file-change expander drives the adapter iterator under the extraction context; Context is not added to the Git port.
+
+  - id: git_cli_file_blob_batch
+    name: gitlode.git.cli.file_blob_batch
+    scope: gitlode.git
+    kind: internal
+    owner: repository-scoped Git CLI file blob batch session
+    parent:
+      type: explicit_span_context
+      ref: run
+    cardinality:
+      maximum_concurrent_per_worker_run: 1
+      condition: the file blob batch is started lazily
+    lifetime:
+      start: immediately before lazily starting the persistent batch process
+      end: after session disposal, process exit, cancellation, or failure
+      includes:
+        - idle wall-clock time between object reads
+      excludes: []
+    attributes:
+      initial:
+        - ref: git_adapter
+          required: true
+      terminal:
+        - ref: git_cli_process_completion
+          required: true
+        - ref: git_object_read_count
+          required: true
+        - ref: git_blob_read_size
+          required: true
+    status:
+      exited: unset
+      cancellation: unset
+      read_or_session_failure: record_exception_and_error
+    notes:
+      - The adapter captures the run context for this repository-scoped session.
+      - Object counts and blob bytes are also recorded as metrics at the primitive operation owners.
+      - OIDs, paths, command arguments, executable paths, and process output are not recorded.
+      - Individual blob reads and per-commit file-change streams do not emit spans.
+
+  - id: dag_traversal
+    name: gitlode.dag.traversal
+    scope: gitlode.dag
+    kind: internal
+    owner: generic DAG difference traversal facade
+    parent:
+      type: active_caller_at_first_consumption
+      expected_in_git_extraction: git_commit_walk
+    cardinality:
+      per: public difference traversal invocation
+      maximum_per_isomorphic_git_commit_walk: 1
+    lifetime:
+      start: first source next operation that begins logical consumption
+      end: terminal async-iterator completion
+      includes:
+        - wall-clock waits between iterator operations
+      excludes:
+        - downstream consumer work as active child context
+        - internal reachable-set collection and certified-closure child spans
+    attributes:
+      initial:
+        - ref: dag_strategy
+          required: true
+        - ref: dag_has_exclusion
+          required: true
+      terminal:
+        - ref: stream_completion
+          required: true
+        - ref: dag_certification_result
+          condition: certified-lazy performed certification with an exclusion start
+        - ref: dag_fallback_reason
+          condition: certification result is fallback
+        - ref: dag_termination_reason
+          condition: phase-certified traversal completed normally
+    events:
+      - name: gitlode.dag.fallback
+        condition: certified-lazy selects conservative fallback
+        maximum_per_span: 1
+        attributes:
+          - ref: dag_fallback_reason
+            required: true
+    status:
+      success: unset
+      expected_fallback: unset
+      cancellation: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Generic DAG APIs do not receive Git-specific parent knowledge or an explicit Context argument.
+      - Node IDs, domain hints, frontier contents, timestamps, and topology are not recorded.
+      - Internal closure phases, successor expansions, frontier operations, and per-node work do not emit spans.
+      - Partial completed work is reported through the DAG measurement when the stream is cancelled or fails.
+
+  - id: dag_reachable
+    name: gitlode.dag.reachable
+    scope: gitlode.dag
+    kind: internal
+    owner: standalone reachable-set traversal facade
+    parent:
+      type: active_caller_at_first_consumption
+    cardinality:
+      per: standalone public reachable traversal invocation
+    lifetime:
+      start: first source next operation that begins logical consumption
+      end: terminal async-iterator completion
+      includes:
+        - wall-clock waits between iterator operations
+      excludes:
+        - downstream consumer work as active child context
+    attributes:
+      initial:
+        - ref: dag_start_count
+          required: true
+      terminal:
+        - ref: stream_completion
+          required: true
+    status:
+      success: unset
+      cancellation: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Reachable traversal used inside another DAG operation calls the reusable core and emits no nested span.
+      - Start node IDs, domain hints, frontier contents, and topology are not recorded.
+      - Partial completed work is reported through the DAG measurement when the stream is cancelled or fails.
+
+  - id: dag_certified_closure
+    name: gitlode.dag.certified_closure
+    scope: gitlode.dag
+    kind: internal
+    owner: standalone certified-closure facade
+    parent:
+      type: active_caller
+    cardinality:
+      per: standalone public certified-closure invocation
+    lifetime:
+      start: before resolving the standalone certified closure
+      end: after closure resolution succeeds or fails
+      excludes: []
+    attributes:
+      terminal:
+        - ref: dag_certified_closure_result
+          condition: closure resolution completed normally
+    status:
+      closed_boundary: unset
+      exhausted: unset
+      runtime_exception: record_exception_and_error
+    notes:
+      - Closure phases inside phase-certified difference traversal call the reusable core and emit no child span.
+      - Node IDs, closed-boundary IDs, terminal-node IDs, domain hints, frontier contents, and topology are not recorded.
+
+  - id: plugin_init
+    name: gitlode.plugin.init
+    scope:
+      type: resolved_plugin_scope
+      preferred:
+        name: resolved package name
+        version: resolved package version when available
+      package_name_without_version: use package name and omit scope version
+      fallback:
+        name: gitlode.plugin.<namespace>
+        version: omitted
+    kind: internal
+    owner: plugin host initializer around ProjectorPlugin.init
+    parent:
+      type: explicit_span_context
+      ref: plugin_bootstrap
+    cardinality:
+      per: resolved plugin registration
+      maximum_per_bootstrap: configured plugin count
+    lifetime:
+      start: immediately before calling entry.plugin.init with its prepared runtime context
+      end: immediately after ready or fatal is returned, or the callback throws
+      excludes:
+        - plugin telemetry binding and runtime-context preparation
+        - plugin work not awaited by the init callback
+    attributes:
+      terminal:
+        - ref: plugin_init_result
+          required: true
+        - ref: plugin_init_failure_source
+          condition: init result is fatal
+    status:
+      ready: unset
+      returned_fatal: error_without_exception
+      thrown: record_original_exception_and_error
+    notes:
+      - The host starts this span with the same plugin-scoped tracer supplied through PluginRuntimeContext.
+      - All parallel init spans use the plugin bootstrap context explicitly; ambient Promise scheduling does not determine their parent.
+      - A thrown value is rethrown unchanged after recording so the initializer can normalize it and continue awaiting other plugins.
+      - Calling runtime.error does not alter span status when the callback ultimately returns ready.
+      - Namespace, entrypoint, configuration, failure policy, package path, and fatal message are not recorded.
+      - Registering the same package under multiple namespaces intentionally aggregates these spans under the same scope and name.
+      - Host-defined result attributes are locally allowlisted; arbitrary attributes on plugin-created spans are not retained by the local profile.

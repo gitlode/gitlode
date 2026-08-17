@@ -1,0 +1,61 @@
+schema_version: 1
+status: incomplete
+
+# Entries accepted so far. Remaining Git, DAG, file expansion, diff, output-writer, projection, and
+# plugin metrics are tracked by the handoff.
+metrics:
+  - id: extraction_commit_accepted
+    name: gitlode.extraction.commit.accepted
+    scope: gitlode.extraction
+    instrument: counter
+    unit: "{commit}"
+    description: Number of commit facts accepted after pipeline-level cross-ref deduplication.
+    owner: ExtractionPipeline
+    recording:
+      value: 1
+      point: immediately after an unseen commit is admitted by pipeline-level deduplication
+      before:
+        - downstream file expansion
+        - projection
+        - output writing
+      failure_semantics: accepted commits remain recorded if later pipeline work fails
+    attributes:
+      - ref: extraction_granularity
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    zero_policy: omit_datapoint_when_no_commit_is_accepted
+    migration:
+      replaces:
+        - gitlode.extract span-local commits counter
+        - gitlode.run span-local commits counter
+      notes:
+        - CommitFactExtractor and Git adapter counts do not own this pipeline-level observation.
+        - Terminal run and extraction span attributes may intentionally repeat the final count as trace overview data.
+
+  - id: output_write_record
+    name: gitlode.output.write.record
+    scope: gitlode.extraction
+    instrument: counter
+    unit: "{record}"
+    description: Number of output records whose OutputSink write completed successfully.
+    owner: ExtractionPipeline
+    recording:
+      value: 1
+      point: immediately after OutputSink.write resolves successfully
+      before:
+        - recordsWritten progress and result updates
+      failure_semantics: a rejected write is not recorded
+    attributes:
+      - ref: extraction_granularity
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    zero_policy: omit_datapoint_when_no_write_succeeds
+    migration:
+      replaces:
+        - gitlode.extract span-local records counter
+        - gitlode.run span-local records counter
+      notes:
+        - Write success and failure duration is defined separately by the output metric slice.
+        - Terminal run and extraction span attributes may intentionally repeat the final count as trace overview data.

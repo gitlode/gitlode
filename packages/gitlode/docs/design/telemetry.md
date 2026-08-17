@@ -183,8 +183,28 @@ distinct questions: one operation's explanation and aggregation across operation
 
 ## Observation catalog rules
 
-The complete observation catalog is a design gate tracked by the handoff. Each metric entry must
-define:
+Structured observation definitions live beside this document:
+
+- [`telemetry-catalog/attributes.yaml`](telemetry-catalog/attributes.yaml) owns attribute keys,
+  types, permitted values, and local-profile reducers;
+- [`telemetry-catalog/spans.yaml`](telemetry-catalog/spans.yaml) owns span names, scopes, owners,
+  parent policy, lifetime, attributes, status, and cardinality;
+- [`telemetry-catalog/metrics.yaml`](telemetry-catalog/metrics.yaml) owns instruments, recording
+  points, units, attributes, outcomes, zero policy, and histogram buckets; and
+- [`telemetry-catalog/profile-view.yaml`](telemetry-catalog/profile-view.yaml) owns profile grouping,
+  labels, preferred reading order, and unknown-observation fallback.
+
+Markdown remains canonical for rationale, cross-cutting behavior, and policies that are better read
+as prose. YAML is canonical for repetitive structured definitions. The same field must not be
+maintained independently in both forms; prose refers to catalog IDs when an exact structured entry
+exists.
+
+The YAML files are design contracts, not runtime configuration. Production code does not parse them
+at startup. Implementation metadata is checked against the catalogs during tests; code generation
+is not introduced unless a later concrete need justifies it.
+
+The complete observation catalog remains a design gate tracked by the handoff. Each metric entry
+must define:
 
 - name, instrument kind, description, and unit;
 - instrumentation scope and operation owner;
@@ -212,9 +232,9 @@ Attributes use namespaced keys and bounded enumerations. OIDs, file paths, repos
 refs, people, email addresses, raw errors, and arbitrary configuration values are forbidden. The
 maximum theoretical attribute combination count for one metric must not exceed 128.
 
-Shared identifiers and collection policy live in the instrumentation catalog. The collector does
-not contain operation-specific knowledge. Domain recorders own when and how values are recorded,
-while presentation owns grouping, labels, and preferred display order.
+Shared identifiers and collection policy live in the observation and attribute catalogs. The
+collector does not contain operation-specific knowledge. Domain recorders own when and how values
+are recorded, while the profile-view catalog owns grouping, labels, and preferred display order.
 
 ## Accepted observation inventory
 
@@ -256,16 +276,23 @@ descriptions, attribute sets, and buckets remain to be normalized in the complet
 
 ### DAG traversal
 
-- Algorithm internals do not depend on `Span`. A run-local DAG measurement value accumulates common
-  work and is reported by the facade.
+- Algorithm internals do not depend on `Span` or other OpenTelemetry API types. An operation-local,
+  SDK-independent DAG measurement accumulates common work and is reported once by the facade,
+  including completed partial work on cancellation or failure.
 - The facade owns the logical traversal span and terminal metrics for steps, stale steps, successor
   expansions by role, yielded nodes, completion outcome, and fallback.
-- Expected fallback leaves span status unset and uses a bounded reason, event, and counter.
+- Difference traversal uses `gitlode.dag.traversal`; its active parent in normal isomorphic Git
+  extraction is `gitlode.git.commit.walk`. The generic DAG API does not encode that Git-specific
+  relationship or require an explicit parent `Context` argument.
+- Expected fallback leaves span status unset and uses a bounded certification result, fallback
+  reason, one fallback event, and a counter.
 - Phase-certified internal phase details remain span attributes or local-profile details rather
   than stable metrics initially.
-- Standalone certified-closure and reachable operations may have bounded/logical spans. Reachable
-  work nested inside a larger traversal contributes to the outer measurement instead of emitting a
-  duplicate span and metric set.
+- Standalone certified-closure and reachable facades own `gitlode.dag.certified_closure` and
+  `gitlode.dag.reachable`. The corresponding core work nested inside a larger traversal contributes
+  to the outer measurement instead of emitting a duplicate span and metric set.
+- Closure phases, successor expansions, frontier operations, and per-node work do not emit spans.
+  Node IDs, domain hints, frontier contents, timestamps, and topology are not attributes.
 
 ### File expansion, diff, projection, and output
 
@@ -280,10 +307,17 @@ descriptions, attribute sets, and buckets remain to be normalized in the complet
 
 ### Plugins
 
-- The host keeps bounded bootstrap and initialization spans. Per-plugin initialization spans use
-  the plugin instrumentation scope and an explicit host-init parent.
+- The host keeps one bounded bootstrap span and one `gitlode.plugin.init` span for each resolved
+  plugin registration. It does not create an aggregate initialize child span.
+- Per-plugin initialization spans use the same plugin instrumentation scope supplied through the
+  runtime context and the explicit bootstrap context as parent. Concurrent Promise scheduling does
+  not determine their parent.
 - Plugin init `ready` leaves status unset; a returned fatal result sets `ERROR` without an exception;
-  a thrown value records an exception and `ERROR`.
+  a thrown value records the original exception and `ERROR` before the initializer normalizes it.
+  Runtime diagnostics do not independently determine span status.
+- Package telemetry metadata is resolved once during bootstrap and reused for the init span,
+  `Tracer`, and `Meter`. The init span contains only the awaited `init(runtime)` callback, not
+  runtime-context preparation or unawaited plugin work.
 - The host does not create a span for each fact/plugin projection.
 - The host records plugin projection count and duration with bounded fact type and outcomes:
   `success`, `skip`, `failure_continued`, and `failure_aborted`.
@@ -294,6 +328,10 @@ descriptions, attribute sets, and buckets remain to be normalized in the complet
 - Local profile includes plugin spans with calls, duration, and errors but excludes their arbitrary
   attributes. Plugin-created metrics are excluded from local profile initially; future external
   export may still carry them subject to its own policy.
+- Instrumentation scope identifies the plugin package that provides instrumentation, not an
+  arbitrary workload injected through that package. If a future general-purpose IPC or custom-script
+  plugin needs workload-level comparison, introduce and review a separate bounded semantic
+  dimension then; do not preemptively encode namespace, script identity, or configuration now.
 
 ## Duration measurement
 
@@ -411,10 +449,11 @@ zero. An explicitly recorded zero remains distinguishable.
 Collector output has a canonical deterministic order by scope, name, and metric attributes. The
 collector has no knowledge of pipeline display order or particular span names.
 
-Presentation owns a declarative view catalog with group, preferred order, and label for known
-observations. Span names do not contain numeric display prefixes. Unknown observations remain
-visible using canonical fallback order. Preferred display order is a diagnostic reading order, not
-an assertion about chronology.
+Presentation owns the declarative
+[`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog with group, preferred order, and
+label for known observations. Span names do not contain numeric display prefixes. Unknown
+observations remain visible using canonical fallback order. Preferred display order is a diagnostic
+reading order, not an assertion about chronology.
 
 The profile is presented in separate span, counter, histogram, and diagnostic sections. Formatting
 may convert canonical units into readable units. Percentiles are omitted initially rather than

@@ -226,7 +226,10 @@ When a plugin returns `fatal` or throws on a given fact:
   histograms, while a plugin may create its own bounded internal spans and metrics.
 - **Plugin telemetry uses plugin scopes.** The package name and version identify the scope when they
   can be resolved. Registering one package under multiple output namespaces does not add namespace
-  as a metric attribute.
+  as a metric attribute. Scope identifies the package providing instrumentation rather than any
+  arbitrary workload injected through it. A future general-purpose IPC or custom-script plugin may
+  require a separately reviewed bounded workload dimension, but the current design does not encode
+  namespace, script identity, or configuration in anticipation of that use case.
 - **Local profile applies a bounded plugin policy.** Plugin spans contribute calls, duration, and
   errors without arbitrary plugin attributes. Plugin-created metrics are not included in the local
   profile initially.

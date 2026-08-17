@@ -109,6 +109,14 @@ review must be added here explicitly rather than introduced as an untracked sequ
      histogram buckets.
    - Reconcile the catalog against every existing custom span and counter so each has a destination
      or explicit removal rationale.
+   - The complete accepted span catalog, including execution, extraction, Git adapter, DAG, plugin
+     host, and per-plugin initialization spans, is recorded in
+     `docs/design/telemetry-catalog/spans.yaml`.
+   - Attribute and profile-view entries used by accepted spans are recorded in their respective YAML
+     catalogs.
+   - Execution and extraction pipeline counters are accepted in
+     `docs/design/telemetry-catalog/metrics.yaml`; Git, DAG, file expansion, diff, concrete output,
+     projection, and plugin metrics remain.
 2. **Concrete report and view catalogs**
    - Finalize the structured-clone-safe `ProfileReport` field schema and numeric units.
    - Define the initial known-observation groups, labels, preferred order, and unknown fallback.
@@ -197,7 +205,7 @@ Migrate owners in coherent slices rather than mechanically replacing calls:
 1. execution root and setup;
 2. extraction planning, traversal, projection, output, and file expansion;
 3. Git common operations and each adapter's implementation details;
-4. DAG facades and run-local measurements;
+4. DAG facades and operation-local measurements;
 5. line-diff implementation;
 6. plugin runtime, plugin API, and official plugins.
 

@@ -1,8 +1,6 @@
 schema_version: 1
-status: incomplete
+status: accepted_target
 
-# Entries accepted so far. Remaining Git, DAG, file expansion, diff, output-writer, projection, and
-# plugin metrics are tracked by the handoff.
 metrics:
   - id: extraction_commit_accepted
     name: gitlode.extraction.commit.accepted
@@ -59,3 +57,1002 @@ metrics:
       notes:
         - Write success and failure duration is defined separately by the output metric slice.
         - Terminal run and extraction span attributes may intentionally repeat the final count as trace overview data.
+
+  - id: git_commit_yielded
+    name: gitlode.git.commit.yielded
+    scope: gitlode.git
+    instrument: counter
+    unit: "{commit}"
+    description: Number of valid RawCommit values yielded by a Git adapter commit walk.
+    owner: GitAdapter walk implementation
+    recording:
+      value: 1
+      point: immediately after commit materialization and parsing succeed and before yielding RawCommit
+      failure_semantics: an object response that cannot become a valid RawCommit is not recorded
+    attributes:
+      - ref: git_adapter
+        required: true
+      - ref: git_commit_walk_strategy
+        required: true
+      - ref: git_commit_walk_has_exclusion
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 16
+    zero_policy: omit_datapoint_when_no_commit_is_yielded
+    migration:
+      replaces:
+        - git.walk_commits span-local commits_yielded counter
+      removes_without_replacement:
+        - git.cli.rev_list span-local yielded counter
+        - git.cli.cat_file_batch span-local yielded counter
+      notes:
+        - Git CLI command diagnostics remain spans; they do not own duplicate yield counters.
+
+  - id: git_object_read
+    name: gitlode.git.object.read
+    scope: gitlode.git
+    instrument: counter
+    unit: "{object}"
+    description: Number of complete Git object responses successfully obtained and validated from a backend.
+    owner: Git adapter object-read primitive
+    recording:
+      value: 1
+      point: after a complete backend object response and basic response validation succeed
+      failure_semantics: cache hits and failed reads are not recorded
+      notes:
+        - A Git CLI commit batch response is recorded before domain commit parsing.
+        - An isomorphic-git commit is recorded after git.readCommit resolves successfully.
+        - A blob is recorded after its content response is validated and normalized.
+    attributes:
+      - ref: git_adapter
+        required: true
+      - ref: git_object_type
+        required: true
+      - ref: git_object_purpose
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 12
+    zero_policy: omit_datapoint_when_no_backend_object_read_succeeds
+    migration:
+      replaces:
+        - git.walk_commits span-local commit_reads counters
+        - git.cli.file_blob_batch span-local objects_read counter as a metric source
+      notes:
+        - The persistent CLI batch span retains a session-local terminal object count without adding this metric twice.
+
+  - id: git_object_cache_lookup
+    name: gitlode.git.object.cache.lookup
+    scope: gitlode.git
+    instrument: counter
+    unit: "{object}"
+    description: Number of Git object cache lookups performed before deciding whether a backend read is needed.
+    owner: Git adapter object cache
+    recording:
+      value: 1
+      point: immediately before each cache lookup
+      failure_semantics: recorded for both cache hits and misses
+    attributes:
+      - ref: git_adapter
+        required: true
+      - ref: git_object_type
+        required: true
+      - ref: git_object_purpose
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 12
+    zero_policy: omit_datapoint_when_no_cache_lookup_occurs
+    notes:
+      - The initial implementation records this only for isomorphic-git commit access.
+
+  - id: git_object_cache_hit
+    name: gitlode.git.object.cache.hit
+    scope: gitlode.git
+    instrument: counter
+    unit: "{object}"
+    description: Number of Git object cache lookups satisfied by an existing cached object.
+    owner: Git adapter object cache
+    recording:
+      value: 1
+      point: after a cache lookup finds and returns an existing object
+      failure_semantics: cache misses are not recorded
+    attributes:
+      - ref: git_adapter
+        required: true
+      - ref: git_object_type
+        required: true
+      - ref: git_object_purpose
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 12
+    zero_policy: omit_datapoint_when_no_cache_hit_occurs
+    migration:
+      replaces:
+        - git.walk_commits span-local purpose-specific commit_cache_hits counters
+      notes:
+        - Cache misses are derived from lookup count minus hit count; backend failures may prevent misses from matching successful reads.
+
+  - id: git_file_change_yielded
+    name: gitlode.git.file_change.yielded
+    scope: gitlode.git
+    instrument: counter
+    unit: "{change}"
+    description: Number of fully materialized file-backed blob changes yielded by a Git adapter.
+    owner: GitAdapter.getFileBlobChanges implementation
+    recording:
+      value: 1
+      point: after every required blob read succeeds and before yielding FileBlobChange
+      failure_semantics: a change whose materialization fails is not recorded
+    attributes:
+      - ref: git_adapter
+        required: true
+      - ref: git_file_change_type
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 6
+    zero_policy: omit_datapoint_when_no_file_change_is_yielded
+    migration:
+      replaces:
+        - git.file_blob_changes span-local yielded and status counters
+      notes:
+        - Paths, OIDs, and file modes are not recorded.
+
+  - id: git_blob_read_duration
+    name: gitlode.git.blob.read.duration
+    scope: gitlode.git
+    instrument: histogram
+    unit: s
+    description: End-to-end duration of one semantic blob read, including Git CLI batch queue wait.
+    owner: Git adapter blob-read primitive
+    recording:
+      point:
+        start: immediately before WalkerEntry.content or persistent batch readBlob is invoked
+        end: after content validation and normalization succeed or the read fails
+      records:
+        success: once with outcome success
+        error: once with outcome error
+      notes:
+        - Duration is caller-observed latency, not exclusive Git process time.
+    attributes:
+      - ref: git_adapter
+        required: true
+      - ref: git_blob_read_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 4
+    explicit_bucket_boundaries:
+      - 0
+      - 0.0001
+      - 0.00025
+      - 0.0005
+      - 0.001
+      - 0.0025
+      - 0.005
+      - 0.01
+      - 0.025
+      - 0.05
+      - 0.1
+      - 0.25
+      - 0.5
+      - 1
+      - 2.5
+      - 5
+    zero_policy: record_zero_duration_if_reported_by_monotonic_clock
+    migration:
+      replaces:
+        - git.blob_read per-operation span duration
+
+  - id: git_blob_read_size
+    name: gitlode.git.blob.read.size
+    scope: gitlode.git
+    instrument: histogram
+    unit: By
+    description: Distribution of content sizes returned by successful semantic blob reads.
+    owner: Git adapter blob-read primitive
+    recording:
+      point: after a blob content response is validated and normalized successfully
+      value: normalized content byte length
+      failure_semantics: failed reads do not record a size
+    attributes:
+      - ref: git_adapter
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    explicit_bucket_boundaries:
+      - 0
+      - 64
+      - 256
+      - 1024
+      - 4096
+      - 16384
+      - 65536
+      - 262144
+      - 1048576
+      - 4194304
+      - 16777216
+    zero_policy: record_empty_blob_as_size_zero
+    migration:
+      replaces:
+        - git.blob_read per-operation span size detail
+
+  - id: git_blob_read_byte
+    name: gitlode.git.blob.read.byte
+    scope: gitlode.git
+    instrument: counter
+    unit: By
+    description: Total bytes returned by successful semantic blob reads.
+    owner: Git adapter blob-read primitive
+    recording:
+      point: after a blob content response is validated and normalized successfully
+      value: normalized content byte length
+      failure_semantics: failed reads are not recorded
+    attributes:
+      - ref: git_adapter
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    zero_policy: omit_add_for_empty_blob
+    migration:
+      replaces:
+        - git.file_blob_changes span-local blob_bytes counter
+        - git.cli.file_blob_batch span-local blob_bytes counter as a metric source
+      notes:
+        - The blob-size histogram intentionally repeats the total as its sum while preserving the per-read distribution.
+        - The persistent CLI batch span retains a session-local terminal byte count without adding this metric twice.
+
+  - id: dag_operation_completion
+    name: gitlode.dag.operation.completion
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{operation}"
+    description: Number of public DAG facade operations reaching each normalized terminal completion.
+    owner: generic DAG facade
+    recording:
+      value: 1
+      point: once when a started facade operation terminates
+      terminal_mapping:
+        stream_exhausted: success
+        stream_cancelled: cancelled
+        stream_handled_throw: handled-throw
+        stream_unhandled_throw: error
+        certified_closure_success: success
+        certified_closure_error: error
+      failure_semantics: an error completion is recorded together with completed partial work
+    attributes:
+      - ref: dag_operation
+        required: true
+      - ref: dag_operation_completion
+        required: true
+      - ref: dag_strategy
+        condition: operation is difference
+      - ref: dag_has_exclusion
+        condition: operation is difference
+    cardinality:
+      maximum_attribute_combinations: 30
+    zero_policy: record_exactly_one_completion_for_each_started_operation
+    notes:
+      - Closed-boundary and exhausted standalone closure results are both successful completions; their semantic result remains a span attribute.
+
+  - id: dag_step_processed
+    name: gitlode.dag.step.processed
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{step}"
+    description: Number of work items actually processed by a public DAG operation and its reusable cores.
+    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    recording:
+      value: accumulated processed step count
+      point: once at operation termination, including completed partial work
+      includes:
+        - dequeued difference include work
+        - dequeued reachable work
+        - phase-certified closure root classification
+        - processed split-closure frontier work
+        - standalone certified-closure work
+      excludes:
+        - queued work abandoned after result finality
+    attributes:
+      - ref: dag_operation
+        required: true
+      - ref: dag_strategy
+        condition: operation is difference
+      - ref: dag_has_exclusion
+        condition: operation is difference
+    cardinality:
+      maximum_attribute_combinations: 8
+    zero_policy: omit_datapoint_when_no_step_is_processed
+    migration:
+      replaces:
+        - dag span-local traversal_steps counter
+
+  - id: dag_step_stale
+    name: gitlode.dag.step.stale
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{step}"
+    description: Number of processed DAG work items discarded as stale or duplicate.
+    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    recording:
+      value: accumulated stale step count
+      point: once at operation termination, including completed partial work
+      includes:
+        - duplicate items
+        - already-expanded items
+        - items whose operation-local state was already deleted
+      excludes:
+        - certified hits that perform a meaningful state transition
+        - queued work abandoned without processing after result finality
+    attributes:
+      - ref: dag_operation
+        required: true
+      - ref: dag_strategy
+        condition: operation is difference
+      - ref: dag_has_exclusion
+        condition: operation is difference
+    cardinality:
+      maximum_attribute_combinations: 8
+    zero_policy: omit_datapoint_when_no_stale_step_is_processed
+    migration:
+      replaces:
+        - dag span-local stale_steps counter
+
+  - id: dag_successor_expansion
+    name: gitlode.dag.successor.expansion
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{expansion}"
+    description: Number of calls made to DagTopologyPort.getSuccessors by role.
+    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    recording:
+      value: accumulated successor expansion count
+      point: once at operation termination, including completed partial work
+      increment_point: immediately before each DagTopologyPort.getSuccessors call
+      excludes:
+        - operation-local predecessor and successor walks
+        - frontier operations
+        - adapter cache lookups
+    attributes:
+      - ref: dag_operation
+        required: true
+      - ref: dag_role
+        required: true
+      - ref: dag_strategy
+        condition: operation is difference
+      - ref: dag_has_exclusion
+        condition: operation is difference
+    cardinality:
+      maximum_attribute_combinations: 14
+    zero_policy: omit_datapoint_when_no_successor_expansion_occurs
+    migration:
+      replaces:
+        - dag span-local successor_expansions counter
+        - dag span-local main_expansions counter
+        - dag span-local exclude_expansions counter
+      notes:
+        - Total expansions are derived by summing role datapoints.
+
+  - id: dag_node_yielded
+    name: gitlode.dag.node.yielded
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{node}"
+    description: Number of result node IDs yielded by a public difference or reachable facade.
+    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    recording:
+      value: accumulated yielded result node count
+      point: once at operation termination, including nodes yielded before cancellation or error
+      increment_point: immediately before the public facade yields a result node ID
+      excludes:
+        - internal exclude-collection core yields
+        - certified nodes that are not public result nodes
+        - standalone certified-closure results
+    attributes:
+      - ref: dag_operation
+        required: true
+        permitted_values:
+          - difference
+          - reachable
+      - ref: dag_strategy
+        condition: operation is difference
+      - ref: dag_has_exclusion
+        condition: operation is difference
+    cardinality:
+      maximum_attribute_combinations: 7
+    zero_policy: omit_datapoint_when_no_result_node_is_yielded
+    migration:
+      replaces:
+        - dag span-local yielded_nodes counter
+
+  - id: dag_node_excluded
+    name: gitlode.dag.node.excluded
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{node}"
+    description: Number of unique nodes discovered while materializing a complete excluded reachable set.
+    owner: operation-local DagTraversalMeasurement reported by the difference facade
+    recording:
+      value: accumulated unique excluded node count
+      point: once at operation termination, including completed partial collection work
+      increment_point: when a unique node is admitted to an eager or fallback full exclude collection
+      conditions:
+        - eager-exclude pre-collection
+        - certified-lazy conservative fallback collection
+      excludes:
+        - lazily marked stop points when no complete excluded set is materialized
+    attributes:
+      - ref: dag_operation
+        required: true
+        fixed_value: difference
+      - ref: dag_strategy
+        required: true
+      - ref: dag_has_exclusion
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 6
+    zero_policy: omit_when_no_full_exclude_collection_work_occurs
+    migration:
+      replaces:
+        - dag span-local excluded_nodes counter
+      notes:
+        - Absence after successful certification means the collection was not performed, not that its size was zero.
+
+  - id: dag_fallback
+    name: gitlode.dag.fallback
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{fallback}"
+    description: Number of certified-lazy traversals that selected conservative fallback by reason.
+    owner: operation-local DagTraversalMeasurement reported by the difference facade
+    recording:
+      value: 1
+      decision_point: when certified-lazy selects conservative fallback
+      metric_point: once at operation termination, including when later fallback work fails
+      event_semantics: markFallback emits the cataloged span event exactly once through a facade-owned bounded callback
+    attributes:
+      - ref: dag_strategy
+        required: true
+        fixed_value: certified-lazy
+      - ref: dag_fallback_reason
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 4
+    zero_policy: omit_datapoint_when_fallback_is_not_selected
+
+  - id: dag_fallback_node_removed
+    name: gitlode.dag.fallback.node.removed
+    scope: gitlode.dag
+    instrument: counter
+    unit: "{node}"
+    description: Number of buffered result candidates removed after conservative fallback collection.
+    owner: operation-local DagTraversalMeasurement reported by the difference facade
+    recording:
+      value: accumulated removed candidate count
+      point: once at operation termination
+      increment_point: when a fully collected excluded node removes a buffered result candidate
+      failure_semantics: no value is recorded if fallback fails before any candidate is removed
+    attributes:
+      - ref: dag_strategy
+        required: true
+        fixed_value: certified-lazy
+      - ref: dag_fallback_reason
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 4
+    zero_policy: omit_datapoint_when_fallback_removes_no_candidate
+    migration:
+      replaces:
+        - dag span-local fallback_removed counter
+
+  - id: file_change_expansion_duration
+    name: gitlode.file_change.expansion.duration
+    scope: gitlode.extraction
+    instrument: histogram
+    unit: s
+    description: End-to-end duration of expanding one commit's file changes into facts.
+    owner: FileChangeFactExpander
+    recording:
+      point:
+        start: immediately before requesting the Git adapter file-change iterator for one commit
+        end: after the iterator is exhausted and every change is built, or when expansion fails
+      includes:
+        - Git adapter change discovery and blob access
+        - size and binary guards
+        - concrete line-diff computation
+      excludes:
+        - yielding the completed fact batch downstream
+        - projection and output
+      records:
+        success: once after the commit's iterator is exhausted and all facts are built
+        error: once when adapter iteration, fact construction, line diff, or result validation fails
+    attributes:
+      - ref: file_change_expansion_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    explicit_bucket_boundaries:
+      - 0
+      - 0.0001
+      - 0.00025
+      - 0.0005
+      - 0.001
+      - 0.0025
+      - 0.005
+      - 0.01
+      - 0.025
+      - 0.05
+      - 0.1
+      - 0.25
+      - 0.5
+      - 1
+      - 2.5
+      - 5
+    zero_policy: record_zero_duration_if_reported_by_monotonic_clock
+    migration:
+      replaces:
+        - gitlode.file_change_expansion per-commit span duration
+
+  - id: file_change_expanded
+    name: gitlode.file_change.expanded
+    scope: gitlode.extraction
+    instrument: counter
+    unit: "{change}"
+    description: Number of file-change facts successfully built by the expander.
+    owner: FileChangeFactExpander
+    recording:
+      value: 1
+      point: after one FileChangeFact file value is built and before it is added to the commit batch
+      includes:
+        - facts whose line diff was skipped for size or binary content
+      failure_semantics: a change whose fact construction fails is not recorded
+      notes:
+        - Completed work remains recorded if a later change causes the buffered commit batch to fail before yielding.
+    attributes:
+      - ref: git_file_change_type
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 3
+    zero_policy: omit_datapoint_when_no_file_change_fact_is_built
+    migration:
+      replaces:
+        - gitlode.file_change_expansion span-local changes counter
+
+  - id: file_change_expansion_size
+    name: gitlode.file_change.expansion.size
+    scope: gitlode.extraction
+    instrument: histogram
+    unit: "{change}"
+    description: Distribution of successfully completed file-change batch sizes per commit.
+    owner: FileChangeFactExpander
+    recording:
+      point: once after the Git adapter iterator for one commit is exhausted and all facts are built
+      value: number of file-change facts in the completed commit batch
+      failure_semantics: a partially built batch that terminates with an error is not recorded
+    attributes: []
+    cardinality:
+      maximum_attribute_combinations: 1
+    explicit_bucket_boundaries:
+      - 0
+      - 1
+      - 2
+      - 4
+      - 8
+      - 16
+      - 32
+      - 64
+      - 128
+      - 256
+      - 512
+      - 1024
+      - 4096
+    zero_policy: record_zero_for_a_successful_commit_with_no_file_changes
+
+  - id: file_change_diff_skipped
+    name: gitlode.file_change.diff.skipped
+    scope: gitlode.extraction
+    instrument: counter
+    unit: "{change}"
+    description: Number of file changes whose line diff was intentionally skipped.
+    owner: FileChangeFactExpander
+    recording:
+      value: 1
+      point: when the first applicable guard decides not to invoke the line-diff calculator
+      precedence:
+        - size
+        - binary
+      failure_semantics: exactly one reason is recorded for each skipped diff
+    attributes:
+      - ref: file_change_diff_skip_reason
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    zero_policy: omit_datapoint_when_no_diff_is_skipped
+    migration:
+      replaces:
+        - gitlode.file_change_expansion span-local skipped_size counter
+        - gitlode.file_change_expansion span-local skipped_binary counter
+        - gitlode.extract span-local skipped_diffs counter as a metric source
+      notes:
+        - Terminal run and extraction span attributes may intentionally retain the final skipped-diff count as trace overview data.
+
+  - id: line_diff_compute_operation
+    name: gitlode.line_diff.compute.operation
+    scope: gitlode.line_diff
+    instrument: counter
+    unit: "{operation}"
+    description: Number of concrete line-diff computation attempts by terminal outcome.
+    owner: concrete LineDiffCalculator implementation
+    recording:
+      value: 1
+      point: once when an invoked concrete computation returns or throws
+      records:
+        success: the concrete implementation returns normally
+        error: the concrete implementation throws
+      notes:
+        - A later defensive result-validation failure in the expander does not rewrite this implementation outcome.
+    attributes:
+      - ref: line_diff_compute_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    zero_policy: omit_datapoint_when_no_concrete_computation_is_attempted
+
+  - id: line_diff_compute_duration
+    name: gitlode.line_diff.compute.duration
+    scope: gitlode.line_diff
+    instrument: histogram
+    unit: s
+    description: Duration of one concrete line-diff computation attempt.
+    owner: concrete LineDiffCalculator implementation
+    recording:
+      point:
+        start: immediately before the implementation begins decoding or comparing the supplied inputs
+        end: when the implementation returns or throws
+      records:
+        success: once when the concrete implementation returns normally
+        error: once when the concrete implementation throws
+      excludes:
+        - expander size and binary guards
+        - expander defensive result validation
+    attributes:
+      - ref: line_diff_compute_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    explicit_bucket_boundaries:
+      - 0
+      - 0.0001
+      - 0.00025
+      - 0.0005
+      - 0.001
+      - 0.0025
+      - 0.005
+      - 0.01
+      - 0.025
+      - 0.05
+      - 0.1
+      - 0.25
+      - 0.5
+      - 1
+      - 2.5
+      - 5
+    zero_policy: record_zero_duration_if_reported_by_monotonic_clock
+    migration:
+      replaces:
+        - line_diff.compute per-operation span duration
+
+  - id: line_diff_compute_input_size
+    name: gitlode.line_diff.compute.input.size
+    scope: gitlode.line_diff
+    instrument: histogram
+    unit: By
+    description: Distribution of total byte sizes supplied to concrete line-diff computation attempts.
+    owner: concrete LineDiffCalculator implementation
+    recording:
+      point: once when an invoked concrete computation returns or throws
+      value: before byte length plus after byte length
+      failure_semantics: the input size is recorded for both successful and failed attempts
+    attributes:
+      - ref: line_diff_compute_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 2
+    explicit_bucket_boundaries:
+      - 0
+      - 64
+      - 256
+      - 1024
+      - 4096
+      - 16384
+      - 65536
+      - 262144
+      - 1048576
+      - 4194304
+      - 16777216
+    zero_policy: record_zero_when_both_inputs_are_empty
+    notes:
+      - Before and after sizes are intentionally combined so that one computation attempt produces one size datapoint.
+      - The LineDiffCalculator port does not require telemetry; each production implementation owns its recorder.
+
+  - id: output_write_duration
+    name: gitlode.output.write.duration
+    scope: gitlode.extraction
+    instrument: histogram
+    unit: s
+    description: End-to-end duration of one OutputSink write call.
+    owner: ExtractionPipeline
+    recording:
+      point:
+        start: immediately before invoking OutputSink.write with one projected record
+        end: when OutputSink.write resolves or rejects
+      includes:
+        - concrete sink serialization
+        - output-segment open when required
+        - underlying file write
+        - rotation decision and rotation close completed within the call
+      records:
+        success: once when the complete sink call resolves
+        error: once when the sink call rejects or throws
+    attributes:
+      - ref: extraction_granularity
+        required: true
+      - ref: output_write_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 4
+    explicit_bucket_boundaries:
+      - 0
+      - 0.0001
+      - 0.00025
+      - 0.0005
+      - 0.001
+      - 0.0025
+      - 0.005
+      - 0.01
+      - 0.025
+      - 0.05
+      - 0.1
+      - 0.25
+      - 0.5
+      - 1
+      - 2.5
+      - 5
+    zero_policy: record_zero_duration_if_reported_by_monotonic_clock
+    migration:
+      replaces:
+        - gitlode.output.write per-record span duration
+    notes:
+      - A write that persists bytes and then fails during rotation close records error duration but no successful output-write record.
+
+  - id: output_file_created
+    name: gitlode.output.file.created
+    scope: gitlode.extraction
+    instrument: counter
+    unit: "{file}"
+    description: Number of output file segments successfully opened by the concrete writer.
+    owner: JsonlFileWriter
+    recording:
+      value: 1
+      point: immediately after a new output segment is opened successfully
+      failure_semantics: a failed open is not recorded; an opened segment remains recorded if later write or close work fails
+    attributes: []
+    cardinality:
+      maximum_attribute_combinations: 1
+    zero_policy: omit_datapoint_when_no_output_segment_is_opened
+    notes:
+      - The first segment is opened lazily by the first record, and later segments are opened lazily after rotation.
+      - No constant output-format attribute is added while JSONL is the only concrete format.
+
+  - id: output_byte_written
+    name: gitlode.output.byte.written
+    scope: gitlode.extraction
+    instrument: counter
+    unit: By
+    description: Number of UTF-8 JSONL bytes whose underlying file write completed successfully.
+    owner: JsonlFileWriter
+    recording:
+      point: immediately after the underlying write of one serialized JSONL line succeeds
+      value: UTF-8 byte length of the serialized JSON record plus its trailing LF
+      failure_semantics:
+        - a failed underlying write is not recorded
+        - completed bytes remain recorded if the subsequent rotation close or later run work fails
+    attributes: []
+    cardinality:
+      maximum_attribute_combinations: 1
+    zero_policy: omit_datapoint_when_no_bytes_are_written
+    notes:
+      - Output path, filename, segment sequence, and record content are not attributes.
+      - This concrete-I/O count may exceed bytes belonging to successful OutputSink calls when rotation close fails.
+      - Successful run and root-span totals intentionally repeat this sum as overview data.
+
+  - id: projection_duration
+    name: gitlode.projection.duration
+    scope: gitlode.extraction
+    instrument: histogram
+    unit: s
+    description: Duration of one built-in fact-to-record mapping operation.
+    owner: BuiltInFactProjector
+    recording:
+      point:
+        start: after validating a bounded fact type and immediately before built-in dispatch
+        end: when the mapping function returns or throws
+      includes:
+        - commit or file-change dispatch
+        - projected record construction
+        - timestamp formatting
+        - repository metadata attachment
+        - file-change field transfer when applicable
+      excludes:
+        - upstream iterator wait
+        - plugin enrichment
+        - downstream consumer wait
+        - output serialization and write
+      records:
+        success: once when the built-in mapping returns normally
+        error: once when the built-in mapping throws
+      notes:
+        - Contract-invalid unknown facts fail before a bounded fact type can be selected and do not record this metric.
+        - Completed built-in work remains successful if later plugin enrichment or output fails.
+    attributes:
+      - ref: projection_fact_type
+        required: true
+      - ref: projection_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations: 4
+    explicit_bucket_boundaries:
+      - 0
+      - 0.000005
+      - 0.00001
+      - 0.000025
+      - 0.00005
+      - 0.0001
+      - 0.00025
+      - 0.0005
+      - 0.001
+      - 0.0025
+      - 0.005
+      - 0.01
+      - 0.025
+      - 0.05
+      - 0.1
+    zero_policy: record_zero_duration_if_reported_by_monotonic_clock
+    migration:
+      replaces:
+        - gitlode.projection.project per-record span duration
+    notes:
+      - Histogram count is the built-in projection operation count; no duplicate counter is defined.
+      - Projection mode is intentionally omitted because plugin work is outside this measurement.
+
+  - id: plugin_projection_operation
+    name: gitlode.plugin.projection.operation
+    scope:
+      type: resolved_plugin_scope
+      preferred:
+        name: resolved package name
+        version: resolved package version when available
+      package_name_without_version: use package name and omit scope version
+      fallback:
+        name: gitlode.plugin.<namespace>
+        version: omitted
+    instrument: counter
+    unit: "{operation}"
+    description: Number of plugin projection callback attempts by host-normalized outcome.
+    owner: EnrichingFactProjector around ProjectorPlugin.project
+    recording:
+      value: 1
+      point: once after a contract-valid result returns or a thrown value is normalized
+      outcome_mapping:
+        returned_success: success
+        returned_skip: skip
+        returned_fatal_with_skip_fact_policy: failure_continued
+        returned_fatal_with_fatal_policy: failure_aborted
+        thrown_with_skip_fact_policy: failure_continued
+        thrown_with_fatal_policy: failure_aborted
+      failure_semantics:
+        - completed callback work remains recorded if later diagnostics, host result application, or run work fails
+        - a contract-invalid return is not forced into a cataloged outcome
+    attributes:
+      - ref: projection_fact_type
+        required: true
+      - ref: plugin_projection_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations_per_instrumentation_scope: 8
+    zero_policy: omit_datapoint_when_no_plugin_projection_is_attempted
+    notes:
+      - Namespace, entrypoint, configuration, failure policy, package path, messages, and fact identity are not attributes.
+      - Registrations resolving to the same package scope intentionally aggregate regardless of namespace or configuration.
+
+  - id: plugin_projection_duration
+    name: gitlode.plugin.projection.duration
+    scope:
+      type: resolved_plugin_scope
+      preferred:
+        name: resolved package name
+        version: resolved package version when available
+      package_name_without_version: use package name and omit scope version
+      fallback:
+        name: gitlode.plugin.<namespace>
+        version: omitted
+    instrument: histogram
+    unit: s
+    description: Duration of one host-invoked plugin projection callback attempt.
+    owner: EnrichingFactProjector around ProjectorPlugin.project
+    recording:
+      point:
+        start: immediately before invoking plugin.project with the prepared context
+        end: immediately when the returned promise resolves or rejects
+      includes:
+        - plugin callback execution
+        - work awaited by the callback
+        - plugin-owned telemetry work performed within the callback
+      excludes:
+        - base projection and context preparation
+        - host application of the callback result
+        - host diagnostics and failure-policy handling
+        - later plugin callbacks
+      outcome_mapping:
+        returned_success: success
+        returned_skip: skip
+        returned_fatal_with_skip_fact_policy: failure_continued
+        returned_fatal_with_fatal_policy: failure_aborted
+        thrown_with_skip_fact_policy: failure_continued
+        thrown_with_fatal_policy: failure_aborted
+      failure_semantics:
+        - callback duration remains recorded if later host handling or run work fails
+        - a contract-invalid return is not forced into a cataloged outcome
+    attributes:
+      - ref: projection_fact_type
+        required: true
+      - ref: plugin_projection_outcome
+        required: true
+    cardinality:
+      maximum_attribute_combinations_per_instrumentation_scope: 8
+    explicit_bucket_boundaries:
+      - 0
+      - 0.0001
+      - 0.00025
+      - 0.0005
+      - 0.001
+      - 0.0025
+      - 0.005
+      - 0.01
+      - 0.025
+      - 0.05
+      - 0.1
+      - 0.25
+      - 0.5
+      - 1
+      - 2.5
+      - 5
+      - 10
+      - 30
+      - 60
+    zero_policy: record_zero_duration_if_reported_by_monotonic_clock
+    notes:
+      - Each cataloged callback emits this histogram sample and the operation counter with identical attributes.
+      - Values above 60 seconds remain represented by histogram count, sum, and overflow bucket.
+      - Host-reserved names are locally allowlisted; arbitrary plugin-created metrics are excluded from the initial local profile.
+      - No plugin-init counter or duration histogram duplicates the bounded initialization spans.
+
+removed_observations:
+  - ids:
+      - closure_phases
+      - closed_boundary_phases
+      - exhausted_phases
+      - certified_nodes
+      - terminal_nodes
+      - certified_hits
+      - classification_runs
+      - classification_newer_nodes
+      - classification_older_nodes
+      - classification_excluded_nodes
+      - certification_yielded_nodes
+      - drain_yielded_nodes
+    former_owner: phase-certified DAG instrumentation
+    disposition: removed_without_initial_otel_replacement
+    rationale:
+      - These counts expose prototype state-machine structure rather than cross-strategy semantics.
+      - Stabilizing them would constrain future phase-certified algorithm changes.
+      - Common DAG work metrics and the phase-certified termination span attribute retain the initial comparison surface.
+      - Exact topology traces and operation-local measurement unit tests continue to protect synthetic efficiency fixtures.
+    future_policy: add only through an explicitly reviewed experimental catalog slice if operational profiling requires them

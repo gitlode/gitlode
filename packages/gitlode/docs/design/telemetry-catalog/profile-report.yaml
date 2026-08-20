@@ -1,0 +1,397 @@
+schema_version: 1
+status: accepted_target
+
+report:
+  type: ProfileReport
+  structured_clone_safe: true
+  allowed_runtime_values:
+    - plain_object
+    - array
+    - string
+    - finite_number
+    - boolean
+    - null
+  prohibited_runtime_values:
+    - OpenTelemetry SDK objects
+    - class instances
+    - Map
+    - Set
+    - typed arrays
+    - Error
+    - bigint
+    - functions
+  fields:
+    schemaVersion:
+      type: literal
+      value: 1
+    signalStatus:
+      type: ProfileSignalStatusSet
+    spans:
+      type: array
+      items: ProfileSpanAggregate
+    counters:
+      type: array
+      items: ProfileCounterPoint
+    histograms:
+      type: array
+      items: ProfileHistogramPoint
+    diagnostics:
+      type: array
+      items: ProfileDiagnostic
+      maximum_items: 16
+
+types:
+  ProfileInstrumentationScope:
+    fields:
+      name:
+        type: string
+      version:
+        type:
+          - string
+          - "null"
+    identity:
+      - name
+      - version
+    excludes:
+      - schema URL
+      - resource
+      - provider references
+    normalization:
+      missing_version: "null"
+
+  ProfileAttributeValue:
+    union:
+      - string
+      - finite_number
+      - boolean
+    excludes:
+      - array-valued OpenTelemetry attributes
+    normalization:
+      negative_zero: 0
+
+  ProfileAttribute:
+    fields:
+      key:
+        type: string
+      value:
+        type: ProfileAttributeValue
+
+  ProfileSpanAggregate:
+    identity:
+      - scope
+      - name
+    fields:
+      scope:
+        type: ProfileInstrumentationScope
+      name:
+        type: string
+      callCount:
+        type: nonnegative_safe_integer
+      errorCount:
+        type: nonnegative_safe_integer
+      totalDurationSeconds:
+        type: finite_nonnegative_number
+        unit: s
+      maxDurationSeconds:
+        type: finite_nonnegative_number
+        unit: s
+      attributes:
+        type: array
+        items: ProfileSpanAttributeSummary
+    invariants:
+      - errorCount is less than or equal to callCount
+      - errorCount counts spans ending with SpanStatusCode.ERROR, not spans merely containing an exception
+      - attributes are sorted by key
+    excludes:
+      - trace IDs
+      - span IDs
+      - parent relationships
+      - events
+      - exceptions
+      - messages
+      - stacks
+
+  ProfileSpanAttributeSummary:
+    discriminant: reducer
+    variants:
+      single:
+        fields:
+          key:
+            type: string
+          reducer:
+            type: literal
+            value: single
+          value:
+            type: ProfileAttributeValue
+          observedCount:
+            type: positive_safe_integer
+          conflictCount:
+            type: nonnegative_safe_integer
+        semantics:
+          - retain the first observed value
+          - increment observedCount for observations equal to the retained value
+          - increment conflictCount for different values
+          - a nonzero conflictCount makes the span signal partial
+      distinct:
+        fields:
+          key:
+            type: string
+          reducer:
+            type: literal
+            value: distinct
+          values:
+            type: array
+            items:
+              type: object
+              fields:
+                value:
+                  type: ProfileAttributeValue
+                count:
+                  type: positive_safe_integer
+            maximum_items: 16
+          observedCount:
+            type: positive_safe_integer
+          overflowCount:
+            type: nonnegative_safe_integer
+        semantics:
+          - values contain occurrence counts for retained distinct values
+          - overflowCount counts attribute observations whose values could not be retained
+          - a nonzero overflowCount makes the span signal partial
+        invariants:
+          - values are sorted by value type and canonical value
+          - observedCount equals retained value counts plus overflowCount
+      min_max:
+        fields:
+          key:
+            type: string
+          reducer:
+            type: literal
+            value: min_max
+          minimum:
+            type: finite_number
+          maximum:
+            type: finite_number
+          observedCount:
+            type: positive_safe_integer
+        invariants:
+          - minimum is less than or equal to maximum
+    absence: omit the summary when the attribute was never observed
+
+  ProfileCounterPoint:
+    identity:
+      - scope
+      - name
+      - attributes
+    fields:
+      scope:
+        type: ProfileInstrumentationScope
+      name:
+        type: string
+      unit:
+        type: string
+        source: metric catalog canonical unit
+      attributes:
+        type: array
+        items: ProfileAttribute
+      value:
+        type: finite_nonnegative_number
+    invariants:
+      - attributes are sorted by key
+    zero_semantics:
+      unobserved: omit the point
+      explicitly_recorded: retain value 0
+    excludes:
+      - instrument description
+      - SDK temporality objects
+
+  ProfileHistogramPoint:
+    identity:
+      - scope
+      - name
+      - attributes
+    fields:
+      scope:
+        type: ProfileInstrumentationScope
+      name:
+        type: string
+      unit:
+        type: string
+        source: metric catalog canonical unit
+      attributes:
+        type: array
+        items: ProfileAttribute
+      count:
+        type: positive_safe_integer
+      sum:
+        type: finite_nonnegative_number
+      minimum:
+        type:
+          - finite_nonnegative_number
+          - "null"
+      maximum:
+        type:
+          - finite_nonnegative_number
+          - "null"
+      explicitBounds:
+        type: array
+        items: finite_number
+      bucketCounts:
+        type: array
+        items: nonnegative_safe_integer
+    invariants:
+      - attributes are sorted by key
+      - explicitBounds are strictly increasing
+      - bucketCounts length equals explicitBounds length plus one
+      - bucketCounts sum equals count
+      - minimum and maximum are null only when unavailable from SDK aggregation
+      - when both are numbers, minimum is less than or equal to maximum
+    excludes:
+      - raw samples
+      - calculated percentiles
+
+  ProfileSignalStatus:
+    enum:
+      - complete
+      - partial
+      - unavailable
+    semantics:
+      complete: collection and report conversion succeeded without omitted valid observations
+      partial: usable data exists or may exist, but some valid observations or summaries were omitted
+      unavailable: the signal section could not be collected or built and its corresponding array is empty
+
+  ProfileSignalStatusSet:
+    fields:
+      spans:
+        type: ProfileSignalStatus
+      counters:
+        type: ProfileSignalStatus
+      histograms:
+        type: ProfileSignalStatus
+    invariants:
+      - an unavailable signal has an empty corresponding report array
+      - a complete empty array means that collection succeeded and observed no values
+      - a partial array may be empty
+      - every partial or unavailable status has an explanatory diagnostic unless diagnostics themselves overflowed
+
+  ProfileDiagnostic:
+    fields:
+      code:
+        enum:
+          - span_group_overflow
+          - span_attribute_value_overflow
+          - metric_point_overflow
+          - attribute_reducer_conflict
+          - invalid_aggregation
+          - lifecycle_failure
+          - diagnostic_overflow
+      severity:
+        enum:
+          - info
+          - warning
+      stage:
+        enum:
+          - span_aggregation
+          - trace_flush
+          - metric_collection
+          - report_build
+          - telemetry_shutdown
+      signal:
+        enum:
+          - spans
+          - counters
+          - histograms
+          - report
+          - telemetry
+      count:
+        type: positive_safe_integer
+      message:
+        type:
+          - string
+          - "null"
+        maximum_utf16_code_units: 512
+    severity_policy:
+      info:
+        - span_group_overflow
+        - span_attribute_value_overflow
+        - metric_point_overflow
+      warning:
+        - attribute_reducer_conflict
+        - invalid_aggregation
+        - lifecycle_failure
+        - diagnostic_overflow
+    message_policy:
+      overflow: normally null
+      lifecycle_failure: safely normalized bounded message
+      prohibited_content:
+        - stack
+        - raw exception object
+        - paths
+        - records
+        - attribute values
+    deduplication_key:
+      - code
+      - stage
+      - signal
+      - message
+    deduplication_value: increment count
+
+limits:
+  span_groups:
+    maximum: 128
+    overflow_effect:
+      - discard excess span groups
+      - add or increment span_group_overflow diagnostic
+      - mark spans partial
+    synthetic_span_group: prohibited
+  distinct_span_attribute_values:
+    maximum_per_attribute: 16
+    overflow_effect:
+      - increment the attribute summary overflowCount
+      - add or increment span_attribute_value_overflow diagnostic
+      - mark spans partial
+  metric_points:
+    maximum_per_instrument: 128
+    overflow_effect:
+      - discard excess points
+      - add or increment metric_point_overflow diagnostic
+      - mark the affected counter or histogram signal partial
+  diagnostics:
+    maximum: 16
+    reservation:
+      entries: 1
+      purpose: diagnostic_overflow
+    overflow_effect:
+      - increment the reserved diagnostic_overflow entry
+
+canonical_order:
+  scope:
+    - name
+    - version
+  scope_version:
+    null_before_string: true
+  spans:
+    - scope
+    - name
+  metrics:
+    - scope
+    - name
+    - attributes
+  span_attributes:
+    - key
+  distinct_attribute_values:
+    - value_type
+    - canonical_value
+  diagnostics:
+    - code
+    - stage
+    - signal
+    - message
+  string_comparison: locale-independent code-unit order
+
+availability:
+  profiling_disabled: report absent
+  local_initialization_failure: report absent and structured warning emitted outside the report
+  initialized_empty_profile: report present with complete empty signal arrays
+  finalization_partial_failure: report present with signal status and diagnostics
+  telemetry_shutdown_failure: preserve already-built signal data and add a bounded diagnostic when possible
+  application_failure: finalize telemetry but retain the current success-only rendering policy

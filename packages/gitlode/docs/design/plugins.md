@@ -223,7 +223,9 @@ When a plugin returns `fatal` or throws on a given fact:
   not exported through `gitlode/plugin-api`.
 - **Per-fact host tracing is prohibited by default.** `EnrichingFactProjector` does not create a
   span for every plugin/fact call. The host records bounded projection outcome counts and duration
-  histograms, while a plugin may create its own bounded internal spans and metrics.
+  histograms, while a plugin may create its own bounded internal spans and metrics. Exact host
+  metric names, callback boundaries, outcomes, and attributes are defined by the
+  [telemetry metric catalog](telemetry-catalog/metrics.yaml).
 - **Plugin telemetry uses plugin scopes.** The package name and version identify the scope when they
   can be resolved. Registering one package under multiple output namespaces does not add namespace
   as a metric attribute. Scope identifies the package providing instrumentation rather than any

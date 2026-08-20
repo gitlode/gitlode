@@ -190,7 +190,10 @@ Structured observation definitions live beside this document:
 - [`telemetry-catalog/spans.yaml`](telemetry-catalog/spans.yaml) owns span names, scopes, owners,
   parent policy, lifetime, attributes, status, and cardinality;
 - [`telemetry-catalog/metrics.yaml`](telemetry-catalog/metrics.yaml) owns instruments, recording
-  points, units, attributes, outcomes, zero policy, and histogram buckets; and
+  points, units, attributes, outcomes, zero policy, and histogram buckets;
+- [`telemetry-catalog/profile-report.yaml`](telemetry-catalog/profile-report.yaml) owns the
+  structured-clone report fields, signal status, aggregate invariants, diagnostics, limits, and
+  canonical collection order; and
 - [`telemetry-catalog/profile-view.yaml`](telemetry-catalog/profile-view.yaml) owns profile grouping,
   labels, preferred reading order, and unknown-observation fallback.
 
@@ -279,15 +282,21 @@ descriptions, attribute sets, and buckets remain to be normalized in the complet
 - Algorithm internals do not depend on `Span` or other OpenTelemetry API types. An operation-local,
   SDK-independent DAG measurement accumulates common work and is reported once by the facade,
   including completed partial work on cancellation or failure.
-- The facade owns the logical traversal span and terminal metrics for steps, stale steps, successor
-  expansions by role, yielded nodes, completion outcome, and fallback.
+- The facade owns the logical traversal span and reports the operation-local measurement once at
+  termination. Common metrics cover completion, processed and stale steps, successor expansions by
+  role, yielded and fully collected excluded nodes, fallback selection, and candidates removed by
+  fallback. Completed partial work is retained on cancellation and failure; zero work counters are
+  omitted while every started operation records one completion.
 - Difference traversal uses `gitlode.dag.traversal`; its active parent in normal isomorphic Git
   extraction is `gitlode.git.commit.walk`. The generic DAG API does not encode that Git-specific
   relationship or require an explicit parent `Context` argument.
 - Expected fallback leaves span status unset and uses a bounded certification result, fallback
   reason, one fallback event, and a counter.
-- Phase-certified internal phase details remain span attributes or local-profile details rather
-  than stable metrics initially.
+- Phase-certified state-machine counters such as closure phases, certification classifications, and
+  yield-source splits are removed without an initial OpenTelemetry replacement. They are protected
+  by exact synthetic topology and measurement tests rather than being retained as span attributes or
+  unstructured profile details. Add them later only through an explicitly reviewed experimental
+  catalog slice if operational profiling requires them.
 - Standalone certified-closure and reachable facades own `gitlode.dag.certified_closure` and
   `gitlode.dag.reachable`. The corresponding core work nested inside a larger traversal contributes
   to the outer measurement instead of emitting a duplicate span and metric set.
@@ -296,14 +305,41 @@ descriptions, attribute sets, and buckets remain to be normalized in the complet
 
 ### File expansion, diff, projection, and output
 
-- File-change expansion duration and changes-per-commit are histograms owned by the expander;
-  expanded changes and skipped diffs are counters.
-- Diff skip reason is bounded to size or binary, with the size guard taking precedence.
-- Concrete line-diff computation records outcome count, duration, and input-size distribution. It
-  does not emit a span per diff.
-- Built-in projection records duration by bounded fact type and outcome. It does not emit a span per
-  record.
-- Output write records duration and successful record count without a span per write.
+- The expander records one end-to-end duration for each commit's file-change expansion. The
+  duration begins before the adapter change iterator is requested and ends after all changes are
+  built or the expansion fails. It includes adapter change discovery, blob access, guards, and
+  line-diff work, but excludes downstream projection and output.
+- Successfully built file-change facts are counted by bounded change type, including facts whose
+  diff was skipped. A changes-per-commit histogram is recorded only after successful iterator
+  exhaustion and includes zero-change commits; failed partial batches do not enter that
+  distribution.
+- Diff skip reason is bounded to size or binary, with the size guard taking precedence when both
+  could apply.
+- Concrete line-diff implementations record outcome count, duration, and the combined byte size of
+  the before and after inputs once per computation attempt. They do not emit a span per diff or
+  require telemetry through the `LineDiffCalculator` port.
+- A concrete line-diff implementation returning normally is a successful implementation attempt.
+  If the expander's subsequent defensive contract validation rejects that result, the containing
+  expansion records an error; it does not retroactively rewrite the implementation-owned metric.
+- Built-in projection records pure fact-to-record mapping duration by bounded fact type and
+  outcome. It excludes upstream iterator wait, plugin enrichment, downstream consumer wait, and
+  output serialization. The duration histogram's count is the built-in operation count, so there is
+  no duplicate projection-operation counter or per-record span.
+- A built-in mapping that returns normally remains successful if later plugin enrichment or output
+  fails. Dispatch of a contract-invalid unknown fact is represented by the outer projection span
+  error and does not invent an uncataloged fact-type metric series.
+- The extraction pipeline records end-to-end `OutputSink.write()` duration and successful call
+  count without a span per write. Duration includes concrete sink serialization, file open and
+  write, and any rotation close performed before the call settles.
+- The concrete writer counts files after successful output-segment open and bytes after each
+  successful underlying write. These completed I/O effects remain recorded if a later rotation
+  close or run operation fails, while the pipeline's successful-record counter requires the whole
+  sink call to resolve.
+- Output paths, filenames, sequence numbers, and record contents are not metric attributes. The
+  initial catalog does not add a constant output-format attribute while JSONL is the only concrete
+  format.
+- Final `OutputSink.close()` remains a bounded span. Separate close-duration, rotation-count,
+  file-I/O-duration, and flush-count metrics are not included initially.
 
 ### Plugins
 
@@ -319,8 +355,14 @@ descriptions, attribute sets, and buckets remain to be normalized in the complet
   `Tracer`, and `Meter`. The init span contains only the awaited `init(runtime)` callback, not
   runtime-context preparation or unawaited plugin work.
 - The host does not create a span for each fact/plugin projection.
-- The host records plugin projection count and duration with bounded fact type and outcomes:
-  `success`, `skip`, `failure_continued`, and `failure_aborted`.
+- Around each `plugin.project(context)` callback, the host records a projection-operation counter
+  and duration histogram under that plugin's resolved instrumentation scope. The measurement
+  includes awaited callback work but excludes context preparation, host result application,
+  diagnostics, policy handling, and subsequent plugins.
+- Host projection metrics use bounded fact type and outcomes: `success`, `skip`,
+  `failure_continued`, and `failure_aborted`. Returned fatal results and thrown values map according
+  to whether the configured failure policy continues or aborts extraction; their source remains in
+  diagnostics rather than another metric attribute.
 - A continued failure emits a warning while its containing projection span remains unset. An aborted
   failure marks the containing projection span as `ERROR`.
 - Plugins may create their own bounded spans and metrics. Host-reserved metric names use the
@@ -332,6 +374,11 @@ descriptions, attribute sets, and buckets remain to be normalized in the complet
   arbitrary workload injected through that package. If a future general-purpose IPC or custom-script
   plugin needs workload-level comparison, introduce and review a separate bounded semantic
   dimension then; do not preemptively encode namespace, script identity, or configuration now.
+- The initial design adds no duplicate plugin-init or bootstrap metrics: their bounded spans already
+  retain callback duration, results, aggregate counts, and compatibility-warning counts.
+- A plugin return value outside `PluginProjectionResult` is not forced into a cataloged metric
+  outcome. Telemetry does not change plugin-runtime contract-validation behavior or create an
+  unbounded fallback attribute.
 
 ## Duration measurement
 
@@ -427,10 +474,13 @@ not an application warning or failure.
 
 ## Profile report and presentation
 
-The worker emits a structured-clone-safe, SDK-independent `ProfileReport`:
+The worker emits the structured-clone-safe, SDK-independent `ProfileReport` defined by
+[`profile-report.yaml`](telemetry-catalog/profile-report.yaml). Its top-level shape is:
 
 ```ts
 interface ProfileReport {
+  readonly schemaVersion: 1;
+  readonly signalStatus: ProfileSignalStatusSet;
   readonly spans: readonly ProfileSpanAggregate[];
   readonly counters: readonly ProfileCounterPoint[];
   readonly histograms: readonly ProfileHistogramPoint[];
@@ -446,8 +496,32 @@ Span aggregates use scope and span name as identity. Metric datapoints use scope
 and the sorted attribute set. An unobserved metric is absent; presentation does not synthesize a
 zero. An explicitly recorded zero remains distinguishable.
 
-Collector output has a canonical deterministic order by scope, name, and metric attributes. The
-collector has no knowledge of pipeline display order or particular span names.
+Signal status is `complete`, `partial`, or `unavailable` independently for spans, counters, and
+histograms. A complete empty array means collection succeeded with no observations; an unavailable
+signal has an empty array and a diagnostic; a partial signal may retain any usable observations.
+Overflow makes the affected signal partial but remains a normal profile result.
+
+Report data uses only plain structured-clone values. Scope identity is name plus a nullable version;
+metric attributes are sorted scalar string, finite-number, or boolean values. Span duration fields
+and duration histogram values use seconds. Counter and histogram units remain the canonical catalog
+units. Histogram aggregates retain count, sum, nullable minimum and maximum, explicit boundaries,
+and bucket counts, but no raw samples or calculated percentiles.
+
+Span attribute summaries retain observation counts. Distinct reducers additionally retain bounded
+per-value counts and an overflow count; single reducers retain a conflict count so a violated stable
+value assumption is explicit rather than silently overwritten. Missing conditional attributes do
+not create summaries.
+
+Diagnostics are bounded structured records with cataloged code, severity, stage, signal, occurrence
+count, and an optional safely normalized message. Lifecycle messages are limited to 512 UTF-16 code
+units and exclude raw exceptions, stacks, paths, records, and attribute values. Equal diagnostics
+are deduplicated by code, stage, signal, and message. One of the 16 diagnostic slots is reserved for
+a diagnostic-overflow summary.
+
+Collector output has the exact canonical deterministic order defined by the report catalog: scope
+name, nullable scope version, observation name, and metric attributes, with subordinate span
+attributes and diagnostics similarly sorted. Comparison is locale-independent. The collector has
+no knowledge of pipeline display order or particular span names.
 
 Presentation owns the declarative
 [`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog with group, preferred order, and
@@ -458,6 +532,26 @@ reading order, not an assertion about chronology.
 The profile is presented in separate span, counter, histogram, and diagnostic sections. Formatting
 may convert canonical units into readable units. Percentiles are omitted initially rather than
 presenting bucket approximations as exact measurements.
+
+Known spans and metrics appear in the catalog's diagnostic reading order; groups without
+observations are omitted. Plugin observations are subgrouped by resolved scope name and optional
+version. Core scope is normally omitted from known row labels, while plugin and fallback identity
+remains visible. A known observation name under an unexpected scope is treated as unknown rather
+than receiving a misleading known label.
+
+Span rows show total, calls, average, maximum, errors, and bounded attribute summaries. Counter rows
+show one value per attribute set. Histogram rows show count, sum, average, nullable minimum and
+maximum, unit, and attributes. Explicit bucket counts remain in `ProfileReport` but are not expanded
+by the initial CLI view, and zero rows are never synthesized for absent metrics.
+
+Duration and byte values may be humanized by presentation while the report retains `s` and `By`.
+Rounding must not display a nonzero value as an unqualified zero. Exact padding, borders, column
+widths, decimal places, and punctuation are not compatibility contracts.
+
+When any signal is partial or unavailable, a compact status summary precedes the signal sections and
+the affected section repeats its state. Diagnostics render their severity, signal, stage, cataloged
+label, repeated or dropped count, and bounded message when present. Collection overflow stays inside
+the profile as informational diagnostic data and does not become an application warning.
 
 ## Failure isolation
 

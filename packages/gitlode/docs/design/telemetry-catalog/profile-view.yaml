@@ -1,5 +1,31 @@
 schema_version: 1
-status: incomplete
+status: accepted_target
+
+layout:
+  title: Profile
+  signal_sections:
+    - spans
+    - counters
+    - histograms
+    - diagnostics
+  section_policy:
+    complete_empty: omit
+    partial:
+      show_section: true
+      status_label: partial
+    unavailable:
+      show_section: true
+      status_label: unavailable
+      rows: none
+  non_complete_summary:
+    position: before_signal_sections
+    include_complete_signals: false
+    fields:
+      - signal
+      - status
+  notes:
+    - Signal sections remain separate; metrics are not rendered as span details.
+    - Table borders, padding, column widths, and fixed decimal places are not design contracts.
 
 span_groups:
   - id: overview
@@ -41,6 +67,8 @@ span_groups:
         label: Projection
       - ref: output_close
         label: Output close
+    notes:
+      - Preferred order is a diagnostic reading order, not an assertion about span timestamps.
 
   - id: git_operations
     label: Git operations
@@ -90,6 +118,12 @@ span_groups:
     label: Plugins
     match:
       scope_class: resolved_plugin_scope
+    scope_subgroups:
+      order:
+        - scope
+      label:
+        version_present: <scope-name>@<version>
+        version_absent: <scope-name>
     observations:
       - ref: plugin_init
         label: Initialization
@@ -97,33 +131,266 @@ span_groups:
       include: true
       description: Plugin-created spans not otherwise listed in this catalog.
       order:
-        - scope
         - name
     notes:
       - Scope identity includes its optional version.
       - Multiple registrations using the same package scope and span name aggregate into one row.
+      - Namespace and configuration are not reconstructed as display labels.
 
 metric_groups:
   - id: pipeline_metrics
     label: Pipeline
     observations:
       - ref: extraction_commit_accepted
-        label: Unique commits
+        label: Accepted commits
+
+  - id: git_traversal_metrics
+    label: Git traversal
+    observations:
+      - ref: git_commit_yielded
+        label: Yielded commits
+
+  - id: git_object_access_metrics
+    label: Git object access
+    observations:
+      - ref: git_object_read
+        label: Object reads
+      - ref: git_object_cache_lookup
+        label: Cache lookups
+      - ref: git_object_cache_hit
+        label: Cache hits
+      - ref: git_blob_read_duration
+        label: Blob-read duration
+      - ref: git_blob_read_size
+        label: Blob-read size
+      - ref: git_blob_read_byte
+        label: Blob bytes
+
+  - id: git_file_access_metrics
+    label: Git file access
+    observations:
+      - ref: git_file_change_yielded
+        label: File changes
+
+  - id: dag_metrics
+    label: DAG
+    observations:
+      - ref: dag_operation_completion
+        label: Operation completion
+      - ref: dag_step_processed
+        label: Processed steps
+      - ref: dag_step_stale
+        label: Stale steps
+      - ref: dag_successor_expansion
+        label: Successor expansions
+      - ref: dag_node_yielded
+        label: Yielded nodes
+      - ref: dag_node_excluded
+        label: Excluded nodes
+      - ref: dag_fallback
+        label: Fallbacks
+      - ref: dag_fallback_node_removed
+        label: Fallback-removed nodes
+
+  - id: file_expansion_metrics
+    label: File expansion
+    observations:
+      - ref: file_change_expansion_duration
+        label: Expansion duration
+      - ref: file_change_expanded
+        label: Expanded changes
+      - ref: file_change_expansion_size
+        label: Changes per commit
+      - ref: file_change_diff_skipped
+        label: Skipped diffs
+
+  - id: line_diff_metrics
+    label: Line diff
+    observations:
+      - ref: line_diff_compute_operation
+        label: Diff operations
+      - ref: line_diff_compute_duration
+        label: Diff duration
+      - ref: line_diff_compute_input_size
+        label: Diff input size
+
+  - id: projection_metrics
+    label: Projection
+    observations:
+      - ref: projection_duration
+        label: Built-in projection
 
   - id: output_metrics
     label: Output
     observations:
       - ref: output_write_record
         label: Records written
+      - ref: output_write_duration
+        label: Write duration
+      - ref: output_file_created
+        label: Files created
+      - ref: output_byte_written
+        label: Bytes written
+
+  - id: plugin_metrics
+    label: Plugins
+    match:
+      scope_class: resolved_plugin_scope
+    scope_subgroups:
+      order:
+        - scope
+      label:
+        version_present: <scope-name>@<version>
+        version_absent: <scope-name>
+    observations:
+      - ref: plugin_projection_operation
+        label: Projection operations
+      - ref: plugin_projection_duration
+        label: Projection duration
+    notes:
+      - Multiple registrations using the same package scope aggregate regardless of namespace or configuration.
+      - Plugin-created metrics are excluded from the initial local profile collection policy.
+
+span_rendering:
+  fields:
+    - label
+    - total_duration
+    - call_count
+    - average_duration
+    - maximum_duration
+    - error_count
+    - attributes
+  scope:
+    known_core: omit
+    plugin: show_in_scope_subgroup
+    fallback: show_with_observation_name
+  average_duration: totalDurationSeconds divided by callCount
+  attributes:
+    key_label: full_catalog_key
+    single:
+      value: key=value
+      conditional: show observedCount when less than callCount
+      conflict: show conflictCount when greater than zero
+    distinct:
+      value: value(count)
+      overflow: show overflowCount when greater than zero
+    min_max:
+      value: key=minimum…maximum
+      conditional: show observedCount when less than callCount
+
+counter_rendering:
+  one_row_per_datapoint: true
+  fields:
+    - label
+    - value
+    - unit
+    - attributes
+  attributes: sorted key=value pairs
+  zero:
+    observed: show
+    absent: do_not_synthesize
+
+histogram_rendering:
+  one_row_per_datapoint: true
+  fields:
+    - label
+    - count
+    - total
+    - average
+    - minimum
+    - maximum
+    - unit
+    - attributes
+  calculations:
+    total: sum
+    average: sum divided by count
+  unavailable_minimum_or_maximum: "—"
+  explicit_buckets:
+    retained_in_report: true
+    initial_cli_view: omit
+  percentiles:
+    initial_cli_view: omit
+    reason: do not present bucket approximations as exact measurements
+
+unit_rendering:
+  s:
+    human_units:
+      - ns
+      - µs
+      - ms
+      - s
+  By:
+    human_units:
+      - B
+      - KiB
+      - MiB
+      - GiB
+  annotated_entity:
+    display: human-readable plural label
+  unknown:
+    display: canonical unit
+  rounding:
+    fixed_decimal_places: false
+    nonzero_must_not_render_as_plain_zero: true
+
+diagnostic_rendering:
+  show_when:
+    - diagnostics are nonempty
+    - any signal is partial or unavailable
+  fields:
+    - severity
+    - signal
+    - stage
+    - label
+    - count_when_greater_than_one
+    - message_when_present
+  labels:
+    span_group_overflow: Span groups truncated
+    span_attribute_value_overflow: Span attribute values truncated
+    metric_point_overflow: Metric datapoints truncated
+    attribute_reducer_conflict: Span attribute invariant violated
+    invalid_aggregation: Invalid aggregation discarded
+    lifecycle_failure: Telemetry lifecycle stage failed
+    diagnostic_overflow: Additional diagnostics omitted
+  overflow_policy:
+    application_warning: false
+    profile_diagnostic_only: true
+  notes:
+    - Rendering preserves code semantics through its cataloged label, signal, stage, count, and optional message.
+    - Exact punctuation and spacing are not design contracts.
 
 fallback:
   include_unknown: true
+  known_name_unexpected_scope: treat_as_unknown
+  identity_label:
+    version_present: <scope-name>@<version> / <observation-name>
+    version_absent: <scope-name> / <observation-name>
   spans:
+    group_label: Other spans
     order:
       - scope
       - name
-  metrics:
+    exception:
+      plugin_scope_unknown_spans: include_in_plugins_remainder
+  counters:
+    group_label: Other counters
     order:
       - scope
       - name
       - attributes
+  histograms:
+    group_label: Other histograms
+    order:
+      - scope
+      - name
+      - attributes
+
+validation:
+  - every accepted core span ID belongs to exactly one known span group
+  - every accepted core metric ID belongs to exactly one known metric group
+  - every observation ref exists in its source span or metric catalog
+  - duplicate observation refs are prohibited
+  - dynamic plugin entries define a resolved-plugin-scope rule
+  - unknown fallback is enabled for spans, counters, and histograms
+  - every ProfileDiagnostic code has a label
+  - complete, partial, and unavailable signal states all have rendering policies

@@ -150,6 +150,78 @@ attributes:
     profile:
       reducer: min_max
 
+  - id: git_object_type
+    key: gitlode.git.object.type
+    type: string
+    description: Bounded Git object type involved in an object-access measurement.
+    values:
+      - commit
+      - blob
+    profile:
+      reducer: distinct
+
+  - id: git_object_purpose
+    key: gitlode.git.object.purpose
+    type: string
+    description: Semantic purpose for which a Git object was accessed.
+    values:
+      - topology
+      - materialize
+      - file-change
+    profile:
+      reducer: distinct
+
+  - id: git_file_change_type
+    key: gitlode.git.file_change.type
+    type: string
+    description: Type of a fully materialized file-backed blob change yielded by a Git adapter.
+    values:
+      - added
+      - modified
+      - deleted
+    profile:
+      reducer: distinct
+
+  - id: file_change_expansion_outcome
+    key: gitlode.file_change.expansion.outcome
+    type: string
+    description: Terminal outcome of expanding one commit's file changes into facts.
+    values:
+      - success
+      - error
+    profile:
+      reducer: distinct
+
+  - id: file_change_diff_skip_reason
+    key: gitlode.file_change.diff.skip_reason
+    type: string
+    description: Bounded reason that line-diff computation was intentionally skipped for a file change.
+    values:
+      - size
+      - binary
+    profile:
+      reducer: distinct
+
+  - id: line_diff_compute_outcome
+    key: gitlode.line_diff.compute.outcome
+    type: string
+    description: Terminal outcome of one concrete line-diff implementation attempt.
+    values:
+      - success
+      - error
+    profile:
+      reducer: distinct
+
+  - id: git_blob_read_outcome
+    key: gitlode.git.blob.read.outcome
+    type: string
+    description: Terminal outcome of one semantic blob-read operation.
+    values:
+      - success
+      - error
+    profile:
+      reducer: distinct
+
   - id: dag_strategy
     key: gitlode.dag.strategy
     type: string
@@ -158,6 +230,39 @@ attributes:
       - eager-exclude
       - certified-lazy
       - phase-certified
+    profile:
+      reducer: distinct
+
+  - id: dag_operation
+    key: gitlode.dag.operation
+    type: string
+    description: Public generic DAG facade operation that owns a measurement.
+    values:
+      - difference
+      - reachable
+      - certified-closure
+    profile:
+      reducer: distinct
+
+  - id: dag_operation_completion
+    key: gitlode.dag.operation.completion
+    type: string
+    description: Normalized terminal completion of one public DAG facade operation.
+    values:
+      - success
+      - cancelled
+      - handled-throw
+      - error
+    profile:
+      reducer: distinct
+
+  - id: dag_role
+    key: gitlode.dag.role
+    type: string
+    description: Include-side or exclude-side role of a topology expansion.
+    values:
+      - main
+      - exclude
     profile:
       reducer: distinct
 
@@ -266,6 +371,16 @@ attributes:
     profile:
       reducer: min_max
 
+  - id: output_write_outcome
+    key: gitlode.output.write.outcome
+    type: string
+    description: Terminal outcome of one OutputSink write call.
+    values:
+      - success
+      - error
+    profile:
+      reducer: distinct
+
   - id: requested_ref_count
     key: gitlode.ref.requested.count
     type: integer
@@ -342,6 +457,26 @@ attributes:
       - plugin_enriched
     profile:
       reducer: single
+
+  - id: projection_fact_type
+    key: gitlode.projection.fact.type
+    type: string
+    description: Bounded extraction fact type supplied to a projection operation.
+    values:
+      - commit
+      - file-change
+    profile:
+      reducer: distinct
+
+  - id: projection_outcome
+    key: gitlode.projection.outcome
+    type: string
+    description: Terminal outcome of one built-in fact-to-record mapping operation.
+    values:
+      - success
+      - error
+    profile:
+      reducer: distinct
 
   - id: repository_name_source
     key: gitlode.repository.name.source
@@ -427,5 +562,17 @@ attributes:
     values:
       - returned
       - thrown
+    profile:
+      reducer: distinct
+
+  - id: plugin_projection_outcome
+    key: gitlode.plugin.projection.outcome
+    type: string
+    description: Host-normalized terminal outcome of one plugin projection callback.
+    values:
+      - success
+      - skip
+      - failure_continued
+      - failure_aborted
     profile:
       reducer: distinct

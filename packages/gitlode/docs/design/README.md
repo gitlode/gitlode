@@ -14,6 +14,8 @@ behavioral detail is useful.
 | Architecture               | [`architecture.md`](architecture.md)                             | System layering, runtime flow, implementation responsibilities, and major trade-offs.              |
 | Domain design              | [`domain-design.md`](domain-design.md)                           | Domain principles, charters, allowed dependencies, source imports, and enforcement guidance.       |
 | Telemetry                  | [`telemetry.md`](telemetry.md)                                   | OpenTelemetry API contracts, signal policy, local collection, lifecycle, and profiling boundaries. |
+| Telemetry verification     | [`telemetry-verification.md`](telemetry-verification.md)         | Migration fixtures, test layers, failure injection, equivalence, and verification evidence.        |
+| Telemetry performance      | [`telemetry-performance.md`](telemetry-performance.md)           | Reproducible overhead, memory, volume, fixture, and acceptance policy for the migration.           |
 | CLI                        | [`cli.md`](cli.md)                                               | Command shape, options, validation, stderr behavior, exit codes, and CLI implementation notes.     |
 | Configuration              | [`configuration.md`](configuration.md)                           | Versioned configuration shape, path resolution, precedence, and validation pipeline.               |
 | Git adapters               | [`git-adapters.md`](git-adapters.md)                             | Git adapter selection, blob-fact boundaries, `git-cli` protocols, lifecycle, and benchmarking.     |

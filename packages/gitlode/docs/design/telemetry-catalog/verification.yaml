@@ -1,0 +1,402 @@
+schema_version: 1
+status: accepted_target
+
+assertion_policy:
+  fixed:
+    - observation identity
+    - instrumentation scope
+    - owner
+    - parentage
+    - recording count and point
+    - bounded attributes and outcome
+    - report invariants
+    - canonical order
+  not_fixed:
+    - measured wall-clock duration
+    - incidental terminal spacing
+    - table borders and column widths
+  duration_assertions:
+    - finite
+    - nonnegative
+    - count, sum, minimum, and maximum invariants
+
+test_layers:
+  - id: catalog_contract
+    evidence:
+      - span name, scope, owner, parent policy, and cardinality
+      - metric name, instrument, unit, attributes, owner, recording semantics, and buckets
+      - attribute key, type, values, and reducer
+      - valid attribute references
+      - unique IDs and names
+      - exactly one profile-view placement for every accepted core observation
+      - diagnostic labels and ProfileReport schema version
+      - removed observations are absent from implementation metadata
+    production_runtime_reads_yaml: false
+
+  - id: otel_helpers
+    evidence:
+      - sync and async return identity
+      - original throw and rejection identity
+      - typed failure versus runtime-exception status
+      - explicit parent context
+      - active callback context
+      - exception recording
+      - exactly-once span end
+      - successful spans are not forced to OK
+    async_iterable_cases:
+      - exhaustion
+      - consumer cancellation
+      - handled throw
+      - unhandled throw
+      - explicit return
+      - iterator method serialization
+      - active context for each pull
+      - exactly-once termination
+    sdk_policy:
+      private_foundation: fake OpenTelemetry API objects
+      application_integration: real SDK and context propagation
+
+  - id: domain_recorders
+    evidence:
+      - instruments are created once during recorder construction
+      - no instrument creation occurs on hot paths
+      - cataloged values and attributes
+      - normalized terminal outcomes
+      - zero policy
+      - completed partial work
+      - exactly-once timing-token completion
+      - callback and exception control flow remain outside the recorder
+      - no-op recorder does not read the clock
+      - no-op recorder does not require hot-path allocation
+    coverage: every accepted metric has at least one owner test for its recording semantics
+
+  - id: collector_and_report
+    span_aggregation:
+      - scope name, nullable version, and span name identity
+      - calls, errors, total duration, and maximum duration
+      - error count derives from span status
+      - single reducer conditional observations and conflicts
+      - distinct reducer value counts and overflow
+      - min-max reducer
+      - invalid value isolation
+      - completed span objects are not retained
+    metrics:
+      - counters and histograms remain separate
+      - attribute sets identify datapoints
+      - observed zero differs from absence
+      - histogram count, sum, minimum, maximum, bounds, and buckets
+      - raw samples are not retained
+      - invalid aggregation causes a diagnostic and partial signal
+    report:
+      - structuredClone round trip preserves semantic equality
+      - only plain schema-approved values occur
+      - schemaVersion is 1
+      - missing scope version becomes null
+      - NaN, Infinity, negative zero, and undefined are normalized or rejected
+      - shuffled inputs produce canonical output order
+      - complete-empty, partial-empty, and unavailable-empty are distinct
+
+  - id: worker_session_fault_injection
+    failure_stages:
+      - provider or context initialization
+      - trace flush
+      - metric collect
+      - report build
+      - telemetry shutdown
+    evidence:
+      - application result is unchanged
+      - finalize does not reject
+      - later finalization stages are attempted
+      - shutdown runs exactly once
+      - repeated finalize returns the same result
+      - initialization failure degrades to no-op and yields no report
+      - collection or build failure preserves available signals
+      - shutdown failure preserves an already-built report
+      - diagnostics are deduplicated and message-bounded
+    seam_policy: internal test injection only; not a public telemetry backend extension point
+
+limits:
+  - target: span_groups
+    maximum: 128
+    boundary_cases:
+      - 127
+      - 128
+      - 129
+    overflow_evidence:
+      - excess groups are not retained
+      - spans become partial
+      - span_group_overflow diagnostic is aggregated
+
+  - target: distinct_span_attribute_values
+    maximum: 16
+    boundary_cases:
+      - 15
+      - 16
+      - 17
+    overflow_evidence:
+      - excess observations increment overflowCount
+      - spans become partial
+      - span_attribute_value_overflow diagnostic is aggregated
+
+  - target: metric_points_per_instrument
+    maximum: 128
+    boundary_cases:
+      - 127
+      - 128
+      - 129
+    overflow_evidence:
+      - excess points are not retained
+      - affected signal becomes partial
+      - metric_point_overflow diagnostic is aggregated
+
+  - target: diagnostics
+    maximum: 16
+    boundary_cases:
+      - 15
+      - 16
+      - 17
+    overflow_evidence:
+      - one slot remains reserved for diagnostic_overflow
+      - repeated overflow increments a bounded count
+
+overflow_selection:
+  retained: first values accepted by the bounded collector
+  excess: summarized without replacing retained values
+  canonical_sorting: applies after bounded retention
+  not_required: replacing retained values to select the lexicographically smallest set across concurrent completion order
+
+operation_owner_slices:
+  - id: execution_and_setup
+    evidence:
+      - gitlode.run is the root
+      - setup spans are run children
+      - gitlode.extract ends after output close and result construction
+      - success, typed-user-error, and runtime-exception status
+      - application resources are disposed before root end
+
+  - id: extraction
+    evidence:
+      - planning, traversal, and projection are extract children
+      - one outer projection span
+      - at most one output-close span
+      - accepted commits record after cross-ref deduplication
+      - output records count only resolved sink writes
+      - no per-record projection or output-write spans
+
+  - id: file_extraction
+    evidence:
+      - size guard precedes binary guard
+      - skipped diffs still contribute to expanded facts
+      - failed partial commit batches do not enter expansion-size distribution
+      - skipped inputs do not invoke line diff
+      - concrete line-diff outcome and expander validation error remain distinct
+
+  - id: git_adapters
+    common_evidence:
+      - commit yielded
+      - object read
+      - cache lookup and hit
+      - file change yielded
+      - blob duration, size, and bytes
+    git_cli_evidence:
+      - rev-list, batch, and diff-tree hierarchy
+      - persistent blob-batch disposal
+      - command-error status
+      - no per-blob span
+    isomorphic_git_evidence:
+      - DAG child hierarchy
+      - strategy attributes
+      - object-purpose and cache semantics
+
+  - id: dag
+    evidence:
+      - one completion per started public operation
+      - success, cancelled, handled-throw, and error completion
+      - partial work reported once at termination
+      - nested reusable cores do not emit duplicate metric sets
+      - fallback event and counter occur once
+      - removed phase-certified counters do not return
+      - existing exact synthetic topology and graph-work tests remain
+
+  - id: plugins
+    evidence:
+      - resolved package and fallback scopes
+      - explicit bootstrap parent for init spans
+      - stable parentage under parallel initialization
+      - all four projection outcomes
+      - returned-fatal and thrown-value policy mapping
+      - same package under different namespaces aggregates by scope
+      - namespace, config, and path are not metric attributes
+      - plugin-created metrics are excluded from the local report
+      - arbitrary plugin-created span attributes are excluded
+      - extension JSON content and declaration order are unchanged
+
+repository_fixture:
+  construction: generate from a deterministic recipe during test setup
+  do_not_store: binary Git repository directory
+  fixed_inputs:
+    - author and committer identity
+    - timestamps and timezone offsets
+    - branch and tag names
+    - commit graph
+    - file contents
+    - commit messages
+    - session timestamp
+  topology:
+    - root commit
+    - linear commits
+    - independent branch
+    - non-fast-forward merge
+    - overlapping refs
+    - annotated tag
+    - lightweight tag
+    - incremental boundary
+  file_cases:
+    - added file
+    - modified file
+    - deleted file
+    - empty text file
+    - UTF-8 multibyte content
+    - NUL-containing binary file
+    - size threshold minus one
+    - size threshold equal
+    - size threshold plus one
+  excluded_for_portability:
+    - symlinks
+    - submodules
+    - platform-dependent file modes
+
+profile_equivalence:
+  modes:
+    - disabled
+    - enabled
+  same_inputs:
+    - request
+    - repository fixture
+    - session timestamp
+  compare:
+    - application result kind
+    - records written
+    - commits traversed
+    - refs
+    - skipped diffs
+    - files created
+    - bytes written
+    - checkpoint
+    - JSONL file sequence and byte content
+  exclude:
+    - elapsed time
+    - profile report
+    - temporary output path
+    - telemetry lifecycle diagnostics
+  same_adapter: byte-for-byte JSONL comparison
+  cross_adapter: semantic record-set comparison without line-order requirement
+
+scenarios:
+  - id: commit_snapshot
+    evidence:
+      - JSONL equivalence
+      - root and phase hierarchy
+      - commit counts
+  - id: file_snapshot
+    evidence:
+      - add, modify, and delete behavior
+      - blob, guard, diff, projection, and output observations
+      - JSONL equivalence
+  - id: incremental
+    evidence:
+      - checkpoint and range behavior
+      - deduplication
+      - unchanged ref
+  - id: multiple_refs
+    evidence:
+      - cross-ref deduplication
+      - deterministic result
+  - id: isomorphic_git
+    evidence:
+      - DAG hierarchy and strategy
+      - cache and object metrics
+  - id: git_cli
+    evidence:
+      - process and session hierarchy
+      - disposal
+      - common Git metrics
+  - id: built_in_projection
+    evidence:
+      - fact type and outcome
+      - duration ownership
+      - no leaf span
+  - id: plugin_enrichment
+    evidence:
+      - output equivalence
+      - scope
+      - four projection outcomes
+  - id: output_rotation
+    evidence:
+      - file and byte counts
+      - write success and error semantics
+      - close behavior
+  - id: user_error
+    evidence:
+      - typed status
+      - application-result identity
+      - telemetry finalization
+  - id: runtime_error
+    evidence:
+      - exception and status
+      - original error identity
+  - id: iterator_terminals
+    evidence:
+      - exhaustion, cancellation, and throw
+      - exactly-once end
+  - id: collector_overflow
+    evidence:
+      - bounded report
+      - partial status
+      - deterministic overflow diagnostics
+  - id: lifecycle_failure
+    evidence:
+      - unchanged application result
+      - best-effort shutdown
+  - id: empty_extraction
+    evidence:
+      - valid empty signals
+      - explicit zero differs from absence
+  - id: unknown_observation
+    evidence:
+      - fallback visibility
+      - canonical order
+
+presentation:
+  semantic_assertions:
+    - group and row order
+    - known labels
+    - plugin scope subgroup
+    - unknown fallback
+    - partial and unavailable sections
+    - diagnostic fields
+    - absent zero is not synthesized
+    - nonzero does not render as plain zero
+    - histogram percentiles are absent
+    - quiet suppresses the profile block
+    - current success-only profile UX
+  incidental_assertions_to_avoid:
+    - entire-output snapshots as the primary contract
+    - fixed padding
+    - fixed column width
+
+execution_tiers:
+  continuous_integration:
+    - catalog contract
+    - unit tests
+    - collector and session fault injection
+    - owner integration
+    - deterministic small-repository scenarios
+    - worker structured-clone round trip
+    - presentation semantics
+    - format, lint, type, architecture, test, and build checks
+  phase_6_explicit:
+    - representative large repository
+    - repeated wall-clock and memory measurement
+    - trace-volume measurement
+    - profile-enabled versus disabled overhead comparison

@@ -1,0 +1,249 @@
+schema_version: 1
+status: accepted_target
+
+states:
+  legacy_off:
+    revision: migration baseline
+    profile: disabled
+  target_off:
+    revision: redesigned implementation
+    profile: disabled
+  target_on:
+    revision: redesigned implementation
+    profile: enabled
+
+comparisons:
+  disabled_overhead:
+    candidate: target_off
+    baseline: legacy_off
+    wall_clock_maximum_ratio: 1.05
+    peak_rss_allowed_increase:
+      greater_of:
+        absolute_mib: 8
+        baseline_ratio: 0.05
+  profile_overhead:
+    candidate: target_on
+    baseline: target_off
+    wall_clock_maximum_ratio: 1.15
+    peak_rss_allowed_increase:
+      greater_of:
+        absolute_mib: 32
+        baseline_ratio: 0.15
+  legacy_profile_enabled:
+    disposition: not_compared
+    rationale: the custom and target profilers intentionally observe different signal shapes and volumes
+
+wall_clock_evaluation:
+  statistic: median paired candidate-to-baseline ratio minus one
+  minimum_fixture_median_seconds: 10
+  target_fixture_median_seconds:
+    minimum: 10
+    maximum: 30
+  repetitions:
+    warmup: 2
+    measured_pairs: 7
+    order:
+      - A-B
+      - B-A
+      - alternate for all measured pairs
+  inconclusive_when:
+    - baseline median absolute deviation exceeds 5 percent of its median
+    - candidate median absolute deviation exceeds 5 percent of its median
+    - recorded environmental interference invalidates the run
+    - a child process does not exit successfully
+    - behavioral equivalence fails
+    - environment fingerprint is incompatible with the baseline
+
+peak_rss:
+  source: external sampling of the target gitlode child process
+  maximum_sampling_interval_ms: 25
+  excludes:
+    - benchmark harness RSS
+  notes:
+    - CPU time may be recorded as supplementary data but is not an initial acceptance gate.
+
+bounded_growth:
+  workload_scales:
+    - N
+    - 4N
+  fixed:
+    - observation identities
+    - attribute sets
+  requirements:
+    - span aggregate group count does not grow
+    - metric datapoint count does not grow
+    - histogram bucket count does not grow
+    - collector does not retain raw spans or histogram samples
+    - profile-specific peak RSS delta grows by no more than 8 MiB
+  profile_specific_peak_rss_delta: peak RSS with profile enabled minus peak RSS with profile disabled
+
+fixtures:
+  - id: commit_heavy_repository
+    adapters:
+      - isomorphic-git
+      - git-cli
+    covers:
+      - long linear history
+      - periodic branches and merges
+      - overlapping refs
+      - incremental boundary
+      - small text changes
+      - commit traversal, object access, DAG, projection, and output
+
+  - id: file_heavy_repository
+    adapters:
+      - isomorphic-git
+      - git-cli
+    covers:
+      - multiple changes per commit
+      - added, modified, and deleted files
+      - UTF-8 text
+      - binary and size skips
+      - multiple output rotations
+      - blob, expansion, line-diff, projection, and output work
+
+  - id: plugin_heavy_projection
+    plugin_characteristics:
+      - deterministic
+      - no external I/O
+      - success and skip outcomes
+      - multiple registrations
+      - same package under different namespaces
+    excludes:
+      - network
+      - IPC
+      - arbitrary script workloads
+
+  - id: aggregation_scale
+    repository_access: none
+    input: deterministic fake fact and record sources
+    covers:
+      - N versus 4N bounded growth
+      - disabled recorder path
+      - enabled metric recording
+      - span aggregation without raw-observation retention
+
+fixture_calibration:
+  phase: 0
+  procedure:
+    - double candidate workload size for each pilot
+    - select the smallest size whose legacy_off median is between 10 and 30 seconds on the reference environment
+    - record commit, file, plugin, and rotation quantities in the manifest
+    - do not recalibrate during migration comparisons
+  shorter_fixture_policy: semantic or volume evidence only; not a wall-clock gate
+
+execution:
+  build: clean release build
+  subject: installed or bundled CLI as a child process
+  cli:
+    quiet: true
+    profile_enabled_semantics: collect and build the report while suppressing terminal rendering
+  repository:
+    same_snapshot_within_comparison: true
+  output:
+    location: separate temporary directory per run on the same filesystem class
+    reuse_written_files: false
+  cache:
+    comparison_state: after warmup
+  comparison_order: interleaved paired runs
+
+environment_fingerprint:
+  required:
+    - operating system and version
+    - architecture
+    - CPU model and logical CPU count
+    - total memory
+    - Node version
+    - npm version
+    - Git version
+    - Git adapter
+    - build mode
+    - repository revision
+    - fixture manifest hash
+    - benchmark script revision
+    - profile state
+    - warmup and measurement counts
+  incompatible_baseline_when:
+    - Node major differs
+    - operating system differs
+    - architecture differs
+    - Git version differs for a git-cli comparison
+
+run_measurements:
+  - wall-clock elapsed time
+  - child-process exit result
+  - peak RSS
+  - output bytes
+  - output files
+  - records
+  - commits
+  - skipped diffs
+  - ProfileReport JSON UTF-8 byte size
+  - span aggregate group count
+  - total ended span count
+  - counter datapoint count
+  - histogram datapoint count
+  - diagnostic count
+
+trace_volume:
+  prohibited_scaling_spans:
+    - per-record projection
+    - per-output-write
+    - per-blob
+    - per-diff
+    - per-commit file expansion
+  non_command_spans: explainable by cataloged bounded operations
+  git_cli_command_spans:
+    scaling: permitted only with actual command invocations
+    requirements:
+      - span count equals command-start count
+      - telemetry causes no additional command
+  plugin_created_spans: report separately from host volume
+
+report_size:
+  maximum_bytes: 1048576
+  measurement: UTF-8 byte length of JSON.stringify(ProfileReport)
+  applies_to:
+    - commit_heavy_repository
+    - file_heavy_repository
+    - plugin_heavy_projection
+  scope: fixture manifest's fixed plugin count; not an absolute guarantee for unbounded configuration size
+
+microbenchmarks:
+  hard_cross_machine_nanoseconds_per_operation_gate: false
+  uses:
+    - verify clock-read counts
+    - locate disabled and enabled hot-path regressions
+    - compare branches on one environment
+    - verify instruments are not recreated on hot paths
+  formal_acceptance_source:
+    - end-to-end paired measurements
+    - bounded-growth criterion
+
+baseline_artifacts:
+  phase: 0
+  required:
+    - benchmark manifest
+    - environment fingerprint
+    - unrounded raw run results
+    - calculated paired ratios
+    - behavioral equivalence result
+    - baseline Git revision
+  storage: benchmark artifacts rather than embedded design-document data
+
+failure_process:
+  steps:
+    - check measurement noise
+    - inspect observation volume
+    - inspect no-op path, clock access, attribute allocation, and instrument lifecycle
+    - inspect collector retention and SDK views
+    - improve and repeat with the unchanged manifest
+  threshold_change: prohibited without explicit design review
+  reviewed_exception_requires:
+    - fixture and adapter
+    - measured result
+    - cause
+    - acceptance rationale
+    - impact
+    - reevaluation condition
+  catalog_reduction: requires an explicit design update

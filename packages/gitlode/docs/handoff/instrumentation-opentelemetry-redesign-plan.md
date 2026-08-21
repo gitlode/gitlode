@@ -106,9 +106,14 @@ Only the following design gates remain. New items discovered during documentatio
 review must be added here explicitly rather than introduced as an untracked sequence of discussions.
 
 1. **Verification and implementation handoff**
-   - Define behavioral fixtures, hierarchy/metric contract tests, bounded-memory tests, and
-     representative performance measurements.
-   - Set acceptance criteria for instrumentation overhead.
+   - The behavioral fixtures, test layers, owner-integration evidence, collection-boundary cases,
+     fault injection, profile equivalence matrix, and CI/manual split are accepted in
+     `docs/design/telemetry-verification.md` and
+     `docs/design/telemetry-catalog/verification.yaml`.
+   - Performance fixtures, measurement protocol, environment fingerprint, wall-clock and RSS
+     thresholds, bounded-growth and volume criteria, and exception handling are accepted in
+     `docs/design/telemetry-performance.md` and
+     `docs/design/telemetry-catalog/performance.yaml`.
    - Split implementation into branch-sized units with explicit prerequisites and completion gates.
 
 Implementation must not begin beyond a phase's prerequisite boundary while that phase depends on

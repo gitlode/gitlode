@@ -9,6 +9,9 @@ than preserve those transitional contracts.
 
 The migration status, branch-sized work plan, and remaining design gates are tracked in
 [`../handoff/instrumentation-opentelemetry-redesign-plan.md`](../handoff/instrumentation-opentelemetry-redesign-plan.md).
+The verification contract for the migration is defined in
+[`telemetry-verification.md`](telemetry-verification.md).
+Performance acceptance is defined in [`telemetry-performance.md`](telemetry-performance.md).
 
 ## Purpose and scope
 

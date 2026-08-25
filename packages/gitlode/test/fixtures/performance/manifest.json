@@ -1,0 +1,32 @@
+{
+  "calibration": {
+    "reason": "This branch environment is not an approved stable reference environment; run the documented calibration command on the reference host.",
+    "status": "incomplete"
+  },
+  "fixtures": {
+    "aggregation_scale": { "commits": 0, "files": 0, "plugins": 0, "rotations": 0, "scale": 1024 },
+    "commit_heavy_repository": {
+      "commits": 8,
+      "files": 1,
+      "plugins": 0,
+      "rotations": 1,
+      "scale": 0
+    },
+    "file_heavy_repository": {
+      "commits": 4,
+      "files": 16,
+      "plugins": 0,
+      "rotations": 4,
+      "scale": 0
+    },
+    "plugin_heavy_projection": {
+      "commits": 4,
+      "files": 4,
+      "plugins": 8,
+      "rotations": 2,
+      "scale": 0
+    }
+  },
+  "recipeRevision": "performance-v1",
+  "schemaVersion": 1
+}

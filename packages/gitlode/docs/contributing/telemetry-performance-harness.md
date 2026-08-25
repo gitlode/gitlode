@@ -1,43 +1,50 @@
 # Telemetry performance harness
 
-The test/development-only harness implements the procedure whose fixture semantics, measurements,
-thresholds, and incompatibility rules are canonical in
-[`../design/telemetry-catalog/performance.yaml`](../design/telemetry-catalog/performance.yaml).
-It launches a clean release bundle as a child process, always adds `--quiet`, samples that child's
-RSS externally on Linux, and gives every run a fresh output directory on the repository's temporary
-filesystem. `target_on` additionally receives `--profile`; quiet mode suppresses presentation, not
-collection.
+The development-only harness implements the procedure whose fixture semantics, measurements, and
+thresholds are canonical in
+[`../design/telemetry-catalog/performance.yaml`](../design/telemetry-catalog/performance.yaml). It
+supports the bundled release CLI, adds `--quiet` to every child, and adds `--profile` only for
+`target_on`. Each run has a fresh output and checkpoint file on one temporary filesystem.
+
+Repository targets are commit-heavy and file-heavy with either adapter, plus plugin-heavy fixed to
+`isomorphic-git`. The plugin recipe creates one deterministic local package, registers it under
+multiple namespaces, and exercises success and skip without network, IPC, or injected scripts.
+`aggregation_scale` is a fixed Git-independent N/4N recipe and pure evaluator; selecting it in a
+command reports that its dedicated T13 collector child runner is not implemented rather than
+routing it through a repository benchmark.
 
 ## Reference workflow
 
-From the repository root, first create clean release bundles (or preserve the legacy bundle at a
-separate path), then calibrate each repository fixture on the designated quiet reference host:
+After preserving a clean legacy release bundle, calibrate all five manifest targets separately:
 
 ```bash
-npm run build:clean
-npm run build:release
-npm run performance:calibrate -w gitlode -- --fixture commit_heavy_repository --adapter isomorphic-git --baseline-cli /absolute/path/to/legacy/dist/index.js
+npm run performance:calibrate -w gitlode -- --fixture commit_heavy_repository --adapter isomorphic-git --baseline-cli /abs/legacy/dist/index.js --legacy-revision <legacy-git-oid>
 ```
 
-Repeat calibration for both repository fixtures and adapters. Calibration alone may update
-`test/fixtures/performance/manifest.json`; it doubles the workload and freezes the first candidate
-whose seven-run legacy median is in the cataloged window. Commit the completed manifest before
-migration measurement.
+Calibration alone updates the selected target. Quantities express the **final total commit count**,
+including the five commits in the T00A base recipe. The manifest is globally ready only when both
+repository fixtures with both adapters and plugin-heavy/isomorphic-git are complete, with an
+environment reference and calibration artifact reference for every target.
 
-Run a normal comparison without modifying the manifest:
+Capture legacy baseline artifacts without a target implementation:
 
 ```bash
-npm run performance:measure -w gitlode -- --fixture commit_heavy_repository --adapter git-cli --baseline-cli /absolute/path/to/legacy/dist/index.js --candidate-cli /absolute/path/to/target/dist/index.js --candidate-state target_off --artifacts /absolute/path/to/artifacts
+npm run performance:capture-legacy -w gitlode -- --fixture commit_heavy_repository --adapter isomorphic-git --baseline-cli /abs/legacy/dist/index.js --legacy-revision <legacy-git-oid> --artifacts /abs/artifacts
 ```
 
-Use `--candidate-state target_on` for the profile comparison. Artifacts default to
-`packages/gitlode/.benchmark-artifacts/` and contain raw warmups, measured pairs, order, child exits,
-RSS samples, output observations, fingerprints, behavioral equivalence, statistics, and evaluation.
-Preserve legacy artifacts with the baseline revision and completed manifest. Re-run after
-interference or an inconclusive result; never edit thresholds or recalibrate during migration.
+Run comparison measurement only after that target is complete:
 
-The checked-in manifest is intentionally **incomplete** until a stable reference host is nominated.
-Container scheduling and shared-host interference make this branch environment unsuitable for
-freezing a 10–30 second baseline. A pass takes 18 child runs per pilot, plus additional pilots for
-every doubling, fixture, and adapter. T13 must not start until the completed manifest and
-`legacy_off` artifact set have been reviewed and stored.
+```bash
+npm run performance:measure -w gitlode -- --fixture commit_heavy_repository --adapter git-cli --baseline-cli /abs/legacy/dist/index.js --legacy-revision <legacy-git-oid> --candidate-cli /abs/target/dist/index.js --candidate-revision <target-git-oid> --candidate-state target_off --artifacts /abs/artifacts
+```
+
+Use `target_on` for profiling comparison. Artifacts record separate legacy, candidate, and benchmark
+script revisions; the completed manifest/hash and calibration provenance; fingerprints; raw
+warmups/measured pairs; child exit and RSS samples; output/checkpoint behavior; and evaluation.
+Formal fail or inconclusive results are saved and then return a nonzero command status. Measurement
+never changes the manifest. Re-run environmental interference with the unchanged manifest and do
+not relax catalog thresholds.
+
+The checked-in targets remain explicitly incomplete because this shared container is not an
+approved reference host. No formal calibration or legacy artifact has been claimed. T13 remains
+blocked until all targets are calibrated and the reference legacy artifacts are reviewed.

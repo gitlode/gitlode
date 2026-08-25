@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6,7 +7,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  comparePerformanceBehavior,
+  normalizePerformanceFilename,
+} from "../support/performance-equivalence.js";
+import {
   createAggregationFixture,
+  createPerformanceRepository,
   createPluginProjectionFixture,
 } from "../support/performance-fixtures.js";
 import {
@@ -14,6 +20,7 @@ import {
   environmentCompatibility,
   evaluateComparison,
   evaluateVolume,
+  launchMeasuredChild,
   mad,
   manifestHash,
   median,
@@ -32,8 +39,15 @@ afterEach(async () =>
 );
 const manifest: FixtureManifest = {
   schemaVersion: 1,
-  calibration: { status: "incomplete", reason: "reference calibration pending" },
   recipeRevision: "performance-v1",
+  aggregation: { status: "fixed-recipe", integration: "pending-target-collector" },
+  calibrationTargets: {
+    "commit_heavy_repository/git-cli": {
+      status: "incomplete",
+      reason: "pending",
+      quantities: { commits: 8, files: 1, plugins: 0, rotations: 1, scale: 0 },
+    },
+  },
   fixtures: {
     commit_heavy_repository: { commits: 8, files: 1, plugins: 0, rotations: 1, scale: 0 },
   },
@@ -56,9 +70,10 @@ const fingerprint = (overrides: Partial<EnvironmentFingerprint> = {}): Environme
   measuredPairCount: 7,
   ...overrides,
 });
-const run = (elapsedMs: number, rss = 100 * 1024 ** 2, code = 0): RawRun => ({
+const run = (elapsedMs: number, rss = 100 * 1024 ** 2, code = 0, pairIndex = 0): RawRun => ({
   state: "legacy_off",
   phase: "measured",
+  pairIndex,
   order: "A-B",
   elapsedMs,
   exit: { code, signal: null },
@@ -75,7 +90,7 @@ const run = (elapsedMs: number, rss = 100 * 1024 ** 2, code = 0): RawRun => ({
   commits: { status: "unavailable", reason: "test" },
   skippedDiffs: { status: "unavailable", reason: "test" },
   telemetry: unavailableTargetTelemetry("legacy_off"),
-  outputDirectory: "/tmp/out",
+  runId: `measured-${pairIndex}-legacy_off`,
 });
 
 describe("performance harness contracts", () => {
@@ -96,11 +111,13 @@ describe("performance harness contracts", () => {
   it("calculates paired ratios, median, MAD, and exact threshold boundaries", () => {
     expect(median([3, 1, 2])).toBe(2);
     expect(mad([1, 2, 3])).toBe(1);
-    const baseline = Array.from({ length: 7 }, () => run(20_000));
+    const baseline = Array.from({ length: 7 }, (_, index) =>
+      run(20_000, 100 * 1024 ** 2, 0, index),
+    );
     const atBoundary = evaluateComparison({
       kind: "disabled_overhead",
       baseline,
-      candidate: Array.from({ length: 7 }, () => run(21_000, 108 * 1024 ** 2)),
+      candidate: Array.from({ length: 7 }, (_, index) => run(21_000, 108 * 1024 ** 2, 0, index)),
     });
     expect(atBoundary.status).toBe("pass");
     expect(atBoundary.wallClockOverhead).toBeCloseTo(0.05);
@@ -109,21 +126,19 @@ describe("performance harness contracts", () => {
       evaluateComparison({
         kind: "disabled_overhead",
         baseline,
-        candidate: Array.from({ length: 7 }, () => run(21_001, 108 * 1024 ** 2 + 1)),
+        candidate: Array.from({ length: 7 }, (_, index) =>
+          run(21_001, 108 * 1024 ** 2 + 1, 0, index),
+        ),
       }).status,
     ).toBe("fail");
   });
   it("makes noise, environment, child, behavior, and interference inconclusive", () => {
-    const noisy = [
-      run(10_000),
-      run(20_000),
-      run(30_000),
-      run(40_000),
-      run(50_000),
-      run(60_000),
-      run(70_000),
-    ];
-    const candidate = Array.from({ length: 7 }, () => run(20_000));
+    const noisy = [10_000, 20_000, 30_000, 40_000, 50_000, 60_000, 70_000].map((value, index) =>
+      run(value, 100 * 1024 ** 2, 0, index),
+    );
+    const candidate = Array.from({ length: 7 }, (_, index) =>
+      run(20_000, 100 * 1024 ** 2, 0, index),
+    );
     expect(
       evaluateComparison({ kind: "disabled_overhead", baseline: noisy, candidate }).status,
     ).toBe("inconclusive");
@@ -141,7 +156,7 @@ describe("performance harness contracts", () => {
       evaluateComparison({
         kind: "disabled_overhead",
         baseline: candidate,
-        candidate: [...candidate.slice(0, 6), run(20_000, 1, 1)],
+        candidate: [...candidate.slice(0, 6), run(20_000, 1, 1, 6)],
       }).reasons,
     ).toContain("child process failure");
   });
@@ -199,7 +214,7 @@ describe("performance harness contracts", () => {
     await new Promise((resolve) => {
       setTimeout(resolve, 12);
     });
-    child.emit("exit", 0, null);
+    child.emit("close", 0, null);
     const result = await promise;
     const after = reads;
     await new Promise((resolve) => {
@@ -216,6 +231,94 @@ describe("performance harness contracts", () => {
     expect(roundTrip.value).toBe(1.23456789);
     expect(artifact.runs[0].telemetry.reportJsonBytes.status).toBe("not-applicable");
     expect(unavailableTargetTelemetry("target_on").reportJsonBytes.status).toBe("unavailable");
+  });
+  it("marks unsupported platforms and empty RSS readers inconclusive", async () => {
+    const child = new EventEmitter() as EventEmitter & { pid: number };
+    child.pid = 9;
+    await expect(sampleChildRss(child, { platform: "darwin" })).resolves.toMatchObject({
+      status: "unsupported",
+    });
+    const pending = sampleChildRss(child, { platform: "linux", reader: async () => undefined });
+    child.emit("close", 0, null);
+    await expect(pending).resolves.toMatchObject({ status: "unsupported" });
+    const baseline = Array.from({ length: 7 }, (_, index) => run(20_000, 100, 0, index));
+    baseline[0] = {
+      ...baseline[0]!,
+      peakRss: { status: "unsupported", platform: "darwin", intervalMs: 20, reason: "unsupported" },
+    };
+    const result = evaluateComparison({
+      kind: "disabled_overhead",
+      baseline,
+      candidate: Array.from({ length: 7 }, (_, index) => run(20_000, 100, 0, index)),
+    });
+    expect(result.status).toBe("inconclusive");
+    expect(result.peakRssIncreaseBytes).toBeUndefined();
+    expect(result.reasons).toContain("peak RSS unsupported or incomplete");
+  });
+  it("rejects empty, mismatched, and duplicate measured pair structures", () => {
+    expect(
+      evaluateComparison({ kind: "disabled_overhead", baseline: [], candidate: [] }).status,
+    ).toBe("inconclusive");
+    const valid = [run(1, 1, 0, 0), run(1, 1, 0, 1)];
+    expect(
+      evaluateComparison({
+        kind: "disabled_overhead",
+        baseline: valid,
+        candidate: valid.slice(0, 1),
+      }).reasons,
+    ).toContain("baseline and candidate measured pair counts differ");
+    expect(
+      evaluateComparison({
+        kind: "disabled_overhead",
+        baseline: valid,
+        candidate: [run(1, 1, 0, 0), run(1, 1, 0, 0)],
+      }).reasons,
+    ).toContain("candidate measured pair indexes are missing or duplicated");
+  });
+  it("normalizes only filename session timestamps and exact checkpoint timestamps", () => {
+    expect(normalizePerformanceFilename("prefix-20240101T010203Z-000001.jsonl")).toBe(
+      "prefix-<session>-000001.jsonl",
+    );
+    const artifact = (name: string, bytes = "same", generatedAt = "2024-01-01T01:02:03.000Z") => ({
+      exit: { code: 0, signal: null },
+      checkpoint: { repositoryPath: "/repo", generatedAt },
+      jsonl: [{ name, bytes: Buffer.from(bytes) }],
+      derived: { records: 1, commits: 1, skippedDiffs: 0, files: 1, bytes: 4 },
+    });
+    const left = artifact("prefix-20240101T010203Z-000001.jsonl");
+    const input = {
+      repositoryPath: "/repo",
+      baselineGeneratedAt: "2024-01-01T01:02:03.000Z",
+      candidateGeneratedAt: "2024-02-01T01:02:03.000Z",
+    };
+    expect(
+      comparePerformanceBehavior(
+        left,
+        artifact("prefix-20240201T010203Z-000001.jsonl", "same", input.candidateGeneratedAt),
+        input,
+      ),
+    ).toEqual([]);
+    expect(
+      comparePerformanceBehavior(
+        left,
+        artifact("other-20240201T010203Z-000001.jsonl", "same", input.candidateGeneratedAt),
+        input,
+      ),
+    ).toContain("JSONL prefix, sequence, or extension differs");
+    expect(
+      comparePerformanceBehavior(
+        left,
+        artifact("prefix-20240201T010203Z-000002.jsonl", "same", input.candidateGeneratedAt),
+        input,
+      ),
+    ).toContain("JSONL prefix, sequence, or extension differs");
+    expect(
+      comparePerformanceBehavior(
+        left,
+        artifact("prefix-20240201T010203Z-000001.jsonl", "changed", input.candidateGeneratedAt),
+        input,
+      ),
+    ).toContain("JSONL bytes or ordering differs");
   });
   it("evaluates bounded growth, trace volume, report size, and separates plugin spans", () => {
     const base = {
@@ -252,7 +355,65 @@ describe("performance harness contracts", () => {
     const directory = await mkdtemp(join(tmpdir(), "plugins-"));
     dirs.push(directory);
     const quantities = { commits: 0, files: 0, plugins: 4, rotations: 0, scale: 0 };
-    expect(await createPluginProjectionFixture(directory, quantities)).toHaveLength(4);
+    const pluginFixture = await createPluginProjectionFixture(directory, quantities);
+    expect(pluginFixture.registrations).toHaveLength(4);
+    const factory = (await import(`file://${join(directory, "deterministic-plugin/index.js")}`))
+      .default;
+    const success = await factory({ outcome: "success", ordinal: 1 });
+    const skip = await factory({ outcome: "skip", ordinal: 2 });
+    const context = { fact: { type: "file-change" } };
+    await expect(success.project(context)).resolves.toMatchObject({ type: "success" });
+    await expect(skip.project(context)).resolves.toEqual({ type: "skip" });
     expect(await readFile(join(directory, "plugin-input.json"), "utf8")).not.toContain("http");
+  });
+  it("treats manifest commits as the final repository total", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "performance-repository-"));
+    dirs.push(directory);
+    await createPerformanceRepository(directory, "commit_heavy_repository", {
+      commits: 7,
+      files: 1,
+      plugins: 0,
+      rotations: 1,
+      scale: 0,
+    });
+    const count = await new Promise<string>((resolve, reject) => {
+      execFile("git", ["rev-list", "--count", "--all"], { cwd: directory }, (error, stdout) => {
+        if (error) reject(error);
+        else resolve(stdout.trim());
+      });
+    });
+    expect(count).toBe("7");
+  });
+  it("derives nested file skipped diffs and handles spawn failure without hanging", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "performance-child-"));
+    dirs.push(directory);
+    const script = join(directory, "child.cjs");
+    await writeFile(
+      script,
+      `require('node:fs').writeFileSync(${JSON.stringify(join(directory, "performance-20240101T000000Z-000001.jsonl"))}, JSON.stringify({oid:'a',file:{additions:null,deletions:null}})+'\\n')`,
+    );
+    const result = await launchMeasuredChild({
+      executable: process.execPath,
+      args: [script],
+      outputDirectory: directory,
+      state: "legacy_off",
+      phase: "measured",
+      pairIndex: 0,
+      order: "A-B",
+    });
+    expect(result.skippedDiffs).toEqual({ status: "available", value: 1 });
+    const empty = await mkdtemp(join(tmpdir(), "performance-spawn-"));
+    dirs.push(empty);
+    await expect(
+      launchMeasuredChild({
+        executable: join(empty, "absent"),
+        args: [],
+        outputDirectory: empty,
+        state: "legacy_off",
+        phase: "measured",
+        pairIndex: 0,
+        order: "A-B",
+      }),
+    ).resolves.toMatchObject({ exit: { code: null } });
   });
 });

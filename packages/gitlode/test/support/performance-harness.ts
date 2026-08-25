@@ -22,9 +22,23 @@ export interface FixtureQuantities {
 }
 export interface FixtureManifest {
   readonly schemaVersion: 1;
-  readonly calibration: { readonly status: "complete" | "incomplete"; readonly reason?: string };
   readonly recipeRevision: string;
   readonly fixtures: Readonly<Record<string, FixtureQuantities>>;
+  readonly calibrationTargets: Readonly<Record<string, CalibrationTarget>>;
+  readonly aggregation: {
+    readonly status: "fixed-recipe";
+    readonly integration: "pending-target-collector";
+  };
+}
+export interface CalibrationTarget {
+  readonly status: "complete" | "incomplete";
+  readonly quantities: FixtureQuantities;
+  readonly environmentRef?: string;
+  readonly artifactRef?: string;
+  readonly reason?: string;
+}
+export function calibrationComplete(manifest: FixtureManifest): boolean {
+  return Object.values(manifest.calibrationTargets).every((target) => target.status === "complete");
 }
 
 function canonical(value: unknown): unknown {
@@ -32,7 +46,7 @@ function canonical(value: unknown): unknown {
   if (value && typeof value === "object")
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([a], [b]) => a.localeCompare(b))
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
         .map(([key, item]) => [key, canonical(item)]),
     );
   return value;
@@ -153,7 +167,7 @@ export function sampleChildRss(
     };
     void poll();
     const timer = setInterval(() => void poll(), intervalMs);
-    child.once("exit", () => {
+    child.once("close", () => {
       finished = true;
       clearInterval(timer);
       const peakBytes = samples.length
@@ -218,7 +232,7 @@ export interface RawRun {
   readonly commits: Availability<number>;
   readonly skippedDiffs: Availability<number>;
   readonly telemetry: TargetTelemetryMeasurements;
-  readonly outputDirectory: string;
+  readonly runId: string;
 }
 export async function launchMeasuredChild(input: {
   readonly executable: string;
@@ -237,7 +251,8 @@ export async function launchMeasuredChild(input: {
   const rss = sampleChildRss(child, { reader: input.rssReader });
   const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
     (resolve) => {
-      child.once("exit", (code, signal) => resolve({ code, signal }));
+      child.once("error", () => resolve({ code: null, signal: null }));
+      child.once("close", (code, signal) => resolve({ code, signal }));
     },
   );
   const elapsedMs = performance.now() - start;
@@ -259,9 +274,15 @@ export async function launchMeasuredChild(input: {
   const commitOids = new Set(
     records.map((record) => record.oid).filter((oid): oid is string => typeof oid === "string"),
   );
-  const skippedDiffs = records.filter(
-    (record) => "additions" in record && record.additions === null && record.deletions === null,
-  ).length;
+  const skippedDiffs = records.filter((record) => {
+    const file = record.file;
+    return (
+      !!file &&
+      typeof file === "object" &&
+      (file as Record<string, unknown>).additions === null &&
+      (file as Record<string, unknown>).deletions === null
+    );
+  }).length;
   return {
     state: input.state,
     phase: input.phase,
@@ -276,7 +297,7 @@ export async function launchMeasuredChild(input: {
     commits: { status: "available", value: commitOids.size },
     skippedDiffs: { status: "available", value: skippedDiffs },
     telemetry: unavailableTargetTelemetry(input.state),
-    outputDirectory: input.outputDirectory,
+    runId: `${input.phase}-${input.pairIndex ?? 0}-${input.state}`,
   };
 }
 
@@ -287,6 +308,7 @@ export function pairPlan(
   return [
     ...Array.from({ length: warmups }, (_, index) => ({
       phase: "warmup" as const,
+      pairIndex: index,
       order: (index % 2 ? "B-A" : "A-B") as "A-B" | "B-A",
     })),
     ...Array.from({ length: pairs }, (_, pairIndex) => ({
@@ -325,6 +347,32 @@ export function evaluateComparison(input: {
   readonly behavioralErrors?: readonly string[];
   readonly environmentalInterference?: string;
 }): Evaluation {
+  const structuralReasons: string[] = [];
+  if (!input.baseline.length || !input.candidate.length)
+    structuralReasons.push("measured pairs are empty");
+  if (input.baseline.length !== input.candidate.length)
+    structuralReasons.push("baseline and candidate measured pair counts differ");
+  const validateIndexes = (runs: readonly RawRun[], label: string) => {
+    const indexes = runs.map((run) => run.pairIndex);
+    if (indexes.some((index) => index === undefined) || new Set(indexes).size !== indexes.length)
+      structuralReasons.push(`${label} measured pair indexes are missing or duplicated`);
+    else if (indexes.some((index, position) => index !== position))
+      structuralReasons.push(`${label} measured pair indexes are not contiguous`);
+  };
+  validateIndexes(input.baseline, "baseline");
+  validateIndexes(input.candidate, "candidate");
+  if (structuralReasons.length)
+    return {
+      status: "inconclusive",
+      pairedRatios: [],
+      baselineMedian: 0,
+      candidateMedian: 0,
+      baselineMad: 0,
+      candidateMad: 0,
+      wallClockOverhead: 0,
+      peakRssIncreaseBytes: undefined,
+      reasons: structuralReasons,
+    };
   const b = input.baseline.map((run) => run.elapsedMs),
     c = input.candidate.map((run) => run.elapsedMs);
   const pairedRatios = c.map((value, index) => value / b[index]!);
@@ -338,6 +386,8 @@ export function evaluateComparison(input: {
     reasons.push("child process failure");
   if (baselineMad > baselineMedian * 0.05) reasons.push("baseline MAD exceeds 5 percent");
   if (candidateMad > candidateMedian * 0.05) reasons.push("candidate MAD exceeds 5 percent");
+  if (baselineMedian < 10_000)
+    reasons.push("fixture median is below the 10 second wall-clock gate minimum");
   const baselinePeaks = input.baseline
     .map((r) => r.peakRss.peakBytes)
     .filter((v): v is number => v !== undefined);
@@ -346,13 +396,15 @@ export function evaluateComparison(input: {
     .filter((v): v is number => v !== undefined);
   if (baselinePeaks.length !== b.length || candidatePeaks.length !== c.length)
     reasons.push("peak RSS unsupported or incomplete");
-  const peakRssIncreaseBytes = reasons.includes("peak RSS unsupported or incomplete")
+  const rssIncomplete = reasons.includes("peak RSS unsupported or incomplete");
+  const peakRssIncreaseBytes = rssIncomplete
     ? undefined
     : median(candidatePeaks) - median(baselinePeaks);
   const maximumRatio = input.kind === "disabled_overhead" ? 1.05 : 1.15;
   const allowedBytes = Math.max(
     (input.kind === "disabled_overhead" ? 8 : 32) * 1024 ** 2,
-    median(baselinePeaks) * (input.kind === "disabled_overhead" ? 0.05 : 0.15),
+    (rssIncomplete ? 0 : median(baselinePeaks)) *
+      (input.kind === "disabled_overhead" ? 0.05 : 0.15),
   );
   const wallClockOverhead = median(pairedRatios) - 1;
   return {

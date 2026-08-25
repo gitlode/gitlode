@@ -111,12 +111,26 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
         errors.push(`span ${String(span.id)} references unknown attribute: ${ref}`);
     }
     const parent = span.parent as Record<string, unknown> | undefined;
+    const parentType = parent?.type;
+    const referencedParentTypes = new Set(["span", "explicit_span_context"]);
+    const callerParentTypes = new Set([
+      "root",
+      "active_caller",
+      "active_caller_at_first_consumption",
+    ]);
     if (
-      (parent?.type === "span" || parent?.type === "explicit_span_context") &&
-      typeof parent.ref === "string" &&
-      !spanIds.has(parent.ref)
+      !referencedParentTypes.has(String(parentType)) &&
+      !callerParentTypes.has(String(parentType))
     ) {
-      errors.push(`span ${String(span.id)} references unknown parent span: ${parent.ref}`);
+      errors.push(`span ${String(span.id)} has unknown parent type: ${String(parentType)}`);
+    } else if (referencedParentTypes.has(String(parentType))) {
+      if (typeof parent?.ref !== "string" || parent.ref.length === 0) {
+        errors.push(`span ${String(span.id)} parent ${String(parentType)} requires string ref`);
+      } else if (!spanIds.has(parent.ref)) {
+        errors.push(`span ${String(span.id)} references unknown parent span: ${parent.ref}`);
+      }
+    } else if (parent && "ref" in parent) {
+      errors.push(`span ${String(span.id)} parent ${String(parentType)} must not define ref`);
     }
   }
   for (const metric of metrics) {

@@ -38,11 +38,15 @@ afterEach(async () => {
   );
 });
 
+function file(content: string, name = "baseline-20240203T040506000Z-000001.jsonl") {
+  return { name, bytes: Buffer.from(content) };
+}
+
 function artifacts(overrides: Partial<BehavioralArtifacts> = {}): BehavioralArtifacts {
   return {
     result: { kind: "success", success: { recordsWritten: 1, elapsedMs: 1, profileEntries: [] } },
     checkpoint: { repositoryPath: "/tmp/repo", refs: [{ ref: "main", tipOid: "a" }] },
-    jsonl: [Buffer.from('{"oid":"a"}\n')],
+    jsonl: [file('{"oid":"a"}\n')],
     ...overrides,
   };
 }
@@ -97,27 +101,111 @@ describe("deterministic telemetry behavioral baseline support", () => {
   it.each([
     ["result", artifacts({ result: { kind: "user-error", message: "changed" } })],
     ["checkpoint", artifacts({ checkpoint: { repositoryPath: "/tmp/repo", refs: [] } })],
-    ["JSONL", artifacts({ jsonl: [Buffer.from('{"oid":"different"}\n')] })],
+    ["JSONL", artifacts({ jsonl: [file('{"oid":"different"}\n')] })],
   ])("detects an intentional %s difference", (_name, changed) => {
     expect(compareBehavioralArtifacts(artifacts(), changed)).not.toEqual([]);
   });
 
-  it("canonicalizes object keys but preserves array order and record multiplicity", () => {
-    const canonical = artifacts({
-      jsonl: [Buffer.from('{"a":1,"nested":{"x":2,"y":3},"array":[1,2]}\n{"a":1}\n')],
+  it("normalizes only the exact fixture repository path in both checkpoint locations", () => {
+    const correct = artifacts({
+      result: {
+        kind: "success",
+        success: { recordsWritten: 1, elapsedMs: 1, profileEntries: [] },
+        checkpoint: { repositoryPath: "/fixture", refs: [] },
+      },
+      checkpoint: { repositoryPath: "/fixture", refs: [] },
+    });
+    const wrong = artifacts({
+      result: {
+        kind: "success",
+        success: { recordsWritten: 1, elapsedMs: 2, profileEntries: [] },
+        checkpoint: { repositoryPath: "/wrong", refs: [] },
+      },
+      checkpoint: { repositoryPath: "/wrong", refs: [] },
+    });
+    expect(compareBehavioralArtifacts(correct, wrong, "same-adapter", "/fixture")).toEqual(
+      expect.arrayContaining(["application result differs", "checkpoint differs"]),
+    );
+    expect(frozenBehavioralBaseline(wrong, "/fixture")).not.toEqual(
+      frozenBehavioralBaseline(correct, "/fixture"),
+    );
+  });
+
+  it("compares result and checkpoint objects semantically while preserving arrays and values", () => {
+    const left = artifacts({
+      result: {
+        kind: "success",
+        success: { recordsWritten: 1, refs: ["main", "topic"], elapsedMs: 1, profileEntries: [] },
+      },
+      checkpoint: {
+        repositoryPath: "/fixture",
+        refs: [{ tipOid: "a", ref: "main" }],
+        generatedAt: "fixed",
+      },
     });
     const reordered = artifacts({
-      jsonl: [Buffer.from('{"array":[1,2],"nested":{"y":3,"x":2},"a":1}\n{"a":1}\n')],
+      result: {
+        success: { profileEntries: [], elapsedMs: 2, refs: ["main", "topic"], recordsWritten: 1 },
+        kind: "success",
+      },
+      checkpoint: {
+        generatedAt: "fixed",
+        refs: [{ ref: "main", tipOid: "a" }],
+        repositoryPath: "/fixture",
+      },
+    });
+    expect(compareBehavioralArtifacts(left, reordered, "same-adapter", "/fixture")).toEqual([]);
+    const changedArray = artifacts({
+      ...reordered,
+      result: {
+        kind: "success",
+        success: { recordsWritten: 1, refs: ["topic", "main"], elapsedMs: 2, profileEntries: [] },
+      },
+    });
+    expect(compareBehavioralArtifacts(left, changedArray, "same-adapter", "/fixture")).toContain(
+      "application result differs",
+    );
+    const changedValue = artifacts({
+      ...reordered,
+      checkpoint: {
+        repositoryPath: "/fixture",
+        refs: [{ ref: "main", tipOid: "b" }],
+        generatedAt: "fixed",
+      },
+    });
+    expect(compareBehavioralArtifacts(left, changedValue, "same-adapter", "/fixture")).toContain(
+      "checkpoint differs",
+    );
+  });
+
+  it("treats filename as same-adapter and frozen baseline data but ignores it cross-adapter", () => {
+    const original = artifacts({ jsonl: [file('{"oid":"a"}\n', "first.jsonl")] });
+    const renamed = artifacts({ jsonl: [file('{"oid":"a"}\n', "renamed.jsonl")] });
+    expect(compareBehavioralArtifacts(original, renamed)).toContain(
+      "JSONL filename, file sequence, or bytes differ",
+    );
+    expect(compareBehavioralArtifacts(original, renamed, "cross-adapter")).toEqual([]);
+    expect(frozenBehavioralBaseline(original, "/tmp/repo")).not.toEqual(
+      frozenBehavioralBaseline(renamed, "/tmp/repo"),
+    );
+  });
+
+  it("canonicalizes object keys but preserves array order and record multiplicity", () => {
+    const canonical = artifacts({
+      jsonl: [file('{"a":1,"nested":{"x":2,"y":3},"array":[1,2]}\n{"a":1}\n')],
+    });
+    const reordered = artifacts({
+      jsonl: [file('{"array":[1,2],"nested":{"y":3,"x":2},"a":1}\n{"a":1}\n')],
     });
     expect(compareBehavioralArtifacts(canonical, reordered, "cross-adapter")).toEqual([]);
     const arrayChanged = artifacts({
-      jsonl: [Buffer.from('{"a":1,"nested":{"x":2,"y":3},"array":[2,1]}\n{"a":1}\n')],
+      jsonl: [file('{"a":1,"nested":{"x":2,"y":3},"array":[2,1]}\n{"a":1}\n')],
     });
     expect(compareBehavioralArtifacts(canonical, arrayChanged, "cross-adapter")).toContain(
       "JSONL semantic record sets differ",
     );
     const multiplicityChanged = artifacts({
-      jsonl: [Buffer.from('{"a":1,"nested":{"x":2,"y":3},"array":[1,2]}\n')],
+      jsonl: [file('{"a":1,"nested":{"x":2,"y":3},"array":[1,2]}\n')],
     });
     expect(compareBehavioralArtifacts(canonical, multiplicityChanged, "cross-adapter")).toContain(
       "JSONL semantic record sets differ",
@@ -218,6 +306,15 @@ describe("frozen migration-before legacy behavioral baselines", () => {
           async (profile) => await runLegacyBaseline(repository, adapter, profile, scenario),
           repository.directory,
         );
+        if (scenario.id === "output_rotation") {
+          expect(modes.disabled.jsonl.map((file) => file.name)).toEqual([
+            "baseline-20240203T040506Z-000001.jsonl",
+            "baseline-20240203T040506Z-000002.jsonl",
+            "baseline-20240203T040506Z-000003.jsonl",
+            "baseline-20240203T040506Z-000004.jsonl",
+            "baseline-20240203T040506Z-000005.jsonl",
+          ]);
+        }
         expect(
           modes.disabled.result,
           `${adapter} ${scenario.id}: ${JSON.stringify(modes.disabled.result)}`,

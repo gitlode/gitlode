@@ -133,4 +133,22 @@ describe("accepted telemetry catalog contract", () => {
       ]),
     );
   });
+  it("rejects malformed and unsupported span parent policies", () => {
+    const catalogs = clone(accepted);
+    const spans = catalogs.spans.spans as Record<string, unknown>[];
+    spans[1]!.parent = { type: "span" };
+    spans[3]!.parent = { type: "explicit_span_context", ref: 42 };
+    spans[0]!.parent = { type: "unknown" };
+    spans[4]!.parent = { type: "active_caller", ref: "run" };
+    spans[5]!.parent = { type: "root", ref: "run" };
+    expect(validateTelemetryCatalogs(catalogs)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("parent span requires string ref"),
+        expect.stringContaining("parent explicit_span_context requires string ref"),
+        expect.stringContaining("unknown parent type"),
+        expect.stringContaining("parent active_caller must not define ref"),
+        expect.stringContaining("parent root must not define ref"),
+      ]),
+    );
+  });
 });

@@ -13,3 +13,5 @@ and coding agents need while changing the codebase.
   release bundle, package validation, and publish-gate workflow.
 - [`lint-policy.md`](lint-policy.md): oxlint rule adoption policy, including rule category handling,
   LLM autonomy boundaries, severity, and review cadence.
+- [`telemetry-performance-harness.md`](telemetry-performance-harness.md): reference calibration,
+  legacy baseline capture, and migration comparison workflow.

@@ -14,6 +14,7 @@ export interface PerformanceBehavior {
   readonly checkpoint: unknown;
   readonly jsonl: readonly JsonlArtifact[];
   readonly derived: DerivedOutput;
+  readonly captureErrors: readonly string[];
 }
 const filename = /^(.*)-(\d{8}T\d{6}Z)-(\d{6})(\.jsonl)$/;
 export function normalizePerformanceFilename(name: string): string {
@@ -40,6 +41,15 @@ export function comparePerformanceBehavior(
   input: { repositoryPath: string; baselineGeneratedAt: string; candidateGeneratedAt: string },
 ): string[] {
   const errors: string[] = [];
+  errors.push(...baseline.captureErrors, ...candidate.captureErrors);
+  const baselineCheckpoint = baseline.checkpoint as Record<string, unknown> | null;
+  const candidateCheckpoint = candidate.checkpoint as Record<string, unknown> | null;
+  if (!baselineCheckpoint) errors.push("baseline checkpoint is missing or malformed");
+  if (!candidateCheckpoint) errors.push("candidate checkpoint is missing or malformed");
+  if (baselineCheckpoint?.repositoryPath !== input.repositoryPath)
+    errors.push("baseline checkpoint repositoryPath differs from harness repository");
+  if (candidateCheckpoint?.repositoryPath !== input.repositoryPath)
+    errors.push("candidate checkpoint repositoryPath differs from harness repository");
   if (JSON.stringify(baseline.exit) !== JSON.stringify(candidate.exit))
     errors.push("exit classification differs");
   if (JSON.stringify(baseline.derived) !== JSON.stringify(candidate.derived))
@@ -75,15 +85,34 @@ export function comparePerformanceBehavior(
 }
 export function performanceBehaviorEvidence(behavior: PerformanceBehavior, repositoryPath: string) {
   const generatedAt = (behavior.checkpoint as { generatedAt?: unknown } | null)?.generatedAt;
-  if (typeof generatedAt !== "string") throw new Error("checkpoint generatedAt unavailable");
-  return {
-    exit: behavior.exit,
-    checkpoint: normalizeCheckpoint(behavior.checkpoint, repositoryPath, generatedAt),
-    derived: behavior.derived,
-    files: behavior.jsonl.map(({ name, bytes }) => ({
-      name: normalizePerformanceFilename(name),
+  const evidenceErrors = [...behavior.captureErrors];
+  if (typeof generatedAt !== "string") evidenceErrors.push("checkpoint generatedAt unavailable");
+  const checkpoint =
+    typeof generatedAt === "string"
+      ? normalizeCheckpoint(behavior.checkpoint, repositoryPath, generatedAt)
+      : behavior.checkpoint;
+  if (
+    (behavior.checkpoint as { repositoryPath?: unknown } | null)?.repositoryPath !== repositoryPath
+  )
+    evidenceErrors.push("checkpoint repositoryPath differs from harness repository");
+  const files = behavior.jsonl.map(({ name, bytes }) => {
+    let normalizedName = name;
+    try {
+      normalizedName = normalizePerformanceFilename(name);
+    } catch {
+      evidenceErrors.push(`invalid gitlode output filename: ${name}`);
+    }
+    return {
+      name: normalizedName,
       sha256: createHash("sha256").update(bytes).digest("hex"),
       bytes: bytes.byteLength,
-    })),
+    };
+  });
+  return {
+    exit: behavior.exit,
+    checkpoint,
+    derived: behavior.derived,
+    files,
+    captureErrors: [...new Set(evidenceErrors)],
   };
 }

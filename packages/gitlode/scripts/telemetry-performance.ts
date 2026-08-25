@@ -17,6 +17,7 @@ import {
 } from "../test/support/performance-fixtures.js";
 import {
   calibrationComplete,
+  calibrationTargetRecipeHash,
   canonicalManifest,
   environmentCompatibility,
   evaluateComparison,
@@ -26,20 +27,22 @@ import {
   median,
   nextCalibrationQuantity,
   pairPlan,
+  sealedManifestHash,
   type CalibrationTarget,
   type EnvironmentFingerprint,
   type FixtureManifest,
   type FixtureQuantities,
   type ProfileState,
   type RawRun,
-  validateCalibrationMatrix,
 } from "../test/support/performance-harness.js";
 import {
   calibrationKey,
   parseAdapter,
+  parseComparison,
   parseFixture,
-  parseState,
   requireTarget,
+  rotationLinesFor,
+  validateFixtureManifest,
   type RepositoryFixture,
 } from "../test/support/performance-workflow.js";
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
@@ -64,7 +67,7 @@ async function main() {
     option("manifest", join(packageDirectory, "test/fixtures/performance/manifest.json")),
   );
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as FixtureManifest;
-  const matrixErrors = validateCalibrationMatrix(manifest);
+  const matrixErrors = validateFixtureManifest(manifest);
   if (matrixErrors.length) throw new Error(matrixErrors.join("; "));
   const fixture = parseFixture(option("fixture"));
   if (fixture === "aggregation_scale")
@@ -73,10 +76,16 @@ async function main() {
     );
   const adapter = parseAdapter(option("adapter"));
   const target = requireTarget(manifest, fixture, adapter, mode !== "calibrate");
-  const cli = resolve(option("baseline-cli"));
-  const legacyRevision = option("legacy-revision");
-  const candidateState = mode === "measure" ? parseState(option("candidate-state")) : undefined;
-  const candidateCli = mode === "measure" ? resolve(option("candidate-cli")) : undefined;
+  const comparison = mode === "measure" ? parseComparison(option("comparison")) : undefined;
+  const legacyCli =
+    mode !== "measure" || comparison === "disabled_overhead"
+      ? resolve(option("baseline-cli"))
+      : undefined;
+  const legacyRevision =
+    mode !== "measure" || comparison === "disabled_overhead"
+      ? option("legacy-revision")
+      : undefined;
+  const targetCli = mode === "measure" ? resolve(option("candidate-cli")) : undefined;
   const candidateRevision = mode === "measure" ? option("candidate-revision") : undefined;
   const artifacts = resolve(option("artifacts", join(packageDirectory, ".benchmark-artifacts")));
   const originalManifest = await readFile(manifestPath);
@@ -84,17 +93,40 @@ async function main() {
     let quantity = target.quantities.commits;
     let calibrationRuns: readonly RawRun[] = [];
     for (;;) {
-      const pilot = await executeSingle(manifest, fixture, adapter, cli, "legacy_off", quantity);
+      const pilot = await executeSingle(
+        manifest,
+        fixture,
+        adapter,
+        legacyCli as string,
+        "legacy_off",
+        quantity,
+      );
       try {
-        const measured = pilot.runs.filter((run) => run.phase === "measured");
+        const measured = pilot.baseline.filter((run) => run.phase === "measured");
+        const pilotErrors = await validateLegacy(
+          pilot,
+          { ...target.quantities, commits: quantity },
+          fixture,
+        );
         if (measured.some((run) => run.exit.code !== 0))
-          throw new Error("calibration child failed");
+          pilotErrors.push("calibration child failed");
+        if (pilotErrors.length) {
+          await mkdir(artifacts, { recursive: true });
+          await writeFile(
+            join(
+              artifacts,
+              `${calibrationKey(fixture, adapter).replace("/", "-")}-calibration-failure.json`,
+            ),
+            `${JSON.stringify({ schemaVersion: 2, kind: "calibration-failure", fixture, adapter, legacyRevision, quantities: { ...target.quantities, commits: quantity }, calibrationTargetRecipeHash: calibrationTargetRecipeHash(manifest, calibrationKey(fixture, adapter), { ...target.quantities, commits: quantity }), errors: [...new Set(pilotErrors)], runs: pilot.baseline, behaviorEvidence: pilot.baseline.filter((run) => run.phase === "measured").map((run) => performanceBehaviorEvidence(pilot.behavior.get(run.runId) as PerformanceBehavior, pilot.repositoryPath)) }, undefined, 2)}\n`,
+          );
+          throw new Error(`calibration behavior validation failed: ${pilotErrors.join("; ")}`);
+        }
         const decision = nextCalibrationQuantity(
           quantity,
           median(measured.map((run) => run.elapsedMs)),
         );
         if (decision.complete) {
-          calibrationRuns = pilot.runs;
+          calibrationRuns = pilot.baseline;
           break;
         }
         quantity = decision.quantity;
@@ -121,12 +153,14 @@ async function main() {
         },
       },
     };
+    const targetRecipeHash = calibrationTargetRecipeHash(updated, key);
     const calibrationEnvironment = await makeFingerprint(
       updated,
       adapter,
       "legacy_off",
-      legacyRevision,
+      legacyRevision as string,
       scriptRevision,
+      targetRecipeHash,
     );
     await mkdir(artifacts, { recursive: true });
     await writeFile(
@@ -135,7 +169,7 @@ async function main() {
     );
     await writeFile(
       join(artifacts, artifactRef),
-      `${JSON.stringify({ schemaVersion: 2, fixture, adapter, legacyRevision, benchmarkScriptRevision: scriptRevision, fixtureRecipeHash: fixtureRecipeHash(updated), quantities: { ...target.quantities, commits: quantity }, environmentRef, runs: calibrationRuns }, undefined, 2)}\n`,
+      `${JSON.stringify({ schemaVersion: 2, fixture, adapter, legacyRevision, benchmarkScriptRevision: scriptRevision, calibrationTargetRecipeHash: targetRecipeHash, sealedManifestHash: sealedManifestHash(updated), quantities: { ...target.quantities, commits: quantity }, environmentRef, runs: calibrationRuns }, undefined, 2)}\n`,
     );
     await writeFile(manifestPath, canonicalManifest(updated));
     process.stdout.write(`calibrated ${key}; allComplete=${calibrationComplete(updated)}\n`);
@@ -144,22 +178,46 @@ async function main() {
   const benchmarkScriptRevision = (
     await exec("git", ["-C", resolve(packageDirectory, "../.."), "rev-parse", "HEAD"])
   ).stdout.trim();
+  const baselineSpec =
+    mode === "capture-legacy"
+      ? {
+          cli: legacyCli as string,
+          state: "legacy_off" as const,
+          revision: legacyRevision as string,
+        }
+      : comparison === "disabled_overhead"
+        ? {
+            cli: legacyCli as string,
+            state: "legacy_off" as const,
+            revision: legacyRevision as string,
+          }
+        : {
+            cli: targetCli as string,
+            state: "target_off" as const,
+            revision: candidateRevision as string,
+          };
   const candidate =
     mode === "measure"
       ? {
-          cli: candidateCli as string,
-          state: candidateState as ProfileState,
+          cli: targetCli as string,
+          state:
+            comparison === "disabled_overhead" ? ("target_off" as const) : ("target_on" as const),
           revision: candidateRevision as string,
         }
       : undefined;
-  const workflow = await executePaired(manifest, fixture, adapter, cli, candidate);
+  const workflow = await executePaired(manifest, fixture, adapter, baselineSpec, candidate);
   try {
+    const formalTargetRecipeHash = calibrationTargetRecipeHash(
+      manifest,
+      calibrationKey(fixture, adapter),
+    );
     const environment = await makeFingerprint(
       manifest,
       adapter,
-      "legacy_off",
-      legacyRevision,
+      baselineSpec.state,
+      baselineSpec.revision,
       benchmarkScriptRevision,
+      formalTargetRecipeHash,
     );
     const candidateEnvironment = candidate
       ? await makeFingerprint(
@@ -168,6 +226,7 @@ async function main() {
           candidate.state,
           candidate.revision,
           benchmarkScriptRevision,
+          formalTargetRecipeHash,
         )
       : undefined;
     const behaviorErrors = candidate
@@ -175,7 +234,7 @@ async function main() {
       : await validateLegacy(workflow, target.quantities, fixture);
     const evaluation = candidate
       ? evaluateComparison({
-          kind: candidate.state === "target_on" ? "profile_overhead" : "disabled_overhead",
+          kind: comparison as "disabled_overhead" | "profile_overhead",
           baseline: workflow.baseline.filter((r) => r.phase === "measured"),
           candidate: workflow.candidate.filter((r) => r.phase === "measured"),
           environmentErrors: environmentCompatibility(
@@ -199,17 +258,34 @@ async function main() {
       fixture,
       adapter,
       manifest,
-      fixtureHash: fixtureRecipeHash(manifest),
+      calibrationTargetRecipeHash: calibrationTargetRecipeHash(
+        manifest,
+        calibrationKey(fixture, adapter),
+      ),
+      sealedManifestHash: sealedManifestHash(manifest),
       calibrationProvenance: target,
+      comparison,
       revisions: {
-        legacy: legacyRevision,
+        baseline: baselineSpec.revision,
         candidate: candidate?.revision,
         benchmarkScript: benchmarkScriptRevision,
       },
       environment: { baseline: environment, candidate: candidateEnvironment },
       pairOrder: pairPlan(),
       behavioralValidation: { passed: behaviorErrors.length === 0, errors: behaviorErrors },
-      behaviorEvidence: measuredEvidence,
+      behaviorEvidence: {
+        baseline: measuredEvidence,
+        candidate: candidate
+          ? workflow.candidate
+              .filter((run) => run.phase === "measured")
+              .map((run) =>
+                performanceBehaviorEvidence(
+                  workflow.behavior.get(run.runId) as PerformanceBehavior,
+                  workflow.repositoryPath,
+                ),
+              )
+          : undefined,
+      },
       expectedQuantities: target.quantities,
       runs: { baseline: workflow.baseline, candidate: candidate ? workflow.candidate : undefined },
       evaluation,
@@ -233,6 +309,7 @@ async function makeFingerprint(
   state: ProfileState,
   revision: string,
   script: string,
+  recipeHash = fixtureRecipeHash(manifest),
 ) {
   return await fingerprint({
     npmVersion: (await exec("npm", ["--version"])).stdout.trim(),
@@ -240,7 +317,7 @@ async function makeFingerprint(
     gitAdapter: adapter,
     buildMode: "release-bundled",
     repositoryRevision: revision,
-    fixtureManifestHash: fixtureRecipeHash(manifest),
+    fixtureManifestHash: recipeHash,
     benchmarkScriptRevision: script,
     profileState: state,
     warmupCount: 2,
@@ -258,7 +335,7 @@ async function executePaired(
   manifest: FixtureManifest,
   fixture: RepositoryFixture,
   adapter: "isomorphic-git" | "git-cli",
-  baselineCli: string,
+  baselineSpec: { cli: string; state: ProfileState; revision: string },
   candidate?: { cli: string; state: ProfileState; revision: string },
 ): Promise<Execution> {
   const root = await mkdtemp(join(tmpdir(), "gitlode-performance-"));
@@ -286,7 +363,7 @@ async function executePaired(
         : 0;
     const rotationLines =
       fixture === "file_heavy_repository"
-        ? Math.ceil(changedFiles / quantities.rotations)
+        ? rotationLinesFor(changedFiles, quantities.rotations)
         : undefined;
     const baseline: RawRun[] = [],
       candidates: RawRun[] = [],
@@ -296,14 +373,14 @@ async function executePaired(
       const states = candidate
         ? planned.order === "A-B"
           ? [
-              ["legacy_off", baselineCli, baseline],
+              [baselineSpec.state, baselineSpec.cli, baseline],
               [candidate.state, candidate.cli, candidates],
             ]
           : [
               [candidate.state, candidate.cli, candidates],
-              ["legacy_off", baselineCli, baseline],
+              [baselineSpec.state, baselineSpec.cli, baseline],
             ]
-        : [["legacy_off", baselineCli, baseline]];
+        : [[baselineSpec.state, baselineSpec.cli, baseline]];
       for (const [state, cli, destination] of states as [ProfileState, string, RawRun[]][]) {
         const output = join(root, `output-${ordinal}`),
           checkpoint = join(root, `state-${ordinal}.json`);
@@ -372,17 +449,32 @@ async function executeSingle(
       },
     },
   };
-  const execution = await executePaired(temporary, fixture, adapter, cli);
-  return { runs: execution.baseline, cleanup: execution.cleanup };
+  const execution = await executePaired(temporary, fixture, adapter, {
+    cli,
+    state,
+    revision: "calibration-pilot",
+  });
+  return execution;
 }
 async function behaviorFor(
   run: RawRun,
   output: string,
   checkpointPath: string,
 ): Promise<PerformanceBehavior> {
-  const jsonl = await readJsonlArtifacts(output);
-  const checkpoint =
-    run.exit.code === 0 ? JSON.parse(await readFile(checkpointPath, "utf8")) : null;
+  const captureErrors = [...run.captureErrors];
+  let jsonl = [] as Awaited<ReturnType<typeof readJsonlArtifacts>>;
+  try {
+    jsonl = await readJsonlArtifacts(output);
+  } catch {
+    captureErrors.push("output artifacts are unreadable");
+  }
+  let checkpoint: unknown = null;
+  if (run.exit.code === 0)
+    try {
+      checkpoint = JSON.parse(await readFile(checkpointPath, "utf8"));
+    } catch {
+      captureErrors.push("checkpoint is missing or malformed");
+    }
   const derived: DerivedOutput = {
     records: run.records.status === "available" ? run.records.value : 0,
     commits: run.commits.status === "available" ? run.commits.value : 0,
@@ -390,12 +482,13 @@ async function behaviorFor(
     files: run.outputFiles.length,
     bytes: run.outputBytes,
   };
-  return { exit: run.exit, checkpoint, jsonl, derived };
+  if (typeof (checkpoint as { generatedAt?: unknown } | null)?.generatedAt !== "string")
+    captureErrors.push("checkpoint generatedAt unavailable");
+  return { exit: run.exit, checkpoint, jsonl, derived, captureErrors };
 }
 function generatedAt(behavior: PerformanceBehavior): string {
   const value = behavior.checkpoint as { generatedAt?: unknown };
-  if (typeof value?.generatedAt !== "string") throw new Error("checkpoint generatedAt unavailable");
-  return value.generatedAt;
+  return typeof value?.generatedAt === "string" ? value.generatedAt : "<missing-generatedAt>";
 }
 async function compareAll(
   workflow: Execution,
@@ -451,6 +544,11 @@ async function validateLegacy(
       errors.push("legacy child process failure");
       continue;
     }
+    if (
+      (behavior.checkpoint as { repositoryPath?: unknown } | null)?.repositoryPath !==
+      workflow.repositoryPath
+    )
+      errors.push("checkpoint repositoryPath differs from harness repository");
     errors.push(...fixtureInvariantErrors(fixture, quantities, behavior));
     if (first && behavior !== first)
       errors.push(
@@ -469,6 +567,7 @@ export function fixtureInvariantErrors(
   behavior: PerformanceBehavior,
 ): string[] {
   const errors: string[] = [];
+  errors.push(...behavior.captureErrors);
   if (behavior.derived.commits !== quantities.commits)
     errors.push(`fixture commit count differs: expected ${quantities.commits}`);
   if (fixture === "commit_heavy_repository" && behavior.derived.records !== quantities.commits)

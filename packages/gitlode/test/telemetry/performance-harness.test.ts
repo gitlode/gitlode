@@ -95,6 +95,7 @@ const run = (elapsedMs: number, rss = 100 * 1024 ** 2, code = 0, pairIndex = 0):
   skippedDiffs: { status: "unavailable", reason: "test" },
   telemetry: unavailableTargetTelemetry("legacy_off"),
   runId: `measured-${pairIndex}-legacy_off`,
+  captureErrors: [],
 });
 
 describe("performance harness contracts", () => {
@@ -288,6 +289,7 @@ describe("performance harness contracts", () => {
       checkpoint: { repositoryPath: "/repo", generatedAt },
       jsonl: [{ name, bytes: Buffer.from(bytes) }],
       derived: { records: 1, commits: 1, skippedDiffs: 0, files: 1, bytes: 4 },
+      captureErrors: [],
     });
     const left = artifact("prefix-20240101T010203Z-000001.jsonl");
     const input = {

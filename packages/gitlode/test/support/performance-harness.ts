@@ -103,6 +103,34 @@ export function fixtureRecipeHash(manifest: FixtureManifest): string {
     )
     .digest("hex");
 }
+export function calibrationTargetRecipeHash(
+  manifest: FixtureManifest,
+  targetKey: string,
+  quantities = manifest.calibrationTargets[targetKey]?.quantities,
+): string {
+  if (
+    !requiredCalibrationTargets.includes(
+      targetKey as (typeof requiredCalibrationTargets)[number],
+    ) ||
+    !quantities
+  )
+    throw new Error(`unknown calibration target: ${targetKey}`);
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        canonical({
+          schemaVersion: manifest.schemaVersion,
+          recipeRevision: manifest.recipeRevision,
+          targetKey,
+          quantities,
+        }),
+      ),
+    )
+    .digest("hex");
+}
+export function sealedManifestHash(manifest: FixtureManifest): string | undefined {
+  return calibrationComplete(manifest) ? manifestHash(manifest) : undefined;
+}
 
 export interface EnvironmentFingerprint {
   readonly os: { readonly name: string; readonly version: string };
@@ -279,6 +307,7 @@ export interface RawRun {
   readonly skippedDiffs: Availability<number>;
   readonly telemetry: TargetTelemetryMeasurements;
   readonly runId: string;
+  readonly captureErrors: readonly string[];
 }
 export async function launchMeasuredChild(input: {
   readonly executable: string;
@@ -311,12 +340,15 @@ export async function launchMeasuredChild(input: {
   const contents = await Promise.all(
     outputFiles.map(async (name) => await readFile(join(input.outputDirectory, name), "utf8")),
   );
-  const records = contents.flatMap((content) =>
-    content
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as Record<string, unknown>),
-  );
+  const captureErrors: string[] = [];
+  const records: Record<string, unknown>[] = [];
+  for (const content of contents)
+    for (const line of content.split("\n").filter(Boolean))
+      try {
+        records.push(JSON.parse(line) as Record<string, unknown>);
+      } catch {
+        captureErrors.push("unreadable JSONL record");
+      }
   const commitOids = new Set(
     records.map((record) => record.oid).filter((oid): oid is string => typeof oid === "string"),
   );
@@ -344,6 +376,7 @@ export async function launchMeasuredChild(input: {
     skippedDiffs: { status: "available", value: skippedDiffs },
     telemetry: unavailableTargetTelemetry(input.state),
     runId: `${input.phase}-${input.pairIndex ?? 0}-${input.state}`,
+    captureErrors,
   };
 }
 

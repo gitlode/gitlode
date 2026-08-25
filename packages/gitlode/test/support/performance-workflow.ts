@@ -1,4 +1,8 @@
-import type { CalibrationTarget, FixtureManifest } from "./performance-harness.js";
+import {
+  validateCalibrationMatrix,
+  type CalibrationTarget,
+  type FixtureManifest,
+} from "./performance-harness.js";
 
 export const repositoryFixtures = [
   "commit_heavy_repository",
@@ -19,6 +23,10 @@ export function parseState(value: string): "target_off" | "target_on" {
   if (value === "target_off" || value === "target_on") return value;
   throw new Error(`invalid candidate state: ${value}`);
 }
+export function parseComparison(value: string): "disabled_overhead" | "profile_overhead" {
+  if (value === "disabled_overhead" || value === "profile_overhead") return value;
+  throw new Error(`invalid comparison: ${value}`);
+}
 export function calibrationKey(fixture: RepositoryFixture, adapter: "isomorphic-git" | "git-cli") {
   return `${fixture}/${adapter}`;
 }
@@ -37,4 +45,53 @@ export function requireTarget(
       `formal measurement requires completed calibration: ${calibrationKey(fixture, adapter)}`,
     );
   return target;
+}
+
+export function validateFixtureManifest(value: unknown): string[] {
+  const errors: string[] = [];
+  if (!value || typeof value !== "object") return ["manifest must be an object"];
+  const manifest = value as Partial<FixtureManifest>;
+  if (manifest.schemaVersion !== 2) errors.push("manifest schemaVersion must be 2");
+  if (typeof manifest.recipeRevision !== "string" || !manifest.recipeRevision)
+    errors.push("manifest recipeRevision is required");
+  if (!manifest.calibrationTargets || typeof manifest.calibrationTargets !== "object")
+    errors.push("manifest calibrationTargets are required");
+  else {
+    errors.push(...validateCalibrationMatrix(manifest as FixtureManifest));
+    for (const [key, target] of Object.entries(manifest.calibrationTargets)) {
+      if (!target || (target.status !== "complete" && target.status !== "incomplete")) {
+        errors.push(`${key} has invalid status`);
+        continue;
+      }
+      const quantities = target.quantities;
+      for (const name of ["commits", "files", "plugins", "rotations", "scale"] as const)
+        if (!Number.isSafeInteger(quantities?.[name]) || (quantities?.[name] ?? -1) < 0)
+          errors.push(`${key} has invalid ${name} quantity`);
+      if (target.status === "complete" && (!target.environmentRef || !target.artifactRef))
+        errors.push(`${key} complete target requires environmentRef and artifactRef`);
+      if (target.status === "incomplete" && !target.reason)
+        errors.push(`${key} incomplete target requires reason`);
+    }
+  }
+  const aggregation = manifest.aggregationScale;
+  if (
+    aggregation?.status !== "fixed-recipe" ||
+    aggregation.integration !== "pending-target-collector" ||
+    !Number.isSafeInteger(aggregation.quantities?.scale) ||
+    (aggregation.quantities?.scale ?? 0) <= 0
+  )
+    errors.push("aggregationScale recipe is invalid");
+  return errors;
+}
+export function rotationLinesFor(records: number, rotations: number): number {
+  if (
+    !Number.isSafeInteger(records) ||
+    !Number.isSafeInteger(rotations) ||
+    records < 1 ||
+    rotations < 1
+  )
+    throw new Error("rotation recipe requires positive integer records and rotations");
+  for (let lines = 1; lines <= records; lines++)
+    if (Math.ceil(records / lines) === rotations) return lines;
+  throw new Error(`cannot produce exactly ${rotations} rotations from ${records} records`);
 }

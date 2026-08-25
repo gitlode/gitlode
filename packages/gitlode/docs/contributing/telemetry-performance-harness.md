@@ -27,10 +27,10 @@ repository fixtures with both adapters and plugin-heavy/isomorphic-git are compl
 environment reference and calibration artifact reference for every target.
 
 `calibrationTargets[*].quantities` is the sole authoritative source for repository execution; there
-is no second fixture-wide quantity that can overwrite adapter-specific calibration. The immutable
-fixture recipe hash covers schema version, recipe revision, all selected target quantities, and the
-aggregation recipe, but excludes mutable completion status and artifact references. Calibration
-fingerprints and artifacts store that recipe hash after the selected quantity has been applied.
+is no second fixture-wide quantity that can overwrite adapter-specific calibration. Each calibration
+artifact uses a target-scoped recipe hash over schema version, recipe revision, target identity, and
+that target's selected quantities. Later calibration of another target therefore cannot invalidate
+it. A separate sealed manifest hash exists only after the exact five-target matrix is complete.
 
 Capture legacy baseline artifacts without a target implementation:
 
@@ -38,13 +38,21 @@ Capture legacy baseline artifacts without a target implementation:
 npm run performance:capture-legacy -w gitlode -- --fixture commit_heavy_repository --adapter isomorphic-git --baseline-cli /abs/legacy/dist/index.js --legacy-revision <legacy-git-oid> --artifacts /abs/artifacts
 ```
 
-Run comparison measurement only after that target is complete:
+Run disabled overhead only after that target is complete. This compares the legacy CLI with profile
+off against the target CLI with profile off:
 
 ```bash
-npm run performance:measure -w gitlode -- --fixture commit_heavy_repository --adapter git-cli --baseline-cli /abs/legacy/dist/index.js --legacy-revision <legacy-git-oid> --candidate-cli /abs/target/dist/index.js --candidate-revision <target-git-oid> --candidate-state target_off --artifacts /abs/artifacts
+npm run performance:measure -w gitlode -- --comparison disabled_overhead --fixture commit_heavy_repository --adapter git-cli --baseline-cli /abs/legacy/dist/index.js --legacy-revision <legacy-git-oid> --candidate-cli /abs/target/dist/index.js --candidate-revision <target-git-oid> --artifacts /abs/artifacts
 ```
 
-Use `target_on` for profiling comparison. Artifacts record separate legacy, candidate, and benchmark
+Run profile overhead with the same target CLI and revision on both sides; the harness supplies
+`target_off` without `--profile`, then `target_on` with `--profile`:
+
+```bash
+npm run performance:measure -w gitlode -- --comparison profile_overhead --fixture commit_heavy_repository --adapter git-cli --candidate-cli /abs/target/dist/index.js --candidate-revision <target-git-oid> --artifacts /abs/artifacts
+```
+
+Artifacts record separate baseline, candidate, and benchmark
 script revisions; the completed manifest/hash and calibration provenance; fingerprints; raw
 warmups/measured pairs; child exit and RSS samples; output/checkpoint behavior; and evaluation.
 Legacy artifacts also contain normalized checkpoint/filename evidence plus SHA-256 for each exact
@@ -56,6 +64,9 @@ rotation count and at least one skipped diff.
 Formal fail or inconclusive results are saved and then return a nonzero command status. Measurement
 never changes the manifest. Re-run environmental interference with the unchanged manifest and do
 not relax catalog thresholds.
+Malformed checkpoint, missing `generatedAt`, invalid filename, unreadable JSONL, and incorrect
+repository path are structured behavioral errors. Available raw runs, normalized evidence, capture
+errors, fixture/revision identity, and target-scoped provenance are written before a nonzero exit.
 
 The checked-in targets remain explicitly incomplete because this shared container is not an
 approved reference host. No formal calibration or legacy artifact has been claimed. T13 remains

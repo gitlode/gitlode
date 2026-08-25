@@ -40,7 +40,7 @@ describe("accepted telemetry catalog contract", () => {
       expect.arrayContaining([
         expect.stringContaining("duplicate span id"),
         expect.stringContaining("duplicate span name"),
-        expect.stringContaining("duplicate profile view placement"),
+        expect.stringContaining("duplicate span profile view placement"),
       ]),
     );
   });
@@ -55,7 +55,7 @@ describe("accepted telemetry catalog contract", () => {
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("unknown attribute"),
-        expect.stringContaining("unknown observation"),
+        expect.stringContaining("non-metric observation"),
       ]),
     );
   });
@@ -71,7 +71,7 @@ describe("accepted telemetry catalog contract", () => {
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("not referenced"),
-        expect.stringMatching(/has 0 profile view placements/),
+        expect.stringMatching(/accepted metric .* has 0 profile view placements/),
       ]),
     );
   });
@@ -90,6 +90,46 @@ describe("accepted telemetry catalog contract", () => {
         expect.stringContaining("no label"),
         expect.stringContaining("schemaVersion"),
         expect.stringContaining("boundary cases"),
+      ]),
+    );
+  });
+  it("rejects invalid parent and cross-signal profile placements", () => {
+    const catalogs = clone(accepted);
+    const spans = catalogs.spans.spans as Record<string, unknown>[];
+    spans[3]!.parent = { type: "explicit_span_context", ref: "missing_parent" };
+    const spanGroups = catalogs.profileView.span_groups as Record<string, unknown>[];
+    (spanGroups[0]!.observations as Record<string, unknown>[])[0]!.ref = (
+      catalogs.metrics.metrics as Record<string, unknown>[]
+    )[0]!.id;
+    const metricGroups = catalogs.profileView.metric_groups as Record<string, unknown>[];
+    (metricGroups[0]!.observations as Record<string, unknown>[])[0]!.ref = spans[0]!.id;
+    expect(validateTelemetryCatalogs(catalogs)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("unknown parent span: missing_parent"),
+        expect.stringContaining("span profile group references non-span observation"),
+        expect.stringContaining("metric profile group references non-metric observation"),
+      ]),
+    );
+  });
+  it("rejects missing and non-string required identity fields", () => {
+    const catalogs = clone(accepted);
+    delete (catalogs.spans.spans as Record<string, unknown>[])[0]!.id;
+    (catalogs.metrics.metrics as Record<string, unknown>[])[0]!.name = 42;
+    delete (catalogs.attributes.attributes as Record<string, unknown>[])[0]!.key;
+    delete (catalogs.profileView.span_groups as Record<string, unknown>[])[0]!.id;
+    delete (
+      (catalogs.profileView.metric_groups as Record<string, unknown>[])[0]!.observations as Record<
+        string,
+        unknown
+      >[]
+    )[0]!.ref;
+    expect(validateTelemetryCatalogs(catalogs)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("span 0 requires string id"),
+        expect.stringContaining("metric 0 requires string name"),
+        expect.stringContaining("attribute 0 requires string key"),
+        expect.stringContaining("span profile group 0 requires string id"),
+        expect.stringContaining("metric profile observation 0:0 requires string ref"),
       ]),
     );
   });

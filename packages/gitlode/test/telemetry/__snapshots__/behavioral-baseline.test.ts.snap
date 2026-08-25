@@ -1,0 +1,1597 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli built_in_projection profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6356,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli built_in_projection profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6356,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli commit_snapshot profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli commit_snapshot profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli file_snapshot profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6392,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 7,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli file_snapshot profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6392,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 7,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli incremental profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 1423,
+      "commitsTraversed": 3,
+      "filesCreated": 1,
+      "recordsWritten": 3,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli incremental profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 1423,
+      "commitsTraversed": 3,
+      "filesCreated": 1,
+      "recordsWritten": 3,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli multiple_refs profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "overlap",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "release-annotated",
+        "refType": "tag-annotated",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "overlap",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "release-annotated",
+          "refType": "tag-annotated",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+        "overlap",
+        "release-annotated",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli multiple_refs profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "overlap",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "release-annotated",
+        "refType": "tag-annotated",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "overlap",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "release-annotated",
+          "refType": "tag-annotated",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+        "overlap",
+        "release-annotated",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli official_file_type_plugin profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null},"extensions":{"fileType":{"name":"Unknown"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6863,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli official_file_type_plugin profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null},"extensions":{"fileType":{"name":"Unknown"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6863,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli output_rotation profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 5,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with git-cli > git-cli output_rotation profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 5,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git built_in_projection profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6356,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git built_in_projection profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6356,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git commit_snapshot profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git commit_snapshot profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git file_snapshot profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6392,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 7,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git file_snapshot profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":null,"deletions":null}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":null,"deletions":null}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":null,"deletions":null}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6392,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 7,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git incremental profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 1423,
+      "commitsTraversed": 3,
+      "filesCreated": 1,
+      "recordsWritten": 3,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git incremental profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 1423,
+      "commitsTraversed": 3,
+      "filesCreated": 1,
+      "recordsWritten": 3,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git multiple_refs profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "overlap",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "release-annotated",
+        "refType": "tag-annotated",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "overlap",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "release-annotated",
+          "refType": "tag-annotated",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+        "overlap",
+        "release-annotated",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git multiple_refs profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "overlap",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+      {
+        "ref": "release-annotated",
+        "refType": "tag-annotated",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "overlap",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+        {
+          "ref": "release-annotated",
+          "refType": "tag-annotated",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+        "overlap",
+        "release-annotated",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git official_file_type_plugin profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null},"extensions":{"fileType":{"name":"Unknown"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6863,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git official_file_type_plugin profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"deleted","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"binary.dat","status":"added","additions":null,"deletions":null},"extensions":{"fileType":{"name":"Unknown"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-equal.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-minus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"limit-plus-one.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"utf8.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"modified","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"alpha.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"empty.txt","status":"added","additions":0,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"},"file":{"path":"topic.txt","status":"added","additions":1,"deletions":0},"extensions":{"fileType":{"name":"Text"}}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 6863,
+      "commitsTraversed": 5,
+      "filesCreated": 1,
+      "recordsWritten": 12,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 1,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git output_rotation profile disabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 5,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;
+
+exports[`frozen migration-before legacy behavioral baselines > matches frozen baseline for every scenario with isomorphic-git > isomorphic-git output_rotation profile enabled 1`] = `
+{
+  "checkpoint": {
+    "generatedAt": "2024-02-03T04:05:06.000Z",
+    "refs": [
+      {
+        "ref": "main",
+        "refType": "branch",
+        "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+        "updatedAt": "2024-02-03T04:05:06.000Z",
+      },
+    ],
+    "repositoryPath": "<repository>",
+  },
+  "jsonlFiles": [
+    "{"oid":"71f66d2ef520d7085268f14fcf0192fc7174bd48","message":"merge topic\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-05T14:00:00-07:00"},"parents":["f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","ab46144610a44460a6d0a50f5ce304725744fadd"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"f53b9eeb191bfd24bd6aaa25edd88906f3bf2487","message":"main deletion and modification\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-04T13:00:00+00:00"},"parents":["3d86f16da88216b4b7f664f86a957be9af2e98db"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"3d86f16da88216b4b7f664f86a957be9af2e98db","message":"main content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-02T11:00:00-02:00"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"9e8adc21a50a279ee942fe973a20f01c1fc7dfc2","message":"root commit\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-01T10:00:00+01:00"},"parents":[],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+    "{"oid":"ab46144610a44460a6d0a50f5ce304725744fadd","message":"topic content\\n","author":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"committer":{"name":"Gitlode Fixture","email":"fixture@gitlode.invalid","timestamp":"2024-01-03T12:00:00+05:30"},"parents":["9e8adc21a50a279ee942fe973a20f01c1fc7dfc2"],"repository":{"name":"fixture-repository","url":"https://example.invalid/fixture-repository.git"}}
+",
+  ],
+  "result": {
+    "checkpoint": {
+      "generatedAt": "2024-02-03T04:05:06.000Z",
+      "refs": [
+        {
+          "ref": "main",
+          "refType": "branch",
+          "tipOid": "71f66d2ef520d7085268f14fcf0192fc7174bd48",
+          "updatedAt": "2024-02-03T04:05:06.000Z",
+        },
+      ],
+      "repositoryPath": "<repository>",
+    },
+    "kind": "success",
+    "success": {
+      "bytesWritten": 2288,
+      "commitsTraversed": 5,
+      "filesCreated": 5,
+      "recordsWritten": 5,
+      "refs": [
+        "main",
+      ],
+      "skippedDiffs": 0,
+    },
+  },
+}
+`;

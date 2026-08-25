@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extraction";
 import type { AbsoluteDirectoryPath, AbsolutePath } from "@gitlode/internal-foundation/support";
@@ -11,119 +12,188 @@ import type { ExecutionGitAdapterName, WorkerRunInput } from "../../src/executio
 import {
   createDeterministicRepository,
   repositorySemanticSnapshot,
+  type DeterministicRepository,
 } from "../support/deterministic-repository.js";
 import {
   compareBehavioralArtifacts,
+  frozenBehavioralBaseline,
   readJsonlArtifacts,
   verifyProfileEquivalence,
   type BehavioralArtifacts,
 } from "../support/profile-equivalence.js";
 
+const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const directories: string[] = [];
 async function temporary(prefix: string): Promise<string> {
   const value = await mkdtemp(join(tmpdir(), prefix));
   directories.push(value);
   return value;
 }
-afterEach(
-  async () =>
-    await Promise.all(
-      directories
-        .splice(0)
-        .map(async (directory) => await rm(directory, { recursive: true, force: true })),
-    ),
-);
+afterEach(async () => {
+  vi.useRealTimers();
+  await Promise.all(
+    directories
+      .splice(0)
+      .map(async (directory) => await rm(directory, { recursive: true, force: true })),
+  );
+});
 
 function artifacts(overrides: Partial<BehavioralArtifacts> = {}): BehavioralArtifacts {
   return {
-    result: { kind: "success", elapsedMs: 1, profileEntries: [] },
-    checkpoint: { refs: [{ ref: "main", tipOid: "a" }] },
+    result: { kind: "success", success: { recordsWritten: 1, elapsedMs: 1, profileEntries: [] } },
+    checkpoint: { repositoryPath: "/tmp/repo", refs: [{ ref: "main", tipOid: "a" }] },
     jsonl: [Buffer.from('{"oid":"a"}\n')],
     ...overrides,
   };
 }
 
 describe("deterministic telemetry behavioral baseline support", () => {
-  it("regenerates identical portable repository semantics", async () => {
+  it("regenerates identical isolated SHA-1 repository semantics and tag objects", async () => {
     const first = await createDeterministicRepository(await temporary("gitlode-fixture-a-"));
     const second = await createDeterministicRepository(await temporary("gitlode-fixture-b-"));
     expect(await repositorySemanticSnapshot(first)).toEqual(
       await repositorySemanticSnapshot(second),
     );
+    expect(first.objectFormat).toBe("sha1");
+    expect(first.annotatedTagType).toBe("tag");
+    expect(first.lightweightTagType).toBe("commit");
+    expect(first.annotatedTagOid).toMatch(/^[0-9a-f]{40}$/);
+    expect(first.annotatedTagObject).toContain("type commit\n");
+    expect(first.annotatedTagObject).toContain("tag release-annotated\n");
+    expect(first.refs["root-lightweight"]).toMatch(/^[0-9a-f]{40}$/);
+    expect(first.refs["release-annotated"]).toMatch(/^[0-9a-f]{40}$/);
+    expect(Object.values(first.refs).every((oid) => /^[0-9a-f]{40}$/.test(oid))).toBe(true);
+    expect(first.graph.every((oid) => /^[0-9a-f]{40}$/.test(oid))).toBe(true);
     expect(first.graph).toHaveLength(5);
     expect(first.refs.main).toBe(first.refs.overlap);
   });
-  it("compares disabled/enabled mode while excluding legacy profile and elapsed time", async () => {
-    const runs: boolean[] = [];
+
+  it("excludes only success elapsed/profile fields and detects application diagnostics", async () => {
     await expect(
-      verifyProfileEquivalence(async (profile) => {
-        runs.push(profile);
-        return artifacts({
+      verifyProfileEquivalence(async (profile) =>
+        artifacts({
           result: {
             kind: "success",
-            elapsedMs: profile ? 99 : 1,
-            profileEntries: profile ? [{ name: "legacy" }] : [],
+            success: {
+              recordsWritten: 1,
+              elapsedMs: profile ? 99 : 1,
+              profileEntries: profile ? [{ name: "legacy" }] : [],
+            },
           },
-        });
-      }),
+        }),
+      ),
     ).resolves.toBeDefined();
-    expect(runs).toEqual([false, true]);
+    const changed = artifacts({
+      result: {
+        kind: "success",
+        success: { recordsWritten: 1, elapsedMs: 1, profileEntries: [], diagnostics: ["changed"] },
+      },
+    });
+    expect(compareBehavioralArtifacts(artifacts(), changed)).toContain(
+      "application result differs",
+    );
   });
+
   it.each([
-    ["result", artifacts({ result: { kind: "user-error" } })],
-    ["checkpoint", artifacts({ checkpoint: { refs: [] } })],
+    ["result", artifacts({ result: { kind: "user-error", message: "changed" } })],
+    ["checkpoint", artifacts({ checkpoint: { repositoryPath: "/tmp/repo", refs: [] } })],
     ["JSONL", artifacts({ jsonl: [Buffer.from('{"oid":"different"}\n')] })],
   ])("detects an intentional %s difference", (_name, changed) => {
     expect(compareBehavioralArtifacts(artifacts(), changed)).not.toEqual([]);
   });
-  it("uses byte comparison within adapters and order-independent semantics across adapters", () => {
-    const ordered = artifacts({ jsonl: [Buffer.from('{"n":1}\n{"n":2}\n')] });
-    const reversed = artifacts({ jsonl: [Buffer.from('{"n":2}\n{"n":1}\n')] });
-    expect(compareBehavioralArtifacts(ordered, reversed, "same-adapter")).toContain(
-      "JSONL file sequence or bytes differ",
+
+  it("canonicalizes object keys but preserves array order and record multiplicity", () => {
+    const canonical = artifacts({
+      jsonl: [Buffer.from('{"a":1,"nested":{"x":2,"y":3},"array":[1,2]}\n{"a":1}\n')],
+    });
+    const reordered = artifacts({
+      jsonl: [Buffer.from('{"array":[1,2],"nested":{"y":3,"x":2},"a":1}\n{"a":1}\n')],
+    });
+    expect(compareBehavioralArtifacts(canonical, reordered, "cross-adapter")).toEqual([]);
+    const arrayChanged = artifacts({
+      jsonl: [Buffer.from('{"a":1,"nested":{"x":2,"y":3},"array":[2,1]}\n{"a":1}\n')],
+    });
+    expect(compareBehavioralArtifacts(canonical, arrayChanged, "cross-adapter")).toContain(
+      "JSONL semantic record sets differ",
     );
-    expect(compareBehavioralArtifacts(ordered, reversed, "cross-adapter")).toEqual([]);
+    const multiplicityChanged = artifacts({
+      jsonl: [Buffer.from('{"a":1,"nested":{"x":2,"y":3},"array":[1,2]}\n')],
+    });
+    expect(compareBehavioralArtifacts(canonical, multiplicityChanged, "cross-adapter")).toContain(
+      "JSONL semantic record sets differ",
+    );
   });
 });
 
-const baselineScenarios = [
-  { id: "commit_snapshot", input: { granularity: "commit" as const } },
-  {
-    id: "file_snapshot_and_built_in_projection",
-    input: { granularity: "file" as const, maxDiffSize: 8 },
-  },
+interface BaselineScenario {
+  readonly id: string;
+  readonly input: Partial<WorkerRunInput>;
+  readonly prior?: (repository: DeterministicRepository) => ExtractionCheckpoint;
+}
+const baselineScenarios: readonly BaselineScenario[] = [
+  { id: "commit_snapshot", input: { granularity: "commit" } },
+  { id: "file_snapshot", input: { granularity: "file", maxDiffSize: 8 } },
+  { id: "built_in_projection", input: { granularity: "file" } },
   {
     id: "multiple_refs",
-    input: { granularity: "commit" as const, refs: ["main", "overlap", "release-annotated"] },
+    input: { granularity: "commit", refs: ["main", "overlap", "release-annotated"] },
   },
-  { id: "output_rotation", input: { granularity: "commit" as const, rotation: { maxLines: 1 } } },
-] as const;
+  { id: "output_rotation", input: { granularity: "commit", rotation: { maxLines: 1 } } },
+  {
+    id: "incremental",
+    input: { granularity: "commit" },
+    prior: (repository) => ({
+      generatedAt: repository.sessionTimestamp,
+      repositoryPath: repository.directory as AbsolutePath,
+      refs: [
+        {
+          ref: "main",
+          refType: "branch",
+          tipOid: repository.refs.incrementalBoundary!,
+          updatedAt: repository.sessionTimestamp,
+        },
+      ],
+    }),
+  },
+  {
+    id: "official_file_type_plugin",
+    input: {
+      granularity: "file",
+      pluginBaseDirectory: packageDirectory as AbsoluteDirectoryPath,
+      pluginDeclarations: {
+        fileType: { entrypoint: "../plugin-file-type/src/index.ts", failurePolicy: "fail-run" },
+      },
+    },
+  },
+];
 
 async function runLegacyBaseline(
-  repositoryPath: string,
+  repository: DeterministicRepository,
   adapter: ExecutionGitAdapterName,
   profile: boolean,
-  overrides: Partial<WorkerRunInput>,
-  priorCheckpoint?: ExtractionCheckpoint,
+  scenario: BaselineScenario,
 ): Promise<BehavioralArtifacts> {
   const outputDir = await temporary(`gitlode-baseline-${adapter}-`);
   const input: WorkerRunInput = {
-    repositoryPath: repositoryPath as AbsolutePath,
+    repositoryPath: repository.directory as AbsolutePath,
+    repoName: "fixture-repository",
+    repoUrl: "https://example.invalid/fixture-repository.git",
     refs: ["main"],
     outputDir: outputDir as AbsolutePath,
+    outputPrefix: "baseline",
     rotation: {},
     granularity: "commit",
     profile,
     gitAdapter: adapter,
-    ...overrides,
+    ...scenario.input,
   };
-  const checkpoint = priorCheckpoint ?? {
-    generatedAt: "2024-02-03T04:05:06.000Z",
-    repositoryPath: repositoryPath as AbsolutePath,
+  const priorCheckpoint = scenario.prior?.(repository) ?? {
+    generatedAt: repository.sessionTimestamp,
+    repositoryPath: repository.directory as AbsolutePath,
     refs: [],
   };
   const result = await executeWorkerRunRequest(
-    { input, priorCheckpoint: checkpoint },
+    { input, priorCheckpoint },
     { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
     { environment: process.env },
   );
@@ -134,70 +204,50 @@ async function runLegacyBaseline(
   };
 }
 
-describe("legacy profile equivalence baselines", () => {
+describe("frozen migration-before legacy behavioral baselines", () => {
   it.each(["isomorphic-git", "git-cli"] as const)(
-    "covers commit, file, multiple refs, rotation, and built-in projection with %s",
+    "matches frozen baseline for every scenario with %s",
     async (adapter) => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2024-02-03T04:05:06.000Z"));
-      try {
-        const repository = await createDeterministicRepository(
-          await temporary(`gitlode-${adapter}-repo-`),
+      const repository = await createDeterministicRepository(
+        await temporary(`gitlode-${adapter}-repo-`),
+      );
+      for (const scenario of baselineScenarios) {
+        const modes = await verifyProfileEquivalence(
+          async (profile) => await runLegacyBaseline(repository, adapter, profile, scenario),
+          repository.directory,
         );
-        for (const scenario of baselineScenarios) {
-          await verifyProfileEquivalence(
-            async (profile) =>
-              await runLegacyBaseline(repository.directory, adapter, profile, scenario.input),
-          );
-        }
-        const prior: ExtractionCheckpoint = {
-          generatedAt: repository.sessionTimestamp,
-          repositoryPath: repository.directory as AbsolutePath,
-          refs: [
-            {
-              ref: "main",
-              refType: "branch",
-              tipOid: repository.refs.incrementalBoundary!,
-              updatedAt: repository.sessionTimestamp,
-            },
-          ],
-        };
-        await verifyProfileEquivalence(
-          async (profile) =>
-            await runLegacyBaseline(
-              repository.directory,
-              adapter,
-              profile,
-              { granularity: "commit" },
-              prior,
-            ),
+        expect(
+          modes.disabled.result,
+          `${adapter} ${scenario.id}: ${JSON.stringify(modes.disabled.result)}`,
+        ).toMatchObject({ kind: "success" });
+        expect(frozenBehavioralBaseline(modes.disabled, repository.directory)).toMatchSnapshot(
+          `${adapter} ${scenario.id} profile disabled`,
         );
-      } finally {
-        vi.useRealTimers();
+        expect(frozenBehavioralBaseline(modes.enabled, repository.directory)).toMatchSnapshot(
+          `${adapter} ${scenario.id} profile enabled`,
+        );
       }
     },
     30_000,
   );
 
-  it("preserves official plugin projection output when profiling changes", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2024-02-03T04:05:06.000Z"));
-    try {
-      const repository = await createDeterministicRepository(
-        await temporary("gitlode-plugin-repo-"),
-      );
-      await verifyProfileEquivalence(
-        async (profile) =>
-          await runLegacyBaseline(repository.directory, "isomorphic-git", profile, {
-            granularity: "file",
-            pluginBaseDirectory: process.cwd() as AbsoluteDirectoryPath,
-            pluginDeclarations: {
-              fileType: { entrypoint: "@gitlode/plugin-file-type", failurePolicy: "fail-run" },
-            },
-          }),
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  }, 30_000);
+  it("rejects identical drift applied to both profile modes against the frozen baseline", () => {
+    const original = frozenBehavioralBaseline(artifacts(), "/tmp/repo");
+    const driftedOff = artifacts({
+      result: { kind: "success", success: { recordsWritten: 2, elapsedMs: 1, profileEntries: [] } },
+    });
+    const driftedOn = artifacts({
+      result: {
+        kind: "success",
+        success: { recordsWritten: 2, elapsedMs: 2, profileEntries: [{ name: "profile" }] },
+      },
+    });
+    expect(compareBehavioralArtifacts(driftedOff, driftedOn, "same-adapter", "/tmp/repo")).toEqual(
+      [],
+    );
+    expect(frozenBehavioralBaseline(driftedOff, "/tmp/repo")).not.toEqual(original);
+    expect(frozenBehavioralBaseline(driftedOn, "/tmp/repo")).not.toEqual(original);
+  });
 });

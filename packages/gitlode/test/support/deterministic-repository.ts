@@ -12,17 +12,36 @@ const identityEnvironment = {
   GIT_COMMITTER_NAME: "Gitlode Fixture",
   GIT_COMMITTER_EMAIL: "fixture@gitlode.invalid",
   TZ: "UTC",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
 };
+const isolatedConfig = [
+  "-c",
+  "commit.gpgSign=false",
+  "-c",
+  "tag.gpgSign=false",
+  "-c",
+  `core.hooksPath=${process.platform === "win32" ? "NUL" : "/dev/null"}`,
+  "-c",
+  "core.autocrlf=false",
+  "-c",
+  "core.fileMode=false",
+];
 
 export interface DeterministicRepository {
   readonly directory: string;
   readonly sessionTimestamp: string;
   readonly refs: Readonly<Record<string, string>>;
   readonly graph: readonly string[];
+  readonly objectFormat: "sha1";
+  readonly annotatedTagObject: string;
+  readonly annotatedTagOid: string;
+  readonly annotatedTagType: string;
+  readonly lightweightTagType: string;
 }
 
 async function git(directory: string, args: readonly string[], date?: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", args, {
+  const { stdout } = await execFileAsync("git", [...isolatedConfig, ...args], {
     cwd: directory,
     env: date
       ? { ...identityEnvironment, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }
@@ -40,7 +59,7 @@ export async function createDeterministicRepository(
   directory: string,
 ): Promise<DeterministicRepository> {
   await mkdir(directory, { recursive: true });
-  await git(directory, ["init", "--initial-branch=main"]);
+  await git(directory, ["init", "--initial-branch=main", "--object-format=sha1", "--template="]);
   await git(directory, ["config", "user.name", "Gitlode Fixture"]);
   await git(directory, ["config", "user.email", "fixture@gitlode.invalid"]);
 
@@ -85,11 +104,22 @@ export async function createDeterministicRepository(
       ),
     ),
   );
+  const objectFormat = await git(directory, ["rev-parse", "--show-object-format"]);
+  if (objectFormat !== "sha1") throw new Error(`fixture requires SHA-1, received ${objectFormat}`);
+  const annotatedTagOid = await git(directory, ["rev-parse", "release-annotated"]);
+  const annotatedTagObject = await git(directory, ["cat-file", "tag", annotatedTagOid]);
+  const annotatedTagType = await git(directory, ["cat-file", "-t", "release-annotated"]);
+  const lightweightTagType = await git(directory, ["cat-file", "-t", "root-lightweight"]);
   return {
     directory,
     sessionTimestamp: FIXED_SESSION_TIMESTAMP,
     refs: { ...refs, incrementalBoundary },
     graph: (await git(directory, ["rev-list", "--topo-order", "--all"])).split("\n"),
+    objectFormat: "sha1",
+    annotatedTagObject,
+    annotatedTagOid,
+    annotatedTagType,
+    lightweightTagType,
   };
 }
 
@@ -108,5 +138,14 @@ export async function repositorySemanticSnapshot(
       tree: await git(repository.directory, ["ls-tree", "-r", oid]),
     })),
   );
-  return { sessionTimestamp: repository.sessionTimestamp, refs: repository.refs, commits };
+  return {
+    sessionTimestamp: repository.sessionTimestamp,
+    refs: repository.refs,
+    objectFormat: repository.objectFormat,
+    annotatedTagObject: repository.annotatedTagObject,
+    annotatedTagOid: repository.annotatedTagOid,
+    annotatedTagType: repository.annotatedTagType,
+    lightweightTagType: repository.lightweightTagType,
+    commits,
+  };
 }

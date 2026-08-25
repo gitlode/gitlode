@@ -77,6 +77,18 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
   const spans = objects(catalogs.spans.spans);
   const metrics = objects(catalogs.metrics.metrics);
   const attributes = objects(catalogs.attributes.attributes);
+  for (const [kind, entries, fields] of [
+    ["span", spans, ["id", "name"]],
+    ["metric", metrics, ["id", "name"]],
+    ["attribute", attributes, ["id", "key"]],
+  ] as const) {
+    for (const [index, entry] of entries.entries()) {
+      for (const field of fields) {
+        if (typeof entry[field] !== "string" || entry[field].length === 0)
+          errors.push(`${kind} ${index} requires string ${field}`);
+      }
+    }
+  }
   for (const [kind, entries] of [
     ["span", spans],
     ["metric", metrics],
@@ -92,7 +104,6 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
   const spanIds = new Set(spans.map((entry) => text(entry.id)).filter(Boolean));
   const metricIds = new Set(metrics.map((entry) => text(entry.id)).filter(Boolean));
   const attributeIds = new Set(attributes.map((entry) => text(entry.id)).filter(Boolean));
-  const observationIds = new Set([...spanIds, ...metricIds]);
 
   for (const span of spans) {
     for (const ref of refsFrom(span.attributes)) {
@@ -100,7 +111,11 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
         errors.push(`span ${String(span.id)} references unknown attribute: ${ref}`);
     }
     const parent = span.parent as Record<string, unknown> | undefined;
-    if (parent?.type === "span" && typeof parent.ref === "string" && !spanIds.has(parent.ref)) {
+    if (
+      (parent?.type === "span" || parent?.type === "explicit_span_context") &&
+      typeof parent.ref === "string" &&
+      !spanIds.has(parent.ref)
+    ) {
       errors.push(`span ${String(span.id)} references unknown parent span: ${parent.ref}`);
     }
   }
@@ -123,22 +138,45 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
   const view = catalogs.profileView;
   const spanGroups = objects(view.span_groups);
   const metricGroups = objects(view.metric_groups);
+  for (const [kind, groups, validIds] of [
+    ["span", spanGroups, spanIds],
+    ["metric", metricGroups, metricIds],
+  ] as const) {
+    for (const [groupIndex, group] of groups.entries()) {
+      if (typeof group.id !== "string" || group.id.length === 0)
+        errors.push(`${kind} profile group ${groupIndex} requires string id`);
+      for (const [observationIndex, observation] of objects(group.observations).entries()) {
+        if (typeof observation.ref !== "string" || observation.ref.length === 0) {
+          errors.push(
+            `${kind} profile observation ${groupIndex}:${observationIndex} requires string ref`,
+          );
+        } else if (!validIds.has(observation.ref)) {
+          errors.push(
+            `${kind} profile group references non-${kind} observation: ${observation.ref}`,
+          );
+        }
+      }
+    }
+  }
   for (const id of duplicateValues([...spanGroups, ...metricGroups].map((group) => text(group.id))))
     errors.push(`duplicate profile view group id: ${id}`);
-  const placements = [
-    ...spanGroups.flatMap((group) => objects(group.observations).map((entry) => text(entry.ref))),
-    ...metricGroups.flatMap((group) => objects(group.observations).map((entry) => text(entry.ref))),
-  ];
-  for (const ref of placements) {
-    if (ref && !observationIds.has(ref))
-      errors.push(`profile view references unknown observation: ${ref}`);
+  const spanPlacements = spanGroups.flatMap((group) =>
+    objects(group.observations).map((entry) => text(entry.ref)),
+  );
+  const metricPlacements = metricGroups.flatMap((group) =>
+    objects(group.observations).map((entry) => text(entry.ref)),
+  );
+  for (const [kind, ids, placements] of [
+    ["span", spanIds, spanPlacements],
+    ["metric", metricIds, metricPlacements],
+  ] as const) {
+    for (const id of ids) {
+      const count = placements.filter((placement) => placement === id).length;
+      if (count !== 1) errors.push(`accepted ${kind} ${id} has ${count} profile view placements`);
+    }
+    for (const ref of duplicateValues(placements))
+      errors.push(`duplicate ${kind} profile view placement: ${ref}`);
   }
-  for (const id of observationIds) {
-    const count = placements.filter((placement) => placement === id).length;
-    if (count !== 1) errors.push(`accepted observation ${id} has ${count} profile view placements`);
-  }
-  for (const ref of duplicateValues(placements))
-    errors.push(`duplicate profile view placement: ${ref}`);
 
   const report = catalogs.profileReport;
   const reportDefinition = report.report as Record<string, unknown> | undefined;

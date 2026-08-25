@@ -1,6 +1,6 @@
 import type { Instrumentation, InstrumentationOptions, InstrumentationSpan } from "./type.js";
 
-export function instrumentAsyncIterable<T>(
+export function instrumentLegacyAsyncIterable<T>(
   instrumentation: Instrumentation,
   name: string,
   factory: (span: InstrumentationSpan) => AsyncIterable<T>,

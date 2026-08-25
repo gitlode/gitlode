@@ -13,7 +13,7 @@ import {
 import type { CommitOid, OidProfile, RefType } from "@gitlode/internal-contracts/model";
 import { isCommitOid } from "@gitlode/internal-contracts/model";
 import {
-  instrumentAsyncIterable,
+  instrumentLegacyAsyncIterable,
   type Instrumentation,
   type InstrumentationSpan,
 } from "@gitlode/internal-foundation/instrumentation";
@@ -223,7 +223,7 @@ export class GitCliAdapter implements GitAdapter {
     parentOid?: CommitOid,
   ): AsyncIterable<FileBlobChange> {
     this._throwIfDisposed();
-    yield* instrumentAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
+    yield* instrumentLegacyAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
       this._materializeFileBlobChanges(repoPath, commitOid, parentOid, span),
     );
   }

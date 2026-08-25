@@ -9,7 +9,7 @@ import type {
 import type { GitAdapter, RawCommit } from "@gitlode/internal-contracts/git";
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import {
-  instrumentAsyncIterable,
+  instrumentLegacyAsyncIterable,
   type Instrumentation,
 } from "@gitlode/internal-foundation/instrumentation";
 
@@ -49,7 +49,7 @@ export class CommitFactExtractor implements CommitTraversalExtractor {
     diagnosticReporter: DiagnosticReporter,
   ): AsyncIterable<CommitFact> {
     const { repositoryPath, repoName, repoUrl, plans, range } = request;
-    return instrumentAsyncIterable(this.instrumentation, "gitlode.traversal", (span) => {
+    return instrumentLegacyAsyncIterable(this.instrumentation, "gitlode.traversal", (span) => {
       span.incrementCounter("plans", plans.length);
       span.setAttribute("gitlode.range.kind", range?.type ?? "none");
       return this.iterateCommitFacts(

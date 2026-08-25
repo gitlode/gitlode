@@ -1,4 +1,4 @@
-import { instrumentAsyncIterable } from "../instrumentation/index.js";
+import { instrumentLegacyAsyncIterable } from "../instrumentation/index.js";
 import { OrderedQueue } from "../support/index.js";
 import { CertifiedClosurePhase } from "./certified-closure.js";
 import { PhaseCertifiedDifferenceState } from "./phase-certified-difference-state.js";
@@ -108,7 +108,7 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<
   excludeNodeId?: NodeId,
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentAsyncIterable(
+  yield* instrumentLegacyAsyncIterable(
     context.instrumentation,
     "dag.traversal",
     (span) =>

@@ -102,19 +102,15 @@ only a routing summary for implementation sessions.
 
 ### Remaining
 
-Only the following design gates remain. New items discovered during documentation or implementation
-review must be added here explicitly rather than introduced as an untracked sequence of discussions.
+There are no remaining design gates. The verification contracts are accepted in
+[`../design/telemetry-verification.md`](../design/telemetry-verification.md) and its YAML catalog,
+the performance contracts are accepted in
+[`../design/telemetry-performance.md`](../design/telemetry-performance.md) and its YAML catalog, and
+the branch-sized implementation sequence is defined below.
 
-1. **Verification and implementation handoff**
-   - The behavioral fixtures, test layers, owner-integration evidence, collection-boundary cases,
-     fault injection, profile equivalence matrix, and CI/manual split are accepted in
-     `docs/design/telemetry-verification.md` and
-     `docs/design/telemetry-catalog/verification.yaml`.
-   - Performance fixtures, measurement protocol, environment fingerprint, wall-clock and RSS
-     thresholds, bounded-growth and volume criteria, and exception handling are accepted in
-     `docs/design/telemetry-performance.md` and
-     `docs/design/telemetry-catalog/performance.yaml`.
-   - Split implementation into branch-sized units with explicit prerequisites and completion gates.
+New design questions discovered during implementation review must be recorded here and resolved in
+the trunk session. A branch session must not make a local design decision that changes the accepted
+contracts.
 
 Implementation must not begin beyond a phase's prerequisite boundary while that phase depends on
 an unresolved design gate.
@@ -245,6 +241,361 @@ Acceptance:
 - profile off/on JSONL comparisons pass for the full verification matrix;
 - current documentation describes the implemented behavior; and
 - no unfinished migration item remains.
+
+## Trunk and branch execution protocol
+
+The trunk session owns this plan, design interpretation, starting prompts, review, and completion
+tracking. A branch session owns only the bounded implementation unit named in its prompt. A human
+starts each branch session by copying the prompt prepared by the trunk session; the branch session
+returns a summary and does not choose the next unit.
+
+For every unit, use this gate:
+
+1. The trunk session confirms that all prerequisite units are complete and prepares a starting
+   prompt containing scope, exclusions, required reading, acceptance evidence, and summary format.
+2. The branch session implements only that unit, runs its required checks, and reports changed
+   files, design-contract mapping, tests, and residual concerns.
+3. The trunk session reviews the actual worktree diff and the summary against the durable contracts.
+   The summary is evidence to inspect, not a substitute for inspecting code and tests.
+4. If review finds a problem, the trunk session prepares a correction prompt for the same branch
+   session and repeats review after correction.
+5. The trunk session marks a unit complete only when the diff, tests, documentation, and unit exit
+   gate all pass. Only then may a dependent unit start.
+
+All implementation branches are sequential and cumulative. Do not implement two units concurrently,
+because later units deliberately depend on types and migration state established by earlier ones.
+The trunk session must preserve unrelated worktree changes and distinguish them from the reviewed
+unit.
+
+### Intermediate migration policy
+
+The target API foundation, recorders, and local SDK composition are introduced before all production
+owners can use them. The following temporary state is deliberate:
+
+- migrated owners accept and use their final OTel API values and domain recorders;
+- owners not yet migrated continue to use the legacy custom instrumentation directly;
+- composition supplies OTel no-op API values to migrated owners until the target runtime switch;
+- the legacy local recorder remains the only active profile collector until the integration unit;
+  observations already migrated away from it may therefore be absent from the transitional profile;
+  and
+- the integration unit activates `WorkerTelemetrySession`, switches transport and presentation to
+  `ProfileReport`, and removes the legacy collector and remaining custom contracts.
+
+This temporary loss of profile coverage is allowed only on the non-release migration trunk. Every
+unit must still preserve application results and JSONL behavior. Do not introduce an old-to-new or
+new-to-old compatibility adapter, duplicate an observation in both systems, merge old and new
+profile outputs, or keep a migration abstraction in the final design.
+
+## Branch-sized implementation units
+
+The identifiers below are stable references for starting prompts and review notes. A unit may contain
+several commits, but it is reviewed and completed as one branch-session result. Splitting a unit
+further requires a trunk-session plan update that preserves its stated exit gate.
+
+### T00A: Catalog verification and behavioral baselines
+
+Prerequisites: accepted design documents only.
+
+Scope:
+
+- implement catalog-contract validation for the accepted span, metric, attribute, report, view, and
+  verification YAML without loading YAML in production;
+- add the deterministic repository recipe and reusable profile-disabled/enabled comparison helpers;
+- capture legacy behavioral baselines for the cataloged commit, file, incremental, adapter, output,
+  and plugin scenarios; and
+- prove that the comparison detects intentional result, JSONL, and checkpoint differences.
+
+Do not change production instrumentation or freeze the legacy profile table.
+
+Exit gate:
+
+- deterministic fixture regeneration produces identical semantic inputs;
+- baseline comparisons detect an intentional JSONL or checkpoint difference;
+- catalog validation detects missing, duplicate, invalidly referenced, and misplaced observations;
+  and
+- normal build, relevant tests, lint, architecture, and format checks pass.
+
+### T00B: Performance harness and legacy baseline
+
+Prerequisites: T00A.
+
+Scope:
+
+- add the performance harness, fixture generators, fixture manifest, environment fingerprint,
+  child-process RSS sampling, raw-artifact format, comparison logic, and fixture calibration workflow
+  required by the performance contract;
+- reuse T00A behavioral comparison rules before accepting any measured run;
+- calibrate and freeze reference fixture quantities when the reference environment is available; and
+- capture the `legacy_off` raw artifacts and baseline Git revision needed by T13.
+
+Do not change production instrumentation. Keep generated repositories, outputs, and large raw run
+artifacts out of normal tests and package contents. If wall-clock fixture calibration cannot be
+completed in the branch environment, the branch must still deliver and test the harness and an
+explicitly incomplete manifest; T13 then remains blocked until calibration and baseline capture on a
+suitable reference environment.
+
+Exit gate:
+
+- the harness records every field required by `performance.yaml`;
+- test-scale fixtures verify pairing, statistics, incompatibility, inconclusive-run, output
+  equivalence, RSS, report-size, and artifact serialization logic;
+- a documented command reproduces calibration and measurement without changing the manifest; and
+- normal build, relevant tests, lint, architecture, and format checks pass.
+
+### T01: OpenTelemetry API helper foundation
+
+Prerequisites: T00B.
+
+Scope:
+
+- add direct `@opentelemetry/api` dependencies to workspaces that import it in this unit;
+- implement `withSpan`, `withAsyncSpan`, `recordSpanError`, and `instrumentAsyncIterable` with the
+  accepted OTel API signatures and semantics;
+- add shared scope and observation identifiers needed by the helpers without adding SDK code; and
+- test callback and error identity, active and explicit parent context, status policy, iterator
+  serialization, every terminal path, and exactly-once ending using fake API values.
+
+Keep the legacy custom instrumentation available to existing production call sites. Do not add SDK
+dependencies, exporters, or compatibility overloads to the target helpers.
+
+Exit gate: Phase 1 acceptance is satisfied and existing extraction behavior is unchanged.
+
+### T02: Shared metric and report contracts
+
+Prerequisites: T01.
+
+Scope:
+
+- implement machine-checkable production metadata corresponding to the accepted observation
+  catalogs, including names, scopes, instruments, units, attributes, reducers, buckets, owners, and
+  explicit removals;
+- implement the SDK-independent `ProfileReport` protocol, canonical value normalization utilities,
+  collection limits, and diagnostic identifiers;
+- add the shared monotonic timing-token and no-op-recorder primitives used by domain recorder
+  factories; and
+- extend catalog contract tests to compare production metadata to every accepted YAML entry.
+
+Production code must not parse YAML. Report types must contain no OTel SDK type and must be
+structured-clone-safe by construction.
+
+Exit gate: shared metadata and report contracts match the catalogs, and no-op timing primitives read
+no clock and allocate no per-operation timing token.
+
+### T03: Extraction-side domain metric recorders
+
+Prerequisites: T02.
+
+Scope:
+
+- add final recorder factories and no-op implementations for extraction, file expansion, built-in
+  projection, output, concrete line diff, and plugin runtime metrics;
+- place each factory with the operation-owning domain and declare `@opentelemetry/api` directly in
+  every importing workspace;
+- pre-create instruments and implement the cataloged outcome, zero, partial-work, attribute, and
+  timing semantics; and
+- add fake-`Meter` owner tests for every metric in these families.
+
+Do not yet replace production observation call sites and do not introduce a generic counter API.
+
+Exit gate: all extraction-side accepted metrics have exactly one tested recorder owner, and disabled
+recorders perform no clock reads or hot-path instrument creation.
+
+### T04: Git and DAG domain metric recorders
+
+Prerequisites: T03.
+
+Scope:
+
+- add final recorder factories and no-op implementations for common Git, adapter-specific Git, and
+  DAG metrics;
+- preserve the separation between public-operation completion and reusable DAG core measurements;
+- encode adapter, object-purpose, cache-result, fallback, completion, and partial-work semantics from
+  the catalogs; and
+- add fake-`Meter` owner tests for every metric in these families while retaining exact existing DAG
+  correctness and efficiency tests.
+
+Do not instrument production owners yet and do not retain removed prototype-specific DAG counters.
+
+Exit gate: Phase 2 acceptance is satisfied for the complete metric catalog.
+
+### T05: Bounded local collection and report building
+
+Prerequisites: T04.
+
+Scope:
+
+- add OTel SDK dependencies only to the public `gitlode` package;
+- implement the bounded local span processor, manual metric reader and views, diagnostic accumulator,
+  and `ProfileReport` builder under the execution module group;
+- implement all reducers, normalization, signal-status, overflow, invalid-aggregation, and canonical
+  sorting rules; and
+- test every limit below, at, and above its boundary, signal availability states, shuffled input,
+  structured cloning, and non-retention of completed span objects and raw histogram samples.
+
+Do not connect the collector to production execution, add an exporter, or create a destination
+abstraction.
+
+Exit gate: the collector-and-report layer in the verification catalog passes and remains bounded.
+
+### T06: Worker telemetry session
+
+Prerequisites: T05.
+
+Scope:
+
+- implement `WorkerTelemetrySession` with explicit providers, compatible async context management,
+  root-span ownership, idempotent non-rejecting finalization, best-effort stage progression, and
+  exactly-once shutdown;
+- expose only internal fault-injection seams required by the verification catalog;
+- test initialization, active context propagation, flush, collection, report-build, and shutdown
+  failures, including partial reports and bounded diagnostics; and
+- verify that finalization cannot change or replace an application result.
+
+Keep this session unconnected from `executeRun`; the production switch occurs in T12 after owner
+migration. Do not generalize test seams into a backend interface.
+
+Exit gate: Phase 3 component acceptance and the worker-session fault-injection matrix pass.
+
+### T07: Execution, extraction, projection, and output owner migration
+
+Prerequisites: T06.
+
+Scope:
+
+- migrate execution setup operations, `ExtractionPipeline`, traversal planning, commit extraction,
+  built-in projection, file expansion, and output owners to final OTel tracers and domain recorders;
+- establish final explicit parent-context flow for logical async streams;
+- remove replaced per-item spans and generic counters in this slice; and
+- add owner-integration evidence for root/setup semantics in isolation, extraction hierarchy,
+  deduplication, partial counts, guards, projection, output close, rotation, and write effects.
+
+The root span remains owned by the unconnected session component until T12. Tests may instantiate
+the session or fake API values directly, while normal production composition supplies OTel no-op
+values to migrated owners under the intermediate migration policy.
+
+Exit gate: this slice contains no custom instrumentation types and its behavior and JSONL baselines
+pass with profile input disabled and enabled.
+
+### T08: DAG owner migration
+
+Prerequisites: T07.
+
+Scope:
+
+- migrate public DAG facades and reusable traversal cores to final tracer and recorder inputs;
+- implement logical-stream spans, operation completion, partial work, cancellation, handled-throw,
+  fallback event and counter, and exactly-once measurement semantics; and
+- replace legacy instrumentation assertions while preserving exact topology and graph-work tests.
+
+Exit gate: the DAG verification slice passes, with no duplicate metric set and no legacy or removed
+DAG observation remaining.
+
+### T09: Git adapter owner migration
+
+Prerequisites: T08.
+
+Scope:
+
+- migrate common Git port operations and both adapters to final tracer and recorder inputs;
+- implement common operation spans and metrics, isomorphic-git DAG hierarchy, and Git CLI version,
+  rev-list, commit batch, diff-tree, and persistent blob-batch lifecycles;
+- remove per-blob and other prohibited high-frequency spans; and
+- test typed failures, runtime exceptions, command errors, cancellation, disposal, cache and object
+  semantics, and absence of telemetry-induced Git commands.
+
+Exit gate: both adapters satisfy the Git owner-integration matrix and behavioral baselines without
+custom instrumentation types.
+
+### T10: Concrete line-diff owner migration
+
+Prerequisites: T09.
+
+Scope:
+
+- replace the ad hoc line-diff instrumentation shape with the final domain recorder;
+- record operation, duration, input-size, and concrete outcome semantics at the implementation owner;
+  and
+- test success, binary, too-large, and error distinctions together with file-expander guard ordering.
+
+Exit gate: the line-diff adapter exposes no legacy telemetry shape and its accepted owner evidence
+passes.
+
+### T11: Plugin API, runtime, and official plugin migration
+
+Prerequisites: T10.
+
+Scope:
+
+- replace the plugin `StageProfiler`-style surface with plugin-scoped `Tracer` and `Meter` values;
+- implement resolved package and bounded fallback scopes, explicit bootstrap/init parentage, and
+  package-version handling;
+- migrate plugin runtime host spans and projection recorders, including all four projection outcomes
+  and fatal/thrown-value policy; and
+- update official plugins and public declaration tests while preserving extension JSON and order.
+
+Do not use namespace, configuration, paths, or arbitrary injected-work identity as metric attributes.
+The possible future need to distinguish arbitrary-work plugins remains deferred until such a plugin
+has concrete requirements.
+
+Exit gate: plugin output is equivalent, scope and parentage tests pass, and no public plugin
+declaration exposes a removed telemetry contract.
+
+### T12: Runtime integration, presentation, and legacy removal
+
+Prerequisites: T11.
+
+Scope:
+
+- connect `WorkerTelemetrySession` to worker execution and finalize it after application resource
+  disposal without changing the application result;
+- transport the structured-clone-safe `ProfileReport` through worker and presentation boundaries;
+- implement the declarative signal-separated profile view, known diagnostic reading order, plugin
+  grouping, unknown fallback, partial/unavailable states, unit formatting, and quiet/success-only UX;
+- remove the legacy local recorder, no-op implementation, custom instrumentation and span contracts,
+  `ProfileSummaryEntry`, old profile formatting, and stale tests; and
+- update `profiling.md`, usage material, architecture/domain/plugin target markers, dependencies, and
+  public package declarations to implemented state.
+
+Exit gate: Phase 4 and Phase 5 acceptance are complete, repository-wide search finds no removed
+contract, profile reports cross the worker boundary, and all CI-tier checks pass.
+
+### T13: Performance, full verification, and handoff closure
+
+Prerequisites: T12 and completed T00B fixture calibration and `legacy_off` artifacts.
+
+Scope:
+
+- run the complete cataloged functional, owner, fault, equivalence, volume, bounded-growth,
+  wall-clock, RSS, report-size, architecture, type, lint, test, build, package, and format checks;
+- compare target disabled performance with the frozen legacy baseline and target enabled with target
+  disabled using the accepted paired protocol;
+- investigate failures without silently relaxing thresholds or observations;
+- record any explicitly reviewed exception with every required field; and
+- migrate all remaining stable facts to durable documentation, remove transitional status text, and
+  delete this handoff when no unfinished item remains.
+
+Exit gate: Phase 6 acceptance passes or a trunk-reviewed exception is documented, no migration-only
+code or note remains, and the trunk session confirms the redesign complete.
+
+## Unit status
+
+| Unit | Status  | Trunk review evidence |
+| ---- | ------- | --------------------- |
+| T00A | pending | —                     |
+| T00B | pending | —                     |
+| T01  | pending | —                     |
+| T02  | pending | —                     |
+| T03  | pending | —                     |
+| T04  | pending | —                     |
+| T05  | pending | —                     |
+| T06  | pending | —                     |
+| T07  | pending | —                     |
+| T08  | pending | —                     |
+| T09  | pending | —                     |
+| T10  | pending | —                     |
+| T11  | pending | —                     |
+| T12  | pending | —                     |
+| T13  | pending | —                     |
 
 ## Required verification matrix
 

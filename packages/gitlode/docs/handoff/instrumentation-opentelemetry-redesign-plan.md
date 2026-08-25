@@ -579,23 +579,23 @@ code or note remains, and the trunk session confirms the redesign complete.
 
 ## Unit status
 
-| Unit | Status  | Trunk review evidence |
-| ---- | ------- | --------------------- |
-| T00A | pending | —                     |
-| T00B | pending | —                     |
-| T01  | pending | —                     |
-| T02  | pending | —                     |
-| T03  | pending | —                     |
-| T04  | pending | —                     |
-| T05  | pending | —                     |
-| T06  | pending | —                     |
-| T07  | pending | —                     |
-| T08  | pending | —                     |
-| T09  | pending | —                     |
-| T10  | pending | —                     |
-| T11  | pending | —                     |
-| T12  | pending | —                     |
-| T13  | pending | —                     |
+| Unit | Status   | Trunk review evidence                                                              |
+| ---- | -------- | ---------------------------------------------------------------------------------- |
+| T00A | complete | Frozen catalog validation and behavioral baselines reviewed; focused 21 tests pass |
+| T00B | pending  | —                                                                                  |
+| T01  | pending  | —                                                                                  |
+| T02  | pending  | —                                                                                  |
+| T03  | pending  | —                                                                                  |
+| T04  | pending  | —                                                                                  |
+| T05  | pending  | —                                                                                  |
+| T06  | pending  | —                                                                                  |
+| T07  | pending  | —                                                                                  |
+| T08  | pending  | —                                                                                  |
+| T09  | pending  | —                                                                                  |
+| T10  | pending  | —                                                                                  |
+| T11  | pending  | —                                                                                  |
+| T12  | pending  | —                                                                                  |
+| T13  | pending  | —                                                                                  |
 
 ## Required verification matrix
 

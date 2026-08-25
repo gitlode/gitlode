@@ -71,12 +71,37 @@ export function validateFixtureManifest(value: unknown): string[] {
         errors.push(`${key} complete target requires environmentRef and artifactRef`);
       if (target.status === "incomplete" && !target.reason)
         errors.push(`${key} incomplete target requires reason`);
+      const [fixture, adapter] = key.split("/");
+      if ((quantities?.commits ?? 0) < 5)
+        errors.push(`${key} commits must be a final total of at least 5`);
+      if (fixture === "commit_heavy_repository") {
+        if (quantities?.files !== 1 || quantities.rotations !== 1)
+          errors.push(`${key} commit-heavy files and rotations must be 1`);
+        if (quantities?.plugins !== 0 || quantities.scale !== 0)
+          errors.push(`${key} commit-heavy plugins and scale must be 0`);
+      } else if (fixture === "file_heavy_repository") {
+        if ((quantities?.files ?? 0) <= 0 || (quantities?.rotations ?? 0) <= 0)
+          errors.push(`${key} file-heavy files and rotations must be positive`);
+        const scalableRecords =
+          10 + Math.max(0, ((quantities?.commits ?? 5) - 5) * (quantities?.files ?? 0));
+        if ((quantities?.rotations ?? 0) > scalableRecords)
+          errors.push(`${key} file-heavy rotations exceed the deterministic recipe volume`);
+        if (quantities?.plugins !== 0 || quantities.scale !== 0)
+          errors.push(`${key} file-heavy plugins and scale must be 0`);
+      } else if (fixture === "plugin_heavy_projection") {
+        if (adapter !== "isomorphic-git")
+          errors.push(`${key} plugin-heavy adapter must be isomorphic-git`);
+        if ((quantities?.files ?? 0) <= 0 || (quantities?.plugins ?? 0) < 2)
+          errors.push(`${key} plugin-heavy requires files and at least two plugins`);
+        if (quantities?.scale !== 0) errors.push(`${key} plugin-heavy scale must be 0`);
+      }
     }
   }
   const aggregation = manifest.aggregationScale;
   if (
     aggregation?.status !== "fixed-recipe" ||
     aggregation.integration !== "pending-target-collector" ||
+    Object.keys(aggregation?.quantities ?? {}).some((key) => key !== "scale") ||
     !Number.isSafeInteger(aggregation.quantities?.scale) ||
     (aggregation.quantities?.scale ?? 0) <= 0
   )

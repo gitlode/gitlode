@@ -31,6 +31,10 @@ is no second fixture-wide quantity that can overwrite adapter-specific calibrati
 artifact uses a target-scoped recipe hash over schema version, recipe revision, target identity, and
 that target's selected quantities. Later calibration of another target therefore cannot invalidate
 it. A separate sealed manifest hash exists only after the exact five-target matrix is complete.
+Environment fingerprints store these as distinct `calibrationTargetRecipeHash` and optional
+`sealedManifestHash` fields. The removed `fixtureManifestHash` name is not reused for a target hash.
+Calibration uses its target hash; legacy capture and both comparisons use the selected target's hash
+and include the sealed hash only when the final manifest is complete.
 
 Capture legacy baseline artifacts without a target implementation:
 
@@ -67,6 +71,9 @@ not relax catalog thresholds.
 Malformed checkpoint, missing `generatedAt`, invalid filename, unreadable JSONL, and incorrect
 repository path are structured behavioral errors. Available raw runs, normalized evidence, capture
 errors, fixture/revision identity, and target-scoped provenance are written before a nonzero exit.
+This artifact guarantee begins after manifest and CLI validation, when repository/child workflow
+preparation starts. Expected preparation, rotation setup, child capture, and behavior-validation
+failures are covered; an unreadable manifest or invalid command line may exit without an artifact.
 
 The checked-in targets remain explicitly incomplete because this shared container is not an
 approved reference host. No formal calibration or legacy artifact has been claimed. T13 remains

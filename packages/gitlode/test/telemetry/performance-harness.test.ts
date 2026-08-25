@@ -43,7 +43,7 @@ const manifest: FixtureManifest = {
   aggregationScale: {
     status: "fixed-recipe",
     integration: "pending-target-collector",
-    quantities: { commits: 0, files: 0, plugins: 0, rotations: 0, scale: 4 },
+    quantities: { scale: 4 },
   },
   calibrationTargets: {
     "commit_heavy_repository/git-cli": {
@@ -67,7 +67,7 @@ const fingerprint = (overrides: Partial<EnvironmentFingerprint> = {}): Environme
   gitAdapter: "git-cli",
   buildMode: "release-bundled",
   repositoryRevision: "abc",
-  fixtureManifestHash: manifestHash(manifest),
+  calibrationTargetRecipeHash: manifestHash(manifest),
   benchmarkScriptRevision: "def",
   profileState: "legacy_off",
   warmupCount: 2,
@@ -184,6 +184,23 @@ describe("performance harness contracts", () => {
         fingerprint({ gitAdapter: "isomorphic-git", gitVersion: "other" }),
       ),
     ).toEqual([]);
+  });
+  it("serializes target recipe and sealed manifest hashes as distinct fingerprint scopes", () => {
+    const value = fingerprint({
+      calibrationTargetRecipeHash: "target-hash",
+      sealedManifestHash: "sealed-hash",
+    });
+    expect(JSON.parse(JSON.stringify(value))).toMatchObject({
+      calibrationTargetRecipeHash: "target-hash",
+      sealedManifestHash: "sealed-hash",
+    });
+    expect(JSON.stringify(value)).not.toContain("fixtureManifestHash");
+    expect(
+      environmentCompatibility(value, fingerprint({ calibrationTargetRecipeHash: "other" })),
+    ).toContain("calibration target recipe differs");
+    expect(environmentCompatibility(value, fingerprint({ sealedManifestHash: "other" }))).toContain(
+      "sealed manifest differs",
+    );
   });
   it("has stable canonical manifest hashing and normal serialization does not mutate it", async () => {
     const reordered = { ...manifest, calibrationTargets: { ...manifest.calibrationTargets } };

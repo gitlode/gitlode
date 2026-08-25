@@ -93,14 +93,37 @@ async function main() {
     let quantity = target.quantities.commits;
     let calibrationRuns: readonly RawRun[] = [];
     for (;;) {
-      const pilot = await executeSingle(
-        manifest,
-        fixture,
-        adapter,
-        legacyCli as string,
-        "legacy_off",
-        quantity,
-      );
+      let pilot: Execution;
+      try {
+        pilot = await executeSingle(
+          manifest,
+          fixture,
+          adapter,
+          legacyCli as string,
+          "legacy_off",
+          quantity,
+        );
+      } catch (error) {
+        await writeWorkflowFailureArtifact(
+          artifacts,
+          `${calibrationKey(fixture, adapter).replace("/", "-")}-calibration-failure.json`,
+          {
+            kind: "calibration-failure",
+            failureStage: "preparation-or-capture",
+            fixture,
+            adapter,
+            revisions: { baseline: legacyRevision },
+            calibrationTargetRecipeHash: calibrationTargetRecipeHash(
+              manifest,
+              calibrationKey(fixture, adapter),
+              { ...target.quantities, commits: quantity },
+            ),
+            quantities: { ...target.quantities, commits: quantity },
+            error,
+          },
+        );
+        throw error;
+      }
       try {
         const measured = pilot.baseline.filter((run) => run.phase === "measured");
         const pilotErrors = await validateLegacy(
@@ -205,7 +228,29 @@ async function main() {
           revision: candidateRevision as string,
         }
       : undefined;
-  const workflow = await executePaired(manifest, fixture, adapter, baselineSpec, candidate);
+  let workflow: Execution;
+  try {
+    workflow = await executePaired(manifest, fixture, adapter, baselineSpec, candidate);
+  } catch (error) {
+    await writeWorkflowFailureArtifact(artifacts, `${fixture}-${adapter}-${mode}.json`, {
+      kind: mode === "capture-legacy" ? "legacy-baseline-failure" : "comparison-failure",
+      failureStage: "preparation-or-capture",
+      fixture,
+      adapter,
+      comparison,
+      revisions: { baseline: baselineSpec.revision, candidate: candidate?.revision },
+      calibrationTargetRecipeHash: calibrationTargetRecipeHash(
+        manifest,
+        calibrationKey(fixture, adapter),
+      ),
+      sealedManifestHash: sealedManifestHash(manifest),
+      expectedQuantities: target.quantities,
+      runs: { baseline: [], candidate: [] },
+      error,
+    });
+    process.exitCode = 2;
+    return;
+  }
   try {
     const formalTargetRecipeHash = calibrationTargetRecipeHash(
       manifest,
@@ -273,6 +318,7 @@ async function main() {
       environment: { baseline: environment, candidate: candidateEnvironment },
       pairOrder: pairPlan(),
       behavioralValidation: { passed: behaviorErrors.length === 0, errors: behaviorErrors },
+      failureStage: behaviorErrors.length ? "behavior-validation" : undefined,
       behaviorEvidence: {
         baseline: measuredEvidence,
         candidate: candidate
@@ -303,6 +349,19 @@ async function main() {
   }
 }
 
+async function writeWorkflowFailureArtifact(
+  directory: string,
+  name: string,
+  value: Record<string, unknown>,
+) {
+  await mkdir(directory, { recursive: true });
+  const error = value.error;
+  await writeFile(
+    join(directory, name),
+    `${JSON.stringify({ schemaVersion: 2, ...value, error: error instanceof Error ? error.message : String(error) }, undefined, 2)}\n`,
+  );
+}
+
 async function makeFingerprint(
   manifest: FixtureManifest,
   adapter: "isomorphic-git" | "git-cli",
@@ -317,7 +376,8 @@ async function makeFingerprint(
     gitAdapter: adapter,
     buildMode: "release-bundled",
     repositoryRevision: revision,
-    fixtureManifestHash: recipeHash,
+    calibrationTargetRecipeHash: recipeHash,
+    sealedManifestHash: sealedManifestHash(manifest),
     benchmarkScriptRevision: script,
     profileState: state,
     warmupCount: 2,
@@ -579,13 +639,16 @@ export function fixtureInvariantErrors(
       errors.push("file-heavy required size skip was not observed");
   }
   if (fixture === "plugin_heavy_projection") {
-    const values = behavior.jsonl.flatMap(({ bytes }) =>
-      new TextDecoder()
-        .decode(bytes)
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { extensions?: Record<string, unknown> }),
-    );
+    if (behavior.captureErrors.includes("unreadable JSONL record"))
+      errors.push("plugin-heavy JSONL record is malformed");
+    const values: { extensions?: Record<string, unknown> }[] = [];
+    for (const { bytes } of behavior.jsonl)
+      for (const line of new TextDecoder().decode(bytes).split("\n").filter(Boolean))
+        try {
+          values.push(JSON.parse(line) as { extensions?: Record<string, unknown> });
+        } catch {
+          errors.push("plugin-heavy JSONL record is malformed");
+        }
     if (
       values.some(({ extensions }) => Object.keys(extensions ?? {}).length !== quantities.plugins)
     )

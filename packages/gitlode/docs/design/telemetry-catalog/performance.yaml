@@ -159,7 +159,8 @@ environment_fingerprint:
     - Git adapter
     - build mode
     - repository revision
-    - fixture manifest hash
+    - calibration target recipe hash
+    - sealed manifest hash when the final manifest is complete
     - benchmark script revision
     - profile state
     - warmup and measurement counts
@@ -168,6 +169,8 @@ environment_fingerprint:
     - operating system differs
     - architecture differs
     - Git version differs for a git-cli comparison
+    - calibration target recipe hash differs
+    - sealed manifest hashes differ when both fingerprints contain one
 
 run_measurements:
   - wall-clock elapsed time

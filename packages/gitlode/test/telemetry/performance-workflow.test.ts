@@ -27,6 +27,10 @@ import {
 } from "../support/performance-workflow.js";
 
 const quantities = { commits: 5, files: 1, plugins: 0, rotations: 1, scale: 0 };
+const quantitiesFor = (key: string) =>
+  key.startsWith("plugin_heavy_projection/")
+    ? { commits: 5, files: 1, plugins: 2, rotations: 1, scale: 0 }
+    : quantities;
 const temporary: string[] = [];
 afterEach(async () =>
   Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true }))),
@@ -37,14 +41,14 @@ const manifest = (status: "complete" | "incomplete"): FixtureManifest => ({
   aggregationScale: {
     status: "fixed-recipe",
     integration: "pending-target-collector",
-    quantities: { ...quantities, scale: 4 },
+    quantities: { scale: 4 },
   },
   calibrationTargets: Object.fromEntries(
     requiredCalibrationTargets.map((key) => [
       key,
       {
         status,
-        quantities,
+        quantities: quantitiesFor(key),
         ...(status === "incomplete"
           ? { reason: "pending" }
           : { environmentRef: "environment.json", artifactRef: "calibration.json" }),
@@ -269,6 +273,57 @@ describe("performance workflow routing", () => {
       ]),
     );
   }, 30_000);
+  it("saves plugin malformed JSONL and unreadable output capture failures", async () => {
+    const root = await mkdtemp(join(tmpdir(), "performance-plugin-errors-"));
+    temporary.push(root);
+    const repositoryRoot = resolve(import.meta.dirname, "../../../.."),
+      artifacts = join(root, "artifacts"),
+      manifestPath = join(root, "manifest.json"),
+      cli = join(root, "plugin-bad.cjs");
+    await mkdir(artifacts);
+    await writeFile(manifestPath, JSON.stringify(manifest("complete")));
+    await writeFile(
+      cli,
+      `const fs=require('node:fs'),a=process.argv.slice(2),value=(n)=>a[a.indexOf(n)+1],out=value('--output-dir');fs.writeFileSync(out+'/performance-20240101T000000Z-000001.jsonl','{bad plugin json}\\n');fs.mkdirSync(out+'/unreadable.jsonl');fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedAt:'2024-01-01T00:00:00.000Z'}));`,
+    );
+    await expect(
+      promisify(execFile)(
+        process.execPath,
+        [
+          resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+          resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance.ts"),
+          "capture-legacy",
+          "--manifest",
+          manifestPath,
+          "--fixture",
+          "plugin_heavy_projection",
+          "--adapter",
+          "isomorphic-git",
+          "--baseline-cli",
+          cli,
+          "--legacy-revision",
+          "legacy-plugin-bad",
+          "--artifacts",
+          artifacts,
+        ],
+        { cwd: repositoryRoot, timeout: 30_000 },
+      ),
+    ).rejects.toMatchObject({ code: 2 });
+    const artifact = JSON.parse(
+      await readFile(
+        join(artifacts, "plugin_heavy_projection-isomorphic-git-capture-legacy.json"),
+        "utf8",
+      ),
+    );
+    expect(artifact.behavioralValidation.errors).toEqual(
+      expect.arrayContaining([
+        "unreadable JSONL record",
+        "output artifacts are unreadable",
+        "plugin-heavy JSONL record is malformed",
+      ]),
+    );
+    expect(artifact.failureStage ?? "behavior-validation").toBe("behavior-validation");
+  }, 30_000);
   it("rejects malformed calibrate and incomplete measure commands at script level", async () => {
     const root = await mkdtemp(join(tmpdir(), "performance-command-reject-"));
     temporary.push(root);
@@ -332,6 +387,36 @@ describe("performance workflow routing", () => {
     expect(rotationLinesFor(8, 4)).toBe(2);
     expect(rotationLinesFor(16, 4)).toBe(4);
     expect(() => rotationLinesFor(2, 3)).toThrow(/cannot produce exactly/);
+  });
+  it("rejects fixture-specific invalid quantities before repository generation", () => {
+    const invalid = manifest("complete");
+    invalid.calibrationTargets["commit_heavy_repository/isomorphic-git"] = {
+      status: "complete",
+      quantities: { commits: 4, files: 2, plugins: 1, rotations: 2, scale: 1 },
+      environmentRef: "e",
+      artifactRef: "a",
+    };
+    invalid.calibrationTargets["file_heavy_repository/git-cli"] = {
+      status: "complete",
+      quantities: { commits: 5, files: 0, plugins: 1, rotations: 11, scale: 1 },
+      environmentRef: "e",
+      artifactRef: "a",
+    };
+    invalid.calibrationTargets["plugin_heavy_projection/isomorphic-git"] = {
+      status: "complete",
+      quantities: { commits: 5, files: 0, plugins: 1, rotations: 1, scale: 1 },
+      environmentRef: "e",
+      artifactRef: "a",
+    };
+    expect(validateFixtureManifest(invalid)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("commits must be a final total of at least 5"),
+        expect.stringContaining("commit-heavy files and rotations must be 1"),
+        expect.stringContaining("file-heavy files and rotations must be positive"),
+        expect.stringContaining("file-heavy rotations exceed"),
+        expect.stringContaining("plugin-heavy requires files and at least two plugins"),
+      ]),
+    );
   });
   it("keeps target calibration hashes verifiable across sequential target updates", () => {
     const initial = manifest("incomplete"),

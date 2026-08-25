@@ -61,12 +61,6 @@
   "aggregationScale": {
     "integration": "pending-target-collector",
     "status": "fixed-recipe",
-    "quantities": {
-      "commits": 0,
-      "files": 0,
-      "plugins": 0,
-      "rotations": 0,
-      "scale": 1024
-    }
+    "quantities": { "scale": 1024 }
   }
 }

@@ -27,7 +27,7 @@ export interface FixtureManifest {
   readonly aggregationScale: {
     readonly status: "fixed-recipe";
     readonly integration: "pending-target-collector";
-    readonly quantities: FixtureQuantities;
+    readonly quantities: { readonly scale: number };
   };
 }
 export interface CalibrationTarget {
@@ -143,7 +143,8 @@ export interface EnvironmentFingerprint {
   readonly gitAdapter: "isomorphic-git" | "git-cli" | "none";
   readonly buildMode: "release-bundled" | "release-installed";
   readonly repositoryRevision: string;
-  readonly fixtureManifestHash: string;
+  readonly calibrationTargetRecipeHash: string;
+  readonly sealedManifestHash?: string;
   readonly benchmarkScriptRevision: string;
   readonly profileState: ProfileState;
   readonly warmupCount: number;
@@ -159,6 +160,14 @@ export function environmentCompatibility(
     errors.push("Node major differs");
   if (baseline.os.name !== candidate.os.name) errors.push("operating system differs");
   if (baseline.architecture !== candidate.architecture) errors.push("architecture differs");
+  if (baseline.calibrationTargetRecipeHash !== candidate.calibrationTargetRecipeHash)
+    errors.push("calibration target recipe differs");
+  if (
+    baseline.sealedManifestHash !== undefined &&
+    candidate.sealedManifestHash !== undefined &&
+    baseline.sealedManifestHash !== candidate.sealedManifestHash
+  )
+    errors.push("sealed manifest differs");
   if (
     (baseline.gitAdapter === "git-cli" || candidate.gitAdapter === "git-cli") &&
     baseline.gitVersion !== candidate.gitVersion
@@ -331,16 +340,25 @@ export async function launchMeasuredChild(input: {
     },
   );
   const elapsedMs = performance.now() - start;
-  const outputFiles = (await readdir(input.outputDirectory))
-    .filter((name) => name.endsWith(".jsonl"))
-    .sort();
-  const sizes = await Promise.all(
-    outputFiles.map(async (name) => (await stat(join(input.outputDirectory, name))).size),
-  );
-  const contents = await Promise.all(
-    outputFiles.map(async (name) => await readFile(join(input.outputDirectory, name), "utf8")),
-  );
   const captureErrors: string[] = [];
+  let outputFiles: string[] = [];
+  try {
+    outputFiles = (await readdir(input.outputDirectory))
+      .filter((name) => name.endsWith(".jsonl"))
+      .sort();
+  } catch {
+    captureErrors.push("output directory is unreadable");
+  }
+  const sizes: number[] = [];
+  const contents: string[] = [];
+  for (const name of outputFiles) {
+    try {
+      sizes.push((await stat(join(input.outputDirectory, name))).size);
+      contents.push(await readFile(join(input.outputDirectory, name), "utf8"));
+    } catch {
+      captureErrors.push(`output artifact is unreadable: ${name}`);
+    }
+  }
   const records: Record<string, unknown>[] = [];
   for (const content of contents)
     for (const line of content.split("\n").filter(Boolean))

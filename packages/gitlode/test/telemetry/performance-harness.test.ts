@@ -38,9 +38,13 @@ afterEach(async () =>
   Promise.all(dirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))),
 );
 const manifest: FixtureManifest = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   recipeRevision: "performance-v1",
-  aggregation: { status: "fixed-recipe", integration: "pending-target-collector" },
+  aggregationScale: {
+    status: "fixed-recipe",
+    integration: "pending-target-collector",
+    quantities: { commits: 0, files: 0, plugins: 0, rotations: 0, scale: 4 },
+  },
   calibrationTargets: {
     "commit_heavy_repository/git-cli": {
       status: "incomplete",
@@ -181,7 +185,7 @@ describe("performance harness contracts", () => {
     ).toEqual([]);
   });
   it("has stable canonical manifest hashing and normal serialization does not mutate it", async () => {
-    const reordered = { ...manifest, fixtures: { ...manifest.fixtures } };
+    const reordered = { ...manifest, calibrationTargets: { ...manifest.calibrationTargets } };
     expect(manifestHash(reordered)).toBe(manifestHash(manifest));
     const directory = await mkdtemp(join(tmpdir(), "manifest-"));
     dirs.push(directory);

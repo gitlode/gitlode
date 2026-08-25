@@ -26,6 +26,12 @@ including the five commits in the T00A base recipe. The manifest is globally rea
 repository fixtures with both adapters and plugin-heavy/isomorphic-git are complete, with an
 environment reference and calibration artifact reference for every target.
 
+`calibrationTargets[*].quantities` is the sole authoritative source for repository execution; there
+is no second fixture-wide quantity that can overwrite adapter-specific calibration. The immutable
+fixture recipe hash covers schema version, recipe revision, all selected target quantities, and the
+aggregation recipe, but excludes mutable completion status and artifact references. Calibration
+fingerprints and artifacts store that recipe hash after the selected quantity has been applied.
+
 Capture legacy baseline artifacts without a target implementation:
 
 ```bash
@@ -41,6 +47,12 @@ npm run performance:measure -w gitlode -- --fixture commit_heavy_repository --ad
 Use `target_on` for profiling comparison. Artifacts record separate legacy, candidate, and benchmark
 script revisions; the completed manifest/hash and calibration provenance; fingerprints; raw
 warmups/measured pairs; child exit and RSS samples; output/checkpoint behavior; and evaluation.
+Legacy artifacts also contain normalized checkpoint/filename evidence plus SHA-256 for each exact
+JSONL file, so determinism can be audited without retaining temporary paths or session timestamps.
+Capture accepts a baseline only when all measured runs agree and the fixture-specific commit,
+rotation, size-skip, and plugin invariants hold. File-heavy execution derives `--rotate-lines` from
+the deterministic change volume, supplies `--max-diff-size`, and requires the manifest's exact file
+rotation count and at least one skipped diff.
 Formal fail or inconclusive results are saved and then return a nonzero command status. Measurement
 never changes the manifest. Re-run environmental interference with the unchanged manifest and do
 not relax catalog thresholds.

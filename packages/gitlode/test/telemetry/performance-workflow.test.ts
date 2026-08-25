@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
 
-import { calibrationComplete, type FixtureManifest } from "../support/performance-harness.js";
+import { afterEach, describe, expect, it } from "vitest";
+
+import {
+  calibrationComplete,
+  requiredCalibrationTargets,
+  validateCalibrationMatrix,
+  type FixtureManifest,
+} from "../support/performance-harness.js";
 import {
   calibrationKey,
   parseAdapter,
@@ -10,20 +21,30 @@ import {
 } from "../support/performance-workflow.js";
 
 const quantities = { commits: 5, files: 1, plugins: 0, rotations: 1, scale: 0 };
+const temporary: string[] = [];
+afterEach(async () =>
+  Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true }))),
+);
 const manifest = (status: "complete" | "incomplete"): FixtureManifest => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   recipeRevision: "test",
-  aggregation: { status: "fixed-recipe", integration: "pending-target-collector" },
-  fixtures: { commit_heavy_repository: quantities },
-  calibrationTargets: {
-    "commit_heavy_repository/isomorphic-git": {
-      status,
-      quantities,
-      ...(status === "incomplete"
-        ? { reason: "pending" }
-        : { environmentRef: "environment.json", artifactRef: "calibration.json" }),
-    },
+  aggregationScale: {
+    status: "fixed-recipe",
+    integration: "pending-target-collector",
+    quantities: { ...quantities, scale: 4 },
   },
+  calibrationTargets: Object.fromEntries(
+    requiredCalibrationTargets.map((key) => [
+      key,
+      {
+        status,
+        quantities,
+        ...(status === "incomplete"
+          ? { reason: "pending" }
+          : { environmentRef: "environment.json", artifactRef: "calibration.json" }),
+      },
+    ]),
+  ) as FixtureManifest["calibrationTargets"],
 });
 describe("performance workflow routing", () => {
   it("validates fixture, adapter, state and preserves aggregation identity", () => {
@@ -58,5 +79,174 @@ describe("performance workflow routing", () => {
     expect(() => requireTarget(plugin, "plugin_heavy_projection", "git-cli")).toThrow(
       /requires isomorphic-git/,
     );
+  });
+  it("rejects missing and extra calibration matrix targets", () => {
+    const complete = manifest("complete");
+    const missing = { ...complete, calibrationTargets: { ...complete.calibrationTargets } };
+    delete (missing.calibrationTargets as Record<string, unknown>)[requiredCalibrationTargets[0]];
+    expect(calibrationComplete(missing)).toBe(false);
+    expect(validateCalibrationMatrix(missing)[0]).toMatch(/missing calibration target/);
+    const extra = {
+      ...complete,
+      calibrationTargets: {
+        ...complete.calibrationTargets,
+        "plugin_heavy_projection/git-cli": { status: "complete" as const, quantities },
+      },
+    };
+    expect(validateCalibrationMatrix(extra)).toContain(
+      "invalid calibration target: plugin_heavy_projection/git-cli",
+    );
+  });
+  it("runs capture-legacy, applies rotation/size options, preserves evidence and manifest", async () => {
+    const root = await mkdtemp(join(tmpdir(), "performance-workflow-"));
+    temporary.push(root);
+    const artifacts = join(root, "artifacts"),
+      manifestPath = join(root, "manifest.json"),
+      cli = join(root, "fake-cli.cjs");
+    const complete = manifest("complete");
+    complete.calibrationTargets["file_heavy_repository/isomorphic-git"] = {
+      status: "complete",
+      quantities: { ...quantities, files: 4, rotations: 2 },
+      environmentRef: "environment.json",
+      artifactRef: "calibration.json",
+    };
+    await writeFile(manifestPath, `${JSON.stringify(complete, undefined, 2)}\n`);
+    const before = await readFile(manifestPath, "utf8");
+    await writeFile(
+      cli,
+      `const fs=require('node:fs'),a=process.argv.slice(2),value=(n)=>a[a.indexOf(n)+1]; if(!a.includes('--rotate-lines')||value('--max-diff-size')!=='16')process.exit(9); const out=value('--output-dir'),repo=a[0],state=value('--state'); fs.mkdirSync(out,{recursive:true}); const rows=Array.from({length:5},(_,i)=>JSON.stringify({oid:String(i),file:{path:String(i),additions:null,deletions:null}})); fs.writeFileSync(out+'/performance-20240101T000000Z-000001.jsonl',rows.slice(0,3).join('\\n')+'\\n'); fs.writeFileSync(out+'/performance-20240101T000000Z-000002.jsonl',rows.slice(3).join('\\n')+'\\n'); fs.writeFileSync(state,JSON.stringify({repositoryPath:repo,generatedAt:'2024-01-01T00:00:00.000Z',refs:[]}));`,
+    );
+    await mkdir(artifacts);
+    const repositoryRoot = resolve(import.meta.dirname, "../../../..");
+    await promisify(execFile)(
+      process.execPath,
+      [
+        resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+        resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance.ts"),
+        "capture-legacy",
+        "--manifest",
+        manifestPath,
+        "--fixture",
+        "file_heavy_repository",
+        "--adapter",
+        "isomorphic-git",
+        "--baseline-cli",
+        cli,
+        "--legacy-revision",
+        "legacy-test",
+        "--artifacts",
+        artifacts,
+      ],
+      { cwd: repositoryRoot, timeout: 30_000 },
+    );
+    expect(await readFile(manifestPath, "utf8")).toBe(before);
+    const artifactText = await readFile(
+      join(artifacts, "file_heavy_repository-isomorphic-git-capture-legacy.json"),
+      "utf8",
+    );
+    const artifact = JSON.parse(artifactText);
+    expect(artifact.revisions.legacy).toBe("legacy-test");
+    expect(artifact.behavioralValidation.passed).toBe(true);
+    expect(artifact.behaviorEvidence[0].derived).toMatchObject({ files: 2, skippedDiffs: 5 });
+    expect(artifact.behaviorEvidence[0].files.map((file: { name: string }) => file.name)).toEqual([
+      "performance-<session>-000001.jsonl",
+      "performance-<session>-000002.jsonl",
+    ]);
+    expect(artifactText).not.toContain("gitlode-performance-");
+  }, 30_000);
+  it("saves malformed legacy failure evidence before returning nonzero", async () => {
+    const root = await mkdtemp(join(tmpdir(), "performance-empty-"));
+    temporary.push(root);
+    const artifacts = join(root, "artifacts"),
+      manifestPath = join(root, "manifest.json"),
+      cli = join(root, "empty-cli.cjs");
+    await mkdir(artifacts);
+    await writeFile(manifestPath, `${JSON.stringify(manifest("complete"))}\n`);
+    await writeFile(
+      cli,
+      `const fs=require('node:fs'),a=process.argv.slice(2),value=(n)=>a[a.indexOf(n)+1]; fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedAt:'2024-01-01T00:00:00.000Z',refs:[]}));`,
+    );
+    const repositoryRoot = resolve(import.meta.dirname, "../../../..");
+    await expect(
+      promisify(execFile)(
+        process.execPath,
+        [
+          resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+          resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance.ts"),
+          "capture-legacy",
+          "--manifest",
+          manifestPath,
+          "--fixture",
+          "commit_heavy_repository",
+          "--adapter",
+          "isomorphic-git",
+          "--baseline-cli",
+          cli,
+          "--legacy-revision",
+          "legacy-empty",
+          "--artifacts",
+          artifacts,
+        ],
+        { cwd: repositoryRoot, timeout: 30_000 },
+      ),
+    ).rejects.toMatchObject({ code: 2 });
+    const artifact = JSON.parse(
+      await readFile(
+        join(artifacts, "commit_heavy_repository-isomorphic-git-capture-legacy.json"),
+        "utf8",
+      ),
+    );
+    expect(artifact.behavioralValidation).toMatchObject({
+      passed: false,
+      errors: expect.arrayContaining(["legacy output is empty or unavailable"]),
+    });
+    expect(artifact.revisions.legacy).toBe("legacy-empty");
+  }, 30_000);
+  it("rejects malformed calibrate and incomplete measure commands at script level", async () => {
+    const root = await mkdtemp(join(tmpdir(), "performance-command-reject-"));
+    temporary.push(root);
+    const repositoryRoot = resolve(import.meta.dirname, "../../../.."),
+      script = resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance.ts"),
+      tsx = resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+      malformed = join(root, "malformed.json"),
+      incomplete = join(root, "incomplete.json");
+    const missing = manifest("complete");
+    delete (missing.calibrationTargets as Record<string, unknown>)[requiredCalibrationTargets[0]];
+    await writeFile(malformed, JSON.stringify(missing));
+    await writeFile(incomplete, JSON.stringify(manifest("incomplete")));
+    await expect(
+      promisify(execFile)(
+        process.execPath,
+        [
+          tsx,
+          script,
+          "calibrate",
+          "--manifest",
+          malformed,
+          "--fixture",
+          "commit_heavy_repository",
+          "--adapter",
+          "isomorphic-git",
+        ],
+        { cwd: repositoryRoot },
+      ),
+    ).rejects.toMatchObject({ code: 1 });
+    await expect(
+      promisify(execFile)(
+        process.execPath,
+        [
+          tsx,
+          script,
+          "measure",
+          "--manifest",
+          incomplete,
+          "--fixture",
+          "commit_heavy_repository",
+          "--adapter",
+          "isomorphic-git",
+        ],
+        { cwd: repositoryRoot },
+      ),
+    ).rejects.toMatchObject({ code: 1 });
   });
 });

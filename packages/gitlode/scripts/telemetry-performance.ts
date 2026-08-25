@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 import {
   comparePerformanceBehavior,
+  performanceBehaviorEvidence,
   type DerivedOutput,
   type PerformanceBehavior,
 } from "../test/support/performance-equivalence.js";
@@ -20,16 +21,18 @@ import {
   environmentCompatibility,
   evaluateComparison,
   fingerprint,
+  fixtureRecipeHash,
   launchMeasuredChild,
-  manifestHash,
   median,
   nextCalibrationQuantity,
   pairPlan,
   type CalibrationTarget,
   type EnvironmentFingerprint,
   type FixtureManifest,
+  type FixtureQuantities,
   type ProfileState,
   type RawRun,
+  validateCalibrationMatrix,
 } from "../test/support/performance-harness.js";
 import {
   calibrationKey,
@@ -61,6 +64,8 @@ async function main() {
     option("manifest", join(packageDirectory, "test/fixtures/performance/manifest.json")),
   );
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as FixtureManifest;
+  const matrixErrors = validateCalibrationMatrix(manifest);
+  if (matrixErrors.length) throw new Error(matrixErrors.join("; "));
   const fixture = parseFixture(option("fixture"));
   if (fixture === "aggregation_scale")
     throw new Error(
@@ -104,8 +109,20 @@ async function main() {
     const scriptRevision = (
       await exec("git", ["-C", resolve(packageDirectory, "../.."), "rev-parse", "HEAD"])
     ).stdout.trim();
+    const updated: FixtureManifest = {
+      ...manifest,
+      calibrationTargets: {
+        ...manifest.calibrationTargets,
+        [key]: {
+          status: "complete",
+          quantities: { ...target.quantities, commits: quantity },
+          environmentRef,
+          artifactRef,
+        },
+      },
+    };
     const calibrationEnvironment = await makeFingerprint(
-      manifest,
+      updated,
       adapter,
       "legacy_off",
       legacyRevision,
@@ -118,21 +135,8 @@ async function main() {
     );
     await writeFile(
       join(artifacts, artifactRef),
-      `${JSON.stringify({ schemaVersion: 1, fixture, adapter, legacyRevision, benchmarkScriptRevision: scriptRevision, quantities: { ...target.quantities, commits: quantity }, runs: calibrationRuns }, undefined, 2)}\n`,
+      `${JSON.stringify({ schemaVersion: 2, fixture, adapter, legacyRevision, benchmarkScriptRevision: scriptRevision, fixtureRecipeHash: fixtureRecipeHash(updated), quantities: { ...target.quantities, commits: quantity }, environmentRef, runs: calibrationRuns }, undefined, 2)}\n`,
     );
-    const updated: FixtureManifest = {
-      ...manifest,
-      calibrationTargets: {
-        ...manifest.calibrationTargets,
-        [key]: {
-          status: "complete",
-          quantities: { ...target.quantities, commits: quantity },
-          environmentRef,
-          artifactRef,
-        },
-      },
-      fixtures: { ...manifest.fixtures, [fixture]: { ...target.quantities, commits: quantity } },
-    };
     await writeFile(manifestPath, canonicalManifest(updated));
     process.stdout.write(`calibrated ${key}; allComplete=${calibrationComplete(updated)}\n`);
     return;
@@ -166,7 +170,9 @@ async function main() {
           benchmarkScriptRevision,
         )
       : undefined;
-    const behaviorErrors = candidate ? await compareAll(workflow) : await validateLegacy(workflow);
+    const behaviorErrors = candidate
+      ? await compareAll(workflow, target.quantities, fixture)
+      : await validateLegacy(workflow, target.quantities, fixture);
     const evaluation = candidate
       ? evaluateComparison({
           kind: candidate.state === "target_on" ? "profile_overhead" : "disabled_overhead",
@@ -179,13 +185,21 @@ async function main() {
           behavioralErrors: behaviorErrors,
         })
       : undefined;
+    const measuredEvidence = workflow.baseline
+      .filter((run) => run.phase === "measured")
+      .map((run) =>
+        performanceBehaviorEvidence(
+          workflow.behavior.get(run.runId) as PerformanceBehavior,
+          workflow.repositoryPath,
+        ),
+      );
     const artifact = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: mode === "capture-legacy" ? "legacy-baseline" : "comparison",
       fixture,
       adapter,
       manifest,
-      fixtureHash: manifestHash(manifest),
+      fixtureHash: fixtureRecipeHash(manifest),
       calibrationProvenance: target,
       revisions: {
         legacy: legacyRevision,
@@ -195,6 +209,7 @@ async function main() {
       environment: { baseline: environment, candidate: candidateEnvironment },
       pairOrder: pairPlan(),
       behavioralValidation: { passed: behaviorErrors.length === 0, errors: behaviorErrors },
+      behaviorEvidence: measuredEvidence,
       expectedQuantities: target.quantities,
       runs: { baseline: workflow.baseline, candidate: candidate ? workflow.candidate : undefined },
       evaluation,
@@ -225,7 +240,7 @@ async function makeFingerprint(
     gitAdapter: adapter,
     buildMode: "release-bundled",
     repositoryRevision: revision,
-    fixtureManifestHash: manifestHash(manifest),
+    fixtureManifestHash: fixtureRecipeHash(manifest),
     benchmarkScriptRevision: script,
     profileState: state,
     warmupCount: 2,
@@ -236,6 +251,7 @@ type Execution = {
   baseline: RawRun[];
   candidate: RawRun[];
   behavior: Map<string, PerformanceBehavior>;
+  repositoryPath: string;
   cleanup(): Promise<void>;
 };
 async function executePaired(
@@ -262,6 +278,16 @@ async function executePaired(
         config,
         `${JSON.stringify({ version: 1, runtime: { gitAdapter: adapter } })}\n`,
       );
+    const changedFiles =
+      fixture === "file_heavy_repository"
+        ? (await exec("git", ["-C", repository, "log", "--format=", "--name-only", "main"])).stdout
+            .split("\n")
+            .filter(Boolean).length
+        : 0;
+    const rotationLines =
+      fixture === "file_heavy_repository"
+        ? Math.ceil(changedFiles / quantities.rotations)
+        : undefined;
     const baseline: RawRun[] = [],
       candidates: RawRun[] = [],
       behavior = new Map<string, PerformanceBehavior>();
@@ -298,6 +324,9 @@ async function executePaired(
             "--config",
             config,
             ...(fixture !== "commit_heavy_repository" ? ["--per-file"] : []),
+            ...(fixture === "file_heavy_repository"
+              ? ["--rotate-lines", String(rotationLines), "--max-diff-size", "16"]
+              : []),
           ],
           outputDirectory: output,
           state,
@@ -312,6 +341,7 @@ async function executePaired(
       baseline,
       candidate: candidates,
       behavior,
+      repositoryPath: repository,
       cleanup: async () => {
         await rm(root, { recursive: true, force: true });
       },
@@ -367,7 +397,11 @@ function generatedAt(behavior: PerformanceBehavior): string {
   if (typeof value?.generatedAt !== "string") throw new Error("checkpoint generatedAt unavailable");
   return value.generatedAt;
 }
-async function compareAll(workflow: Execution) {
+async function compareAll(
+  workflow: Execution,
+  quantities: FixtureQuantities,
+  fixture: RepositoryFixture,
+) {
   const errors: string[] = [];
   const baseline = workflow.baseline.filter((r) => r.phase === "measured"),
     candidate = workflow.candidate.filter((r) => r.phase === "measured");
@@ -385,8 +419,12 @@ async function compareAll(workflow: Execution) {
       continue;
     }
     errors.push(
+      ...fixtureInvariantErrors(fixture, quantities, left),
+      ...fixtureInvariantErrors(fixture, quantities, right),
+    );
+    errors.push(
       ...comparePerformanceBehavior(left, right, {
-        repositoryPath: (left.checkpoint as { repositoryPath: string }).repositoryPath,
+        repositoryPath: workflow.repositoryPath,
         baselineGeneratedAt: generatedAt(left),
         candidateGeneratedAt: generatedAt(right),
       }),
@@ -394,8 +432,68 @@ async function compareAll(workflow: Execution) {
   }
   return errors;
 }
-async function validateLegacy(workflow: Execution) {
-  return workflow.baseline.some((run) => run.exit.code !== 0)
-    ? ["legacy child process failure"]
-    : [];
+async function validateLegacy(
+  workflow: Execution,
+  quantities: FixtureQuantities,
+  fixture: RepositoryFixture,
+) {
+  const errors: string[] = [];
+  const measured = workflow.baseline.filter((run) => run.phase === "measured");
+  if (!measured.length) return ["legacy measured runs are empty"];
+  const firstRun = measured[0];
+  if (!firstRun) return ["legacy measured runs are empty"];
+  const first = workflow.behavior.get(firstRun.runId);
+  if (!first || first.derived.records === 0 || first.jsonl.length === 0)
+    errors.push("legacy output is empty or unavailable");
+  for (const run of measured) {
+    const behavior = workflow.behavior.get(run.runId);
+    if (!behavior || run.exit.code !== 0) {
+      errors.push("legacy child process failure");
+      continue;
+    }
+    errors.push(...fixtureInvariantErrors(fixture, quantities, behavior));
+    if (first && behavior !== first)
+      errors.push(
+        ...comparePerformanceBehavior(first, behavior, {
+          repositoryPath: workflow.repositoryPath,
+          baselineGeneratedAt: generatedAt(first),
+          candidateGeneratedAt: generatedAt(behavior),
+        }),
+      );
+  }
+  return [...new Set(errors)];
+}
+export function fixtureInvariantErrors(
+  fixture: RepositoryFixture,
+  quantities: FixtureQuantities,
+  behavior: PerformanceBehavior,
+): string[] {
+  const errors: string[] = [];
+  if (behavior.derived.commits !== quantities.commits)
+    errors.push(`fixture commit count differs: expected ${quantities.commits}`);
+  if (fixture === "commit_heavy_repository" && behavior.derived.records !== quantities.commits)
+    errors.push("commit-heavy record count differs from final commit count");
+  if (fixture === "file_heavy_repository") {
+    if (behavior.derived.files !== quantities.rotations)
+      errors.push(`file-heavy rotation count differs: expected ${quantities.rotations}`);
+    if (behavior.derived.skippedDiffs < 1)
+      errors.push("file-heavy required size skip was not observed");
+  }
+  if (fixture === "plugin_heavy_projection") {
+    const values = behavior.jsonl.flatMap(({ bytes }) =>
+      new TextDecoder()
+        .decode(bytes)
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { extensions?: Record<string, unknown> }),
+    );
+    if (
+      values.some(({ extensions }) => Object.keys(extensions ?? {}).length !== quantities.plugins)
+    )
+      errors.push("plugin-heavy namespace count differs");
+    const projected = values.flatMap(({ extensions }) => Object.values(extensions ?? {}));
+    if (!projected.some((value) => value === null) || !projected.some((value) => value !== null))
+      errors.push("plugin-heavy success and skip outcomes were not both observed");
+  }
+  return errors;
 }

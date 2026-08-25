@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { JsonlArtifact } from "./profile-equivalence.js";
 
 export interface DerivedOutput {
@@ -70,4 +72,18 @@ export function comparePerformanceBehavior(
         errors.push("JSONL bytes or ordering differs");
     }
   return [...new Set(errors)];
+}
+export function performanceBehaviorEvidence(behavior: PerformanceBehavior, repositoryPath: string) {
+  const generatedAt = (behavior.checkpoint as { generatedAt?: unknown } | null)?.generatedAt;
+  if (typeof generatedAt !== "string") throw new Error("checkpoint generatedAt unavailable");
+  return {
+    exit: behavior.exit,
+    checkpoint: normalizeCheckpoint(behavior.checkpoint, repositoryPath, generatedAt),
+    derived: behavior.derived,
+    files: behavior.jsonl.map(({ name, bytes }) => ({
+      name: normalizePerformanceFilename(name),
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      bytes: bytes.byteLength,
+    })),
+  };
 }

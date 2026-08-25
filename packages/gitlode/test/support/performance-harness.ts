@@ -21,13 +21,13 @@ export interface FixtureQuantities {
   readonly scale: number;
 }
 export interface FixtureManifest {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly recipeRevision: string;
-  readonly fixtures: Readonly<Record<string, FixtureQuantities>>;
   readonly calibrationTargets: Readonly<Record<string, CalibrationTarget>>;
-  readonly aggregation: {
+  readonly aggregationScale: {
     readonly status: "fixed-recipe";
     readonly integration: "pending-target-collector";
+    readonly quantities: FixtureQuantities;
   };
 }
 export interface CalibrationTarget {
@@ -37,8 +37,34 @@ export interface CalibrationTarget {
   readonly artifactRef?: string;
   readonly reason?: string;
 }
+export const requiredCalibrationTargets = [
+  "commit_heavy_repository/isomorphic-git",
+  "commit_heavy_repository/git-cli",
+  "file_heavy_repository/isomorphic-git",
+  "file_heavy_repository/git-cli",
+  "plugin_heavy_projection/isomorphic-git",
+] as const;
+export function validateCalibrationMatrix(manifest: FixtureManifest): string[] {
+  const actual = Object.keys(manifest.calibrationTargets);
+  return [
+    ...requiredCalibrationTargets
+      .filter((key) => !actual.includes(key))
+      .map((key) => `missing calibration target: ${key}`),
+    ...actual
+      .filter(
+        (key) =>
+          !requiredCalibrationTargets.includes(key as (typeof requiredCalibrationTargets)[number]),
+      )
+      .map((key) => `invalid calibration target: ${key}`),
+  ];
+}
 export function calibrationComplete(manifest: FixtureManifest): boolean {
-  return Object.values(manifest.calibrationTargets).every((target) => target.status === "complete");
+  return (
+    validateCalibrationMatrix(manifest).length === 0 &&
+    requiredCalibrationTargets.every(
+      (key) => manifest.calibrationTargets[key]?.status === "complete",
+    )
+  );
 }
 
 function canonical(value: unknown): unknown {
@@ -56,6 +82,26 @@ export function canonicalManifest(manifest: FixtureManifest): string {
 }
 export function manifestHash(manifest: FixtureManifest): string {
   return createHash("sha256").update(canonicalManifest(manifest)).digest("hex");
+}
+/** Hashes only execution-affecting recipe data; mutable provenance references cannot invalidate it. */
+export function fixtureRecipeHash(manifest: FixtureManifest): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        canonical({
+          schemaVersion: manifest.schemaVersion,
+          recipeRevision: manifest.recipeRevision,
+          quantities: Object.fromEntries(
+            requiredCalibrationTargets.map((key) => [
+              key,
+              manifest.calibrationTargets[key]?.quantities,
+            ]),
+          ),
+          aggregationScale: manifest.aggregationScale,
+        }),
+      ),
+    )
+    .digest("hex");
 }
 
 export interface EnvironmentFingerprint {

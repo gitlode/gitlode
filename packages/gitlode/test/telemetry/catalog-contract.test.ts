@@ -94,7 +94,7 @@ describe("accepted telemetry catalog contract", () => {
     delete labels.lifecycle_failure;
     const reportFields = (catalogs.profileReport.report as Record<string, unknown>)
       .fields as Record<string, Record<string, unknown>>;
-    report.schema_version = 2;
+    reportFields.schemaVersion!.value = 2;
     const limits = catalogs.verification.limits as Record<string, unknown>[];
     limits[0]!.boundary_cases = [126, 128, 129];
     expect(validateTelemetryCatalogs(catalogs)).toEqual(

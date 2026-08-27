@@ -650,7 +650,10 @@
         ],
         "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
       },
-      "missingNodeModulesDetection": true,
+      "missingNodeModulesDetection": {
+        "enabled": true,
+        "excludeModules": ["@opentelemetry/api"]
+      },
       "devDepsUsageOnProdDetection": {
         "ignoreTypeImports": true
       },

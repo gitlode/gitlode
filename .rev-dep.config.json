@@ -399,7 +399,8 @@
             "packages/internal-contracts/dist/git/index.js",
             "packages/internal-contracts/dist/line-diff/index.js",
             "packages/internal-contracts/dist/model/index.js",
-            "packages/internal-contracts/dist/progress/index.js"
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -649,7 +650,10 @@
         ],
         "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
       },
-      "missingNodeModulesDetection": true,
+      "missingNodeModulesDetection": {
+        "enabled": true,
+        "excludeModules": ["@opentelemetry/api"]
+      },
       "devDepsUsageOnProdDetection": {
         "ignoreTypeImports": true
       },

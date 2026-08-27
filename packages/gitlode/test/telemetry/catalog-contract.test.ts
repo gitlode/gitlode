@@ -1,3 +1,15 @@
+import {
+  PROFILE_COLLECTION_LIMITS,
+  PROFILE_DIAGNOSTIC_SEVERITY,
+  PROFILE_DIAGNOSTIC_SIGNALS,
+  PROFILE_DIAGNOSTIC_STAGES,
+  PROFILE_REPORT_SCHEMA_VERSION,
+  PROFILE_SIGNAL_STATUSES,
+  REMOVED_TELEMETRY_OBSERVATIONS,
+  TELEMETRY_ATTRIBUTES,
+  TELEMETRY_METRICS,
+  TELEMETRY_SPANS,
+} from "@gitlode/internal-contracts/telemetry";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -150,5 +162,111 @@ describe("accepted telemetry catalog contract", () => {
         expect.stringContaining("parent root must not define ref"),
       ]),
     );
+  });
+});
+
+describe("production observation metadata", () => {
+  it("matches the accepted catalog structured projection", async () => {
+    const scope = (value: unknown) =>
+      typeof value === "string" ? { type: "core", name: value } : { type: "resolved_plugin" };
+    const attributes = (accepted.attributes.attributes as Record<string, unknown>[]).map(
+      (entry) => ({
+        id: entry.id,
+        key: entry.key,
+        valueType: entry.type,
+        ...(entry.values ? { boundedValues: entry.values } : {}),
+        ...(entry.minimum !== undefined
+          ? {
+              numericConstraint: {
+                minimum: entry.minimum,
+                ...(entry.value_unit ? { unit: entry.value_unit } : {}),
+              },
+            }
+          : {}),
+        ...(entry.value_policy ? { valuePolicy: entry.value_policy } : {}),
+        profileReducer: (entry.profile as Record<string, unknown>).reducer,
+      }),
+    );
+    const spans = (accepted.spans.spans as Record<string, unknown>[]).map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      scope: scope(entry.scope),
+      owner: entry.owner,
+      parent: entry.parent,
+      attributes: Object.fromEntries(
+        Object.entries(entry.attributes as Record<string, { ref: string }[]>).map(
+          ([phase, refs]) => [phase, refs.map((item) => item.ref)],
+        ),
+      ),
+    }));
+    const metrics = (accepted.metrics.metrics as Record<string, unknown>[]).map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      scope: scope(entry.scope),
+      instrument: entry.instrument,
+      description: entry.description,
+      unit: entry.unit,
+      owner: entry.owner,
+      attributes: (entry.attributes as { ref: string; required: boolean }[]).map((item) => ({
+        id: item.ref,
+        required: item.required,
+      })),
+      ...(entry.explicit_bucket_boundaries
+        ? { explicitBucketBoundaries: entry.explicit_bucket_boundaries }
+        : {}),
+      zeroPolicy: entry.zero_policy,
+    }));
+    const removed = (
+      accepted.metrics.removed_observations as { ids: string[]; disposition: string }[]
+    ).flatMap((group) => group.ids.map((id) => ({ id, disposition: group.disposition })));
+    expect(TELEMETRY_ATTRIBUTES).toEqual(attributes);
+    expect(TELEMETRY_SPANS).toEqual(spans);
+    expect(TELEMETRY_METRICS).toEqual(metrics);
+    expect(REMOVED_TELEMETRY_OBSERVATIONS).toEqual(removed);
+    const acceptedIds = new Set([...spans, ...metrics].map((item) => item.id));
+    for (const item of removed) expect(acceptedIds).not.toContain(item.id);
+  });
+});
+
+describe("production profile report contract", () => {
+  it("matches the accepted catalog structured constants", () => {
+    const report = accepted.profileReport;
+    const reportFields = (report.report as Record<string, unknown>).fields as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const types = report.types as Record<string, Record<string, unknown>>;
+    const diagnosticFields = (types.ProfileDiagnostic!.fields as Record<
+      string,
+      Record<string, unknown>
+    >)!;
+    const severityPolicy = types.ProfileDiagnostic!.severity_policy as Record<string, string[]>;
+    const severity = Object.fromEntries(
+      Object.entries(severityPolicy).flatMap(([level, codes]) =>
+        codes.map((code) => [code, level]),
+      ),
+    );
+    const limits = report.limits as Record<string, Record<string, unknown>>;
+    const diagnosticsLimit = limits.diagnostics!;
+
+    expect(PROFILE_REPORT_SCHEMA_VERSION).toBe(report.schema_version);
+    expect(PROFILE_SIGNAL_STATUSES).toEqual(types.ProfileSignalStatus!.enum);
+    expect(Object.keys(PROFILE_DIAGNOSTIC_SEVERITY)).toEqual(diagnosticFields.code!.enum);
+    expect(PROFILE_DIAGNOSTIC_SEVERITY).toEqual(severity);
+    expect(PROFILE_DIAGNOSTIC_STAGES).toEqual(diagnosticFields.stage!.enum);
+    expect(PROFILE_DIAGNOSTIC_SIGNALS).toEqual(diagnosticFields.signal!.enum);
+    expect(PROFILE_COLLECTION_LIMITS).toEqual({
+      spanGroups: (limits.span_groups as Record<string, unknown>).maximum,
+      distinctSpanAttributeValuesPerAttribute: (
+        limits.distinct_span_attribute_values as Record<string, unknown>
+      ).maximum_per_attribute,
+      metricPointsPerInstrument: (limits.metric_points as Record<string, unknown>)
+        .maximum_per_instrument,
+      diagnostics: {
+        maximum: reportFields.diagnostics!.maximum_items,
+        overflowReservedEntries: (diagnosticsLimit.reservation as Record<string, unknown>).entries,
+      },
+      diagnosticMessageUtf16CodeUnits: diagnosticFields.message!.maximum_utf16_code_units,
+    });
   });
 });

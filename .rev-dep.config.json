@@ -115,6 +115,11 @@
           ]
         },
         {
+          "name": "telemetry",
+          "pattern": "packages/internal-contracts/src/telemetry/**",
+          "allow": ["packages/internal-contracts/src/telemetry/**"]
+        },
+        {
           "name": "git-impl",
           "pattern": "packages/git-adapters/src/git-impl/**",
           "allow": [
@@ -537,7 +542,8 @@
         "src/progress/index.ts",
         "src/extraction-api/index.ts",
         "src/git/index.ts",
-        "src/line-diff/index.ts"
+        "src/line-diff/index.ts",
+        "src/telemetry/index.ts"
       ],
       "devEntryPoints": ["test/**", "vitest.config.ts"]
     },

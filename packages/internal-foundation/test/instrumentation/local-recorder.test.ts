@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  instrumentLegacyAsyncIterable,
+  instrumentAsyncIterable,
   LocalInstrumentationRecorder,
 } from "../../src/instrumentation/index.js";
 
@@ -122,7 +122,7 @@ describe("LocalInstrumentationRecorder", () => {
     const recorder = new LocalInstrumentationRecorder(() => time);
     let factoryCalls = 0;
 
-    const iterable = instrumentLegacyAsyncIterable(recorder, "stream", (span) => {
+    const iterable = instrumentAsyncIterable(recorder, "stream", (span) => {
       factoryCalls++;
       span.setAttribute("kind", "async-iterable");
       return (async function* () {

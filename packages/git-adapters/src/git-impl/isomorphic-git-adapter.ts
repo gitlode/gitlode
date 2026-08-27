@@ -12,7 +12,7 @@ import type { BlobOid, RefType, CommitOid, OidProfile } from "@gitlode/internal-
 import { isCommitOid } from "@gitlode/internal-contracts/model";
 import { type DagSuccessor, type DagTopologyPort } from "@gitlode/internal-foundation/dag";
 import {
-  instrumentLegacyAsyncIterable,
+  instrumentAsyncIterable,
   type Instrumentation,
   type InstrumentationSpan,
 } from "@gitlode/internal-foundation/instrumentation";
@@ -210,7 +210,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    yield* instrumentLegacyAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
+    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
       const strategy = this._commitTraversalStrategy;
       span.setAttribute("strategy", strategy.name);
       const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
@@ -252,7 +252,7 @@ export class IsomorphicGitAdapter implements GitAdapter {
     commitOid: CommitOid,
     parentOid?: CommitOid,
   ): AsyncIterable<FileBlobChange> {
-    yield* instrumentLegacyAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
+    yield* instrumentAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
       this._getFileBlobChanges(repoPath, commitOid, parentOid, span),
     );
   }

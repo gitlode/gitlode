@@ -45,9 +45,6 @@
     "test:watch": "npm run build:dev && vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage"
   },
-  "dependencies": {
-    "@opentelemetry/api": "^1.9.0"
-  },
   "devDependencies": {
     "@types/node": "^22.13.14",
     "@vitest/coverage-v8": "^4.1.10",

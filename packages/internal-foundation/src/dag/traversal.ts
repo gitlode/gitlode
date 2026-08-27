@@ -1,4 +1,4 @@
-import { instrumentLegacyAsyncIterable } from "../instrumentation/index.js";
+import { instrumentAsyncIterable } from "../instrumentation/index.js";
 import { collectAsyncIterableToSet, firstOrThrow, OrderedQueue } from "../support/index.js";
 import type {
   BasicDagSchedulingContext,
@@ -25,7 +25,7 @@ export async function* walkDagNodeIdsEagerExclude<
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentLegacyAsyncIterable(
+  yield* instrumentAsyncIterable(
     context.instrumentation,
     "dag.traversal",
     (span) =>
@@ -116,7 +116,7 @@ export async function* walkDagNodeIdsCertifiedLazy<
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentLegacyAsyncIterable(
+  yield* instrumentAsyncIterable(
     context.instrumentation,
     "dag.traversal",
     (span) =>
@@ -275,7 +275,7 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentLegacyAsyncIterable(context.instrumentation, "dag.reachable", (span) =>
+  yield* instrumentAsyncIterable(context.instrumentation, "dag.reachable", (span) =>
     walkDagReachableNodeIdsCore(
       {
         ...context,

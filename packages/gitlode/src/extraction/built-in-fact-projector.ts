@@ -8,7 +8,7 @@ import type {
   ProjectedRecord,
 } from "@gitlode/internal-contracts/extraction";
 import {
-  instrumentLegacyAsyncIterable,
+  instrumentAsyncIterable,
   type Instrumentation,
 } from "@gitlode/internal-foundation/instrumentation";
 import { assertNever, formatUnixTimestampWithOffset } from "@gitlode/internal-foundation/support";
@@ -81,7 +81,7 @@ export class BuiltInFactProjector implements FactProjector {
   }
 
   project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
-    return instrumentLegacyAsyncIterable(this.instrumentation, "gitlode.projection", () =>
+    return instrumentAsyncIterable(this.instrumentation, "gitlode.projection", () =>
       this.projectRecords(facts),
     );
   }

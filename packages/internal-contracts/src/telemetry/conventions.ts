@@ -15,3 +15,5 @@ export const STREAM_COMPLETION_VALUES = [
   "handled_throw",
   "error",
 ] as const;
+
+export type StreamCompletion = (typeof STREAM_COMPLETION_VALUES)[number];

@@ -630,7 +630,7 @@ code or note remains, and the trunk session confirms the redesign complete.
 | T00A | complete | Frozen catalog validation and behavioral baselines reviewed; focused 21 tests pass                                                                |
 | T00B | complete | Performance harness and test-scale workflows reviewed; focused 41 tests pass; reference calibration and legacy artifacts remain T13 prerequisites |
 | T01  | complete | Generic OTel lifecycle and gitlode policy split reviewed; focused 128 tests pass; clean-environment architecture check passes                     |
-| T02  | pending  | —                                                                                                                                                 |
+| T02  | complete | Shared metadata, profile contracts, normalization, and timing primitives reviewed; focused 31 and full 753 tests pass                             |
 | T03  | pending  | —                                                                                                                                                 |
 | T04  | pending  | —                                                                                                                                                 |
 | T05  | pending  | —                                                                                                                                                 |

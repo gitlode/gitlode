@@ -1,9 +1,27 @@
 export const PROFILE_REPORT_SCHEMA_VERSION = 1 as const;
+export const PROFILE_SIGNAL_STATUSES = ["complete", "partial", "unavailable"] as const;
+export const PROFILE_DIAGNOSTIC_STAGES = [
+  "span_aggregation",
+  "trace_flush",
+  "metric_collection",
+  "report_build",
+  "telemetry_shutdown",
+] as const;
+export const PROFILE_DIAGNOSTIC_SIGNALS = [
+  "spans",
+  "counters",
+  "histograms",
+  "report",
+  "telemetry",
+] as const;
 export const PROFILE_COLLECTION_LIMITS = {
   spanGroups: 128,
   distinctSpanAttributeValuesPerAttribute: 16,
   metricPointsPerInstrument: 128,
-  diagnostics: 16,
+  diagnostics: {
+    maximum: 16,
+    overflowReservedEntries: 1,
+  },
   diagnosticMessageUtf16CodeUnits: 512,
 } as const;
 
@@ -67,7 +85,7 @@ export interface ProfileHistogramPoint {
   readonly explicitBounds: readonly number[];
   readonly bucketCounts: readonly number[];
 }
-export type ProfileSignalStatus = "complete" | "partial" | "unavailable";
+export type ProfileSignalStatus = (typeof PROFILE_SIGNAL_STATUSES)[number];
 export interface ProfileSignalStatusSet {
   readonly spans: ProfileSignalStatus;
   readonly counters: ProfileSignalStatus;
@@ -84,21 +102,20 @@ export const PROFILE_DIAGNOSTIC_SEVERITY = {
 } as const;
 export type ProfileDiagnosticCode = keyof typeof PROFILE_DIAGNOSTIC_SEVERITY;
 export type ProfileDiagnosticSeverity = (typeof PROFILE_DIAGNOSTIC_SEVERITY)[ProfileDiagnosticCode];
-export type ProfileDiagnosticStage =
-  | "span_aggregation"
-  | "trace_flush"
-  | "metric_collection"
-  | "report_build"
-  | "telemetry_shutdown";
-export type ProfileDiagnosticSignal = "spans" | "counters" | "histograms" | "report" | "telemetry";
-export interface ProfileDiagnostic {
-  readonly code: ProfileDiagnosticCode;
-  readonly severity: ProfileDiagnosticSeverity;
+export type ProfileDiagnosticStage = (typeof PROFILE_DIAGNOSTIC_STAGES)[number];
+export type ProfileDiagnosticSignal = (typeof PROFILE_DIAGNOSTIC_SIGNALS)[number];
+interface ProfileDiagnosticFields {
   readonly stage: ProfileDiagnosticStage;
   readonly signal: ProfileDiagnosticSignal;
   readonly count: number;
   readonly message: string | null;
 }
+export type ProfileDiagnostic = {
+  readonly [Code in ProfileDiagnosticCode]: ProfileDiagnosticFields & {
+    readonly code: Code;
+    readonly severity: (typeof PROFILE_DIAGNOSTIC_SEVERITY)[Code];
+  };
+}[ProfileDiagnosticCode];
 export interface ProfileReport {
   readonly schemaVersion: typeof PROFILE_REPORT_SCHEMA_VERSION;
   readonly signalStatus: ProfileSignalStatusSet;

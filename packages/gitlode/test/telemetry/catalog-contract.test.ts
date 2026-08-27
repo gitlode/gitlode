@@ -1,3 +1,15 @@
+import {
+  PROFILE_COLLECTION_LIMITS,
+  PROFILE_DIAGNOSTIC_SEVERITY,
+  PROFILE_DIAGNOSTIC_SIGNALS,
+  PROFILE_DIAGNOSTIC_STAGES,
+  PROFILE_REPORT_SCHEMA_VERSION,
+  PROFILE_SIGNAL_STATUSES,
+  REMOVED_TELEMETRY_OBSERVATIONS,
+  TELEMETRY_ATTRIBUTES,
+  TELEMETRY_METRICS,
+  TELEMETRY_SPANS,
+} from "@gitlode/internal-contracts/telemetry";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -82,7 +94,7 @@ describe("accepted telemetry catalog contract", () => {
     delete labels.lifecycle_failure;
     const reportFields = (catalogs.profileReport.report as Record<string, unknown>)
       .fields as Record<string, Record<string, unknown>>;
-    reportFields.schemaVersion!.value = 2;
+    report.schema_version = 2;
     const limits = catalogs.verification.limits as Record<string, unknown>[];
     limits[0]!.boundary_cases = [126, 128, 129];
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
@@ -155,7 +167,6 @@ describe("accepted telemetry catalog contract", () => {
 
 describe("production observation metadata", () => {
   it("matches the accepted catalog structured projection", async () => {
-    const production = await import("../../../internal-contracts/src/telemetry/metadata.js");
     const scope = (value: unknown) =>
       typeof value === "string" ? { type: "core", name: value } : { type: "resolved_plugin" };
     const attributes = (accepted.attributes.attributes as Record<string, unknown>[]).map(
@@ -208,11 +219,54 @@ describe("production observation metadata", () => {
     const removed = (
       accepted.metrics.removed_observations as { ids: string[]; disposition: string }[]
     ).flatMap((group) => group.ids.map((id) => ({ id, disposition: group.disposition })));
-    expect(production.TELEMETRY_ATTRIBUTES).toEqual(attributes);
-    expect(production.TELEMETRY_SPANS).toEqual(spans);
-    expect(production.TELEMETRY_METRICS).toEqual(metrics);
-    expect(production.REMOVED_TELEMETRY_OBSERVATIONS).toEqual(removed);
+    expect(TELEMETRY_ATTRIBUTES).toEqual(attributes);
+    expect(TELEMETRY_SPANS).toEqual(spans);
+    expect(TELEMETRY_METRICS).toEqual(metrics);
+    expect(REMOVED_TELEMETRY_OBSERVATIONS).toEqual(removed);
     const acceptedIds = new Set([...spans, ...metrics].map((item) => item.id));
     for (const item of removed) expect(acceptedIds).not.toContain(item.id);
+  });
+});
+
+describe("production profile report contract", () => {
+  it("matches the accepted catalog structured constants", () => {
+    const report = accepted.profileReport;
+    const reportFields = (report.report as Record<string, unknown>).fields as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const types = report.types as Record<string, Record<string, unknown>>;
+    const diagnosticFields = (types.ProfileDiagnostic!.fields as Record<
+      string,
+      Record<string, unknown>
+    >)!;
+    const severityPolicy = types.ProfileDiagnostic!.severity_policy as Record<string, string[]>;
+    const severity = Object.fromEntries(
+      Object.entries(severityPolicy).flatMap(([level, codes]) =>
+        codes.map((code) => [code, level]),
+      ),
+    );
+    const limits = report.limits as Record<string, Record<string, unknown>>;
+    const diagnosticsLimit = limits.diagnostics!;
+
+    expect(PROFILE_REPORT_SCHEMA_VERSION).toBe(report.schema_version);
+    expect(PROFILE_SIGNAL_STATUSES).toEqual(types.ProfileSignalStatus!.enum);
+    expect(Object.keys(PROFILE_DIAGNOSTIC_SEVERITY)).toEqual(diagnosticFields.code!.enum);
+    expect(PROFILE_DIAGNOSTIC_SEVERITY).toEqual(severity);
+    expect(PROFILE_DIAGNOSTIC_STAGES).toEqual(diagnosticFields.stage!.enum);
+    expect(PROFILE_DIAGNOSTIC_SIGNALS).toEqual(diagnosticFields.signal!.enum);
+    expect(PROFILE_COLLECTION_LIMITS).toEqual({
+      spanGroups: (limits.span_groups as Record<string, unknown>).maximum,
+      distinctSpanAttributeValuesPerAttribute: (
+        limits.distinct_span_attribute_values as Record<string, unknown>
+      ).maximum_per_attribute,
+      metricPointsPerInstrument: (limits.metric_points as Record<string, unknown>)
+        .maximum_per_instrument,
+      diagnostics: {
+        maximum: reportFields.diagnostics!.maximum_items,
+        overflowReservedEntries: (diagnosticsLimit.reservation as Record<string, unknown>).entries,
+      },
+      diagnosticMessageUtf16CodeUnits: diagnosticFields.message!.maximum_utf16_code_units,
+    });
   });
 });

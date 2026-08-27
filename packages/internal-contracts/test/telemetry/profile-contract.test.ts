@@ -4,6 +4,7 @@ import {
   PROFILE_COLLECTION_LIMITS,
   PROFILE_DIAGNOSTIC_SEVERITY,
   PROFILE_REPORT_SCHEMA_VERSION,
+  type ProfileDiagnostic,
   type ProfileReport,
 } from "../../src/telemetry/profile-report.js";
 
@@ -61,7 +62,42 @@ describe("ProfileReport", () => {
       ],
     };
     expect(structuredClone(report)).toEqual(report);
-    expect(PROFILE_COLLECTION_LIMITS).toMatchObject({ spanGroups: 128, diagnostics: 16 });
+    expect(PROFILE_COLLECTION_LIMITS).toMatchObject({
+      spanGroups: 128,
+      diagnostics: { maximum: 16, overflowReservedEntries: 1 },
+    });
     expect(PROFILE_DIAGNOSTIC_SEVERITY.lifecycle_failure).toBe("warning");
   });
 });
+
+const validLifecycleDiagnostic: ProfileDiagnostic = {
+  code: "lifecycle_failure",
+  severity: "warning",
+  stage: "telemetry_shutdown",
+  signal: "telemetry",
+  count: 1,
+  message: null,
+};
+void validLifecycleDiagnostic;
+
+// @ts-expect-error lifecycle failures have catalog-fixed warning severity.
+const invalidLifecycleDiagnostic: ProfileDiagnostic = {
+  code: "lifecycle_failure",
+  severity: "info",
+  stage: "telemetry_shutdown",
+  signal: "telemetry",
+  count: 1,
+  message: null,
+};
+void invalidLifecycleDiagnostic;
+
+// @ts-expect-error span group overflow has catalog-fixed info severity.
+const invalidOverflowDiagnostic: ProfileDiagnostic = {
+  code: "span_group_overflow",
+  severity: "warning",
+  stage: "span_aggregation",
+  signal: "spans",
+  count: 1,
+  message: null,
+};
+void invalidOverflowDiagnostic;

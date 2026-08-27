@@ -56,9 +56,11 @@ test_layers:
       - explicit return
       - iterator method serialization
       - active context for each pull
+      - active context after an awaited continuation in async callbacks and source methods
       - exactly-once termination
     sdk_policy:
-      private_contract: fake OpenTelemetry API objects
+      foundation_support: fake OpenTelemetry API objects with await-capable test context management
+      contract_binding: verify gitlode completion attribute policy over the generic mechanism
       application_integration: real SDK and context propagation
 
   - id: domain_recorders

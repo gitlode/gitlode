@@ -87,14 +87,14 @@ distinguish those registrations.
 
 ## Tracing helpers
 
-The gitlode-specific `telemetry` domain supplies helpers with OpenTelemetry types rather than a
-gitlode tracing interface:
+The generic `otel-support` domain supplies OpenTelemetry lifecycle mechanisms rather than a gitlode
+tracing interface:
 
 ```ts
 withSpan(tracer, name, callback, options?, parentContext?)
 withAsyncSpan(tracer, name, callback, options?, parentContext?)
 recordSpanError(span, error)
-instrumentAsyncIterable(tracer, name, factory, options?, parentContext?)
+createAsyncIterableInstrumenter(onCompletion)
 ```
 
 `withSpan` accepts only synchronous callbacks at the type level. `withAsyncSpan` preserves the
@@ -103,6 +103,36 @@ preserve the identity of a value returned or thrown by application code.
 
 `recordSpanError` records error semantics but does not end the span. Successful operations normally
 leave status unset rather than setting `OK` automatically.
+
+`otel-support` exports an `AsyncIterableCompletion` union and
+`createAsyncIterableInstrumenter(onCompletion)`. The returned generic instrumenter owns iterator
+lifecycle, serialization, active context, error recording, and exactly-once ending. It reports a
+protocol-neutral completion to the injected callback and contains no attribute name or other
+gitlode policy.
+
+```ts
+type AsyncIterableCompletion = "exhausted" | "cancelled" | "handled_throw" | "error";
+
+interface InstrumentAsyncIterable {
+  <T>(
+    tracer: Tracer,
+    name: string,
+    factory: (span: Span) => AsyncIterable<T>,
+    options?: SpanOptions,
+    parentContext?: Context,
+  ): AsyncIterable<T>;
+}
+
+createAsyncIterableInstrumenter(
+  onCompletion: (span: Span, completion: AsyncIterableCompletion) => void,
+): InstrumentAsyncIterable;
+```
+
+The gitlode-specific `telemetry` domain constructs and exports `instrumentAsyncIterable` by passing
+a completion callback that records `STREAM_COMPLETION_ATTRIBUTE`. This thin binding preserves the
+public helper signature below while keeping its state machine in `otel-support`. Its source imports
+the typed factory and `InstrumentAsyncIterable` from the foundation export, not
+`@opentelemetry/api` directly.
 
 ### Error and status policy
 
@@ -598,17 +628,23 @@ shutdown are isolated by `WorkerTelemetrySession`.
 
 ## Source and dependency boundaries
 
-The `telemetry` domain, exported from `@gitlode/internal-contracts/telemetry`, owns API-based
-helpers, gitlode-specific conventions, catalog metadata, collection policies, and the
-SDK-independent report model. Keeping this domain in the existing contract workspace makes the
-shared application vocabulary available to adapters and the public package without introducing a
-one-domain workspace. `@gitlode/internal-contracts` depends on `@opentelemetry/api`, not SDK
-packages.
+The generic `otel-support` domain, exported from `@gitlode/internal-foundation/otel-support`, owns
+the sync, async, error, and async-iterator lifecycle mechanisms. It depends on
+`@opentelemetry/api`, not SDK packages, and contains no `gitlode.*` observation name, catalog,
+profile contract, or operation policy.
 
-`@gitlode/internal-foundation` remains generic and contains no `gitlode.*` observation names or
-other application-specific telemetry policy. Its legacy `instrumentation` export is transitional
-custom instrumentation and is removed when the migration completes; the target telemetry domain
-does not replace that export in place.
+The gitlode-specific `telemetry` domain, exported from
+`@gitlode/internal-contracts/telemetry`, owns conventions, catalog metadata, collection policies,
+the SDK-independent report model, and thin configured bindings over `otel-support`. Keeping both
+domains in the existing workspaces avoids a one-domain workspace while preserving their different
+charters. The contracts package depends on the foundation package and composes the async-iterable
+binding through its exported typed factory; it does not directly import `@opentelemetry/api` for
+that binding.
+
+The legacy `@gitlode/internal-foundation/instrumentation` export is transitional custom
+instrumentation and is removed when the migration completes. It remains separate from
+`@gitlode/internal-foundation/otel-support`; new helpers must not be re-exported from the legacy
+barrel.
 
 Operation-specific recorder factories live with their owning domains, for example extraction, Git
 implementation, line-diff implementation, output, and plugin runtime. They pre-create instruments

@@ -133,7 +133,7 @@ spans:
       per: extractor invocation
       current_bound: traversal plan count
     lifetime:
-      start: first source next operation that begins logical consumption
+      start: first next invocation, before source iterator acquisition
       end: terminal async-iterator completion
       includes:
         - wall-clock waits between iterator operations
@@ -171,7 +171,7 @@ spans:
       per: outer projector invocation
       current_bound: traversal plan count
     lifetime:
-      start: first source next operation that begins logical consumption
+      start: first next invocation, before source iterator acquisition
       end: terminal async-iterator completion
       includes:
         - wall-clock waits between iterator operations
@@ -585,7 +585,7 @@ spans:
       per: adapter walk invocation
       current_bound: traversal plan count
     lifetime:
-      start: first source next operation that begins logical consumption
+      start: first next invocation, before source iterator acquisition
       end: terminal async-iterator completion
       includes:
         - wall-clock waits between iterator operations
@@ -776,7 +776,7 @@ spans:
     name: gitlode.dag.traversal
     scope: gitlode.dag
     kind: internal
-    owner: generic DAG difference traversal facade
+    owner: generic DAG difference facade through the injected Git implementation telemetry binding
     parent:
       type: active_caller_at_first_consumption
       expected_in_git_extraction: git_commit_walk
@@ -784,7 +784,7 @@ spans:
       per: public difference traversal invocation
       maximum_per_isomorphic_git_commit_walk: 1
     lifetime:
-      start: first source next operation that begins logical consumption
+      start: first next invocation, before source iterator acquisition
       end: terminal async-iterator completion
       includes:
         - wall-clock waits between iterator operations
@@ -828,13 +828,13 @@ spans:
     name: gitlode.dag.reachable
     scope: gitlode.dag
     kind: internal
-    owner: standalone reachable-set traversal facade
+    owner: standalone reachable-set facade through the injected Git implementation telemetry binding
     parent:
       type: active_caller_at_first_consumption
     cardinality:
       per: standalone public reachable traversal invocation
     lifetime:
-      start: first source next operation that begins logical consumption
+      start: first next invocation, before source iterator acquisition
       end: terminal async-iterator completion
       includes:
         - wall-clock waits between iterator operations
@@ -860,7 +860,7 @@ spans:
     name: gitlode.dag.certified_closure
     scope: gitlode.dag
     kind: internal
-    owner: standalone certified-closure facade
+    owner: standalone certified-closure facade through the injected Git implementation telemetry binding
     parent:
       type: active_caller
     cardinality:

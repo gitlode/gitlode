@@ -22,7 +22,7 @@ loading YAML in production. They reject missing or duplicate observations, inval
 references, metadata drift, view omissions, and reintroduction of observations explicitly removed
 by the target design.
 
-Low-level OTel helper tests use fake API objects so private foundation packages do not gain SDK
+Low-level OTel helper tests use fake API objects so the private contract package does not gain SDK
 dependencies. Application-package integration tests separately exercise real provider and async
 context behavior. Async-iterable tests cover every terminal path and exactly-once ending.
 

@@ -44,6 +44,11 @@ test_layers:
       - exactly-once span end
       - successful spans are not forced to OK
     async_iterable_cases:
+      - no span or source acquisition before first next
+      - omitted parent resolves active context at first next rather than wrapper construction
+      - empty first-next exhaustion emits one exhausted span
+      - iterator acquisition failure records one error span
+      - return and throw before first next do not emit a span
       - exhaustion
       - consumer cancellation
       - handled throw
@@ -53,7 +58,7 @@ test_layers:
       - active context for each pull
       - exactly-once termination
     sdk_policy:
-      private_foundation: fake OpenTelemetry API objects
+      private_contract: fake OpenTelemetry API objects
       application_integration: real SDK and context propagation
 
   - id: domain_recorders

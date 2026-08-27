@@ -185,14 +185,17 @@ charter.
   exist only for CLI or output concerns.
 - Must remain a deliberately small common model rather than a general location for shared code.
 
-### 2.4 `instrumentation`
+### 2.4 `telemetry`
 
-**Purpose:** Define SDK-independent, OpenTelemetry API-based support for gitlode observations.
+**Purpose:** Define SDK-independent, OpenTelemetry API-based support and shared vocabulary for
+gitlode observations.
 
 - Includes tracing and async-iterable helpers, observation identifiers and catalogs, collection
   policies, and the structured-clone-safe profile report model.
 - Depends on `@opentelemetry/api` types and semantics rather than defining gitlode replacements for
   tracers, spans, meters, attributes, context, status, or no-op behavior.
+- Contains gitlode-specific span, metric, attribute, and instrumentation-scope names; it is not a
+  generic foundation domain.
 - Excludes SDK providers, processors, readers, exporters, context-manager implementations, worker
   lifecycle, product workflow decisions, and presentation policy.
 - Owns shared observation definitions and transport-neutral report vocabulary, not operation
@@ -200,6 +203,10 @@ charter.
 
 Operation-specific metric recorders live with the domain that owns the operation. Local SDK
 collection is an execution implementation concern. See [`telemetry.md`](telemetry.md).
+
+The pre-migration `internal-foundation/instrumentation` source is a transitional custom API, not the
+target domain described here. It remains available only until production owners migrate and is then
+removed. Generic foundation domains must not acquire gitlode-specific observation names.
 
 ### 2.5 `dag`
 
@@ -394,29 +401,29 @@ exchange for this global status, `type-utils` must preserve the stricter charter
 other domain is global. In particular, `support` remains explicit because its charter permits
 Node.js runtime APIs.
 
-| Domain            | Allowed direct domain dependencies                                                                     |
-| ----------------- | ------------------------------------------------------------------------------------------------------ |
-| `type-utils`      | None                                                                                                   |
-| `support`         | None                                                                                                   |
-| `model`           | None                                                                                                   |
-| `instrumentation` | None                                                                                                   |
-| `diagnostics`     | None                                                                                                   |
-| `progress`        | None                                                                                                   |
-| `dag`             | `instrumentation`, `support`                                                                           |
-| `git`             | `model`                                                                                                |
-| `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                                    |
-| `line-diff`       | None                                                                                                   |
-| `line-diff-impl`  | `instrumentation`, `line-diff`                                                                         |
-| `state`           | `extraction-api`, `model`, `support`                                                                   |
-| `extraction-api`  | `diagnostics`, `model`, `support`                                                                      |
-| `extraction`      | `diagnostics`, `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `support` |
-| `plugin-api`      | `extraction-api`, `instrumentation`                                                                    |
-| `plugin-runtime`  | `diagnostics`, `extraction-api`, `instrumentation`, `plugin-api`, `support`                            |
-| `output`          | `extraction-api`                                                                                       |
-| `config`          | `plugin-api`, `support`                                                                                |
-| `cli`             | `config`, `support`                                                                                    |
-| `presentation`    | `diagnostics`, `instrumentation`, `progress`, `support`                                                |
-| `execution`       | Listed below because this composition domain has a larger direct dependency set.                       |
+| Domain           | Allowed direct domain dependencies                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| `type-utils`     | None                                                                                             |
+| `support`        | None                                                                                             |
+| `model`          | None                                                                                             |
+| `telemetry`      | None                                                                                             |
+| `diagnostics`    | None                                                                                             |
+| `progress`       | None                                                                                             |
+| `dag`            | `support`                                                                                        |
+| `git`            | `model`                                                                                          |
+| `git-impl`       | `dag`, `git`, `model`, `support`, `telemetry`                                                    |
+| `line-diff`      | None                                                                                             |
+| `line-diff-impl` | `line-diff`, `telemetry`                                                                         |
+| `state`          | `extraction-api`, `model`, `support`                                                             |
+| `extraction-api` | `diagnostics`, `model`, `support`                                                                |
+| `extraction`     | `diagnostics`, `extraction-api`, `git`, `line-diff`, `model`, `progress`, `support`, `telemetry` |
+| `plugin-api`     | `extraction-api`                                                                                 |
+| `plugin-runtime` | `diagnostics`, `extraction-api`, `plugin-api`, `support`, `telemetry`                            |
+| `output`         | `extraction-api`                                                                                 |
+| `config`         | `plugin-api`, `support`                                                                          |
+| `cli`            | `config`, `support`                                                                              |
+| `presentation`   | `diagnostics`, `progress`, `support`, `telemetry`                                                |
+| `execution`      | Listed below because this composition domain has a larger direct dependency set.                 |
 
 `execution` may directly depend on:
 
@@ -425,7 +432,7 @@ Node.js runtime APIs.
 - `extraction-api`
 - `git`
 - `git-impl`
-- `instrumentation`
+- `telemetry`
 - `line-diff-impl`
 - `model`
 - `output`
@@ -451,8 +458,8 @@ The production workspaces own these domains and application responsibilities:
 
 | Workspace                      | Owned source                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `@gitlode/internal-foundation` | `type-utils`, `support`, `instrumentation`, `dag`                                                            |
-| `@gitlode/internal-contracts`  | `diagnostics`, `model`, `progress`, `extraction-api`, `git`, `line-diff`                                     |
+| `@gitlode/internal-foundation` | `type-utils`, `support`, `dag`                                                                               |
+| `@gitlode/internal-contracts`  | `diagnostics`, `model`, `progress`, `extraction-api`, `git`, `line-diff`, `telemetry`                        |
 | `@gitlode/git-adapters`        | `git-impl`                                                                                                   |
 | `@gitlode/line-diff-adapters`  | `line-diff-impl`                                                                                             |
 | `gitlode`                      | application composition, extraction policy, CLI, config, output, state, presentation, and plugin API/runtime |
@@ -467,8 +474,9 @@ not install them or observe private package specifiers. Build and bundling mecha
 
 The accepted post-migration production package dependency envelope is:
 
-- `@gitlode/internal-foundation` depends on `@opentelemetry/api`.
-- `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation`.
+- `@gitlode/internal-foundation` has no OpenTelemetry dependency in the completed target.
+- `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation` and
+  `@opentelemetry/api`.
 - `@gitlode/git-adapters` depends on `@gitlode/internal-contracts`,
   `@gitlode/internal-foundation`, `@opentelemetry/api`, and `isomorphic-git`.
 - `@gitlode/line-diff-adapters` depends on `@gitlode/internal-contracts`,
@@ -492,11 +500,10 @@ package has no package-level dependency path to its target.
 
 The official private-package exports are:
 
-- `@gitlode/internal-foundation/type-utils`, `/support`, `/instrumentation`, and `/dag`; the package
-  root has no export.
+- `@gitlode/internal-foundation/type-utils`, `/support`, and `/dag`; the package root has no export.
 - `@gitlode/internal-contracts/diagnostics`, `/model`, `/progress`, `/extraction`, `/git`, and
-  `/line-diff`; the package root has no export. The source domain named `extraction-api` maps to the
-  package export `@gitlode/internal-contracts/extraction`.
+  `/line-diff`, and `/telemetry`; the package root has no export. The source domain named
+  `extraction-api` maps to the package export `@gitlode/internal-contracts/extraction`.
 - `@gitlode/git-adapters` and `@gitlode/git-adapters/experimental`. The `experimental` subpath is
   the unstable Git traversal-selection surface.
 - `@gitlode/line-diff-adapters`.
@@ -528,8 +535,8 @@ rules. An arrow from `A` to `B` means that domain `A` may directly depend on dom
 #### 4.1.1 Structural domain graph
 
 This view shows the structural domain dependencies while omitting `type-utils`, `support`, and
-`instrumentation`, together with edges to them. `type-utils` is global. `support` and
-`instrumentation` are explicit dependencies, but their edges largely indicate whether current code
+`telemetry`, together with edges to them. `type-utils` is global. `support` and
+`telemetry` are explicit dependencies, but their edges largely indicate whether current code
 happens to need a general utility or measurement hook rather than clarifying the product structure.
 Their omission does not make them global: adding either dependency still requires an intentional
 change to Section 2.22 and the Rev-dep configuration.
@@ -630,7 +637,6 @@ flowchart TB
   gitImpl --> dag
   gitImpl --> git
   gitImpl --> model
-  lineDiffImpl --> instrumentation
   lineDiffImpl --> lineDiff
 
 ```
@@ -641,7 +647,7 @@ grant dependencies between its members.
 #### 4.1.2 Extraction core
 
 This view removes CLI, configuration, presentation, and cross-cutting dependencies such as
-`type-utils`, `support`, `instrumentation`, `diagnostics`, and `progress`. It also suppresses direct composition
+`type-utils`, `support`, `telemetry`, `diagnostics`, and `progress`. It also suppresses direct composition
 edges from `execution` to lower-level contracts when the corresponding implementation relationship
 is already visible. Consult Section 2.22 for the complete rule.
 
@@ -744,6 +750,14 @@ checks exclude generated `dist` files while continuing to analyze package source
 Workspace-level boundaries let package-owned tests import their own source and test support while
 requiring cross-workspace test imports to use official exports. Plugin source and tests likewise
 reach gitlode only through the official `gitlode/plugin-api` export.
+
+Missing-module enforcement follows source ownership. A workspace must declare an external package
+when its own source imports that package. It must not be forced to declare an external package solely
+because a dependency's public declaration mentions that package and the dependency correctly owns
+it. In particular, official plugins that import only `gitlode/plugin-api` do not acquire a direct
+`@opentelemetry/api` dependency from the `Tracer` and `Meter` types in gitlode's declaration graph.
+Rev-dep configuration must distinguish that transitive declaration case without suppressing missing
+direct source dependencies.
 
 Intentional rule changes must update this document and the configuration together. Reviewers must
 compare them in both directions: every accepted dependency must be representable, and the

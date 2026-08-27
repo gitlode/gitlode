@@ -305,7 +305,7 @@ metrics:
     instrument: counter
     unit: "{operation}"
     description: Number of public DAG facade operations reaching each normalized terminal completion.
-    owner: generic DAG facade
+    owner: Git implementation telemetry binding receiving terminal evidence from the generic DAG facade
     recording:
       value: 1
       point: once when a started facade operation terminates
@@ -338,7 +338,7 @@ metrics:
     instrument: counter
     unit: "{step}"
     description: Number of work items actually processed by a public DAG operation and its reusable cores.
-    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    owner: Git implementation telemetry binding receiving an operation-local neutral DAG measurement
     recording:
       value: accumulated processed step count
       point: once at operation termination, including completed partial work
@@ -370,7 +370,7 @@ metrics:
     instrument: counter
     unit: "{step}"
     description: Number of processed DAG work items discarded as stale or duplicate.
-    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    owner: Git implementation telemetry binding receiving an operation-local neutral DAG measurement
     recording:
       value: accumulated stale step count
       point: once at operation termination, including completed partial work
@@ -401,7 +401,7 @@ metrics:
     instrument: counter
     unit: "{expansion}"
     description: Number of calls made to DagTopologyPort.getSuccessors by role.
-    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    owner: Git implementation telemetry binding receiving an operation-local neutral DAG measurement
     recording:
       value: accumulated successor expansion count
       point: once at operation termination, including completed partial work
@@ -436,7 +436,7 @@ metrics:
     instrument: counter
     unit: "{node}"
     description: Number of result node IDs yielded by a public difference or reachable facade.
-    owner: operation-local DagTraversalMeasurement reported by the generic DAG facade
+    owner: Git implementation telemetry binding receiving an operation-local neutral DAG measurement
     recording:
       value: accumulated yielded result node count
       point: once at operation termination, including nodes yielded before cancellation or error
@@ -468,7 +468,7 @@ metrics:
     instrument: counter
     unit: "{node}"
     description: Number of unique nodes discovered while materializing a complete excluded reachable set.
-    owner: operation-local DagTraversalMeasurement reported by the difference facade
+    owner: Git implementation telemetry binding receiving a difference-operation neutral DAG measurement
     recording:
       value: accumulated unique excluded node count
       point: once at operation termination, including completed partial collection work
@@ -501,7 +501,7 @@ metrics:
     instrument: counter
     unit: "{fallback}"
     description: Number of certified-lazy traversals that selected conservative fallback by reason.
-    owner: operation-local DagTraversalMeasurement reported by the difference facade
+    owner: Git implementation telemetry binding receiving a difference-operation neutral DAG measurement
     recording:
       value: 1
       decision_point: when certified-lazy selects conservative fallback
@@ -523,7 +523,7 @@ metrics:
     instrument: counter
     unit: "{node}"
     description: Number of buffered result candidates removed after conservative fallback collection.
-    owner: operation-local DagTraversalMeasurement reported by the difference facade
+    owner: Git implementation telemetry binding receiving a difference-operation neutral DAG measurement
     recording:
       value: accumulated removed candidate count
       point: once at operation termination

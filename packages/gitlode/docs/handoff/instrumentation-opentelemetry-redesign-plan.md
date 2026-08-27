@@ -58,6 +58,9 @@ only a routing summary for implementation sessions.
   `@opentelemetry/api`.
 - gitlode owns tracing helpers, semantic catalogs, domain metric recorders, local collection, and
   worker composition, not substitute tracing contracts.
+- The target gitlode-specific `telemetry` domain is exported from
+  `@gitlode/internal-contracts/telemetry`; no new workspace is introduced for it, and generic
+  `internal-foundation` does not own `gitlode.*` names.
 - One `WorkerTelemetrySession` owns one worker run and finalizes after application resource
   disposal without changing its result.
 - Normal traces contain bounded operations and logical streams, not per-commit/file/record/blob/diff
@@ -135,9 +138,10 @@ Acceptance:
 
 ### Phase 1: OpenTelemetry API helpers
 
-1. Add `@opentelemetry/api` to each workspace that imports it directly.
-2. Replace custom helper contracts with sync, async, error, and async-iterable helpers using OTel API
-   types.
+1. Add the target `telemetry` domain and export to `@gitlode/internal-contracts`, and add
+   `@opentelemetry/api` there because that workspace imports it directly.
+2. Add sync, async, error, and async-iterable helpers using OTel API types without changing or
+   re-exporting them through the legacy `internal-foundation/instrumentation` surface.
 3. Add focused tests for return/error identity, active context, parent override, all iterator
    terminal paths, serialization of iterator methods, and exactly-once ending.
 4. Keep call sites on the old instrumentation until helper behavior is complete.
@@ -145,9 +149,12 @@ Acceptance:
 Acceptance:
 
 - helper signatures expose OTel API types;
+- `gitlode.*` conventions occur only in the gitlode-specific `telemetry` domain;
 - all specified lifecycle paths are tested;
-- no exporter or SDK package is introduced below execution; and
-- extraction behavior is unchanged.
+- no exporter or SDK package is introduced below execution;
+- extraction behavior is unchanged; and
+- repository architecture checks pass without adding OpenTelemetry dependencies to workspaces that
+  do not import it in source.
 
 ### Phase 2: Observation catalog and domain recorders
 
@@ -342,21 +349,36 @@ Exit gate:
 - a documented command reproduces calibration and measurement without changing the manifest; and
 - normal build, relevant tests, lint, architecture, and format checks pass.
 
-### T01: OpenTelemetry API helper foundation
+### T01: OpenTelemetry API helpers and telemetry domain
 
 Prerequisites: T00B.
 
 Scope:
 
-- add direct `@opentelemetry/api` dependencies to workspaces that import it in this unit;
+- create the gitlode-specific `telemetry` source domain and
+  `@gitlode/internal-contracts/telemetry` export inside the existing `internal-contracts`
+  workspace; do not add another workspace/package;
+- add `@opentelemetry/api` directly to `internal-contracts`, the only workspace that imports it in
+  this unit, and remove the migration-only dependency from `internal-foundation`;
 - implement `withSpan`, `withAsyncSpan`, `recordSpanError`, and `instrumentAsyncIterable` with the
   accepted OTel API signatures and semantics;
-- add shared scope and observation identifiers needed by the helpers without adding SDK code; and
+- add shared gitlode scope and observation identifiers to that telemetry domain without adding SDK
+  code or gitlode-specific names to `internal-foundation`; and
 - test callback and error identity, active and explicit parent context, status policy, iterator
   serialization, every terminal path, and exactly-once ending using fake API values.
 
-Keep the legacy custom instrumentation available to existing production call sites. Do not add SDK
-dependencies, exporters, or compatibility overloads to the target helpers.
+For `instrumentAsyncIterable`, starting the first `next()` starts one span before source iterator
+acquisition. Empty first-pull exhaustion therefore emits one `exhausted` span, while acquisition and
+first-pull failures emit one error span and preserve the original thrown value. `return()` or
+`throw(value)` before any `next()` does not acquire the source or emit a span. This replaces the
+unimplementable requirement to run the first pull in a span and later discard that span when it is
+empty.
+
+Keep the legacy custom instrumentation export and existing production call sites unchanged. The
+new helpers must not be added to its barrel, so declaration traversal from the legacy plugin API
+does not make `@opentelemetry/api` appear to be a plugin dependency. Do not rename legacy helpers,
+add SDK dependencies or exporters, or add compatibility overloads to the target helpers. Regenerate
+a complete lockfile entry from a usable registry and verify `architecture:check`.
 
 Exit gate: Phase 1 acceptance is satisfied and existing extraction behavior is unchanged.
 
@@ -377,6 +399,9 @@ Scope:
 
 Production code must not parse YAML. Report types must contain no OTel SDK type and must be
 structured-clone-safe by construction.
+
+These shared contracts and utilities extend `@gitlode/internal-contracts/telemetry`; they do not
+create a new workspace or move gitlode-specific metadata into `internal-foundation`.
 
 Exit gate: shared metadata and report contracts match the catalogs, and no-op timing primitives read
 no clock and allocate no per-operation timing token.
@@ -407,7 +432,9 @@ Prerequisites: T03.
 Scope:
 
 - add final recorder factories and no-op implementations for common Git, adapter-specific Git, and
-  DAG metrics;
+  DAG metrics in the Git implementation domain;
+- define an adapter from algorithm-neutral DAG observation hooks to the cataloged `gitlode.dag`
+  recorder without connecting it to production DAG owners yet;
 - preserve the separation between public-operation completion and reusable DAG core measurements;
 - encode adapter, object-purpose, cache-result, fallback, completion, and partial-work semantics from
   the catalogs; and
@@ -415,6 +442,8 @@ Scope:
   correctness and efficiency tests.
 
 Do not instrument production owners yet and do not retain removed prototype-specific DAG counters.
+Do not import `@gitlode/internal-contracts/telemetry`, `@opentelemetry/api`, or `gitlode.*`
+identifiers from the generic `dag` domain.
 
 Exit gate: Phase 2 acceptance is satisfied for the complete metric catalog.
 
@@ -482,7 +511,10 @@ Prerequisites: T07.
 
 Scope:
 
-- migrate public DAG facades and reusable traversal cores to final tracer and recorder inputs;
+- replace the generic DAG domain's legacy telemetry dependency with algorithm-neutral observation
+  hooks and connect those hooks to the Git implementation-owned OTel binding;
+- apply logical-stream tracing around the Git implementation's use of public DAG facades rather
+  than importing OTel or gitlode telemetry conventions into the generic DAG domain;
 - implement logical-stream spans, operation completion, partial work, cancellation, handled-throw,
   fallback event and counter, and exactly-once measurement semantics; and
 - replace legacy instrumentation assertions while preserving exact topology and graph-work tests.
@@ -533,9 +565,13 @@ Scope:
   and fatal/thrown-value policy; and
 - update official plugins and public declaration tests while preserving extension JSON and order.
 
+Update architecture enforcement so a plugin that imports only `gitlode/plugin-api` is not required
+to declare `@opentelemetry/api` merely because that package appears in transitive declarations.
+
 Do not use namespace, configuration, paths, or arbitrary injected-work identity as metric attributes.
 The possible future need to distinguish arbitrary-work plugins remains deferred until such a plugin
-has concrete requirements.
+has concrete requirements. Do not add `@opentelemetry/api` to official plugin manifests unless that
+plugin's own source imports it directly.
 
 Exit gate: plugin output is equivalent, scope and parentage tests pass, and no public plugin
 declaration exposes a removed telemetry contract.
@@ -552,7 +588,8 @@ Scope:
 - implement the declarative signal-separated profile view, known diagnostic reading order, plugin
   grouping, unknown fallback, partial/unavailable states, unit formatting, and quiet/success-only UX;
 - remove the legacy local recorder, no-op implementation, custom instrumentation and span contracts,
-  `ProfileSummaryEntry`, old profile formatting, and stale tests; and
+  `ProfileSummaryEntry`, the `@gitlode/internal-foundation/instrumentation` export, its now-unused
+  package dependency, old profile formatting, and stale tests; and
 - update `profiling.md`, usage material, architecture/domain/plugin target markers, dependencies, and
   public package declarations to implemented state.
 

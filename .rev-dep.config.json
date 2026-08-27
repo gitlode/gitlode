@@ -44,6 +44,11 @@
           ]
         },
         {
+          "name": "otel-support",
+          "pattern": "packages/internal-foundation/src/otel-support/**",
+          "allow": ["packages/internal-foundation/src/otel-support/**"]
+        },
+        {
           "name": "dag",
           "pattern": "packages/internal-foundation/src/dag/**",
           "allow": [
@@ -112,6 +117,15 @@
             "packages/internal-contracts/src/line-diff/**",
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js"
+          ]
+        },
+        {
+          "name": "telemetry",
+          "pattern": "packages/internal-contracts/src/telemetry/**",
+          "allow": [
+            "packages/internal-contracts/src/telemetry/**",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
           ]
         },
         {
@@ -344,7 +358,11 @@
         {
           "name": "internal-contracts-tests",
           "pattern": "packages/internal-contracts/test/**",
-          "allow": ["packages/internal-contracts/src/**", "packages/internal-contracts/test/**"]
+          "allow": [
+            "packages/internal-contracts/src/**",
+            "packages/internal-contracts/test/**",
+            "packages/internal-foundation/dist/otel-support/index.js"
+          ]
         },
         {
           "name": "git-adapters-tests",
@@ -506,6 +524,7 @@
         "src/type-utils/index.ts",
         "src/support/index.ts",
         "src/instrumentation/index.ts",
+        "src/otel-support/index.ts",
         "src/dag/index.ts"
       ],
       "devEntryPoints": ["test/**", "vitest.config.ts"]
@@ -526,7 +545,10 @@
         "excludeModules": ["@types/*", "@vitest/coverage-v8", "@gitlode/internal-foundation"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
-      "missingNodeModulesDetection": true,
+      "missingNodeModulesDetection": {
+        "enabled": true,
+        "excludeModules": ["@opentelemetry/api"]
+      },
       "devDepsUsageOnProdDetection": {
         "ignoreTypeImports": true
       },
@@ -537,7 +559,8 @@
         "src/progress/index.ts",
         "src/extraction-api/index.ts",
         "src/git/index.ts",
-        "src/line-diff/index.ts"
+        "src/line-diff/index.ts",
+        "src/telemetry/index.ts"
       ],
       "devEntryPoints": ["test/**", "vitest.config.ts"]
     },

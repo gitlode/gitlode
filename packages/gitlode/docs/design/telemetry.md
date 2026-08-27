@@ -87,14 +87,14 @@ distinguish those registrations.
 
 ## Tracing helpers
 
-The instrumentation domain supplies helpers with OpenTelemetry types rather than a gitlode tracing
-interface:
+The generic `otel-support` domain supplies OpenTelemetry lifecycle mechanisms rather than a gitlode
+tracing interface:
 
 ```ts
 withSpan(tracer, name, callback, options?, parentContext?)
 withAsyncSpan(tracer, name, callback, options?, parentContext?)
 recordSpanError(span, error)
-instrumentAsyncIterable(tracer, name, factory, options?, parentContext?)
+createAsyncIterableInstrumenter(onCompletion)
 ```
 
 `withSpan` accepts only synchronous callbacks at the type level. `withAsyncSpan` preserves the
@@ -103,6 +103,36 @@ preserve the identity of a value returned or thrown by application code.
 
 `recordSpanError` records error semantics but does not end the span. Successful operations normally
 leave status unset rather than setting `OK` automatically.
+
+`otel-support` exports an `AsyncIterableCompletion` union and
+`createAsyncIterableInstrumenter(onCompletion)`. The returned generic instrumenter owns iterator
+lifecycle, serialization, active context, error recording, and exactly-once ending. It reports a
+protocol-neutral completion to the injected callback and contains no attribute name or other
+gitlode policy.
+
+```ts
+type AsyncIterableCompletion = "exhausted" | "cancelled" | "handled_throw" | "error";
+
+interface InstrumentAsyncIterable {
+  <T>(
+    tracer: Tracer,
+    name: string,
+    factory: (span: Span) => AsyncIterable<T>,
+    options?: SpanOptions,
+    parentContext?: Context,
+  ): AsyncIterable<T>;
+}
+
+createAsyncIterableInstrumenter(
+  onCompletion: (span: Span, completion: AsyncIterableCompletion) => void,
+): InstrumentAsyncIterable;
+```
+
+The gitlode-specific `telemetry` domain constructs and exports `instrumentAsyncIterable` by passing
+a completion callback that records `STREAM_COMPLETION_ATTRIBUTE`. This thin binding preserves the
+public helper signature below while keeping its state machine in `otel-support`. Its source imports
+the typed factory and `InstrumentAsyncIterable` from the foundation export, not
+`@opentelemetry/api` directly.
 
 ### Error and status policy
 
@@ -124,11 +154,31 @@ below.
 
 `instrumentAsyncIterable` measures consumption, not iterator factory creation.
 
+Its target signature is:
+
+```ts
+instrumentAsyncIterable<T>(
+  tracer: Tracer,
+  name: string,
+  factory: (span: Span) => AsyncIterable<T>,
+  options?: SpanOptions,
+  parentContext?: Context,
+): AsyncIterable<T>
+```
+
 - Each iterator instance owns an independent span.
 - No span is started until the first `next()` call.
-- If the first `next()` returns `done: true`, no source operation occurred and no span is emitted.
-- If obtaining the iterator or the first `next()` throws before a source operation starts, the
-  original error is propagated without manufacturing a source span.
+- An explicit `parentContext` is used for that iterator. When it is omitted, the helper reads the
+  active context at the first `next()` invocation, not when the wrapper or iterator is constructed.
+- The first `next()` starts the span before obtaining the source iterator and invokes both iterator
+  acquisition and the source `next()` under that span's active context.
+- If the first `next()` returns `done: true`, one bounded span is emitted with `exhausted`
+  completion. OpenTelemetry API spans are not retroactively discarded after the result is known.
+- If obtaining the iterator or the first `next()` throws, the error is recorded on that span, the
+  span ends with `error` completion, and the original thrown value is propagated.
+- `return(value)` before the first `next()` does not obtain the source iterator or emit a span and
+  resolves to `{ value, done: true }`. `throw(value)` before the first `next()` likewise emits no
+  span, does not obtain the source iterator, and rejects with the original value.
 - Source `next()`, `return()`, and `throw()` calls execute under the span context.
 - Downstream consumer work does not inherit that span as its active parent.
 - The span remains open across waits between iterator calls. Its duration is logical wall-clock
@@ -578,13 +628,33 @@ shutdown are isolated by `WorkerTelemetrySession`.
 
 ## Source and dependency boundaries
 
-`@gitlode/internal-foundation/instrumentation` owns API-based helpers, conventions, catalogs,
-collection policies, and the SDK-independent report model. It depends on `@opentelemetry/api`, not
-SDK packages.
+The generic `otel-support` domain, exported from `@gitlode/internal-foundation/otel-support`, owns
+the sync, async, error, and async-iterator lifecycle mechanisms. It depends on
+`@opentelemetry/api`, not SDK packages, and contains no `gitlode.*` observation name, catalog,
+profile contract, or operation policy.
 
-Operation-specific recorder factories live with their owning domains, for example extraction,
-Git implementation, DAG, line-diff implementation, output, and plugin runtime. They pre-create
-instruments from an injected `Meter` and contain domain recording semantics.
+The gitlode-specific `telemetry` domain, exported from
+`@gitlode/internal-contracts/telemetry`, owns conventions, catalog metadata, collection policies,
+the SDK-independent report model, and thin configured bindings over `otel-support`. Keeping both
+domains in the existing workspaces avoids a one-domain workspace while preserving their different
+charters. The contracts package depends on the foundation package and composes the async-iterable
+binding through its exported typed factory; it does not directly import `@opentelemetry/api` for
+that binding.
+
+The legacy `@gitlode/internal-foundation/instrumentation` export is transitional custom
+instrumentation and is removed when the migration completes. It remains separate from
+`@gitlode/internal-foundation/otel-support`; new helpers must not be re-exported from the legacy
+barrel.
+
+Operation-specific recorder factories live with their owning domains, for example extraction, Git
+implementation, line-diff implementation, output, and plugin runtime. They pre-create instruments
+from an injected `Meter` and contain domain recording semantics. The Git implementation's DAG
+binding is the explicit exception to placing a recorder in the operation's algorithm domain.
+
+The generic `dag` domain does not depend on the gitlode-specific `telemetry` domain. It exposes only
+algorithm-neutral observation hooks for graph-work evidence. The Git implementation owns the OTel
+binding that supplies those hooks and records the cataloged `gitlode.dag` observations. This keeps
+the package graph acyclic and prevents gitlode names from entering the generic foundation package.
 
 Worker SDK composition remains an internal module group under `execution`, including the telemetry
 session, local span processor, local metric reader, context management, and report builder. This is
@@ -593,10 +663,15 @@ not a separate top-level domain or workspace package during this migration.
 Presentation consumes only `ProfileReport` and the shared observation identifiers it needs. It does
 not depend on OpenTelemetry SDK types or collection implementations.
 
-Every workspace that directly imports `@opentelemetry/api` declares it directly. The public
-`gitlode` package declares it because plugin API declarations expose OpenTelemetry API types. SDK
-packages remain implementation dependencies of the public application package and do not leak into
-private-package or plugin declarations.
+Every workspace whose source directly imports `@opentelemetry/api` declares it directly. The
+public `gitlode` package declares it because plugin API declarations expose OpenTelemetry API types.
+An official plugin that imports only `gitlode/plugin-api` and receives an injected `Tracer` or
+`Meter` does not declare `@opentelemetry/api` merely because that type occurs in a transitive public
+declaration. If a plugin later imports `@opentelemetry/api` itself, its manifest must declare the API
+according to that direct use. Architecture enforcement must model this source-import rule rather
+than spreading dependencies to non-importing plugins. SDK packages remain implementation
+dependencies of the public application package and do not leak into private-package or plugin
+declarations.
 
 ## Deliberate non-goals
 

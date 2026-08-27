@@ -27,6 +27,10 @@
       "types": "./dist/instrumentation/index.d.ts",
       "default": "./dist/instrumentation/index.js"
     },
+    "./otel-support": {
+      "types": "./dist/otel-support/index.d.ts",
+      "default": "./dist/otel-support/index.js"
+    },
     "./dag": {
       "types": "./dist/dag/index.d.ts",
       "default": "./dist/dag/index.js"
@@ -44,6 +48,9 @@
     "test": "npm run build:dev && vitest run",
     "test:watch": "npm run build:dev && vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.14",

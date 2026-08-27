@@ -185,14 +185,35 @@ charter.
   exist only for CLI or output concerns.
 - Must remain a deliberately small common model rather than a general location for shared code.
 
-### 2.4 `instrumentation`
+### 2.4 Cross-cutting telemetry domains
 
-**Purpose:** Define SDK-independent, OpenTelemetry API-based support for gitlode observations.
+#### 2.4.1 `otel-support`
 
-- Includes tracing and async-iterable helpers, observation identifiers and catalogs, collection
-  policies, and the structured-clone-safe profile report model.
-- Depends on `@opentelemetry/api` types and semantics rather than defining gitlode replacements for
-  tracers, spans, meters, attributes, context, status, or no-op behavior.
+**Purpose:** Provide generic OpenTelemetry API lifecycle mechanisms without application observation
+policy.
+
+- Includes synchronous and asynchronous span helpers, safe exception recording, and the generic
+  async-iterator instrumentation state machine.
+- Depends on `@opentelemetry/api` types and semantics rather than defining replacements for tracers,
+  spans, context, status, or no-op behavior.
+- May report protocol-neutral async-iterator completion values to an injected callback.
+- Excludes every `gitlode.*` name, observation catalog, operation owner, profile-report contract,
+  SDK provider, processor, reader, exporter, and context-manager implementation.
+
+This domain is generic by charter even though gitlode is currently its only repository consumer.
+Its OpenTelemetry dependency is part of that explicit charter and does not make product-specific
+telemetry policy admissible.
+
+#### 2.4.2 `telemetry`
+
+**Purpose:** Define the SDK-independent, gitlode-specific vocabulary and policy for observations.
+
+- Includes observation identifiers and catalogs, collection policies, the structured-clone-safe
+  profile report model, and thin policy bindings over generic `otel-support` mechanisms.
+- Depends on `otel-support` to compose the public gitlode async-iterable helper without owning its
+  iterator state machine.
+- Contains gitlode-specific span, metric, attribute, and instrumentation-scope names; it is not a
+  generic foundation domain.
 - Excludes SDK providers, processors, readers, exporters, context-manager implementations, worker
   lifecycle, product workflow decisions, and presentation policy.
 - Owns shared observation definitions and transport-neutral report vocabulary, not operation
@@ -200,6 +221,11 @@ charter.
 
 Operation-specific metric recorders live with the domain that owns the operation. Local SDK
 collection is an execution implementation concern. See [`telemetry.md`](telemetry.md).
+
+The pre-migration `internal-foundation/instrumentation` source is a transitional custom API, not the
+target domain described here. It remains available only until production owners migrate and is then
+removed. `otel-support` is distinct from that legacy domain and must not acquire gitlode-specific
+observation names.
 
 ### 2.5 `dag`
 
@@ -394,29 +420,30 @@ exchange for this global status, `type-utils` must preserve the stricter charter
 other domain is global. In particular, `support` remains explicit because its charter permits
 Node.js runtime APIs.
 
-| Domain            | Allowed direct domain dependencies                                                                     |
-| ----------------- | ------------------------------------------------------------------------------------------------------ |
-| `type-utils`      | None                                                                                                   |
-| `support`         | None                                                                                                   |
-| `model`           | None                                                                                                   |
-| `instrumentation` | None                                                                                                   |
-| `diagnostics`     | None                                                                                                   |
-| `progress`        | None                                                                                                   |
-| `dag`             | `instrumentation`, `support`                                                                           |
-| `git`             | `model`                                                                                                |
-| `git-impl`        | `dag`, `git`, `instrumentation`, `model`, `support`                                                    |
-| `line-diff`       | None                                                                                                   |
-| `line-diff-impl`  | `instrumentation`, `line-diff`                                                                         |
-| `state`           | `extraction-api`, `model`, `support`                                                                   |
-| `extraction-api`  | `diagnostics`, `model`, `support`                                                                      |
-| `extraction`      | `diagnostics`, `extraction-api`, `git`, `instrumentation`, `line-diff`, `model`, `progress`, `support` |
-| `plugin-api`      | `extraction-api`, `instrumentation`                                                                    |
-| `plugin-runtime`  | `diagnostics`, `extraction-api`, `instrumentation`, `plugin-api`, `support`                            |
-| `output`          | `extraction-api`                                                                                       |
-| `config`          | `plugin-api`, `support`                                                                                |
-| `cli`             | `config`, `support`                                                                                    |
-| `presentation`    | `diagnostics`, `instrumentation`, `progress`, `support`                                                |
-| `execution`       | Listed below because this composition domain has a larger direct dependency set.                       |
+| Domain           | Allowed direct domain dependencies                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `type-utils`     | None                                                                                                             |
+| `support`        | None                                                                                                             |
+| `model`          | None                                                                                                             |
+| `otel-support`   | None                                                                                                             |
+| `telemetry`      | `otel-support`                                                                                                   |
+| `diagnostics`    | None                                                                                                             |
+| `progress`       | None                                                                                                             |
+| `dag`            | `support`                                                                                                        |
+| `git`            | `model`                                                                                                          |
+| `git-impl`       | `dag`, `git`, `model`, `otel-support`, `support`, `telemetry`                                                    |
+| `line-diff`      | None                                                                                                             |
+| `line-diff-impl` | `line-diff`, `telemetry`                                                                                         |
+| `state`          | `extraction-api`, `model`, `support`                                                                             |
+| `extraction-api` | `diagnostics`, `model`, `support`                                                                                |
+| `extraction`     | `diagnostics`, `extraction-api`, `git`, `line-diff`, `model`, `otel-support`, `progress`, `support`, `telemetry` |
+| `plugin-api`     | `extraction-api`                                                                                                 |
+| `plugin-runtime` | `diagnostics`, `extraction-api`, `otel-support`, `plugin-api`, `support`, `telemetry`                            |
+| `output`         | `extraction-api`, `telemetry`                                                                                    |
+| `config`         | `plugin-api`, `support`                                                                                          |
+| `cli`            | `config`, `support`                                                                                              |
+| `presentation`   | `diagnostics`, `progress`, `support`, `telemetry`                                                                |
+| `execution`      | Listed below because this composition domain has a larger direct dependency set.                                 |
 
 `execution` may directly depend on:
 
@@ -425,7 +452,8 @@ Node.js runtime APIs.
 - `extraction-api`
 - `git`
 - `git-impl`
-- `instrumentation`
+- `otel-support`
+- `telemetry`
 - `line-diff-impl`
 - `model`
 - `output`
@@ -451,8 +479,8 @@ The production workspaces own these domains and application responsibilities:
 
 | Workspace                      | Owned source                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `@gitlode/internal-foundation` | `type-utils`, `support`, `instrumentation`, `dag`                                                            |
-| `@gitlode/internal-contracts`  | `diagnostics`, `model`, `progress`, `extraction-api`, `git`, `line-diff`                                     |
+| `@gitlode/internal-foundation` | `type-utils`, `support`, `otel-support`, `dag`                                                               |
+| `@gitlode/internal-contracts`  | `diagnostics`, `model`, `progress`, `extraction-api`, `git`, `line-diff`, `telemetry`                        |
 | `@gitlode/git-adapters`        | `git-impl`                                                                                                   |
 | `@gitlode/line-diff-adapters`  | `line-diff-impl`                                                                                             |
 | `gitlode`                      | application composition, extraction policy, CLI, config, output, state, presentation, and plugin API/runtime |
@@ -467,8 +495,10 @@ not install them or observe private package specifiers. Build and bundling mecha
 
 The accepted post-migration production package dependency envelope is:
 
-- `@gitlode/internal-foundation` depends on `@opentelemetry/api`.
-- `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation`.
+- `@gitlode/internal-foundation` depends on `@opentelemetry/api` for `otel-support`.
+- `@gitlode/internal-contracts` depends on `@gitlode/internal-foundation`. Its telemetry policy
+  wrapper is composed through the typed `otel-support` factory and does not directly import
+  `@opentelemetry/api`.
 - `@gitlode/git-adapters` depends on `@gitlode/internal-contracts`,
   `@gitlode/internal-foundation`, `@opentelemetry/api`, and `isomorphic-git`.
 - `@gitlode/line-diff-adapters` depends on `@gitlode/internal-contracts`,
@@ -492,11 +522,11 @@ package has no package-level dependency path to its target.
 
 The official private-package exports are:
 
-- `@gitlode/internal-foundation/type-utils`, `/support`, `/instrumentation`, and `/dag`; the package
+- `@gitlode/internal-foundation/type-utils`, `/support`, `/otel-support`, and `/dag`; the package
   root has no export.
 - `@gitlode/internal-contracts/diagnostics`, `/model`, `/progress`, `/extraction`, `/git`, and
-  `/line-diff`; the package root has no export. The source domain named `extraction-api` maps to the
-  package export `@gitlode/internal-contracts/extraction`.
+  `/line-diff`, and `/telemetry`; the package root has no export. The source domain named
+  `extraction-api` maps to the package export `@gitlode/internal-contracts/extraction`.
 - `@gitlode/git-adapters` and `@gitlode/git-adapters/experimental`. The `experimental` subpath is
   the unstable Git traversal-selection surface.
 - `@gitlode/line-diff-adapters`.
@@ -527,12 +557,12 @@ rules. An arrow from `A` to `B` means that domain `A` may directly depend on dom
 
 #### 4.1.1 Structural domain graph
 
-This view shows the structural domain dependencies while omitting `type-utils`, `support`, and
-`instrumentation`, together with edges to them. `type-utils` is global. `support` and
-`instrumentation` are explicit dependencies, but their edges largely indicate whether current code
+This view shows the structural domain dependencies while omitting `type-utils`, `support`,
+`otel-support`, and `telemetry`, together with edges to them. `type-utils` is global. The other three
+are explicit dependencies, but their edges largely indicate whether current code
 happens to need a general utility or measurement hook rather than clarifying the product structure.
-Their omission does not make them global: adding either dependency still requires an intentional
-change to Section 2.22 and the Rev-dep configuration.
+Their omission does not make them global: adding any of these dependencies still requires an
+intentional change to Section 2.22 and the Rev-dep configuration.
 
 Domain appearance indicates its primary architectural nature:
 
@@ -630,7 +660,6 @@ flowchart TB
   gitImpl --> dag
   gitImpl --> git
   gitImpl --> model
-  lineDiffImpl --> instrumentation
   lineDiffImpl --> lineDiff
 
 ```
@@ -641,9 +670,9 @@ grant dependencies between its members.
 #### 4.1.2 Extraction core
 
 This view removes CLI, configuration, presentation, and cross-cutting dependencies such as
-`type-utils`, `support`, `instrumentation`, `diagnostics`, and `progress`. It also suppresses direct composition
-edges from `execution` to lower-level contracts when the corresponding implementation relationship
-is already visible. Consult Section 2.22 for the complete rule.
+`type-utils`, `support`, `otel-support`, `telemetry`, `diagnostics`, and `progress`. It also
+suppresses direct composition edges from `execution` to lower-level contracts when the corresponding
+implementation relationship is already visible. Consult Section 2.22 for the complete rule.
 
 Arrow style in this focused view reflects the architectural relationship:
 
@@ -744,6 +773,14 @@ checks exclude generated `dist` files while continuing to analyze package source
 Workspace-level boundaries let package-owned tests import their own source and test support while
 requiring cross-workspace test imports to use official exports. Plugin source and tests likewise
 reach gitlode only through the official `gitlode/plugin-api` export.
+
+Missing-module enforcement follows source ownership. A workspace must declare an external package
+when its own source imports that package. It must not be forced to declare an external package solely
+because a dependency's public declaration mentions that package and the dependency correctly owns
+it. In particular, official plugins that import only `gitlode/plugin-api` do not acquire a direct
+`@opentelemetry/api` dependency from the `Tracer` and `Meter` types in gitlode's declaration graph.
+Rev-dep configuration must distinguish that transitive declaration case without suppressing missing
+direct source dependencies.
 
 Intentional rule changes must update this document and the configuration together. Reviewers must
 compare them in both directions: every accepted dependency must be representable, and the

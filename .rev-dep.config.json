@@ -44,6 +44,11 @@
           ]
         },
         {
+          "name": "otel-support",
+          "pattern": "packages/internal-foundation/src/otel-support/**",
+          "allow": ["packages/internal-foundation/src/otel-support/**"]
+        },
+        {
           "name": "dag",
           "pattern": "packages/internal-foundation/src/dag/**",
           "allow": [
@@ -117,7 +122,11 @@
         {
           "name": "telemetry",
           "pattern": "packages/internal-contracts/src/telemetry/**",
-          "allow": ["packages/internal-contracts/src/telemetry/**"]
+          "allow": [
+            "packages/internal-contracts/src/telemetry/**",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
+          ]
         },
         {
           "name": "git-impl",
@@ -349,7 +358,11 @@
         {
           "name": "internal-contracts-tests",
           "pattern": "packages/internal-contracts/test/**",
-          "allow": ["packages/internal-contracts/src/**", "packages/internal-contracts/test/**"]
+          "allow": [
+            "packages/internal-contracts/src/**",
+            "packages/internal-contracts/test/**",
+            "packages/internal-foundation/dist/otel-support/index.js"
+          ]
         },
         {
           "name": "git-adapters-tests",
@@ -511,6 +524,7 @@
         "src/type-utils/index.ts",
         "src/support/index.ts",
         "src/instrumentation/index.ts",
+        "src/otel-support/index.ts",
         "src/dag/index.ts"
       ],
       "devEntryPoints": ["test/**", "vitest.config.ts"]
@@ -531,7 +545,10 @@
         "excludeModules": ["@types/*", "@vitest/coverage-v8", "@gitlode/internal-foundation"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
-      "missingNodeModulesDetection": true,
+      "missingNodeModulesDetection": {
+        "enabled": true,
+        "excludeModules": ["@opentelemetry/api"]
+      },
       "devDepsUsageOnProdDetection": {
         "ignoreTypeImports": true
       },

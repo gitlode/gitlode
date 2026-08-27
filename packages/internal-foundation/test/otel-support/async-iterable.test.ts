@@ -1,14 +1,18 @@
 import { context, createContextKey, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { instrumentAsyncIterable, STREAM_COMPLETION_ATTRIBUTE } from "../../src/telemetry/index.js";
+import { createAsyncIterableInstrumenter } from "../../src/otel-support/index.js";
 import { installContextManager, makeTracer } from "./fakes.js";
 
 beforeEach(() => installContextManager());
 afterEach(() => context.disable());
 
+const COMPLETION_ATTRIBUTE = "test.stream.completion";
 const completion = (span: { attributes: Record<string, unknown> }) =>
-  span.attributes[STREAM_COMPLETION_ATTRIBUTE];
+  span.attributes[COMPLETION_ATTRIBUTE];
+const instrumentAsyncIterable = createAsyncIterableInstrumenter((span, value) => {
+  span.setAttribute(COMPLETION_ATTRIBUTE, value);
+});
 
 function iterableFrom<T>(iterator: AsyncIterator<T>): AsyncIterable<T> {
   return { [Symbol.asyncIterator]: () => iterator };
@@ -31,6 +35,9 @@ describe("instrumentAsyncIterable", () => {
       ["exhausted", 1],
       ["exhausted", 1],
     ]);
+    expect(starts.every(({ span }) => !("gitlode.stream.completion" in span.attributes))).toBe(
+      true,
+    );
   });
 
   it("resolves omitted parent on first next, supports override, and forwards options", async () => {
@@ -74,13 +81,19 @@ describe("instrumentAsyncIterable", () => {
           return {
             next: async () => {
               active.push(trace.getSpan(context.active()));
+              await Promise.resolve();
+              active.push(trace.getSpan(context.active()));
               return { value: ++pulls, done: false };
             },
             return: async () => {
               active.push(trace.getSpan(context.active()));
+              await Promise.resolve();
+              active.push(trace.getSpan(context.active()));
               return { value: 0, done: true };
             },
             throw: async () => {
+              active.push(trace.getSpan(context.active()));
+              await Promise.resolve();
               active.push(trace.getSpan(context.active()));
               return { value: 0, done: true };
             },

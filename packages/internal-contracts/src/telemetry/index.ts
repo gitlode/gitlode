@@ -5,4 +5,3 @@ export {
   STREAM_COMPLETION_VALUES,
   type StreamCompletion,
 } from "./conventions.js";
-export { recordSpanError, withAsyncSpan, withSpan } from "./tracing.js";

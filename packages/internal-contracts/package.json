@@ -58,8 +58,7 @@
     "test:coverage": "npm run build:dev && vitest run --coverage"
   },
   "dependencies": {
-    "@gitlode/internal-foundation": "0.0.0",
-    "@opentelemetry/api": "^1.9.0"
+    "@gitlode/internal-foundation": "0.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.14",

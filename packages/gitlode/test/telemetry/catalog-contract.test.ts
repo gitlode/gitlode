@@ -152,3 +152,67 @@ describe("accepted telemetry catalog contract", () => {
     );
   });
 });
+
+describe("production observation metadata", () => {
+  it("matches the accepted catalog structured projection", async () => {
+    const production = await import("../../../internal-contracts/src/telemetry/metadata.js");
+    const scope = (value: unknown) =>
+      typeof value === "string" ? { type: "core", name: value } : { type: "resolved_plugin" };
+    const attributes = (accepted.attributes.attributes as Record<string, unknown>[]).map(
+      (entry) => ({
+        id: entry.id,
+        key: entry.key,
+        valueType: entry.type,
+        ...(entry.values ? { boundedValues: entry.values } : {}),
+        ...(entry.minimum !== undefined
+          ? {
+              numericConstraint: {
+                minimum: entry.minimum,
+                ...(entry.value_unit ? { unit: entry.value_unit } : {}),
+              },
+            }
+          : {}),
+        ...(entry.value_policy ? { valuePolicy: entry.value_policy } : {}),
+        profileReducer: (entry.profile as Record<string, unknown>).reducer,
+      }),
+    );
+    const spans = (accepted.spans.spans as Record<string, unknown>[]).map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      scope: scope(entry.scope),
+      owner: entry.owner,
+      parent: entry.parent,
+      attributes: Object.fromEntries(
+        Object.entries(entry.attributes as Record<string, { ref: string }[]>).map(
+          ([phase, refs]) => [phase, refs.map((item) => item.ref)],
+        ),
+      ),
+    }));
+    const metrics = (accepted.metrics.metrics as Record<string, unknown>[]).map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      scope: scope(entry.scope),
+      instrument: entry.instrument,
+      description: entry.description,
+      unit: entry.unit,
+      owner: entry.owner,
+      attributes: (entry.attributes as { ref: string; required: boolean }[]).map((item) => ({
+        id: item.ref,
+        required: item.required,
+      })),
+      ...(entry.explicit_bucket_boundaries
+        ? { explicitBucketBoundaries: entry.explicit_bucket_boundaries }
+        : {}),
+      zeroPolicy: entry.zero_policy,
+    }));
+    const removed = (
+      accepted.metrics.removed_observations as { ids: string[]; disposition: string }[]
+    ).flatMap((group) => group.ids.map((id) => ({ id, disposition: group.disposition })));
+    expect(production.TELEMETRY_ATTRIBUTES).toEqual(attributes);
+    expect(production.TELEMETRY_SPANS).toEqual(spans);
+    expect(production.TELEMETRY_METRICS).toEqual(metrics);
+    expect(production.REMOVED_TELEMETRY_OBSERVATIONS).toEqual(removed);
+    const acceptedIds = new Set([...spans, ...metrics].map((item) => item.id));
+    for (const item of removed) expect(acceptedIds).not.toContain(item.id);
+  });
+});

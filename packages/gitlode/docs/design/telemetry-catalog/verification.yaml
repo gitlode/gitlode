@@ -67,15 +67,24 @@ test_layers:
     evidence:
       - instruments are created once during recorder construction
       - no instrument creation occurs on hot paths
+      - instrument names, descriptions, units, and histogram bucket advice match catalog metadata
       - cataloged values and attributes
       - normalized terminal outcomes
       - zero policy
       - completed partial work
-      - exactly-once timing-token completion
+      - first timing-token completion is distinct from duration availability
+      - an enabled token whose start clock read fails still completes exactly once
+      - clock failure omits only duration and preserves valid sibling observations
+      - repeated timing-token completion records no signal
+      - successful file-change expansion requires a size including zero
+      - failed file-change expansion records no size
+      - invalid numeric input is isolated to the affected observation
       - callback and exception control flow remain outside the recorder
       - no-op recorder does not read the clock
       - no-op recorder does not require hot-path allocation
-    coverage: every accepted metric has at least one owner test for its recording semantics
+      - no-op recorder creates no instruments
+      - shared telemetry vocabulary does not create dependencies between operation-owner implementations
+    coverage: every accepted metric and every no-op recorder family has an owner test for its recording semantics
 
   - id: collector_and_report
     span_aggregation:

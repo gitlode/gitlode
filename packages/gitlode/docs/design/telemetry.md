@@ -443,13 +443,38 @@ Once an attempt starts, its terminal duration is recorded once for success or fa
 metric's bounded outcome set. Validation that prevents an operation from starting does not create a
 duration observation unless the catalog explicitly defines the skip as an attempted operation.
 
-Domain recorders own opaque timing tokens:
+Domain recorders own opaque timing tokens. Their shared completion result distinguishes terminal
+ownership from duration availability:
 
-- an enabled recorder reads the monotonic clock when starting;
-- a no-op recorder avoids the clock read and can use an allocation-free token;
-- call sites do not calculate with or inspect the token;
-- one token is ended at most once by the recorder that created it; and
-- application callbacks and exception control flow remain outside the recorder.
+```ts
+type TimingCompletion =
+  | { readonly firstCompletion: false }
+  | {
+      readonly firstCompletion: true;
+      readonly durationSeconds: number | null;
+    };
+```
+
+- an enabled start creates a distinct token even when the initial monotonic-clock read fails;
+- its first completion returns `firstCompletion: true`; `durationSeconds` is `null` when either
+  clock reading is unavailable, non-finite, or would produce a negative duration;
+- every later completion of the same token returns `firstCompletion: false`;
+- the shared no-op token completes as `firstCompletion: false`, avoids clock reads, and requires no
+  per-operation allocation;
+- call sites do not calculate with or inspect tokens and application callbacks and exception
+  control flow remain outside the recorder.
+
+For a compound operation, first completion governs all terminal observations while duration
+availability governs only the duration histogram. A clock failure therefore suppresses only the
+duration sample: valid counters, sizes, outcomes, and other sibling observations are still recorded
+once. Likewise, an invalid numeric value suppresses only the observation that would consume it and
+must not suppress valid sibling observations. Count and size observations accept finite,
+non-negative values; operation-specific integer requirements remain defined by the observation
+catalog.
+
+Completion APIs make required terminal evidence explicit. In particular, successful file-change
+expansion carries its expanded size, including zero, while failed expansion carries no size. A
+successful completion without that value is not representable by the recorder interface.
 
 ## Worker telemetry session
 
@@ -641,6 +666,11 @@ charters. The contracts package depends on the foundation package and composes t
 binding through its exported typed factory; it does not directly import `@opentelemetry/api` for
 that binding.
 
+Pure typed metadata lookup, immutable instrument-option values, and attribute-value types derived
+from the catalogs also belong to `@gitlode/internal-contracts/telemetry`. Catalog metadata remains
+immutable; an owner that passes histogram boundaries to an OpenTelemetry API accepting a mutable
+array supplies a detached copy rather than weakening the metadata type.
+
 The legacy `@gitlode/internal-foundation/instrumentation` export is transitional custom
 instrumentation and is removed when the migration completes. It remains separate from
 `@gitlode/internal-foundation/otel-support`; new helpers must not be re-exported from the legacy
@@ -648,8 +678,13 @@ barrel.
 
 Operation-specific recorder factories live with their owning domains, for example extraction, Git
 implementation, line-diff implementation, output, and plugin runtime. They pre-create instruments
-from an injected `Meter` and contain domain recording semantics. The Git implementation's DAG
-binding is the explicit exception to placing a recorder in the operation's algorithm domain.
+from an injected `Meter` and contain domain recording semantics. There is no application-level
+`telemetry` support domain for shared recorder construction under `packages/gitlode/src`; the
+cross-cutting split is the generic foundation mechanism and the gitlode-specific contracts domain.
+One operation owner must not import another owner's recorder implementation merely to reuse an
+attribute or completion type; shared vocabulary is derived from the contracts telemetry catalog.
+The Git implementation's DAG binding is the explicit exception to placing a recorder in the
+operation's algorithm domain.
 
 The generic `dag` domain does not depend on the gitlode-specific `telemetry` domain. It exposes only
 algorithm-neutral observation hooks for graph-work evidence. The Git implementation owns the OTel

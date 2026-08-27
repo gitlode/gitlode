@@ -32,8 +32,18 @@ cover every terminal path and exactly-once ending.
 
 Each domain recorder is tested through a fake `Meter` and injected clock. Metadata coverage alone is
 insufficient: every accepted metric needs an owner test for its recording point, values, attributes,
-outcome mapping, zero policy, and partial-work semantics. No-op recorder tests prove that disabled
-telemetry does not read the clock or require hot-path allocation.
+outcome mapping, zero policy, and partial-work semantics. Instrument creation tests verify the exact
+cataloged name, description, unit, and histogram bucket advice.
+
+Compound-recorder tests distinguish first completion from duration availability. They prove that a
+clock failure omits only the duration sample, preserves valid non-duration sibling observations,
+and does not permit a repeated completion to record any signal again. An enabled start whose clock
+read fails must still acquire terminal ownership exactly once. File-change expansion tests require a
+size, including zero, for success and no size for failure. Invalid numeric inputs are tested per
+signal so that an invalid value cannot enter an instrument or suppress valid sibling observations.
+
+Every no-op recorder family is exercised directly. These tests prove that disabled telemetry creates
+no instruments, reads no clock, and needs no per-operation timing-token allocation.
 
 Collector and report tests cover bounded span aggregation, metric conversion, reducer behavior,
 canonical sorting, signal status, structured cloning, and invalid aggregation. Completed span

@@ -425,14 +425,27 @@ Scope:
   projection, output, concrete line diff, and plugin runtime metrics;
 - place each factory with the operation-owning domain and declare `@opentelemetry/api` directly in
   every importing workspace;
+- keep pure typed metadata lookup and catalog-derived attribute types in
+  `@gitlode/internal-contracts/telemetry`; do not add an application-level shared telemetry-support
+  domain or create dependencies between operation-owner implementations;
 - pre-create instruments and implement the cataloged outcome, zero, partial-work, attribute, and
-  timing semantics; and
-- add fake-`Meter` owner tests for every metric in these families.
+  timing semantics;
+- refine the shared timing completion contract, if necessary, so first completion is represented
+  independently from nullable duration availability; enabled tokens retain exactly-once terminal
+  ownership even when the clock fails;
+- record valid non-duration observations on first completion even when duration is unavailable, and
+  isolate invalid numeric input to only the affected signal;
+- make successful file-change expansion require its size, including zero, while failure carries no
+  size; and
+- add fake-`Meter` owner tests for every metric and every no-op recorder family in these domains,
+  including exact histogram advice and the completion boundary cases above.
 
 Do not yet replace production observation call sites and do not introduce a generic counter API.
 
-Exit gate: all extraction-side accepted metrics have exactly one tested recorder owner, and disabled
-recorders perform no clock reads or hot-path instrument creation.
+Exit gate: all extraction-side accepted metrics have exactly one tested recorder owner; compound
+recorders preserve valid sibling signals when timing or another numeric signal is invalid; repeated
+completion records nothing; and disabled recorders create no instruments, perform no clock reads,
+and require no per-operation timing-token allocation.
 
 ### T04: Git and DAG domain metric recorders
 

@@ -157,7 +157,16 @@
             "packages/internal-foundation/src/instrumentation/index.ts",
             "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/line-diff/index.ts",
-            "packages/internal-contracts/dist/line-diff/index.js"
+            "packages/internal-contracts/dist/line-diff/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
+          ]
+        },
+        {
+          "name": "gitlode-telemetry-support",
+          "pattern": "packages/gitlode/src/telemetry/**",
+          "allow": [
+            "packages/gitlode/src/telemetry/**",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -202,7 +211,9 @@
             "packages/internal-contracts/src/model/index.ts",
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/src/progress/index.ts",
-            "packages/internal-contracts/dist/progress/index.js"
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/gitlode/src/telemetry/**"
           ]
         },
         {
@@ -215,7 +226,10 @@
             "packages/internal-foundation/src/instrumentation/index.ts",
             "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/gitlode/src/extraction/built-in-fact-projector-metric-recorder.ts",
+            "packages/gitlode/src/telemetry/**"
           ]
         },
         {
@@ -234,7 +248,9 @@
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/gitlode/src/telemetry/**"
           ]
         },
         {
@@ -650,10 +666,7 @@
         ],
         "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
       },
-      "missingNodeModulesDetection": {
-        "enabled": true,
-        "excludeModules": ["@opentelemetry/api"]
-      },
+      "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {
         "ignoreTypeImports": true
       },

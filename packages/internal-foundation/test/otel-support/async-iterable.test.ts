@@ -282,6 +282,32 @@ describe("instrumentAsyncIterable", () => {
     expect(starts[0]!.span.endCount).toBe(1);
   });
 
+  it("ends once and preserves a completion callback failure", async () => {
+    const failure = Symbol("completion callback failure");
+    const onCompletion = vi.fn(() => {
+      throw failure;
+    });
+    const throwingInstrumenter = createAsyncIterableInstrumenter(onCompletion);
+    const { tracer, starts } = makeTracer();
+    const next = vi.fn(async () => ({ value: 1, done: true as const }));
+    const iterator = throwingInstrumenter(tracer, "stream", () => iterableFrom({ next }))[
+      Symbol.asyncIterator
+    ]();
+
+    await expect(iterator.next()).rejects.toBe(failure);
+    expect(onCompletion).toHaveBeenCalledOnce();
+    expect(onCompletion).toHaveBeenCalledWith(starts[0]!.span, "exhausted");
+    expect(starts[0]!.span.endCount).toBe(1);
+
+    expect(await iterator.next()).toEqual({ value: undefined, done: true });
+    expect(await iterator.return?.(2)).toEqual({ value: 2, done: true });
+    const terminalThrow = Symbol("terminal throw");
+    await expect(iterator.throw?.(terminalThrow)).rejects.toBe(terminalThrow);
+    expect(next).toHaveBeenCalledOnce();
+    expect(onCompletion).toHaveBeenCalledOnce();
+    expect(starts[0]!.span.endCount).toBe(1);
+  });
+
   it("does not create source or span for return/throw before first next", async () => {
     const { tracer, starts } = makeTracer();
     const factory = vi.fn(() =>

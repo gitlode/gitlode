@@ -53,8 +53,11 @@ export function createAsyncIterableInstrumenter(
         const finish = (completion: AsyncIterableCompletion): void => {
           if (terminal) return;
           terminal = true;
-          if (span) onCompletion(span, completion);
-          span?.end();
+          try {
+            if (span) onCompletion(span, completion);
+          } finally {
+            span?.end();
+          }
         };
 
         const fail = (error: unknown): never => {

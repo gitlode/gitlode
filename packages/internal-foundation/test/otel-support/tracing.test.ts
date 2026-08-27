@@ -1,7 +1,7 @@
 import { context, createContextKey, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from "vitest";
 
-import { recordSpanError, withAsyncSpan, withSpan } from "../../src/telemetry/index.js";
+import { recordSpanError, withAsyncSpan, withSpan } from "../../src/otel-support/index.js";
 import { installContextManager, makeSpan, makeTracer } from "./fakes.js";
 
 beforeEach(() => installContextManager());
@@ -58,6 +58,8 @@ describe("span helpers", () => {
     const success = makeTracer();
     await expect(
       withAsyncSpan(success.tracer, "success", async (span) => {
+        expect(trace.getSpan(context.active())).toBe(span);
+        await Promise.resolve();
         expect(trace.getSpan(context.active())).toBe(span);
         return resolved;
       }),

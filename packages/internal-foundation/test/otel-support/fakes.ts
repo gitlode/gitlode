@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import {
   context,
   ROOT_CONTEXT,
@@ -11,9 +13,9 @@ import {
 } from "@opentelemetry/api";
 
 export class TestContextManager implements ContextManager {
-  private current = ROOT_CONTEXT;
+  private readonly storage = new AsyncLocalStorage<Context>();
   active(): Context {
-    return this.current;
+    return this.storage.getStore() ?? ROOT_CONTEXT;
   }
   with<A extends unknown[], F extends (...args: A) => ReturnType<F>>(
     activeContext: Context,
@@ -21,13 +23,7 @@ export class TestContextManager implements ContextManager {
     thisArg?: ThisParameterType<F>,
     ...args: A
   ): ReturnType<F> {
-    const previous = this.current;
-    this.current = activeContext;
-    try {
-      return fn.apply(thisArg, args);
-    } finally {
-      this.current = previous;
-    }
+    return this.storage.run(activeContext, () => fn.apply(thisArg, args));
   }
   bind<T>(_context: Context, target: T): T {
     return target;
@@ -36,7 +32,7 @@ export class TestContextManager implements ContextManager {
     return this;
   }
   disable(): this {
-    this.current = ROOT_CONTEXT;
+    this.storage.disable();
     return this;
   }
 }

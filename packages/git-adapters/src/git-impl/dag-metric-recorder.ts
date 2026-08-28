@@ -10,25 +10,39 @@ import type {
 } from "@gitlode/internal-foundation/dag";
 import type { Counter, Meter } from "@opentelemetry/api";
 
-export type DagOperationContext =
+type DagOperation = TelemetryAttributeValue<"dag_operation">;
+type DifferenceOperation = Extract<DagOperation, "difference">;
+type ReachableOperation = Extract<DagOperation, "reachable">;
+type CertifiedClosureOperation = Extract<DagOperation, "certified-closure">;
+export type StreamDagOperationContext =
   | {
-      readonly operation: "difference";
+      readonly operation: DifferenceOperation;
       readonly strategy: TelemetryAttributeValue<"dag_strategy">;
       readonly hasExclusion: boolean;
     }
-  | { readonly operation: "reachable" | "certified-closure" };
-export type NeutralDagCompletion =
-  | {
-      readonly type: "stream";
-      readonly completion: "exhausted" | "cancelled" | "handled_throw" | "error";
-    }
-  | { readonly type: "certified-closure"; readonly completion: "success" | "error" };
-export interface DagMetricOperation {
+  | { readonly operation: ReachableOperation };
+export type CertifiedClosureDagOperationContext = {
+  readonly operation: CertifiedClosureOperation;
+};
+export type DagOperationContext = StreamDagOperationContext | CertifiedClosureDagOperationContext;
+export type StreamDagCompletion = {
+  readonly type: "stream";
+  readonly completion: "exhausted" | "cancelled" | "handled_throw" | "error";
+};
+export type CertifiedClosureDagCompletion = {
+  readonly type: "certified-closure";
+  readonly completion: "success" | "error";
+};
+export type NeutralDagCompletion = StreamDagCompletion | CertifiedClosureDagCompletion;
+type CompletionFor<C extends DagOperationContext> = C extends CertifiedClosureDagOperationContext
+  ? CertifiedClosureDagCompletion
+  : StreamDagCompletion;
+export interface DagMetricOperation<C extends NeutralDagCompletion = NeutralDagCompletion> {
   readonly observations: DagOperationObservationHooks;
-  complete(completion: NeutralDagCompletion): void;
+  complete(completion: C): void;
 }
 export interface DagMetricRecorder {
-  startOperation(context: DagOperationContext): DagMetricOperation;
+  startOperation<C extends DagOperationContext>(context: C): DagMetricOperation<CompletionFor<C>>;
 }
 
 const noopHooks = Object.freeze<DagOperationObservationHooks>({
@@ -42,7 +56,7 @@ const noopHooks = Object.freeze<DagOperationObservationHooks>({
 });
 const noopOperation = Object.freeze<DagMetricOperation>({ observations: noopHooks, complete() {} });
 export const NOOP_DAG_METRIC_RECORDER = Object.freeze<DagMetricRecorder>({
-  startOperation: () => noopOperation,
+  startOperation: () => noopOperation as never,
 });
 export function normalizeDagCompletion(
   c: NeutralDagCompletion,
@@ -77,7 +91,7 @@ export function createDagMetricRecorder(meter: Meter): DagMetricRecorder {
     fallbackMetric = make("dag_fallback"),
     removedMetric = make("dag_fallback_node_removed");
   return {
-    startOperation(context) {
+    startOperation<C extends DagOperationContext>(context: C) {
       let completed = false,
         processed = 0,
         stale = 0,
@@ -85,6 +99,8 @@ export function createDagMetricRecorder(meter: Meter): DagMetricRecorder {
         excluded = 0,
         removed = 0,
         fallback: DagFallbackReason | undefined;
+      const acceptsFallback =
+        context.operation === "difference" && context.strategy === "certified-lazy";
       const expansion: Record<DagTraversalRole, number> = { main: 0, exclude: 0 };
       const add = (current: number, requested?: number) => {
         const count = requested ?? 1;
@@ -112,10 +128,10 @@ export function createDagMetricRecorder(meter: Meter): DagMetricRecorder {
           excluded = add(excluded, c);
         },
         markFallback(r) {
-          fallback ??= r;
+          if (acceptsFallback) fallback ??= r;
         },
         recordFallbackNodeRemoved(c) {
-          removed = add(removed, c);
+          if (fallback) removed = add(removed, c);
         },
       };
       return {
@@ -142,7 +158,8 @@ export function createDagMetricRecorder(meter: Meter): DagMetricRecorder {
           for (const role of ["main", "exclude"] as const)
             record(expansionMetric, expansion[role], { ...attrs, [key("dag_role")]: role });
           if (context.operation !== "certified-closure") record(yieldedMetric, yielded);
-          if (context.operation === "difference") record(excludedMetric, excluded, attrs);
+          if (context.operation === "difference" && context.hasExclusion)
+            record(excludedMetric, excluded, attrs);
           if (fallback) {
             const fattrs = {
               [key("dag_strategy")]: "certified-lazy",
@@ -152,7 +169,7 @@ export function createDagMetricRecorder(meter: Meter): DagMetricRecorder {
             record(removedMetric, removed, fattrs);
           }
         },
-      };
+      } as DagMetricOperation<CompletionFor<C>>;
     },
   };
 }

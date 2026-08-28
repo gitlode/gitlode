@@ -146,7 +146,9 @@
             "packages/internal-contracts/src/git/index.ts",
             "packages/internal-contracts/dist/git/index.js",
             "packages/internal-contracts/src/model/index.ts",
-            "packages/internal-contracts/dist/model/index.js"
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -381,7 +383,9 @@
             "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/dist/git/index.js",
-            "packages/internal-contracts/dist/model/index.js"
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {

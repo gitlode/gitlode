@@ -14,9 +14,16 @@ export type GitObjectType = TelemetryAttributeValue<"git_object_type">;
 export type GitObjectPurpose = TelemetryAttributeValue<"git_object_purpose">;
 export type GitFileChangeType = TelemetryAttributeValue<"git_file_change_type">;
 export type GitObjectCacheResult = "hit" | "miss";
+export type GitBlobReadOutcome = TelemetryAttributeValue<"git_blob_read_outcome">;
+type SuccessfulGitBlobReadOutcome = Extract<GitBlobReadOutcome, "success">;
+type UnsuccessfulGitBlobReadOutcome = Exclude<GitBlobReadOutcome, SuccessfulGitBlobReadOutcome>;
 export type GitBlobReadCompletion =
-  | { readonly outcome: "success"; readonly purpose: GitObjectPurpose; readonly sizeBytes: number }
-  | { readonly outcome: "error" };
+  | {
+      readonly outcome: SuccessfulGitBlobReadOutcome;
+      readonly purpose: GitObjectPurpose;
+      readonly sizeBytes: number;
+    }
+  | { readonly outcome: UnsuccessfulGitBlobReadOutcome };
 
 export interface GitMetricRecorder {
   recordCommitYielded(strategy: GitCommitWalkStrategy, hasExclusion: boolean): void;
@@ -111,7 +118,7 @@ export function createGitMetricRecorder(
       if (completion.outcome === "error") return;
       objectRead.add(1, objectAttrs("blob", completion.purpose));
       if (Number.isFinite(completion.sizeBytes) && completion.sizeBytes >= 0) {
-        size.record(completion.sizeBytes, outcomeAttrs);
+        size.record(completion.sizeBytes, adapterAttrs);
         if (completion.sizeBytes > 0) bytes.add(completion.sizeBytes, adapterAttrs);
       }
     },

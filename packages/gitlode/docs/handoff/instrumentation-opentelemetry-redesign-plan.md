@@ -646,7 +646,7 @@ code or note remains, and the trunk session confirms the redesign complete.
 | T02  | complete | Shared metadata, profile contracts, normalization, and timing primitives reviewed; focused 31 and full 753 tests pass                             |
 | T03  | complete | Extraction-side recorders, timing failure isolation, owner boundaries, and all 15 metric/no-op contracts reviewed; full 807 tests pass            |
 | T04  | complete | Git and neutral DAG recorders, all 16 metric/no-op contracts, type boundaries, and owner tests reviewed; focused 216 and full 849 tests pass      |
-| T05  | pending  | —                                                                                                                                                 |
+| T05  | complete | Bounded span and metric collection, diagnostics, catalog filtering, canonical report building, and all limit contracts reviewed; 886 tests pass   |
 | T06  | pending  | —                                                                                                                                                 |
 | T07  | pending  | —                                                                                                                                                 |
 | T08  | pending  | —                                                                                                                                                 |

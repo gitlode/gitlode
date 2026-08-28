@@ -10,9 +10,14 @@ import type { Meter } from "@opentelemetry/api";
 export type FileChangeType = TelemetryAttributeValue<"git_file_change_type">;
 export type FileChangeExpansionOutcome = TelemetryAttributeValue<"file_change_expansion_outcome">;
 export type DiffSkipReason = TelemetryAttributeValue<"file_change_diff_skip_reason">;
+type SuccessfulFileChangeExpansionOutcome = Extract<FileChangeExpansionOutcome, "success">;
+type UnsuccessfulFileChangeExpansionOutcome = Exclude<
+  FileChangeExpansionOutcome,
+  SuccessfulFileChangeExpansionOutcome
+>;
 export type FileChangeExpansionCompletion =
-  | { readonly outcome: "success"; readonly size: number }
-  | { readonly outcome: "error" };
+  | { readonly outcome: SuccessfulFileChangeExpansionOutcome; readonly size: number }
+  | { readonly outcome: UnsuccessfulFileChangeExpansionOutcome };
 export interface FileChangeFactExpanderMetricRecorder {
   startExpansion(): TimingToken;
   completeExpansion(token: TimingToken, completion: FileChangeExpansionCompletion): void;

@@ -1,20 +1,15 @@
 import {
   createMonotonicTiming,
+  getTelemetryAttributeMetadata,
+  getTelemetryMetricMetadata,
   type MonotonicTiming,
+  type TelemetryAttributeValue,
   type TimingToken,
 } from "@gitlode/internal-contracts/telemetry";
 import type { Meter } from "@opentelemetry/api";
 
-import {
-  attribute,
-  counter,
-  finishDuration,
-  histogram,
-  type AttributeValue,
-} from "../telemetry/metric-recorder-support.js";
-
-export type ExtractionGranularity = AttributeValue<"extraction_granularity">;
-export type OutputWriteOutcome = AttributeValue<"output_write_outcome">;
+export type ExtractionGranularity = TelemetryAttributeValue<"extraction_granularity">;
+export type OutputWriteOutcome = TelemetryAttributeValue<"output_write_outcome">;
 export interface ExtractionPipelineMetricRecorder {
   recordCommitAccepted(granularity: ExtractionGranularity): void;
   startOutputWrite(): TimingToken;
@@ -24,9 +19,9 @@ export interface ExtractionPipelineMetricRecorder {
     outcome: OutputWriteOutcome,
   ): void;
 }
-const noop = createMonotonicTiming(() => 0).start(false);
-export const NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER: ExtractionPipelineMetricRecorder =
-  Object.freeze({
+const noop = createMonotonicTiming().start(false);
+export const NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER =
+  Object.freeze<ExtractionPipelineMetricRecorder>({
     recordCommitAccepted() {},
     startOutputWrite: () => noop,
     completeOutputWrite() {},
@@ -35,24 +30,29 @@ export function createExtractionPipelineMetricRecorder(
   meter: Meter,
   timing: MonotonicTiming = createMonotonicTiming(),
 ): ExtractionPipelineMetricRecorder {
-  const accepted = counter(meter, "extraction_commit_accepted");
-  const written = counter(meter, "output_write_record");
-  const duration = histogram(meter, "output_write_duration");
-  const granularityKey = attribute("extraction_granularity").key;
-  const outcomeKey = attribute("output_write_outcome").key;
+  const a = getTelemetryMetricMetadata("extraction_commit_accepted"),
+    w = getTelemetryMetricMetadata("output_write_record"),
+    d = getTelemetryMetricMetadata("output_write_duration");
+  const accepted = meter.createCounter(a.name, { description: a.description, unit: a.unit }),
+    written = meter.createCounter(w.name, { description: w.description, unit: w.unit }),
+    duration = meter.createHistogram(d.name, {
+      description: d.description,
+      unit: d.unit,
+      advice: { explicitBucketBoundaries: [...d.explicitBucketBoundaries] },
+    });
+  const granularityKey = getTelemetryAttributeMetadata("extraction_granularity").key,
+    outcomeKey = getTelemetryAttributeMetadata("output_write_outcome").key;
   return {
-    recordCommitAccepted(granularity) {
-      accepted.add(1, { [granularityKey]: granularity });
+    recordCommitAccepted(g) {
+      accepted.add(1, { [granularityKey]: g });
     },
-    startOutputWrite() {
-      return timing.start(true);
-    },
-    completeOutputWrite(token, granularity, outcome) {
-      const completion = finishDuration(timing, token);
-      if (!completion.recordable) return;
-      const attributes = { [granularityKey]: granularity, [outcomeKey]: outcome };
-      duration.record(completion.durationSeconds, attributes);
-      if (outcome === "success") written.add(1, { [granularityKey]: granularity });
+    startOutputWrite: () => timing.start(true),
+    completeOutputWrite(token, g, outcome) {
+      const c = timing.complete(token);
+      if (!c.firstCompletion) return;
+      const attrs = { [granularityKey]: g, [outcomeKey]: outcome };
+      if (c.durationSeconds !== null) duration.record(c.durationSeconds, attrs);
+      if (outcome === "success") written.add(1, { [granularityKey]: g });
     },
   };
 }

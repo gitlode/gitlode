@@ -645,7 +645,7 @@ code or note remains, and the trunk session confirms the redesign complete.
 | T01  | complete | Generic OTel lifecycle and gitlode policy split reviewed; focused 128 tests pass; clean-environment architecture check passes                     |
 | T02  | complete | Shared metadata, profile contracts, normalization, and timing primitives reviewed; focused 31 and full 753 tests pass                             |
 | T03  | complete | Extraction-side recorders, timing failure isolation, owner boundaries, and all 15 metric/no-op contracts reviewed; full 807 tests pass            |
-| T04  | pending  | —                                                                                                                                                 |
+| T04  | complete | Git and neutral DAG recorders, all 16 metric/no-op contracts, type boundaries, and owner tests reviewed; focused 216 and full 849 tests pass      |
 | T05  | pending  | —                                                                                                                                                 |
 | T06  | pending  | —                                                                                                                                                 |
 | T07  | pending  | —                                                                                                                                                 |

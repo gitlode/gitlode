@@ -35,11 +35,24 @@ const ids = [
 ] as const;
 const attrs = { "gitlode.line_diff.compute.outcome": "success" };
 describe("line diff metric recorder", () => {
+  test("creates exactly the three cataloged instruments", () => {
+    const fake = new FakeMeter();
+    createLineDiffMetricRecorder(meter(fake));
+    const expectedNames = ids.map(
+      (id) => TELEMETRY_METRICS.find((metadata) => metadata.id === id)!.name,
+    );
+    expect(fake.creations).toHaveLength(ids.length);
+    expect(fake.creations.map((creation) => creation.name).sort()).toEqual(
+      [...expectedNames].sort(),
+    );
+  });
   test.each(ids)("creates %s with exact detached metadata", (id) => {
     const fake = new FakeMeter();
     createLineDiffMetricRecorder(meter(fake));
-    const m = TELEMETRY_METRICS.find((x) => x.id === id)!,
-      c = fake.creations.find((x) => x.name === m.name)!;
+    const m = TELEMETRY_METRICS.find((x) => x.id === id)!;
+    const matches = fake.creations.filter((creation) => creation.name === m.name);
+    expect(matches).toHaveLength(1);
+    const c = matches[0]!;
     expect(c).toEqual({
       kind: m.instrument,
       name: m.name,

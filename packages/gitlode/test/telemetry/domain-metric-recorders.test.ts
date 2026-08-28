@@ -89,11 +89,24 @@ function constructAll(fake: FakeMeter) {
 }
 
 describe("instrument metadata", () => {
+  test("creates exactly the cataloged owner instrument set", () => {
+    const fake = new FakeMeter();
+    constructAll(fake);
+    const expectedNames = targetIds.map(
+      (id) => TELEMETRY_METRICS.find((metadata) => metadata.id === id)!.name,
+    );
+    expect(fake.creations).toHaveLength(targetIds.length);
+    expect(fake.creations.map((creation) => creation.name).sort()).toEqual(
+      [...expectedNames].sort(),
+    );
+  });
   test.each(targetIds)("creates %s exactly from catalog", (id) => {
     const fake = new FakeMeter();
     constructAll(fake);
     const metadata = TELEMETRY_METRICS.find((x) => x.id === id)!;
-    const creation = fake.creations.find((x) => x.name === metadata.name)!;
+    const matches = fake.creations.filter((creation) => creation.name === metadata.name);
+    expect(matches).toHaveLength(1);
+    const creation = matches[0]!;
     expect(creation).toEqual({
       kind: metadata.instrument,
       name: metadata.name,

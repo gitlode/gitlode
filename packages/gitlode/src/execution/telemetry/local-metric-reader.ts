@@ -1,4 +1,5 @@
 import {
+  CORE_INSTRUMENTATION_SCOPES,
   getTelemetryAttributeMetadata,
   normalizeProfileAttributeValue,
   normalizeProfileInstrumentationScope,
@@ -28,6 +29,7 @@ import type {
   ViewOptions,
 } from "@opentelemetry/sdk-metrics";
 
+import { FirstAcceptedBoundedMap } from "./bounded-retention.js";
 import type { BoundedDiagnosticAccumulator } from "./diagnostic-accumulator.js";
 
 export interface LocalMetricSnapshot {
@@ -65,8 +67,11 @@ function acceptedMetric(
   return TELEMETRY_METRICS.find(
     (candidate) =>
       candidate.name === metric.descriptor.name &&
-      candidate.scope.type === "core" &&
-      candidate.scope.name === scopeName,
+      (candidate.scope.type === "core"
+        ? candidate.scope.name === scopeName
+        : !CORE_INSTRUMENTATION_SCOPES.includes(
+            scopeName as (typeof CORE_INSTRUMENTATION_SCOPES)[number],
+          )),
   );
 }
 
@@ -86,7 +91,9 @@ function acceptedAttribute(
       : null;
   }
   if (typeof normalized.value !== "string") return null;
-  return normalized.value;
+  return metadata.boundedValues && !metadata.boundedValues.includes(normalized.value)
+    ? null
+    : normalized.value;
 }
 
 function attributesFor(
@@ -159,8 +166,7 @@ export function convertLocalMetrics(
 ): LocalMetricSnapshot {
   const counters: ProfileCounterPoint[] = [];
   const histograms: ProfileHistogramPoint[] = [];
-  const retainedIdentities = new Set<string>();
-  const acceptedPerInstrument = new Map<string, number>();
+  const retainedPerInstrument = new Map<string, FirstAcceptedBoundedMap<string, true>>();
   let counterStatus: ProfileSignalStatus = "complete";
   let histogramStatus: ProfileSignalStatus = "complete";
 
@@ -208,27 +214,19 @@ export function convertLocalMetrics(
               continue;
             }
             const identity = metricIdentity(scope, metadata.name, attributes);
-            if (retainedIdentities.has(identity)) {
-              invalid(signal);
-              continue;
-            }
-            const accepted = acceptedPerInstrument.get(instrumentKey) ?? 0;
-            if (accepted >= PROFILE_COLLECTION_LIMITS.metricPointsPerInstrument) {
-              overflow(signal);
-              continue;
-            }
+            let converted: ProfileCounterPoint | ProfileHistogramPoint;
             if (metadata.instrument === "counter" && metric.dataPointType === DataPointType.SUM) {
               if (!metric.isMonotonic || !finiteNonnegative(point.value)) {
                 invalid("counters");
                 continue;
               }
-              counters.push({
+              converted = {
                 scope: { ...scope },
                 name: metadata.name,
                 unit: metadata.unit,
                 attributes,
                 value: Object.is(point.value, -0) ? 0 : point.value,
-              });
+              };
             } else if (
               metadata.instrument === "histogram" &&
               metric.dataPointType === DataPointType.HISTOGRAM
@@ -239,7 +237,7 @@ export function convertLocalMetrics(
                 invalid("histograms");
                 continue;
               }
-              histograms.push({
+              converted = {
                 scope: { ...scope },
                 name: metadata.name,
                 unit: metadata.unit,
@@ -260,13 +258,29 @@ export function convertLocalMetrics(
                       : histogramValue.max,
                 explicitBounds: [...histogramValue.buckets.boundaries],
                 bucketCounts: [...histogramValue.buckets.counts],
-              });
+              };
             } else {
               invalid(signal);
               continue;
             }
-            retainedIdentities.add(identity);
-            acceptedPerInstrument.set(instrumentKey, accepted + 1);
+            let retention = retainedPerInstrument.get(instrumentKey);
+            if (!retention) {
+              retention = new FirstAcceptedBoundedMap(
+                PROFILE_COLLECTION_LIMITS.metricPointsPerInstrument,
+              );
+              retainedPerInstrument.set(instrumentKey, retention);
+            }
+            const acceptance = retention.accept(identity, () => true);
+            if (!acceptance.accepted) {
+              overflow(signal);
+              continue;
+            }
+            if (!acceptance.isNew) {
+              invalid(signal);
+              continue;
+            }
+            if (metadata.instrument === "counter") counters.push(converted as ProfileCounterPoint);
+            else histograms.push(converted as ProfileHistogramPoint);
           } catch {
             invalid(signal);
           }

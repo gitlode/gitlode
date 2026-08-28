@@ -19,6 +19,7 @@ import { SpanStatusCode } from "@opentelemetry/api";
 import type { Context } from "@opentelemetry/api";
 import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
 
+import { FirstAcceptedBoundedMap } from "./bounded-retention.js";
 import type { BoundedDiagnosticAccumulator } from "./diagnostic-accumulator.js";
 
 type MutableSummary =
@@ -32,7 +33,7 @@ type MutableSummary =
   | {
       key: string;
       reducer: "distinct";
-      values: Map<string, { value: ProfileAttributeValue; count: number }>;
+      values: FirstAcceptedBoundedMap<string, { value: ProfileAttributeValue; count: number }>;
       observedCount: number;
       overflowCount: number;
     }
@@ -69,7 +70,7 @@ function acceptedAttributeValue(
     return value >= (metadata.numericConstraint?.minimum ?? -Infinity) ? value : null;
   }
   if (typeof value !== "string") return null;
-  return value;
+  return metadata.boundedValues && !metadata.boundedValues.includes(value) ? null : value;
 }
 
 function allowedAttributes(span: ReadableSpan): readonly ObservationAttributeMetadata[] {
@@ -106,7 +107,9 @@ export interface LocalSpanSnapshot {
 }
 
 export class LocalSpanProcessor implements SpanProcessor {
-  readonly #aggregates = new Map<string, MutableSpanAggregate>();
+  readonly #aggregates = new FirstAcceptedBoundedMap<string, MutableSpanAggregate>(
+    PROFILE_COLLECTION_LIMITS.spanGroups,
+  );
   readonly #diagnostics: BoundedDiagnosticAccumulator;
   #partial = false;
 
@@ -123,23 +126,20 @@ export class LocalSpanProcessor implements SpanProcessor {
         span.instrumentationScope.version,
       );
       const key = JSON.stringify([scope.name, scope.version, span.name]);
-      let aggregate = this.#aggregates.get(key);
-      if (!aggregate) {
-        if (this.#aggregates.size >= PROFILE_COLLECTION_LIMITS.spanGroups) {
-          this.#markInvalid("span_group_overflow");
-          return;
-        }
-        aggregate = {
-          scope,
-          name: span.name,
-          callCount: 0,
-          errorCount: 0,
-          totalDurationSeconds: 0,
-          maxDurationSeconds: 0,
-          attributes: new Map(),
-        };
-        this.#aggregates.set(key, aggregate);
+      const acceptance = this.#aggregates.accept(key, () => ({
+        scope,
+        name: span.name,
+        callCount: 0,
+        errorCount: 0,
+        totalDurationSeconds: 0,
+        maxDurationSeconds: 0,
+        attributes: new Map(),
+      }));
+      if (!acceptance.accepted) {
+        this.#markInvalid("span_group_overflow");
+        return;
       }
+      const aggregate = acceptance.value;
       aggregate.callCount += 1;
       if (span.status.code === SpanStatusCode.ERROR) aggregate.errorCount += 1;
       const duration = durationSeconds(span);
@@ -188,10 +188,15 @@ export class LocalSpanProcessor implements SpanProcessor {
           conflictCount: 0,
         });
       } else if (metadata.profileReducer === "distinct") {
+        const values = new FirstAcceptedBoundedMap<
+          string,
+          { value: ProfileAttributeValue; count: number }
+        >(PROFILE_COLLECTION_LIMITS.distinctSpanAttributeValuesPerAttribute);
+        values.accept(scalarKey(value), () => ({ value, count: 1 }));
         aggregate.attributes.set(metadata.key, {
           key: metadata.key,
           reducer: "distinct",
-          values: new Map([[scalarKey(value), { value, count: 1 }]]),
+          values,
           observedCount: 1,
           overflowCount: 0,
         });
@@ -222,12 +227,8 @@ export class LocalSpanProcessor implements SpanProcessor {
     if (current.reducer === "distinct") {
       current.observedCount += 1;
       const key = scalarKey(value);
-      const retained = current.values.get(key);
-      if (retained) retained.count += 1;
-      else if (
-        current.values.size < PROFILE_COLLECTION_LIMITS.distinctSpanAttributeValuesPerAttribute
-      )
-        current.values.set(key, { value, count: 1 });
+      const acceptance = current.values.accept(key, () => ({ value, count: 0 }));
+      if (acceptance.accepted) acceptance.value.count += 1;
       else {
         current.overflowCount += 1;
         this.#partial = true;

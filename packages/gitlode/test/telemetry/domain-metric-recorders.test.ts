@@ -78,7 +78,7 @@ describe("domain metric recorders", () => {
       expansionToken = expansion.startExpansion();
     expansion.recordExpanded("added");
     expansion.recordDiffSkipped("binary");
-    expansion.completeExpansion(expansionToken, "success", 0);
+    expansion.completeExpansion(expansionToken, { outcome: "success", size: 0 });
     const projection = createBuiltInFactProjectorMetricRecorder(meter(fake), time.timing),
       projectionToken = projection.startProjection();
     projection.completeProjection(projectionToken, "commit", "error");
@@ -100,7 +100,7 @@ describe("domain metric recorders", () => {
     expect(fake.calls.filter((x) => x.name === "gitlode.plugin.projection.operation")).toHaveLength(
       1,
     );
-    expect(fake.creations).toHaveLength(14);
+    expect(fake.creations).toHaveLength(12);
   });
   test("no-op start neither creates an instrument nor reads a clock", () => {
     const fake = new FakeMeter(),

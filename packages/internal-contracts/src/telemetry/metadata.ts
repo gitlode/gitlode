@@ -1796,3 +1796,24 @@ export const REMOVED_TELEMETRY_OBSERVATIONS = [
     disposition: "removed_without_initial_otel_replacement",
   },
 ] as const satisfies readonly RemovedObservationMetadata[];
+
+export type TelemetryMetricId = (typeof TELEMETRY_METRICS)[number]["id"];
+export type TelemetryAttributeId = (typeof TELEMETRY_ATTRIBUTES)[number]["id"];
+export type TelemetryAttributeValue<I extends TelemetryAttributeId> =
+  Extract<(typeof TELEMETRY_ATTRIBUTES)[number], { id: I }> extends {
+    boundedValues: readonly (infer Value extends string)[];
+  }
+    ? Value
+    : never;
+
+export function getTelemetryMetricMetadata<I extends TelemetryMetricId>(id: I) {
+  const metadata = TELEMETRY_METRICS.find((candidate) => candidate.id === id);
+  if (!metadata) throw new Error(`Missing telemetry metric metadata: ${id}`);
+  return metadata as Extract<(typeof TELEMETRY_METRICS)[number], { id: I }>;
+}
+
+export function getTelemetryAttributeMetadata<I extends TelemetryAttributeId>(id: I) {
+  const metadata = TELEMETRY_ATTRIBUTES.find((candidate) => candidate.id === id);
+  if (!metadata) throw new Error(`Missing telemetry attribute metadata: ${id}`);
+  return metadata as Extract<(typeof TELEMETRY_ATTRIBUTES)[number], { id: I }>;
+}

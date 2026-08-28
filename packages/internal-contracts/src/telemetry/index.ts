@@ -10,6 +10,8 @@ export {
   TELEMETRY_ATTRIBUTES,
   TELEMETRY_METRICS,
   TELEMETRY_SPANS,
+  getTelemetryAttributeMetadata,
+  getTelemetryMetricMetadata,
   type AttributeValueType,
   type CoreInstrumentationScope,
   type InstrumentationScopePolicy,
@@ -18,6 +20,9 @@ export {
   type ProfileReducer,
   type RemovedObservationMetadata,
   type SpanObservationMetadata,
+  type TelemetryAttributeId,
+  type TelemetryAttributeValue,
+  type TelemetryMetricId,
 } from "./metadata.js";
 export {
   PROFILE_COLLECTION_LIMITS,

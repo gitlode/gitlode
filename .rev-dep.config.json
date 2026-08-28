@@ -157,7 +157,8 @@
             "packages/internal-foundation/src/instrumentation/index.ts",
             "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/line-diff/index.ts",
-            "packages/internal-contracts/dist/line-diff/index.js"
+            "packages/internal-contracts/dist/line-diff/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -202,7 +203,8 @@
             "packages/internal-contracts/src/model/index.ts",
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/src/progress/index.ts",
-            "packages/internal-contracts/dist/progress/index.js"
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -215,7 +217,8 @@
             "packages/internal-foundation/src/instrumentation/index.ts",
             "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -234,7 +237,8 @@
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -245,7 +249,8 @@
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -383,7 +388,8 @@
           "allow": [
             "packages/line-diff-adapters/src/**",
             "packages/line-diff-adapters/test/**",
-            "packages/internal-foundation/dist/instrumentation/index.js"
+            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -626,7 +632,19 @@
     {
       "path": "packages/gitlode",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts", "src/plugin-api.ts", "src/execution/worker-entry.ts"],
+      "prodEntryPoints": [
+        "src/index.ts",
+        "src/plugin-api.ts",
+        "src/execution/worker-entry.ts",
+        "src/extraction/extraction-pipeline-metric-recorder.ts",
+        "src/extraction/file-change-fact-expander-metric-recorder.ts",
+        "src/extraction/built-in-fact-projector-metric-recorder.ts",
+        "src/output/jsonl-file-writer-metric-recorder.ts",
+        "src/plugin-runtime/plugin-projection-metric-recorder.ts",
+        "src/extraction/index.ts",
+        "src/output/index.ts",
+        "src/plugin-runtime/index.ts"
+      ],
       "devEntryPoints": ["test/**", "scripts/**", "tsdown.config.ts", "vitest.config.ts"],
       "circularImportsDetection": {
         "ignoreTypeImports": false
@@ -650,10 +668,7 @@
         ],
         "pkgJsonFieldsWithBinaries": ["scripts", "bin"]
       },
-      "missingNodeModulesDetection": {
-        "enabled": true,
-        "excludeModules": ["@opentelemetry/api"]
-      },
+      "missingNodeModulesDetection": true,
       "devDepsUsageOnProdDetection": {
         "ignoreTypeImports": true
       },

@@ -218,9 +218,14 @@ telemetry policy admissible.
   lifecycle, product workflow decisions, and presentation policy.
 - Owns shared observation definitions and transport-neutral report vocabulary, not operation
   recording points or display order.
+- Owns pure typed lookup of catalog metadata, immutable instrument-option values, and shared
+  attribute-value types derived from that metadata.
 
 Operation-specific metric recorders live with the domain that owns the operation. Local SDK
-collection is an execution implementation concern. See [`telemetry.md`](telemetry.md).
+collection is an execution implementation concern. Owners create OpenTelemetry instruments from an
+injected `Meter`; they do not depend on another operation owner's implementation to share telemetry
+types. A third application-level telemetry-support domain under `packages/gitlode/src` is not part
+of this design. See [`telemetry.md`](telemetry.md).
 
 The pre-migration `internal-foundation/instrumentation` source is a transitional custom API, not the
 target domain described here. It remains available only until production owners migrate and is then

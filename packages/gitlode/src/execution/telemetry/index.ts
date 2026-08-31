@@ -14,3 +14,11 @@ export {
   type ProfileReportBuildInput,
   type ProfileSignalInput,
 } from "./profile-report-builder.js";
+export {
+  createWorkerTelemetrySessionForTest,
+  WorkerTelemetrySession,
+  type WorkerTelemetryFinalization,
+  type WorkerTelemetryInitializationWarning,
+  type WorkerTelemetryTestAttempt,
+  type WorkerTelemetryTestHooks,
+} from "./worker-telemetry-session.js";

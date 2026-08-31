@@ -3,11 +3,13 @@ import { trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
 import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
+import type { BuiltInFactProjectorMetricRecorder } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
 import {
   BuiltInFactProjector,
   projectCommit,
   projectFileChange,
 } from "../../src/extraction/built-in-fact-projector.js";
+import { makeTracer } from "../support/otel-fakes.js";
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) yield item;
@@ -61,13 +63,13 @@ function makeFileChangeFact(
   };
 }
 
-function makeProjector(repoName: string, repoUrl: string | null): BuiltInFactProjector {
-  return new BuiltInFactProjector(
-    repoName,
-    repoUrl,
-    trace.getTracer("gitlode.extraction"),
-    NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
-  );
+function makeProjector(
+  repoName: string,
+  repoUrl: string | null,
+  tracer = trace.getTracer("gitlode.extraction"),
+  metricRecorder: BuiltInFactProjectorMetricRecorder = NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+): BuiltInFactProjector {
+  return new BuiltInFactProjector(repoName, repoUrl, tracer, metricRecorder);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,5 +368,35 @@ describe("BuiltInFactProjector metric ownership", () => {
       "file-change",
       "success",
     );
+  });
+
+  it("records projection exhaustion and early cancellation on the logical stream", async () => {
+    const recording = makeTracer();
+    const projector = makeProjector("repo", null, recording.tracer);
+    const iterator = projector
+      .project(toAsyncIter<Fact>([makeCommitFact()]))
+      [Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.return?.();
+
+    expect(recording.starts).toHaveLength(1);
+    expect(recording.starts[0]!.name).toBe("gitlode.projection");
+    expect(recording.starts[0]!.span.attributes["gitlode.projection.mode"]).toBe("built_in");
+    expect(recording.starts[0]!.span.attributes["gitlode.stream.completion"]).toBe("cancelled");
+    expect(recording.starts[0]!.span.endCount).toBe(1);
+  });
+
+  it("records source rejection as one error projection completion", async () => {
+    const recording = makeTracer();
+    const projector = makeProjector("repo", null, recording.tracer);
+    const source = (async function* (): AsyncIterable<Fact> {
+      throw new Error("projection source failed");
+    })();
+
+    await expect(collect(projector.project(source))).rejects.toThrow("projection source failed");
+    expect(recording.starts).toHaveLength(1);
+    expect(recording.starts[0]!.span.statuses).toEqual([{ code: 2 }]);
+    expect(recording.starts[0]!.span.exceptions).toHaveLength(1);
+    expect(recording.starts[0]!.span.endCount).toBe(1);
   });
 });

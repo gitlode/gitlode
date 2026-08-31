@@ -329,4 +329,49 @@ describe("FileChangeFactExpander expansion", () => {
       "deleted",
     ]);
   });
+
+  it("records an empty expansion with an explicit zero size", async () => {
+    const completeExpansion = vi.fn();
+    const token = { token: true } as never;
+    const recorder = {
+      ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+      startExpansion: vi.fn(() => token),
+      completeExpansion,
+    };
+    await collect(
+      makeExpander([], { metricRecorder: recorder }).expand(
+        toAsyncIter([makeCommitFact()]),
+        REPO_PATH,
+      ),
+    );
+    expect(recorder.startExpansion).toHaveBeenCalledTimes(1);
+    expect(completeExpansion).toHaveBeenCalledWith(token, { outcome: "success", size: 0 });
+  });
+
+  it("records partial expansion failure without a size and preserves the original error", async () => {
+    const failure = new Error("blob expansion failed");
+    const completeExpansion = vi.fn();
+    const recordExpanded = vi.fn();
+    const token = { token: true } as never;
+    const source: Pick<GitAdapter, "getFileBlobChanges"> = {
+      async *getFileBlobChanges() {
+        yield { status: "added", before: null, after: snapshot("a", "a") };
+        throw failure;
+      },
+    };
+    const recorder = {
+      ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+      startExpansion: vi.fn(() => token),
+      completeExpansion,
+      recordExpanded,
+    };
+    const expander = new FileChangeFactExpander(source, fakeLineDiffCalculator, recorder);
+
+    await expect(collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH))).rejects.toBe(
+      failure,
+    );
+    expect(recordExpanded).toHaveBeenCalledWith("added");
+    expect(completeExpansion).toHaveBeenCalledTimes(1);
+    expect(completeExpansion).toHaveBeenCalledWith(token, { outcome: "error" });
+  });
 });

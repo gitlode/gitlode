@@ -727,4 +727,54 @@ describe("ExtractionPipeline orchestration", () => {
       "error",
     );
   });
+
+  it("keeps partial counts on write failure and closes exactly once", async () => {
+    const { tracer, starts } = makeTracer();
+    const sink: OutputSink = {
+      async write() {
+        throw new Error("partial write failure");
+      },
+      async close() {},
+      get filesCreated() {
+        return 0;
+      },
+      get bytesWritten() {
+        return 0;
+      },
+    };
+    await expect(
+      new ExtractionPipeline(makeDeps({ tracer, sink })).run(baseRequest()),
+    ).rejects.toThrow("partial write failure");
+    const extractSpan = starts.find(({ name }) => name === "gitlode.extract")!.span;
+    expect(extractSpan.attributes["gitlode.commit.unique.count"]).toBe(1);
+    expect(extractSpan.attributes["gitlode.output.record.count"]).toBe(0);
+    expect(starts.filter(({ name }) => name === "gitlode.output.close")).toHaveLength(1);
+    expect(starts.find(({ name }) => name === "gitlode.output.close")!.span.statuses).toEqual([]);
+    expect(starts.every(({ span }) => span.endCount === 1)).toBe(true);
+  });
+
+  it("keeps successful output counts when close fails and marks only close as error", async () => {
+    const { tracer, starts } = makeTracer();
+    const sink: OutputSink = {
+      async write() {},
+      async close() {
+        throw new Error("close failure");
+      },
+      get filesCreated() {
+        return 1;
+      },
+      get bytesWritten() {
+        return 10;
+      },
+    };
+    await expect(
+      new ExtractionPipeline(makeDeps({ tracer, sink })).run(baseRequest()),
+    ).rejects.toThrow("close failure");
+    const extract = starts.find(({ name }) => name === "gitlode.extract")!.span;
+    const close = starts.find(({ name }) => name === "gitlode.output.close")!.span;
+    expect(extract.attributes["gitlode.output.record.count"]).toBe(1);
+    expect(extract.statuses).toEqual([{ code: 2 }]);
+    expect(close.statuses).toEqual([{ code: 2 }]);
+    expect(close.exceptions).toHaveLength(1);
+  });
 });

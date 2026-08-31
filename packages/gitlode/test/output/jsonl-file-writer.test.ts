@@ -230,4 +230,21 @@ describe("JsonlFileWriter", () => {
       Buffer.byteLength(`${JSON.stringify(record)}\n`, "utf8"),
     );
   });
+
+  it("does not record or advance file state when opening fails", async () => {
+    const recordFileCreated = vi.fn();
+    const recordBytesWritten = vi.fn();
+    const writer = new JsonlFileWriter(
+      join(tmpDir, "missing-directory"),
+      (seq) => `failed-${seq}.jsonl`,
+      {},
+      { recordFileCreated, recordBytesWritten },
+    );
+
+    await expect(writer.write(makeCommit(oid(1)))).rejects.toThrow();
+    expect(recordFileCreated).not.toHaveBeenCalled();
+    expect(recordBytesWritten).not.toHaveBeenCalled();
+    expect(writer.filesCreated).toBe(0);
+    expect(writer.bytesWritten).toBe(0);
+  });
 });

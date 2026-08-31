@@ -6,10 +6,11 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import { type GitAdapter, GitAdapterError, type RawCommit } from "@gitlode/internal-contracts/git";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
-import { trace } from "@opentelemetry/api";
+import { ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
 import { CommitFactExtractor } from "../../src/extraction/commit-fact-extractor.js";
+import { makeTracer } from "../support/otel-fakes.js";
 
 function makeOid(n: number): CommitOid {
   return n.toString(16).padStart(12, "0") as CommitOid;
@@ -39,6 +40,7 @@ function makeAdapter(
   options: {
     commits?: Record<CommitOid, AsyncIterable<RawCommit>>;
     walkError?: { head: CommitOid; excludeHash: CommitOid; code: "COMMIT_NOT_FOUND" };
+    walkFailure?: Error;
   } = {},
 ): GitAdapter {
   return {
@@ -58,6 +60,7 @@ function makeAdapter(
       return "branch";
     },
     async *walkCommits(_repo, head, excludeHash) {
+      if (options.walkFailure) throw options.walkFailure;
       if (
         options.walkError &&
         head === options.walkError.head &&
@@ -81,8 +84,11 @@ function makeAdapter(
   };
 }
 
-function makeTraverser(adapter: GitAdapter): CommitFactExtractor {
-  return new CommitFactExtractor(adapter, trace.getTracer("gitlode.extraction"));
+function makeTraverser(
+  adapter: GitAdapter,
+  tracer = trace.getTracer("gitlode.extraction"),
+): CommitFactExtractor {
+  return new CommitFactExtractor(adapter, tracer);
 }
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {
@@ -124,6 +130,33 @@ describe("CommitFactExtractor traversal", () => {
     );
 
     expect(facts.map((fact) => fact.oid)).toEqual([makeOid(3), makeOid(2), makeOid(1)]);
+  });
+
+  it("starts traversal on first pull and completes exhausted with the explicit parent", async () => {
+    const recording = makeTracer();
+    const traverser = makeTraverser(makeAdapter(), recording.tracer);
+    const parent = ROOT_CONTEXT;
+    const iterable = traverser.extract(baseRequest(), makeReporter(), parent);
+    expect(recording.starts).toHaveLength(0);
+    await iterable[Symbol.asyncIterator]().next();
+    expect(recording.starts).toHaveLength(1);
+    expect(recording.starts[0]!.name).toBe("gitlode.traversal");
+    expect(recording.starts[0]!.parent).toBe(parent);
+    expect(recording.starts[0]!.span.attributes["gitlode.stream.completion"]).toBe("exhausted");
+    expect(recording.starts[0]!.span.endCount).toBe(1);
+  });
+
+  it("records source rejection as one error traversal completion", async () => {
+    const recording = makeTracer();
+    const failure = new Error("walk failed");
+    const traverser = makeTraverser(makeAdapter({ walkFailure: failure }), recording.tracer);
+    await expect(collectFacts(traverser.extract(baseRequest(), makeReporter()))).rejects.toBe(
+      failure,
+    );
+    expect(recording.starts).toHaveLength(1);
+    expect(recording.starts[0]!.span.endCount).toBe(1);
+    expect(recording.starts[0]!.span.exceptions).toHaveLength(1);
+    expect(recording.starts[0]!.span.statuses).toEqual([{ code: 2 }]);
   });
 
   it("maps repoName and remoteUrl onto CommitFact.repository", async () => {

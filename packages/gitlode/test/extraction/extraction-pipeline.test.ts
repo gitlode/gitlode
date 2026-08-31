@@ -16,14 +16,13 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
 import type { ProgressEvent, ProgressReporter } from "@gitlode/internal-contracts/progress";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
-import { describe, expect, it } from "vitest";
+import { ROOT_CONTEXT, trace } from "@opentelemetry/api";
+import { describe, expect, it, vi } from "vitest";
 
+import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "../../src/extraction/extraction-pipeline-metric-recorder.js";
 import { ExtractionPipeline } from "../../src/extraction/extraction-pipeline.js";
 import type { CoordinatorDependencies } from "../../src/extraction/types.js";
+import { makeTracer } from "../support/otel-fakes.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -183,7 +182,8 @@ function makeDeps(
     sink,
     progressReporter: overrides.progressReporter ?? makeProgressReporter(),
     diagnosticReporter: overrides.diagnosticReporter ?? makeDiagnosticReporter(),
-    instrumentation: overrides.instrumentation ?? noopInstrumentation,
+    tracer: overrides.tracer ?? trace.getTracer("gitlode.extraction"),
+    metricRecorder: overrides.metricRecorder ?? NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
   };
 }
 
@@ -193,7 +193,7 @@ function baseRequest(
   return {
     repositoryPath: "/repo",
     repoName: "repo",
-    remoteUrl: null,
+    repoUrl: null,
     refs: ["main"],
     granularity: "commit",
     priorCheckpoint: emptyCheckpoint(),
@@ -641,17 +641,140 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
-  it("instruments write and close spans", async () => {
-    let time = 0;
-    const instrumentation = new LocalInstrumentationRecorder(() => time++);
-
-    const deps = makeDeps({ oids: ["1".padStart(12, "0")], instrumentation });
+  it("uses the explicitly supplied extraction domain recorder", async () => {
+    const accepted = vi.fn();
+    const metricRecorder = {
+      ...NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+      recordCommitAccepted: accepted,
+    };
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")], metricRecorder });
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest());
 
-    expect(instrumentation.summary()).toEqual([
-      { name: "gitlode.output.write", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 },
-      { name: "gitlode.output.close", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 },
-    ]);
+    expect(accepted).toHaveBeenCalledWith("commit");
+  });
+
+  it("owns extract and output-close spans under the injected parent", async () => {
+    const { tracer, starts } = makeTracer();
+    const deps = makeDeps({ tracer });
+    const parent = ROOT_CONTEXT;
+    const coord = new ExtractionPipeline({ ...deps, parentContext: parent });
+
+    await coord.run(baseRequest());
+
+    expect(starts.map(({ name }) => name)).toEqual(["gitlode.extract", "gitlode.output.close"]);
+    expect(starts[0]?.parent).toBe(ROOT_CONTEXT);
+    expect(trace.getSpan(starts[1]?.parent ?? ROOT_CONTEXT)).toBe(starts[0]?.span);
+    expect(starts[0]?.span.endCount).toBe(1);
+    expect(starts[1]?.span.endCount).toBe(1);
+  });
+
+  it("records deduplicated commits and successful output writes at owner points", async () => {
+    const startOutputWrite = vi.fn(() => ({ token: true }) as never);
+    const completeOutputWrite = vi.fn();
+    const recordCommitAccepted = vi.fn();
+    const metricRecorder = {
+      ...NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+      startOutputWrite,
+      completeOutputWrite,
+      recordCommitAccepted,
+    };
+    const deps = makeDeps({
+      oids: ["1".padStart(12, "0"), "1".padStart(12, "0")],
+      metricRecorder,
+    });
+
+    const result = await new ExtractionPipeline(deps).run(baseRequest());
+
+    expect(result.commitsTraversed).toBe(1);
+    expect(result.recordsWritten).toBe(1);
+    expect(recordCommitAccepted).toHaveBeenCalledTimes(1);
+    expect(recordCommitAccepted).toHaveBeenCalledWith("commit");
+    expect(startOutputWrite).toHaveBeenCalledTimes(1);
+    expect(completeOutputWrite).toHaveBeenCalledWith(
+      startOutputWrite.mock.results[0]?.value,
+      "commit",
+      "success",
+    );
+  });
+
+  it("records failed output writes without counting a record", async () => {
+    const completeOutputWrite = vi.fn();
+    const failingSink: OutputSink = {
+      async write() {
+        throw new Error("write failure");
+      },
+      async close() {},
+      get filesCreated() {
+        return 0;
+      },
+      get bytesWritten() {
+        return 0;
+      },
+    };
+    const metricRecorder = {
+      ...NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+      startOutputWrite: vi.fn(() => ({ token: true }) as never),
+      completeOutputWrite,
+    };
+
+    await expect(
+      new ExtractionPipeline(makeDeps({ sink: failingSink, metricRecorder })).run(baseRequest()),
+    ).rejects.toThrow("write failure");
+    expect(completeOutputWrite).toHaveBeenCalledWith(
+      metricRecorder.startOutputWrite.mock.results[0]?.value,
+      "commit",
+      "error",
+    );
+  });
+
+  it("keeps partial counts on write failure and closes exactly once", async () => {
+    const { tracer, starts } = makeTracer();
+    const sink: OutputSink = {
+      async write() {
+        throw new Error("partial write failure");
+      },
+      async close() {},
+      get filesCreated() {
+        return 0;
+      },
+      get bytesWritten() {
+        return 0;
+      },
+    };
+    await expect(
+      new ExtractionPipeline(makeDeps({ tracer, sink })).run(baseRequest()),
+    ).rejects.toThrow("partial write failure");
+    const extractSpan = starts.find(({ name }) => name === "gitlode.extract")!.span;
+    expect(extractSpan.attributes["gitlode.commit.unique.count"]).toBe(1);
+    expect(extractSpan.attributes["gitlode.output.record.count"]).toBe(0);
+    expect(starts.filter(({ name }) => name === "gitlode.output.close")).toHaveLength(1);
+    expect(starts.find(({ name }) => name === "gitlode.output.close")!.span.statuses).toEqual([]);
+    expect(starts.every(({ span }) => span.endCount === 1)).toBe(true);
+  });
+
+  it("keeps successful output counts when close fails and marks only close as error", async () => {
+    const { tracer, starts } = makeTracer();
+    const sink: OutputSink = {
+      async write() {},
+      async close() {
+        throw new Error("close failure");
+      },
+      get filesCreated() {
+        return 1;
+      },
+      get bytesWritten() {
+        return 10;
+      },
+    };
+    await expect(
+      new ExtractionPipeline(makeDeps({ tracer, sink })).run(baseRequest()),
+    ).rejects.toThrow("close failure");
+    const extract = starts.find(({ name }) => name === "gitlode.extract")!.span;
+    const close = starts.find(({ name }) => name === "gitlode.output.close")!.span;
+    expect(extract.attributes["gitlode.output.record.count"]).toBe(1);
+    expect(extract.statuses).toEqual([{ code: 2 }]);
+    expect(close.statuses).toEqual([{ code: 2 }]);
+    expect(close.exceptions).toHaveLength(1);
   });
 });

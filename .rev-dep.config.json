@@ -208,7 +208,9 @@
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/src/progress/index.ts",
             "packages/internal-contracts/dist/progress/index.js",
-            "packages/internal-contracts/dist/telemetry/index.js"
+            "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
           ]
         },
         {
@@ -332,7 +334,9 @@
             "packages/git-adapters/src/git-impl/commit-traversal/index.ts",
             "packages/git-adapters/dist/git-impl/commit-traversal/index.js",
             "packages/line-diff-adapters/src/line-diff-impl/index.ts",
-            "packages/line-diff-adapters/dist/line-diff-impl/index.js"
+            "packages/line-diff-adapters/dist/line-diff-impl/index.js",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
           ]
         },
         {

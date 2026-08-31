@@ -2,12 +2,9 @@ import type { CommitFact } from "@gitlode/internal-contracts/extraction";
 import type { FileBlobChange, FileBlobSnapshot, GitAdapter } from "@gitlode/internal-contracts/git";
 import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
 import type { BlobOid, CommitOid } from "@gitlode/internal-contracts/model";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
 import { describe, expect, it, vi } from "vitest";
 
+import { NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER } from "../../src/extraction/file-change-fact-expander-metric-recorder.js";
 import { FileChangeFactExpander } from "../../src/extraction/file-change-fact-expander.js";
 
 const REPO_PATH = "/fake/repo";
@@ -84,13 +81,13 @@ function makeExpander(
   options: {
     readonly lineDiffCalculator?: LineDiffCalculator;
     readonly maxDiffSize?: number;
-    readonly instrumentation?: ConstructorParameters<typeof FileChangeFactExpander>[2];
+    readonly metricRecorder?: ConstructorParameters<typeof FileChangeFactExpander>[2];
   } = {},
 ): FileChangeFactExpander {
   return new FileChangeFactExpander(
     makeSource(changes),
     options.lineDiffCalculator ?? fakeLineDiffCalculator,
-    options.instrumentation ?? noopInstrumentation,
+    options.metricRecorder ?? NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
     options.maxDiffSize,
   );
 }
@@ -139,7 +136,7 @@ describe("FileChangeFactExpander expansion", () => {
     const expander = new FileChangeFactExpander(
       source,
       fakeLineDiffCalculator,
-      noopInstrumentation,
+      NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
     );
     const root = makeCommitFact({ oid: "1".repeat(40) as CommitOid, parents: [] });
     const firstParent = "2".repeat(40) as CommitOid;
@@ -186,13 +183,16 @@ describe("FileChangeFactExpander expansion", () => {
     expect(expander.skippedDiffCount).toBe(0);
   });
 
-  it("applies maxDiffSize before binary detection and line diff", async () => {
+  it("applies maxDiffSize before binary detection and line diff without legacy observations", async () => {
     const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 1 }));
     const content = new Uint8Array([0, 1, 2, 3]);
-    const recorder = new LocalInstrumentationRecorder(() => 1);
+    const recorder = {
+      ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+      recordDiffSkipped: vi.fn(),
+    };
     const expander = makeExpander(
       [{ status: "added", before: null, after: snapshot("large.bin", content) }],
-      { lineDiffCalculator: { computeLineDiff }, maxDiffSize: 3, instrumentation: recorder },
+      { lineDiffCalculator: { computeLineDiff }, maxDiffSize: 3, metricRecorder: recorder },
     );
 
     const [result] = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
@@ -200,16 +200,11 @@ describe("FileChangeFactExpander expansion", () => {
     expect(result?.file.additions).toBeNull();
     expect(computeLineDiff).not.toHaveBeenCalled();
     expect(expander.skippedDiffCount).toBe(1);
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "gitlode.file_change_expansion",
-        counters: { changes: 1, skipped_size: 1 },
-      }),
-    ]);
+    expect(recorder.recordDiffSkipped).toHaveBeenCalledWith("size");
   });
 
-  it("records owned spans and counters for mixed file changes", async () => {
-    const instrumentation = new LocalInstrumentationRecorder(() => 1);
+  it("records skipped expansion inputs through the domain recorder", async () => {
+    const recordDiffSkipped = vi.fn();
     const changes: FileBlobChange[] = [
       {
         status: "modified",
@@ -222,7 +217,10 @@ describe("FileChangeFactExpander expansion", () => {
     const expander = makeExpander(changes, {
       lineDiffCalculator: fakeLineDiffCalculator,
       maxDiffSize: 4,
-      instrumentation,
+      metricRecorder: {
+        ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+        recordDiffSkipped,
+      },
     });
 
     const results = await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
@@ -232,25 +230,8 @@ describe("FileChangeFactExpander expansion", () => {
       { path: "binary.bin", status: "added", additions: null, deletions: null },
     ]);
     expect(expander.skippedDiffCount).toBe(2);
-    const expansion = instrumentation
-      .records()
-      .find(({ name }) => name === "gitlode.file_change_expansion");
-    expect(expansion?.counters).toEqual({
-      changes: 3,
-      diffs: 1,
-      skipped_size: 1,
-      skipped_binary: 1,
-    });
-    expect(
-      instrumentation.records().filter(({ name }) => name === "gitlode.file_change_expansion"),
-    ).toHaveLength(1);
-    for (const rejectedName of [
-      ["git", "file_changes"],
-      ["git", "diff"],
-      ["gitlode", "line_diff"],
-    ].map((parts) => parts.join("."))) {
-      expect(instrumentation.records().some(({ name }) => name === rejectedName)).toBe(false);
-    }
+    expect(recordDiffSkipped).toHaveBeenNthCalledWith(1, "size");
+    expect(recordDiffSkipped).toHaveBeenNthCalledWith(2, "binary");
   });
 
   it("runs the diff when content size equals maxDiffSize", async () => {
@@ -314,5 +295,83 @@ describe("FileChangeFactExpander expansion", () => {
     await expect(collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH))).rejects.toBe(
       failure,
     );
+  });
+
+  it("records one expansion lifecycle with size and completed partial facts", async () => {
+    const startExpansion = vi.fn(() => ({ token: true }) as never);
+    const completeExpansion = vi.fn();
+    const recordExpanded = vi.fn();
+    const recorder = {
+      ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+      startExpansion,
+      completeExpansion,
+      recordExpanded,
+    };
+    const expander = makeExpander(
+      [
+        { status: "added", before: null, after: snapshot("a", "a") },
+        { status: "modified", before: snapshot("b", "b"), after: snapshot("b", "bb") },
+        { status: "deleted", before: snapshot("c", "c"), after: null },
+      ],
+      { metricRecorder: recorder },
+    );
+
+    await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
+
+    expect(startExpansion).toHaveBeenCalledTimes(1);
+    expect(completeExpansion).toHaveBeenCalledWith(startExpansion.mock.results[0]?.value, {
+      outcome: "success",
+      size: 3,
+    });
+    expect(recordExpanded.mock.calls.map(([type]) => type)).toEqual([
+      "added",
+      "modified",
+      "deleted",
+    ]);
+  });
+
+  it("records an empty expansion with an explicit zero size", async () => {
+    const completeExpansion = vi.fn();
+    const token = { token: true } as never;
+    const recorder = {
+      ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+      startExpansion: vi.fn(() => token),
+      completeExpansion,
+    };
+    await collect(
+      makeExpander([], { metricRecorder: recorder }).expand(
+        toAsyncIter([makeCommitFact()]),
+        REPO_PATH,
+      ),
+    );
+    expect(recorder.startExpansion).toHaveBeenCalledTimes(1);
+    expect(completeExpansion).toHaveBeenCalledWith(token, { outcome: "success", size: 0 });
+  });
+
+  it("records partial expansion failure without a size and preserves the original error", async () => {
+    const failure = new Error("blob expansion failed");
+    const completeExpansion = vi.fn();
+    const recordExpanded = vi.fn();
+    const token = { token: true } as never;
+    const source: Pick<GitAdapter, "getFileBlobChanges"> = {
+      async *getFileBlobChanges() {
+        yield { status: "added", before: null, after: snapshot("a", "a") };
+        throw failure;
+      },
+    };
+    const recorder = {
+      ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+      startExpansion: vi.fn(() => token),
+      completeExpansion,
+      recordExpanded,
+    };
+    const expander = new FileChangeFactExpander(source, fakeLineDiffCalculator, recorder);
+
+    await expect(collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH))).rejects.toBe(
+      failure,
+    );
+    expect(recordExpanded).toHaveBeenCalledWith("added");
+    expect(completeExpansion).toHaveBeenCalledTimes(1);
+    expect(completeExpansion).toHaveBeenCalledWith(token, { outcome: "error" });
   });
 });

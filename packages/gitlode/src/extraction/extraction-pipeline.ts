@@ -7,9 +7,12 @@ import type {
   Fact,
   RefCheckpoint,
 } from "@gitlode/internal-contracts/extraction";
-import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { getTelemetryAttributeMetadata } from "@gitlode/internal-contracts/telemetry";
+import { withAsyncSpan } from "@gitlode/internal-foundation/otel-support";
 import { atOrThrow } from "@gitlode/internal-foundation/support";
+import { context, trace, type Context } from "@opentelemetry/api";
 
+import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "./extraction-pipeline-metric-recorder.js";
 import type { CoordinatorDependencies } from "./types.js";
 
 async function* deduplicateCommits(
@@ -42,6 +45,58 @@ export class ExtractionPipeline implements ExtractionCoordinator {
   }
 
   async run(request: CoordinatorRequest): Promise<CoordinatorResult> {
+    const tracer = this.deps.tracer;
+    return await withAsyncSpan(
+      tracer,
+      "gitlode.extract",
+      async (span) => {
+        const extractContext = trace.setSpan(this.deps.parentContext ?? context.active(), span);
+        span.setAttribute(
+          getTelemetryAttributeMetadata("extraction_granularity").key,
+          request.granularity,
+        );
+        span.setAttribute(
+          getTelemetryAttributeMetadata("extraction_range_kind").key,
+          request.range?.type ?? "none",
+        );
+        span.setAttribute(
+          getTelemetryAttributeMetadata("requested_ref_count").key,
+          request.refs.length,
+        );
+        let commitsTraversed = 0;
+        let recordsWritten = 0;
+        try {
+          const result = await this.runExtraction(request, extractContext, (commits, records) => {
+            commitsTraversed = commits;
+            recordsWritten = records;
+          });
+          return result;
+        } finally {
+          span.setAttribute(
+            getTelemetryAttributeMetadata("unique_commit_count").key,
+            commitsTraversed,
+          );
+          span.setAttribute(
+            getTelemetryAttributeMetadata("output_record_count").key,
+            recordsWritten,
+          );
+          if (request.granularity === "file")
+            span.setAttribute(
+              getTelemetryAttributeMetadata("skipped_diff_count").key,
+              this.deps.fileChangeExpander.skippedDiffCount,
+            );
+        }
+      },
+      undefined,
+      this.deps.parentContext,
+    );
+  }
+
+  private async runExtraction(
+    request: CoordinatorRequest,
+    extractContext: Context,
+    updateCounts: (commits: number, records: number) => void,
+  ): Promise<CoordinatorResult> {
     const {
       traversalPlanner,
       traversalExtractor,
@@ -51,7 +106,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
       progressReporter,
       diagnosticReporter,
     } = this.deps;
-    const instrumentation: Instrumentation = this.deps.instrumentation;
+    const metricRecorder = this.deps.metricRecorder ?? NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER;
 
     // -----------------------------------------------------------------------
     // 1. Preparing phase: plan branch traversal boundaries.
@@ -69,6 +124,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
         range: request.range,
       },
       diagnosticReporter,
+      extractContext,
     );
 
     progressReporter.emit({ type: "phase-end", phase: "preparing" });
@@ -120,11 +176,14 @@ export class ExtractionPipeline implements ExtractionCoordinator {
             range: request.range,
           },
           diagnosticReporter,
+          extractContext,
         );
 
         const dedupedStream = deduplicateCommits(rawStream, allVisited);
         const countedStream = wrapCommitCounter(dedupedStream, () => {
           commitsTraversed++;
+          metricRecorder.recordCommitAccepted(request.granularity);
+          updateCounts(commitsTraversed, recordsWritten);
         });
 
         const factStream: AsyncIterable<Fact> =
@@ -132,12 +191,17 @@ export class ExtractionPipeline implements ExtractionCoordinator {
             ? fileChangeExpander.expand(countedStream, request.repositoryPath)
             : countedStream;
 
-        for await (const record of projector.project(factStream)) {
-          await instrumentation.runAsync(
-            "gitlode.output.write",
-            async () => await sink.write(record),
-          );
+        for await (const record of projector.project(factStream, extractContext)) {
+          const writeToken = metricRecorder.startOutputWrite();
+          try {
+            await sink.write(record);
+            metricRecorder.completeOutputWrite(writeToken, request.granularity, "success");
+          } catch (error) {
+            metricRecorder.completeOutputWrite(writeToken, request.granularity, "error");
+            throw error;
+          }
           recordsWritten++;
+          updateCounts(commitsTraversed, recordsWritten);
           progressReporter.emit({
             type: "extracting-progress",
             phase: "extracting",
@@ -150,7 +214,13 @@ export class ExtractionPipeline implements ExtractionCoordinator {
         }
       }
     } finally {
-      await instrumentation.runAsync("gitlode.output.close", async () => await sink.close());
+      await withAsyncSpan(
+        this.deps.tracer,
+        "gitlode.output.close",
+        async () => await sink.close(),
+        undefined,
+        extractContext,
+      );
     }
 
     progressReporter.emit({ type: "phase-end", phase: "extracting" });

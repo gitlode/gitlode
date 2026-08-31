@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
+import { ROOT_CONTEXT, metrics, trace } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,7 @@ import {
 } from "../../src/execution/execute-run.js";
 import type { ExecutionRunInput, WorkerRunRequest } from "../../src/execution/types.js";
 import type { StateStore } from "../../src/state/index.js";
+import { makeTracer } from "../support/otel-fakes.js";
 
 const tempDirs: string[] = [];
 
@@ -232,6 +234,7 @@ describe("executeWorkerRunRequest profiling", () => {
       },
     };
 
+    const telemetryTracer = makeTracer();
     const result = await executeWorkerRunRequest(
       request,
       {
@@ -239,10 +242,65 @@ describe("executeWorkerRunRequest profiling", () => {
         diagnosticReporter: { report() {} },
       },
       { environment: {} },
+      {
+        executionTracer: telemetryTracer.tracer,
+        extractionTracer: telemetryTracer.tracer,
+        extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+        rootContext: (await import("@opentelemetry/api")).ROOT_CONTEXT,
+      },
     );
 
     expect(result.kind).toBe("success");
     if (result.kind !== "success") return;
+
+    expect(telemetryTracer.starts.map(({ name }) => name)).toEqual([
+      "gitlode.repository.access.validate",
+      "gitlode.repository.object_format.resolve",
+      "gitlode.state.validate",
+      "gitlode.repository.metadata.resolve",
+      "gitlode.extraction.range.resolve",
+      "gitlode.extract",
+      "gitlode.planning",
+      "gitlode.projection",
+      "gitlode.traversal",
+      "gitlode.output.close",
+    ]);
+    expect(telemetryTracer.starts.every(({ span }) => span.endCount === 1)).toBe(true);
+    expect(telemetryTracer.starts.some(({ name }) => name === "gitlode.run")).toBe(false);
+    for (const start of telemetryTracer.starts.slice(0, 5)) {
+      expect(start.parent).toBe(ROOT_CONTEXT);
+      expect(start.span.statuses).toEqual([]);
+      expect(start.span.exceptions).toHaveLength(0);
+    }
+    expect(telemetryTracer.starts[1]!.span.attributes).toMatchObject({
+      "gitlode.git.object_format": "sha1",
+    });
+    expect(telemetryTracer.starts[2]!.span.attributes).toMatchObject({
+      "gitlode.ref.prior.count": 0,
+    });
+    expect(telemetryTracer.starts[3]!.span.attributes).toMatchObject({
+      "gitlode.repository.name.source": "path",
+      "gitlode.repository.url.source": "missing",
+    });
+    expect(telemetryTracer.starts[4]!.span.attributes).toMatchObject({
+      "gitlode.extraction.range.kind": "none",
+    });
+    const serializedAttributes = JSON.stringify(
+      telemetryTracer.starts.slice(0, 5).map(({ span }) => span.attributes),
+    );
+    expect(serializedAttributes).not.toContain("gitlode-execution");
+    expect(serializedAttributes).not.toContain("fixture-repository");
+    const extractSpan = telemetryTracer.starts.find(({ name }) => name === "gitlode.extract")!.span;
+    for (const name of [
+      "gitlode.planning",
+      "gitlode.traversal",
+      "gitlode.projection",
+      "gitlode.output.close",
+    ]) {
+      const child = telemetryTracer.starts.find((start) => start.name === name)!;
+      expect(trace.getSpan(child.parent!)).toBe(extractSpan);
+    }
+    expect(telemetryTracer.starts.filter(({ name }) => name.includes("write")).length).toBe(0);
 
     const walkEntry = result.success.profileEntries.find(
       (entry) => entry.name === "git.walk_commits",
@@ -341,11 +399,11 @@ describe("executeWorkerRunRequest profiling", () => {
       deletions: 0,
     });
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
     const fileBlobBatchEntry = result.success.profileEntries.find(
       (entry) => entry.name === "git.cli.file_blob_batch",
     );
+    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
     expect(fileBlobBatchEntry?.calls).toBe(1);
     expect(fileBlobBatchEntry?.counters).toEqual({ blob_bytes: 6, objects_read: 1 });
   });
@@ -507,10 +565,71 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       return;
     }
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
     expect(result.success.profileEntries.some((entry) => entry.name === "git.cli.rev_list")).toBe(
       true,
     );
+    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+  });
+
+  it("records typed setup failures without exception events", async () => {
+    const request = await createOneCommitRequest();
+    const telemetryTracer = makeTracer();
+    const result = await executeWorkerRunRequest(
+      {
+        ...request,
+        input: { ...request.input, profile: true, range: { type: "ref", since: "missing-ref" } },
+      },
+      { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+      { environment: {} },
+      {
+        executionTracer: telemetryTracer.tracer,
+        extractionTracer: telemetryTracer.tracer,
+        extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+        rootContext: ROOT_CONTEXT,
+      },
+    );
+
+    expect(result.kind).toBe("user-error");
+    expect(telemetryTracer.starts.map(({ name }) => name)).toEqual([
+      "gitlode.repository.access.validate",
+      "gitlode.repository.object_format.resolve",
+      "gitlode.state.validate",
+      "gitlode.repository.metadata.resolve",
+      "gitlode.extraction.range.resolve",
+    ]);
+    const rangeSpan = telemetryTracer.starts[4]!.span;
+    expect(rangeSpan.statuses).toEqual([{ code: 2 }]);
+    expect(rangeSpan.exceptions).toHaveLength(0);
+    expect(rangeSpan.endCount).toBe(1);
+    expect(telemetryTracer.starts.slice(0, 4).every(({ span }) => span.statuses.length === 0)).toBe(
+      true,
+    );
+  });
+
+  it("records ordinary setup failures with the original exception", async () => {
+    const request = await createOneCommitRequest();
+    const telemetryTracer = makeTracer();
+    await expect(
+      executeWorkerRunRequest(
+        {
+          ...request,
+          input: { ...request.input, range: { type: "date", since: "not-a-date" } as never },
+        },
+        { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+        { environment: {} },
+        {
+          executionTracer: telemetryTracer.tracer,
+          extractionTracer: telemetryTracer.tracer,
+          extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+          rootContext: ROOT_CONTEXT,
+        },
+      ),
+    ).rejects.toThrow("Invalid date format");
+    const rangeSpan = telemetryTracer.starts.at(-1)!.span;
+    expect(rangeSpan.statuses).toEqual([{ code: 2 }]);
+    expect(rangeSpan.exceptions).toHaveLength(1);
+    expect(rangeSpan.exceptions[0]).toBeInstanceOf(Error);
+    expect(rangeSpan.endCount).toBe(1);
   });
 });

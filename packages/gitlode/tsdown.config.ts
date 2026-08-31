@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 import { defineConfig } from "tsdown";
 
 const externalRuntimePackages = [
+  "@opentelemetry/api",
+  "@opentelemetry/context-async-hooks",
+  "@opentelemetry/sdk-metrics",
+  "@opentelemetry/sdk-trace-base",
   "chalk",
   "commander",
   "diff",

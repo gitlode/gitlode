@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { ProjectedCommit, ProjectedFileChange } from "@gitlode/internal-contracts/extraction";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "../../src/output/jsonl-file-writer-metric-recorder.js";
 import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
@@ -210,5 +210,24 @@ describe("JsonlFileWriter", () => {
     expect(parsed.file.status).toBe("modified");
     expect(parsed.file.additions).toBe(5);
     expect(parsed.file.deletions).toBe(2);
+  });
+
+  it("records file and UTF-8 bytes only after successful writes", async () => {
+    const recordFileCreated = vi.fn();
+    const recordBytesWritten = vi.fn();
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      (seq) => `metrics-${seq}.jsonl`,
+      {},
+      { recordFileCreated, recordBytesWritten },
+    );
+    const record = makeCommit(oid(1));
+    await writer.write(record);
+    await writer.close();
+
+    expect(recordFileCreated).toHaveBeenCalledTimes(1);
+    expect(recordBytesWritten).toHaveBeenCalledWith(
+      Buffer.byteLength(`${JSON.stringify(record)}\n`, "utf8"),
+    );
   });
 });

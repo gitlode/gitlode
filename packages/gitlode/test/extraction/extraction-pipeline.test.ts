@@ -16,12 +16,13 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
 import type { ProgressEvent, ProgressReporter } from "@gitlode/internal-contracts/progress";
-import { trace } from "@opentelemetry/api";
+import { ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
 import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "../../src/extraction/extraction-pipeline-metric-recorder.js";
 import { ExtractionPipeline } from "../../src/extraction/extraction-pipeline.js";
 import type { CoordinatorDependencies } from "../../src/extraction/types.js";
+import { makeTracer } from "../support/otel-fakes.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -651,5 +652,79 @@ describe("ExtractionPipeline orchestration", () => {
     await coord.run(baseRequest());
 
     expect(accepted).toHaveBeenCalledWith("commit");
+  });
+
+  it("owns extract and output-close spans under the injected parent", async () => {
+    const { tracer, starts } = makeTracer();
+    const deps = makeDeps({ tracer });
+    const parent = ROOT_CONTEXT;
+    const coord = new ExtractionPipeline({ ...deps, parentContext: parent });
+
+    await coord.run(baseRequest());
+
+    expect(starts.map(({ name }) => name)).toEqual(["gitlode.extract", "gitlode.output.close"]);
+    expect(starts[0]?.parent).toBe(ROOT_CONTEXT);
+    expect(trace.getSpan(starts[1]?.parent ?? ROOT_CONTEXT)).toBe(starts[0]?.span);
+    expect(starts[0]?.span.endCount).toBe(1);
+    expect(starts[1]?.span.endCount).toBe(1);
+  });
+
+  it("records deduplicated commits and successful output writes at owner points", async () => {
+    const startOutputWrite = vi.fn(() => ({ token: true }) as never);
+    const completeOutputWrite = vi.fn();
+    const recordCommitAccepted = vi.fn();
+    const metricRecorder = {
+      ...NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+      startOutputWrite,
+      completeOutputWrite,
+      recordCommitAccepted,
+    };
+    const deps = makeDeps({
+      oids: ["1".padStart(12, "0"), "1".padStart(12, "0")],
+      metricRecorder,
+    });
+
+    const result = await new ExtractionPipeline(deps).run(baseRequest());
+
+    expect(result.commitsTraversed).toBe(1);
+    expect(result.recordsWritten).toBe(1);
+    expect(recordCommitAccepted).toHaveBeenCalledTimes(1);
+    expect(recordCommitAccepted).toHaveBeenCalledWith("commit");
+    expect(startOutputWrite).toHaveBeenCalledTimes(1);
+    expect(completeOutputWrite).toHaveBeenCalledWith(
+      startOutputWrite.mock.results[0]?.value,
+      "commit",
+      "success",
+    );
+  });
+
+  it("records failed output writes without counting a record", async () => {
+    const completeOutputWrite = vi.fn();
+    const failingSink: OutputSink = {
+      async write() {
+        throw new Error("write failure");
+      },
+      async close() {},
+      get filesCreated() {
+        return 0;
+      },
+      get bytesWritten() {
+        return 0;
+      },
+    };
+    const metricRecorder = {
+      ...NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+      startOutputWrite: vi.fn(() => ({ token: true }) as never),
+      completeOutputWrite,
+    };
+
+    await expect(
+      new ExtractionPipeline(makeDeps({ sink: failingSink, metricRecorder })).run(baseRequest()),
+    ).rejects.toThrow("write failure");
+    expect(completeOutputWrite).toHaveBeenCalledWith(
+      metricRecorder.startOutputWrite.mock.results[0]?.value,
+      "commit",
+      "error",
+    );
   });
 });

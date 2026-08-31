@@ -1,6 +1,6 @@
 import type { CommitFact, Fact, FileChangeFact } from "@gitlode/internal-contracts/extraction";
 import { trace } from "@opentelemetry/api";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
 import {
@@ -332,5 +332,39 @@ describe("projectFileChange — pure function", () => {
     const fact = makeFileChangeFact();
     const record = projectFileChange(fact, "repo", null);
     expect(record.repository.url).toBeNull();
+  });
+});
+
+describe("BuiltInFactProjector metric ownership", () => {
+  it("records one duration completion per fact without creating record spans", async () => {
+    const startProjection = vi.fn(() => ({ token: true }) as never);
+    const completeProjection = vi.fn();
+    const projector = new BuiltInFactProjector(
+      "repo",
+      null,
+      trace.getTracer("gitlode.extraction"),
+      { startProjection, completeProjection },
+    );
+    const facts = (async function* () {
+      yield makeCommitFact();
+      yield makeFileChangeFact();
+    })();
+    const records = [];
+    for await (const record of projector.project(facts)) records.push(record);
+
+    expect(records).toHaveLength(2);
+    expect(startProjection).toHaveBeenCalledTimes(2);
+    expect(completeProjection).toHaveBeenNthCalledWith(
+      1,
+      startProjection.mock.results[0]?.value,
+      "commit",
+      "success",
+    );
+    expect(completeProjection).toHaveBeenNthCalledWith(
+      2,
+      startProjection.mock.results[1]?.value,
+      "file-change",
+      "success",
+    );
   });
 });

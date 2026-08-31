@@ -296,4 +296,37 @@ describe("FileChangeFactExpander expansion", () => {
       failure,
     );
   });
+
+  it("records one expansion lifecycle with size and completed partial facts", async () => {
+    const startExpansion = vi.fn(() => ({ token: true }) as never);
+    const completeExpansion = vi.fn();
+    const recordExpanded = vi.fn();
+    const recorder = {
+      ...NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+      startExpansion,
+      completeExpansion,
+      recordExpanded,
+    };
+    const expander = makeExpander(
+      [
+        { status: "added", before: null, after: snapshot("a", "a") },
+        { status: "modified", before: snapshot("b", "b"), after: snapshot("b", "bb") },
+        { status: "deleted", before: snapshot("c", "c"), after: null },
+      ],
+      { metricRecorder: recorder },
+    );
+
+    await collect(expander.expand(toAsyncIter([makeCommitFact()]), REPO_PATH));
+
+    expect(startExpansion).toHaveBeenCalledTimes(1);
+    expect(completeExpansion).toHaveBeenCalledWith(startExpansion.mock.results[0]?.value, {
+      outcome: "success",
+      size: 3,
+    });
+    expect(recordExpanded.mock.calls.map(([type]) => type)).toEqual([
+      "added",
+      "modified",
+      "deleted",
+    ]);
+  });
 });

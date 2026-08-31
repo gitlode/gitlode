@@ -5,10 +5,11 @@ import {
 } from "@gitlode/internal-contracts/telemetry";
 import type {
   DagFallbackReason,
+  DagOperationObservation,
   DagOperationObservationHooks,
   DagTraversalRole,
 } from "@gitlode/internal-foundation/dag";
-import type { Counter, Meter } from "@opentelemetry/api";
+import type { Counter, Meter, Span } from "@opentelemetry/api";
 
 type DagOperation = TelemetryAttributeValue<"dag_operation">;
 type DifferenceOperation = Extract<DagOperation, "difference">;
@@ -43,6 +44,74 @@ export interface DagMetricOperation<C extends NeutralDagCompletion = NeutralDagC
 }
 export interface DagMetricRecorder {
   startOperation<C extends DagOperationContext>(context: C): DagMetricOperation<CompletionFor<C>>;
+}
+
+/** Binds neutral DAG evidence to the Git-owned span and metric signals. */
+export function bindDagObservation(
+  span: Span,
+  operation: DagMetricOperation,
+  context: DagOperationContext,
+): DagOperationObservation {
+  let fallbackRecorded = false;
+  const attrs = (
+    id: Parameters<typeof getTelemetryAttributeMetadata>[0],
+    value: string | boolean,
+  ) => span.setAttribute(key(id), value);
+  return {
+    recordStepProcessed: (count) => operation.observations.recordStepProcessed(count),
+    recordStepStale: (count) => operation.observations.recordStepStale(count),
+    recordSuccessorExpansion: (role, count) =>
+      operation.observations.recordSuccessorExpansion(role, count),
+    recordNodeYielded: (count) => operation.observations.recordNodeYielded(count),
+    recordNodeExcluded: (count) => operation.observations.recordNodeExcluded(count),
+    markFallback(reason) {
+      operation.observations.markFallback(reason);
+      if (!fallbackRecorded) {
+        fallbackRecorded = true;
+        span.addEvent("gitlode.dag.fallback", {
+          [key("dag_fallback_reason")]: fallbackMap[reason],
+        });
+      }
+    },
+    recordFallbackNodeRemoved: (count) => operation.observations.recordFallbackNodeRemoved(count),
+    complete(completion) {
+      if (context.operation === "difference") {
+        attrs("dag_operation", context.operation);
+        attrs("dag_strategy", context.strategy);
+        attrs("dag_has_exclusion", context.hasExclusion);
+      } else {
+        attrs("dag_operation", context.operation);
+      }
+      const normalized =
+        context.operation === "certified-closure"
+          ? normalizeDagCompletion({
+              type: "certified-closure",
+              completion: completion === "success" ? "success" : "error",
+            })
+          : normalizeDagCompletion({
+              type: "stream",
+              completion:
+                completion === "success"
+                  ? "exhausted"
+                  : (completion as StreamDagCompletion["completion"]),
+            });
+      attrs("dag_operation_completion", normalized);
+      operation.complete(
+        context.operation === "certified-closure"
+          ? {
+              type: "certified-closure",
+              completion: completion === "success" ? "success" : "error",
+            }
+          : {
+              type: "stream",
+              completion:
+                completion === "success"
+                  ? "exhausted"
+                  : (completion as StreamDagCompletion["completion"]),
+            },
+      );
+    },
+  };
 }
 
 const noopHooks = Object.freeze<DagOperationObservationHooks>({

@@ -1,7 +1,6 @@
-import type { Instrumentation, InstrumentationSpan } from "../instrumentation/index.js";
 import type { WorkQueue } from "../support/index.js";
-
-export type DagTraversalRole = "main" | "exclude";
+import type { DagOperationObservation, DagTraversalRole } from "./observations.js";
+export type { DagTraversalRole } from "./observations.js";
 
 export interface BasicDagSchedulingContext {
   readonly role: DagTraversalRole;
@@ -32,7 +31,8 @@ export type DagFrontier<T> = WorkQueue<T>;
 
 export interface WalkDagContext<NodeId extends PropertyKey, DomainHint = undefined> {
   readonly graph: DagTopologyPort<NodeId, DomainHint>;
-  readonly instrumentation: Instrumentation;
+  /** Optional algorithm-neutral observation sink owned by the caller. */
+  readonly observation?: DagOperationObservation;
 }
 
 /**
@@ -56,7 +56,7 @@ export interface WalkDagStrategyOptions<
 }
 
 interface DagTraversalTelemetry {
-  readonly span: InstrumentationSpan;
+  readonly observation?: DagOperationObservation;
   readonly countYieldedNodes: boolean;
 }
 

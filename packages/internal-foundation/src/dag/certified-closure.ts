@@ -465,8 +465,7 @@ class ClosureGraphState<NodeId extends PropertyKey, DomainHint = undefined> {
   }
 
   async expand(nodeId: NodeId): Promise<readonly DagSuccessor<NodeId, DomainHint>[]> {
-    this.telemetry?.span.incrementCounter("successor_expansions");
-    this.telemetry?.span.incrementCounter("exclude_expansions");
+    this.telemetry?.observation?.recordSuccessorExpansion("exclude");
     const successors = await this.graph.getSuccessors(nodeId);
     this.markExpandedAndReached(nodeId);
     return successors;
@@ -498,7 +497,7 @@ class ClosureGraphState<NodeId extends PropertyKey, DomainHint = undefined> {
   }
 
   recordStaleStep(): void {
-    this.telemetry?.span.incrementCounter("stale_steps");
+    this.telemetry?.observation?.recordStepStale();
   }
 
   nodeStates(): Iterable<ReadonlyCertifiedClosureNodeState<NodeId>> {

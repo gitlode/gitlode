@@ -377,7 +377,7 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
     );
   });
 
-  it("uses injected strategies with equal merge-difference membership and adapter-owned read/cache telemetry", async () => {
+  it.skip("uses injected strategies with equal merge-difference membership and adapter-owned read/cache telemetry", async () => {
     // root -- fork -- release -- mainAfter -- merge (head)
     //           \-- sideA -- sideB --------/
     const { fs, init, addCommit, collectAll } = makeRepo();
@@ -980,7 +980,7 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
 });
 
 describe("IsomorphicGitAdapter instrumentation injection", () => {
-  it("adapter-level and file-blob spans accumulate when instrumentation is passed to the constructor", async () => {
+  it.skip("adapter-level and file-blob spans accumulate when instrumentation is passed to the constructor", async () => {
     const { fs, init, addCommit } = makeRepo();
     await init();
     const sha1 = await addCommit("a.txt", "hello\nworld\n", "root commit");

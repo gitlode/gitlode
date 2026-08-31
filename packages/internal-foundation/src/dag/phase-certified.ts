@@ -1,4 +1,3 @@
-import { instrumentAsyncIterable } from "../instrumentation/index.js";
 import { OrderedQueue } from "../support/index.js";
 import { CertifiedClosurePhase } from "./certified-closure.js";
 import { PhaseCertifiedDifferenceState } from "./phase-certified-difference-state.js";
@@ -45,18 +44,16 @@ export async function resolveDagCertifiedClosurePhase<
   nodeId: NodeId,
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
-  return await context.instrumentation.runAsync("dag.certified_closure", async (span) => {
-    const resolution = await resolveDagCertifiedClosurePhaseCore(context, nodeId, options, {
-      span,
+  try {
+    const result = await resolveDagCertifiedClosurePhaseCore(context, nodeId, options, {
+      observation: context.observation,
     });
-    const { result } = resolution;
-    span.setAttribute("result", result.kind);
-    span.incrementCounter("certified_nodes", result.certifiedNodes.size);
-    if (result.kind === "exhausted") {
-      span.incrementCounter("terminal_nodes", result.terminalNodes.length);
-    }
-    return result;
-  });
+    context.observation?.complete("success");
+    return result.result;
+  } catch (error) {
+    context.observation?.complete("error");
+    throw error;
+  }
 }
 
 async function resolveDagCertifiedClosurePhaseCore<
@@ -72,7 +69,7 @@ async function resolveDagCertifiedClosurePhaseCore<
   const { graph } = context;
   const phase = new CertifiedClosurePhase<NodeId, DomainHint>(graph, nodeId, telemetry);
 
-  telemetry?.span.incrementCounter("traversal_steps");
+  telemetry?.observation?.recordStepProcessed();
   const initialFrontierItems = await phase.begin(rootDomainHint);
   if (initialFrontierItems.length === 0 || phase.hasClosedBoundary()) {
     return phase.buildResolution();
@@ -86,7 +83,7 @@ async function resolveDagCertifiedClosurePhaseCore<
   while (!frontier.isEmpty() && !phase.hasClosedBoundary()) {
     const item = frontier.dequeueOrThrow();
 
-    telemetry?.span.incrementCounter("traversal_steps");
+    telemetry?.observation?.recordStepProcessed();
     frontier.enqueueMany(await phase.processFrontierItem(item));
   }
 
@@ -108,18 +105,20 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<
   excludeNodeId?: NodeId,
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentAsyncIterable(
-    context.instrumentation,
-    "dag.traversal",
-    (span) =>
-      walkDagNodeIdsPhaseCertifiedDifferenceCore(
-        { ...context, telemetry: { span } },
-        nodeId,
-        excludeNodeId,
-        options,
-      ),
-    { attributes: { strategy: "phaseCertified" } },
-  );
+  try {
+    yield* walkDagNodeIdsPhaseCertifiedDifferenceCore(
+      { ...context, telemetry: { observation: context.observation } },
+      nodeId,
+      excludeNodeId,
+      options,
+    );
+    context.observation?.complete("exhausted");
+  } catch (error) {
+    context.observation?.complete("error");
+    throw error;
+  } finally {
+    context.observation?.complete("cancelled");
+  }
 }
 
 async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
@@ -151,15 +150,14 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
     const item = frontier.dequeueOrThrow();
 
     if (item.role === "main") {
-      telemetry.span.incrementCounter("traversal_steps");
+      telemetry.observation?.recordStepProcessed();
       const advance = await state.advanceIncludeNode(item.nodeId);
       if (advance.kind === "ignored") {
-        telemetry.span.incrementCounter("stale_steps");
+        telemetry.observation?.recordStepStale();
       }
       if (advance.kind === "certified-hit") {
         for await (const yielded of state.resolveIncludeHits(new Set([item.nodeId]))) {
-          telemetry.span.incrementCounter("certification_yielded_nodes");
-          telemetry.span.incrementCounter("yielded_nodes");
+          telemetry.observation?.recordNodeYielded();
           yield yielded;
         }
         continue;
@@ -176,7 +174,6 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
       continue;
     }
 
-    telemetry.span.incrementCounter("closure_phases");
     const closureResolution = await resolveDagCertifiedClosurePhaseCore(
       context,
       item.nodeId,
@@ -185,15 +182,8 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
       item.domainHint,
     );
     const { result: closure, closedBoundaryDomainHint } = closureResolution;
-    telemetry.span.incrementCounter(
-      closure.kind === "closed-boundary" ? "closed_boundary_phases" : "exhausted_phases",
-    );
-    if (closure.kind === "exhausted") {
-      telemetry.span.incrementCounter("terminal_nodes", closure.terminalNodes.length);
-    }
     for await (const yielded of state.applyClosureAndResolveIncludeHits(closure)) {
-      telemetry.span.incrementCounter("certification_yielded_nodes");
-      telemetry.span.incrementCounter("yielded_nodes");
+      telemetry.observation?.recordNodeYielded();
       yield yielded;
     }
     // Once the include graph is empty, remaining scheduled main/exclude work is stale with
@@ -209,12 +199,8 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
     }
   }
 
-  const terminationReason = frontier.isEmpty() ? "frontier-exhausted" : "include-resolved";
-  telemetry.span.setAttribute("termination_reason", terminationReason);
-
   for (const yielded of state.drainRemainingInclude()) {
-    telemetry.span.incrementCounter("drain_yielded_nodes");
-    telemetry.span.incrementCounter("yielded_nodes");
+    telemetry.observation?.recordNodeYielded();
     yield yielded;
   }
 }

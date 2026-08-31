@@ -16,6 +16,8 @@ import {
   type Instrumentation,
   type InstrumentationSpan,
 } from "@gitlode/internal-foundation/instrumentation";
+import { createAsyncIterableInstrumenter } from "@gitlode/internal-foundation/otel-support";
+import { metrics, trace, type Meter, type Tracer } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
@@ -25,17 +27,24 @@ import {
   type CommitPathSchedulingHint,
   type CommitTraversalStrategy,
 } from "./commit-traversal/index.js";
+import { createDagMetricRecorder, bindDagObservation } from "./dag-metric-recorder.js";
+
+const instrumentDagStream = createAsyncIterableInstrumenter(() => {});
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
   readonly instrumentation: Instrumentation;
   readonly commitTraversalStrategy?: CommitTraversalStrategy;
+  readonly dagTracer?: Tracer;
+  readonly dagMeter?: Meter;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _instrumentation: Instrumentation;
   private readonly _commitTraversalStrategy: CommitTraversalStrategy;
+  private readonly _dagTracer: Tracer;
+  private readonly _dagMetricRecorder: ReturnType<typeof createDagMetricRecorder>;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
@@ -43,6 +52,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
     this._commitTraversalStrategy =
       dependencies.commitTraversalStrategy ??
       createCommitTraversalStrategy(DEFAULT_COMMIT_TRAVERSAL_STRATEGY);
+    this._dagTracer = dependencies.dagTracer ?? trace.getTracer("gitlode.dag");
+    this._dagMetricRecorder = createDagMetricRecorder(
+      dependencies.dagMeter ?? metrics.getMeter("gitlode.dag"),
+    );
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -214,13 +227,28 @@ export class IsomorphicGitAdapter implements GitAdapter {
       const strategy = this._commitTraversalStrategy;
       span.setAttribute("strategy", strategy.name);
       const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
-      const oidWalk = strategy.walk(
-        {
-          graph: topology,
-          instrumentation: this._instrumentation,
+      const oidWalk = instrumentDagStream<CommitOid>(
+        this._dagTracer,
+        "gitlode.dag.traversal",
+        (dagSpan) => {
+          const operation = this._dagMetricRecorder.startOperation({
+            operation: "difference",
+            strategy: strategy.name === "certified-lazy" ? "certified-lazy" : "phase-certified",
+            hasExclusion: excludeOid !== undefined,
+          });
+          return strategy.walk(
+            {
+              graph: topology,
+              observation: bindDagObservation(dagSpan, operation, {
+                operation: "difference",
+                strategy: strategy.name === "certified-lazy" ? "certified-lazy" : "phase-certified",
+                hasExclusion: excludeOid !== undefined,
+              }),
+            },
+            oid,
+            excludeOid,
+          );
         },
-        oid,
-        excludeOid,
       );
 
       return commitObjectsFromOids(oidWalk, topology);

@@ -1,6 +1,6 @@
 import type { Brand } from "@gitlode/internal-foundation/type-utils";
 
-import type { InstrumentationSpan } from "../instrumentation/index.js";
+import type { DagOperationObservation } from "./observations.js";
 import type { DagFrontier } from "./types.js";
 
 /** Shared contracts for the phase-certified prototype facade and internal state modules. */
@@ -36,7 +36,7 @@ export interface PhaseCertifiedStrategyOptions<NodeId extends PropertyKey, Domai
 }
 
 export interface DagPhaseCertifiedTelemetry {
-  readonly span: InstrumentationSpan;
+  readonly observation?: DagOperationObservation;
 }
 
 export interface CertifiedClosurePhaseResolution<

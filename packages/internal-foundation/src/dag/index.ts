@@ -9,7 +9,13 @@ export type {
   WalkDagContext,
   WalkDagStrategyOptions,
 } from "./types.js";
-export type { DagFallbackReason, DagOperationObservationHooks } from "./observations.js";
+export type {
+  DagFallbackReason,
+  DagOperationCompletion,
+  DagOperationObservation,
+  DagOperationObservationHooks,
+  DagStreamCompletion,
+} from "./observations.js";
 export {
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,

@@ -1,4 +1,8 @@
-import { getTelemetryMetricMetadata, TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
+import {
+  getTelemetryMetricMetadata,
+  PROFILE_COLLECTION_LIMITS,
+  TELEMETRY_SPANS,
+} from "@gitlode/internal-contracts/telemetry";
 import { ROOT_CONTEXT, context, metrics, trace, type Span } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -196,34 +200,60 @@ describe("WorkerTelemetrySession context manager ownership", () => {
 
 describe("WorkerTelemetrySession initialization degradation", () => {
   test.each([
-    ["trace_provider_construction", "provider failed"],
-    ["meter_provider_construction", "m".repeat(700)],
-    ["context_manager_construction", new Error("private path C:/secret")],
-    ["context_manager_enable", Symbol("context enable")],
-    ["context_manager_registration", "registration failed"],
-  ] as const)("degrades without rejecting after %s failure", async (stage, failure) => {
-    const { hooks: testHooks, attempts } = hooks({ [stage]: failure });
-    const session = await createWorkerTelemetrySessionForTest(testHooks);
-    let ran = false;
-    await session.runInRootContext(async () => {
-      ran = true;
-      await Promise.resolve();
-    });
-    const applicationResult = { type: "typed_failure", detail: new Error("application secret") };
-    const finalization = session.finalize(applicationResult);
-    await expect(finalization).resolves.toBeDefined();
-    const finalized = await finalization;
+    ["ordinary string", "ordinary failure content", "ordinary failure content"],
+    ["700-code-unit string", "l".repeat(700), "l".repeat(32)],
+    ["Windows path", "failed at C:\\private\\repository\\config.json", "private\\repository"],
+    ["POSIX path", "failed at /private/source/config.json", "/private/source"],
+    ["stack-like string", "Error\n    at /private/source/file.ts:10", "file.ts:10"],
+    ["Error", new Error("error failure content"), "error failure content"],
+    ["Symbol", Symbol("symbol failure content"), "symbol failure content"],
+    ["object", { secret: "object failure content" }, "object failure content"],
+  ] as const)(
+    "does not expose %s initialization failure content",
+    async (_label, failure, secret) => {
+      const { hooks: testHooks, attempts } = hooks({ meter_provider_construction: failure });
+      const session = await createWorkerTelemetrySessionForTest(testHooks);
+      let ran = false;
+      await session.runInRootContext(async () => {
+        ran = true;
+        await Promise.resolve();
+      });
+      const applicationResult = { type: "typed_failure", detail: new Error("application secret") };
+      const finalization = session.finalize(applicationResult);
+      await expect(finalization).resolves.toBeDefined();
+      const finalized = await finalization;
 
-    expect(ran).toBe(true);
-    expect(finalized.applicationResult).toBe(applicationResult);
-    expect(finalized.profileReport).toBeUndefined();
-    expect(finalized.initializationWarning?.code).toBe("telemetry_initialization_failed");
-    expect(finalized.initializationWarning?.message?.length ?? 0).toBeLessThanOrEqual(512);
-    expect(finalized.initializationWarning?.message).toBe(
-      typeof failure === "string" ? failure.slice(0, 512) : null,
-    );
-    expect(finalized.initializationWarning).not.toHaveProperty("error");
-    expect(session.finalize(Symbol("later"))).toBe(finalization);
+      expect(ran).toBe(true);
+      expect(finalized.applicationResult).toBe(applicationResult);
+      expect(finalized.profileReport).toBeUndefined();
+      expect(finalized.initializationWarning).toEqual({
+        code: "telemetry_initialization_failed",
+        message: null,
+      });
+      const serialized = JSON.stringify(finalized.initializationWarning);
+      expect(serialized.match(/telemetry_initialization_failed/g)).toHaveLength(1);
+      expect(serialized).not.toContain(secret);
+      expect(session.finalize(Symbol("later"))).toBe(finalization);
+      expect(attempts).toContain("initialization_trace_provider_cleanup");
+      expect(attempts).toContain("initialization_meter_provider_cleanup");
+    },
+  );
+
+  test.each([
+    "trace_provider_construction",
+    "meter_provider_construction",
+    "context_manager_construction",
+    "context_manager_enable",
+    "context_manager_registration",
+  ] as const)("cleans partial resources after %s failure", async (stage) => {
+    const { hooks: testHooks, attempts } = hooks({ [stage]: { secret: "not serialized" } });
+    const session = await createWorkerTelemetrySessionForTest(testHooks);
+    const result = await session.finalize("application result");
+
+    expect(result.initializationWarning).toEqual({
+      code: "telemetry_initialization_failed",
+      message: null,
+    });
     expect(attempts).toContain("initialization_trace_provider_cleanup");
     expect(attempts).toContain("initialization_meter_provider_cleanup");
     if (stage === "context_manager_enable" || stage === "context_manager_registration")
@@ -264,14 +294,26 @@ describe("WorkerTelemetrySession best-effort finalization", () => {
   });
 
   test.each([
-    ["root_end", "trace_flush", "spans", "partial"],
-    ["trace_flush", "trace_flush", "spans", "partial"],
-    ["metric_collect", "metric_collection", "counters", "unavailable"],
-    ["report_build", "report_build", "report", "complete"],
+    ["trace_flush", "failed at C:\\private\\trace.json", "trace_flush", "spans", "partial"],
+    [
+      "metric_collect",
+      "failed at /private/metrics.bin",
+      "metric_collection",
+      "counters",
+      "unavailable",
+    ],
+    ["report_build", "Error\n    at /private/report.ts:10", "report_build", "report", "complete"],
+    [
+      "telemetry_shutdown",
+      "attribute gitlode.example=value",
+      "telemetry_shutdown",
+      "telemetry",
+      "complete",
+    ],
   ] as const)(
-    "preserves the result and later stages after %s failure",
-    async (fault, diagnosticStage, signal, expectedSignalStatus) => {
-      const { hooks: testHooks, attempts } = hooks({ [fault]: "x".repeat(700) });
+    "isolates failure content and preserves later stages after %s failure",
+    async (fault, failureContent, diagnosticStage, signal, expectedSignalStatus) => {
+      const { hooks: testHooks, attempts } = hooks({ [fault]: failureContent });
       const session = await createWorkerTelemetrySessionForTest(testHooks);
       const result = { identity: fault };
       const finalization = session.finalize(result);
@@ -286,7 +328,14 @@ describe("WorkerTelemetrySession best-effort finalization", () => {
       const diagnostic = lifecycle(finalized.profileReport!).find(
         (entry) => entry.stage === diagnosticStage && entry.signal === signal,
       );
-      expect(diagnostic?.message).toHaveLength(512);
+      expect(diagnostic).toMatchObject({
+        code: "lifecycle_failure",
+        stage: diagnosticStage,
+        signal,
+        count: 1,
+        message: null,
+      });
+      expect(JSON.stringify(finalized.profileReport)).not.toContain(failureContent);
       if (signal === "spans")
         expect(finalized.profileReport?.signalStatus.spans).toBe(expectedSignalStatus);
       if (signal === "counters") {
@@ -296,14 +345,17 @@ describe("WorkerTelemetrySession best-effort finalization", () => {
         expect(finalized.profileReport?.histograms).toEqual([]);
       }
       if (signal === "report") expect(finalized.profileReport?.signalStatus.spans).toBe("complete");
+      if (signal === "telemetry")
+        expect(finalized.profileReport?.signalStatus.spans).toBe(expectedSignalStatus);
     },
   );
 
   test("deduplicates multiple shutdown failures and preserves the built signals", async () => {
+    const failureContent = "failed at C:\\private\\shutdown.json";
     const { hooks: testHooks, attempts } = hooks({
-      trace_provider_shutdown: "shutdown",
-      meter_provider_shutdown: "shutdown",
-      context_manager_cleanup: "shutdown",
+      trace_provider_shutdown: failureContent,
+      meter_provider_shutdown: failureContent,
+      context_manager_cleanup: failureContent,
     });
     const session = await createWorkerTelemetrySessionForTest(testHooks);
     const finalized = await session.finalize(Symbol.for("application-result"));
@@ -319,7 +371,11 @@ describe("WorkerTelemetrySession best-effort finalization", () => {
       counters: "complete",
       histograms: "complete",
     });
-    expect(shutdown).toMatchObject({ message: "shutdown", count: 3 });
+    expect(shutdown).toMatchObject({ message: null, count: 3 });
+    expect(JSON.stringify(report)).not.toContain("private\\shutdown.json");
+    expect(report.diagnostics.length).toBeLessThanOrEqual(
+      PROFILE_COLLECTION_LIMITS.diagnostics.maximum,
+    );
     for (const resource of [
       "trace_provider_shutdown",
       "meter_provider_shutdown",

@@ -1,6 +1,5 @@
 export {
   BoundedDiagnosticAccumulator,
-  normalizeTelemetryFailureMessage,
   type ProfileDiagnosticInput,
 } from "./diagnostic-accumulator.js";
 export {

@@ -24,7 +24,7 @@ const overflowIdentity = {
   message: null,
 } as const;
 
-export function normalizeTelemetryFailureMessage(message: unknown): string | null {
+function normalizeMessage(message: unknown): string | null {
   if (typeof message !== "string") return null;
   return message.slice(0, PROFILE_COLLECTION_LIMITS.diagnosticMessageUtf16CodeUnits);
 }
@@ -54,7 +54,7 @@ export class BoundedDiagnosticAccumulator {
         code: input.code,
         stage: input.stage,
         signal: input.signal,
-        message: normalizeTelemetryFailureMessage(input.message),
+        message: normalizeMessage(input.message),
       };
       if (normalized.code === overflowIdentity.code) {
         this.#overflowCount += 1;

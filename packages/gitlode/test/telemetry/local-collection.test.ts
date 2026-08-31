@@ -133,7 +133,7 @@ describe("bounded diagnostic accumulator", () => {
     },
   );
 
-  test("deduplicates, derives severity, bounds messages, and never expands errors", () => {
+  test("bounds an explicitly supplied safe message and never expands errors", () => {
     const diagnostics = new BoundedDiagnosticAccumulator();
     const long = "x".repeat(600);
     diagnostics.add({

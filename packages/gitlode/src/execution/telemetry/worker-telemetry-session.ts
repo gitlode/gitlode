@@ -12,10 +12,7 @@ import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-ho
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
 import { AlwaysOffSampler, BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 
-import {
-  BoundedDiagnosticAccumulator,
-  normalizeTelemetryFailureMessage,
-} from "./diagnostic-accumulator.js";
+import { BoundedDiagnosticAccumulator } from "./diagnostic-accumulator.js";
 import {
   createLocalMetricViews,
   LocalMetricReader,
@@ -207,47 +204,43 @@ export class WorkerTelemetrySession {
 
     try {
       attempt(this.#hooks, "root_end");
-    } catch (failure) {
+    } catch {
       traceFailed = true;
       active?.diagnostics.add({
         code: "lifecycle_failure",
         stage: "trace_flush",
         signal: "spans",
-        message: failure,
       });
     }
     try {
       this.#rootSpan.end();
-    } catch (failure) {
+    } catch {
       traceFailed = true;
       active?.diagnostics.add({
         code: "lifecycle_failure",
         stage: "trace_flush",
         signal: "spans",
-        message: failure,
       });
     }
 
     try {
       attempt(this.#hooks, "trace_flush");
-    } catch (failure) {
+    } catch {
       traceFailed = true;
       active?.diagnostics.add({
         code: "lifecycle_failure",
         stage: "trace_flush",
         signal: "spans",
-        message: failure,
       });
     }
     try {
       await this.#tracerProvider.forceFlush();
-    } catch (failure) {
+    } catch {
       traceFailed = true;
       active?.diagnostics.add({
         code: "lifecycle_failure",
         stage: "trace_flush",
         signal: "spans",
-        message: failure,
       });
     }
 
@@ -259,25 +252,24 @@ export class WorkerTelemetrySession {
         counters: [],
         histograms: [],
       };
-      let metricInjectedFailure: unknown;
+      let metricFailed = false;
       try {
         attempt(this.#hooks, "metric_collect");
-      } catch (failure) {
-        metricInjectedFailure = failure;
+      } catch {
+        metricFailed = true;
       }
       try {
         const collected = await active.metricReader.collectSnapshot(active.diagnostics);
-        if (metricInjectedFailure === undefined) metricSnapshot = collected;
-      } catch (failure) {
-        metricInjectedFailure ??= failure;
+        if (!metricFailed) metricSnapshot = collected;
+      } catch {
+        metricFailed = true;
       }
-      if (metricInjectedFailure !== undefined) {
+      if (metricFailed) {
         for (const signal of ["counters", "histograms"] as const)
           active.diagnostics.add({
             code: "lifecycle_failure",
             stage: "metric_collection",
             signal,
-            message: metricInjectedFailure,
           });
       }
 
@@ -291,56 +283,47 @@ export class WorkerTelemetrySession {
       };
       try {
         attempt(this.#hooks, "report_build");
-      } catch (failure) {
+      } catch {
         active.diagnostics.add({
           code: "lifecycle_failure",
           stage: "report_build",
           signal: "report",
-          message: failure,
         });
       }
       try {
         profileReport = active.reportBuilder.build(reportInput);
-      } catch (failure) {
+      } catch {
         active.diagnostics.add({
           code: "lifecycle_failure",
           stage: "report_build",
           signal: "report",
-          message: failure,
         });
       }
     }
 
-    const shutdownFailures: unknown[] = [];
+    let shutdownFailureCount = 0;
     try {
       attempt(this.#hooks, "telemetry_shutdown");
-    } catch (failure) {
-      shutdownFailures.push(failure);
+    } catch {
+      shutdownFailureCount += 1;
     }
-    await this.#shutdownResource(
-      "trace_provider_shutdown",
-      () => this.#tracerProvider.shutdown(),
-      shutdownFailures,
+    shutdownFailureCount += await this.#shutdownResource("trace_provider_shutdown", () =>
+      this.#tracerProvider.shutdown(),
     );
-    await this.#shutdownResource(
-      "meter_provider_shutdown",
-      () => this.#meterProvider.shutdown(),
-      shutdownFailures,
+    shutdownFailureCount += await this.#shutdownResource("meter_provider_shutdown", () =>
+      this.#meterProvider.shutdown(),
     );
     if (this.#ownedContextManager)
-      await this.#shutdownResource(
-        "context_manager_cleanup",
-        () => context.disable(),
-        shutdownFailures,
+      shutdownFailureCount += await this.#shutdownResource("context_manager_cleanup", () =>
+        context.disable(),
       );
 
-    if (active && shutdownFailures.length > 0) {
-      for (const failure of shutdownFailures)
+    if (active && shutdownFailureCount > 0) {
+      for (let index = 0; index < shutdownFailureCount; index += 1)
         active.diagnostics.add({
           code: "lifecycle_failure",
           stage: "telemetry_shutdown",
           signal: "telemetry",
-          message: failure,
         });
       if (profileReport)
         profileReport = { ...profileReport, diagnostics: active.diagnostics.snapshot() };
@@ -352,18 +335,19 @@ export class WorkerTelemetrySession {
   async #shutdownResource(
     attemptName: "trace_provider_shutdown" | "meter_provider_shutdown" | "context_manager_cleanup",
     shutdown: () => void | Promise<void>,
-    failures: unknown[],
-  ): Promise<void> {
+  ): Promise<number> {
+    let failureCount = 0;
     try {
       attempt(this.#hooks, attemptName);
-    } catch (failure) {
-      failures.push(failure);
+    } catch {
+      failureCount += 1;
     }
     try {
       await shutdown();
-    } catch (failure) {
-      failures.push(failure);
+    } catch {
+      failureCount += 1;
     }
+    return failureCount;
   }
 }
 
@@ -412,7 +396,7 @@ async function createSession(hooks?: WorkerTelemetryTestHooks): Promise<WorkerTe
       active: { diagnostics, spanProcessor, metricReader, reportBuilder },
       hooks,
     });
-  } catch (failure) {
+  } catch {
     if (candidateContextManager)
       await cleanupInitializationResource(hooks, "initialization_context_manager_cleanup", () => {
         candidateContextManager?.disable();
@@ -443,7 +427,7 @@ async function createSession(hooks?: WorkerTelemetryTestHooks): Promise<WorkerTe
       rootContext: ROOT_CONTEXT,
       initializationWarning: {
         code: "telemetry_initialization_failed",
-        message: normalizeTelemetryFailureMessage(failure),
+        message: null,
       },
       hooks,
     });

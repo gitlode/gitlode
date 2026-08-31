@@ -2,19 +2,28 @@ import { performance } from "node:perf_hooks";
 
 import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type { FactProjector } from "@gitlode/internal-contracts/extraction";
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
 import {
   LocalInstrumentationRecorder,
   noopInstrumentation,
-  type Instrumentation,
 } from "@gitlode/internal-foundation/instrumentation";
-import { withAsyncSpan, withSpan } from "@gitlode/internal-foundation/otel-support";
+import { recordSpanError } from "@gitlode/internal-foundation/otel-support";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import {
   JsLineDiffCalculator,
   type JsLineDiffCalculatorDependencies,
 } from "@gitlode/line-diff-adapters";
-import { metrics, trace } from "@opentelemetry/api";
+import {
+  context,
+  metrics,
+  SpanStatusCode,
+  trace,
+  type Context,
+  type Meter,
+  type Span,
+  type Tracer,
+} from "@opentelemetry/api";
 
 import {
   CommitFactExtractor,
@@ -64,11 +73,9 @@ interface WorkerExecutionReporters {
   readonly diagnosticReporter: DiagnosticReporter;
 }
 
-async function finishUserError(
-  runSpan: ReturnType<Instrumentation["startSpan"]>,
-  message: string,
-): Promise<WorkerRunResult> {
+async function finishUserError(runSpan: Span, message: string): Promise<WorkerRunResult> {
   runSpan.setAttribute("gitlode.result", "user-error");
+  runSpan.setStatus({ code: SpanStatusCode.ERROR });
   runSpan.end();
   return {
     kind: "user-error",
@@ -76,30 +83,90 @@ async function finishUserError(
   };
 }
 
+interface WorkerExecutionTelemetry {
+  readonly executionTracer: Tracer;
+  readonly extractionTracer: Tracer;
+  readonly extractionMeter: Meter;
+  readonly rootContext: Context;
+}
+
+const defaultWorkerExecutionTelemetry: WorkerExecutionTelemetry = {
+  executionTracer: trace.getTracer("gitlode.execution"),
+  extractionTracer: trace.getTracer("gitlode.extraction"),
+  extractionMeter: metrics.getMeter("gitlode.extraction"),
+  rootContext: context.active(),
+};
+
+async function withSetupAsyncSpan<T>(
+  tracer: Tracer,
+  name: string,
+  callback: (span: Span) => Promise<T>,
+  parentContext: Context,
+): Promise<T> {
+  const span = tracer.startSpan(name, undefined, parentContext);
+  try {
+    return await context.with(trace.setSpan(parentContext, span), () => callback(span));
+  } catch (error) {
+    if (error instanceof GitAdapterError) {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    } else {
+      recordSpanError(span, error);
+    }
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
+function withSetupSpan<T>(
+  tracer: Tracer,
+  name: string,
+  parentContext: Context,
+  callback: (span: Span) => T,
+): T {
+  const span = tracer.startSpan(name, undefined, parentContext);
+  try {
+    return context.with(trace.setSpan(parentContext, span), () => callback(span));
+  } catch (error) {
+    if (error instanceof GitAdapterError) {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    } else {
+      recordSpanError(span, error);
+    }
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
 export async function executeWorkerRunRequest(
   request: WorkerRunRequest,
   reporters: WorkerExecutionReporters,
   dependencies: GitAdapterFactoryDependencies = { environment: process.env },
+  telemetry: WorkerExecutionTelemetry = defaultWorkerExecutionTelemetry,
 ): Promise<WorkerRunResult> {
   const { input, priorCheckpoint } = request;
   const recorder = input.profile
     ? new LocalInstrumentationRecorder(() => performance.now())
     : undefined;
   const instrumentation = recorder ?? noopInstrumentation;
-  const executionTracer = trace.getTracer("gitlode.execution");
-  const extractionTracer = trace.getTracer("gitlode.extraction");
-  const extractionMeter = metrics.getMeter("gitlode.extraction");
+  const { executionTracer, extractionTracer, extractionMeter, rootContext } = telemetry;
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
   const resolvedRepoPath: AbsolutePath = input.repositoryPath;
-  const runSpan = instrumentation.startSpan("gitlode.run", {
-    attributes: {
-      "gitlode.granularity": input.granularity,
-      "gitlode.profile": input.profile,
-      "git.adapter": input.gitAdapter,
+  const runSpan = executionTracer.startSpan(
+    "gitlode.run",
+    {
+      attributes: {
+        "gitlode.granularity": input.granularity,
+        "gitlode.profile": input.profile,
+        "git.adapter": input.gitAdapter,
+      },
     },
-  });
+    rootContext,
+  );
+  const runContext = trace.setSpan(rootContext, runSpan);
 
   try {
     const gitAdapterResult = await buildGitAdapter(input.gitAdapter, instrumentation, dependencies);
@@ -111,13 +178,14 @@ export async function executeWorkerRunRequest(
     }
     await using gitAdapter = gitAdapterResult.adapter;
 
-    await withAsyncSpan(
+    await withSetupAsyncSpan(
       executionTracer,
       "gitlode.repository.access.validate",
       async () => await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter),
+      runContext,
     );
 
-    const repositoryObjectFormat = await withAsyncSpan(
+    const repositoryObjectFormat = await withSetupAsyncSpan(
       executionTracer,
       "gitlode.repository.object_format.resolve",
       async (span) => {
@@ -125,14 +193,15 @@ export async function executeWorkerRunRequest(
         span.setAttribute("gitlode.git.object_format", objectFormat);
         return objectFormat;
       },
+      runContext,
     );
 
-    withSpan(executionTracer, "gitlode.state.validate", (span) => {
+    withSetupSpan(executionTracer, "gitlode.state.validate", runContext, (span) => {
       span.setAttribute("gitlode.ref.prior.count", priorCheckpoint.refs.length);
       validatePriorCheckpoint(priorCheckpoint, resolvedRepoPath, repositoryObjectFormat);
     });
 
-    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await withAsyncSpan(
+    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await withSetupAsyncSpan(
       executionTracer,
       "gitlode.repository.metadata.resolve",
       async (span) => {
@@ -152,15 +221,17 @@ export async function executeWorkerRunRequest(
         );
         return basics;
       },
+      runContext,
     );
 
-    const resolvedRange = await withAsyncSpan(
+    const resolvedRange = await withSetupAsyncSpan(
       executionTracer,
       "gitlode.extraction.range.resolve",
       async (span) => {
         span.setAttribute("gitlode.extraction.range.kind", input.range?.type ?? "none");
         return await resolveExtractionRange(input.range, resolvedRepoPath, gitAdapter);
       },
+      runContext,
     );
 
     const resolvedOutputPrefix = resolveOutputPrefix(
@@ -236,6 +307,7 @@ export async function executeWorkerRunRequest(
       diagnosticReporter: reporters.diagnosticReporter,
       tracer: extractionTracer,
       metricRecorder: createExtractionPipelineMetricRecorder(extractionMeter),
+      parentContext: runContext,
     });
 
     const result = await coordinator.run({
@@ -253,8 +325,6 @@ export async function executeWorkerRunRequest(
     // await-using declaration still guarantees cleanup on every earlier exit.
     await gitAdapter[Symbol.asyncDispose]();
 
-    runSpan.incrementCounter("records", result.recordsWritten);
-    runSpan.incrementCounter("commits", result.commitsTraversed);
     runSpan.setAttribute("gitlode.result", "success");
     runSpan.end();
 
@@ -275,7 +345,11 @@ export async function executeWorkerRunRequest(
       checkpoint: result.checkpoint,
     };
   } catch (error) {
-    runSpan.end(error);
+    if (error instanceof GitAdapterError) {
+      return await finishUserError(runSpan, error.message);
+    }
+    recordSpanError(runSpan, error);
+    runSpan.end();
     throw error;
   }
 }

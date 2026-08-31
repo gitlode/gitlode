@@ -15,7 +15,6 @@ import { assertNever, formatUnixTimestampWithOffset } from "@gitlode/internal-fo
 import type { Context, Tracer } from "@opentelemetry/api";
 
 import type { BuiltInFactProjectorMetricRecorder } from "./built-in-fact-projector-metric-recorder.js";
-import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "./built-in-fact-projector-metric-recorder.js";
 
 export function projectCommit(
   fact: CommitFact,
@@ -83,7 +82,7 @@ export class BuiltInFactProjector implements FactProjector {
     repoName: string,
     repoUrl: string | null,
     tracer: Tracer,
-    metricRecorder: BuiltInFactProjectorMetricRecorder = NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+    metricRecorder: BuiltInFactProjectorMetricRecorder,
   ) {
     this.repoName = repoName;
     this.repoUrl = repoUrl;

@@ -16,12 +16,10 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
 import type { ProgressEvent, ProgressReporter } from "@gitlode/internal-contracts/progress";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
-import { describe, expect, it } from "vitest";
+import { trace } from "@opentelemetry/api";
+import { describe, expect, it, vi } from "vitest";
 
+import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "../../src/extraction/extraction-pipeline-metric-recorder.js";
 import { ExtractionPipeline } from "../../src/extraction/extraction-pipeline.js";
 import type { CoordinatorDependencies } from "../../src/extraction/types.js";
 
@@ -183,7 +181,8 @@ function makeDeps(
     sink,
     progressReporter: overrides.progressReporter ?? makeProgressReporter(),
     diagnosticReporter: overrides.diagnosticReporter ?? makeDiagnosticReporter(),
-    instrumentation: overrides.instrumentation ?? noopInstrumentation,
+    tracer: overrides.tracer ?? trace.getTracer("gitlode.extraction"),
+    metricRecorder: overrides.metricRecorder ?? NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
   };
 }
 
@@ -193,7 +192,7 @@ function baseRequest(
   return {
     repositoryPath: "/repo",
     repoName: "repo",
-    remoteUrl: null,
+    repoUrl: null,
     refs: ["main"],
     granularity: "commit",
     priorCheckpoint: emptyCheckpoint(),
@@ -641,14 +640,16 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
-  it("does not record migrated output observations through legacy instrumentation", async () => {
-    let time = 0;
-    const instrumentation = new LocalInstrumentationRecorder(() => time++);
-
-    const deps = makeDeps({ oids: ["1".padStart(12, "0")], instrumentation });
+  it("uses the explicitly supplied extraction domain recorder", async () => {
+    const accepted = vi.fn();
+    const metricRecorder = {
+      ...NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+      recordCommitAccepted: accepted,
+    };
+    const deps = makeDeps({ oids: ["1".padStart(12, "0")], metricRecorder });
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest());
 
-    expect(instrumentation.summary()).toEqual([]);
+    expect(accepted).toHaveBeenCalledWith("commit");
   });
 });

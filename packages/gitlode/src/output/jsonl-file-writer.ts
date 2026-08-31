@@ -5,7 +5,6 @@ import { join } from "node:path";
 import type { ProjectedRecord } from "@gitlode/internal-contracts/extraction";
 
 import type { JsonlFileWriterMetricRecorder } from "./jsonl-file-writer-metric-recorder.js";
-import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "./jsonl-file-writer-metric-recorder.js";
 
 interface RotationOptions {
   readonly maxLines?: number;
@@ -27,7 +26,7 @@ export class JsonlFileWriter {
     outputDir: string,
     filenameFor: (seq: number) => string,
     rotation: RotationOptions,
-    metricRecorder: JsonlFileWriterMetricRecorder = NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    metricRecorder: JsonlFileWriterMetricRecorder,
   ) {
     this.outputDir = outputDir;
     this.filenameFor = filenameFor;
@@ -44,10 +43,11 @@ export class JsonlFileWriter {
   }
 
   private async openNext(): Promise<FileHandle> {
-    this.seq++;
-    const filename = this.filenameFor(this.seq);
+    const nextSeq = this.seq + 1;
+    const filename = this.filenameFor(nextSeq);
     const filepath = join(this.outputDir, filename);
     const handle = await open(filepath, "w");
+    this.seq = nextSeq;
     this.metricRecorder.recordFileCreated();
     this.handle = handle;
     this.lineCount = 0;

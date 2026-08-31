@@ -267,8 +267,7 @@ describe("executeWorkerRunRequest profiling", () => {
       yielded_nodes: 1,
     });
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
+    expect(result.success.profileEntries.some((entry) => entry.name === "gitlode.run")).toBe(false);
   });
 
   it("writes file-level records with the git-cli adapter selected", async () => {
@@ -341,8 +340,6 @@ describe("executeWorkerRunRequest profiling", () => {
       deletions: 0,
     });
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
     const fileBlobBatchEntry = result.success.profileEntries.find(
       (entry) => entry.name === "git.cli.file_blob_batch",
     );
@@ -402,9 +399,7 @@ describe("executeWorkerRunRequest profiling", () => {
     if (result.kind !== "success") return;
     expect(result.success.commitsTraversed).toBe(1);
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
-    expect(runEntry?.attributes?.["git.cli.version"]?.[0]).toMatch(/^git version /);
+    expect(result.success.profileEntries.some((entry) => entry.name === "gitlode.run")).toBe(false);
   });
 });
 
@@ -507,8 +502,6 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       return;
     }
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
     expect(result.success.profileEntries.some((entry) => entry.name === "git.cli.rev_list")).toBe(
       true,
     );

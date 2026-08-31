@@ -6,7 +6,7 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import { type GitAdapter, GitAdapterError, type RawCommit } from "@gitlode/internal-contracts/git";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
 import { CommitFactExtractor } from "../../src/extraction/commit-fact-extractor.js";
@@ -82,7 +82,7 @@ function makeAdapter(
 }
 
 function makeTraverser(adapter: GitAdapter): CommitFactExtractor {
-  return new CommitFactExtractor(adapter, noopInstrumentation);
+  return new CommitFactExtractor(adapter, trace.getTracer("gitlode.extraction"));
 }
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {

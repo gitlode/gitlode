@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { ProjectedRecord } from "@gitlode/internal-contracts/extraction";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "../../src/output/jsonl-file-writer-metric-recorder.js";
 import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
 import { JsonlOutputSink } from "../../src/output/jsonl-output-sink.js";
 
@@ -37,6 +38,7 @@ describe("JsonlOutputSink", () => {
       tmpDir,
       (seq) => `out-${String(seq).padStart(6, "0")}.jsonl`,
       {},
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
     );
     const sink = new JsonlOutputSink(writer);
     return { writer, sink };

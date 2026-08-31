@@ -1,7 +1,8 @@
 import type { CommitFact, Fact, FileChangeFact } from "@gitlode/internal-contracts/extraction";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { trace } from "@opentelemetry/api";
 import { describe, expect, it } from "vitest";
 
+import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
 import {
   BuiltInFactProjector,
   projectCommit,
@@ -61,7 +62,12 @@ function makeFileChangeFact(
 }
 
 function makeProjector(repoName: string, repoUrl: string | null): BuiltInFactProjector {
-  return new BuiltInFactProjector(repoName, repoUrl, noopInstrumentation);
+  return new BuiltInFactProjector(
+    repoName,
+    repoUrl,
+    trace.getTracer("gitlode.extraction"),
+    NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+  );
 }
 
 // ---------------------------------------------------------------------------

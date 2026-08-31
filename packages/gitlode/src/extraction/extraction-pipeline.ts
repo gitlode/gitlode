@@ -45,7 +45,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
   }
 
   async run(request: CoordinatorRequest): Promise<CoordinatorResult> {
-    const tracer = this.deps.tracer ?? trace.getTracer("gitlode.extraction");
+    const tracer = this.deps.tracer;
     return await withAsyncSpan(
       tracer,
       "gitlode.extract",
@@ -215,7 +215,7 @@ export class ExtractionPipeline implements ExtractionCoordinator {
       }
     } finally {
       await withAsyncSpan(
-        this.deps.tracer ?? trace.getTracer("gitlode.extraction"),
+        this.deps.tracer,
         "gitlode.output.close",
         async () => await sink.close(),
         undefined,

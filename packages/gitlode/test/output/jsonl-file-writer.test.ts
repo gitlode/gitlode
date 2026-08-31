@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { ProjectedCommit, ProjectedFileChange } from "@gitlode/internal-contracts/extraction";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "../../src/output/jsonl-file-writer-metric-recorder.js";
 import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
 
 function makeCommit(oid: string): ProjectedCommit {
@@ -45,7 +46,12 @@ describe("JsonlFileWriter", () => {
 
   it("writes all commits to a single file when no rotation is configured", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      filenameFor,
+      {},
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    );
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2)));
     await writer.write(makeCommit(oid(3)));
@@ -58,7 +64,12 @@ describe("JsonlFileWriter", () => {
 
   it("rotates to a new file after maxLines — triggering line stays in file 1", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new JsonlFileWriter(tmpDir, filenameFor, { maxLines: 2 });
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      filenameFor,
+      { maxLines: 2 },
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    );
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2))); // triggers rotation; this line is in file 1
     await writer.write(makeCommit(oid(3))); // goes to file 2
@@ -80,7 +91,12 @@ describe("JsonlFileWriter", () => {
 
     // maxBytes = exactly one line: after first write byte count equals maxBytes → rotate
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new JsonlFileWriter(tmpDir, filenameFor, { maxBytes: lineSize });
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      filenameFor,
+      { maxBytes: lineSize },
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    );
     await writer.write(makeCommit(oid(1))); // triggers rotation; stays in file 1
     await writer.write(makeCommit(oid(2))); // goes to file 2
     await writer.close();
@@ -97,10 +113,15 @@ describe("JsonlFileWriter", () => {
 
   it("rotates when either threshold is reached first (lines wins)", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new JsonlFileWriter(tmpDir, filenameFor, {
-      maxLines: 2,
-      maxBytes: 999_999,
-    });
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      filenameFor,
+      {
+        maxLines: 2,
+        maxBytes: 999_999,
+      },
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    );
     for (let i = 1; i <= 3; i++) {
       await writer.write(makeCommit(oid(i)));
     }
@@ -119,7 +140,12 @@ describe("JsonlFileWriter", () => {
   it("output is valid JSONL: each line parses as JSON and matches the written commit", async () => {
     const commit = makeCommit("a".repeat(40));
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      filenameFor,
+      {},
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    );
     await writer.write(commit);
     await writer.close();
 
@@ -134,7 +160,12 @@ describe("JsonlFileWriter", () => {
 
   it("uses LF line endings only (no CRLF)", async () => {
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      filenameFor,
+      {},
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    );
     await writer.write(makeCommit(oid(1)));
     await writer.write(makeCommit(oid(2)));
     await writer.close();
@@ -163,7 +194,12 @@ describe("JsonlFileWriter", () => {
       },
     };
     const filenameFor = (seq: number) => `repo-${String(seq).padStart(6, "0")}.jsonl`;
-    const writer = new JsonlFileWriter(tmpDir, filenameFor, {});
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      filenameFor,
+      {},
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+    );
     await writer.write(fileRecord);
     await writer.close();
 

@@ -7,7 +7,6 @@ import type { FileBlobChange, GitAdapter } from "@gitlode/internal-contracts/git
 import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
 
 import type { FileChangeFactExpanderMetricRecorder } from "./file-change-fact-expander-metric-recorder.js";
-import { NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER } from "./file-change-fact-expander-metric-recorder.js";
 
 const EMPTY_CONTENT = new Uint8Array(0);
 const BINARY_SCAN_LIMIT = 8_000;
@@ -27,10 +26,7 @@ export class FileChangeFactExpander implements FileChangeExpander {
   ) {
     this.adapter = adapter;
     this.lineDiffCalculator = lineDiffCalculator;
-    this.metricRecorder =
-      typeof metricRecorder.startExpansion === "function"
-        ? metricRecorder
-        : NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER;
+    this.metricRecorder = metricRecorder;
     this.maxDiffSize = maxDiffSize;
   }
 

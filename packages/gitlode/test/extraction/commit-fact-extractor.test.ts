@@ -146,6 +146,29 @@ describe("CommitFactExtractor traversal", () => {
     expect(recording.starts[0]!.span.endCount).toBe(1);
   });
 
+  it("completes cancellation after one yielded fact and ignores repeated termination", async () => {
+    const recording = makeTracer();
+    const head = makeOid(1);
+    const traverser = makeTraverser(
+      makeAdapter({ commits: { [head]: toAsyncIter([makeRawCommit(1)]) } }),
+      recording.tracer,
+    );
+    const parent = ROOT_CONTEXT;
+    const iterator = traverser
+      .extract(baseRequest({ plans: [makePlan("main", head)] }), makeReporter(), parent)
+      [Symbol.asyncIterator]();
+
+    expect(await iterator.next()).toMatchObject({ done: false });
+    await iterator.return?.();
+    await iterator.next();
+    await iterator.return?.();
+
+    expect(recording.starts).toHaveLength(1);
+    expect(recording.starts[0]!.parent).toBe(parent);
+    expect(recording.starts[0]!.span.attributes["gitlode.stream.completion"]).toBe("cancelled");
+    expect(recording.starts[0]!.span.endCount).toBe(1);
+  });
+
   it("records source rejection as one error traversal completion", async () => {
     const recording = makeTracer();
     const failure = new Error("walk failed");

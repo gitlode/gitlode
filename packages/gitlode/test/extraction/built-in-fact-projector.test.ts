@@ -1,5 +1,6 @@
 import type { CommitFact, Fact, FileChangeFact } from "@gitlode/internal-contracts/extraction";
-import { trace } from "@opentelemetry/api";
+import { createMonotonicTiming } from "@gitlode/internal-contracts/telemetry";
+import { ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
 import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
@@ -339,7 +340,8 @@ describe("projectFileChange — pure function", () => {
 
 describe("BuiltInFactProjector metric ownership", () => {
   it("records one duration completion per fact without creating record spans", async () => {
-    const startProjection = vi.fn(() => ({ token: true }) as never);
+    const timing = createMonotonicTiming();
+    const startProjection = vi.fn(() => timing.start(false));
     const completeProjection = vi.fn();
     const projector = new BuiltInFactProjector(
       "repo",
@@ -370,7 +372,36 @@ describe("BuiltInFactProjector metric ownership", () => {
     );
   });
 
-  it("records projection exhaustion and early cancellation on the logical stream", async () => {
+  it("records mapping failure with the original error and no record span", async () => {
+    const recording = makeTracer();
+    const timing = createMonotonicTiming();
+    const token = timing.start(false);
+    const startProjection = vi.fn(() => token);
+    const completeProjection = vi.fn();
+    const metricRecorder: BuiltInFactProjectorMetricRecorder = {
+      startProjection,
+      completeProjection,
+    };
+    const projector = makeProjector("repo", null, recording.tracer, metricRecorder);
+    const failure = new Error("malformed commit fact");
+    const fact = makeCommitFact();
+    Object.defineProperty(fact, "author", {
+      get: () => {
+        throw failure;
+      },
+    });
+
+    await expect(collect(projector.project(toAsyncIter<Fact>([fact])))).rejects.toBe(failure);
+    expect(startProjection).toHaveBeenCalledTimes(1);
+    expect(completeProjection).toHaveBeenCalledTimes(1);
+    expect(completeProjection).toHaveBeenCalledWith(token, "commit", "error");
+    expect(recording.starts).toHaveLength(1);
+    expect(recording.starts[0]!.span.statuses).toEqual([{ code: 2 }]);
+    expect(recording.starts[0]!.span.exceptions).toHaveLength(1);
+    expect(recording.starts[0]!.span.endCount).toBe(1);
+  });
+
+  it("records early cancellation on the logical stream", async () => {
     const recording = makeTracer();
     const projector = makeProjector("repo", null, recording.tracer);
     const iterator = projector
@@ -378,11 +409,27 @@ describe("BuiltInFactProjector metric ownership", () => {
       [Symbol.asyncIterator]();
     await iterator.next();
     await iterator.return?.();
+    await iterator.next();
+    await iterator.return?.();
 
     expect(recording.starts).toHaveLength(1);
     expect(recording.starts[0]!.name).toBe("gitlode.projection");
     expect(recording.starts[0]!.span.attributes["gitlode.projection.mode"]).toBe("built_in");
     expect(recording.starts[0]!.span.attributes["gitlode.stream.completion"]).toBe("cancelled");
+    expect(recording.starts[0]!.span.endCount).toBe(1);
+  });
+
+  it("records exhaustion under the explicit parent without record spans", async () => {
+    const recording = makeTracer();
+    const projector = makeProjector("repo", null, recording.tracer);
+    const parent = ROOT_CONTEXT;
+
+    expect(await collect(projector.project(toAsyncIter<Fact>([]), parent))).toEqual([]);
+    expect(recording.starts).toHaveLength(1);
+    expect(recording.starts[0]!.parent).toBe(parent);
+    expect(recording.starts[0]!.span.attributes["gitlode.stream.completion"]).toBe("exhausted");
+    expect(recording.starts[0]!.span.statuses).toEqual([]);
+    expect(recording.starts[0]!.span.exceptions).toHaveLength(0);
     expect(recording.starts[0]!.span.endCount).toBe(1);
   });
 

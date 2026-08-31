@@ -28,6 +28,10 @@ function makeCommit(oid: string): ProjectedCommit {
   };
 }
 
+function replaceHandle(writer: JsonlFileWriter, handle: object): void {
+  Object.defineProperty(writer, "handle", { configurable: true, value: handle, writable: true });
+}
+
 function oid(n: number): string {
   return String(n).padStart(40, "0");
 }
@@ -229,6 +233,93 @@ describe("JsonlFileWriter", () => {
     expect(recordBytesWritten).toHaveBeenCalledWith(
       Buffer.byteLength(`${JSON.stringify(record)}\n`, "utf8"),
     );
+  });
+
+  it("records each successful rotated open and UTF-8 JSONL byte count exactly once", async () => {
+    const recordFileCreated = vi.fn();
+    const recordBytesWritten = vi.fn();
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      (seq) => `rotated-${seq}.jsonl`,
+      { maxLines: 1 },
+      { recordFileCreated, recordBytesWritten },
+    );
+    const records = [makeCommit(oid(1)), makeCommit(oid(2)), makeCommit(oid(3))];
+
+    for (const record of records) await writer.write(record);
+    await writer.close();
+
+    const expectedBytes = records.map((record) => Buffer.byteLength(`${JSON.stringify(record)}\n`));
+    expect(recordFileCreated).toHaveBeenCalledTimes(3);
+    expect(recordBytesWritten).toHaveBeenCalledTimes(3);
+    expect(recordBytesWritten.mock.calls.map(([bytes]) => bytes)).toEqual(expectedBytes);
+    expect(writer.filesCreated).toBe(recordFileCreated.mock.calls.length);
+    expect(writer.bytesWritten).toBe(expectedBytes.reduce((total, bytes) => total + bytes, 0));
+  });
+
+  it("keeps successful metrics and state when an underlying write fails", async () => {
+    const recordFileCreated = vi.fn();
+    const recordBytesWritten = vi.fn();
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      (seq) => `write-failure-${seq}.jsonl`,
+      { maxLines: 1 },
+      { recordFileCreated, recordBytesWritten },
+    );
+    const first = makeCommit(oid(1));
+    await writer.write(first);
+    const failure = new Error("write failed");
+    const close = vi.fn(async () => undefined);
+    replaceHandle(writer, {
+      write: async () => {
+        throw failure;
+      },
+      close,
+    });
+
+    await expect(writer.write(makeCommit(oid(2)))).rejects.toBe(failure);
+    expect(recordFileCreated).toHaveBeenCalledTimes(1);
+    expect(recordBytesWritten).toHaveBeenCalledTimes(1);
+    expect(writer.filesCreated).toBe(1);
+    expect(writer.bytesWritten).toBe(Buffer.byteLength(`${JSON.stringify(first)}\n`));
+    expect(close).not.toHaveBeenCalled();
+    await writer.close();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps successful metrics and state when rotation close fails", async () => {
+    const recordFileCreated = vi.fn();
+    const recordBytesWritten = vi.fn();
+    const writer = new JsonlFileWriter(
+      tmpDir,
+      (seq) => `close-failure-${seq}.jsonl`,
+      { maxLines: 1 },
+      { recordFileCreated, recordBytesWritten },
+    );
+    const first = makeCommit(oid(1));
+    await writer.write(first);
+    const failure = new Error("rotation close failed");
+    const close = vi.fn(async () => {
+      throw failure;
+    });
+    const second = makeCommit(oid(2));
+    replaceHandle(writer, {
+      write: async () => undefined,
+      close,
+    });
+
+    await expect(writer.write(second)).rejects.toBe(failure);
+    expect(recordFileCreated).toHaveBeenCalledTimes(1);
+    expect(recordBytesWritten.mock.calls.map(([bytes]) => bytes)).toEqual([
+      Buffer.byteLength(`${JSON.stringify(first)}\n`),
+      Buffer.byteLength(`${JSON.stringify(second)}\n`),
+    ]);
+    expect(writer.filesCreated).toBe(1);
+    expect(writer.bytesWritten).toBe(
+      Buffer.byteLength(`${JSON.stringify(first)}\n`) +
+        Buffer.byteLength(`${JSON.stringify(second)}\n`),
+    );
+    expect(close).toHaveBeenCalledTimes(1);
   });
 
   it("does not record or advance file state when opening fails", async () => {

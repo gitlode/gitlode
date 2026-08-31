@@ -9,9 +9,13 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import {
   instrumentAsyncIterable,
-  type Instrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
+  getTelemetryAttributeMetadata,
+} from "@gitlode/internal-contracts/telemetry";
 import { assertNever, formatUnixTimestampWithOffset } from "@gitlode/internal-foundation/support";
+import type { Context, Tracer } from "@opentelemetry/api";
+
+import type { BuiltInFactProjectorMetricRecorder } from "./built-in-fact-projector-metric-recorder.js";
+import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "./built-in-fact-projector-metric-recorder.js";
 
 export function projectCommit(
   fact: CommitFact,
@@ -72,17 +76,31 @@ export function projectFileChange(
 export class BuiltInFactProjector implements FactProjector {
   private readonly repoName: string;
   private readonly repoUrl: string | null;
-  private readonly instrumentation: Instrumentation;
+  private readonly tracer: Tracer;
+  private readonly metricRecorder: BuiltInFactProjectorMetricRecorder;
 
-  constructor(repoName: string, repoUrl: string | null, instrumentation: Instrumentation) {
+  constructor(
+    repoName: string,
+    repoUrl: string | null,
+    tracer: Tracer,
+    metricRecorder: BuiltInFactProjectorMetricRecorder = NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+  ) {
     this.repoName = repoName;
     this.repoUrl = repoUrl;
-    this.instrumentation = instrumentation;
+    this.tracer = tracer;
+    this.metricRecorder = metricRecorder;
   }
 
-  project(facts: AsyncIterable<Fact>): AsyncIterable<ProjectedRecord> {
-    return instrumentAsyncIterable(this.instrumentation, "gitlode.projection", () =>
-      this.projectRecords(facts),
+  project(facts: AsyncIterable<Fact>, parentContext?: Context): AsyncIterable<ProjectedRecord> {
+    return instrumentAsyncIterable(
+      this.tracer,
+      "gitlode.projection",
+      (span) => {
+        span.setAttribute(getTelemetryAttributeMetadata("projection_mode").key, "built_in");
+        return this.projectRecords(facts);
+      },
+      undefined,
+      parentContext,
     );
   }
 
@@ -90,15 +108,27 @@ export class BuiltInFactProjector implements FactProjector {
     for await (const fact of facts) {
       switch (fact.type) {
         case "commit": {
-          yield this.instrumentation.run("gitlode.projection.project", () =>
-            projectCommit(fact, this.repoName, this.repoUrl),
-          );
+          const token = this.metricRecorder.startProjection();
+          try {
+            const record = projectCommit(fact, this.repoName, this.repoUrl);
+            this.metricRecorder.completeProjection(token, fact.type, "success");
+            yield record;
+          } catch (error) {
+            this.metricRecorder.completeProjection(token, fact.type, "error");
+            throw error;
+          }
           break;
         }
         case "file-change": {
-          yield this.instrumentation.run("gitlode.projection.project", () =>
-            projectFileChange(fact, this.repoName, this.repoUrl),
-          );
+          const token = this.metricRecorder.startProjection();
+          try {
+            const record = projectFileChange(fact, this.repoName, this.repoUrl);
+            this.metricRecorder.completeProjection(token, fact.type, "success");
+            yield record;
+          } catch (error) {
+            this.metricRecorder.completeProjection(token, fact.type, "error");
+            throw error;
+          }
           break;
         }
         default:

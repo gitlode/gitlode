@@ -641,7 +641,7 @@ describe("ExtractionPipeline orchestration", () => {
     expect(result.checkpoint.generatedAt).toBe("2025-06-15T12:00:00.000Z");
   });
 
-  it("instruments write and close spans", async () => {
+  it("does not record migrated output observations through legacy instrumentation", async () => {
     let time = 0;
     const instrumentation = new LocalInstrumentationRecorder(() => time++);
 
@@ -649,9 +649,6 @@ describe("ExtractionPipeline orchestration", () => {
     const coord = new ExtractionPipeline(deps);
     await coord.run(baseRequest());
 
-    expect(instrumentation.summary()).toEqual([
-      { name: "gitlode.output.write", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 },
-      { name: "gitlode.output.close", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 },
-    ]);
+    expect(instrumentation.summary()).toEqual([]);
   });
 });

@@ -10,8 +10,9 @@ import type { GitAdapter, RawCommit } from "@gitlode/internal-contracts/git";
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import {
   instrumentAsyncIterable,
-  type Instrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
+  getTelemetryAttributeMetadata,
+} from "@gitlode/internal-contracts/telemetry";
+import type { Context, Tracer } from "@opentelemetry/api";
 
 function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | null): CommitFact {
   return {
@@ -37,30 +38,40 @@ function toCommitFact(rawCommit: RawCommit, repoName: string, repoUrl: string | 
 
 export class CommitFactExtractor implements CommitTraversalExtractor {
   private readonly adapter: GitAdapter;
-  private readonly instrumentation: Instrumentation;
+  private readonly tracer: Tracer;
 
-  constructor(adapter: GitAdapter, instrumentation: Instrumentation) {
+  constructor(adapter: GitAdapter, tracer: Tracer) {
     this.adapter = adapter;
-    this.instrumentation = instrumentation;
+    this.tracer = tracer;
   }
 
   extract(
     request: CommitTraversalRequest,
     diagnosticReporter: DiagnosticReporter,
+    parentContext?: Context,
   ): AsyncIterable<CommitFact> {
     const { repositoryPath, repoName, repoUrl, plans, range } = request;
-    return instrumentAsyncIterable(this.instrumentation, "gitlode.traversal", (span) => {
-      span.incrementCounter("plans", plans.length);
-      span.setAttribute("gitlode.range.kind", range?.type ?? "none");
-      return this.iterateCommitFacts(
-        plans,
-        repositoryPath,
-        repoName,
-        repoUrl,
-        range,
-        diagnosticReporter,
-      );
-    });
+    return instrumentAsyncIterable(
+      this.tracer,
+      "gitlode.traversal",
+      (span) => {
+        span.setAttribute(getTelemetryAttributeMetadata("traversal_plan_count").key, plans.length);
+        span.setAttribute(
+          getTelemetryAttributeMetadata("extraction_range_kind").key,
+          range?.type ?? "none",
+        );
+        return this.iterateCommitFacts(
+          plans,
+          repositoryPath,
+          repoName,
+          repoUrl,
+          range,
+          diagnosticReporter,
+        );
+      },
+      undefined,
+      parentContext,
+    );
   }
 
   private async *iterateCommitFacts(
@@ -116,9 +127,7 @@ export class CommitFactExtractor implements CommitTraversalExtractor {
         plan.head,
         plan.excludeHash,
       )) {
-        const fact = this.instrumentation.run("gitlode.traversal.process_commit", () =>
-          processRawCommit(rawCommit),
-        );
+        const fact = processRawCommit(rawCommit);
         if (fact !== null) yield fact;
       }
     } catch (err) {
@@ -129,9 +138,7 @@ export class CommitFactExtractor implements CommitTraversalExtractor {
         });
         // Full traversal without excludeHash; already-visited commits are skipped via deduplication.
         for await (const rawCommit of this.adapter.walkCommits(repositoryPath, plan.head)) {
-          const fact = this.instrumentation.run("gitlode.traversal.process_commit", () =>
-            processRawCommit(rawCommit),
-          );
+          const fact = processRawCommit(rawCommit);
           if (fact !== null) yield fact;
         }
       } else {

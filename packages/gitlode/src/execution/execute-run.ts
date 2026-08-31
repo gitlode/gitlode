@@ -8,11 +8,13 @@ import {
   noopInstrumentation,
   type Instrumentation,
 } from "@gitlode/internal-foundation/instrumentation";
+import { withAsyncSpan, withSpan } from "@gitlode/internal-foundation/otel-support";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import {
   JsLineDiffCalculator,
   type JsLineDiffCalculatorDependencies,
 } from "@gitlode/line-diff-adapters";
+import { metrics, trace } from "@opentelemetry/api";
 
 import {
   CommitFactExtractor,
@@ -20,8 +22,16 @@ import {
   BuiltInFactProjector,
   FileChangeFactExpander,
   RepositoryTraversalPlanner,
+  createExtractionPipelineMetricRecorder,
+  createFileChangeFactExpanderMetricRecorder,
+  createBuiltInFactProjectorMetricRecorder,
 } from "../extraction/index.js";
-import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
+import {
+  formatSessionTimestamp,
+  JsonlFileWriter,
+  JsonlOutputSink,
+  createJsonlFileWriterMetricRecorder,
+} from "../output/index.js";
 import {
   createEmptyCheckpoint,
   loadStateFile,
@@ -76,6 +86,9 @@ export async function executeWorkerRunRequest(
     ? new LocalInstrumentationRecorder(() => performance.now())
     : undefined;
   const instrumentation = recorder ?? noopInstrumentation;
+  const executionTracer = trace.getTracer("gitlode.execution");
+  const extractionTracer = trace.getTracer("gitlode.extraction");
+  const extractionMeter = metrics.getMeter("gitlode.extraction");
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
@@ -98,34 +111,54 @@ export async function executeWorkerRunRequest(
     }
     await using gitAdapter = gitAdapterResult.adapter;
 
-    await instrumentation.runAsync(
-      "gitlode.validate_repository_access",
+    await withAsyncSpan(
+      executionTracer,
+      "gitlode.repository.access.validate",
       async () => await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter),
     );
 
-    const repositoryObjectFormat = await instrumentation.runAsync(
-      "gitlode.resolve_object_format",
+    const repositoryObjectFormat = await withAsyncSpan(
+      executionTracer,
+      "gitlode.repository.object_format.resolve",
       async (span) => {
         const objectFormat = await resolveRepositoryObjectFormat(resolvedRepoPath, gitAdapter);
-        span.setAttribute("git.object_format", objectFormat);
+        span.setAttribute("gitlode.git.object_format", objectFormat);
         return objectFormat;
       },
     );
 
-    instrumentation.run("gitlode.state.validate", () => {
+    withSpan(executionTracer, "gitlode.state.validate", (span) => {
+      span.setAttribute("gitlode.ref.prior.count", priorCheckpoint.refs.length);
       validatePriorCheckpoint(priorCheckpoint, resolvedRepoPath, repositoryObjectFormat);
     });
 
-    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await instrumentation.runAsync(
-      "gitlode.repository_basics",
-      async () =>
-        await resolveRepositoryBasics(resolvedRepoPath, gitAdapter, input.repoName, input.repoUrl),
+    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await withAsyncSpan(
+      executionTracer,
+      "gitlode.repository.metadata.resolve",
+      async (span) => {
+        const basics = await resolveRepositoryBasics(
+          resolvedRepoPath,
+          gitAdapter,
+          input.repoName,
+          input.repoUrl,
+        );
+        span.setAttribute(
+          "gitlode.repository.name.source",
+          input.repoName !== undefined ? "explicit" : basics.repoUrl ? "remote_url" : "path",
+        );
+        span.setAttribute(
+          "gitlode.repository.url.source",
+          input.repoUrl !== undefined ? "explicit" : basics.repoUrl ? "remote" : "missing",
+        );
+        return basics;
+      },
     );
 
-    const resolvedRange = await instrumentation.runAsync(
-      "gitlode.resolve_extraction_range",
+    const resolvedRange = await withAsyncSpan(
+      executionTracer,
+      "gitlode.extraction.range.resolve",
       async (span) => {
-        span.setAttribute("gitlode.range.kind", input.range?.type ?? "none");
+        span.setAttribute("gitlode.extraction.range.kind", input.range?.type ?? "none");
         return await resolveExtractionRange(input.range, resolvedRepoPath, gitAdapter);
       },
     );
@@ -145,24 +178,30 @@ export async function executeWorkerRunRequest(
       maxDiffSize: input.maxDiffSize,
     };
 
-    const traversalPlanner = new RepositoryTraversalPlanner(gitAdapter, instrumentation);
-    const traversalExtractor = new CommitFactExtractor(gitAdapter, instrumentation);
+    const traversalPlanner = new RepositoryTraversalPlanner(gitAdapter, extractionTracer);
+    const traversalExtractor = new CommitFactExtractor(gitAdapter, extractionTracer);
     const fileChangeExpander = new FileChangeFactExpander(
       gitAdapter,
       new JsLineDiffCalculator({ instrumentation } satisfies JsLineDiffCalculatorDependencies),
-      instrumentation,
+      createFileChangeFactExpanderMetricRecorder(extractionMeter),
       extractionSettings.maxDiffSize,
     );
 
     let projector: FactProjector;
     const { pluginBaseDirectory, pluginDeclarations } = input;
     if (!pluginBaseDirectory || !hasEffectivePluginDeclarations(pluginDeclarations)) {
-      projector = new BuiltInFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
+      projector = new BuiltInFactProjector(
+        resolvedRepoName,
+        resolvedRepoUrl,
+        extractionTracer,
+        createBuiltInFactProjectorMetricRecorder(extractionMeter),
+      );
     } else {
       const baseProjector = new BuiltInFactProjector(
         resolvedRepoName,
         resolvedRepoUrl,
-        instrumentation,
+        extractionTracer,
+        createBuiltInFactProjectorMetricRecorder(extractionMeter),
       );
       const projectorResult = await buildPluginProjector(
         pluginDeclarations,
@@ -183,6 +222,7 @@ export async function executeWorkerRunRequest(
         (seq) =>
           `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
         extractionSettings.rotation,
+        createJsonlFileWriterMetricRecorder(extractionMeter),
       ),
     );
 
@@ -194,25 +234,19 @@ export async function executeWorkerRunRequest(
       sink,
       progressReporter: reporters.progressReporter,
       diagnosticReporter: reporters.diagnosticReporter,
-      instrumentation,
+      tracer: extractionTracer,
+      metricRecorder: createExtractionPipelineMetricRecorder(extractionMeter),
     });
 
-    const result = await instrumentation.runAsync("gitlode.extract", async (span) => {
-      span.incrementCounter("refs", extractionSettings.refs.length);
-      const coordinatorResult = await coordinator.run({
-        repositoryPath: resolvedRepoPath,
-        repoName: resolvedRepoName,
-        repoUrl: resolvedRepoUrl,
-        refs: [...extractionSettings.refs],
-        granularity: extractionSettings.granularity,
-        range: extractionSettings.range,
-        priorCheckpoint,
-        sessionTimestamp,
-      });
-      span.incrementCounter("records", coordinatorResult.recordsWritten);
-      span.incrementCounter("commits", coordinatorResult.commitsTraversed);
-      span.incrementCounter("skipped_diffs", coordinatorResult.skippedDiffs);
-      return coordinatorResult;
+    const result = await coordinator.run({
+      repositoryPath: resolvedRepoPath,
+      repoName: resolvedRepoName,
+      repoUrl: resolvedRepoUrl,
+      refs: [...extractionSettings.refs],
+      granularity: extractionSettings.granularity,
+      range: extractionSettings.range,
+      priorCheckpoint,
+      sessionTimestamp,
     });
 
     // End run-scoped Git processes before taking the profiling snapshot. The

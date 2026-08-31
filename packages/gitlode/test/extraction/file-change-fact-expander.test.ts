@@ -186,7 +186,7 @@ describe("FileChangeFactExpander expansion", () => {
     expect(expander.skippedDiffCount).toBe(0);
   });
 
-  it("applies maxDiffSize before binary detection and line diff", async () => {
+  it("applies maxDiffSize before binary detection and line diff without legacy observations", async () => {
     const computeLineDiff = vi.fn(() => ({ additions: 1, deletions: 1 }));
     const content = new Uint8Array([0, 1, 2, 3]);
     const recorder = new LocalInstrumentationRecorder(() => 1);
@@ -200,15 +200,10 @@ describe("FileChangeFactExpander expansion", () => {
     expect(result?.file.additions).toBeNull();
     expect(computeLineDiff).not.toHaveBeenCalled();
     expect(expander.skippedDiffCount).toBe(1);
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "gitlode.file_change_expansion",
-        counters: { changes: 1, skipped_size: 1 },
-      }),
-    ]);
+    expect(recorder.records()).toEqual([]);
   });
 
-  it("records owned spans and counters for mixed file changes", async () => {
+  it("does not record migrated expansion observations through legacy instrumentation", async () => {
     const instrumentation = new LocalInstrumentationRecorder(() => 1);
     const changes: FileBlobChange[] = [
       {
@@ -232,18 +227,9 @@ describe("FileChangeFactExpander expansion", () => {
       { path: "binary.bin", status: "added", additions: null, deletions: null },
     ]);
     expect(expander.skippedDiffCount).toBe(2);
-    const expansion = instrumentation
-      .records()
-      .find(({ name }) => name === "gitlode.file_change_expansion");
-    expect(expansion?.counters).toEqual({
-      changes: 3,
-      diffs: 1,
-      skipped_size: 1,
-      skipped_binary: 1,
-    });
     expect(
       instrumentation.records().filter(({ name }) => name === "gitlode.file_change_expansion"),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     for (const rejectedName of [
       ["git", "file_changes"],
       ["git", "diff"],

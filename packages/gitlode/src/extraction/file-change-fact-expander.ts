@@ -5,10 +5,9 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import type { FileBlobChange, GitAdapter } from "@gitlode/internal-contracts/git";
 import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
-import type {
-  Instrumentation,
-  InstrumentationSpan,
-} from "@gitlode/internal-foundation/instrumentation";
+
+import type { FileChangeFactExpanderMetricRecorder } from "./file-change-fact-expander-metric-recorder.js";
+import { NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER } from "./file-change-fact-expander-metric-recorder.js";
 
 const EMPTY_CONTENT = new Uint8Array(0);
 const BINARY_SCAN_LIMIT = 8_000;
@@ -16,19 +15,22 @@ const BINARY_SCAN_LIMIT = 8_000;
 export class FileChangeFactExpander implements FileChangeExpander {
   private readonly adapter: Pick<GitAdapter, "getFileBlobChanges">;
   private readonly lineDiffCalculator: LineDiffCalculator;
-  private readonly instrumentation: Instrumentation;
+  private readonly metricRecorder: FileChangeFactExpanderMetricRecorder;
   private readonly maxDiffSize: number | undefined;
   private _skippedDiffCount = 0;
 
   constructor(
     adapter: Pick<GitAdapter, "getFileBlobChanges">,
     lineDiffCalculator: LineDiffCalculator,
-    instrumentation: Instrumentation,
+    metricRecorder: FileChangeFactExpanderMetricRecorder,
     maxDiffSize?: number,
   ) {
     this.adapter = adapter;
     this.lineDiffCalculator = lineDiffCalculator;
-    this.instrumentation = instrumentation;
+    this.metricRecorder =
+      typeof metricRecorder.startExpansion === "function"
+        ? metricRecorder
+        : NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER;
     this.maxDiffSize = maxDiffSize;
   }
 
@@ -41,9 +43,8 @@ export class FileChangeFactExpander implements FileChangeExpander {
     repositoryPath: string,
   ): AsyncIterable<FileChangeFact> {
     for await (const commit of commits) {
-      const span = this.instrumentation.startSpan("gitlode.file_change_expansion");
+      const token = this.metricRecorder.startExpansion();
       const facts: FileChangeFact[] = [];
-      let spanError: unknown;
       try {
         const parentOid = commit.parents[0];
         for await (const change of this.adapter.getFileBlobChanges(
@@ -51,34 +52,33 @@ export class FileChangeFactExpander implements FileChangeExpander {
           commit.oid,
           parentOid,
         )) {
-          const file = this.buildFile(change, span);
-          span.incrementCounter("changes");
+          const file = this.buildFile(change);
+          this.metricRecorder.recordExpanded(change.status);
           facts.push({ type: "file-change", commit, file });
         }
       } catch (error) {
-        spanError = error;
+        this.metricRecorder.completeExpansion(token, { outcome: "error" });
         throw error;
-      } finally {
-        span.end(spanError);
       }
+      this.metricRecorder.completeExpansion(token, { outcome: "success", size: facts.length });
       yield* facts;
     }
   }
 
-  private buildFile(change: FileBlobChange, span: InstrumentationSpan): FileChangeFact["file"] {
+  private buildFile(change: FileBlobChange): FileChangeFact["file"] {
     const beforeContent = change.before?.content ?? EMPTY_CONTENT;
     const afterContent = change.after?.content ?? EMPTY_CONTENT;
     const path = fileChangePath(change);
 
     if (this.exceedsMaxDiffSize(beforeContent, afterContent)) {
       this._skippedDiffCount++;
-      span.incrementCounter("skipped_size");
+      this.metricRecorder.recordDiffSkipped("size");
       return { path, status: change.status, additions: null, deletions: null };
     }
 
     if (isBinary(beforeContent) || isBinary(afterContent)) {
       this._skippedDiffCount++;
-      span.incrementCounter("skipped_binary");
+      this.metricRecorder.recordDiffSkipped("binary");
       return { path, status: change.status, additions: null, deletions: null };
     }
 
@@ -87,7 +87,6 @@ export class FileChangeFactExpander implements FileChangeExpander {
       afterContent,
     );
     validateDiffResult(additions, deletions);
-    span.incrementCounter("diffs");
     return { path, status: change.status, additions, deletions };
   }
 

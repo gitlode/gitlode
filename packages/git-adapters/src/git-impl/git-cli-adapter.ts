@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import {
@@ -14,15 +15,25 @@ import type { CommitOid, OidProfile, RefType } from "@gitlode/internal-contracts
 import { isCommitOid } from "@gitlode/internal-contracts/model";
 import {
   createAsyncIterableInstrumenter,
+  recordSpanError,
   type InstrumentAsyncIterable,
 } from "@gitlode/internal-foundation/otel-support";
-import { context, trace, type Context, type Span, type Tracer } from "@opentelemetry/api";
+import {
+  context,
+  SpanStatusCode,
+  trace,
+  type Context,
+  type Span,
+  type Tracer,
+} from "@opentelemetry/api";
 
 import {
   GitCatFileBatchSession,
   parseBatchObjectStream,
   processClosed,
   type GitBatchObject,
+  type GitCliProcess,
+  type GitCliProcessFactory,
 } from "./git-cli-cat-file-batch.js";
 import { parseGitCommitObject } from "./git-cli-commit-parser.js";
 import {
@@ -31,7 +42,7 @@ import {
   type CliFileBlobSnapshotDescriptor,
 } from "./git-cli-raw-diff.js";
 import type { GitMetricRecorder } from "./git-metric-recorder.js";
-import { attributeKey, setGitError, withGitAsyncSpan } from "./git-telemetry.js";
+import { attributeKey, setGitProcessError, withGitAsyncSpan } from "./git-telemetry.js";
 
 export { parseBatchObjectStream } from "./git-cli-cat-file-batch.js";
 export { parseRawDiffTreeOutput } from "./git-cli-raw-diff.js";
@@ -41,7 +52,19 @@ export interface GitCliAdapterDependencies {
   readonly metricRecorder: GitMetricRecorder;
   readonly parentContext: Context;
   readonly gitExecutable?: string;
+  readonly processFactory?: GitCliProcessFactory;
+  readonly pipeline?: GitCliPipeline;
 }
+
+type GitCliPipeline = (source: Readable, destination: Writable) => Promise<void>;
+
+interface GitCliProcessStart {
+  readonly kind: "rev-list" | "commit-batch";
+  readonly command: string;
+  readonly args: readonly string[];
+}
+
+export type { GitCliProcessFactory } from "./git-cli-cat-file-batch.js";
 
 interface GitCommandResult {
   readonly stdout: string;
@@ -57,12 +80,29 @@ interface GitCommandBufferResult {
 
 const DEFAULT_GIT_EXECUTABLE = "git";
 
+function defaultGitCliPipeline(source: Readable, destination: Writable): Promise<void> {
+  return pipeline(source, destination);
+}
+
+function defaultGitCliProcessFactory(start: GitCliProcessStart): GitCliProcess {
+  if (start.kind === "rev-list") {
+    return spawn(start.command, start.args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    }) as unknown as GitCliProcess;
+  }
+  return spawn(start.command, start.args, {
+    stdio: ["pipe", "pipe", "pipe"],
+  }) as unknown as GitCliProcess;
+}
+
 export class GitCliAdapter implements GitAdapter {
   private readonly _tracer: Tracer;
   private readonly _parentContext: Context;
   private readonly _metricRecorder: GitMetricRecorder;
   private readonly _gitExecutable: string;
   private readonly _instrumentWalk: InstrumentAsyncIterable;
+  private readonly _processFactory: GitCliProcessFactory;
+  private readonly _pipeline: GitCliPipeline;
   private readonly _fileBlobBatchSessions = new Map<string, GitCatFileBatchSession>();
   private _disposed = false;
 
@@ -71,9 +111,17 @@ export class GitCliAdapter implements GitAdapter {
     this._parentContext = dependencies.parentContext;
     this._metricRecorder = dependencies.metricRecorder;
     this._gitExecutable = dependencies.gitExecutable ?? DEFAULT_GIT_EXECUTABLE;
-    this._instrumentWalk = createAsyncIterableInstrumenter((span, completion) => {
-      span.setAttribute(attributeKey("stream_completion"), completion);
-    });
+    this._processFactory = dependencies.processFactory ?? defaultGitCliProcessFactory;
+    this._pipeline = dependencies.pipeline ?? defaultGitCliPipeline;
+    this._instrumentWalk = createAsyncIterableInstrumenter(
+      (span, completion) => {
+        span.setAttribute(attributeKey("stream_completion"), completion);
+      },
+      (span, error) => {
+        if (error instanceof GitAdapterError) span.setStatus({ code: SpanStatusCode.ERROR });
+        else recordSpanError(span, error);
+      },
+    );
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -288,6 +336,8 @@ export class GitCliAdapter implements GitAdapter {
               args,
               revListSpan,
               catFileSpan,
+              this._processFactory,
+              this._pipeline,
             )) {
               if (object.type !== "commit") {
                 throw new GitAdapterError(`Commit not found: ${object.oid}`, "COMMIT_NOT_FOUND");
@@ -457,6 +507,7 @@ export class GitCliAdapter implements GitAdapter {
       this._tracer,
       this._metricRecorder,
       this._parentContext,
+      this._processFactory,
     );
     this._fileBlobBatchSessions.set(repoPath, session);
     return session;
@@ -535,23 +586,54 @@ async function* streamRevListBatchObjects(
   revListArgs: readonly string[],
   revListSpan: Span,
   catFileSpan: Span,
+  processFactory: GitCliProcessFactory,
+  pipelineFactory: GitCliPipeline,
 ): AsyncIterable<GitBatchObject> {
-  const revList = spawn(command, ["-C", repoPath, ...revListArgs], {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const catFile = spawn(command, ["-C", repoPath, "cat-file", "--batch"], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  let revList: GitCliProcess | undefined;
+  let catFile: GitCliProcess | undefined;
+  let revListClosed: Promise<Awaited<ReturnType<typeof processClosed>>> | undefined;
+  try {
+    revList = processFactory({
+      kind: "rev-list",
+      command,
+      args: ["-C", repoPath, ...revListArgs],
+    });
+    revListClosed = processClosed(revList);
+    catFile = processFactory({
+      kind: "commit-batch",
+      command,
+      args: ["-C", repoPath, "cat-file", "--batch"],
+    });
+  } catch (error) {
+    revList?.kill();
+    if (revListClosed) await revListClosed;
+    revListSpan.setAttribute(
+      attributeKey("git_cli_process_completion"),
+      revList ? "cancelled" : "error",
+    );
+    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "error");
+    setGitProcessError(catFileSpan, error);
+    revListSpan.end();
+    catFileSpan.end();
+    throw new GitAdapterError(
+      `Unexpected error starting Git commit walk: ${formatUnknownError(error)}`,
+      "UNKNOWN",
+      error,
+    );
+  }
+  if (!revList || !catFile) throw new Error("Git CLI process did not start");
+  const startedRevList = revList;
   const revListStderrChunks: Buffer[] = [];
   const catFileStderrChunks: Buffer[] = [];
   revList.stderr.on("data", (chunk: Buffer) => revListStderrChunks.push(chunk));
   catFile.stderr.on("data", (chunk: Buffer) => catFileStderrChunks.push(chunk));
 
-  const pipeClosed = pipeline(revList.stdout, catFile.stdin).then(
+  if (catFile.stdin === null) throw new Error("Git commit-batch process has no stdin");
+  const pipeClosed = pipelineFactory(startedRevList.stdout, catFile.stdin).then(
     () => undefined,
     (error: unknown) => error,
   );
-  const revListClosed = processClosed(revList);
+  const revListClosePromise = revListClosed;
   const catFileClosed = processClosed(catFile);
   let finalized = false;
   const finalize = (
@@ -564,8 +646,8 @@ async function* streamRevListBatchObjects(
     finalized = true;
     revListSpan.setAttribute(attributeKey("git_cli_process_completion"), revListCompletion);
     catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), catFileCompletion);
-    if (revListError !== undefined) setGitError(revListSpan, revListError);
-    if (catFileError !== undefined) setGitError(catFileSpan, catFileError);
+    if (revListError !== undefined) setGitProcessError(revListSpan, revListError);
+    if (catFileError !== undefined) setGitProcessError(catFileSpan, catFileError);
     revListSpan.end();
     catFileSpan.end();
   };
@@ -582,14 +664,14 @@ async function* streamRevListBatchObjects(
     | undefined;
   let closeResults:
     | readonly [
-        Awaited<typeof revListClosed>,
+        Awaited<typeof revListClosePromise>,
         Awaited<typeof catFileClosed>,
         Awaited<typeof pipeClosed>,
       ]
     | undefined;
   try {
     for await (const object of parseBatchObjectStream(catFile.stdout)) yield object;
-    closeResults = await Promise.all([revListClosed, catFileClosed, pipeClosed]);
+    closeResults = await Promise.all([revListClosePromise, catFileClosed, pipeClosed]);
     const [revListResult, catFileResult, pipeError] = closeResults;
     const revListStderr = Buffer.concat(revListStderrChunks).toString("utf8");
     const catFileStderr = Buffer.concat(catFileStderrChunks).toString("utf8");
@@ -690,10 +772,10 @@ async function* streamRevListBatchObjects(
     if (!exited) {
       revList.kill();
       catFile.kill();
-      closeResults ??= await Promise.all([revListClosed, catFileClosed, pipeClosed]);
+      closeResults ??= await Promise.all([revListClosePromise, catFileClosed, pipeClosed]);
     }
     const [revListResult, catFileResult] =
-      closeResults ?? (await Promise.all([revListClosed, catFileClosed, pipeClosed]));
+      closeResults ?? (await Promise.all([revListClosePromise, catFileClosed, pipeClosed]));
     if (exited) {
       finalize("exited", "exited");
     } else if (failure === undefined) {
@@ -706,7 +788,7 @@ async function* streamRevListBatchObjects(
     } else if (failure.owner === "parse") {
       finalize(
         revListResult.ok && revListResult.code === 0 ? "cancelled" : "error",
-        catFileResult.ok && catFileResult.code === 0 ? "cancelled" : "error",
+        "error",
         failure.revListError ?? failure.revListTelemetryError,
         failure.catFileError ?? failure.catFileTelemetryError,
       );

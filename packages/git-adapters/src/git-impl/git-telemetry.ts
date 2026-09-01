@@ -28,17 +28,19 @@ export async function withGitAsyncSpan<T>(
     return await context.with(trace.setSpan(parent, span), () => callback(span));
   } catch (error) {
     if (error instanceof GitAdapterError) span.setStatus({ code: SpanStatusCode.ERROR });
-    else {
-      span.setStatus({ code: SpanStatusCode.ERROR });
-      span.recordException(new Error("Git adapter runtime failure"));
-    }
+    else recordSpanError(span, error);
     throw error;
   } finally {
     span.end();
   }
 }
 
-export function setGitError(span: Span, error: unknown): void {
+function recordSpanError(span: Span, error: unknown): void {
+  span.setStatus({ code: SpanStatusCode.ERROR });
+  span.recordException(error as Error);
+}
+
+export function setGitProcessError(span: Span, error: unknown): void {
   if (error instanceof GitAdapterError) span.setStatus({ code: SpanStatusCode.ERROR });
   else {
     span.setStatus({ code: SpanStatusCode.ERROR });

@@ -32,6 +32,7 @@ function validateResult<T>(result: IteratorResult<T>): IteratorResultObject<T> {
 
 export function createAsyncIterableInstrumenter(
   onCompletion: (span: Span, completion: AsyncIterableCompletion) => void,
+  onError: (span: Span, error: unknown) => void = recordSpanError,
 ): InstrumentAsyncIterable {
   return function instrumentAsyncIterable<T>(
     tracer: Tracer,
@@ -62,7 +63,7 @@ export function createAsyncIterableInstrumenter(
 
         const fail = (error: unknown): never => {
           if (!terminal && span) {
-            recordSpanError(span, error);
+            onError(span, error);
             finish("error");
           }
           throw error;

@@ -16,6 +16,7 @@ import {
   type Instrumentation,
   type InstrumentationSpan,
 } from "@gitlode/internal-foundation/instrumentation";
+import { metrics, trace, type Meter, type Tracer } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
@@ -25,17 +26,22 @@ import {
   type CommitPathSchedulingHint,
   type CommitTraversalStrategy,
 } from "./commit-traversal/index.js";
+import { createDagTelemetryBinding } from "./dag-metric-recorder.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
   readonly instrumentation: Instrumentation;
   readonly commitTraversalStrategy?: CommitTraversalStrategy;
+  readonly dagTracer?: Tracer;
+  readonly dagMeter?: Meter;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _instrumentation: Instrumentation;
   private readonly _commitTraversalStrategy: CommitTraversalStrategy;
+  private readonly _dagTracer: Tracer;
+  private readonly _dagTelemetryBinding: ReturnType<typeof createDagTelemetryBinding>;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
@@ -43,6 +49,11 @@ export class IsomorphicGitAdapter implements GitAdapter {
     this._commitTraversalStrategy =
       dependencies.commitTraversalStrategy ??
       createCommitTraversalStrategy(DEFAULT_COMMIT_TRAVERSAL_STRATEGY);
+    this._dagTracer = dependencies.dagTracer ?? trace.getTracer("gitlode.dag");
+    this._dagTelemetryBinding = createDagTelemetryBinding(
+      this._dagTracer,
+      dependencies.dagMeter ?? metrics.getMeter("gitlode.dag"),
+    );
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -214,13 +225,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
       const strategy = this._commitTraversalStrategy;
       span.setAttribute("strategy", strategy.name);
       const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
-      const oidWalk = strategy.walk(
-        {
-          graph: topology,
-          instrumentation: this._instrumentation,
-        },
-        oid,
-        excludeOid,
+      const oidWalk = this._dagTelemetryBinding.instrumentDifference(
+        strategy.name === "certified-lazy" ? "certified-lazy" : "phase-certified",
+        excludeOid !== undefined,
+        (observation) => strategy.walk({ graph: topology, observation }, oid, excludeOid),
       );
 
       return commitObjectsFromOids(oidWalk, topology);

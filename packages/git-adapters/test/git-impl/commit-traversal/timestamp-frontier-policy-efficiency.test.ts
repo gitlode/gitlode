@@ -245,7 +245,27 @@ function createContext<NodeId extends PropertyKey, DomainHint>(
   graph: DagTopologyPort<NodeId, DomainHint>,
   instrumentation: LocalInstrumentationRecorder,
 ): WalkDagContext<NodeId, DomainHint> {
-  return { graph, instrumentation };
+  const span = instrumentation.startSpan("dag.traversal");
+  return {
+    graph,
+    observation: {
+      recordStepProcessed: (count = 1) => span.incrementCounter("traversal_steps", count),
+      recordStepStale: (count = 1) => span.incrementCounter("stale_steps", count),
+      recordSuccessorExpansion: (role, count = 1) => {
+        span.incrementCounter("successor_expansions", count);
+        span.incrementCounter(`${role}_expansions`, count);
+      },
+      recordNodeYielded: (count = 1) => span.incrementCounter("yielded_nodes", count),
+      recordNodeExcluded: (count = 1) => span.incrementCounter("excluded_nodes", count),
+      markFallback: () => {},
+      recordFallbackNodeRemoved: () => {},
+      setCertificationResult: () => {},
+      setTerminationReason: (reason) => span.setAttribute("termination_reason", reason),
+      recordStartCount: () => {},
+      setCertifiedClosureResult: () => {},
+      complete: () => span.end(),
+    },
+  };
 }
 
 function expectMembershipAndOracle(fixture: Fixture, result: RunResult): void {

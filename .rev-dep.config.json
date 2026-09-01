@@ -57,8 +57,8 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js"
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
           ]
         },
         {
@@ -139,6 +139,8 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/dag/index.ts",
             "packages/internal-foundation/dist/dag/index.js",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js",
             "packages/internal-foundation/src/instrumentation/index.ts",
             "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-foundation/src/support/index.ts",

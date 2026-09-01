@@ -314,17 +314,6 @@ describe("executeWorkerRunRequest profiling", () => {
       topology_commit_cache_hits: 1,
     });
 
-    const traversalEntry = result.success.profileEntries.find(
-      (entry) => entry.name === "dag.traversal",
-    );
-    expect(traversalEntry?.attributes).toEqual({ strategy: ["certifiedLazy"] });
-    expect(traversalEntry?.counters).toEqual({
-      main_expansions: 1,
-      successor_expansions: 1,
-      traversal_steps: 1,
-      yielded_nodes: 1,
-    });
-
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
   });
@@ -520,10 +509,10 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
   }
 
   it.each([
-    [undefined, "certified-lazy", "certifiedLazy"],
-    ["phase-certified-fifo", "phase-certified-fifo", "phaseCertified"],
-    ["phase-certified-timestamp", "phase-certified-timestamp", "phaseCertified"],
-  ] as const)("selects %s through injected environment", async (value, outer, inner) => {
+    [undefined, "certified-lazy"],
+    ["phase-certified-fifo", "phase-certified-fifo"],
+    ["phase-certified-timestamp", "phase-certified-timestamp"],
+  ] as const)("selects %s through injected environment", async (value, outer) => {
     const environment = value === undefined ? {} : { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: value };
     const result = await runWithEnvironment(environment);
 
@@ -532,11 +521,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     const walkEntry = result.success.profileEntries.find(
       (entry) => entry.name === "git.walk_commits",
     );
-    const traversalEntry = result.success.profileEntries.find(
-      (entry) => entry.name === "dag.traversal",
-    );
     expect(walkEntry?.attributes?.strategy).toEqual([outer]);
-    expect(traversalEntry?.attributes?.strategy).toEqual([inner]);
   });
 
   it("returns a user error for invalid isomorphic-git strategy environment", async () => {

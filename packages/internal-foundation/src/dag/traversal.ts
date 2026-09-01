@@ -1,5 +1,5 @@
-import { instrumentAsyncIterable } from "../instrumentation/index.js";
 import { collectAsyncIterableToSet, firstOrThrow, OrderedQueue } from "../support/index.js";
+import type { DagFallbackReason } from "./observations.js";
 import type {
   BasicDagSchedulingContext,
   DagFrontier,
@@ -25,22 +25,33 @@ export async function* walkDagNodeIdsEagerExclude<
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentAsyncIterable(
-    context.instrumentation,
-    "dag.traversal",
-    (span) =>
-      walkDagNodeIdsEagerExcludeCore(
-        {
-          ...context,
-          role: "main",
-          telemetry: { span, countYieldedNodes: true },
-        },
-        nodeId,
-        excludeNodeId,
-        options,
-      ),
-    { attributes: { strategy: "eagerExclude" } },
-  );
+  let completed = false;
+  const complete = (completion: "exhausted" | "cancelled" | "handled_throw" | "error") => {
+    if (!completed) {
+      completed = true;
+      context.observation?.complete(completion);
+    }
+  };
+  try {
+    yield* walkDagNodeIdsEagerExcludeCore(
+      {
+        ...context,
+        role: "main",
+        telemetry: { observation: context.observation, countYieldedNodes: true },
+      },
+      nodeId,
+      excludeNodeId,
+      options,
+    );
+    context.observation?.setCertificationResult("certified");
+    context.observation?.setTerminationReason("frontier-exhausted");
+    complete("exhausted");
+  } catch (error) {
+    complete("error");
+    throw error;
+  } finally {
+    complete("cancelled");
+  }
 }
 
 async function* walkDagNodeIdsEagerExcludeCore<NodeId extends PropertyKey, DomainHint = undefined>(
@@ -64,7 +75,7 @@ async function* walkDagNodeIdsEagerExcludeCore<NodeId extends PropertyKey, Domai
         )
       : new Set<NodeId>();
   if (excludeNodeId !== undefined) {
-    context.telemetry.span.incrementCounter("excluded_nodes", excluded.size);
+    context.telemetry.observation?.recordNodeExcluded(excluded.size);
   }
 
   const reachable = new Set<NodeId>();
@@ -78,9 +89,9 @@ async function* walkDagNodeIdsEagerExcludeCore<NodeId extends PropertyKey, Domai
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
-    context.telemetry.span.incrementCounter("traversal_steps");
+    context.telemetry.observation?.recordStepProcessed();
     if (reachable.has(item.nodeId) || excluded.has(item.nodeId)) {
-      context.telemetry.span.incrementCounter("stale_steps");
+      context.telemetry.observation?.recordStepStale();
       continue;
     }
     reachable.add(item.nodeId);
@@ -116,22 +127,31 @@ export async function* walkDagNodeIdsCertifiedLazy<
   excludeNodeId?: NodeId,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentAsyncIterable(
-    context.instrumentation,
-    "dag.traversal",
-    (span) =>
-      walkDagNodeIdsCertifiedLazyCore(
-        {
-          ...context,
-          role: "main",
-          telemetry: { span, countYieldedNodes: true },
-        },
-        nodeId,
-        excludeNodeId,
-        options,
-      ),
-    { attributes: { strategy: "certifiedLazy" } },
-  );
+  let completed = false;
+  const complete = (completion: "exhausted" | "cancelled" | "handled_throw" | "error") => {
+    if (!completed) {
+      completed = true;
+      context.observation?.complete(completion);
+    }
+  };
+  try {
+    yield* walkDagNodeIdsCertifiedLazyCore(
+      {
+        ...context,
+        role: "main",
+        telemetry: { observation: context.observation, countYieldedNodes: true },
+      },
+      nodeId,
+      excludeNodeId,
+      options,
+    );
+    complete("exhausted");
+  } catch (error) {
+    complete("error");
+    throw error;
+  } finally {
+    complete("cancelled");
+  }
 }
 
 async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, DomainHint = undefined>(
@@ -142,6 +162,8 @@ async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, Doma
 ): AsyncIterable<NodeId> {
   if (excludeNodeId === undefined) {
     yield* walkDagNodeIdsEagerExcludeCore(context, nodeId, undefined, options);
+    context.telemetry.observation?.setCertificationResult("certified");
+    context.telemetry.observation?.setTerminationReason("frontier-exhausted");
     return;
   }
 
@@ -186,10 +208,10 @@ async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, Doma
 
   while (!includeFrontier.isEmpty()) {
     const item = includeFrontier.dequeueOrThrow();
-    context.telemetry.span.incrementCounter("traversal_steps");
+    context.telemetry.observation?.recordStepProcessed();
     const state = stateFor(item.nodeId);
     if (includeExpanded.has(item.nodeId)) {
-      context.telemetry.span.incrementCounter("stale_steps");
+      context.telemetry.observation?.recordStepStale();
       continue;
     }
     if (state.fromExclude) {
@@ -217,8 +239,7 @@ async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, Doma
   const certificateFailureReason = getCertificateFailureReason();
 
   if (certificateFailureReason !== undefined) {
-    context.telemetry.span.setAttribute("result", "fallback");
-    context.telemetry.span.setAttribute("fallback_reason", certificateFailureReason);
+    context.telemetry.observation?.markFallback(certificateFailureReason);
     const excluded = await collectAsyncIterableToSet(
       walkDagReachableNodeIdsCore(
         {
@@ -230,22 +251,23 @@ async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, Doma
         options,
       ),
     );
-    context.telemetry.span.incrementCounter("excluded_nodes", excluded.size);
+    context.telemetry.observation?.recordNodeExcluded(excluded.size);
     let removed = 0;
     for (const excludedNodeId of excluded) {
       if (resultCandidates.delete(excludedNodeId)) removed++;
     }
-    context.telemetry.span.incrementCounter("fallback_removed", removed);
+    context.telemetry.observation?.recordFallbackNodeRemoved(removed);
   } else {
-    context.telemetry.span.setAttribute("result", "certified");
+    context.telemetry.observation?.setCertificationResult("certified");
   }
 
   for (const resultCandidate of resultCandidates) {
     recordYieldedNode(context);
     yield resultCandidate;
   }
+  context.telemetry.observation?.setTerminationReason("frontier-exhausted");
 
-  function getCertificateFailureReason(): string | undefined {
+  function getCertificateFailureReason(): DagFallbackReason | undefined {
     if (includePathReachedTerminal || excludePathSplit || stopPoints.size === 0) {
       if (includePathReachedTerminal) return "open_include_path";
       if (excludePathSplit) return "exclude_path_split";
@@ -275,17 +297,32 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  yield* instrumentAsyncIterable(context.instrumentation, "dag.reachable", (span) =>
-    walkDagReachableNodeIdsCore(
+  let completed = false;
+  const complete = (completion: "exhausted" | "cancelled" | "handled_throw" | "error") => {
+    if (!completed) {
+      completed = true;
+      context.observation?.complete(completion);
+    }
+  };
+  try {
+    const starts = Array.from(nodeIds);
+    context.observation?.recordStartCount(starts.length);
+    yield* walkDagReachableNodeIdsCore(
       {
         ...context,
         role: "main",
-        telemetry: { span, countYieldedNodes: true },
+        telemetry: { observation: context.observation, countYieldedNodes: true },
       },
-      nodeIds,
+      starts,
       options,
-    ),
-  );
+    );
+    complete("exhausted");
+  } catch (error) {
+    complete("error");
+    throw error;
+  } finally {
+    complete("cancelled");
+  }
 }
 
 async function* walkDagReachableNodeIdsCore<NodeId extends PropertyKey, DomainHint = undefined>(
@@ -305,9 +342,9 @@ async function* walkDagReachableNodeIdsCore<NodeId extends PropertyKey, DomainHi
 
   while (!frontier.isEmpty()) {
     const item = frontier.dequeueOrThrow();
-    context.telemetry.span.incrementCounter("traversal_steps");
+    context.telemetry.observation?.recordStepProcessed();
     if (visited.has(item.nodeId)) {
-      context.telemetry.span.incrementCounter("stale_steps");
+      context.telemetry.observation?.recordStepStale();
       continue;
     }
     visited.add(item.nodeId);
@@ -328,10 +365,7 @@ async function expandDagSuccessors<NodeId extends PropertyKey, DomainHint = unde
   nodeId: NodeId,
 ): Promise<readonly DagSuccessor<NodeId, DomainHint>[]> {
   const role = context.role;
-  context.telemetry.span.incrementCounter("successor_expansions");
-  context.telemetry.span.incrementCounter(
-    role === "exclude" ? "exclude_expansions" : "main_expansions",
-  );
+  context.telemetry.observation?.recordSuccessorExpansion(role);
   return await context.graph.getSuccessors(nodeId);
 }
 
@@ -339,7 +373,7 @@ function recordYieldedNode<NodeId extends PropertyKey, DomainHint = undefined>(
   context: WalkDagCoreContext<NodeId, DomainHint>,
 ): void {
   if (context.telemetry.countYieldedNodes) {
-    context.telemetry.span.incrementCounter("yielded_nodes");
+    context.telemetry.observation?.recordNodeYielded();
   }
 }
 

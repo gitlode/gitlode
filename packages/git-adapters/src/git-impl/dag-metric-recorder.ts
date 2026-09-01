@@ -5,10 +5,24 @@ import {
 } from "@gitlode/internal-contracts/telemetry";
 import type {
   DagFallbackReason,
+  DagOperationObservation,
   DagOperationObservationHooks,
+  DagTopologyPort,
+  WalkDagStrategyOptions,
+  BasicDagSchedulingContext,
+  CertifiedClosurePhaseResult,
+  PhaseCertifiedStrategyOptions,
   DagTraversalRole,
 } from "@gitlode/internal-foundation/dag";
-import type { Counter, Meter } from "@opentelemetry/api";
+import {
+  walkDagReachableNodeIds,
+  resolveDagCertifiedClosurePhase,
+} from "@gitlode/internal-foundation/dag";
+import {
+  createAsyncIterableInstrumenter,
+  withAsyncSpan,
+} from "@gitlode/internal-foundation/otel-support";
+import type { Counter, Meter, Span, Tracer } from "@opentelemetry/api";
 
 type DagOperation = TelemetryAttributeValue<"dag_operation">;
 type DifferenceOperation = Extract<DagOperation, "difference">;
@@ -45,6 +59,73 @@ export interface DagMetricRecorder {
   startOperation<C extends DagOperationContext>(context: C): DagMetricOperation<CompletionFor<C>>;
 }
 
+/** Binds neutral DAG evidence to the Git-owned span and metric signals. */
+export function bindDagObservation(
+  span: Span,
+  operation: DagMetricOperation,
+  context: DagOperationContext,
+): DagOperationObservation {
+  let fallbackRecorded = false;
+  let completed = false;
+  const attrs = (
+    id: Parameters<typeof getTelemetryAttributeMetadata>[0],
+    value: string | boolean | number,
+  ) => span.setAttribute(key(id), value);
+  if (context.operation === "difference") {
+    attrs("dag_strategy", context.strategy);
+    attrs("dag_has_exclusion", context.hasExclusion);
+  }
+  return {
+    recordStepProcessed: (count) => operation.observations.recordStepProcessed(count),
+    recordStepStale: (count) => operation.observations.recordStepStale(count),
+    recordSuccessorExpansion: (role, count) =>
+      operation.observations.recordSuccessorExpansion(role, count),
+    recordNodeYielded: (count) => operation.observations.recordNodeYielded(count),
+    recordNodeExcluded: (count) => operation.observations.recordNodeExcluded(count),
+    markFallback(reason) {
+      operation.observations.markFallback(reason);
+      span.setAttribute(key("dag_certification_result"), "fallback");
+      span.setAttribute(key("dag_fallback_reason"), fallbackMap[reason]);
+      if (!fallbackRecorded) {
+        fallbackRecorded = true;
+        span.addEvent("gitlode.dag.fallback", {
+          [key("dag_fallback_reason")]: fallbackMap[reason],
+        });
+      }
+    },
+    recordFallbackNodeRemoved: (count) => operation.observations.recordFallbackNodeRemoved(count),
+    setCertificationResult: (result) => span.setAttribute(key("dag_certification_result"), result),
+    setTerminationReason: (reason) => span.setAttribute(key("dag_termination_reason"), reason),
+    recordStartCount: (count) => span.setAttribute(key("dag_start_count"), count),
+    setCertifiedClosureResult: (result) =>
+      span.setAttribute(key("dag_certified_closure_result"), result),
+    complete(completion) {
+      if (completed) return;
+      completed = true;
+      if (context.operation !== "certified-closure") {
+        span.setAttribute(
+          key("stream_completion"),
+          completion === "success" ? "exhausted" : completion,
+        );
+      }
+      operation.complete(
+        context.operation === "certified-closure"
+          ? {
+              type: "certified-closure",
+              completion: completion === "success" ? "success" : "error",
+            }
+          : {
+              type: "stream",
+              completion:
+                completion === "success"
+                  ? "exhausted"
+                  : (completion as StreamDagCompletion["completion"]),
+            },
+      );
+    },
+  };
+}
+
 const noopHooks = Object.freeze<DagOperationObservationHooks>({
   recordStepProcessed() {},
   recordStepStale() {},
@@ -53,11 +134,83 @@ const noopHooks = Object.freeze<DagOperationObservationHooks>({
   recordNodeExcluded() {},
   markFallback() {},
   recordFallbackNodeRemoved() {},
+  setCertificationResult() {},
+  setTerminationReason() {},
+  recordStartCount() {},
+  setCertifiedClosureResult() {},
 });
 const noopOperation = Object.freeze<DagMetricOperation>({ observations: noopHooks, complete() {} });
 export const NOOP_DAG_METRIC_RECORDER = Object.freeze<DagMetricRecorder>({
   startOperation: () => noopOperation as never,
 });
+
+export interface DagTelemetryBinding {
+  instrumentDifference<NodeId extends PropertyKey>(
+    strategy: TelemetryAttributeValue<"dag_strategy">,
+    hasExclusion: boolean,
+    walk: (observation: DagOperationObservation) => AsyncIterable<NodeId>,
+  ): AsyncIterable<NodeId>;
+  instrumentReachable<NodeId extends PropertyKey, DomainHint = undefined>(
+    graph: DagTopologyPort<NodeId, DomainHint>,
+    nodeIds: Iterable<NodeId>,
+    options?: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>,
+  ): AsyncIterable<NodeId>;
+  instrumentCertifiedClosure<NodeId extends PropertyKey, DomainHint = undefined>(
+    graph: DagTopologyPort<NodeId, DomainHint>,
+    nodeId: NodeId,
+    options?: PhaseCertifiedStrategyOptions<NodeId, DomainHint>,
+  ): Promise<CertifiedClosurePhaseResult<NodeId>>;
+}
+
+export function createDagTelemetryBinding(tracer: Tracer, meter: Meter): DagTelemetryBinding {
+  const recorder = createDagMetricRecorder(meter);
+  const observations = new WeakMap<Span, DagOperationObservation>();
+  const instrumentDagStream = createAsyncIterableInstrumenter((span, completion) => {
+    observations.get(span)?.complete(completion);
+  });
+  return {
+    instrumentDifference(strategy, hasExclusion, walk) {
+      return instrumentDagStream(tracer, "gitlode.dag.traversal", (span) => {
+        const operation = recorder.startOperation({
+          operation: "difference",
+          strategy,
+          hasExclusion,
+        });
+        const observation = bindDagObservation(span, operation, {
+          operation: "difference",
+          strategy,
+          hasExclusion,
+        });
+        observations.set(span, observation);
+        return walk(observation);
+      });
+    },
+    instrumentReachable(graph, nodeIds, options = {}) {
+      return instrumentDagStream(tracer, "gitlode.dag.reachable", (span) => {
+        const operation = recorder.startOperation({ operation: "reachable" });
+        const observation = bindDagObservation(span, operation, { operation: "reachable" });
+        observations.set(span, observation);
+        return walkDagReachableNodeIds({ graph, observation }, nodeIds, options);
+      });
+    },
+    instrumentCertifiedClosure(graph, nodeId, options = {}) {
+      const operation = recorder.startOperation({ operation: "certified-closure" });
+      return withAsyncSpan(tracer, "gitlode.dag.certified_closure", async (span) => {
+        const observation = bindDagObservation(span, operation, { operation: "certified-closure" });
+        observations.set(span, observation);
+        return resolveDagCertifiedClosurePhase(
+          {
+            graph,
+            observation,
+          },
+          nodeId,
+          options,
+        );
+      });
+    },
+  };
+}
+
 export function normalizeDagCompletion(
   c: NeutralDagCompletion,
 ): TelemetryAttributeValue<"dag_operation_completion"> {
@@ -133,6 +286,10 @@ export function createDagMetricRecorder(meter: Meter): DagMetricRecorder {
         recordFallbackNodeRemoved(c) {
           if (fallback) removed = add(removed, c);
         },
+        setCertificationResult() {},
+        setTerminationReason() {},
+        recordStartCount() {},
+        setCertifiedClosureResult() {},
       };
       return {
         observations,

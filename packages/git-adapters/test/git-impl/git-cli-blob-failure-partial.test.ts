@@ -18,6 +18,7 @@ import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  GitCliAdapter,
   createGitCliAdapterForTesting,
   type GitCliProcessFactory,
 } from "../../src/git-impl/git-cli-adapter.js";
@@ -504,6 +505,21 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
         },
       );
       const version = await adapter.validateGitExecutable();
+      const walkAdapter = new GitCliAdapter({
+        tracer: trace.getTracer(recording ? "parity-walk-recording" : "parity-walk-noop"),
+        metricRecorder: recording
+          ? createGitMetricRecorder(meter as unknown as Meter, "git-cli", timing())
+          : NOOP_GIT_METRIC_RECORDER,
+        parentContext: ROOT_CONTEXT,
+      });
+      const walk = walkAdapter.walkCommits(data.path, data.child as never)[Symbol.asyncIterator]();
+      const commits: string[] = [];
+      for (;;) {
+        const result = await walk.next();
+        if (result.done) break;
+        commits.push(result.value.oid);
+      }
+      await walkAdapter[Symbol.asyncDispose]();
       const iterator = adapter
         .getFileBlobChanges(data.path, data.child as never, data.parent as never)
         [Symbol.asyncIterator]();
@@ -518,6 +534,7 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
         starts,
         requests,
         version,
+        commits,
         values: values.map((value) => ({
           status: value.status,
           before: value.before?.content,
@@ -530,6 +547,7 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
     expect(withTelemetry.starts).toEqual(withoutTelemetry.starts);
     expect(withTelemetry.requests).toEqual(withoutTelemetry.requests);
     expect(withTelemetry.version).toEqual(withoutTelemetry.version);
+    expect(withTelemetry.commits).toEqual(withoutTelemetry.commits);
     expect(withTelemetry.values).toEqual(withoutTelemetry.values);
     expect(withTelemetry.starts).toEqual([
       { kind: "commit-batch", command: "git", args: ["-C", data.path, "cat-file", "--batch"] },

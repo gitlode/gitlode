@@ -3,10 +3,8 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createDagTelemetryBinding, createGitMetricRecorder } from "@gitlode/git-adapters";
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
-import type { Meter } from "@opentelemetry/api";
 import { ROOT_CONTEXT, metrics, trace } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -22,23 +20,27 @@ import { makeTracer } from "../support/otel-fakes.js";
 
 const tempDirs: string[] = [];
 
-class RecordingMeter {
-  readonly creations: Array<{ name: string; kind: "counter" | "histogram" }> = [];
+class RecordingGitMetricRecorder {
+  constructor(private readonly adapter: "isomorphic-git" | "git-cli") {}
   readonly calls: Array<{ name: string; value: number; attributes: Record<string, unknown> }> = [];
-  createCounter(name: string) {
-    this.creations.push({ name, kind: "counter" });
-    return {
-      add: (value: number, attributes: Record<string, unknown>) =>
-        this.calls.push({ name, value, attributes }),
-    };
+  recordCommitYielded(strategy: string, hasExclusion: boolean) {
+    this.calls.push({
+      name: "gitlode.git.commit.yielded",
+      value: 1,
+      attributes: {
+        "gitlode.git.adapter": this.adapter,
+        "gitlode.git.commit.walk.strategy": strategy,
+        "gitlode.git.commit.walk.has_exclusion": hasExclusion,
+      },
+    });
   }
-  createHistogram(name: string) {
-    this.creations.push({ name, kind: "histogram" });
-    return {
-      record: (value: number, attributes: Record<string, unknown>) =>
-        this.calls.push({ name, value, attributes }),
-    };
+  recordCommitObjectRead() {}
+  recordObjectCacheLookup() {}
+  recordFileChangeYielded() {}
+  startBlobRead() {
+    return {} as never;
   }
+  completeBlobRead() {}
 }
 
 const testGitTelemetry = {
@@ -553,7 +555,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
   ) {
     const telemetryTracer = makeTracer();
-    const meter = new RecordingMeter();
+    const metricRecorder = new RecordingGitMetricRecorder(gitAdapter);
     const result = await executeWorkerRunRequest(
       await createOneCommitRequest(gitAdapter),
       { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
@@ -561,17 +563,14 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       {
         executionTracer: telemetryTracer.tracer,
         extractionTracer: telemetryTracer.tracer,
-        extractionMeter: meter as unknown as Meter,
+        extractionMeter: metrics.getMeter("gitlode.test.extraction"),
         gitTracer: telemetryTracer.tracer,
-        gitMetricRecorder: createGitMetricRecorder(meter as unknown as Meter, gitAdapter),
-        dagTelemetryBinding: createDagTelemetryBinding(
-          telemetryTracer.tracer,
-          meter as unknown as Meter,
-        ),
+        gitMetricRecorder: metricRecorder as never,
+        dagTelemetryBinding: testGitTelemetry.dagTelemetryBinding,
         rootContext: ROOT_CONTEXT,
       },
     );
-    return { result, telemetryTracer, meter };
+    return { result, telemetryTracer, metricRecorder };
   }
 
   it.each([
@@ -593,7 +592,8 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     ["phase-certified-timestamp", "phase-certified-timestamp"],
   ] as const)("records the actual %s strategy owner", async (value, strategy) => {
     const environment = value === undefined ? {} : { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: value };
-    const { result, telemetryTracer, meter } = await runWithRecordingTelemetry(environment);
+    const { result, telemetryTracer, metricRecorder } =
+      await runWithRecordingTelemetry(environment);
     expect(result.kind).toBe("success");
     const walkSpans = telemetryTracer.starts.filter(
       ({ name }) => name === "gitlode.git.commit.walk",
@@ -612,7 +612,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     expect(walk.span.statuses).toEqual([]);
     expect(walk.span.exceptions).toHaveLength(0);
     expect(walk.span.endCount).toBe(1);
-    expect(meter.calls.filter((call) => call.name === "gitlode.git.commit.yielded")).toEqual([
+    expect(metricRecorder.calls).toEqual([
       {
         name: "gitlode.git.commit.yielded",
         value: 1,
@@ -641,19 +641,19 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
   });
 
   it("does not start the isomorphic walk for an invalid strategy with actual telemetry", async () => {
-    const { result, telemetryTracer, meter } = await runWithRecordingTelemetry({
+    const { result, telemetryTracer, metricRecorder } = await runWithRecordingTelemetry({
       GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad",
     });
     expect(result.kind).toBe("user-error");
     expect(telemetryTracer.starts.filter(({ name }) => name === "gitlode.git.commit.walk")).toEqual(
       [],
     );
-    expect(meter.calls.filter((call) => call.name === "gitlode.git.commit.yielded")).toEqual([]);
+    expect(metricRecorder.calls).toEqual([]);
     expect(JSON.stringify(telemetryTracer.starts)).not.toContain("exception");
   });
 
   it("records the ignored invalid environment on the actual Git CLI owner", async () => {
-    const { result, telemetryTracer, meter } = await runWithRecordingTelemetry(
+    const { result, telemetryTracer, metricRecorder } = await runWithRecordingTelemetry(
       { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" },
       "git-cli",
     );
@@ -675,7 +675,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     expect(walk.span.statuses).toEqual([]);
     expect(walk.span.exceptions).toHaveLength(0);
     expect(walk.span.endCount).toBe(1);
-    expect(meter.calls.filter((call) => call.name === "gitlode.git.commit.yielded")).toEqual([
+    expect(metricRecorder.calls).toEqual([
       {
         name: "gitlode.git.commit.yielded",
         value: 1,
@@ -686,9 +686,9 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
         },
       },
     ]);
-    expect(JSON.stringify({ spans: telemetryTracer.starts, calls: meter.calls })).not.toContain(
-      "bad",
-    );
+    expect(
+      JSON.stringify({ spans: telemetryTracer.starts, calls: metricRecorder.calls }),
+    ).not.toContain("bad");
   });
 
   it("ignores invalid strategy environment on the actual git-cli runtime path", async () => {

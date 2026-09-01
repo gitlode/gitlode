@@ -67,8 +67,11 @@ export function createAsyncIterableInstrumenter(
               onError(span, error);
             } catch {
               // Telemetry policy failures must not replace the application failure.
-            } finally {
+            }
+            try {
               finish("error");
+            } catch {
+              // Completion callback failures must not replace the application failure.
             }
           }
           throw error;

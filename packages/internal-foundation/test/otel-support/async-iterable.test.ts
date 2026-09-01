@@ -341,6 +341,29 @@ describe("instrumentAsyncIterable", () => {
     expect(starts[0]!.span.endCount).toBe(1);
   });
 
+  it("preserves application failure when error completion callback throws", async () => {
+    const failure = Symbol("source failure");
+    const completion = vi.fn(() => {
+      throw Symbol("completion failure");
+    });
+    const onError = vi.fn();
+    const { tracer, starts } = makeTracer();
+    const iterator = createAsyncIterableInstrumenter(completion, onError)(tracer, "stream", () =>
+      iterableFrom({
+        next: async () => {
+          throw failure;
+        },
+      }),
+    )[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toBe(failure);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+    await expect(iterator.return?.()).resolves.toEqual({ value: undefined, done: true });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(completion).toHaveBeenCalledOnce();
+    expect(completion).toHaveBeenCalledWith(starts[0]!.span, "error");
+    expect(starts[0]!.span.endCount).toBe(1);
+  });
+
   it("keeps the original failure and ends when custom error policy throws", async () => {
     const failure = Symbol("application failure");
     const { tracer, starts } = makeTracer();

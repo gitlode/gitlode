@@ -522,6 +522,11 @@ export class GitCliAdapter implements GitAdapter {
       this._metricRecorder,
       this._parentContext,
       this._processFactory,
+      () => {
+        if (this._fileBlobBatchSessions.get(repoPath) === session) {
+          this._fileBlobBatchSessions.delete(repoPath);
+        }
+      },
     );
     this._fileBlobBatchSessions.set(repoPath, session);
     return session;

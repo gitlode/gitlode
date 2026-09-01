@@ -50,6 +50,7 @@ export class GitCatFileBatchSession implements AsyncDisposable {
   private readonly _tracer: Tracer;
   private readonly _parent: Context;
   private readonly _processFactory: GitCliProcessFactory;
+  private readonly _onUnusable: () => void;
   private _child: GitCliProcess | undefined;
   private _closed: Promise<ProcessCloseResult> | undefined;
   private _objects: AsyncIterator<GitBatchObject> | undefined;
@@ -69,12 +70,14 @@ export class GitCatFileBatchSession implements AsyncDisposable {
     recorder: GitMetricRecorder,
     parent: Context,
     processFactory: GitCliProcessFactory = defaultProcessFactory,
+    onUnusable: () => undefined = () => undefined,
   ) {
     this._command = command;
     this._repoPath = repoPath;
     this._tracer = tracer;
     this._parent = parent;
     this._processFactory = processFactory;
+    this._onUnusable = onUnusable;
     this._recorder = recorder;
   }
 
@@ -216,6 +219,7 @@ export class GitCatFileBatchSession implements AsyncDisposable {
       this._child?.kill();
       if (this._closed) await this._closed;
       this._disposed = true;
+      this._onUnusable();
       this._span.setAttribute(attributeKey("git_cli_process_completion"), "error");
       setGitProcessError(this._span, error);
       this._span.end();

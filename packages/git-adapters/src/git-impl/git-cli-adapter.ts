@@ -625,8 +625,11 @@ async function* streamRevListBatchObjects(
       attributeKey("git_cli_process_completion"),
       revList ? "cancelled" : "error",
     );
-    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "error");
-    setGitProcessError(catFileSpan, error);
+    catFileSpan.setAttribute(
+      attributeKey("git_cli_process_completion"),
+      revList ? "error" : "cancelled",
+    );
+    setGitProcessError(revList ? catFileSpan : revListSpan, error);
     revListSpan.end();
     catFileSpan.end();
     throw new GitAdapterError(
@@ -646,11 +649,32 @@ async function* streamRevListBatchObjects(
     revList.stderr.on("data", (chunk: Buffer) => revListStderrChunks.push(chunk));
     catFile.stderr.on("data", (chunk: Buffer) => catFileStderrChunks.push(chunk));
     if (catFile.stdin === null) throw new Error("Git commit-batch process has no stdin");
-    pipeClosed = pipelineFactory(startedRevList.stdout, catFile.stdin).then(
-      () => undefined,
-      (error: unknown) => error,
-    );
+    try {
+      pipeClosed = pipelineFactory(startedRevList.stdout, catFile.stdin).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+    } catch (error) {
+      revList.kill();
+      catFile.kill();
+      await Promise.all([revListClosePromise, catFileClosed]);
+      revListSpan.setAttribute(attributeKey("git_cli_process_completion"), "cancelled");
+      catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "cancelled");
+      revListSpan.end();
+      catFileSpan.end();
+      throw new GitAdapterError(
+        `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(error)}`,
+        "UNKNOWN",
+        error,
+      );
+    }
   } catch (error) {
+    if (
+      error instanceof GitAdapterError &&
+      error.message.startsWith("Unexpected error piping rev-list output to cat-file:")
+    ) {
+      throw error;
+    }
     revList.kill();
     catFile.kill();
     await Promise.all([revListClosePromise, catFileClosed]);

@@ -82,7 +82,7 @@ export class GitCatFileBatchSession implements AsyncDisposable {
     if (this._disposed) {
       throw new GitAdapterError("cat-file batch session has already been disposed", "UNKNOWN");
     }
-    this._start();
+    await this._start();
     const child = this._child;
     const objects = this._objects;
     if (!child || !objects) throw new Error("Git commit-batch process did not start");
@@ -190,23 +190,37 @@ export class GitCatFileBatchSession implements AsyncDisposable {
     );
   }
 
-  private _start(): void {
+  private async _start(): Promise<void> {
     if (this._child) return;
     this._span = this._tracer.startSpan(
       "gitlode.git.cli.file_blob_batch",
       { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
       this._parent,
     );
-    const child = this._processFactory({
-      kind: "commit-batch",
-      command: this._command,
-      args: ["-C", this._repoPath, "cat-file", "--batch"],
-    });
-    this._child = child;
-    child.stderr.on("data", (chunk: Buffer) => this._stderrChunks.push(chunk));
-    child.stdin?.on("error", () => undefined);
-    this._closed = processClosed(child);
-    this._objects = parseBatchObjectStream(child.stdout)[Symbol.asyncIterator]();
+    try {
+      const child = this._processFactory({
+        kind: "commit-batch",
+        command: this._command,
+        args: ["-C", this._repoPath, "cat-file", "--batch"],
+      });
+      this._child = child;
+      const closed = processClosed(child);
+      this._closed = closed;
+      if (!child.stdout || !child.stderr || !child.stdin) {
+        throw new Error("Git commit-batch process has an invalid stream shape");
+      }
+      child.stderr.on("data", (chunk: Buffer) => this._stderrChunks.push(chunk));
+      child.stdin.on("error", () => undefined);
+      this._objects = parseBatchObjectStream(child.stdout)[Symbol.asyncIterator]();
+    } catch (error) {
+      this._child?.kill();
+      if (this._closed) await this._closed;
+      this._disposed = true;
+      this._span.setAttribute(attributeKey("git_cli_process_completion"), "error");
+      setGitProcessError(this._span, error);
+      this._span.end();
+      throw error;
+    }
   }
 
   private _stderrText(): string {

@@ -63,8 +63,13 @@ export function createAsyncIterableInstrumenter(
 
         const fail = (error: unknown): never => {
           if (!terminal && span) {
-            onError(span, error);
-            finish("error");
+            try {
+              onError(span, error);
+            } catch {
+              // Telemetry policy failures must not replace the application failure.
+            } finally {
+              finish("error");
+            }
           }
           throw error;
         };

@@ -2,6 +2,7 @@ import { PassThrough } from "node:stream";
 
 import {
   ROOT_CONTEXT,
+  SpanStatusCode,
   trace,
   type Context,
   type Span,
@@ -15,6 +16,7 @@ import {
   createGitCliAdapterForTesting,
   type GitCliProcessFactory,
 } from "../../src/git-impl/git-cli-adapter.js";
+import { GitCatFileBatchSession } from "../../src/git-impl/git-cli-cat-file-batch.js";
 import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
 interface FakeProcess {
@@ -59,7 +61,7 @@ function fakeProcess(): FakeProcess {
       process.killed++;
       process.stdout.end();
       process.stderr.end();
-      process.stdin.end();
+      process.stdin?.end();
       process.close(137);
       return true;
     },
@@ -157,6 +159,7 @@ type Scenario =
   | "cat-nonzero"
   | "parse"
   | "pipeline"
+  | "pipeline-sync"
   | "both-runtime"
   | "rev-runtime-pending"
   | "cat-runtime-pending";
@@ -206,11 +209,15 @@ async function runScenario(
     return process;
   };
   const pipeline =
-    scenario === "pipeline"
-      ? async () => {
+    scenario === "pipeline-sync"
+      ? () => {
           throw runtimeFailure;
         }
-      : undefined;
+      : scenario === "pipeline"
+        ? async () => {
+            throw runtimeFailure;
+          }
+        : undefined;
   const adapter = createGitCliAdapterForTesting(
     {
       ...adapterTelemetry("git-cli"),
@@ -316,6 +323,20 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
         expect(revList.killed).toBe(1);
         expect(revList.reaped).toBe(true);
       }
+      const revSpan = tracer.starts.find(
+        (entry) => entry.name === "gitlode.git.cli.rev_list",
+      )!.span;
+      const catSpan = tracer.starts.find(
+        (entry) => entry.name === "gitlode.git.cli.commit_batch",
+      )!.span;
+      const failedSpan = failedKind === "rev-list" ? revSpan : catSpan;
+      const cancelledSpan = failedKind === "rev-list" ? catSpan : revSpan;
+      expect(failedSpan.attributes["gitlode.git.cli.process.completion"]).toBe("error");
+      expect(failedSpan.status?.code).toBe(SpanStatusCode.ERROR);
+      expect(failedSpan.exceptions).toHaveLength(1);
+      expect(cancelledSpan.attributes["gitlode.git.cli.process.completion"]).toBe("cancelled");
+      expect(cancelledSpan.status).toBeUndefined();
+      expect(cancelledSpan.exceptions).toHaveLength(0);
       for (const entry of tracer.starts) expect(entry.span.endCount).toBe(1);
     },
   );
@@ -329,6 +350,7 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
     ["cat-nonzero", "exhaust", "error", "exited", "error"],
     ["parse", "exhaust", "error", "cancelled", "error"],
     ["pipeline", "exhaust", "error", "exited", "exited"],
+    ["pipeline-sync", "exhaust", "error", "cancelled", "cancelled"],
     ["both-runtime", "exhaust", "error", "error", "error"],
   ] as const)("classifies %s with %s", async (scenario, terminal, outer, revList, catFile) => {
     const result = await runScenario(scenario, terminal);
@@ -353,7 +375,7 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
         result.tracer.starts.find((entry) => entry.name === "gitlode.git.cli.commit_batch")!.parent,
       ),
     ).toBe(walk.span);
-    if (scenario === "pipeline") {
+    if (scenario === "pipeline" || scenario === "pipeline-sync") {
       expect(result.outward).toMatchObject({ code: "UNKNOWN" });
       expect((result.outward as { cause?: unknown }).cause).toBe(result.runtimeFailure);
       expect(String((result.outward as Error).message)).toContain(
@@ -385,4 +407,33 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
     const result = await runScenario("success", "throw");
     expect(result.outward).toBe(result.runtimeFailure);
   });
+
+  it.each(["startup throw", "missing stdin"] as const)(
+    "closes persistent batch span for %s",
+    async (failureCase) => {
+      const tracer = new RecordingTracer();
+      const process = fakeProcess();
+      const failure = new Error(`sentinel ${failureCase}`);
+      const factory: GitCliProcessFactory = () => {
+        if (failureCase === "startup throw") throw failure;
+        return Object.assign(process, { stdin: undefined });
+      };
+      const session = new GitCatFileBatchSession(
+        "sentinel executable",
+        "sentinel repository path",
+        tracer as unknown as Tracer,
+        adapterTelemetry("git-cli").metricRecorder,
+        ROOT_CONTEXT,
+        factory,
+      );
+      const outward = await session
+        .readBlob("sentinel-oid" as never)
+        .catch((error: unknown) => error);
+      expect(outward).toBeInstanceOf(Error);
+      expect(tracer.starts).toHaveLength(1);
+      expect(tracer.starts[0]!.span.endCount).toBe(1);
+      await session[Symbol.asyncDispose]();
+      expect(tracer.starts[0]!.span.endCount).toBe(1);
+    },
+  );
 });

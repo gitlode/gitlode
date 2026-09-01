@@ -186,10 +186,20 @@ describe("Git adapter production owner telemetry", () => {
         await iterator.next();
         await iterator.return?.();
         if (adapter instanceof GitCliAdapter) {
+          expect(
+            tracer.starts.filter((entry) => entry.name === "gitlode.git.cli.file_blob_batch"),
+          ).toHaveLength(0);
           const extractionContext = ROOT_CONTEXT.setValue(createContextKey("extraction"), true);
           await context.with(extractionContext, async () => {
             for await (const _change of adapter.getFileBlobChanges(repo, head as never)) break;
           });
+          await context.with(extractionContext, async () => {
+            for await (const _change of adapter.getFileBlobChanges(repo, head as never)) break;
+          });
+          const batchSpans = tracer.starts.filter(
+            (entry) => entry.name === "gitlode.git.cli.file_blob_batch",
+          );
+          expect(batchSpans).toHaveLength(1);
           const diffTree = tracer.starts.find(
             (entry) => entry.name === "gitlode.git.cli.diff_tree",
           )!;
@@ -235,16 +245,48 @@ describe("Git adapter production owner telemetry", () => {
       expect(walk.span.attributes["gitlode.stream.completion"]).toBe("exhausted");
       expect(walk.span.endCount).toBe(1);
       expect(walk.span.exceptions).toEqual([]);
-      expect(meter.creations).toEqual(
-        expect.arrayContaining([
-          "gitlode.git.commit.yielded",
-          "gitlode.git.object.read",
-          "gitlode.git.object.cache.lookup",
-          "gitlode.git.file_change.yielded",
-          "gitlode.git.blob.read.duration",
-        ]),
-      );
-      if (adapter instanceof GitCliAdapter) await adapter[Symbol.asyncDispose]();
+      const gitCreations = meter.creations.filter((name) => name.startsWith("gitlode.git."));
+      expect(gitCreations).toEqual([
+        "gitlode.git.commit.yielded",
+        "gitlode.git.object.read",
+        "gitlode.git.object.cache.lookup",
+        "gitlode.git.object.cache.hit",
+        "gitlode.git.file_change.yielded",
+        "gitlode.git.blob.read.duration",
+        "gitlode.git.blob.read.size",
+        "gitlode.git.blob.read.byte",
+      ]);
+      expect(new Set(gitCreations).size).toBe(gitCreations.length);
+      const commitYield = meter.adds.find((call) => call.name === "gitlode.git.commit.yielded");
+      expect(commitYield).toEqual({
+        name: "gitlode.git.commit.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": kind,
+          "gitlode.git.commit.walk.strategy":
+            kind === "git-cli" ? "git-cli-rev-list-stream" : "certified-lazy",
+          "gitlode.git.commit.walk.has_exclusion": false,
+        },
+      });
+      if (adapter instanceof GitCliAdapter) {
+        expect(meter.adds.some((call) => call.name === "gitlode.git.file_change.yielded")).toBe(
+          true,
+        );
+        expect(meter.adds.some((call) => call.name === "gitlode.git.blob.read.duration")).toBe(
+          true,
+        );
+      }
+      if (adapter instanceof GitCliAdapter) {
+        await adapter[Symbol.asyncDispose]();
+        const batchSpan = tracer.starts.find(
+          (entry) => entry.name === "gitlode.git.cli.file_blob_batch",
+        )!;
+        expect(batchSpan.span.attributes["gitlode.git.cli.process.completion"]).toBe("exited");
+        expect(batchSpan.span.attributes["gitlode.git.object.read.count"]).toBe(2);
+        expect(batchSpan.span.status).toBeUndefined();
+        expect(batchSpan.span.exceptions).toEqual([]);
+        expect(batchSpan.span.endCount).toBe(1);
+      }
     },
   );
 });

@@ -649,7 +649,7 @@ code or note remains, and the trunk session confirms the redesign complete.
 | T05  | complete | Bounded span and metric collection, diagnostics, catalog filtering, canonical report building, and all limit contracts reviewed; 886 tests pass                           |
 | T06  | complete | Explicit providers, async root context, idempotent best-effort finalization, no-op degradation, and lifecycle fault isolation reviewed; 918 tests pass                    |
 | T07  | complete | Execution setup and extraction owners migrated with explicit OTel context flow, bounded domain metrics, partial-effect semantics, and owner evidence; full 941 tests pass |
-| T08  | pending  | —                                                                                                                                                                         |
+| T08  | complete | Generic DAG observation hooks and Git-owned OTel bindings reviewed with exact lifecycle, fallback, partial-work, and owner evidence; focused 354 tests pass               |
 | T09  | pending  | —                                                                                                                                                                         |
 | T10  | pending  | —                                                                                                                                                                         |
 | T11  | pending  | —                                                                                                                                                                         |

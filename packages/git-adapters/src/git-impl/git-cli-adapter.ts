@@ -54,10 +54,15 @@ export interface GitCliAdapterDependencies {
   readonly gitExecutable?: string;
 }
 
-interface GitCliProcessStart {
+export interface GitCliProcessStart {
   readonly kind: "rev-list" | "commit-batch";
   readonly command: string;
   readonly args: readonly string[];
+}
+
+export interface GitCliCommandObserver {
+  readonly onCommand?: (command: string, args: readonly string[]) => void;
+  readonly onProcessStart?: (start: GitCliProcessStart) => void;
 }
 
 type GitCliPipeline = (source: Readable, destination: Writable) => Promise<void>;
@@ -67,6 +72,7 @@ export type { GitCliProcessFactory } from "./git-cli-cat-file-batch.js";
 interface GitCliProcessSeam {
   readonly processFactory: GitCliProcessFactory;
   readonly pipeline: GitCliPipeline;
+  readonly commandObserver?: GitCliCommandObserver;
 }
 
 const internalSeams = new WeakMap<GitCliAdapter, GitCliProcessSeam>();
@@ -551,7 +557,9 @@ export class GitCliAdapter implements GitAdapter {
   }
 
   private async _runGitRaw(args: readonly string[]): Promise<GitCommandResult> {
-    return await runCommand(this._gitExecutable, args);
+    return await runCommand(this._gitExecutable, args, {
+      observer: internalSeams.get(this)?.commandObserver,
+    });
   }
 
   private async _runGitBuffer(
@@ -560,6 +568,7 @@ export class GitCliAdapter implements GitAdapter {
   ): Promise<GitCommandBufferResult> {
     return await runCommand(this._gitExecutable, ["-C", repoPath, ...args], {
       encoding: "buffer",
+      observer: internalSeams.get(this)?.commandObserver,
     });
   }
 }
@@ -864,22 +873,35 @@ async function* streamRevListBatchObjects(
 function runCommand(
   command: string,
   args: readonly string[],
-  options: { readonly stdin?: string; readonly encoding: "buffer" },
+  options: {
+    readonly stdin?: string;
+    readonly encoding: "buffer";
+    readonly observer?: GitCliCommandObserver;
+  },
 ): Promise<{ readonly stdout: Buffer; readonly stderr: Buffer; readonly code: number }>;
 function runCommand(
   command: string,
   args: readonly string[],
-  options?: { readonly stdin?: string; readonly encoding?: "utf8" },
+  options?: {
+    readonly stdin?: string;
+    readonly encoding?: "utf8";
+    readonly observer?: GitCliCommandObserver;
+  },
 ): Promise<GitCommandResult>;
 function runCommand(
   command: string,
   args: readonly string[],
-  options: { readonly stdin?: string; readonly encoding?: "utf8" | "buffer" } = {},
+  options: {
+    readonly stdin?: string;
+    readonly encoding?: "utf8" | "buffer";
+    readonly observer?: GitCliCommandObserver;
+  } = {},
 ): Promise<
   GitCommandResult | { readonly stdout: Buffer; readonly stderr: Buffer; readonly code: number }
 > {
   const encoding = options.encoding ?? "utf8";
   return new Promise((resolve, reject) => {
+    options.observer?.onCommand?.(command, args);
     const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"] });
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];

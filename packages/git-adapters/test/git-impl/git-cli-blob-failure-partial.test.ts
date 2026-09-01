@@ -1,8 +1,10 @@
+import { spawn } from "node:child_process";
 import nodeFs from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import { createMonotonicTiming, TELEMETRY_METRICS } from "@gitlode/internal-contracts/telemetry";
@@ -20,6 +22,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   GitCliAdapter,
   createGitCliAdapterForTesting,
+  type GitCliCommandObserver,
+  type GitCliProcessStart,
   type GitCliProcessFactory,
 } from "../../src/git-impl/git-cli-adapter.js";
 import type { GitCliProcess } from "../../src/git-impl/git-cli-cat-file-batch.js";
@@ -305,6 +309,42 @@ const timing = () => {
 };
 const temps: string[] = [];
 
+type ObservedProcess = GitCliProcessStart & {
+  closeCode: number | null | undefined;
+  killCount: number;
+  reaped: boolean;
+};
+
+function realProcessFactory(
+  processes: ObservedProcess[],
+  requests: string[],
+): GitCliProcessFactory {
+  return (start) => {
+    const record: ObservedProcess = { ...start, closeCode: undefined, killCount: 0, reaped: false };
+    processes.push(record);
+    const child = spawn(start.command, start.args, {
+      stdio: start.kind === "rev-list" ? ["ignore", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
+    });
+    if (start.kind === "commit-batch") {
+      child.stdin?.on("data", (chunk) => {
+        for (const request of String(chunk).split("\n")) {
+          if (request.trim().length > 0) requests.push(request.trim());
+        }
+      });
+    }
+    child.once("close", (code) => {
+      record.closeCode = code;
+      record.reaped = true;
+    });
+    const originalKill = child.kill.bind(child);
+    child.kill = ((signal?: NodeJS.Signals | number) => {
+      record.killCount += 1;
+      return originalKill(signal);
+    }) as typeof child.kill;
+    return child as unknown as GitCliProcess;
+  };
+}
+
 function makeAdapter(
   tracer: TracerRecording,
   meter: MeterRecording,
@@ -482,44 +522,36 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
     temps.push(data.path);
     const run = async (recording: boolean) => {
       const requests: string[] = [];
-      const starts: Array<{ kind: string; command: string; args: readonly string[] }> = [];
+      const processes: ObservedProcess[] = [];
+      const commands: Array<{ command: string; args: readonly string[] }> = [];
       const meter = new MeterRecording();
+      const tracer = recording ? new TracerRecording() : undefined;
+      const observer: GitCliCommandObserver = {
+        onCommand: (command, args) => commands.push({ command, args }),
+      };
       const adapter = createGitCliAdapterForTesting(
         {
-          tracer: trace.getTracer(recording ? "parity-recording" : "parity-noop"),
+          tracer: (tracer ?? trace.getTracer("parity-noop")) as unknown as Tracer,
           metricRecorder: recording
             ? createGitMetricRecorder(meter as unknown as Meter, "git-cli", timing())
             : NOOP_GIT_METRIC_RECORDER,
           parentContext: ROOT_CONTEXT,
         },
         {
-          processFactory: processFactory(
-            new TracerRecording(),
-            requests,
-            data.bodies,
-            "success",
-            undefined,
-            starts,
-          ),
-          pipeline: async () => undefined,
+          processFactory: realProcessFactory(processes, requests),
+          pipeline: (source, destination) => pipeline(source, destination),
+          commandObserver: observer,
         },
       );
       const version = await adapter.validateGitExecutable();
-      const walkAdapter = new GitCliAdapter({
-        tracer: trace.getTracer(recording ? "parity-walk-recording" : "parity-walk-noop"),
-        metricRecorder: recording
-          ? createGitMetricRecorder(meter as unknown as Meter, "git-cli", timing())
-          : NOOP_GIT_METRIC_RECORDER,
-        parentContext: ROOT_CONTEXT,
-      });
-      const walk = walkAdapter.walkCommits(data.path, data.child as never)[Symbol.asyncIterator]();
+      const format = await adapter.getRepositoryObjectFormat(data.path);
+      const walk = adapter.walkCommits(data.path, data.child as never)[Symbol.asyncIterator]();
       const commits: string[] = [];
       for (;;) {
         const result = await walk.next();
         if (result.done) break;
         commits.push(result.value.oid);
       }
-      await walkAdapter[Symbol.asyncDispose]();
       const iterator = adapter
         .getFileBlobChanges(data.path, data.child as never, data.parent as never)
         [Symbol.asyncIterator]();
@@ -531,10 +563,14 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       }
       await adapter[Symbol.asyncDispose]();
       return {
-        starts,
+        commands,
+        processes,
         requests,
         version,
+        format,
         commits,
+        spanNames: tracer?.starts.map((entry) => entry.name) ?? [],
+        metricCalls: meter.calls,
         values: values.map((value) => ({
           status: value.status,
           before: value.before?.content,
@@ -544,12 +580,83 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
     };
     const withoutTelemetry = await run(false);
     const withTelemetry = await run(true);
-    expect(withTelemetry.starts).toEqual(withoutTelemetry.starts);
+    expect(withTelemetry.commands).toEqual(withoutTelemetry.commands);
+    expect(
+      withTelemetry.processes.map(({ kind, command, args, closeCode, killCount, reaped }) => ({
+        kind,
+        command,
+        args,
+        closeCode,
+        killCount,
+        reaped,
+      })),
+    ).toEqual(
+      withoutTelemetry.processes.map(({ kind, command, args, closeCode, killCount, reaped }) => ({
+        kind,
+        command,
+        args,
+        closeCode,
+        killCount,
+        reaped,
+      })),
+    );
     expect(withTelemetry.requests).toEqual(withoutTelemetry.requests);
     expect(withTelemetry.version).toEqual(withoutTelemetry.version);
+    expect(withTelemetry.format).toEqual(withoutTelemetry.format);
     expect(withTelemetry.commits).toEqual(withoutTelemetry.commits);
+    expect(withoutTelemetry.spanNames).toEqual([]);
+    expect(withoutTelemetry.metricCalls).toEqual([]);
+    expect(new Set(withTelemetry.spanNames)).toEqual(
+      new Set([
+        "gitlode.git.cli.version.check",
+        "gitlode.git.repository_object_format",
+        "gitlode.git.commit.walk",
+        "gitlode.git.cli.rev_list",
+        "gitlode.git.cli.commit_batch",
+        "gitlode.git.cli.diff_tree",
+        "gitlode.git.cli.file_blob_batch",
+      ]),
+    );
+    expect(new Set(withTelemetry.metricCalls.map((call) => call.name))).toEqual(
+      new Set([
+        "gitlode.git.commit.yielded",
+        "gitlode.git.object.read",
+        "gitlode.git.file_change.yielded",
+        "gitlode.git.blob.read.duration",
+        "gitlode.git.blob.read.size",
+        "gitlode.git.blob.read.byte",
+      ]),
+    );
     expect(withTelemetry.values).toEqual(withoutTelemetry.values);
-    expect(withTelemetry.starts).toEqual([
+    expect(withTelemetry.commands.map(({ command, args }) => ({ command, args }))).toEqual([
+      { command: "git", args: ["--version"] },
+      { command: "git", args: ["-C", data.path, "config", "--get", "extensions.objectFormat"] },
+      {
+        command: "git",
+        args: [
+          "-C",
+          data.path,
+          "diff-tree",
+          "--no-commit-id",
+          "--raw",
+          "--no-abbrev",
+          "-r",
+          "-z",
+          "--no-renames",
+          data.parent,
+          data.child,
+        ],
+      },
+    ]);
+    expect(
+      withTelemetry.processes.map(({ kind, command, args }) => ({ kind, command, args })),
+    ).toEqual([
+      {
+        kind: "rev-list",
+        command: "git",
+        args: ["-C", data.path, "rev-list", "--topo-order", data.child],
+      },
+      { kind: "commit-batch", command: "git", args: ["-C", data.path, "cat-file", "--batch"] },
       { kind: "commit-batch", command: "git", args: ["-C", data.path, "cat-file", "--batch"] },
     ]);
   });

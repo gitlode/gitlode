@@ -6,7 +6,14 @@ import { PassThrough } from "node:stream";
 
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import { createMonotonicTiming, TELEMETRY_METRICS } from "@gitlode/internal-contracts/telemetry";
-import { ROOT_CONTEXT, type Context, type Meter, type Span, type Tracer } from "@opentelemetry/api";
+import {
+  ROOT_CONTEXT,
+  trace,
+  type Context,
+  type Meter,
+  type Span,
+  type Tracer,
+} from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -15,7 +22,10 @@ import {
   type GitCliProcessFactory,
 } from "../../src/git-impl/git-cli-adapter.js";
 import type { GitCliProcess } from "../../src/git-impl/git-cli-cat-file-batch.js";
-import { createGitMetricRecorder } from "../../src/git-impl/git-metric-recorder.js";
+import {
+  NOOP_GIT_METRIC_RECORDER,
+  createGitMetricRecorder,
+} from "../../src/git-impl/git-metric-recorder.js";
 
 type Call = { name: string; value: number; attributes: Record<string, unknown> };
 
@@ -111,8 +121,10 @@ function processFactory(
   bodies: Map<string, Buffer>,
   mode: FailureMode,
   runtimeFailure = new Error("sentinel CLI runtime failure"),
+  starts: Array<{ kind: string; command: string; args: readonly string[] }> = [],
 ): GitCliProcessFactory {
-  return () => {
+  return (start) => {
+    starts.push({ kind: start.kind, command: start.command, args: start.args });
     const stdout = new PassThrough();
     const stderr = new PassThrough();
     const stdin = new PassThrough();
@@ -463,6 +475,63 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       expect(span.span.endSnapshots[0]?.reaped).toBe(true);
     },
   );
+
+  it("keeps Git CLI commands and blob requests identical with and without telemetry", async () => {
+    const data = await fixture();
+    temps.push(data.path);
+    const run = async (recording: boolean) => {
+      const requests: string[] = [];
+      const starts: Array<{ kind: string; command: string; args: readonly string[] }> = [];
+      const meter = new MeterRecording();
+      const adapter = createGitCliAdapterForTesting(
+        {
+          tracer: trace.getTracer(recording ? "parity-recording" : "parity-noop"),
+          metricRecorder: recording
+            ? createGitMetricRecorder(meter as unknown as Meter, "git-cli", timing())
+            : NOOP_GIT_METRIC_RECORDER,
+          parentContext: ROOT_CONTEXT,
+        },
+        {
+          processFactory: processFactory(
+            new TracerRecording(),
+            requests,
+            data.bodies,
+            "success",
+            undefined,
+            starts,
+          ),
+          pipeline: async () => undefined,
+        },
+      );
+      const iterator = adapter
+        .getFileBlobChanges(data.path, data.child as never, data.parent as never)
+        [Symbol.asyncIterator]();
+      const values = [];
+      for (;;) {
+        const result = await iterator.next();
+        if (result.done) break;
+        values.push(result.value);
+      }
+      await adapter[Symbol.asyncDispose]();
+      return {
+        starts,
+        requests,
+        values: values.map((value) => ({
+          status: value.status,
+          before: value.before?.content,
+          after: value.after?.content,
+        })),
+      };
+    };
+    const withoutTelemetry = await run(false);
+    const withTelemetry = await run(true);
+    expect(withTelemetry.starts).toEqual(withoutTelemetry.starts);
+    expect(withTelemetry.requests).toEqual(withoutTelemetry.requests);
+    expect(withTelemetry.values).toEqual(withoutTelemetry.values);
+    expect(withTelemetry.starts).toEqual([
+      { kind: "commit-batch", command: "git", args: ["-C", data.path, "cat-file", "--batch"] },
+    ]);
+  });
 });
 
 afterEach(async () => {

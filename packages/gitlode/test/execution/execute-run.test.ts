@@ -3,8 +3,10 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { createDagTelemetryBinding, createGitMetricRecorder } from "@gitlode/git-adapters";
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
+import type { Meter } from "@opentelemetry/api";
 import { ROOT_CONTEXT, metrics, trace } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +21,25 @@ import type { StateStore } from "../../src/state/index.js";
 import { makeTracer } from "../support/otel-fakes.js";
 
 const tempDirs: string[] = [];
+
+class RecordingMeter {
+  readonly creations: Array<{ name: string; kind: "counter" | "histogram" }> = [];
+  readonly calls: Array<{ name: string; value: number; attributes: Record<string, unknown> }> = [];
+  createCounter(name: string) {
+    this.creations.push({ name, kind: "counter" });
+    return {
+      add: (value: number, attributes: Record<string, unknown>) =>
+        this.calls.push({ name, value, attributes }),
+    };
+  }
+  createHistogram(name: string) {
+    this.creations.push({ name, kind: "histogram" });
+    return {
+      record: (value: number, attributes: Record<string, unknown>) =>
+        this.calls.push({ name, value, attributes }),
+    };
+  }
+}
 
 const testGitTelemetry = {
   gitTracer: trace.getTracer("gitlode.test.git"),
@@ -527,6 +548,32 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     );
   }
 
+  async function runWithRecordingTelemetry(
+    environment: Readonly<Record<string, string | undefined>>,
+    gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
+  ) {
+    const telemetryTracer = makeTracer();
+    const meter = new RecordingMeter();
+    const result = await executeWorkerRunRequest(
+      await createOneCommitRequest(gitAdapter),
+      { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+      { environment },
+      {
+        executionTracer: telemetryTracer.tracer,
+        extractionTracer: telemetryTracer.tracer,
+        extractionMeter: meter as unknown as Meter,
+        gitTracer: telemetryTracer.tracer,
+        gitMetricRecorder: createGitMetricRecorder(meter as unknown as Meter, gitAdapter),
+        dagTelemetryBinding: createDagTelemetryBinding(
+          telemetryTracer.tracer,
+          meter as unknown as Meter,
+        ),
+        rootContext: ROOT_CONTEXT,
+      },
+    );
+    return { result, telemetryTracer, meter };
+  }
+
   it.each([
     [undefined, "certified-lazy"],
     ["phase-certified-fifo", "phase-certified-fifo"],
@@ -540,6 +587,45 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     expect(result.success.commitsTraversed).toBe(1);
   });
 
+  it.each([
+    [undefined, "certified-lazy"],
+    ["phase-certified-fifo", "phase-certified-fifo"],
+    ["phase-certified-timestamp", "phase-certified-timestamp"],
+  ] as const)("records the actual %s strategy owner", async (value, strategy) => {
+    const environment = value === undefined ? {} : { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: value };
+    const { result, telemetryTracer, meter } = await runWithRecordingTelemetry(environment);
+    expect(result.kind).toBe("success");
+    const walkSpans = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.commit.walk",
+    );
+    expect(walkSpans).toHaveLength(1);
+    const walk = walkSpans[0]!;
+    expect(walk.options?.attributes).toEqual({
+      "gitlode.git.adapter": "isomorphic-git",
+      "gitlode.git.commit.walk.strategy": strategy,
+      "gitlode.git.commit.walk.has_exclusion": false,
+    });
+    expect(walk.parent).toBe(ROOT_CONTEXT);
+    expect(walk.span.attributes).toEqual({
+      "gitlode.stream.completion": "exhausted",
+    });
+    expect(walk.span.statuses).toEqual([]);
+    expect(walk.span.exceptions).toHaveLength(0);
+    expect(walk.span.endCount).toBe(1);
+    expect(meter.calls.filter((call) => call.name === "gitlode.git.commit.yielded")).toEqual([
+      {
+        name: "gitlode.git.commit.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": "isomorphic-git",
+          "gitlode.git.commit.walk.strategy": strategy,
+          "gitlode.git.commit.walk.has_exclusion": false,
+        },
+      },
+    ]);
+    expect(walk.span.endCount).toBe(1);
+  });
+
   it("returns a user error for invalid isomorphic-git strategy environment", async () => {
     const result = await runWithEnvironment({ GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" });
     expect(result).toMatchObject({ kind: "user-error" });
@@ -551,6 +637,57 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     expect(result.kind === "user-error" ? result.message : "").toContain("phase-certified-fifo");
     expect(result.kind === "user-error" ? result.message : "").toContain(
       "phase-certified-timestamp",
+    );
+  });
+
+  it("does not start the isomorphic walk for an invalid strategy with actual telemetry", async () => {
+    const { result, telemetryTracer, meter } = await runWithRecordingTelemetry({
+      GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad",
+    });
+    expect(result.kind).toBe("user-error");
+    expect(telemetryTracer.starts.filter(({ name }) => name === "gitlode.git.commit.walk")).toEqual(
+      [],
+    );
+    expect(meter.calls.filter((call) => call.name === "gitlode.git.commit.yielded")).toEqual([]);
+    expect(JSON.stringify(telemetryTracer.starts)).not.toContain("exception");
+  });
+
+  it("records the ignored invalid environment on the actual Git CLI owner", async () => {
+    const { result, telemetryTracer, meter } = await runWithRecordingTelemetry(
+      { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" },
+      "git-cli",
+    );
+    expect(result.kind).toBe("success");
+    const walkSpans = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.commit.walk",
+    );
+    expect(walkSpans).toHaveLength(1);
+    const walk = walkSpans[0]!;
+    expect(walk.options?.attributes).toEqual({
+      "gitlode.git.adapter": "git-cli",
+      "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
+      "gitlode.git.commit.walk.has_exclusion": false,
+    });
+    expect(walk.parent).toBe(ROOT_CONTEXT);
+    expect(walk.span.attributes).toEqual({
+      "gitlode.stream.completion": "exhausted",
+    });
+    expect(walk.span.statuses).toEqual([]);
+    expect(walk.span.exceptions).toHaveLength(0);
+    expect(walk.span.endCount).toBe(1);
+    expect(meter.calls.filter((call) => call.name === "gitlode.git.commit.yielded")).toEqual([
+      {
+        name: "gitlode.git.commit.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": "git-cli",
+          "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
+          "gitlode.git.commit.walk.has_exclusion": false,
+        },
+      },
+    ]);
+    expect(JSON.stringify({ spans: telemetryTracer.starts, calls: meter.calls })).not.toContain(
+      "bad",
     );
   });
 

@@ -1,6 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-import { walkDagNodeIdsCertifiedLazy } from "@gitlode/internal-foundation/dag";
+import {
+  walkDagNodeIdsCertifiedLazy,
+  walkDagNodeIdsEagerExclude,
+} from "@gitlode/internal-foundation/dag";
 import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import {
   context,
@@ -231,6 +234,23 @@ describe("Git-owned DAG telemetry binding", () => {
       "exhausted",
     );
     expect(tracer.starts[0]?.span.endCount).toBe(1);
+    await binding.instrumentCertifiedClosure(
+      {
+        getSuccessors: async (node: string) =>
+          node === "root"
+            ? [{ nodeId: "left" }, { nodeId: "right" }]
+            : node === "left" || node === "right"
+              ? [{ nodeId: "join" }]
+              : node === "join"
+                ? [{ nodeId: "outside" }]
+                : [],
+      },
+      "root",
+    );
+    expect(tracer.starts[1]?.span.attributes["gitlode.dag.certified_closure.result"]).toBe(
+      "closed-boundary",
+    );
+    expect(tracer.starts[1]?.span.endCount).toBe(1);
     const failure = new Error("closure failure");
     await expect(
       binding.instrumentCertifiedClosure(
@@ -242,9 +262,9 @@ describe("Git-owned DAG telemetry binding", () => {
         "root",
       ),
     ).rejects.toBe(failure);
-    expect(tracer.starts[1]?.span.status?.code).toBe(2);
-    expect(tracer.starts[1]?.span.exceptions).toEqual([failure]);
-    expect(tracer.starts[1]?.span.endCount).toBe(1);
+    expect(tracer.starts[2]?.span.status?.code).toBe(2);
+    expect(tracer.starts[2]?.span.exceptions).toEqual([failure]);
+    expect(tracer.starts[2]?.span.endCount).toBe(1);
   });
 
   it("records certified-lazy fallback with exact bounded evidence and zero omission", async () => {
@@ -292,6 +312,49 @@ describe("Git-owned DAG telemetry binding", () => {
     expect(
       meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
     ).toHaveLength(1);
+  });
+
+  it("keeps eager certification evidence independent from certified-lazy fallback", async () => {
+    const eagerTracer = new RecordingTracer();
+    const eagerMeter = new RecordingMeter();
+    const eager = createDagTelemetryBinding(asTracer(eagerTracer), asMeter(eagerMeter));
+    await drain(
+      eager.instrumentDifference("eager-exclude", true, (observation) =>
+        walkDagNodeIdsEagerExclude(
+          { graph: { getSuccessors: async () => [] }, observation },
+          "head",
+          "exclude",
+        ),
+      ),
+    );
+    expect(eagerTracer.starts[0]?.span.attributes).toMatchObject({
+      "gitlode.dag.certification.result": "certified",
+      "gitlode.dag.termination.reason": "frontier-exhausted",
+      "gitlode.stream.completion": "exhausted",
+    });
+
+    const fallbackTracer = new RecordingTracer();
+    const fallbackMeter = new RecordingMeter();
+    const fallback = createDagTelemetryBinding(asTracer(fallbackTracer), asMeter(fallbackMeter));
+    await drain(
+      fallback.instrumentDifference("certified-lazy", true, (observation) =>
+        walkDagNodeIdsCertifiedLazy(
+          {
+            graph: {
+              getSuccessors: async (node: string) =>
+                node === "head" ? [{ nodeId: "headRoot" }] : [],
+            },
+            observation,
+          },
+          "head",
+          "exclude",
+        ),
+      ),
+    );
+    expect(fallbackTracer.starts[0]?.span.attributes).toMatchObject({
+      "gitlode.dag.certification.result": "fallback",
+      "gitlode.dag.fallback.reason": "open-include-path",
+    });
   });
 
   it("preserves difference partial metrics on cancellation and repeated terminals", async () => {
@@ -402,7 +465,10 @@ describe("Git-owned DAG telemetry binding", () => {
     await handledIterator.next();
     const handledResult = await handledIterator.throw?.(token);
     expect(handledResult).toEqual({ value: token, done: true });
-    expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("handled-throw");
+    expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("handled_throw");
+    expect(
+      meter.adds.find((call) => call.name === "gitlode.dag.operation.completion")?.attributes,
+    ).toMatchObject({ "gitlode.dag.operation.completion": "handled-throw" });
     expect(tracer.starts[0]?.span.endCount).toBe(1);
     const rethrowToken = { kind: "rethrow" };
     const rethrown = binding.instrumentDifference("eager-exclude", false, () => ({
@@ -426,6 +492,11 @@ describe("Git-owned DAG telemetry binding", () => {
     const tracer = new RecordingTracer();
     const meter = new RecordingMeter();
     const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
+    await drain(
+      binding.instrumentDifference("eager-exclude", false, async function* () {
+        yield "root";
+      }),
+    );
     await drain(binding.instrumentReachable({ getSuccessors: async () => [] }, ["root"]));
     await binding.instrumentCertifiedClosure({ getSuccessors: async () => [] }, "root");
     await drain(binding.instrumentReachable({ getSuccessors: async () => [] }, ["root"]));

@@ -105,11 +105,7 @@ export function bindDagObservation(
       if (context.operation !== "certified-closure") {
         span.setAttribute(
           key("stream_completion"),
-          completion === "success"
-            ? "exhausted"
-            : completion === "handled_throw"
-              ? "handled-throw"
-              : completion,
+          completion === "success" ? "exhausted" : completion,
         );
       }
       operation.complete(

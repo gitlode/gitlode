@@ -147,6 +147,11 @@ export const NOOP_DAG_METRIC_RECORDER = Object.freeze<DagMetricRecorder>({
 const instrumentDagStream = createAsyncIterableInstrumenter(() => {});
 
 export interface DagTelemetryBinding {
+  instrumentDifference<NodeId extends PropertyKey>(
+    strategy: TelemetryAttributeValue<"dag_strategy">,
+    hasExclusion: boolean,
+    walk: (observation: DagOperationObservation) => AsyncIterable<NodeId>,
+  ): AsyncIterable<NodeId>;
   instrumentReachable<NodeId extends PropertyKey, DomainHint = undefined>(
     graph: DagTopologyPort<NodeId, DomainHint>,
     nodeIds: Iterable<NodeId>,
@@ -162,6 +167,22 @@ export interface DagTelemetryBinding {
 export function createDagTelemetryBinding(tracer: Tracer, meter: Meter): DagTelemetryBinding {
   const recorder = createDagMetricRecorder(meter);
   return {
+    instrumentDifference(strategy, hasExclusion, walk) {
+      return instrumentDagStream(tracer, "gitlode.dag.traversal", (span) => {
+        const operation = recorder.startOperation({
+          operation: "difference",
+          strategy,
+          hasExclusion,
+        });
+        return walk(
+          bindDagObservation(span, operation, {
+            operation: "difference",
+            strategy,
+            hasExclusion,
+          }),
+        );
+      });
+    },
     instrumentReachable(graph, nodeIds, options = {}) {
       return instrumentDagStream(tracer, "gitlode.dag.reachable", (span) => {
         const operation = recorder.startOperation({ operation: "reachable" });

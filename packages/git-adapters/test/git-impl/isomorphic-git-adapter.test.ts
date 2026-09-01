@@ -26,6 +26,8 @@ function createAdapter(
     fs,
     instrumentation: overrides.instrumentation ?? noopInstrumentation,
     commitTraversalStrategy: overrides.commitTraversalStrategy,
+    dagTracer: overrides.dagTracer,
+    dagMeter: overrides.dagMeter,
   });
 }
 

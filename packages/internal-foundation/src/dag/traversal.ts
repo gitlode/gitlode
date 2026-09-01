@@ -145,6 +145,8 @@ export async function* walkDagNodeIdsCertifiedLazy<
       excludeNodeId,
       options,
     );
+    context.observation?.setCertificationResult("certified");
+    context.observation?.setTerminationReason("frontier-exhausted");
     complete("exhausted");
   } catch (error) {
     complete("error");

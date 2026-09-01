@@ -521,7 +521,7 @@ export class GitCliAdapter implements GitAdapter {
       this._tracer,
       this._metricRecorder,
       this._parentContext,
-      this._processFactory,
+      internalSeams.get(this)?.processFactory ?? this._processFactory,
       () => {
         if (this._fileBlobBatchSessions.get(repoPath) === session) {
           this._fileBlobBatchSessions.delete(repoPath);

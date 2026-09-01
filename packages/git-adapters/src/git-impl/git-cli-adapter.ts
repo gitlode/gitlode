@@ -571,7 +571,14 @@ async function* streamRevListBatchObjects(
   };
   let exited = false;
   let failure:
-    | { readonly owner: "rev-list" | "cat-file" | "pipeline"; readonly error: unknown }
+    | {
+        readonly owner: "rev-list" | "cat-file" | "parse" | "pipeline";
+        readonly outward: unknown;
+        readonly revListError?: unknown;
+        readonly catFileError?: unknown;
+        readonly revListTelemetryError?: GitAdapterError;
+        readonly catFileTelemetryError?: GitAdapterError;
+      }
     | undefined;
   let closeResults:
     | readonly [
@@ -586,54 +593,98 @@ async function* streamRevListBatchObjects(
     const [revListResult, catFileResult, pipeError] = closeResults;
     const revListStderr = Buffer.concat(revListStderrChunks).toString("utf8");
     const catFileStderr = Buffer.concat(catFileStderrChunks).toString("utf8");
-    if (!revListResult.ok) {
-      failure = { owner: "rev-list", error: revListResult.error };
-      throw new GitAdapterError(
-        `Unexpected error walking commits: ${formatUnknownError(revListResult.error)}`,
-        "UNKNOWN",
-        revListResult.error,
-      );
-    }
-    if (!catFileResult.ok) {
-      failure = { owner: "cat-file", error: catFileResult.error };
-      throw new GitAdapterError(
-        `Unexpected error reading commit batch: ${formatUnknownError(catFileResult.error)}`,
-        "UNKNOWN",
-        catFileResult.error,
-      );
+    if (!revListResult.ok || !catFileResult.ok) {
+      const revListRuntimeError = revListResult.ok ? undefined : revListResult.error;
+      const catFileRuntimeError = catFileResult.ok ? undefined : catFileResult.error;
+      const outward =
+        revListRuntimeError !== undefined
+          ? new GitAdapterError(
+              `Unexpected error walking commits: ${formatUnknownError(revListRuntimeError)}`,
+              "UNKNOWN",
+              revListRuntimeError,
+            )
+          : new GitAdapterError(
+              `Unexpected error reading commit batch: ${formatUnknownError(catFileRuntimeError)}`,
+              "UNKNOWN",
+              catFileRuntimeError,
+            );
+      failure = {
+        owner: revListRuntimeError !== undefined ? "rev-list" : "cat-file",
+        outward,
+        revListError: revListRuntimeError,
+        catFileError: catFileRuntimeError,
+      };
+      throw outward;
     }
     if (revListResult.code !== 0) {
+      if (isNotRepositoryError(revListStderr)) {
+        failure = {
+          owner: "rev-list",
+          outward: new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY"),
+          revListTelemetryError: new GitAdapterError(
+            "rev-list process exited unsuccessfully",
+            "UNKNOWN",
+          ),
+        };
+        throw failure.outward;
+      }
+      const result = { stdout: "", stderr: revListStderr, code: revListResult.code };
       failure = {
         owner: "rev-list",
-        error: new Error(revListStderr || `exit code ${revListResult.code}`),
+        outward: new GitAdapterError(
+          `Unexpected error walking commits: ${formatCommandFailure(result)}`,
+          "UNKNOWN",
+        ),
+        revListTelemetryError: new GitAdapterError(
+          "rev-list process exited unsuccessfully",
+          "UNKNOWN",
+        ),
       };
-      if (isNotRepositoryError(revListStderr))
-        throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
-      const result = { stdout: "", stderr: revListStderr, code: revListResult.code };
-      throw new GitAdapterError(
-        `Unexpected error walking commits: ${formatCommandFailure(result)}`,
-        "UNKNOWN",
-      );
+      throw failure.outward;
     }
     if (catFileResult.code !== 0) {
+      if (isNotRepositoryError(catFileStderr)) {
+        failure = {
+          owner: "cat-file",
+          outward: new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY"),
+          catFileTelemetryError: new GitAdapterError(
+            "commit-batch process exited unsuccessfully",
+            "UNKNOWN",
+          ),
+        };
+        throw failure.outward;
+      }
       failure = {
         owner: "cat-file",
-        error: new Error(catFileStderr || `exit code ${catFileResult.code}`),
+        outward: new GitAdapterError(
+          `Unexpected error reading commit batch: ${catFileStderr.trim()}`,
+          "UNKNOWN",
+        ),
+        catFileTelemetryError: new GitAdapterError(
+          "commit-batch process exited unsuccessfully",
+          "UNKNOWN",
+        ),
       };
-      if (isNotRepositoryError(catFileStderr))
-        throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
-      throw new GitAdapterError(
-        `Unexpected error reading commit batch: ${catFileStderr.trim()}`,
-        "UNKNOWN",
-      );
+      throw failure.outward;
     }
     if (pipeError !== undefined) {
-      failure = { owner: "pipeline", error: pipeError };
-      throw pipeError;
+      failure = {
+        owner: "pipeline",
+        outward: new GitAdapterError(
+          `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(pipeError)}`,
+          "UNKNOWN",
+          pipeError,
+        ),
+      };
+      throw failure.outward;
     }
     exited = true;
   } catch (error) {
-    failure ??= { owner: "cat-file", error };
+    failure ??= {
+      owner: "parse",
+      outward: error,
+      catFileError: error instanceof GitAdapterError ? undefined : error,
+    };
     throw error;
   } finally {
     if (!exited) {
@@ -645,16 +696,26 @@ async function* streamRevListBatchObjects(
       closeResults ?? (await Promise.all([revListClosed, catFileClosed, pipeClosed]));
     if (exited) {
       finalize("exited", "exited");
-    } else if (failure?.owner === "rev-list") {
-      finalize("error", catFileResult.ok ? "exited" : "cancelled", failure.error);
-    } else if (failure?.owner === "cat-file") {
-      finalize(revListResult.ok ? "exited" : "cancelled", "error", undefined, failure.error);
     } else if (failure === undefined) {
       finalize("cancelled", "cancelled");
+    } else if (failure.owner === "pipeline") {
+      finalize(
+        revListResult.ok && revListResult.code === 0 ? "exited" : "cancelled",
+        catFileResult.ok && catFileResult.code === 0 ? "exited" : "cancelled",
+      );
+    } else if (failure.owner === "parse") {
+      finalize(
+        revListResult.ok && revListResult.code === 0 ? "cancelled" : "error",
+        catFileResult.ok && catFileResult.code === 0 ? "cancelled" : "error",
+        failure.revListError ?? failure.revListTelemetryError,
+        failure.catFileError ?? failure.catFileTelemetryError,
+      );
     } else {
       finalize(
-        revListResult.ok ? "exited" : "cancelled",
-        catFileResult.ok ? "exited" : "cancelled",
+        revListResult.ok && revListResult.code === 0 ? "exited" : "error",
+        catFileResult.ok && catFileResult.code === 0 ? "exited" : "error",
+        failure.revListError ?? failure.revListTelemetryError,
+        failure.catFileError ?? failure.catFileTelemetryError,
       );
     }
   }

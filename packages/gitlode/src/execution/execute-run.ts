@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 
+import { createGitMetricRecorder } from "@gitlode/git-adapters";
 import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type { FactProjector } from "@gitlode/internal-contracts/extraction";
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
@@ -91,6 +92,10 @@ interface WorkerExecutionTelemetry {
   readonly extractionTracer: Tracer;
   readonly extractionMeter: Meter;
   readonly rootContext: Context;
+  readonly gitTracer?: Tracer;
+  readonly gitMeter?: Meter;
+  readonly dagTracer?: Tracer;
+  readonly dagMeter?: Meter;
 }
 
 const defaultWorkerExecutionTelemetry: WorkerExecutionTelemetry = {
@@ -98,6 +103,10 @@ const defaultWorkerExecutionTelemetry: WorkerExecutionTelemetry = {
   extractionTracer: trace.getTracer("gitlode.extraction"),
   extractionMeter: metrics.getMeter("gitlode.extraction"),
   rootContext: context.active(),
+  gitTracer: trace.getTracer("gitlode.git"),
+  gitMeter: metrics.getMeter("gitlode.git"),
+  dagTracer: trace.getTracer("gitlode.dag"),
+  dagMeter: metrics.getMeter("gitlode.dag"),
 };
 
 async function withSetupAsyncSpan<T>(
@@ -154,6 +163,11 @@ export async function executeWorkerRunRequest(
     : undefined;
   const instrumentation = recorder ?? noopInstrumentation;
   const { executionTracer, extractionTracer, extractionMeter, rootContext } = telemetry;
+  const gitTracer = telemetry.gitTracer ?? trace.getTracer("gitlode.git");
+  const gitMeter = telemetry.gitMeter ?? metrics.getMeter("gitlode.git");
+  const dagTracer = telemetry.dagTracer ?? trace.getTracer("gitlode.dag");
+  const dagMeter = telemetry.dagMeter ?? metrics.getMeter("gitlode.dag");
+  const gitMetricRecorder = createGitMetricRecorder(gitMeter, input.gitAdapter);
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
@@ -167,7 +181,18 @@ export async function executeWorkerRunRequest(
   });
 
   try {
-    const gitAdapterResult = await buildGitAdapter(input.gitAdapter, instrumentation, dependencies);
+    const gitAdapterResult = await buildGitAdapter(
+      input.gitAdapter,
+      {
+        tracer: gitTracer,
+        meter: gitMeter,
+        dagTracer,
+        dagMeter,
+        metricRecorder: gitMetricRecorder,
+        parentContext: rootContext,
+      },
+      dependencies,
+    );
     if (gitAdapterResult.kind === "user-error") {
       return await finishUserError(runSpan, gitAdapterResult.message);
     }

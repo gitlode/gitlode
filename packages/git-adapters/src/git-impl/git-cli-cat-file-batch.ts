@@ -4,8 +4,11 @@ import type { Readable } from "node:stream";
 
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import type { BlobOid } from "@gitlode/internal-contracts/model";
-import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { captureGroupOrThrow } from "@gitlode/internal-foundation/support";
+import { type Context, type Span, type Tracer } from "@opentelemetry/api";
+
+import type { GitMetricRecorder } from "./git-metric-recorder.js";
+import { attributeKey, setGitError } from "./git-telemetry.js";
 
 export interface GitBatchObject {
   readonly oid: string;
@@ -29,13 +32,27 @@ export class GitCatFileBatchSession implements AsyncDisposable {
   private readonly _closed: Promise<ProcessCloseResult>;
   private readonly _objects: AsyncIterator<GitBatchObject>;
   private readonly _stderrChunks: Buffer[] = [];
-  private readonly _span: ReturnType<Instrumentation["startSpan"]>;
+  private readonly _span: Span;
+  private readonly _recorder: GitMetricRecorder;
+  private _objectsRead = 0;
+  private _bytesRead = 0;
   private _queue: Promise<void> = Promise.resolve();
   private _disposed = false;
   private _operationFailure: unknown;
 
-  constructor(command: string, repoPath: string, instrumentation: Instrumentation) {
-    this._span = instrumentation.startSpan("git.cli.file_blob_batch");
+  constructor(
+    command: string,
+    repoPath: string,
+    tracer: Tracer,
+    recorder: GitMetricRecorder,
+    parent: Context,
+  ) {
+    this._recorder = recorder;
+    this._span = tracer.startSpan(
+      "gitlode.git.cli.file_blob_batch",
+      { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+      parent,
+    );
     this._child = spawn(command, ["-C", repoPath, "cat-file", "--batch"], {
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -51,24 +68,36 @@ export class GitCatFileBatchSession implements AsyncDisposable {
     if (this._disposed) {
       throw new GitAdapterError("cat-file batch session has already been disposed", "UNKNOWN");
     }
-    return await this._enqueue(async () => {
-      if (!this._child.stdin.write(`${oid}\n`)) {
-        await once(this._child.stdin, "drain");
-      }
-      const result = await this._objects.next();
-      if (result.done) {
-        throw await this._unexpectedCloseError();
-      }
-      if (result.value.oid !== oid || result.value.type !== "blob") {
-        throw new GitAdapterError(
-          `Unexpected cat-file response for blob ${oid}: ${result.value.oid} ${result.value.type}`,
-          "UNKNOWN",
-        );
-      }
-      this._span.incrementCounter("objects_read");
-      this._span.incrementCounter("blob_bytes", result.value.content.length);
-      return result.value.content;
-    });
+    const token = this._recorder.startBlobRead();
+    try {
+      const content = await this._enqueue(async () => {
+        if (!this._child.stdin.write(`${oid}\n`)) {
+          await once(this._child.stdin, "drain");
+        }
+        const result = await this._objects.next();
+        if (result.done) {
+          throw await this._unexpectedCloseError();
+        }
+        if (result.value.oid !== oid || result.value.type !== "blob") {
+          throw new GitAdapterError(
+            `Unexpected cat-file response for blob ${oid}: ${result.value.oid} ${result.value.type}`,
+            "UNKNOWN",
+          );
+        }
+        return result.value.content;
+      });
+      this._objectsRead++;
+      this._bytesRead += content.length;
+      this._recorder.completeBlobRead(token, {
+        outcome: "success",
+        purpose: "file-change",
+        sizeBytes: content.length,
+      });
+      return content;
+    } catch (error) {
+      this._recorder.completeBlobRead(token, { outcome: "error" });
+      throw error;
+    }
   }
 
   async [Symbol.asyncDispose](): Promise<void> {
@@ -98,7 +127,14 @@ export class GitCatFileBatchSession implements AsyncDisposable {
       this._child.kill();
       throw error;
     } finally {
-      this._span.end(failure);
+      this._span.setAttribute(
+        attributeKey("git_cli_process_completion"),
+        failure ? "error" : "exited",
+      );
+      this._span.setAttribute(attributeKey("git_object_read_count"), this._objectsRead);
+      this._span.setAttribute(attributeKey("git_blob_read_size"), this._bytesRead);
+      if (failure) setGitError(this._span, failure);
+      this._span.end();
     }
   }
 

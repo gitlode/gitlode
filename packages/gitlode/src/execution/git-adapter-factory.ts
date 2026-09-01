@@ -1,18 +1,33 @@
 import nodeFs from "node:fs";
 
-import { GitCliAdapter, IsomorphicGitAdapter } from "@gitlode/git-adapters";
+import {
+  GitCliAdapter,
+  IsomorphicGitAdapter,
+  type DagTelemetryBinding,
+  type GitMetricRecorder,
+} from "@gitlode/git-adapters";
 import {
   EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
   createCommitTraversalStrategy,
   resolveCommitTraversalStrategyName,
 } from "@gitlode/git-adapters/experimental";
 import type { GitAdapter } from "@gitlode/internal-contracts/git";
-import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import type { Context, Meter, Tracer } from "@opentelemetry/api";
 
 import type { ExecutionGitAdapterName } from "./types.js";
 
 export interface GitAdapterFactoryDependencies {
   readonly environment: Readonly<Record<string, string | undefined>>;
+}
+
+interface GitAdapterTelemetry {
+  readonly tracer: Tracer;
+  readonly meter: Meter;
+  readonly dagTracer: Tracer;
+  readonly dagMeter: Meter;
+  readonly metricRecorder: GitMetricRecorder;
+  readonly dagTelemetryBinding?: DagTelemetryBinding;
+  readonly parentContext: Context;
 }
 
 type BuildGitAdapterResult =
@@ -33,7 +48,7 @@ function resolveIsomorphicCommitTraversalStrategyFromEnvironment(
 
 export async function buildGitAdapter(
   adapterName: ExecutionGitAdapterName,
-  instrumentation: Instrumentation,
+  telemetry: GitAdapterTelemetry,
   dependencies: GitAdapterFactoryDependencies,
 ): Promise<BuildGitAdapterResult> {
   switch (adapterName) {
@@ -53,14 +68,23 @@ export async function buildGitAdapter(
         kind: "success",
         adapter: new IsomorphicGitAdapter({
           fs: nodeFs,
-          instrumentation,
+          tracer: telemetry.tracer,
+          meter: telemetry.meter,
+          metricRecorder: telemetry.metricRecorder,
+          parentContext: telemetry.parentContext,
           commitTraversalStrategy,
+          dagTracer: telemetry.dagTracer,
+          dagMeter: telemetry.dagMeter,
+          dagTelemetryBinding: telemetry.dagTelemetryBinding,
         }),
       };
     }
     case "git-cli": {
       const adapter = new GitCliAdapter({
-        instrumentation,
+        tracer: telemetry.tracer,
+        meter: telemetry.meter,
+        metricRecorder: telemetry.metricRecorder,
+        parentContext: telemetry.parentContext,
       });
       try {
         const gitVersion = await adapter.validateGitExecutable();

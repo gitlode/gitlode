@@ -12,11 +12,16 @@ import {
 } from "@gitlode/internal-contracts/git";
 import type { CommitOid, OidProfile, RefType } from "@gitlode/internal-contracts/model";
 import { isCommitOid } from "@gitlode/internal-contracts/model";
+import { createAsyncIterableInstrumenter } from "@gitlode/internal-foundation/otel-support";
 import {
-  instrumentAsyncIterable,
-  type Instrumentation,
-  type InstrumentationSpan,
-} from "@gitlode/internal-foundation/instrumentation";
+  context,
+  metrics,
+  trace,
+  type Context,
+  type Meter,
+  type Span,
+  type Tracer,
+} from "@opentelemetry/api";
 
 import {
   GitCatFileBatchSession,
@@ -30,12 +35,17 @@ import {
   type CliFileBlobChangeDescriptor,
   type CliFileBlobSnapshotDescriptor,
 } from "./git-cli-raw-diff.js";
+import { createGitMetricRecorder, type GitMetricRecorder } from "./git-metric-recorder.js";
+import { attributeKey, setGitError, withGitAsyncSpan } from "./git-telemetry.js";
 
 export { parseBatchObjectStream } from "./git-cli-cat-file-batch.js";
 export { parseRawDiffTreeOutput } from "./git-cli-raw-diff.js";
 
 export interface GitCliAdapterDependencies {
-  readonly instrumentation: Instrumentation;
+  readonly tracer?: Tracer;
+  readonly meter?: Meter;
+  readonly parentContext?: Context;
+  readonly metricRecorder?: GitMetricRecorder;
   readonly gitExecutable?: string;
 }
 
@@ -54,13 +64,19 @@ interface GitCommandBufferResult {
 const DEFAULT_GIT_EXECUTABLE = "git";
 
 export class GitCliAdapter implements GitAdapter {
-  private readonly _instrumentation: Instrumentation;
+  private readonly _tracer: Tracer;
+  private readonly _parentContext: Context;
+  private readonly _metricRecorder: GitMetricRecorder;
   private readonly _gitExecutable: string;
   private readonly _fileBlobBatchSessions = new Map<string, GitCatFileBatchSession>();
   private _disposed = false;
 
   constructor(dependencies: GitCliAdapterDependencies) {
-    this._instrumentation = dependencies.instrumentation;
+    this._tracer = dependencies.tracer ?? trace.getTracer("gitlode.git");
+    this._parentContext = dependencies.parentContext ?? context.active();
+    this._metricRecorder =
+      dependencies.metricRecorder ??
+      createGitMetricRecorder(dependencies.meter ?? metrics.getMeter("gitlode.git"), "git-cli");
     this._gitExecutable = dependencies.gitExecutable ?? DEFAULT_GIT_EXECUTABLE;
   }
 
@@ -69,10 +85,23 @@ export class GitCliAdapter implements GitAdapter {
   }
 
   async validateGitExecutable(): Promise<string> {
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.cli.version.check",
+      async (span) => {
+        span.setAttribute(attributeKey("git_adapter"), "git-cli");
+        const result = await this._validateGitExecutable();
+        span.setAttribute(attributeKey("git_cli_version"), sanitizeGitVersion(result));
+        return result;
+      },
+      undefined,
+      this._parentContext,
+    );
+  }
+
+  private async _validateGitExecutable(): Promise<string> {
     try {
-      const result = await this._instrumentation.runAsync("git.cli.version", async () =>
-        this._runGitRaw(["--version"]),
-      );
+      const result = await this._runGitRaw(["--version"]);
       if (result.code !== 0) {
         throw new GitAdapterError(
           `Git command failed: ${formatCommandFailure(result)}`,
@@ -91,8 +120,20 @@ export class GitCliAdapter implements GitAdapter {
   }
 
   async resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
-    const result = await this._instrumentation.runAsync("git.cli.resolve_ref", async () =>
-      this._runGit(repoPath, ["rev-parse", "--verify", `${ref}^{commit}`], [0, 1, 128]),
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.resolve_ref",
+      async () => await this._resolveRef(repoPath, ref),
+      { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+      context.active(),
+    );
+  }
+
+  private async _resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
+    const result = await this._runGit(
+      repoPath,
+      ["rev-parse", "--verify", `${ref}^{commit}`],
+      [0, 1, 128],
     );
     if (result.code !== 0) {
       if (isNotRepositoryError(result.stderr)) {
@@ -105,9 +146,24 @@ export class GitCliAdapter implements GitAdapter {
   }
 
   async getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat> {
-    const result = await this._instrumentation.runAsync(
-      "git.cli.repository_object_format",
-      async () => this._runGit(repoPath, ["config", "--get", "extensions.objectFormat"], [0, 1]),
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.repository_object_format",
+      async (span) => {
+        const result = await this._getRepositoryObjectFormat(repoPath);
+        span.setAttribute(attributeKey("git_object_format"), result);
+        return result;
+      },
+      { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+      context.active(),
+    );
+  }
+
+  private async _getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat> {
+    const result = await this._runGit(
+      repoPath,
+      ["config", "--get", "extensions.objectFormat"],
+      [0, 1],
     );
     if (result.code === 1 && result.stdout.trim().length === 0) {
       return DEFAULT_REPOSITORY_OBJECT_FORMAT;
@@ -127,34 +183,67 @@ export class GitCliAdapter implements GitAdapter {
   }
 
   async classifyRefType(repoPath: string, ref: string): Promise<RefType> {
-    const branch = await this._instrumentation.runAsync("git.cli.classify_ref", async () =>
-      this._runGit(repoPath, ["rev-parse", "--verify", `refs/heads/${ref}`], [0, 1, 128]),
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.classify_ref",
+      async (span) => {
+        const result = await this._classifyRefType(repoPath, ref);
+        span.setAttribute(attributeKey("git_ref_type"), result);
+        return result;
+      },
+      { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+      context.active(),
+    );
+  }
+
+  private async _classifyRefType(repoPath: string, ref: string): Promise<RefType> {
+    const branch = await this._runGit(
+      repoPath,
+      ["rev-parse", "--verify", `refs/heads/${ref}`],
+      [0, 1, 128],
     );
     if (branch.code === 0) return "branch";
 
-    const tag = await this._instrumentation.runAsync("git.cli.classify_ref", async () =>
-      this._runGit(repoPath, ["rev-parse", "--verify", `refs/tags/${ref}`], [0, 1, 128]),
+    const tag = await this._runGit(
+      repoPath,
+      ["rev-parse", "--verify", `refs/tags/${ref}`],
+      [0, 1, 128],
     );
     if (tag.code === 0) {
       const tagOid = firstStdoutLine(tag.stdout);
-      const tagType = await this._instrumentation.runAsync("git.cli.classify_ref", async () =>
-        this._runGit(repoPath, ["cat-file", "-t", tagOid], [0, 1, 128]),
-      );
+      const tagType = await this._runGit(repoPath, ["cat-file", "-t", tagOid], [0, 1, 128]);
       return tagType.stdout.trim() === "tag" ? "tag-annotated" : "tag-lightweight";
     }
 
     if (isCommitOid(ref)) return "commit-oid";
 
-    const generic = await this._instrumentation.runAsync("git.cli.classify_ref", async () =>
-      this._runGit(repoPath, ["rev-parse", "--verify", `${ref}^{commit}`], [0, 1, 128]),
+    const generic = await this._runGit(
+      repoPath,
+      ["rev-parse", "--verify", `${ref}^{commit}`],
+      [0, 1, 128],
     );
     return generic.code === 0 ? "branch" : "commit-oid";
   }
 
   async getRemoteUrl(repoPath: string): Promise<string | null> {
-    const result = await this._instrumentation.runAsync("git.cli.get_remote_url", async () =>
-      this._runGit(repoPath, ["config", "--get", "remote.origin.url"], [0, 1]),
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.remote_url.resolve",
+      async (span) => {
+        const result = await this._getRemoteUrl(repoPath);
+        span.setAttribute(
+          attributeKey("git_remote_url_result"),
+          result === null ? "missing" : "found",
+        );
+        return result;
+      },
+      { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+      context.active(),
     );
+  }
+
+  private async _getRemoteUrl(repoPath: string): Promise<string | null> {
+    const result = await this._runGit(repoPath, ["config", "--get", "remote.origin.url"], [0, 1]);
     if (result.code === 1 && result.stdout.trim().length === 0) return null;
     if (result.code !== 0) {
       if (isNotRepositoryError(result.stderr)) {
@@ -171,41 +260,91 @@ export class GitCliAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
+    const walkParent = context.active();
     const args = ["rev-list", "--topo-order", oid];
     if (excludeOid !== undefined) args.push("--not", excludeOid);
 
-    const revListSpan = this._instrumentation.startSpan("git.cli.rev_list");
-    const catFileSpan = this._instrumentation.startSpan("git.cli.cat_file_batch");
-    revListSpan.setAttribute("strategy", "git-cli-rev-list-stream");
-    let spanError: unknown;
-    try {
-      for await (const object of streamRevListBatchObjects(
-        this._gitExecutable,
-        repoPath,
-        args,
-        revListSpan,
-        catFileSpan,
-      )) {
-        if (object.type !== "commit") {
-          throw new GitAdapterError(`Commit not found: ${object.oid}`, "COMMIT_NOT_FOUND");
+    const instrument = createAsyncIterableInstrumenter((span, completion) => {
+      span.setAttribute(attributeKey("stream_completion"), completion);
+    });
+    yield* instrument(
+      this._tracer,
+      "gitlode.git.commit.walk",
+      (walkSpan) => {
+        walkSpan.setAttribute(attributeKey("git_adapter"), "git-cli");
+        walkSpan.setAttribute(attributeKey("git_commit_walk_strategy"), "git-cli-rev-list-stream");
+        walkSpan.setAttribute(
+          attributeKey("git_commit_walk_has_exclusion"),
+          excludeOid !== undefined,
+        );
+        const revListSpan = this._tracer.startSpan(
+          "gitlode.git.cli.rev_list",
+          undefined,
+          trace.setSpan(this._parentContext, walkSpan),
+        );
+        const catFileSpan = this._tracer.startSpan(
+          "gitlode.git.cli.commit_batch",
+          undefined,
+          trace.setSpan(this._parentContext, walkSpan),
+        );
+        try {
+          return async function* (this: GitCliAdapter) {
+            for await (const object of streamRevListBatchObjects(
+              this._gitExecutable,
+              repoPath,
+              args,
+              revListSpan,
+              catFileSpan,
+            )) {
+              if (object.type !== "commit") {
+                throw new GitAdapterError(`Commit not found: ${object.oid}`, "COMMIT_NOT_FOUND");
+              }
+              this._metricRecorder.recordCommitYielded(
+                "git-cli-rev-list-stream",
+                excludeOid !== undefined,
+              );
+              yield parseGitCommitObject(object.oid as CommitOid, object.content);
+            }
+          }.call(this);
+        } catch (error) {
+          revListSpan.end();
+          catFileSpan.end();
+          throw error;
         }
-        revListSpan.incrementCounter("yielded");
-        catFileSpan.incrementCounter("yielded");
-        yield parseGitCommitObject(object.oid as CommitOid, object.content);
-      }
-    } catch (error) {
-      spanError = error;
-      throw error;
-    } finally {
-      revListSpan.end(spanError);
-      catFileSpan.end(spanError);
-    }
+      },
+      undefined,
+      walkParent,
+    );
   }
 
   async findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null> {
-    const result = await this._instrumentation.runAsync("git.cli.merge_base", async () =>
-      this._runGit(repoPath, ["merge-base", ...oids], [0, 1]),
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.merge_base",
+      async (span) => {
+        span.setAttribute(attributeKey("git_merge_base_input_count"), oids.length);
+        const result = await this._findMergeBase(repoPath, oids);
+        span.setAttribute(
+          attributeKey("git_merge_base_result"),
+          result === null ? "missing" : "found",
+        );
+        return result;
+      },
+      {
+        attributes: {
+          [attributeKey("git_adapter")]: "git-cli",
+          [attributeKey("git_merge_base_input_count")]: oids.length,
+        },
+      },
+      context.active(),
     );
+  }
+
+  private async _findMergeBase(
+    repoPath: string,
+    oids: readonly CommitOid[],
+  ): Promise<CommitOid | null> {
+    const result = await this._runGit(repoPath, ["merge-base", ...oids], [0, 1]);
     if (result.code === 1 && result.stdout.trim().length === 0) return null;
     if (result.code !== 0) {
       throw new GitAdapterError(
@@ -223,9 +362,7 @@ export class GitCliAdapter implements GitAdapter {
     parentOid?: CommitOid,
   ): AsyncIterable<FileBlobChange> {
     this._throwIfDisposed();
-    yield* instrumentAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
-      this._materializeFileBlobChanges(repoPath, commitOid, parentOid, span),
-    );
+    yield* this._materializeFileBlobChanges(repoPath, commitOid, parentOid);
   }
 
   async [Symbol.asyncDispose](): Promise<void> {
@@ -240,25 +377,43 @@ export class GitCliAdapter implements GitAdapter {
     repoPath: string,
     commitOid: CommitOid,
     parentOid: CommitOid | undefined,
-    span: InstrumentationSpan,
   ): AsyncIterable<FileBlobChange> {
     const descriptors = await this._readFileBlobChangeDescriptors(repoPath, commitOid, parentOid);
     let session: GitCatFileBatchSession | undefined;
 
     for (const descriptor of descriptors) {
       session ??= this._fileBlobBatchSession(repoPath);
-      const change = await materializeCliFileBlobChange(descriptor, session, this._instrumentation);
-      span.incrementCounter("yielded");
-      span.incrementCounter(change.status);
-      span.incrementCounter(
-        "blob_bytes",
-        (change.before?.content.length ?? 0) + (change.after?.content.length ?? 0),
-      );
+      const change = await materializeCliFileBlobChange(descriptor, session);
+      this._metricRecorder.recordFileChangeYielded(change.status);
       yield change;
     }
   }
 
   private async _readFileBlobChangeDescriptors(
+    repoPath: string,
+    commitOid: CommitOid,
+    parentOid: CommitOid | undefined,
+  ): Promise<readonly CliFileBlobChangeDescriptor[]> {
+    const mode = parentOid === undefined ? "root" : "parent";
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.cli.diff_tree",
+      async (span) => {
+        const result = await this._readFileBlobChangeDescriptorsRaw(repoPath, commitOid, parentOid);
+        span.setAttribute(attributeKey("git_cli_process_completion"), "exited");
+        return result;
+      },
+      {
+        attributes: {
+          [attributeKey("git_adapter")]: "git-cli",
+          [attributeKey("git_diff_mode")]: mode,
+        },
+      },
+      this._parentContext,
+    );
+  }
+
+  private async _readFileBlobChangeDescriptorsRaw(
     repoPath: string,
     commitOid: CommitOid,
     parentOid: CommitOid | undefined,
@@ -278,9 +433,7 @@ export class GitCliAdapter implements GitAdapter {
       args.push(parentOid, commitOid);
     }
 
-    const result = await this._instrumentation.runAsync("git.cli.diff_tree", async () =>
-      this._runGitBuffer(repoPath, args),
-    );
+    const result = await this._runGitBuffer(repoPath, args);
     if (result.code !== 0) {
       const stderr = result.stderr.toString("utf8");
       if (isNotRepositoryError(stderr)) {
@@ -300,7 +453,9 @@ export class GitCliAdapter implements GitAdapter {
     const session = new GitCatFileBatchSession(
       this._gitExecutable,
       repoPath,
-      this._instrumentation,
+      this._tracer,
+      this._metricRecorder,
+      this._parentContext,
     );
     this._fileBlobBatchSessions.set(repoPath, session);
     return session;
@@ -341,26 +496,25 @@ export class GitCliAdapter implements GitAdapter {
 async function materializeCliFileBlobChange(
   descriptor: CliFileBlobChangeDescriptor,
   session: GitCatFileBatchSession,
-  instrumentation: Instrumentation,
 ): Promise<FileBlobChange> {
   switch (descriptor.status) {
     case "added":
       return {
         status: "added",
         before: null,
-        after: await materializeCliFileBlobSnapshot(descriptor.after, session, instrumentation),
+        after: await materializeCliFileBlobSnapshot(descriptor.after, session),
       };
     case "modified": {
       const [before, after] = await Promise.all([
-        materializeCliFileBlobSnapshot(descriptor.before, session, instrumentation),
-        materializeCliFileBlobSnapshot(descriptor.after, session, instrumentation),
+        materializeCliFileBlobSnapshot(descriptor.before, session),
+        materializeCliFileBlobSnapshot(descriptor.after, session),
       ]);
       return { status: "modified", before, after };
     }
     case "deleted":
       return {
         status: "deleted",
-        before: await materializeCliFileBlobSnapshot(descriptor.before, session, instrumentation),
+        before: await materializeCliFileBlobSnapshot(descriptor.before, session),
         after: null,
       };
   }
@@ -369,11 +523,8 @@ async function materializeCliFileBlobChange(
 async function materializeCliFileBlobSnapshot(
   descriptor: CliFileBlobSnapshotDescriptor,
   session: GitCatFileBatchSession,
-  instrumentation: Instrumentation,
 ): Promise<FileBlobSnapshot> {
-  const content = await instrumentation.runAsync("git.blob_read", async () =>
-    session.readBlob(descriptor.oid),
-  );
+  const content = await session.readBlob(descriptor.oid);
   return { ...descriptor, content };
 }
 
@@ -381,8 +532,8 @@ async function* streamRevListBatchObjects(
   command: string,
   repoPath: string,
   revListArgs: readonly string[],
-  revListSpan: InstrumentationSpan,
-  catFileSpan: InstrumentationSpan,
+  revListSpan: Span,
+  catFileSpan: Span,
 ): AsyncIterable<GitBatchObject> {
   const revList = spawn(command, ["-C", repoPath, ...revListArgs], {
     stdio: ["ignore", "pipe", "pipe"],
@@ -413,6 +564,12 @@ async function* streamRevListBatchObjects(
   } catch (error) {
     revList.kill();
     catFile.kill();
+    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), "error");
+    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "error");
+    setGitError(revListSpan, error);
+    setGitError(catFileSpan, error);
+    revListSpan.end();
+    catFileSpan.end();
     throw error;
   } finally {
     if (!completed) {
@@ -475,9 +632,11 @@ async function* streamRevListBatchObjects(
   }
 
   if (!yielded) {
-    revListSpan.incrementCounter("yielded", 0);
-    catFileSpan.incrementCounter("yielded", 0);
+    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), "exited");
+    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "exited");
   }
+  revListSpan.end();
+  catFileSpan.end();
 }
 
 function runCommand(
@@ -546,4 +705,9 @@ function formatBufferCommandFailure(result: GitCommandBufferResult): string {
 
 function formatUnknownError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function sanitizeGitVersion(value: string): string {
+  const match = /^git version (\d+(?:\.\d+){1,3})/.exec(value.trim());
+  return match?.[1] ?? "unknown";
 }

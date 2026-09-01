@@ -33,7 +33,6 @@ export async function* walkDagNodeIdsEagerExclude<
     }
   };
   try {
-    context.observation?.recordStartCount(1);
     yield* walkDagNodeIdsEagerExcludeCore(
       {
         ...context,
@@ -294,7 +293,6 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  const starts = Array.from(nodeIds);
   let completed = false;
   const complete = (completion: "exhausted" | "cancelled" | "handled_throw" | "error") => {
     if (!completed) {
@@ -303,6 +301,7 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
     }
   };
   try {
+    const starts = Array.from(nodeIds);
     context.observation?.recordStartCount(starts.length);
     yield* walkDagReachableNodeIdsCore(
       {

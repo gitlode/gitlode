@@ -146,6 +146,48 @@ export const NOOP_DAG_METRIC_RECORDER = Object.freeze<DagMetricRecorder>({
 
 const instrumentDagStream = createAsyncIterableInstrumenter(() => {});
 
+export interface DagTelemetryBinding {
+  instrumentReachable<NodeId extends PropertyKey, DomainHint = undefined>(
+    graph: DagTopologyPort<NodeId, DomainHint>,
+    nodeIds: Iterable<NodeId>,
+    options?: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint>,
+  ): AsyncIterable<NodeId>;
+  instrumentCertifiedClosure<NodeId extends PropertyKey, DomainHint = undefined>(
+    graph: DagTopologyPort<NodeId, DomainHint>,
+    nodeId: NodeId,
+    options?: PhaseCertifiedStrategyOptions<NodeId, DomainHint>,
+  ): Promise<CertifiedClosurePhaseResult<NodeId>>;
+}
+
+export function createDagTelemetryBinding(tracer: Tracer, meter: Meter): DagTelemetryBinding {
+  const recorder = createDagMetricRecorder(meter);
+  return {
+    instrumentReachable(graph, nodeIds, options = {}) {
+      return instrumentDagStream(tracer, "gitlode.dag.reachable", (span) => {
+        const operation = recorder.startOperation({ operation: "reachable" });
+        return walkDagReachableNodeIds(
+          { graph, observation: bindDagObservation(span, operation, { operation: "reachable" }) },
+          nodeIds,
+          options,
+        );
+      });
+    },
+    instrumentCertifiedClosure(graph, nodeId, options = {}) {
+      const operation = recorder.startOperation({ operation: "certified-closure" });
+      return withAsyncSpan(tracer, "gitlode.dag.certified_closure", async (span) =>
+        resolveDagCertifiedClosurePhase(
+          {
+            graph,
+            observation: bindDagObservation(span, operation, { operation: "certified-closure" }),
+          },
+          nodeId,
+          options,
+        ),
+      );
+    },
+  };
+}
+
 export function instrumentDagReachable<NodeId extends PropertyKey, DomainHint = undefined>(
   tracer: Tracer,
   meter: Meter,
@@ -153,16 +195,7 @@ export function instrumentDagReachable<NodeId extends PropertyKey, DomainHint = 
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
-  const starts = Array.from(nodeIds);
-  const recorder = createDagMetricRecorder(meter);
-  return instrumentDagStream(tracer, "gitlode.dag.reachable", (span) => {
-    const operation = recorder.startOperation({ operation: "reachable" });
-    return walkDagReachableNodeIds(
-      { graph, observation: bindDagObservation(span, operation, { operation: "reachable" }) },
-      starts,
-      options,
-    );
-  });
+  return createDagTelemetryBinding(tracer, meter).instrumentReachable(graph, nodeIds, options);
 }
 
 export async function instrumentDagCertifiedClosure<
@@ -175,17 +208,11 @@ export async function instrumentDagCertifiedClosure<
   nodeId: NodeId,
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
 ): Promise<CertifiedClosurePhaseResult<NodeId>> {
-  const recorder = createDagMetricRecorder(meter);
-  const operation = recorder.startOperation({ operation: "certified-closure" });
-  return withAsyncSpan(tracer, "gitlode.dag.certified_closure", async (span) => {
-    const observation = bindDagObservation(span, operation, { operation: "certified-closure" });
-    try {
-      return await resolveDagCertifiedClosurePhase({ graph, observation }, nodeId, options);
-    } catch (error) {
-      operation.complete({ type: "certified-closure", completion: "error" });
-      throw error;
-    }
-  });
+  return createDagTelemetryBinding(tracer, meter).instrumentCertifiedClosure(
+    graph,
+    nodeId,
+    options,
+  );
 }
 export function normalizeDagCompletion(
   c: NeutralDagCompletion,

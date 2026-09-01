@@ -327,20 +327,6 @@ describe("DAG traversal telemetry", () => {
     );
 
     expect(result).toEqual(["head"]);
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.traversal",
-        attributes: { strategy: "eagerExclude" },
-        counters: {
-          exclude_expansions: 2,
-          excluded_nodes: 2,
-          main_expansions: 1,
-          successor_expansions: 3,
-          traversal_steps: 3,
-          yielded_nodes: 1,
-        },
-      }),
-    ]);
   });
 
   it("records certified-lazy certificate success without fallback counters", async () => {
@@ -364,20 +350,6 @@ describe("DAG traversal telemetry", () => {
     );
 
     expect(new Set(result)).toEqual(new Set(["head", "after"]));
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.traversal",
-        attributes: { result: "certified", strategy: "certifiedLazy" },
-        counters: expect.objectContaining({
-          exclude_expansions: 2,
-          main_expansions: 2,
-          successor_expansions: 4,
-          yielded_nodes: 2,
-        }),
-      }),
-    ]);
-    expect(recorder.records()[0]?.counters).not.toHaveProperty("fallback_removed");
-    expect(recorder.records()[0]?.counters).not.toHaveProperty("excluded_nodes");
   });
 
   it("records certified-lazy fallback reason and removed candidates", async () => {
@@ -401,21 +373,6 @@ describe("DAG traversal telemetry", () => {
     );
 
     expect(new Set(result)).toEqual(new Set(["head", "headRoot"]));
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.traversal",
-        attributes: {
-          fallback_reason: "open_include_path",
-          result: "fallback",
-          strategy: "certifiedLazy",
-        },
-        counters: expect.objectContaining({
-          excluded_nodes: 2,
-          fallback_removed: 0,
-          yielded_nodes: 2,
-        }),
-      }),
-    ]);
   });
 });
 

@@ -1,9 +1,11 @@
 import { createMonotonicTiming, TELEMETRY_METRICS } from "@gitlode/internal-contracts/telemetry";
-import type { Meter } from "@opentelemetry/api";
+import type { Meter, Span, Tracer } from "@opentelemetry/api";
 import { describe, expect, test } from "vitest";
 
 import {
   createDagMetricRecorder,
+  createDagTelemetryBinding,
+  bindDagObservation,
   NOOP_DAG_METRIC_RECORDER,
   normalizeDagCompletion,
   type DagMetricRecorder,
@@ -30,6 +32,38 @@ class FakeMeter {
     return {
       record: (value: number, attributes: unknown) => this.calls.push({ name, value, attributes }),
     };
+  }
+}
+class FakeSpan {
+  readonly attributes: Record<string, string | boolean | number> = {};
+  readonly events: Array<{ name: string; attributes?: Record<string, unknown> }> = [];
+  endCount = 0;
+  setAttribute(name: string, value: string | boolean | number) {
+    this.attributes[name] = value;
+    return this;
+  }
+  setAttributes(attributes: Record<string, string | boolean | number>) {
+    Object.assign(this.attributes, attributes);
+    return this;
+  }
+  addEvent(name: string, attributes?: Record<string, unknown>) {
+    this.events.push({ name, attributes });
+    return this;
+  }
+  setStatus() {
+    return this;
+  }
+  recordException() {}
+  end() {
+    this.endCount++;
+  }
+}
+class FakeTracer {
+  readonly spans: FakeSpan[] = [];
+  startSpan() {
+    const span = new FakeSpan();
+    this.spans.push(span);
+    return span as unknown as Span;
   }
 }
 const meter = (fake: FakeMeter) => fake as unknown as Meter;
@@ -122,7 +156,58 @@ describe("Git and DAG instrument ownership", () => {
     dag.complete({ type: "stream", completion: "exhausted" });
     expect(fake.creations).toHaveLength(creationCount);
   });
+
+  test("reuses one DAG binding and keeps start count scoped to reachable", async () => {
+    const fakeMeter = new FakeMeter();
+    const fakeTracer = new FakeTracer();
+    const binding = createDagTelemetryBinding(fakeTracer as unknown as Tracer, meter(fakeMeter));
+    expect(fakeMeter.creations).toHaveLength(8);
+    const graph = {
+      getSuccessors: async (node: string) => (node === "root" ? [{ nodeId: "leaf" }] : []),
+    };
+    const oneShot = {
+      [Symbol.iterator]() {
+        let used = false;
+        return {
+          next: () => {
+            if (used) return { done: true, value: undefined };
+            used = true;
+            return { done: false, value: "root" };
+          },
+        };
+      },
+    };
+    const first = binding.instrumentReachable(graph, oneShot);
+    expect(fakeTracer.spans).toHaveLength(0);
+    await expect([...(await collectAsync(first))]).toEqual(["root", "leaf"]);
+    const second = binding.instrumentReachable(graph, ["root"]);
+    await collectAsync(second);
+    expect(fakeMeter.creations).toHaveLength(8);
+    expect(fakeTracer.spans[0]?.attributes).toEqual({
+      "gitlode.dag.start.count": 1,
+      "gitlode.stream.completion": "exhausted",
+    });
+    expect(fakeTracer.spans[0]?.endCount).toBe(1);
+    const differenceSpan = new FakeSpan();
+    const difference = createDagMetricRecorder(meter(new FakeMeter())).startOperation({
+      operation: "difference",
+      strategy: "eager-exclude",
+      hasExclusion: true,
+    });
+    bindDagObservation(differenceSpan as unknown as Span, difference, {
+      operation: "difference",
+      strategy: "eager-exclude",
+      hasExclusion: true,
+    }).complete("exhausted");
+    expect(differenceSpan.attributes).not.toHaveProperty("gitlode.dag.start.count");
+  });
 });
+
+async function collectAsync<T>(items: AsyncIterable<T>): Promise<T[]> {
+  const result: T[] = [];
+  for await (const item of items) result.push(item);
+  return result;
+}
 
 describe("Git metric recorder", () => {
   test("records exact commit, object, and file-change datapoints", () => {

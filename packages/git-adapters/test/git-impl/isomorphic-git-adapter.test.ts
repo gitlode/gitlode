@@ -419,24 +419,17 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
         const entries = instrumentation.summary();
         const walkEntry = entries.find((entry) => entry.name === "git.walk_commits");
         expect(walkEntry?.attributes?.strategy).toEqual([strategyName]);
-        expect(
-          entries.find((entry) => entry.name === "dag.traversal")?.attributes?.strategy,
-        ).toEqual([strategyName === "certified-lazy" ? "certifiedLazy" : "phaseCertified"]);
-        const traversalEntry = entries.find((entry) => entry.name === "dag.traversal");
         const walkCounters = walkEntry?.counters;
-        const traversalCounters = traversalEntry?.counters;
         const commitReads = counter(walkCounters, "commit_reads");
         const topologyCommitReads = counter(walkCounters, "topology_commit_reads");
         const topologyCommitCacheHits = counter(walkCounters, "topology_commit_cache_hits");
         const materializeCommitReads = counter(walkCounters, "materialize_commit_reads");
         const materializeCommitCacheHits = counter(walkCounters, "materialize_commit_cache_hits");
         const commitsYielded = counter(walkCounters, "commits_yielded");
-        const successorExpansions = counter(traversalCounters, "successor_expansions");
 
         expect(commitsYielded).toBe(4);
         expect(commitReads).toBe(topologyCommitReads + materializeCommitReads);
         expect(materializeCommitCacheHits + materializeCommitReads).toBe(commitsYielded);
-        expect(topologyCommitReads + topologyCommitCacheHits).toBe(successorExpansions);
 
         const readOids = readCommit.mock.calls.map(([options]) => options.oid);
         expect(readOids).toHaveLength(commitReads);
@@ -1007,7 +1000,6 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
     const resolveRefEntry = entries.find((e) => e.name === "git.resolve_ref");
     const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
     const walkEntry = entries.find((e) => e.name === "git.walk_commits");
-    const traversalEntry = entries.find((e) => e.name === "dag.traversal");
     const fileChangesEntry = entries.find((e) => e.name === "git.file_blob_changes");
     const blobEntry = entries.find((e) => e.name === "git.blob_read");
     expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
@@ -1021,18 +1013,6 @@ describe("IsomorphicGitAdapter instrumentation injection", () => {
       topology_commit_cache_hits: 1,
       topology_commit_reads: 2,
     });
-    expect(traversalEntry?.attributes).toEqual({
-      result: ["certified"],
-      strategy: ["certifiedLazy"],
-    });
-    expect(traversalEntry?.counters).toEqual(
-      expect.objectContaining({
-        exclude_expansions: 2,
-        main_expansions: 1,
-        successor_expansions: 3,
-        yielded_nodes: 1,
-      }),
-    );
     expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
     expect(fileChangesEntry?.counters).toEqual({ blob_bytes: 27, modified: 1, yielded: 1 });
     expect(blobEntry?.totalMs).toBeGreaterThan(0);

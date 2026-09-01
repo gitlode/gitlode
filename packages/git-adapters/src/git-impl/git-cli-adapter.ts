@@ -54,15 +54,14 @@ export interface GitCliAdapterDependencies {
   readonly gitExecutable?: string;
 }
 
-export interface GitCliProcessStart {
+interface GitCliProcessStart {
   readonly kind: "rev-list" | "commit-batch";
   readonly command: string;
   readonly args: readonly string[];
 }
 
-export interface GitCliCommandObserver {
+interface GitCliCommandObserver {
   readonly onCommand?: (command: string, args: readonly string[]) => void;
-  readonly onProcessStart?: (start: GitCliProcessStart) => void;
 }
 
 type GitCliPipeline = (source: Readable, destination: Writable) => Promise<void>;

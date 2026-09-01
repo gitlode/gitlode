@@ -22,8 +22,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   GitCliAdapter,
   createGitCliAdapterForTesting,
-  type GitCliCommandObserver,
-  type GitCliProcessStart,
   type GitCliProcessFactory,
 } from "../../src/git-impl/git-cli-adapter.js";
 import type { GitCliProcess } from "../../src/git-impl/git-cli-cat-file-batch.js";
@@ -309,10 +307,17 @@ const timing = () => {
 };
 const temps: string[] = [];
 
-type ObservedProcess = GitCliProcessStart & {
+type ProcessStart = Parameters<GitCliProcessFactory>[0];
+type GitCliCommandObserver = {
+  readonly onCommand?: (command: string, args: readonly string[]) => void;
+};
+type ObservedProcess = ProcessStart & {
   closeCode: number | null | undefined;
   killCount: number;
   reaped: boolean;
+  stdinWrites: string[];
+  stdout: unknown;
+  stdin: unknown;
 };
 
 function realProcessFactory(
@@ -320,17 +325,29 @@ function realProcessFactory(
   requests: string[],
 ): GitCliProcessFactory {
   return (start) => {
-    const record: ObservedProcess = { ...start, closeCode: undefined, killCount: 0, reaped: false };
-    processes.push(record);
     const child = spawn(start.command, start.args, {
       stdio: start.kind === "rev-list" ? ["ignore", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
     });
+    const record: ObservedProcess = {
+      ...start,
+      closeCode: undefined,
+      killCount: 0,
+      reaped: false,
+      stdinWrites: [],
+      stdout: child.stdout,
+      stdin: child.stdin,
+    };
+    processes.push(record);
     if (start.kind === "commit-batch") {
-      child.stdin?.on("data", (chunk) => {
-        for (const request of String(chunk).split("\n")) {
+      const stdin = child.stdin;
+      const originalWrite = stdin.write.bind(stdin) as (chunk: string | Uint8Array) => boolean;
+      stdin.write = ((chunk: string | Uint8Array) => {
+        const value = Buffer.from(chunk).toString("utf8");
+        record.stdinWrites.push(value);
+        for (const request of value.split("\n"))
           if (request.trim().length > 0) requests.push(request.trim());
-        }
-      });
+        return originalWrite(chunk);
+      }) as typeof stdin.write;
     }
     child.once("close", (code) => {
       record.closeCode = code;
@@ -524,6 +541,7 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       const requests: string[] = [];
       const processes: ObservedProcess[] = [];
       const commands: Array<{ command: string; args: readonly string[] }> = [];
+      let pipelineCount = 0;
       const meter = new MeterRecording();
       const tracer = recording ? new TracerRecording() : undefined;
       const observer: GitCliCommandObserver = {
@@ -539,7 +557,10 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
         },
         {
           processFactory: realProcessFactory(processes, requests),
-          pipeline: (source, destination) => pipeline(source, destination),
+          pipeline: (source, destination) => {
+            pipelineCount += 1;
+            return pipeline(source, destination);
+          },
           commandObserver: observer,
         },
       );
@@ -571,6 +592,7 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
         commits,
         spanNames: tracer?.starts.map((entry) => entry.name) ?? [],
         metricCalls: meter.calls,
+        pipelineCount,
         values: values.map((value) => ({
           status: value.status,
           before: value.before?.content,
@@ -601,6 +623,8 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       })),
     );
     expect(withTelemetry.requests).toEqual(withoutTelemetry.requests);
+    expect(withTelemetry.pipelineCount).toBe(withoutTelemetry.pipelineCount);
+    expect(withTelemetry.pipelineCount).toBe(1);
     expect(withTelemetry.version).toEqual(withoutTelemetry.version);
     expect(withTelemetry.format).toEqual(withoutTelemetry.format);
     expect(withTelemetry.commits).toEqual(withoutTelemetry.commits);
@@ -659,6 +683,19 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       { kind: "commit-batch", command: "git", args: ["-C", data.path, "cat-file", "--batch"] },
       { kind: "commit-batch", command: "git", args: ["-C", data.path, "cat-file", "--batch"] },
     ]);
+    expect(withTelemetry.processes[0]?.stdinWrites).toEqual([]);
+    expect(withTelemetry.processes[1]?.stdinWrites.join("")).toBe(
+      `${data.child}\n${data.parent}\n`,
+    );
+    expect(withTelemetry.processes[2]?.stdinWrites).toEqual([
+      `${data.modifiedBefore}\n`,
+      `${data.modifiedAfter}\n`,
+      `${data.deleted}\n`,
+      `${data.added}\n`,
+    ]);
+    expect(withTelemetry.processes.every((process) => process.closeCode === 0)).toBe(true);
+    expect(withTelemetry.processes.every((process) => process.reaped)).toBe(true);
+    expect(withTelemetry.processes.every((process) => process.killCount === 0)).toBe(true);
   });
 });
 

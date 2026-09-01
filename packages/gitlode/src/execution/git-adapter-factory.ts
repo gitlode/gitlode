@@ -12,7 +12,7 @@ import {
   resolveCommitTraversalStrategyName,
 } from "@gitlode/git-adapters/experimental";
 import type { GitAdapter } from "@gitlode/internal-contracts/git";
-import type { Context, Meter, Tracer } from "@opentelemetry/api";
+import type { Context, Tracer } from "@opentelemetry/api";
 
 import type { ExecutionGitAdapterName } from "./types.js";
 
@@ -21,13 +21,10 @@ export interface GitAdapterFactoryDependencies {
 }
 
 interface GitAdapterTelemetry {
-  readonly tracer: Tracer;
-  readonly meter: Meter;
-  readonly dagTracer: Tracer;
-  readonly dagMeter: Meter;
-  readonly metricRecorder: GitMetricRecorder;
-  readonly dagTelemetryBinding?: DagTelemetryBinding;
-  readonly parentContext: Context;
+  readonly gitTracer: Tracer;
+  readonly gitMetricRecorder: GitMetricRecorder;
+  readonly dagTelemetryBinding: DagTelemetryBinding;
+  readonly rootContext: Context;
 }
 
 type BuildGitAdapterResult =
@@ -68,23 +65,18 @@ export async function buildGitAdapter(
         kind: "success",
         adapter: new IsomorphicGitAdapter({
           fs: nodeFs,
-          tracer: telemetry.tracer,
-          meter: telemetry.meter,
-          metricRecorder: telemetry.metricRecorder,
-          parentContext: telemetry.parentContext,
+          tracer: telemetry.gitTracer,
+          metricRecorder: telemetry.gitMetricRecorder,
           commitTraversalStrategy,
-          dagTracer: telemetry.dagTracer,
-          dagMeter: telemetry.dagMeter,
           dagTelemetryBinding: telemetry.dagTelemetryBinding,
         }),
       };
     }
     case "git-cli": {
       const adapter = new GitCliAdapter({
-        tracer: telemetry.tracer,
-        meter: telemetry.meter,
-        metricRecorder: telemetry.metricRecorder,
-        parentContext: telemetry.parentContext,
+        tracer: telemetry.gitTracer,
+        metricRecorder: telemetry.gitMetricRecorder,
+        parentContext: telemetry.rootContext,
       });
       try {
         const gitVersion = await adapter.validateGitExecutable();

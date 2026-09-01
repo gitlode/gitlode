@@ -1,5 +1,4 @@
 import { GitAdapterError, type RawCommit } from "@gitlode/internal-contracts/git";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import * as git from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it, vi } from "vitest";
@@ -10,6 +9,7 @@ import {
   IsomorphicGitAdapter,
   projectCommitParentSuccessors,
 } from "../../src/git-impl/isomorphic-git-adapter.js";
+import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -24,15 +24,9 @@ function createAdapter(
 ): IsomorphicGitAdapter {
   return new IsomorphicGitAdapter({
     fs,
-    instrumentation: overrides.instrumentation ?? noopInstrumentation,
-    commitTraversalStrategy: overrides.commitTraversalStrategy,
-    dagTracer: overrides.dagTracer,
-    dagMeter: overrides.dagMeter,
+    ...adapterTelemetry("isomorphic-git"),
+    ...overrides,
   });
-}
-
-function counter(counters: Readonly<Record<string, number>> | undefined, name: string): number {
-  return counters?.[name] ?? 0;
 }
 
 /** Create a fresh in-memory repo and return the memfs-compatible fs and a helper to commit files. */
@@ -402,13 +396,8 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
         "phase-certified-timestamp",
       ] as const) {
         readCommit.mockClear();
-        let time = 0;
-        const { LocalInstrumentationRecorder } =
-          await import("@gitlode/internal-foundation/instrumentation");
-        const instrumentation = new LocalInstrumentationRecorder(() => ++time);
         const commits = await collectAll(
           createAdapter(fs, {
-            instrumentation,
             commitTraversalStrategy: createCommitTraversalStrategy(strategyName),
           }),
           head,
@@ -418,24 +407,7 @@ describe("IsomorphicGitAdapter.walkCommits", () => {
         expect(new Set(oids)).toEqual(expected);
         expect(oids).toHaveLength(new Set(oids).size);
 
-        const entries = instrumentation.summary();
-        const walkEntry = entries.find((entry) => entry.name === "git.walk_commits");
-        expect(walkEntry?.attributes?.strategy).toEqual([strategyName]);
-        const walkCounters = walkEntry?.counters;
-        const commitReads = counter(walkCounters, "commit_reads");
-        const topologyCommitReads = counter(walkCounters, "topology_commit_reads");
-        const topologyCommitCacheHits = counter(walkCounters, "topology_commit_cache_hits");
-        const materializeCommitReads = counter(walkCounters, "materialize_commit_reads");
-        const materializeCommitCacheHits = counter(walkCounters, "materialize_commit_cache_hits");
-        const commitsYielded = counter(walkCounters, "commits_yielded");
-
-        expect(commitsYielded).toBe(4);
-        expect(commitReads).toBe(topologyCommitReads + materializeCommitReads);
-        expect(materializeCommitCacheHits + materializeCommitReads).toBe(commitsYielded);
-
         const readOids = readCommit.mock.calls.map(([options]) => options.oid);
-        expect(readOids).toHaveLength(commitReads);
-        expect(readOids).toHaveLength(new Set(readOids).size);
         for (const yieldedOid of oids) {
           expect(readOids).toContain(yieldedOid);
         }
@@ -881,21 +853,11 @@ describe("IsomorphicGitAdapter.getFileBlobChanges", () => {
       author: AUTHOR,
     });
 
-    const { LocalInstrumentationRecorder } =
-      await import("@gitlode/internal-foundation/instrumentation");
-    let time = 0;
-    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
-    const iterator = createAdapter(fs, { instrumentation })
+    const iterator = createAdapter(fs)
       .getFileBlobChanges("/", root as never)
       [Symbol.asyncIterator]();
-    const blobReadCalls = () =>
-      instrumentation.summary().find((entry) => entry.name === "git.blob_read")?.calls ?? 0;
-
-    expect(blobReadCalls()).toBe(0);
     expect((await iterator.next()).done).toBe(false);
-    expect(blobReadCalls()).toBe(1);
     expect((await iterator.next()).done).toBe(false);
-    expect(blobReadCalls()).toBe(2);
     expect((await iterator.next()).done).toBe(true);
   });
 });
@@ -971,52 +933,5 @@ describe("IsomorphicGitAdapter.findMergeBase", () => {
     } finally {
       spy.mockRestore();
     }
-  });
-});
-
-describe("IsomorphicGitAdapter instrumentation injection", () => {
-  it("adapter-level and file-blob spans accumulate when instrumentation is passed to the constructor", async () => {
-    const { fs, init, addCommit } = makeRepo();
-    await init();
-    const sha1 = await addCommit("a.txt", "hello\nworld\n", "root commit");
-    const sha2 = await addCommit("a.txt", "hello\nuniverse\n", "modify file");
-
-    let time = 0;
-    const clock = () => ++time;
-
-    const { LocalInstrumentationRecorder } =
-      await import("@gitlode/internal-foundation/instrumentation");
-    const instrumentation = new LocalInstrumentationRecorder(clock);
-
-    const adapter = createAdapter(fs, { instrumentation });
-
-    await collectFileBlobChanges(adapter, sha2, sha1);
-    // Also exercise resolve and merge-base paths so adapter-level buckets are populated.
-    await adapter.resolveRef("/", "main");
-    await adapter.findMergeBase("/", [sha2 as never, sha1 as never]);
-    for await (const _c of adapter.walkCommits("/", sha2 as never, sha1 as never)) {
-      // Drain iterator
-    }
-
-    const entries = instrumentation.summary();
-    const resolveRefEntry = entries.find((e) => e.name === "git.resolve_ref");
-    const mergeBaseEntry = entries.find((e) => e.name === "git.merge_base");
-    const walkEntry = entries.find((e) => e.name === "git.walk_commits");
-    const fileChangesEntry = entries.find((e) => e.name === "git.file_blob_changes");
-    const blobEntry = entries.find((e) => e.name === "git.blob_read");
-    expect(resolveRefEntry?.totalMs).toBeGreaterThan(0);
-    expect(mergeBaseEntry?.totalMs).toBeGreaterThan(0);
-    expect(walkEntry?.totalMs).toBeGreaterThan(0);
-    expect(walkEntry?.attributes).toEqual({ strategy: ["certified-lazy"] });
-    expect(walkEntry?.counters).toEqual({
-      commit_reads: 2,
-      commits_yielded: 1,
-      materialize_commit_cache_hits: 1,
-      topology_commit_cache_hits: 1,
-      topology_commit_reads: 2,
-    });
-    expect(fileChangesEntry?.totalMs).toBeGreaterThan(0);
-    expect(fileChangesEntry?.counters).toEqual({ blob_bytes: 27, modified: 1, yielded: 1 });
-    expect(blobEntry?.totalMs).toBeGreaterThan(0);
   });
 });

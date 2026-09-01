@@ -4,7 +4,6 @@ import {
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,
 } from "@gitlode/internal-foundation/dag";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import {
   context,
   createContextKey,
@@ -22,7 +21,9 @@ import { describe, expect, it } from "vitest";
 
 import { createCommitTraversalStrategy } from "../../src/git-impl/commit-traversal/index.js";
 import { createDagTelemetryBinding } from "../../src/git-impl/dag-metric-recorder.js";
+import { createGitMetricRecorder } from "../../src/git-impl/git-metric-recorder.js";
 import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
 class RecordingSpan {
   readonly attributes: Record<string, string | boolean | number> = {};
@@ -83,6 +84,12 @@ class RecordingMeter {
       add: (value: number, attributes: unknown) => this.adds.push({ name, value, attributes }),
     };
   }
+  createHistogram(name: string) {
+    this.creations.push(name);
+    return {
+      record: (value: number, attributes: unknown) => this.adds.push({ name, value, attributes }),
+    };
+  }
 }
 
 class TestContextManager {
@@ -128,10 +135,11 @@ async function makeAdapter(strategy: string, tracer: RecordingTracer, meter: Rec
   return {
     adapter: new IsomorphicGitAdapter({
       fs,
-      instrumentation: noopInstrumentation,
+      ...adapterTelemetry("isomorphic-git"),
+      tracer: asTracer(tracer),
+      metricRecorder: createGitMetricRecorder(asMeter(meter), "isomorphic-git"),
       commitTraversalStrategy: createCommitTraversalStrategy(strategy as never),
-      dagTracer: asTracer(tracer),
-      dagMeter: asMeter(meter),
+      dagTelemetryBinding: createDagTelemetryBinding(asTracer(tracer), asMeter(meter)),
     }),
     head,
   };
@@ -167,6 +175,20 @@ describe("Git-owned DAG telemetry binding", () => {
       expect(
         meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
       ).toHaveLength(1);
+      const walk = tracer.starts.find((entry) => entry.name === "gitlode.git.commit.walk");
+      expect(walk?.options?.attributes).toMatchObject({
+        "gitlode.git.adapter": "isomorphic-git",
+        "gitlode.git.commit.walk.strategy":
+          strategy === "certified-lazy" ? "certified-lazy" : strategy,
+        "gitlode.git.commit.walk.has_exclusion": false,
+      });
+      expect(walk?.span.attributes["gitlode.stream.completion"]).toBe("exhausted");
+      expect(walk?.span.endCount).toBe(1);
+      expect(walk?.span.status).toBeUndefined();
+      expect(walk?.parent).toBeDefined();
+      expect(meter.adds.filter((call) => call.name === "gitlode.git.commit.yielded")).toHaveLength(
+        1,
+      );
       expect(tracer.starts.filter((entry) => entry.name.startsWith("dag.")).length).toBe(0);
     },
   );

@@ -12,16 +12,11 @@ import {
 } from "@gitlode/internal-contracts/git";
 import type { CommitOid, OidProfile, RefType } from "@gitlode/internal-contracts/model";
 import { isCommitOid } from "@gitlode/internal-contracts/model";
-import { createAsyncIterableInstrumenter } from "@gitlode/internal-foundation/otel-support";
 import {
-  context,
-  metrics,
-  trace,
-  type Context,
-  type Meter,
-  type Span,
-  type Tracer,
-} from "@opentelemetry/api";
+  createAsyncIterableInstrumenter,
+  type InstrumentAsyncIterable,
+} from "@gitlode/internal-foundation/otel-support";
+import { context, trace, type Context, type Span, type Tracer } from "@opentelemetry/api";
 
 import {
   GitCatFileBatchSession,
@@ -35,17 +30,16 @@ import {
   type CliFileBlobChangeDescriptor,
   type CliFileBlobSnapshotDescriptor,
 } from "./git-cli-raw-diff.js";
-import { createGitMetricRecorder, type GitMetricRecorder } from "./git-metric-recorder.js";
+import type { GitMetricRecorder } from "./git-metric-recorder.js";
 import { attributeKey, setGitError, withGitAsyncSpan } from "./git-telemetry.js";
 
 export { parseBatchObjectStream } from "./git-cli-cat-file-batch.js";
 export { parseRawDiffTreeOutput } from "./git-cli-raw-diff.js";
 
 export interface GitCliAdapterDependencies {
-  readonly tracer?: Tracer;
-  readonly meter?: Meter;
-  readonly parentContext?: Context;
-  readonly metricRecorder?: GitMetricRecorder;
+  readonly tracer: Tracer;
+  readonly metricRecorder: GitMetricRecorder;
+  readonly parentContext: Context;
   readonly gitExecutable?: string;
 }
 
@@ -68,16 +62,18 @@ export class GitCliAdapter implements GitAdapter {
   private readonly _parentContext: Context;
   private readonly _metricRecorder: GitMetricRecorder;
   private readonly _gitExecutable: string;
+  private readonly _instrumentWalk: InstrumentAsyncIterable;
   private readonly _fileBlobBatchSessions = new Map<string, GitCatFileBatchSession>();
   private _disposed = false;
 
   constructor(dependencies: GitCliAdapterDependencies) {
-    this._tracer = dependencies.tracer ?? trace.getTracer("gitlode.git");
-    this._parentContext = dependencies.parentContext ?? context.active();
-    this._metricRecorder =
-      dependencies.metricRecorder ??
-      createGitMetricRecorder(dependencies.meter ?? metrics.getMeter("gitlode.git"), "git-cli");
+    this._tracer = dependencies.tracer;
+    this._parentContext = dependencies.parentContext;
+    this._metricRecorder = dependencies.metricRecorder;
     this._gitExecutable = dependencies.gitExecutable ?? DEFAULT_GIT_EXECUTABLE;
+    this._instrumentWalk = createAsyncIterableInstrumenter((span, completion) => {
+      span.setAttribute(attributeKey("stream_completion"), completion);
+    });
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -89,12 +85,11 @@ export class GitCliAdapter implements GitAdapter {
       this._tracer,
       "gitlode.git.cli.version.check",
       async (span) => {
-        span.setAttribute(attributeKey("git_adapter"), "git-cli");
         const result = await this._validateGitExecutable();
         span.setAttribute(attributeKey("git_cli_version"), sanitizeGitVersion(result));
         return result;
       },
-      undefined,
+      { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
       this._parentContext,
     );
   }
@@ -264,28 +259,26 @@ export class GitCliAdapter implements GitAdapter {
     const args = ["rev-list", "--topo-order", oid];
     if (excludeOid !== undefined) args.push("--not", excludeOid);
 
-    const instrument = createAsyncIterableInstrumenter((span, completion) => {
-      span.setAttribute(attributeKey("stream_completion"), completion);
-    });
-    yield* instrument(
+    const walkOptions = {
+      attributes: {
+        [attributeKey("git_adapter")]: "git-cli",
+        [attributeKey("git_commit_walk_strategy")]: "git-cli-rev-list-stream",
+        [attributeKey("git_commit_walk_has_exclusion")]: excludeOid !== undefined,
+      },
+    } as const;
+    yield* this._instrumentWalk(
       this._tracer,
       "gitlode.git.commit.walk",
       (walkSpan) => {
-        walkSpan.setAttribute(attributeKey("git_adapter"), "git-cli");
-        walkSpan.setAttribute(attributeKey("git_commit_walk_strategy"), "git-cli-rev-list-stream");
-        walkSpan.setAttribute(
-          attributeKey("git_commit_walk_has_exclusion"),
-          excludeOid !== undefined,
-        );
         const revListSpan = this._tracer.startSpan(
           "gitlode.git.cli.rev_list",
-          undefined,
-          trace.setSpan(this._parentContext, walkSpan),
+          { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+          trace.setSpan(walkParent, walkSpan),
         );
         const catFileSpan = this._tracer.startSpan(
           "gitlode.git.cli.commit_batch",
-          undefined,
-          trace.setSpan(this._parentContext, walkSpan),
+          { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+          trace.setSpan(walkParent, walkSpan),
         );
         try {
           return async function* (this: GitCliAdapter) {
@@ -312,7 +305,7 @@ export class GitCliAdapter implements GitAdapter {
           throw error;
         }
       },
-      undefined,
+      walkOptions,
       walkParent,
     );
   }
@@ -322,7 +315,6 @@ export class GitCliAdapter implements GitAdapter {
       this._tracer,
       "gitlode.git.merge_base",
       async (span) => {
-        span.setAttribute(attributeKey("git_merge_base_input_count"), oids.length);
         const result = await this._findMergeBase(repoPath, oids);
         span.setAttribute(
           attributeKey("git_merge_base_result"),
@@ -399,9 +391,18 @@ export class GitCliAdapter implements GitAdapter {
       this._tracer,
       "gitlode.git.cli.diff_tree",
       async (span) => {
-        const result = await this._readFileBlobChangeDescriptorsRaw(repoPath, commitOid, parentOid);
-        span.setAttribute(attributeKey("git_cli_process_completion"), "exited");
-        return result;
+        try {
+          const result = await this._readFileBlobChangeDescriptorsRaw(
+            repoPath,
+            commitOid,
+            parentOid,
+          );
+          span.setAttribute(attributeKey("git_cli_process_completion"), "exited");
+          return result;
+        } catch (error) {
+          span.setAttribute(attributeKey("git_cli_process_completion"), "error");
+          throw error;
+        }
       },
       {
         attributes: {
@@ -552,91 +553,77 @@ async function* streamRevListBatchObjects(
   );
   const revListClosed = processClosed(revList);
   const catFileClosed = processClosed(catFile);
-  let yielded = false;
-  let completed = false;
-
-  try {
-    for await (const object of parseBatchObjectStream(catFile.stdout)) {
-      yielded = true;
-      yield object;
+  let finalized = false;
+  const finalize = (completion: "exited" | "cancelled" | "error", error?: unknown): void => {
+    if (finalized) return;
+    finalized = true;
+    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), completion);
+    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), completion);
+    if (error !== undefined) {
+      setGitError(revListSpan, error);
+      setGitError(catFileSpan, error);
     }
-    completed = true;
-  } catch (error) {
-    revList.kill();
-    catFile.kill();
-    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), "error");
-    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "error");
-    setGitError(revListSpan, error);
-    setGitError(catFileSpan, error);
     revListSpan.end();
     catFileSpan.end();
+  };
+  let exited = false;
+  try {
+    for await (const object of parseBatchObjectStream(catFile.stdout)) yield object;
+    const [revListResult, catFileResult, pipeError] = await Promise.all([
+      revListClosed,
+      catFileClosed,
+      pipeClosed,
+    ]);
+    const revListStderr = Buffer.concat(revListStderrChunks).toString("utf8");
+    const catFileStderr = Buffer.concat(catFileStderrChunks).toString("utf8");
+    if (!revListResult.ok)
+      throw new GitAdapterError(
+        `Unexpected error walking commits: ${formatUnknownError(revListResult.error)}`,
+        "UNKNOWN",
+        revListResult.error,
+      );
+    if (!catFileResult.ok)
+      throw new GitAdapterError(
+        `Unexpected error reading commit batch: ${formatUnknownError(catFileResult.error)}`,
+        "UNKNOWN",
+        catFileResult.error,
+      );
+    if (revListResult.code !== 0) {
+      if (isNotRepositoryError(revListStderr))
+        throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
+      const result = { stdout: "", stderr: revListStderr, code: revListResult.code };
+      throw new GitAdapterError(
+        `Unexpected error walking commits: ${formatCommandFailure(result)}`,
+        "UNKNOWN",
+      );
+    }
+    if (catFileResult.code !== 0) {
+      if (isNotRepositoryError(catFileStderr))
+        throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
+      throw new GitAdapterError(
+        `Unexpected error reading commit batch: ${catFileStderr.trim()}`,
+        "UNKNOWN",
+      );
+    }
+    if (pipeError !== undefined)
+      throw new GitAdapterError(
+        `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(pipeError)}`,
+        "UNKNOWN",
+        pipeError,
+      );
+    finalize("exited");
+    exited = true;
+  } catch (error) {
+    finalize("error", error);
     throw error;
   } finally {
-    if (!completed) {
+    if (!exited) {
       revList.kill();
       catFile.kill();
+      await Promise.all([revListClosed, catFileClosed, pipeClosed]);
+      finalize("cancelled");
     }
   }
-
-  const [revListResult, catFileResult, pipeError] = await Promise.all([
-    revListClosed,
-    catFileClosed,
-    pipeClosed,
-  ]);
-  const revListStderr = Buffer.concat(revListStderrChunks).toString("utf8");
-  const catFileStderr = Buffer.concat(catFileStderrChunks).toString("utf8");
-
-  if (!revListResult.ok) {
-    throw new GitAdapterError(
-      `Unexpected error walking commits: ${formatUnknownError(revListResult.error)}`,
-      "UNKNOWN",
-      revListResult.error,
-    );
-  }
-  if (!catFileResult.ok) {
-    throw new GitAdapterError(
-      `Unexpected error reading commit batch: ${formatUnknownError(catFileResult.error)}`,
-      "UNKNOWN",
-      catFileResult.error,
-    );
-  }
-
-  const revListCode = revListResult.code;
-  const catFileCode = catFileResult.code;
-
-  if (revListCode !== 0) {
-    if (isNotRepositoryError(revListStderr)) {
-      throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
-    }
-    const result = { stdout: "", stderr: revListStderr, code: revListCode };
-    throw new GitAdapterError(
-      `Unexpected error walking commits: ${formatCommandFailure(result)}`,
-      "UNKNOWN",
-    );
-  }
-  if (catFileCode !== 0) {
-    if (isNotRepositoryError(catFileStderr)) {
-      throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
-    }
-    throw new GitAdapterError(
-      `Unexpected error reading commit batch: ${catFileStderr.trim()}`,
-      "UNKNOWN",
-    );
-  }
-  if (pipeError !== undefined) {
-    throw new GitAdapterError(
-      `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(pipeError)}`,
-      "UNKNOWN",
-      pipeError,
-    );
-  }
-
-  if (!yielded) {
-    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), "exited");
-    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "exited");
-  }
-  revListSpan.end();
-  catFileSpan.end();
 }
 
 function runCommand(

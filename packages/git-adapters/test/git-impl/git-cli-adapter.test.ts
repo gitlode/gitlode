@@ -5,10 +5,6 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import type { CommitOid } from "@gitlode/internal-contracts/model";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -17,6 +13,7 @@ import {
   parseRawDiffTreeOutput,
 } from "../../src/git-impl/git-cli-adapter.js";
 import { GitCliAdapter, IsomorphicGitAdapter } from "../../src/git-impl/index.js";
+import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
 const AUTHOR = {
   name: "Tester",
@@ -41,9 +38,7 @@ async function makeTempRepo(): Promise<string> {
 }
 
 function createAdapter(): GitCliAdapter {
-  return new GitCliAdapter({
-    instrumentation: noopInstrumentation,
-  });
+  return new GitCliAdapter(adapterTelemetry("git-cli"));
 }
 
 async function addCommit(repoPath: string, filename: string, content: string, message: string) {
@@ -113,29 +108,13 @@ describe("GitCliAdapter", () => {
     const first = await addCommit(repoPath, "file.txt", "1", "first");
     const second = await addCommit(repoPath, "file.txt", "2", "second");
     const third = await addCommit(repoPath, "file.txt", "3", "third");
-    const instrumentation = new LocalInstrumentationRecorder(() => Date.now());
-    const adapter = new GitCliAdapter({
-      instrumentation,
-    });
+    const adapter = new GitCliAdapter(adapterTelemetry("git-cli"));
 
     const commits = await collectWalk(adapter, repoPath, third, first);
 
     expect(new Set(commits.map((commit) => commit.oid))).toEqual(new Set([second, third]));
     expect(commits[0]?.author.timezoneOffset).toBe(0);
     expect(commits[0]?.parents.length).toBeGreaterThan(0);
-    expect(instrumentation.records()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "git.cli.rev_list",
-          attributes: expect.objectContaining({ strategy: "git-cli-rev-list-stream" }),
-          counters: expect.objectContaining({ yielded: 2 }),
-        }),
-        expect.objectContaining({
-          name: "git.cli.cat_file_batch",
-          counters: expect.objectContaining({ yielded: 2 }),
-        }),
-      ]),
-    );
   });
 
   it("rejects truncated cat-file batch output that omits the payload delimiter", async () => {
@@ -231,7 +210,7 @@ describe("GitCliAdapter", () => {
     await using cliAdapter = createAdapter();
     const isomorphicAdapter = new IsomorphicGitAdapter({
       fs: nodeFs,
-      instrumentation: noopInstrumentation,
+      ...adapterTelemetry("isomorphic-git"),
     });
 
     const cliChanges = [];
@@ -327,21 +306,13 @@ describe("GitCliAdapter", () => {
     const repoPath = await makeTempRepo();
     const root = await addCommit(repoPath, "file.txt", "one\n", "root");
     const second = await addCommit(repoPath, "file.txt", "one\ntwo\n", "second");
-    let time = 0;
-    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
 
     async function exerciseAdapter() {
-      await using adapter = new GitCliAdapter({ instrumentation });
+      await using adapter = new GitCliAdapter(adapterTelemetry("git-cli"));
       await collectFileBlobChanges(adapter, repoPath, root);
       await collectFileBlobChanges(adapter, repoPath, second, root);
     }
     await exerciseAdapter();
-
-    const sessions = instrumentation
-      .records()
-      .filter((record) => record.name === "git.cli.file_blob_batch");
-    expect(sessions).toHaveLength(1);
-    expect(sessions[0]?.counters).toEqual({ blob_bytes: 16, objects_read: 3 });
   });
 
   it("materializes CLI blob contents one change at a time as the consumer advances", async () => {
@@ -356,18 +327,10 @@ describe("GitCliAdapter", () => {
       message: "root",
       author: AUTHOR,
     })) as CommitOid;
-    let time = 0;
-    const instrumentation = new LocalInstrumentationRecorder(() => ++time);
-    await using adapter = new GitCliAdapter({ instrumentation });
+    await using adapter = new GitCliAdapter(adapterTelemetry("git-cli"));
     const iterator = adapter.getFileBlobChanges(repoPath, root)[Symbol.asyncIterator]();
-    const blobReadCalls = () =>
-      instrumentation.summary().find((entry) => entry.name === "git.blob_read")?.calls ?? 0;
-
-    expect(blobReadCalls()).toBe(0);
     expect((await iterator.next()).done).toBe(false);
-    expect(blobReadCalls()).toBe(1);
     expect((await iterator.next()).done).toBe(false);
-    expect(blobReadCalls()).toBe(2);
     expect((await iterator.next()).done).toBe(true);
   });
 

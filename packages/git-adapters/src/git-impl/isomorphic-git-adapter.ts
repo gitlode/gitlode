@@ -11,8 +11,11 @@ import {
 import type { BlobOid, RefType, CommitOid, OidProfile } from "@gitlode/internal-contracts/model";
 import { isCommitOid } from "@gitlode/internal-contracts/model";
 import { type DagSuccessor, type DagTopologyPort } from "@gitlode/internal-foundation/dag";
-import { createAsyncIterableInstrumenter } from "@gitlode/internal-foundation/otel-support";
-import { context, metrics, trace, type Context, type Meter, type Tracer } from "@opentelemetry/api";
+import {
+  createAsyncIterableInstrumenter,
+  type InstrumentAsyncIterable,
+} from "@gitlode/internal-foundation/otel-support";
+import { context, type Tracer } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
@@ -22,24 +25,16 @@ import {
   type CommitPathSchedulingHint,
   type CommitTraversalStrategy,
 } from "./commit-traversal/index.js";
-import { createDagTelemetryBinding, type DagTelemetryBinding } from "./dag-metric-recorder.js";
-import {
-  createGitMetricRecorder,
-  type GitCommitWalkStrategy,
-  type GitMetricRecorder,
-} from "./git-metric-recorder.js";
+import type { DagTelemetryBinding } from "./dag-metric-recorder.js";
+import { type GitCommitWalkStrategy, type GitMetricRecorder } from "./git-metric-recorder.js";
 import { attributeKey, withGitAsyncSpan } from "./git-telemetry.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
-  readonly tracer?: Tracer;
-  readonly meter?: Meter;
-  readonly parentContext?: Context;
-  readonly metricRecorder?: GitMetricRecorder;
+  readonly tracer: Tracer;
+  readonly metricRecorder: GitMetricRecorder;
   readonly commitTraversalStrategy?: CommitTraversalStrategy;
-  readonly dagTracer?: Tracer;
-  readonly dagMeter?: Meter;
-  readonly dagTelemetryBinding?: DagTelemetryBinding;
+  readonly dagTelemetryBinding: DagTelemetryBinding;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
@@ -47,25 +42,20 @@ export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _tracer: Tracer;
   private readonly _metricRecorder: GitMetricRecorder;
   private readonly _commitTraversalStrategy: CommitTraversalStrategy;
-  private readonly _dagTracer: Tracer;
-  private readonly _dagTelemetryBinding: ReturnType<typeof createDagTelemetryBinding>;
+  private readonly _dagTelemetryBinding: DagTelemetryBinding;
+  private readonly _instrumentWalk: InstrumentAsyncIterable;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
-    this._tracer = dependencies.tracer ?? trace.getTracer("gitlode.git");
-    this._metricRecorder =
-      dependencies.metricRecorder ??
-      createGitMetricRecorder(metrics.getMeter("gitlode.git"), "isomorphic-git");
+    this._tracer = dependencies.tracer;
+    this._metricRecorder = dependencies.metricRecorder;
     this._commitTraversalStrategy =
       dependencies.commitTraversalStrategy ??
       createCommitTraversalStrategy(DEFAULT_COMMIT_TRAVERSAL_STRATEGY);
-    this._dagTracer = dependencies.dagTracer ?? this._tracer;
-    this._dagTelemetryBinding =
-      dependencies.dagTelemetryBinding ??
-      createDagTelemetryBinding(
-        this._dagTracer,
-        dependencies.dagMeter ?? metrics.getMeter("gitlode.dag"),
-      );
+    this._dagTelemetryBinding = dependencies.dagTelemetryBinding;
+    this._instrumentWalk = createAsyncIterableInstrumenter((span, completion) => {
+      span.setAttribute(attributeKey("stream_completion"), completion);
+    });
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -283,18 +273,12 @@ export class IsomorphicGitAdapter implements GitAdapter {
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
     const walkParent = context.active();
-    const instrument = createAsyncIterableInstrumenter((span, completion) => {
-      span.setAttribute(attributeKey("stream_completion"), completion);
-    });
-    yield* instrument(
+    const strategy = this._commitTraversalStrategy;
+    const strategyName = strategy.name as GitCommitWalkStrategy;
+    yield* this._instrumentWalk(
       this._tracer,
       "gitlode.git.commit.walk",
-      (span) => {
-        const strategy = this._commitTraversalStrategy;
-        span.setAttribute(attributeKey("git_adapter"), "isomorphic-git");
-        const strategyName = strategy.name as GitCommitWalkStrategy;
-        span.setAttribute(attributeKey("git_commit_walk_strategy"), strategyName);
-        span.setAttribute(attributeKey("git_commit_walk_has_exclusion"), excludeOid !== undefined);
+      () => {
         const topology = new CommitTopologyAdapter(this._fs, repoPath, this._metricRecorder);
         const oidWalk = this._dagTelemetryBinding.instrumentDifference(
           strategy.name === "certified-lazy" ? "certified-lazy" : "phase-certified",
@@ -304,7 +288,13 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
         return commitObjectsFromOids(oidWalk, topology, strategyName, excludeOid !== undefined);
       },
-      undefined,
+      {
+        attributes: {
+          [attributeKey("git_adapter")]: "isomorphic-git",
+          [attributeKey("git_commit_walk_strategy")]: strategyName,
+          [attributeKey("git_commit_walk_has_exclusion")]: excludeOid !== undefined,
+        },
+      },
       walkParent,
     );
   }
@@ -314,7 +304,6 @@ export class IsomorphicGitAdapter implements GitAdapter {
       this._tracer,
       "gitlode.git.merge_base",
       async (span) => {
-        span.setAttribute(attributeKey("git_merge_base_input_count"), oids.length);
         const result = await this._findMergeBase(repoPath, oids);
         span.setAttribute(
           attributeKey("git_merge_base_result"),

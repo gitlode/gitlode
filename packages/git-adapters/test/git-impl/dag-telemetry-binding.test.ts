@@ -1,6 +1,11 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
+import { walkDagNodeIdsCertifiedLazy } from "@gitlode/internal-foundation/dag";
 import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import {
   context,
+  createContextKey,
+  ROOT_CONTEXT,
   type Context,
   type Span,
   type SpanOptions,
@@ -76,6 +81,29 @@ class RecordingMeter {
     };
   }
 }
+
+class TestContextManager {
+  private readonly storage = new AsyncLocalStorage<Context>();
+  active() {
+    return this.storage.getStore() ?? ROOT_CONTEXT;
+  }
+  with<A, F extends (...args: never[]) => A>(
+    ctx: Context,
+    fn: F,
+    thisArg?: unknown,
+    ...args: never[]
+  ) {
+    return this.storage.run(ctx, () => fn.apply(thisArg, args));
+  }
+  enable() {
+    return this;
+  }
+  disable() {
+    this.storage.disable();
+  }
+}
+
+context.setGlobalContextManager(new TestContextManager());
 
 const asTracer = (tracer: RecordingTracer) => tracer as unknown as Tracer;
 const asMeter = (meter: RecordingMeter) => meter as unknown as Meter;
@@ -154,9 +182,11 @@ describe("Git-owned DAG telemetry binding", () => {
     const stream = binding.instrumentReachable({ getSuccessors: async () => [] }, source);
     expect(iterations).toBe(0);
     expect(tracer.starts).toHaveLength(0);
-    await expect(drain(stream)).resolves.toEqual(["root"]);
+    const uniqueParent = context.active().setValue(createContextKey("dag-test-parent"), true);
+    await expect(context.with(uniqueParent, () => drain(stream))).resolves.toEqual(["root"]);
     expect(iterations).toBe(1);
     expect(tracer.starts[0]?.name).toBe("gitlode.dag.reachable");
+    expect(tracer.starts[0]?.parent).toBe(uniqueParent);
     expect(tracer.starts[0]?.span.attributes["gitlode.dag.start.count"]).toBe(1);
     expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("exhausted");
     expect(tracer.starts[0]?.span.endCount).toBe(1);
@@ -215,6 +245,181 @@ describe("Git-owned DAG telemetry binding", () => {
     expect(tracer.starts[1]?.span.status?.code).toBe(2);
     expect(tracer.starts[1]?.span.exceptions).toEqual([failure]);
     expect(tracer.starts[1]?.span.endCount).toBe(1);
+  });
+
+  it("records certified-lazy fallback with exact bounded evidence and zero omission", async () => {
+    const tracer = new RecordingTracer();
+    const meter = new RecordingMeter();
+    const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
+    const result = await drain(
+      binding.instrumentDifference("certified-lazy", true, (observation) =>
+        walkDagNodeIdsCertifiedLazy(
+          {
+            graph: {
+              getSuccessors: async (node: string) =>
+                node === "head" ? [{ nodeId: "headRoot" }] : [],
+            },
+            observation,
+          },
+          "head",
+          "exclude",
+        ),
+      ),
+    );
+    expect(result).toEqual(["head", "headRoot"]);
+    const span = tracer.starts[0]?.span;
+    expect(span?.attributes).toEqual({
+      "gitlode.dag.certification.result": "fallback",
+      "gitlode.dag.fallback.reason": "open-include-path",
+      "gitlode.dag.has_exclusion": true,
+      "gitlode.dag.strategy": "certified-lazy",
+      "gitlode.dag.termination.reason": "frontier-exhausted",
+      "gitlode.stream.completion": "exhausted",
+    });
+    expect(span?.events).toEqual([
+      {
+        name: "gitlode.dag.fallback",
+        attributes: { "gitlode.dag.fallback.reason": "open-include-path" },
+      },
+    ]);
+    expect(span?.status).toBeUndefined();
+    expect(span?.exceptions).toEqual([]);
+    expect(span?.endCount).toBe(1);
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.fallback")).toHaveLength(1);
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.fallback.node.removed")).toEqual(
+      [],
+    );
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
+    ).toHaveLength(1);
+  });
+
+  it("preserves difference partial metrics on cancellation and repeated terminals", async () => {
+    const tracer = new RecordingTracer();
+    const meter = new RecordingMeter();
+    const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
+    const stream = binding.instrumentDifference("eager-exclude", true, (observation) =>
+      (async function* () {
+        observation.recordStepProcessed(2);
+        observation.recordNodeYielded();
+        yield "head";
+      })(),
+    );
+    const iterator = stream[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.return?.();
+    await iterator.return?.();
+    await iterator.next();
+    expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("cancelled");
+    expect(tracer.starts[0]?.span.status).toBeUndefined();
+    expect(tracer.starts[0]?.span.exceptions).toEqual([]);
+    expect(tracer.starts[0]?.span.endCount).toBe(1);
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.step.processed")[0]?.value).toBe(
+      2,
+    );
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.node.yielded")[0]?.value).toBe(1);
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
+    ).toHaveLength(1);
+  });
+
+  it("records positive fallback removal without emitting zero datapoints", async () => {
+    const tracer = new RecordingTracer();
+    const meter = new RecordingMeter();
+    const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
+    await drain(
+      binding.instrumentDifference("certified-lazy", true, (observation) =>
+        walkDagNodeIdsCertifiedLazy(
+          {
+            graph: {
+              getSuccessors: async (node: string) =>
+                node === "head"
+                  ? [{ nodeId: "common" }]
+                  : node === "exclude"
+                    ? [{ nodeId: "excludeBranch" }]
+                    : node === "excludeBranch"
+                      ? [{ nodeId: "common" }]
+                      : [],
+            },
+            observation,
+          },
+          "head",
+          "exclude",
+        ),
+      ),
+    );
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.fallback.node.removed")).toEqual([
+      expect.objectContaining({ value: 1 }),
+    ]);
+  });
+
+  it("preserves difference partial metrics and thrown identity on error", async () => {
+    const tracer = new RecordingTracer();
+    const meter = new RecordingMeter();
+    const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
+    const failure = new Error("difference failure");
+    const stream = binding.instrumentDifference("eager-exclude", false, (observation) =>
+      (async function* () {
+        observation.recordStepProcessed(2);
+        yield "head";
+        throw failure;
+      })(),
+    );
+    await expect(drain(stream)).rejects.toBe(failure);
+    expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("error");
+    expect(tracer.starts[0]?.span.status?.code).toBe(2);
+    expect(tracer.starts[0]?.span.exceptions).toEqual([failure]);
+    expect(tracer.starts[0]?.span.endCount).toBe(1);
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.step.processed")[0]?.value).toBe(
+      2,
+    );
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
+    ).toHaveLength(1);
+  });
+
+  it("records handled throw separately from rethrown throw", async () => {
+    const tracer = new RecordingTracer();
+    const meter = new RecordingMeter();
+    const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
+    const token = { kind: "handled" };
+    const handled = binding.instrumentDifference("eager-exclude", false, (observation) => {
+      observation.recordNodeYielded();
+      let first = true;
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () =>
+              first
+                ? ((first = false), { value: "head", done: false })
+                : { value: token, done: true },
+            throw: async () => ({ value: token, done: true }),
+          };
+        },
+      };
+    });
+    const handledIterator = handled[Symbol.asyncIterator]();
+    await handledIterator.next();
+    const handledResult = await handledIterator.throw?.(token);
+    expect(handledResult).toEqual({ value: token, done: true });
+    expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("handled-throw");
+    expect(tracer.starts[0]?.span.endCount).toBe(1);
+    const rethrowToken = { kind: "rethrow" };
+    const rethrown = binding.instrumentDifference("eager-exclude", false, () => ({
+      [Symbol.asyncIterator]() {
+        return {
+          next: async () => ({ value: "head", done: false }),
+          throw: async () => {
+            throw rethrowToken;
+          },
+        };
+      },
+    }));
+    const rethrowIterator = rethrown[Symbol.asyncIterator]();
+    await rethrowIterator.next();
+    await expect(rethrowIterator.throw?.(rethrowToken)).rejects.toBe(rethrowToken);
+    expect(tracer.starts[1]?.span.attributes["gitlode.stream.completion"]).toBe("error");
+    expect(tracer.starts[1]?.span.exceptions).toHaveLength(1);
   });
 
   it("creates cataloged DAG instruments once across all binding operations", async () => {

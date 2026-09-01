@@ -43,8 +43,6 @@ export async function* walkDagNodeIdsEagerExclude<
       excludeNodeId,
       options,
     );
-    context.observation?.setCertificationResult("certified");
-    context.observation?.setTerminationReason("frontier-exhausted");
     complete("exhausted");
   } catch (error) {
     complete("error");
@@ -145,8 +143,6 @@ export async function* walkDagNodeIdsCertifiedLazy<
       excludeNodeId,
       options,
     );
-    context.observation?.setCertificationResult("certified");
-    context.observation?.setTerminationReason("frontier-exhausted");
     complete("exhausted");
   } catch (error) {
     complete("error");
@@ -164,6 +160,8 @@ async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, Doma
 ): AsyncIterable<NodeId> {
   if (excludeNodeId === undefined) {
     yield* walkDagNodeIdsEagerExcludeCore(context, nodeId, undefined, options);
+    context.telemetry.observation?.setCertificationResult("certified");
+    context.telemetry.observation?.setTerminationReason("frontier-exhausted");
     return;
   }
 

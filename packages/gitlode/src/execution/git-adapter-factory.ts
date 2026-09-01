@@ -1,18 +1,30 @@
 import nodeFs from "node:fs";
 
-import { GitCliAdapter, IsomorphicGitAdapter } from "@gitlode/git-adapters";
+import {
+  GitCliAdapter,
+  IsomorphicGitAdapter,
+  type DagTelemetryBinding,
+  type GitMetricRecorder,
+} from "@gitlode/git-adapters";
 import {
   EXPERIMENTAL_COMMIT_TRAVERSAL_ENV,
   createCommitTraversalStrategy,
   resolveCommitTraversalStrategyName,
 } from "@gitlode/git-adapters/experimental";
 import type { GitAdapter } from "@gitlode/internal-contracts/git";
-import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
+import type { Context, Tracer } from "@opentelemetry/api";
 
 import type { ExecutionGitAdapterName } from "./types.js";
 
 export interface GitAdapterFactoryDependencies {
   readonly environment: Readonly<Record<string, string | undefined>>;
+}
+
+interface GitAdapterTelemetry {
+  readonly gitTracer: Tracer;
+  readonly gitMetricRecorder: GitMetricRecorder;
+  readonly dagTelemetryBinding: DagTelemetryBinding;
+  readonly rootContext: Context;
 }
 
 type BuildGitAdapterResult =
@@ -33,7 +45,7 @@ function resolveIsomorphicCommitTraversalStrategyFromEnvironment(
 
 export async function buildGitAdapter(
   adapterName: ExecutionGitAdapterName,
-  instrumentation: Instrumentation,
+  telemetry: GitAdapterTelemetry,
   dependencies: GitAdapterFactoryDependencies,
 ): Promise<BuildGitAdapterResult> {
   switch (adapterName) {
@@ -53,14 +65,18 @@ export async function buildGitAdapter(
         kind: "success",
         adapter: new IsomorphicGitAdapter({
           fs: nodeFs,
-          instrumentation,
+          tracer: telemetry.gitTracer,
+          metricRecorder: telemetry.gitMetricRecorder,
           commitTraversalStrategy,
+          dagTelemetryBinding: telemetry.dagTelemetryBinding,
         }),
       };
     }
     case "git-cli": {
       const adapter = new GitCliAdapter({
-        instrumentation,
+        tracer: telemetry.gitTracer,
+        metricRecorder: telemetry.gitMetricRecorder,
+        parentContext: telemetry.rootContext,
       });
       try {
         const gitVersion = await adapter.validateGitExecutable();

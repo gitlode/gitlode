@@ -1,11 +1,14 @@
-import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn } from "node:child_process";
 import { once } from "node:events";
-import type { Readable } from "node:stream";
+import type { Readable, Writable } from "node:stream";
 
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import type { BlobOid } from "@gitlode/internal-contracts/model";
-import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { captureGroupOrThrow } from "@gitlode/internal-foundation/support";
+import { type Context, type Span, type Tracer } from "@opentelemetry/api";
+
+import type { GitMetricRecorder } from "./git-metric-recorder.js";
+import { attributeKey, setGitProcessError } from "./git-telemetry.js";
 
 export interface GitBatchObject {
   readonly oid: string;
@@ -13,11 +16,28 @@ export interface GitBatchObject {
   readonly content: Uint8Array;
 }
 
+export interface GitCliProcess {
+  readonly stdout: Readable;
+  readonly stderr: Readable;
+  readonly stdin: Writable | null;
+  on(event: "error", listener: (error: unknown) => void): this;
+  on(event: "close", listener: (code: number | null) => void): this;
+  kill(): boolean;
+}
+
+interface GitCliProcessStart {
+  readonly kind: "rev-list" | "commit-batch";
+  readonly command: string;
+  readonly args: readonly string[];
+}
+
+export type GitCliProcessFactory = (start: GitCliProcessStart) => GitCliProcess;
+
 type ProcessCloseResult =
   | { readonly ok: true; readonly code: number }
   | { readonly ok: false; readonly error: unknown };
 
-export function processClosed(child: ChildProcess): Promise<ProcessCloseResult> {
+export function processClosed(child: GitCliProcess): Promise<ProcessCloseResult> {
   return new Promise((resolve) => {
     child.on("error", (error) => resolve({ ok: false, error }));
     child.on("close", (code) => resolve({ ok: true, code: code ?? 1 }));
@@ -25,50 +45,81 @@ export function processClosed(child: ChildProcess): Promise<ProcessCloseResult> 
 }
 
 export class GitCatFileBatchSession implements AsyncDisposable {
-  private readonly _child: ChildProcessWithoutNullStreams;
-  private readonly _closed: Promise<ProcessCloseResult>;
-  private readonly _objects: AsyncIterator<GitBatchObject>;
+  private readonly _command: string;
+  private readonly _repoPath: string;
+  private readonly _tracer: Tracer;
+  private readonly _parent: Context;
+  private readonly _processFactory: GitCliProcessFactory;
+  private readonly _onUnusable: () => void;
+  private _child: GitCliProcess | undefined;
+  private _closed: Promise<ProcessCloseResult> | undefined;
+  private _objects: AsyncIterator<GitBatchObject> | undefined;
   private readonly _stderrChunks: Buffer[] = [];
-  private readonly _span: ReturnType<Instrumentation["startSpan"]>;
+  private _span: Span | undefined;
+  private readonly _recorder: GitMetricRecorder;
+  private _objectsRead = 0;
+  private _bytesRead = 0;
   private _queue: Promise<void> = Promise.resolve();
   private _disposed = false;
   private _operationFailure: unknown;
 
-  constructor(command: string, repoPath: string, instrumentation: Instrumentation) {
-    this._span = instrumentation.startSpan("git.cli.file_blob_batch");
-    this._child = spawn(command, ["-C", repoPath, "cat-file", "--batch"], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    this._child.stderr.on("data", (chunk: Buffer) => this._stderrChunks.push(chunk));
-    this._child.stdin.on("error", () => {
-      // Process termination is reported through the shared close result.
-    });
-    this._closed = processClosed(this._child);
-    this._objects = parseBatchObjectStream(this._child.stdout)[Symbol.asyncIterator]();
+  constructor(
+    command: string,
+    repoPath: string,
+    tracer: Tracer,
+    recorder: GitMetricRecorder,
+    parent: Context,
+    processFactory: GitCliProcessFactory = defaultProcessFactory,
+    onUnusable: () => undefined = () => undefined,
+  ) {
+    this._command = command;
+    this._repoPath = repoPath;
+    this._tracer = tracer;
+    this._parent = parent;
+    this._processFactory = processFactory;
+    this._onUnusable = onUnusable;
+    this._recorder = recorder;
   }
 
   async readBlob(oid: BlobOid): Promise<Uint8Array> {
     if (this._disposed) {
       throw new GitAdapterError("cat-file batch session has already been disposed", "UNKNOWN");
     }
-    return await this._enqueue(async () => {
-      if (!this._child.stdin.write(`${oid}\n`)) {
-        await once(this._child.stdin, "drain");
-      }
-      const result = await this._objects.next();
-      if (result.done) {
-        throw await this._unexpectedCloseError();
-      }
-      if (result.value.oid !== oid || result.value.type !== "blob") {
-        throw new GitAdapterError(
-          `Unexpected cat-file response for blob ${oid}: ${result.value.oid} ${result.value.type}`,
-          "UNKNOWN",
-        );
-      }
-      this._span.incrementCounter("objects_read");
-      this._span.incrementCounter("blob_bytes", result.value.content.length);
-      return result.value.content;
-    });
+    const token = this._recorder.startBlobRead();
+    try {
+      await this._start();
+      const child = this._child;
+      const objects = this._objects;
+      if (!child || !objects) throw new Error("Git commit-batch process did not start");
+      const content = await this._enqueue(async () => {
+        if (!child.stdin || !child.stdin.write(`${oid}\n`)) {
+          if (!child.stdin) throw new Error("Git commit-batch process has no stdin");
+          await once(child.stdin, "drain");
+        }
+        const result = await objects.next();
+        if (result.done) {
+          throw await this._unexpectedCloseError();
+        }
+        if (result.value.oid !== oid || result.value.type !== "blob") {
+          throw new GitAdapterError(
+            `Unexpected cat-file response for blob ${oid}: ${result.value.oid} ${result.value.type}`,
+            "UNKNOWN",
+          );
+        }
+        return result.value.content;
+      });
+      this._objectsRead++;
+      this._bytesRead += content.length;
+      this._recorder.completeBlobRead(token, {
+        outcome: "success",
+        purpose: "file-change",
+        sizeBytes: content.length,
+      });
+      return content;
+    } catch (error) {
+      this._recorder.completeBlobRead(token, { outcome: "error" });
+      throw error;
+    }
   }
 
   async [Symbol.asyncDispose](): Promise<void> {
@@ -78,8 +129,12 @@ export class GitCatFileBatchSession implements AsyncDisposable {
     try {
       await this._queue;
       failure ??= this._operationFailure;
-      this._child.stdin.end();
-      const result = await this._closed;
+      const child = this._child;
+      const closed = this._closed;
+      if (!child || !closed) return;
+      if (!child.stdin) throw new Error("Git commit-batch process has no stdin");
+      child.stdin.end();
+      const result = await closed;
       if (!result.ok) {
         throw new GitAdapterError(
           `Unexpected error closing cat-file batch: ${formatUnknownError(result.error)}`,
@@ -95,10 +150,18 @@ export class GitCatFileBatchSession implements AsyncDisposable {
       }
     } catch (error) {
       failure = error;
-      this._child.kill();
+      this._child?.kill();
       throw error;
     } finally {
-      this._span.end(failure);
+      if (!this._span) return;
+      this._span.setAttribute(
+        attributeKey("git_cli_process_completion"),
+        failure ? "error" : "exited",
+      );
+      this._span.setAttribute(attributeKey("git_object_read_count"), this._objectsRead);
+      this._span.setAttribute(attributeKey("git_blob_read_size"), this._bytesRead);
+      if (failure) setGitProcessError(this._span, failure);
+      this._span.end();
     }
   }
 
@@ -114,7 +177,9 @@ export class GitCatFileBatchSession implements AsyncDisposable {
   }
 
   private async _unexpectedCloseError(): Promise<GitAdapterError> {
-    const result = await this._closed;
+    const closed = this._closed;
+    if (!closed) throw new GitAdapterError("cat-file batch process was not started", "UNKNOWN");
+    const result = await closed;
     if (!result.ok) {
       return new GitAdapterError(
         `Unexpected error reading cat-file batch: ${formatUnknownError(result.error)}`,
@@ -128,9 +193,49 @@ export class GitCatFileBatchSession implements AsyncDisposable {
     );
   }
 
+  private async _start(): Promise<void> {
+    if (this._child) return;
+    this._span = this._tracer.startSpan(
+      "gitlode.git.cli.file_blob_batch",
+      { attributes: { [attributeKey("git_adapter")]: "git-cli" } },
+      this._parent,
+    );
+    try {
+      const child = this._processFactory({
+        kind: "commit-batch",
+        command: this._command,
+        args: ["-C", this._repoPath, "cat-file", "--batch"],
+      });
+      this._child = child;
+      const closed = processClosed(child);
+      this._closed = closed;
+      if (!child.stdout || !child.stderr || !child.stdin) {
+        throw new Error("Git commit-batch process has an invalid stream shape");
+      }
+      child.stderr.on("data", (chunk: Buffer) => this._stderrChunks.push(chunk));
+      child.stdin.on("error", () => undefined);
+      this._objects = parseBatchObjectStream(child.stdout)[Symbol.asyncIterator]();
+    } catch (error) {
+      this._child?.kill();
+      if (this._closed) await this._closed;
+      this._disposed = true;
+      this._onUnusable();
+      this._span.setAttribute(attributeKey("git_cli_process_completion"), "error");
+      setGitProcessError(this._span, error);
+      this._span.end();
+      throw error;
+    }
+  }
+
   private _stderrText(): string {
     return Buffer.concat(this._stderrChunks).toString("utf8").trim();
   }
+}
+
+function defaultProcessFactory(start: GitCliProcessStart): GitCliProcess {
+  return spawn(start.command, start.args, {
+    stdio: ["pipe", "pipe", "pipe"],
+  }) as unknown as GitCliProcess;
 }
 
 export async function* parseBatchObjectStream(stream: Readable): AsyncIterable<GitBatchObject> {

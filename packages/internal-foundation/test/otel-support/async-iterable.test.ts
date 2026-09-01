@@ -321,4 +321,79 @@ describe("instrumentAsyncIterable", () => {
     expect(factory).not.toHaveBeenCalled();
     expect(starts).toHaveLength(0);
   });
+
+  it("supports a custom error policy without changing terminal identity or repeating it", async () => {
+    const failure = Symbol("custom failure");
+    const { tracer, starts } = makeTracer();
+    const onError = vi.fn();
+    const instrumenter = createAsyncIterableInstrumenter(vi.fn(), onError);
+    const iterator = instrumenter(tracer, "stream", () =>
+      iterableFrom({
+        next: async () => {
+          throw failure;
+        },
+      }),
+    )[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toBe(failure);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(starts[0]!.span, failure);
+    expect(starts[0]!.span.endCount).toBe(1);
+  });
+
+  it("preserves application failure when error completion callback throws", async () => {
+    const failure = Symbol("source failure");
+    const completion = vi.fn(() => {
+      throw Symbol("completion failure");
+    });
+    const onError = vi.fn();
+    const { tracer, starts } = makeTracer();
+    const iterator = createAsyncIterableInstrumenter(completion, onError)(tracer, "stream", () =>
+      iterableFrom({
+        next: async () => {
+          throw failure;
+        },
+      }),
+    )[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toBe(failure);
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+    await expect(iterator.return?.()).resolves.toEqual({ value: undefined, done: true });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(completion).toHaveBeenCalledOnce();
+    expect(completion).toHaveBeenCalledWith(starts[0]!.span, "error");
+    expect(starts[0]!.span.endCount).toBe(1);
+  });
+
+  it("keeps the original failure and ends when custom error policy throws", async () => {
+    const failure = Symbol("application failure");
+    const { tracer, starts } = makeTracer();
+    const instrumenter = createAsyncIterableInstrumenter(vi.fn(), () => {
+      throw Symbol("telemetry failure");
+    });
+    const iterator = instrumenter(tracer, "stream", () =>
+      iterableFrom({
+        next: async () => {
+          throw failure;
+        },
+      }),
+    )[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toBe(failure);
+    expect(starts[0]!.span.endCount).toBe(1);
+  });
+
+  it("allows a typed policy to set ERROR without recording an exception", async () => {
+    const failure = Symbol("typed failure");
+    const { tracer, starts } = makeTracer();
+    const setTypedError = vi.fn((span) => span.setStatus({ code: SpanStatusCode.ERROR }));
+    const iterator = createAsyncIterableInstrumenter(vi.fn(), setTypedError)(tracer, "stream", () =>
+      iterableFrom({
+        next: async () => {
+          throw failure;
+        },
+      }),
+    )[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toBe(failure);
+    expect(setTypedError).toHaveBeenCalledOnce();
+    expect(starts[0]!.span.endCount).toBe(1);
+  });
 });

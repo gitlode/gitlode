@@ -12,11 +12,10 @@ import type { BlobOid, RefType, CommitOid, OidProfile } from "@gitlode/internal-
 import { isCommitOid } from "@gitlode/internal-contracts/model";
 import { type DagSuccessor, type DagTopologyPort } from "@gitlode/internal-foundation/dag";
 import {
-  instrumentAsyncIterable,
-  type Instrumentation,
-  type InstrumentationSpan,
-} from "@gitlode/internal-foundation/instrumentation";
-import { metrics, trace, type Meter, type Tracer } from "@opentelemetry/api";
+  createAsyncIterableInstrumenter,
+  type InstrumentAsyncIterable,
+} from "@gitlode/internal-foundation/otel-support";
+import { context, type Tracer } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
 
@@ -26,34 +25,53 @@ import {
   type CommitPathSchedulingHint,
   type CommitTraversalStrategy,
 } from "./commit-traversal/index.js";
-import { createDagTelemetryBinding } from "./dag-metric-recorder.js";
+import type { DagTelemetryBinding } from "./dag-metric-recorder.js";
+import { type GitCommitWalkStrategy, type GitMetricRecorder } from "./git-metric-recorder.js";
+import { attributeKey, withGitAsyncSpan } from "./git-telemetry.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;
-  readonly instrumentation: Instrumentation;
+  readonly tracer: Tracer;
+  readonly metricRecorder: GitMetricRecorder;
   readonly commitTraversalStrategy?: CommitTraversalStrategy;
-  readonly dagTracer?: Tracer;
-  readonly dagMeter?: Meter;
+  readonly dagTelemetryBinding: DagTelemetryBinding;
+}
+
+interface IsomorphicGitTestingSeam {
+  readonly readBlob: (entry: git.WalkerEntry) => Promise<Uint8Array | undefined | void>;
+}
+
+const testingSeams = new WeakMap<IsomorphicGitAdapter, IsomorphicGitTestingSeam>();
+
+/** Direct-source test construction only; this is not part of the package API. */
+export function createIsomorphicGitAdapterForTesting(
+  dependencies: IsomorphicGitAdapterDependencies,
+  seam: IsomorphicGitTestingSeam,
+): IsomorphicGitAdapter {
+  const adapter = new IsomorphicGitAdapter(dependencies);
+  testingSeams.set(adapter, seam);
+  return adapter;
 }
 
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
-  private readonly _instrumentation: Instrumentation;
+  private readonly _tracer: Tracer;
+  private readonly _metricRecorder: GitMetricRecorder;
   private readonly _commitTraversalStrategy: CommitTraversalStrategy;
-  private readonly _dagTracer: Tracer;
-  private readonly _dagTelemetryBinding: ReturnType<typeof createDagTelemetryBinding>;
+  private readonly _dagTelemetryBinding: DagTelemetryBinding;
+  private readonly _instrumentWalk: InstrumentAsyncIterable;
 
   constructor(dependencies: IsomorphicGitAdapterDependencies) {
     this._fs = dependencies.fs;
-    this._instrumentation = dependencies.instrumentation;
+    this._tracer = dependencies.tracer;
+    this._metricRecorder = dependencies.metricRecorder;
     this._commitTraversalStrategy =
       dependencies.commitTraversalStrategy ??
       createCommitTraversalStrategy(DEFAULT_COMMIT_TRAVERSAL_STRATEGY);
-    this._dagTracer = dependencies.dagTracer ?? trace.getTracer("gitlode.dag");
-    this._dagTelemetryBinding = createDagTelemetryBinding(
-      this._dagTracer,
-      dependencies.dagMeter ?? metrics.getMeter("gitlode.dag"),
-    );
+    this._dagTelemetryBinding = dependencies.dagTelemetryBinding;
+    this._instrumentWalk = createAsyncIterableInstrumenter((span, completion) => {
+      span.setAttribute(attributeKey("stream_completion"), completion);
+    });
   }
 
   supportedObjectFormats(): readonly OidProfile[] {
@@ -65,11 +83,19 @@ export class IsomorphicGitAdapter implements GitAdapter {
   }
 
   async resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.resolve_ref",
+      async () => await this._resolveRef(repoPath, ref),
+      { attributes: { [attributeKey("git_adapter")]: "isomorphic-git" } },
+      context.active(),
+    );
+  }
+
+  private async _resolveRef(repoPath: string, ref: string): Promise<CommitOid> {
     let oid: string;
     try {
-      oid = (await this._instrumentation.runAsync("git.resolve_ref", async () =>
-        git.resolveRef({ fs: this._fs, dir: repoPath, ref }),
-      )) as string;
+      oid = (await git.resolveRef({ fs: this._fs, dir: repoPath, ref })) as string;
     } catch (err) {
       if (err instanceof Error) {
         const name = err.name;
@@ -105,14 +131,26 @@ export class IsomorphicGitAdapter implements GitAdapter {
   }
 
   async getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat> {
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.repository_object_format",
+      async (span) => {
+        const result = await this._getRepositoryObjectFormat(repoPath);
+        span.setAttribute(attributeKey("git_object_format"), result);
+        return result;
+      },
+      { attributes: { [attributeKey("git_adapter")]: "isomorphic-git" } },
+      context.active(),
+    );
+  }
+
+  private async _getRepositoryObjectFormat(repoPath: string): Promise<RepositoryObjectFormat> {
     try {
-      const raw = await this._instrumentation.runAsync("git.repository_object_format", async () =>
-        git.getConfig({
-          fs: this._fs,
-          dir: repoPath,
-          path: "extensions.objectformat",
-        }),
-      );
+      const raw = await git.getConfig({
+        fs: this._fs,
+        dir: repoPath,
+        path: "extensions.objectformat",
+      });
 
       // Per Git behavior, repository object format defaults to sha1 when unset.
       if (raw === undefined || raw === null) {
@@ -139,6 +177,20 @@ export class IsomorphicGitAdapter implements GitAdapter {
   }
 
   async classifyRefType(repoPath: string, ref: string): Promise<RefType> {
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.classify_ref",
+      async (span) => {
+        const result = await this._classifyRefType(repoPath, ref);
+        span.setAttribute(attributeKey("git_ref_type"), result);
+        return result;
+      },
+      { attributes: { [attributeKey("git_adapter")]: "isomorphic-git" } },
+      context.active(),
+    );
+  }
+
+  private async _classifyRefType(repoPath: string, ref: string): Promise<RefType> {
     try {
       await git.resolveRef({
         fs: this._fs,
@@ -195,14 +247,29 @@ export class IsomorphicGitAdapter implements GitAdapter {
   }
 
   async getRemoteUrl(repoPath: string): Promise<string | null> {
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.remote_url.resolve",
+      async (span) => {
+        const result = await this._getRemoteUrl(repoPath);
+        span.setAttribute(
+          attributeKey("git_remote_url_result"),
+          result === null ? "missing" : "found",
+        );
+        return result;
+      },
+      { attributes: { [attributeKey("git_adapter")]: "isomorphic-git" } },
+      context.active(),
+    );
+  }
+
+  private async _getRemoteUrl(repoPath: string): Promise<string | null> {
     try {
-      const url = await this._instrumentation.runAsync("git.get_remote_url", async () =>
-        git.getConfig({
-          fs: this._fs,
-          dir: repoPath,
-          path: "remote.origin.url",
-        }),
-      );
+      const url = await git.getConfig({
+        fs: this._fs,
+        dir: repoPath,
+        path: "remote.origin.url",
+      });
       if (url === undefined || url === null) {
         return null;
       }
@@ -221,29 +288,65 @@ export class IsomorphicGitAdapter implements GitAdapter {
     oid: CommitOid,
     excludeOid?: CommitOid,
   ): AsyncIterable<RawCommit> {
-    yield* instrumentAsyncIterable(this._instrumentation, "git.walk_commits", (span) => {
-      const strategy = this._commitTraversalStrategy;
-      span.setAttribute("strategy", strategy.name);
-      const topology = new CommitTopologyAdapter(this._fs, repoPath, span);
-      const oidWalk = this._dagTelemetryBinding.instrumentDifference(
-        strategy.name === "certified-lazy" ? "certified-lazy" : "phase-certified",
-        excludeOid !== undefined,
-        (observation) => strategy.walk({ graph: topology, observation }, oid, excludeOid),
-      );
+    const walkParent = context.active();
+    const strategy = this._commitTraversalStrategy;
+    const strategyName = strategy.name as GitCommitWalkStrategy;
+    yield* this._instrumentWalk(
+      this._tracer,
+      "gitlode.git.commit.walk",
+      () => {
+        const topology = new CommitTopologyAdapter(this._fs, repoPath, this._metricRecorder);
+        const oidWalk = this._dagTelemetryBinding.instrumentDifference(
+          strategy.name === "certified-lazy" ? "certified-lazy" : "phase-certified",
+          excludeOid !== undefined,
+          (observation) => strategy.walk({ graph: topology, observation }, oid, excludeOid),
+        );
 
-      return commitObjectsFromOids(oidWalk, topology);
-    });
+        return commitObjectsFromOids(oidWalk, topology, strategyName, excludeOid !== undefined);
+      },
+      {
+        attributes: {
+          [attributeKey("git_adapter")]: "isomorphic-git",
+          [attributeKey("git_commit_walk_strategy")]: strategyName,
+          [attributeKey("git_commit_walk_has_exclusion")]: excludeOid !== undefined,
+        },
+      },
+      walkParent,
+    );
   }
 
   async findMergeBase(repoPath: string, oids: readonly CommitOid[]): Promise<CommitOid | null> {
+    return await withGitAsyncSpan(
+      this._tracer,
+      "gitlode.git.merge_base",
+      async (span) => {
+        const result = await this._findMergeBase(repoPath, oids);
+        span.setAttribute(
+          attributeKey("git_merge_base_result"),
+          result === null ? "missing" : "found",
+        );
+        return result;
+      },
+      {
+        attributes: {
+          [attributeKey("git_adapter")]: "isomorphic-git",
+          [attributeKey("git_merge_base_input_count")]: oids.length,
+        },
+      },
+      context.active(),
+    );
+  }
+
+  private async _findMergeBase(
+    repoPath: string,
+    oids: readonly CommitOid[],
+  ): Promise<CommitOid | null> {
     try {
-      const result = await this._instrumentation.runAsync("git.merge_base", async () =>
-        git.findMergeBase({
-          fs: this._fs,
-          dir: repoPath,
-          oids: oids as unknown as string[],
-        }),
-      );
+      const result = await git.findMergeBase({
+        fs: this._fs,
+        dir: repoPath,
+        oids: oids as unknown as string[],
+      });
       if (result.length === 0) return null;
       return result[0] as CommitOid;
     } catch (err) {
@@ -260,16 +363,13 @@ export class IsomorphicGitAdapter implements GitAdapter {
     commitOid: CommitOid,
     parentOid?: CommitOid,
   ): AsyncIterable<FileBlobChange> {
-    yield* instrumentAsyncIterable(this._instrumentation, "git.file_blob_changes", (span) =>
-      this._getFileBlobChanges(repoPath, commitOid, parentOid, span),
-    );
+    yield* this._getFileBlobChanges(repoPath, commitOid, parentOid);
   }
 
   private async *_getFileBlobChanges(
     repoPath: string,
     commitOid: CommitOid,
     parentOid: CommitOid | undefined,
-    span: InstrumentationSpan,
   ): AsyncIterable<FileBlobChange> {
     const descriptors: FileBlobChangeDescriptor[] = [];
 
@@ -335,14 +435,10 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
     // The walk buffers only lightweight descriptors. Blob contents are read one
     // change at a time so materialization follows the consumer's pace.
+    const readBlob = testingSeams.get(this)?.readBlob ?? ((entry) => entry.content());
     for (const descriptor of descriptors) {
-      const change = await materializeFileBlobChange(descriptor, this._instrumentation);
-      span.incrementCounter("yielded");
-      span.incrementCounter(change.status);
-      span.incrementCounter(
-        "blob_bytes",
-        (change.before?.content.length ?? 0) + (change.after?.content.length ?? 0),
-      );
+      const change = await materializeFileBlobChange(descriptor, this._metricRecorder, readBlob);
+      this._metricRecorder.recordFileChangeYielded(change.status);
       yield change;
     }
   }
@@ -388,26 +484,31 @@ async function describeFileBlobSnapshot(
 
 async function materializeFileBlobChange(
   descriptor: FileBlobChangeDescriptor,
-  instrumentation: Instrumentation,
+  recorder: GitMetricRecorder,
+  readBlob: (entry: git.WalkerEntry) => Promise<Uint8Array | undefined | void>,
 ): Promise<FileBlobChange> {
   switch (descriptor.status) {
     case "added":
       return {
         status: "added",
         before: null,
-        after: await materializeFileBlobSnapshot(descriptor.after, instrumentation),
+        after: await materializeFileBlobSnapshot(descriptor.after, recorder, readBlob),
       };
     case "modified": {
-      const [before, after] = await Promise.all([
-        materializeFileBlobSnapshot(descriptor.before, instrumentation),
-        materializeFileBlobSnapshot(descriptor.after, instrumentation),
+      const results = await Promise.allSettled([
+        materializeFileBlobSnapshot(descriptor.before, recorder, readBlob),
+        materializeFileBlobSnapshot(descriptor.after, recorder, readBlob),
       ]);
-      return { status: "modified", before, after };
+      const before = results[0];
+      const after = results[1];
+      if (before.status === "rejected") throw before.reason;
+      if (after.status === "rejected") throw after.reason;
+      return { status: "modified", before: before.value, after: after.value };
     }
     case "deleted":
       return {
         status: "deleted",
-        before: await materializeFileBlobSnapshot(descriptor.before, instrumentation),
+        before: await materializeFileBlobSnapshot(descriptor.before, recorder, readBlob),
         after: null,
       };
   }
@@ -415,29 +516,35 @@ async function materializeFileBlobChange(
 
 async function materializeFileBlobSnapshot(
   descriptor: FileBlobSnapshotDescriptor,
-  instrumentation: Instrumentation,
+  recorder: GitMetricRecorder,
+  readBlob: (entry: git.WalkerEntry) => Promise<Uint8Array | undefined | void>,
 ): Promise<FileBlobSnapshot> {
-  const content = await instrumentation.runAsync("git.blob_read", async () =>
-    descriptor.entry.content(),
-  );
-  return {
-    path: descriptor.path,
-    oid: descriptor.oid,
-    mode: descriptor.mode,
-    content: content ?? new Uint8Array(0),
-  };
+  const token = recorder.startBlobRead();
+  try {
+    const content = await readBlob(descriptor.entry);
+    const bytes = content ?? new Uint8Array(0);
+    recorder.completeBlobRead(token, {
+      outcome: "success",
+      purpose: "file-change",
+      sizeBytes: bytes.length,
+    });
+    return { path: descriptor.path, oid: descriptor.oid, mode: descriptor.mode, content: bytes };
+  } catch (error) {
+    recorder.completeBlobRead(token, { outcome: "error" });
+    throw error;
+  }
 }
 
 class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSchedulingHint> {
   private readonly cache = new Map<CommitOid, RawCommit>();
   private readonly fs: FsClient;
   private readonly repoPath: string;
-  private readonly span: InstrumentationSpan;
+  private readonly recorder: GitMetricRecorder;
 
-  constructor(fs: FsClient, repoPath: string, span: InstrumentationSpan) {
+  constructor(fs: FsClient, repoPath: string, recorder: GitMetricRecorder) {
     this.fs = fs;
     this.repoPath = repoPath;
-    this.span = span;
+    this.recorder = recorder;
   }
 
   async getSuccessors(
@@ -450,13 +557,12 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSche
   async readCommit(oid: CommitOid, purpose: CommitReadPurpose): Promise<RawCommit> {
     const cached = this.cache.get(oid);
     if (cached !== undefined) {
-      this.span.incrementCounter(`${purpose}_commit_cache_hits`);
+      this.recorder.recordObjectCacheLookup("commit", purpose, "hit");
       return cached;
     }
 
     try {
-      this.span.incrementCounter("commit_reads");
-      this.span.incrementCounter(`${purpose}_commit_reads`);
+      this.recorder.recordObjectCacheLookup("commit", purpose, "miss");
       const { commit } = await git.readCommit({
         fs: this.fs,
         dir: this.repoPath,
@@ -464,6 +570,7 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSche
       });
       const rawCommit = toRawCommit(oid, commit);
       this.cache.set(oid, rawCommit);
+      this.recorder.recordCommitObjectRead(purpose);
       return rawCommit;
     } catch (err) {
       if (err instanceof Error && err.name === "NotFoundError") {
@@ -477,8 +584,8 @@ class CommitTopologyAdapter implements DagTopologyPort<CommitOid, CommitPathSche
     }
   }
 
-  incrementYieldedCommit(): void {
-    this.span.incrementCounter("commits_yielded");
+  incrementYieldedCommit(strategy: GitCommitWalkStrategy, hasExclusion: boolean): void {
+    this.recorder.recordCommitYielded(strategy, hasExclusion);
   }
 }
 
@@ -496,10 +603,12 @@ type CommitReadPurpose = "topology" | "materialize";
 async function* commitObjectsFromOids(
   oids: AsyncIterable<CommitOid>,
   topology: CommitTopologyAdapter,
+  strategy: GitCommitWalkStrategy,
+  hasExclusion: boolean,
 ): AsyncIterable<RawCommit> {
   for await (const oid of oids) {
     const commit = await topology.readCommit(oid, "materialize");
-    topology.incrementYieldedCommit();
+    topology.incrementYieldedCommit(strategy, hasExclusion);
     yield commit;
   }
 }

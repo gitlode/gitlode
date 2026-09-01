@@ -20,6 +20,65 @@ import { makeTracer } from "../support/otel-fakes.js";
 
 const tempDirs: string[] = [];
 
+class RecordingGitMetricRecorder {
+  constructor(private readonly adapter: "isomorphic-git" | "git-cli") {}
+  readonly calls: Array<{ name: string; value: number; attributes: Record<string, unknown> }> = [];
+  recordCommitYielded(strategy: string, hasExclusion: boolean) {
+    this.calls.push({
+      name: "gitlode.git.commit.yielded",
+      value: 1,
+      attributes: {
+        "gitlode.git.adapter": this.adapter,
+        "gitlode.git.commit.walk.strategy": strategy,
+        "gitlode.git.commit.walk.has_exclusion": hasExclusion,
+      },
+    });
+  }
+  recordCommitObjectRead() {}
+  recordObjectCacheLookup() {}
+  recordFileChangeYielded() {}
+  startBlobRead() {
+    return {} as never;
+  }
+  completeBlobRead() {}
+}
+
+const testGitTelemetry = {
+  gitTracer: trace.getTracer("gitlode.test.git"),
+  gitMetricRecorder: {
+    recordCommitYielded() {},
+    recordCommitObjectRead() {},
+    recordObjectCacheLookup() {},
+    recordFileChangeYielded() {},
+    startBlobRead: () => ({}) as never,
+    completeBlobRead() {},
+  },
+  dagTelemetryBinding: {
+    instrumentDifference(
+      _strategy: string,
+      _hasExclusion: boolean,
+      walk: (observation: never) => AsyncIterable<unknown>,
+    ) {
+      const observation = {
+        complete() {},
+        recordStepProcessed() {},
+        recordStepStale() {},
+        recordSuccessorExpansion() {},
+        recordNodeYielded() {},
+        recordNodeExcluded() {},
+        markFallback() {},
+        recordFallbackNodeRemoved() {},
+        setCertificationResult() {},
+        setTerminationReason() {},
+        recordStartCount() {},
+        setCertifiedClosureResult() {},
+      };
+      return walk(observation as never);
+    },
+  },
+  rootContext: ROOT_CONTEXT,
+};
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -246,7 +305,7 @@ describe("executeWorkerRunRequest profiling", () => {
         executionTracer: telemetryTracer.tracer,
         extractionTracer: telemetryTracer.tracer,
         extractionMeter: metrics.getMeter("gitlode.test.extraction"),
-        rootContext: (await import("@opentelemetry/api")).ROOT_CONTEXT,
+        ...testGitTelemetry,
       },
     );
 
@@ -301,18 +360,6 @@ describe("executeWorkerRunRequest profiling", () => {
       expect(trace.getSpan(child.parent!)).toBe(extractSpan);
     }
     expect(telemetryTracer.starts.filter(({ name }) => name.includes("write")).length).toBe(0);
-
-    const walkEntry = result.success.profileEntries.find(
-      (entry) => entry.name === "git.walk_commits",
-    );
-    expect(walkEntry?.totalMs).toBeGreaterThan(0);
-    expect(walkEntry?.attributes).toEqual({ strategy: ["certified-lazy"] });
-    expect(walkEntry?.counters).toEqual({
-      commit_reads: 1,
-      commits_yielded: 1,
-      materialize_commit_reads: 1,
-      topology_commit_cache_hits: 1,
-    });
 
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
@@ -388,13 +435,8 @@ describe("executeWorkerRunRequest profiling", () => {
       deletions: 0,
     });
 
-    const fileBlobBatchEntry = result.success.profileEntries.find(
-      (entry) => entry.name === "git.cli.file_blob_batch",
-    );
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
-    expect(fileBlobBatchEntry?.calls).toBe(1);
-    expect(fileBlobBatchEntry?.counters).toEqual({ blob_bytes: 6, objects_read: 1 });
   });
 
   it("runs successfully with the git-cli adapter selected", async () => {
@@ -508,6 +550,29 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     );
   }
 
+  async function runWithRecordingTelemetry(
+    environment: Readonly<Record<string, string | undefined>>,
+    gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
+  ) {
+    const telemetryTracer = makeTracer();
+    const metricRecorder = new RecordingGitMetricRecorder(gitAdapter);
+    const result = await executeWorkerRunRequest(
+      await createOneCommitRequest(gitAdapter),
+      { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+      { environment },
+      {
+        executionTracer: telemetryTracer.tracer,
+        extractionTracer: telemetryTracer.tracer,
+        extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+        gitTracer: telemetryTracer.tracer,
+        gitMetricRecorder: metricRecorder as never,
+        dagTelemetryBinding: testGitTelemetry.dagTelemetryBinding,
+        rootContext: ROOT_CONTEXT,
+      },
+    );
+    return { result, telemetryTracer, metricRecorder };
+  }
+
   it.each([
     [undefined, "certified-lazy"],
     ["phase-certified-fifo", "phase-certified-fifo"],
@@ -518,10 +583,47 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
 
     expect(result.kind).toBe("success");
     if (result.kind !== "success") return;
-    const walkEntry = result.success.profileEntries.find(
-      (entry) => entry.name === "git.walk_commits",
+    expect(result.success.commitsTraversed).toBe(1);
+  });
+
+  it.each([
+    [undefined, "certified-lazy"],
+    ["phase-certified-fifo", "phase-certified-fifo"],
+    ["phase-certified-timestamp", "phase-certified-timestamp"],
+  ] as const)("records the actual %s strategy owner", async (value, strategy) => {
+    const environment = value === undefined ? {} : { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: value };
+    const { result, telemetryTracer, metricRecorder } =
+      await runWithRecordingTelemetry(environment);
+    expect(result.kind).toBe("success");
+    const walkSpans = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.commit.walk",
     );
-    expect(walkEntry?.attributes?.strategy).toEqual([outer]);
+    expect(walkSpans).toHaveLength(1);
+    const walk = walkSpans[0]!;
+    expect(walk.options?.attributes).toEqual({
+      "gitlode.git.adapter": "isomorphic-git",
+      "gitlode.git.commit.walk.strategy": strategy,
+      "gitlode.git.commit.walk.has_exclusion": false,
+    });
+    expect(walk.parent).toBe(ROOT_CONTEXT);
+    expect(walk.span.attributes).toEqual({
+      "gitlode.stream.completion": "exhausted",
+    });
+    expect(walk.span.statuses).toEqual([]);
+    expect(walk.span.exceptions).toHaveLength(0);
+    expect(walk.span.endCount).toBe(1);
+    expect(metricRecorder.calls).toEqual([
+      {
+        name: "gitlode.git.commit.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": "isomorphic-git",
+          "gitlode.git.commit.walk.strategy": strategy,
+          "gitlode.git.commit.walk.has_exclusion": false,
+        },
+      },
+    ]);
+    expect(walk.span.endCount).toBe(1);
   });
 
   it("returns a user error for invalid isomorphic-git strategy environment", async () => {
@@ -538,6 +640,57 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     );
   });
 
+  it("does not start the isomorphic walk for an invalid strategy with actual telemetry", async () => {
+    const { result, telemetryTracer, metricRecorder } = await runWithRecordingTelemetry({
+      GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad",
+    });
+    expect(result.kind).toBe("user-error");
+    expect(telemetryTracer.starts.filter(({ name }) => name === "gitlode.git.commit.walk")).toEqual(
+      [],
+    );
+    expect(metricRecorder.calls).toEqual([]);
+    expect(JSON.stringify(telemetryTracer.starts)).not.toContain("exception");
+  });
+
+  it("records the ignored invalid environment on the actual Git CLI owner", async () => {
+    const { result, telemetryTracer, metricRecorder } = await runWithRecordingTelemetry(
+      { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" },
+      "git-cli",
+    );
+    expect(result.kind).toBe("success");
+    const walkSpans = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.commit.walk",
+    );
+    expect(walkSpans).toHaveLength(1);
+    const walk = walkSpans[0]!;
+    expect(walk.options?.attributes).toEqual({
+      "gitlode.git.adapter": "git-cli",
+      "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
+      "gitlode.git.commit.walk.has_exclusion": false,
+    });
+    expect(walk.parent).toBe(ROOT_CONTEXT);
+    expect(walk.span.attributes).toEqual({
+      "gitlode.stream.completion": "exhausted",
+    });
+    expect(walk.span.statuses).toEqual([]);
+    expect(walk.span.exceptions).toHaveLength(0);
+    expect(walk.span.endCount).toBe(1);
+    expect(metricRecorder.calls).toEqual([
+      {
+        name: "gitlode.git.commit.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": "git-cli",
+          "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
+          "gitlode.git.commit.walk.has_exclusion": false,
+        },
+      },
+    ]);
+    expect(
+      JSON.stringify({ spans: telemetryTracer.starts, calls: metricRecorder.calls }),
+    ).not.toContain("bad");
+  });
+
   it("ignores invalid strategy environment on the actual git-cli runtime path", async () => {
     const result = await runWithEnvironment(
       { GITLODE_EXPERIMENTAL_COMMIT_TRAVERSAL: "bad" },
@@ -550,9 +703,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       return;
     }
 
-    expect(result.success.profileEntries.some((entry) => entry.name === "git.cli.rev_list")).toBe(
-      true,
-    );
+    expect(result.success.commitsTraversed).toBe(1);
     const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
   });
@@ -571,7 +722,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
         executionTracer: telemetryTracer.tracer,
         extractionTracer: telemetryTracer.tracer,
         extractionMeter: metrics.getMeter("gitlode.test.extraction"),
-        rootContext: ROOT_CONTEXT,
+        ...testGitTelemetry,
       },
     );
 
@@ -607,7 +758,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
           executionTracer: telemetryTracer.tracer,
           extractionTracer: telemetryTracer.tracer,
           extractionMeter: metrics.getMeter("gitlode.test.extraction"),
-          rootContext: ROOT_CONTEXT,
+          ...testGitTelemetry,
         },
       ),
     ).rejects.toThrow("Invalid date format");

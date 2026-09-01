@@ -638,23 +638,23 @@ code or note remains, and the trunk session confirms the redesign complete.
 
 ## Unit status
 
-| Unit | Status   | Trunk review evidence                                                                                                                                                     |
-| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T00A | complete | Frozen catalog validation and behavioral baselines reviewed; focused 21 tests pass                                                                                        |
-| T00B | complete | Performance harness and test-scale workflows reviewed; focused 41 tests pass; reference calibration and legacy artifacts remain T13 prerequisites                         |
-| T01  | complete | Generic OTel lifecycle and gitlode policy split reviewed; focused 128 tests pass; clean-environment architecture check passes                                             |
-| T02  | complete | Shared metadata, profile contracts, normalization, and timing primitives reviewed; focused 31 and full 753 tests pass                                                     |
-| T03  | complete | Extraction-side recorders, timing failure isolation, owner boundaries, and all 15 metric/no-op contracts reviewed; full 807 tests pass                                    |
-| T04  | complete | Git and neutral DAG recorders, all 16 metric/no-op contracts, type boundaries, and owner tests reviewed; focused 216 and full 849 tests pass                              |
-| T05  | complete | Bounded span and metric collection, diagnostics, catalog filtering, canonical report building, and all limit contracts reviewed; 886 tests pass                           |
-| T06  | complete | Explicit providers, async root context, idempotent best-effort finalization, no-op degradation, and lifecycle fault isolation reviewed; 918 tests pass                    |
-| T07  | complete | Execution setup and extraction owners migrated with explicit OTel context flow, bounded domain metrics, partial-effect semantics, and owner evidence; full 941 tests pass |
-| T08  | complete | Generic DAG observation hooks and Git-owned OTel bindings reviewed with exact lifecycle, fallback, partial-work, and owner evidence; focused 354 tests pass               |
-| T09  | pending  | —                                                                                                                                                                         |
-| T10  | pending  | —                                                                                                                                                                         |
-| T11  | pending  | —                                                                                                                                                                         |
-| T12  | pending  | —                                                                                                                                                                         |
-| T13  | pending  | —                                                                                                                                                                         |
+| Unit | Status   | Trunk review evidence                                                                                                                                                                                                                 |
+| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T00A | complete | Frozen catalog validation and behavioral baselines reviewed; focused 21 tests pass                                                                                                                                                    |
+| T00B | complete | Performance harness and test-scale workflows reviewed; focused 41 tests pass; reference calibration and legacy artifacts remain T13 prerequisites                                                                                     |
+| T01  | complete | Generic OTel lifecycle and gitlode policy split reviewed; focused 128 tests pass; clean-environment architecture check passes                                                                                                         |
+| T02  | complete | Shared metadata, profile contracts, normalization, and timing primitives reviewed; focused 31 and full 753 tests pass                                                                                                                 |
+| T03  | complete | Extraction-side recorders, timing failure isolation, owner boundaries, and all 15 metric/no-op contracts reviewed; full 807 tests pass                                                                                                |
+| T04  | complete | Git and neutral DAG recorders, all 16 metric/no-op contracts, type boundaries, and owner tests reviewed; focused 216 and full 849 tests pass                                                                                          |
+| T05  | complete | Bounded span and metric collection, diagnostics, catalog filtering, canonical report building, and all limit contracts reviewed; 886 tests pass                                                                                       |
+| T06  | complete | Explicit providers, async root context, idempotent best-effort finalization, no-op degradation, and lifecycle fault isolation reviewed; 918 tests pass                                                                                |
+| T07  | complete | Execution setup and extraction owners migrated with explicit OTel context flow, bounded domain metrics, partial-effect semantics, and owner evidence; full 941 tests pass                                                             |
+| T08  | complete | Generic DAG observation hooks and Git-owned OTel bindings reviewed with exact lifecycle, fallback, partial-work, and owner evidence; focused 354 tests pass                                                                           |
+| T09  | complete | Both Git adapters migrated to explicit OTel owners with exact DAG/process/session lifecycle, metric, failure, cancellation, and command-parity evidence; 1,014 full-suite tests pass with only 5 known sandbox Git ownership failures |
+| T10  | pending  | —                                                                                                                                                                                                                                     |
+| T11  | pending  | —                                                                                                                                                                                                                                     |
+| T12  | pending  | —                                                                                                                                                                                                                                     |
+| T13  | pending  | —                                                                                                                                                                                                                                     |
 
 ## Required verification matrix
 

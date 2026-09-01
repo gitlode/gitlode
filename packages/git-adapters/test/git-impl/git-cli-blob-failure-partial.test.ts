@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import { createMonotonicTiming, TELEMETRY_METRICS } from "@gitlode/internal-contracts/telemetry";
 import { ROOT_CONTEXT, type Context, type Meter, type Span, type Tracer } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
@@ -109,6 +110,7 @@ function processFactory(
   requests: string[],
   bodies: Map<string, Buffer>,
   mode: FailureMode,
+  runtimeFailure = new Error("sentinel CLI runtime failure"),
 ): GitCliProcessFactory {
   return () => {
     const stdout = new PassThrough();
@@ -154,7 +156,7 @@ function processFactory(
       requests.push(oid);
       if (requests.length === 3 && mode !== "success") {
         if (mode === "runtime") {
-          onError?.(new Error("sentinel CLI runtime failure"));
+          onError?.(runtimeFailure);
           reap(1);
           return;
         }
@@ -189,6 +191,10 @@ async function fixture(): Promise<{
   parent: string;
   child: string;
   bodies: Map<string, Buffer>;
+  modifiedBefore: string;
+  modifiedAfter: string;
+  deleted: string;
+  added: string;
 }> {
   const path = await mkdtemp(join(tmpdir(), "gitlode-cli-failure-"));
   await git.init({ fs: nodeFs, dir: path, defaultBranch: "main" });
@@ -216,6 +222,12 @@ async function fixture(): Promise<{
     author: { name: "Failure", email: "failure@example.com", timestamp: 2, timezoneOffset: 0 },
   });
   const bodies = new Map<string, Buffer>();
+  const parentTree = await git.readTree({ fs: nodeFs, dir: path, oid: parent });
+  const childTree = await git.readTree({ fs: nodeFs, dir: path, oid: child });
+  const modifiedBefore = parentTree.tree.find((entry) => entry.path === "a.txt")!.oid;
+  const modifiedAfter = childTree.tree.find((entry) => entry.path === "a.txt")!.oid;
+  const deleted = parentTree.tree.find((entry) => entry.path === "b.txt")!.oid;
+  const added = childTree.tree.find((entry) => entry.path === "c.txt")!.oid;
   for (const treeOid of [parent, child]) {
     const tree = await git.readTree({ fs: nodeFs, dir: path, oid: treeOid });
     for (const entry of tree.tree)
@@ -233,7 +245,7 @@ async function fixture(): Promise<{
           ),
         );
   }
-  return { path, parent, child, bodies };
+  return { path, parent, child, bodies, modifiedBefore, modifiedAfter, deleted, added };
 }
 
 const names = [
@@ -251,6 +263,25 @@ const metricNames = names.map(
 );
 const calls = (meter: MeterRecording, name: string) =>
   meter.calls.filter((call) => call.name === name);
+const metricCall = (name: string, value: number, attributes: Record<string, unknown>): Call => ({
+  name,
+  value,
+  attributes,
+});
+const blobDuration = (outcome: "success" | "error", value: number) =>
+  metricCall("gitlode.git.blob.read.duration", value, {
+    "gitlode.git.adapter": "git-cli",
+    "gitlode.git.blob.read.outcome": outcome,
+  });
+const blobSize = (value: number) =>
+  metricCall("gitlode.git.blob.read.size", value, { "gitlode.git.adapter": "git-cli" });
+const blobByte = (value: number) =>
+  metricCall("gitlode.git.blob.read.byte", value, { "gitlode.git.adapter": "git-cli" });
+const fileChange = (type: "modified" | "deleted" | "added") =>
+  metricCall("gitlode.git.file_change.yielded", 1, {
+    "gitlode.git.adapter": "git-cli",
+    "gitlode.git.file_change.type": type,
+  });
 const timing = () => {
   let now = 0;
   return createMonotonicTiming(() => {
@@ -285,10 +316,11 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       const tracer = new TracerRecording();
       const meter = new MeterRecording();
       const requests: string[] = [];
+      const runtimeFailure = new Error("sentinel CLI runtime failure");
       const adapter = makeAdapter(
         tracer,
         meter,
-        processFactory(tracer, requests, data.bodies, mode),
+        processFactory(tracer, requests, data.bodies, mode, runtimeFailure),
       );
       const iterator = adapter
         .getFileBlobChanges(data.path, data.child as never, data.parent as never)
@@ -301,7 +333,21 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       } catch (error) {
         outward = error;
       }
-      expect(outward).toBeInstanceOf(Error);
+      expect(outward).toBeInstanceOf(GitAdapterError);
+      const adapterError = outward as GitAdapterError;
+      expect(adapterError.code).toBe("UNKNOWN");
+      expect(adapterError.message).toBe(
+        mode === "runtime"
+          ? "Unexpected error reading cat-file batch: sentinel CLI runtime failure"
+          : mode === "nonzero"
+            ? "Unexpected end of cat-file batch output: exit code 7"
+            : mode === "malformed"
+              ? "Unexpected cat-file batch header: sentinel CLI malformed stdout"
+              : mode === "oid"
+                ? `Unexpected cat-file response for blob ${data.deleted}: deadbeef blob`
+                : `Unexpected cat-file response for blob ${data.deleted}: ${data.deleted} tree`,
+      );
+      expect(adapterError.cause).toBe(mode === "runtime" ? runtimeFailure : undefined);
       const requestSnapshot = requests.slice();
       const metricSnapshot = meter.calls.slice();
       try {
@@ -317,35 +363,15 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       await adapter[Symbol.asyncDispose]().catch(() => undefined);
       expect(requests).toEqual(requestSnapshot);
       expect(meter.calls).toEqual(metricSnapshot);
-      expect(requests).toHaveLength(3);
-      expect(
-        calls(meter, "gitlode.git.blob.read.duration").filter(
-          (call) => call.attributes["gitlode.git.blob.read.outcome"] === "success",
-        ),
-      ).toHaveLength(2);
-      expect(
-        calls(meter, "gitlode.git.blob.read.duration").filter(
-          (call) => call.attributes["gitlode.git.blob.read.outcome"] === "error",
-        ),
-      ).toHaveLength(1);
-      expect(calls(meter, "gitlode.git.blob.read.size")).toEqual([
-        {
-          name: "gitlode.git.blob.read.size",
-          value: 7,
-          attributes: { "gitlode.git.adapter": "git-cli" },
-        },
-        {
-          name: "gitlode.git.blob.read.size",
-          value: 10,
-          attributes: { "gitlode.git.adapter": "git-cli" },
-        },
+      expect(requests).toEqual([data.modifiedBefore, data.modifiedAfter, data.deleted]);
+      expect(calls(meter, "gitlode.git.blob.read.duration")).toEqual([
+        blobDuration("success", 0.2),
+        blobDuration("success", 0.2),
+        blobDuration("error", 0.1),
       ]);
-      expect(calls(meter, "gitlode.git.blob.read.byte").map((call) => call.value)).toEqual([7, 10]);
-      expect(
-        calls(meter, "gitlode.git.file_change.yielded").map(
-          (call) => call.attributes["gitlode.git.file_change.type"],
-        ),
-      ).toEqual(["modified"]);
+      expect(calls(meter, "gitlode.git.blob.read.size")).toEqual([blobSize(7), blobSize(10)]);
+      expect(calls(meter, "gitlode.git.blob.read.byte")).toEqual([blobByte(7), blobByte(10)]);
+      expect(calls(meter, "gitlode.git.file_change.yielded")).toEqual([fileChange("modified")]);
       const span = tracer.starts.find((entry) => entry.name === "gitlode.git.cli.file_blob_batch")!;
       expect(span.span.attributes["gitlode.git.cli.process.completion"]).toBe("error");
       expect(span.span.attributes["gitlode.git.object.read.count"]).toBe(2);
@@ -362,6 +388,9 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
         new Set(metricNames),
       );
       expect(meter.creations).toHaveLength(8);
+      await adapter[Symbol.asyncDispose]().catch(() => undefined);
+      expect(requests).toEqual(requestSnapshot);
+      expect(meter.calls).toEqual(metricSnapshot);
     },
   );
 
@@ -396,16 +425,34 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       }
       expect(requests).toEqual(requestSnapshot);
       expect(meter.calls).toEqual(metricSnapshot);
-      expect(requests).toHaveLength(completed === 1 ? 2 : 3);
-      expect(
-        calls(meter, "gitlode.git.file_change.yielded").map(
-          (call) => call.attributes["gitlode.git.file_change.type"],
-        ),
-      ).toEqual(completed === 1 ? ["modified"] : ["modified", "deleted"]);
-      expect(calls(meter, "gitlode.git.blob.read.size").map((call) => call.value)).toEqual(
-        completed === 1 ? [7, 10] : [7, 10, 6],
+      expect(requests).toEqual(
+        completed === 1
+          ? [data.modifiedBefore, data.modifiedAfter]
+          : [data.modifiedBefore, data.modifiedAfter, data.deleted],
+      );
+      expect(calls(meter, "gitlode.git.blob.read.duration")).toEqual(
+        completed === 1
+          ? [blobDuration("success", 0.2), blobDuration("success", 0.2)]
+          : [
+              blobDuration("success", 0.2),
+              blobDuration("success", 0.2),
+              blobDuration("success", 0.1),
+            ],
+      );
+      expect(calls(meter, "gitlode.git.blob.read.size")).toEqual(
+        completed === 1 ? [blobSize(7), blobSize(10)] : [blobSize(7), blobSize(10), blobSize(6)],
+      );
+      expect(calls(meter, "gitlode.git.blob.read.byte")).toEqual(
+        completed === 1 ? [blobByte(7), blobByte(10)] : [blobByte(7), blobByte(10), blobByte(6)],
+      );
+      expect(calls(meter, "gitlode.git.file_change.yielded")).toEqual(
+        completed === 1
+          ? [fileChange("modified")]
+          : [fileChange("modified"), fileChange("deleted")],
       );
       await adapter[Symbol.asyncDispose]();
+      expect(requests).toEqual(requestSnapshot);
+      expect(meter.calls).toEqual(metricSnapshot);
       const span = tracer.starts.find((entry) => entry.name === "gitlode.git.cli.file_blob_batch")!;
       expect(span.span.attributes["gitlode.git.cli.process.completion"]).toBe("exited");
       expect(span.span.attributes["gitlode.git.object.read.count"]).toBe(completed === 1 ? 2 : 3);

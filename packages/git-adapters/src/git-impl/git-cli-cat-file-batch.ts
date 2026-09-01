@@ -82,12 +82,12 @@ export class GitCatFileBatchSession implements AsyncDisposable {
     if (this._disposed) {
       throw new GitAdapterError("cat-file batch session has already been disposed", "UNKNOWN");
     }
-    await this._start();
-    const child = this._child;
-    const objects = this._objects;
-    if (!child || !objects) throw new Error("Git commit-batch process did not start");
     const token = this._recorder.startBlobRead();
     try {
+      await this._start();
+      const child = this._child;
+      const objects = this._objects;
+      if (!child || !objects) throw new Error("Git commit-batch process did not start");
       const content = await this._enqueue(async () => {
         if (!child.stdin || !child.stdin.write(`${oid}\n`)) {
           if (!child.stdin) throw new Error("Git commit-batch process has no stdin");

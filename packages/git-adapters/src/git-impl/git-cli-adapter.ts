@@ -645,6 +645,7 @@ async function* streamRevListBatchObjects(
   const catFileClosed = processClosed(catFile);
   const revListClosePromise = revListClosed;
   let pipeClosed: Promise<unknown>;
+  let pipelineSyncFailure: { readonly error: unknown } | undefined;
   try {
     revList.stderr.on("data", (chunk: Buffer) => revListStderrChunks.push(chunk));
     catFile.stderr.on("data", (chunk: Buffer) => catFileStderrChunks.push(chunk));
@@ -655,6 +656,11 @@ async function* streamRevListBatchObjects(
         (error: unknown) => error,
       );
     } catch (error) {
+      pipelineSyncFailure = { error };
+      throw error;
+    }
+  } catch (error) {
+    if (pipelineSyncFailure !== undefined) {
       revList.kill();
       catFile.kill();
       await Promise.all([revListClosePromise, catFileClosed]);
@@ -663,17 +669,10 @@ async function* streamRevListBatchObjects(
       revListSpan.end();
       catFileSpan.end();
       throw new GitAdapterError(
-        `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(error)}`,
+        `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(pipelineSyncFailure.error)}`,
         "UNKNOWN",
-        error,
+        pipelineSyncFailure.error,
       );
-    }
-  } catch (error) {
-    if (
-      error instanceof GitAdapterError &&
-      error.message.startsWith("Unexpected error piping rev-list output to cat-file:")
-    ) {
-      throw error;
     }
     revList.kill();
     catFile.kill();

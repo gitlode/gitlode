@@ -414,6 +414,11 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
       const tracer = new RecordingTracer();
       const process = fakeProcess();
       const failure = new Error(`sentinel ${failureCase}`);
+      const calls: unknown[][] = [];
+      const metricRecorder = {
+        startBlobRead: () => "token",
+        completeBlobRead: (...args: unknown[]) => calls.push(args),
+      };
       const factory: GitCliProcessFactory = () => {
         if (failureCase === "startup throw") throw failure;
         return Object.assign(process, { stdin: undefined });
@@ -422,7 +427,7 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
         "sentinel executable",
         "sentinel repository path",
         tracer as unknown as Tracer,
-        adapterTelemetry("git-cli").metricRecorder,
+        metricRecorder as never,
         ROOT_CONTEXT,
         factory,
       );
@@ -430,6 +435,8 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
         .readBlob("sentinel-oid" as never)
         .catch((error: unknown) => error);
       expect(outward).toBeInstanceOf(Error);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.[1]).toEqual({ outcome: "error" });
       expect(tracer.starts).toHaveLength(1);
       expect(tracer.starts[0]!.span.endCount).toBe(1);
       await session[Symbol.asyncDispose]();

@@ -17,7 +17,10 @@ import {
 } from "../../src/git-impl/git-cli-adapter.js";
 import type { GitCliProcess } from "../../src/git-impl/git-cli-cat-file-batch.js";
 import { createGitMetricRecorder } from "../../src/git-impl/git-metric-recorder.js";
-import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+import {
+  createIsomorphicGitAdapterForTesting,
+  IsomorphicGitAdapter,
+} from "../../src/git-impl/isomorphic-git-adapter.js";
 
 type Call = { name: string; value: number; attributes: Record<string, unknown> };
 class RecordingMeter {
@@ -373,6 +376,144 @@ describe("production multi-change metric and lazy matrix", () => {
     assertCreationSet(meter);
     assertPrivacy(meter);
     await adapter[Symbol.asyncDispose]();
+  });
+
+  it.each([
+    ["deleted blob", "deleted"],
+    ["added blob", "added"],
+    ["modified before blob", "modified-before"],
+    ["modified after blob", "modified-after"],
+  ] as const)("preserves production metrics for %s failure", async (_caseName, failureKind) => {
+    const volume = new Volume();
+    const fs = createFsFromVolume(volume);
+    const repo = "/blob-failure";
+    volume.mkdirSync(repo, { recursive: true });
+    const { parent, child } = await fixture(fs, repo);
+    const parentTree = await git.readTree({ fs, dir: repo, oid: parent });
+    const childTree = await git.readTree({ fs, dir: repo, oid: child });
+    const parentA = parentTree.tree.find((entry) => entry.path === "a.txt")!.oid;
+    const parentB = parentTree.tree.find((entry) => entry.path === "b.txt")!.oid;
+    const childA = childTree.tree.find((entry) => entry.path === "a.txt")!.oid;
+    const childC = childTree.tree.find((entry) => entry.path === "c.txt")!.oid;
+    const target =
+      failureKind === "deleted"
+        ? parentB
+        : failureKind === "added"
+          ? childC
+          : failureKind === "modified-before"
+            ? parentA
+            : childA;
+    const readOids: string[] = [];
+    const failure = new Error("sentinel isomorphic blob failure");
+    const meter = new RecordingMeter();
+    const adapter = createIsomorphicGitAdapterForTesting(
+      {
+        fs,
+        tracer: trace.getTracer("blob-failure-matrix"),
+        metricRecorder: recorder(meter, "isomorphic-git"),
+        dagTelemetryBinding: {
+          instrumentDifference: (_strategy, _exclude, run) =>
+            run({
+              onOperationStart() {},
+              onOperationComplete() {},
+              onStep() {},
+              onNodeYielded() {},
+              onSuccessorExpanded() {},
+              onFallback() {},
+            }),
+        },
+      },
+      {
+        readBlob: async (entry) => {
+          const oid = await entry.oid();
+          readOids.push(oid);
+          if (oid === target) throw failure;
+          return await entry.content();
+        },
+      },
+    );
+    const iterator = adapter
+      .getFileBlobChanges(repo, child as never, parent as never)
+      [Symbol.asyncIterator]();
+    const completedChanges = failureKind === "deleted" ? 0 : failureKind === "added" ? 1 : 2;
+    for (let index = 0; index < completedChanges; index += 1) {
+      await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    }
+    await expect(iterator.next()).rejects.toBe(failure);
+    const snapshot = readOids.slice();
+    await iterator.next();
+    await iterator.return?.();
+    try {
+      await iterator.throw?.(new Error("ignored terminal"));
+    } catch {
+      // The terminal error is intentionally ignored; the snapshot below is the assertion.
+    }
+    expect(readOids).toEqual(snapshot);
+    expect(JSON.stringify(meter.calls)).not.toMatch(/sentinel|blob-failure|\.txt/);
+    const successCount = failureKind === "deleted" ? 0 : failureKind === "added" ? 1 : 2;
+    const completedSizes =
+      failureKind === "deleted"
+        ? []
+        : failureKind === "added"
+          ? [6]
+          : failureKind === "modified-before"
+            ? [6, 7]
+            : [6, 7];
+    expect(
+      gitCalls(meter, "gitlode.git.blob.read.duration").filter(
+        (call) => call.attributes["gitlode.git.blob.read.outcome"] === "success",
+      ),
+    ).toHaveLength(successCount);
+    expect(
+      gitCalls(meter, "gitlode.git.blob.read.duration").filter(
+        (call) => call.attributes["gitlode.git.blob.read.outcome"] === "error",
+      ),
+    ).toEqual([
+      {
+        name: "gitlode.git.blob.read.duration",
+        value: failureKind === "modified-before" ? 0.2 : 0.1,
+        attributes: {
+          "gitlode.git.adapter": "isomorphic-git",
+          "gitlode.git.blob.read.outcome": "error",
+        },
+      },
+    ]);
+    expect(
+      gitCalls(meter, "gitlode.git.blob.read.size")
+        .sort((a, b) => a.value - b.value)
+        .map((call) => call.value),
+    ).toEqual(completedSizes);
+    expect(
+      gitCalls(meter, "gitlode.git.blob.read.byte")
+        .sort((a, b) => a.value - b.value)
+        .map((call) => call.value),
+    ).toEqual(completedSizes);
+    expect(gitCalls(meter, "gitlode.git.file_change.yielded")).toEqual(
+      (failureKind === "deleted"
+        ? []
+        : failureKind === "added"
+          ? ["deleted"]
+          : ["deleted", "added"]
+      ).map((type) => ({
+        name: "gitlode.git.file_change.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": "isomorphic-git",
+          "gitlode.git.file_change.type": type,
+        },
+      })),
+    );
+    expect(gitCalls(meter, "gitlode.git.object.cache.lookup")).toEqual([]);
+    expect(gitCalls(meter, "gitlode.git.object.cache.hit")).toEqual([]);
+    expect(gitCalls(meter, "gitlode.git.commit.yielded")).toEqual([]);
+    expect(readOids).toEqual(
+      failureKind === "deleted"
+        ? [parentB]
+        : failureKind === "added"
+          ? [parentB, childC]
+          : [parentB, childC, parentA, childA],
+    );
+    assertCreationSet(meter);
   });
 });
 

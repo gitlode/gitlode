@@ -37,6 +37,22 @@ export interface IsomorphicGitAdapterDependencies {
   readonly dagTelemetryBinding: DagTelemetryBinding;
 }
 
+interface IsomorphicGitTestingSeam {
+  readonly readBlob: (entry: git.WalkerEntry) => Promise<Uint8Array | undefined | void>;
+}
+
+const testingSeams = new WeakMap<IsomorphicGitAdapter, IsomorphicGitTestingSeam>();
+
+/** Direct-source test construction only; this is not part of the package API. */
+export function createIsomorphicGitAdapterForTesting(
+  dependencies: IsomorphicGitAdapterDependencies,
+  seam: IsomorphicGitTestingSeam,
+): IsomorphicGitAdapter {
+  const adapter = new IsomorphicGitAdapter(dependencies);
+  testingSeams.set(adapter, seam);
+  return adapter;
+}
+
 export class IsomorphicGitAdapter implements GitAdapter {
   private readonly _fs: FsClient;
   private readonly _tracer: Tracer;
@@ -419,8 +435,9 @@ export class IsomorphicGitAdapter implements GitAdapter {
 
     // The walk buffers only lightweight descriptors. Blob contents are read one
     // change at a time so materialization follows the consumer's pace.
+    const readBlob = testingSeams.get(this)?.readBlob ?? ((entry) => entry.content());
     for (const descriptor of descriptors) {
-      const change = await materializeFileBlobChange(descriptor, this._metricRecorder);
+      const change = await materializeFileBlobChange(descriptor, this._metricRecorder, readBlob);
       this._metricRecorder.recordFileChangeYielded(change.status);
       yield change;
     }
@@ -468,25 +485,26 @@ async function describeFileBlobSnapshot(
 async function materializeFileBlobChange(
   descriptor: FileBlobChangeDescriptor,
   recorder: GitMetricRecorder,
+  readBlob: (entry: git.WalkerEntry) => Promise<Uint8Array | undefined | void>,
 ): Promise<FileBlobChange> {
   switch (descriptor.status) {
     case "added":
       return {
         status: "added",
         before: null,
-        after: await materializeFileBlobSnapshot(descriptor.after, recorder),
+        after: await materializeFileBlobSnapshot(descriptor.after, recorder, readBlob),
       };
     case "modified": {
       const [before, after] = await Promise.all([
-        materializeFileBlobSnapshot(descriptor.before, recorder),
-        materializeFileBlobSnapshot(descriptor.after, recorder),
+        materializeFileBlobSnapshot(descriptor.before, recorder, readBlob),
+        materializeFileBlobSnapshot(descriptor.after, recorder, readBlob),
       ]);
       return { status: "modified", before, after };
     }
     case "deleted":
       return {
         status: "deleted",
-        before: await materializeFileBlobSnapshot(descriptor.before, recorder),
+        before: await materializeFileBlobSnapshot(descriptor.before, recorder, readBlob),
         after: null,
       };
   }
@@ -495,10 +513,11 @@ async function materializeFileBlobChange(
 async function materializeFileBlobSnapshot(
   descriptor: FileBlobSnapshotDescriptor,
   recorder: GitMetricRecorder,
+  readBlob: (entry: git.WalkerEntry) => Promise<Uint8Array | undefined | void>,
 ): Promise<FileBlobSnapshot> {
   const token = recorder.startBlobRead();
   try {
-    const content = await descriptor.entry.content();
+    const content = await readBlob(descriptor.entry);
     const bytes = content ?? new Uint8Array(0);
     recorder.completeBlobRead(token, {
       outcome: "success",

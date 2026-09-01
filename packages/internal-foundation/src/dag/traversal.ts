@@ -33,6 +33,7 @@ export async function* walkDagNodeIdsEagerExclude<
     }
   };
   try {
+    context.observation?.recordStartCount(1);
     yield* walkDagNodeIdsEagerExcludeCore(
       {
         ...context,
@@ -253,12 +254,15 @@ async function* walkDagNodeIdsCertifiedLazyCore<NodeId extends PropertyKey, Doma
       if (resultCandidates.delete(excludedNodeId)) removed++;
     }
     context.telemetry.observation?.recordFallbackNodeRemoved(removed);
+  } else {
+    context.telemetry.observation?.setCertificationResult("certified");
   }
 
   for (const resultCandidate of resultCandidates) {
     recordYieldedNode(context);
     yield resultCandidate;
   }
+  context.telemetry.observation?.setTerminationReason("frontier-exhausted");
 
   function getCertificateFailureReason(): DagFallbackReason | undefined {
     if (includePathReachedTerminal || excludePathSplit || stopPoints.size === 0) {
@@ -290,6 +294,7 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
   nodeIds: Iterable<NodeId>,
   options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
 ): AsyncIterable<NodeId> {
+  const starts = Array.from(nodeIds);
   let completed = false;
   const complete = (completion: "exhausted" | "cancelled" | "handled_throw" | "error") => {
     if (!completed) {
@@ -298,13 +303,14 @@ export async function* walkDagReachableNodeIds<NodeId extends PropertyKey, Domai
     }
   };
   try {
+    context.observation?.recordStartCount(starts.length);
     yield* walkDagReachableNodeIdsCore(
       {
         ...context,
         role: "main",
         telemetry: { observation: context.observation, countYieldedNodes: true },
       },
-      nodeIds,
+      starts,
       options,
     );
     complete("exhausted");

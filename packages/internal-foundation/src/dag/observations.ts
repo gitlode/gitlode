@@ -8,6 +8,9 @@ export type DagFallbackReason =
 
 export type DagStreamCompletion = "exhausted" | "cancelled" | "handled_throw" | "error";
 export type DagOperationCompletion = DagStreamCompletion | "success";
+export type DagCertificationResult = "certified" | "fallback";
+export type DagTerminationReason = "frontier-exhausted" | "include-resolved";
+export type DagCertifiedClosureResult = "closed-boundary" | "exhausted";
 
 export interface DagOperationObservationHooks {
   recordStepProcessed(count?: number): void;
@@ -17,6 +20,10 @@ export interface DagOperationObservationHooks {
   recordNodeExcluded(count?: number): void;
   markFallback(reason: DagFallbackReason): void;
   recordFallbackNodeRemoved(count?: number): void;
+  setCertificationResult(result: DagCertificationResult): void;
+  setTerminationReason(reason: DagTerminationReason): void;
+  recordStartCount(count: number): void;
+  setCertifiedClosureResult(result: DagCertifiedClosureResult): void;
 }
 
 /**

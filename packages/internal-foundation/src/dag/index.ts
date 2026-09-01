@@ -11,6 +11,9 @@ export type {
 } from "./types.js";
 export type {
   DagFallbackReason,
+  DagCertificationResult,
+  DagTerminationReason,
+  DagCertifiedClosureResult,
   DagOperationCompletion,
   DagOperationObservation,
   DagOperationObservationHooks,

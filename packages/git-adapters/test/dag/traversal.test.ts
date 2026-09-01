@@ -280,7 +280,7 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
 });
 
 // Legacy DAG span-counter assertions were removed with the DAG owner migration.
-describe.skip("DAG traversal telemetry", () => {
+describe("DAG traversal telemetry", () => {
   it("records a top-level reachable operation with yielded nodes", async () => {
     const recorder = new LocalInstrumentationRecorder(() => 0);
 
@@ -288,7 +288,7 @@ describe.skip("DAG traversal telemetry", () => {
       walkDagReachableNodeIds(
         {
           graph: stringTopology({ head: ["left", "right"], left: [], right: [] }),
-          instrumentation: recorder,
+          observation: neutralObservation(recorder, "dag.reachable"),
         },
         ["head"],
       ),
@@ -319,7 +319,7 @@ describe.skip("DAG traversal telemetry", () => {
             release: ["root"],
             head: ["release"],
           }),
-          instrumentation: recorder,
+          observation: neutralObservation(recorder, "dag.traversal"),
         },
         "head",
         "release",
@@ -355,7 +355,7 @@ describe.skip("DAG traversal telemetry", () => {
             after: ["release"],
             head: ["after"],
           }),
-          instrumentation: recorder,
+          observation: neutralObservation(recorder, "dag.traversal"),
         },
         "head",
         "release",
@@ -392,7 +392,7 @@ describe.skip("DAG traversal telemetry", () => {
             excludeRoot: [],
             exclude: ["excludeRoot"],
           }),
-          instrumentation: recorder,
+          observation: neutralObservation(recorder, "dag.traversal"),
         },
         "head",
         "exclude",
@@ -996,3 +996,26 @@ describe("DAG traversal certifiedLazy read trace", () => {
     expect(labelsRead).toEqual(new Set(Object.keys(definition.nodes)));
   });
 });
+function neutralObservation(recorder: LocalInstrumentationRecorder, name: string) {
+  const span = recorder.startSpan(name);
+  return {
+    recordStepProcessed: (count = 1) => span.incrementCounter("traversal_steps", count),
+    recordStepStale: (count = 1) => span.incrementCounter("stale_steps", count),
+    recordSuccessorExpansion: (role: "main" | "exclude", count = 1) => {
+      span.incrementCounter("successor_expansions", count);
+      span.incrementCounter(`${role}_expansions`, count);
+    },
+    recordNodeYielded: (count = 1) => span.incrementCounter("yielded_nodes", count),
+    recordNodeExcluded: (count = 1) => span.incrementCounter("excluded_nodes", count),
+    markFallback: (reason: string) => {
+      span.setAttribute("result", "fallback");
+      span.setAttribute("fallback_reason", reason);
+    },
+    recordFallbackNodeRemoved: (count = 1) => span.incrementCounter("fallback_removed", count),
+    setCertificationResult: (result: string) => span.setAttribute("result", result),
+    setTerminationReason: (reason: string) => span.setAttribute("termination_reason", reason),
+    recordStartCount: (count: number) => span.setAttribute("start_count", count),
+    setCertifiedClosureResult: (result: string) => span.setAttribute("result", result),
+    complete: () => span.end(),
+  };
+}

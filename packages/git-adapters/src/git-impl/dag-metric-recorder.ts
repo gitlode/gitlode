@@ -7,9 +7,22 @@ import type {
   DagFallbackReason,
   DagOperationObservation,
   DagOperationObservationHooks,
+  DagTopologyPort,
+  WalkDagStrategyOptions,
+  BasicDagSchedulingContext,
+  CertifiedClosurePhaseResult,
+  PhaseCertifiedStrategyOptions,
   DagTraversalRole,
 } from "@gitlode/internal-foundation/dag";
-import type { Counter, Meter, Span } from "@opentelemetry/api";
+import {
+  walkDagReachableNodeIds,
+  resolveDagCertifiedClosurePhase,
+} from "@gitlode/internal-foundation/dag";
+import {
+  createAsyncIterableInstrumenter,
+  withAsyncSpan,
+} from "@gitlode/internal-foundation/otel-support";
+import type { Counter, Meter, Span, Tracer } from "@opentelemetry/api";
 
 type DagOperation = TelemetryAttributeValue<"dag_operation">;
 type DifferenceOperation = Extract<DagOperation, "difference">;
@@ -53,10 +66,15 @@ export function bindDagObservation(
   context: DagOperationContext,
 ): DagOperationObservation {
   let fallbackRecorded = false;
+  let completed = false;
   const attrs = (
     id: Parameters<typeof getTelemetryAttributeMetadata>[0],
-    value: string | boolean,
+    value: string | boolean | number,
   ) => span.setAttribute(key(id), value);
+  if (context.operation === "difference") {
+    attrs("dag_strategy", context.strategy);
+    attrs("dag_has_exclusion", context.hasExclusion);
+  }
   return {
     recordStepProcessed: (count) => operation.observations.recordStepProcessed(count),
     recordStepStale: (count) => operation.observations.recordStepStale(count),
@@ -66,6 +84,8 @@ export function bindDagObservation(
     recordNodeExcluded: (count) => operation.observations.recordNodeExcluded(count),
     markFallback(reason) {
       operation.observations.markFallback(reason);
+      span.setAttribute(key("dag_certification_result"), "fallback");
+      span.setAttribute(key("dag_fallback_reason"), fallbackMap[reason]);
       if (!fallbackRecorded) {
         fallbackRecorded = true;
         span.addEvent("gitlode.dag.fallback", {
@@ -74,28 +94,20 @@ export function bindDagObservation(
       }
     },
     recordFallbackNodeRemoved: (count) => operation.observations.recordFallbackNodeRemoved(count),
+    setCertificationResult: (result) => span.setAttribute(key("dag_certification_result"), result),
+    setTerminationReason: (reason) => span.setAttribute(key("dag_termination_reason"), reason),
+    recordStartCount: (count) => span.setAttribute(key("dag_start_count"), count),
+    setCertifiedClosureResult: (result) =>
+      span.setAttribute(key("dag_certified_closure_result"), result),
     complete(completion) {
-      if (context.operation === "difference") {
-        attrs("dag_operation", context.operation);
-        attrs("dag_strategy", context.strategy);
-        attrs("dag_has_exclusion", context.hasExclusion);
-      } else {
-        attrs("dag_operation", context.operation);
+      if (completed) return;
+      completed = true;
+      if (context.operation !== "certified-closure") {
+        span.setAttribute(
+          key("stream_completion"),
+          completion === "success" ? "exhausted" : completion,
+        );
       }
-      const normalized =
-        context.operation === "certified-closure"
-          ? normalizeDagCompletion({
-              type: "certified-closure",
-              completion: completion === "success" ? "success" : "error",
-            })
-          : normalizeDagCompletion({
-              type: "stream",
-              completion:
-                completion === "success"
-                  ? "exhausted"
-                  : (completion as StreamDagCompletion["completion"]),
-            });
-      attrs("dag_operation_completion", normalized);
       operation.complete(
         context.operation === "certified-closure"
           ? {
@@ -122,11 +134,59 @@ const noopHooks = Object.freeze<DagOperationObservationHooks>({
   recordNodeExcluded() {},
   markFallback() {},
   recordFallbackNodeRemoved() {},
+  setCertificationResult() {},
+  setTerminationReason() {},
+  recordStartCount() {},
+  setCertifiedClosureResult() {},
 });
 const noopOperation = Object.freeze<DagMetricOperation>({ observations: noopHooks, complete() {} });
 export const NOOP_DAG_METRIC_RECORDER = Object.freeze<DagMetricRecorder>({
   startOperation: () => noopOperation as never,
 });
+
+const instrumentDagStream = createAsyncIterableInstrumenter(() => {});
+
+export function instrumentDagReachable<NodeId extends PropertyKey, DomainHint = undefined>(
+  tracer: Tracer,
+  meter: Meter,
+  graph: DagTopologyPort<NodeId, DomainHint>,
+  nodeIds: Iterable<NodeId>,
+  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
+): AsyncIterable<NodeId> {
+  const starts = Array.from(nodeIds);
+  const recorder = createDagMetricRecorder(meter);
+  return instrumentDagStream(tracer, "gitlode.dag.reachable", (span) => {
+    const operation = recorder.startOperation({ operation: "reachable" });
+    return walkDagReachableNodeIds(
+      { graph, observation: bindDagObservation(span, operation, { operation: "reachable" }) },
+      starts,
+      options,
+    );
+  });
+}
+
+export async function instrumentDagCertifiedClosure<
+  NodeId extends PropertyKey,
+  DomainHint = undefined,
+>(
+  tracer: Tracer,
+  meter: Meter,
+  graph: DagTopologyPort<NodeId, DomainHint>,
+  nodeId: NodeId,
+  options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
+): Promise<CertifiedClosurePhaseResult<NodeId>> {
+  const recorder = createDagMetricRecorder(meter);
+  const operation = recorder.startOperation({ operation: "certified-closure" });
+  return withAsyncSpan(tracer, "gitlode.dag.certified_closure", async (span) => {
+    const observation = bindDagObservation(span, operation, { operation: "certified-closure" });
+    try {
+      return await resolveDagCertifiedClosurePhase({ graph, observation }, nodeId, options);
+    } catch (error) {
+      operation.complete({ type: "certified-closure", completion: "error" });
+      throw error;
+    }
+  });
+}
 export function normalizeDagCompletion(
   c: NeutralDagCompletion,
 ): TelemetryAttributeValue<"dag_operation_completion"> {
@@ -202,6 +262,10 @@ export function createDagMetricRecorder(meter: Meter): DagMetricRecorder {
         recordFallbackNodeRemoved(c) {
           if (fallback) removed = add(removed, c);
         },
+        setCertificationResult() {},
+        setTerminationReason() {},
+        recordStartCount() {},
+        setCertifiedClosureResult() {},
       };
       return {
         observations,

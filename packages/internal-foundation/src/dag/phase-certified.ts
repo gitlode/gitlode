@@ -48,6 +48,7 @@ export async function resolveDagCertifiedClosurePhase<
     const result = await resolveDagCertifiedClosurePhaseCore(context, nodeId, options, {
       observation: context.observation,
     });
+    context.observation?.setCertifiedClosureResult(result.result.kind);
     context.observation?.complete("success");
     return result.result;
   } catch (error) {
@@ -199,6 +200,9 @@ async function* walkDagNodeIdsPhaseCertifiedDifferenceCore<
     }
   }
 
+  const terminationReason = frontier.isEmpty() ? "frontier-exhausted" : "include-resolved";
+  telemetry.observation?.setTerminationReason(terminationReason);
+  telemetry.observation?.setCertificationResult("certified");
   for (const yielded of state.drainRemainingInclude()) {
     telemetry.observation?.recordNodeYielded();
     yield yielded;

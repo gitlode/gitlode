@@ -86,6 +86,7 @@ class RecordingTracer {
 interface FakeProcess extends GitCliProcess {
   readonly process: PassThrough;
   killed: number;
+  requests: number;
   closed: boolean;
   reaped: boolean;
   mode: "success" | "runtime" | "nonzero" | "malformed";
@@ -103,6 +104,7 @@ function fakeProcess(mode: FakeProcess["mode"] = "success"): FakeProcess {
     stdin,
     process,
     killed: 0,
+    requests: 0,
     closed: false,
     reaped: false,
     mode,
@@ -128,6 +130,7 @@ function fakeProcess(mode: FakeProcess["mode"] = "success"): FakeProcess {
     return true;
   }) as FakeProcess["kill"];
   stdin.on("data", (chunk) => {
+    value.requests++;
     if (value.mode === "runtime") {
       errorListener?.(new Error("sentinel runtime failure"));
       stdout.end();
@@ -266,12 +269,14 @@ describe("GitCliAdapter persistent session production matrix", () => {
     ).toHaveLength(0);
     await iterator.next();
     expect(processes).toHaveLength(1);
+    expect(processes[0]?.requests).toBe(1);
     await iterator.return?.();
     const second = adapter
       .getFileBlobChanges(repo.path, repo.head as never)
       [Symbol.asyncIterator]();
     await second.next();
     expect(processes).toHaveLength(1);
+    expect(processes[0]?.requests).toBe(2);
     await adapter[Symbol.asyncDispose]();
     const batch = tracer.starts.find((entry) => entry.name === "gitlode.git.cli.file_blob_batch")!;
     expect(batch.parent).toBe(parent);
@@ -287,6 +292,8 @@ describe("GitCliAdapter persistent session production matrix", () => {
     expect(batch.span.endCount).toBe(1);
     expect(batch.span.endSnapshots[0]?.reaped).toBe(true);
     expect(processes[0]?.killed).toBe(0);
+    await second.return?.();
+    expect(processes[0]?.requests).toBe(2);
     expect(metrics.blobCompletions).toHaveLength(2);
     expect(metrics.blobCompletions.every((entry) => entry.outcome === "success")).toBe(true);
     expect(JSON.stringify(batch.span)).not.toContain(repo.path);

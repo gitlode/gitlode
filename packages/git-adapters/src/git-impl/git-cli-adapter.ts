@@ -410,7 +410,7 @@ export class GitCliAdapter implements GitAdapter {
           [attributeKey("git_diff_mode")]: mode,
         },
       },
-      this._parentContext,
+      context.active(),
     );
   }
 
@@ -554,41 +554,59 @@ async function* streamRevListBatchObjects(
   const revListClosed = processClosed(revList);
   const catFileClosed = processClosed(catFile);
   let finalized = false;
-  const finalize = (completion: "exited" | "cancelled" | "error", error?: unknown): void => {
+  const finalize = (
+    revListCompletion: "exited" | "cancelled" | "error",
+    catFileCompletion: "exited" | "cancelled" | "error",
+    revListError?: unknown,
+    catFileError?: unknown,
+  ): void => {
     if (finalized) return;
     finalized = true;
-    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), completion);
-    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), completion);
-    if (error !== undefined) {
-      setGitError(revListSpan, error);
-      setGitError(catFileSpan, error);
-    }
+    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), revListCompletion);
+    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), catFileCompletion);
+    if (revListError !== undefined) setGitError(revListSpan, revListError);
+    if (catFileError !== undefined) setGitError(catFileSpan, catFileError);
     revListSpan.end();
     catFileSpan.end();
   };
   let exited = false;
+  let failure:
+    | { readonly owner: "rev-list" | "cat-file" | "pipeline"; readonly error: unknown }
+    | undefined;
+  let closeResults:
+    | readonly [
+        Awaited<typeof revListClosed>,
+        Awaited<typeof catFileClosed>,
+        Awaited<typeof pipeClosed>,
+      ]
+    | undefined;
   try {
     for await (const object of parseBatchObjectStream(catFile.stdout)) yield object;
-    const [revListResult, catFileResult, pipeError] = await Promise.all([
-      revListClosed,
-      catFileClosed,
-      pipeClosed,
-    ]);
+    closeResults = await Promise.all([revListClosed, catFileClosed, pipeClosed]);
+    const [revListResult, catFileResult, pipeError] = closeResults;
     const revListStderr = Buffer.concat(revListStderrChunks).toString("utf8");
     const catFileStderr = Buffer.concat(catFileStderrChunks).toString("utf8");
-    if (!revListResult.ok)
+    if (!revListResult.ok) {
+      failure = { owner: "rev-list", error: revListResult.error };
       throw new GitAdapterError(
         `Unexpected error walking commits: ${formatUnknownError(revListResult.error)}`,
         "UNKNOWN",
         revListResult.error,
       );
-    if (!catFileResult.ok)
+    }
+    if (!catFileResult.ok) {
+      failure = { owner: "cat-file", error: catFileResult.error };
       throw new GitAdapterError(
         `Unexpected error reading commit batch: ${formatUnknownError(catFileResult.error)}`,
         "UNKNOWN",
         catFileResult.error,
       );
+    }
     if (revListResult.code !== 0) {
+      failure = {
+        owner: "rev-list",
+        error: new Error(revListStderr || `exit code ${revListResult.code}`),
+      };
       if (isNotRepositoryError(revListStderr))
         throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
       const result = { stdout: "", stderr: revListStderr, code: revListResult.code };
@@ -598,6 +616,10 @@ async function* streamRevListBatchObjects(
       );
     }
     if (catFileResult.code !== 0) {
+      failure = {
+        owner: "cat-file",
+        error: new Error(catFileStderr || `exit code ${catFileResult.code}`),
+      };
       if (isNotRepositoryError(catFileStderr))
         throw new GitAdapterError(`Not a Git repository: ${repoPath}`, "NOT_A_REPOSITORY");
       throw new GitAdapterError(
@@ -605,23 +627,35 @@ async function* streamRevListBatchObjects(
         "UNKNOWN",
       );
     }
-    if (pipeError !== undefined)
-      throw new GitAdapterError(
-        `Unexpected error piping rev-list output to cat-file: ${formatUnknownError(pipeError)}`,
-        "UNKNOWN",
-        pipeError,
-      );
-    finalize("exited");
+    if (pipeError !== undefined) {
+      failure = { owner: "pipeline", error: pipeError };
+      throw pipeError;
+    }
     exited = true;
   } catch (error) {
-    finalize("error", error);
+    failure ??= { owner: "cat-file", error };
     throw error;
   } finally {
     if (!exited) {
       revList.kill();
       catFile.kill();
-      await Promise.all([revListClosed, catFileClosed, pipeClosed]);
-      finalize("cancelled");
+      closeResults ??= await Promise.all([revListClosed, catFileClosed, pipeClosed]);
+    }
+    const [revListResult, catFileResult] =
+      closeResults ?? (await Promise.all([revListClosed, catFileClosed, pipeClosed]));
+    if (exited) {
+      finalize("exited", "exited");
+    } else if (failure?.owner === "rev-list") {
+      finalize("error", catFileResult.ok ? "exited" : "cancelled", failure.error);
+    } else if (failure?.owner === "cat-file") {
+      finalize(revListResult.ok ? "exited" : "cancelled", "error", undefined, failure.error);
+    } else if (failure === undefined) {
+      finalize("cancelled", "cancelled");
+    } else {
+      finalize(
+        revListResult.ok ? "exited" : "cancelled",
+        catFileResult.ok ? "exited" : "cancelled",
+      );
     }
   }
 }

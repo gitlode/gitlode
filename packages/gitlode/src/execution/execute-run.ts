@@ -3,7 +3,6 @@ import { performance } from "node:perf_hooks";
 import {
   createDagTelemetryBinding,
   createGitMetricRecorder,
-  NOOP_GIT_METRIC_RECORDER,
   type DagTelemetryBinding,
   type GitMetricRecorder,
 } from "@gitlode/git-adapters";
@@ -103,18 +102,23 @@ interface WorkerExecutionTelemetry {
   readonly dagTelemetryBinding: DagTelemetryBinding;
 }
 
-const defaultWorkerExecutionTelemetry: WorkerExecutionTelemetry = {
-  executionTracer: trace.getTracer("gitlode.execution"),
-  extractionTracer: trace.getTracer("gitlode.extraction"),
-  extractionMeter: metrics.getMeter("gitlode.extraction"),
-  rootContext: context.active(),
-  gitTracer: trace.getTracer("gitlode.git"),
-  gitMetricRecorder: NOOP_GIT_METRIC_RECORDER,
-  dagTelemetryBinding: createDagTelemetryBinding(
-    trace.getTracer("gitlode.dag"),
-    metrics.getMeter("gitlode.dag"),
-  ),
-};
+function createDefaultWorkerExecutionTelemetry(
+  adapter: ExecutionRunInput["gitAdapter"],
+): WorkerExecutionTelemetry {
+  const gitTracer = trace.getTracer("gitlode.git");
+  return {
+    executionTracer: trace.getTracer("gitlode.execution"),
+    extractionTracer: trace.getTracer("gitlode.extraction"),
+    extractionMeter: metrics.getMeter("gitlode.extraction"),
+    rootContext: context.active(),
+    gitTracer,
+    gitMetricRecorder: createGitMetricRecorder(metrics.getMeter("gitlode.git"), adapter),
+    dagTelemetryBinding: createDagTelemetryBinding(
+      trace.getTracer("gitlode.dag"),
+      metrics.getMeter("gitlode.dag"),
+    ),
+  };
+}
 
 async function withSetupAsyncSpan<T>(
   tracer: Tracer,
@@ -162,18 +166,15 @@ export async function executeWorkerRunRequest(
   request: WorkerRunRequest,
   reporters: WorkerExecutionReporters,
   dependencies: GitAdapterFactoryDependencies = { environment: process.env },
-  telemetry: WorkerExecutionTelemetry = defaultWorkerExecutionTelemetry,
+  telemetry?: WorkerExecutionTelemetry,
 ): Promise<WorkerRunResult> {
   const { input, priorCheckpoint } = request;
   const recorder = input.profile
     ? new LocalInstrumentationRecorder(() => performance.now())
     : undefined;
   const instrumentation = recorder ?? noopInstrumentation;
-  const { executionTracer, extractionTracer, extractionMeter, rootContext } = telemetry;
-  const gitMetricRecorder =
-    telemetry === defaultWorkerExecutionTelemetry
-      ? createGitMetricRecorder(metrics.getMeter("gitlode.git"), input.gitAdapter)
-      : telemetry.gitMetricRecorder;
+  const activeTelemetry = telemetry ?? createDefaultWorkerExecutionTelemetry(input.gitAdapter);
+  const { executionTracer, extractionTracer, extractionMeter, rootContext } = activeTelemetry;
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
@@ -190,9 +191,9 @@ export async function executeWorkerRunRequest(
     const gitAdapterResult = await buildGitAdapter(
       input.gitAdapter,
       {
-        gitTracer: telemetry.gitTracer,
-        gitMetricRecorder,
-        dagTelemetryBinding: telemetry.dagTelemetryBinding,
+        gitTracer: activeTelemetry.gitTracer,
+        gitMetricRecorder: activeTelemetry.gitMetricRecorder,
+        dagTelemetryBinding: activeTelemetry.dagTelemetryBinding,
         rootContext,
       },
       dependencies,

@@ -224,7 +224,7 @@ describe("Git-owned DAG telemetry binding", () => {
     expect(span.endCount).toBe(1);
   });
 
-  it("records certified closure results and runtime errors exactly once", async () => {
+  it("records certified closure exhausted and closed-boundary results exactly once", async () => {
     const tracer = new RecordingTracer();
     const meter = new RecordingMeter();
     const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
@@ -251,6 +251,27 @@ describe("Git-owned DAG telemetry binding", () => {
       "closed-boundary",
     );
     expect(tracer.starts[1]?.span.endCount).toBe(1);
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
+    ).toHaveLength(2);
+    expect(
+      meter.adds
+        .filter((call) => call.name === "gitlode.dag.operation.completion")
+        .map((call) => call.attributes),
+    ).toEqual([
+      {
+        "gitlode.dag.operation": "certified-closure",
+        "gitlode.dag.operation.completion": "success",
+      },
+      {
+        "gitlode.dag.operation": "certified-closure",
+        "gitlode.dag.operation.completion": "success",
+      },
+    ]);
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.step.processed")).toHaveLength(2);
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.successor.expansion"),
+    ).toHaveLength(2);
     const failure = new Error("closure failure");
     await expect(
       binding.instrumentCertifiedClosure(
@@ -265,6 +286,19 @@ describe("Git-owned DAG telemetry binding", () => {
     expect(tracer.starts[2]?.span.status?.code).toBe(2);
     expect(tracer.starts[2]?.span.exceptions).toEqual([failure]);
     expect(tracer.starts[2]?.span.endCount).toBe(1);
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
+    ).toHaveLength(3);
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion")[2]?.attributes,
+    ).toEqual({
+      "gitlode.dag.operation": "certified-closure",
+      "gitlode.dag.operation.completion": "error",
+    });
+    expect(meter.adds.filter((call) => call.name === "gitlode.dag.step.processed")).toHaveLength(3);
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.successor.expansion"),
+    ).toHaveLength(3);
   });
 
   it("records certified-lazy fallback with exact bounded evidence and zero omission", async () => {
@@ -441,12 +475,13 @@ describe("Git-owned DAG telemetry binding", () => {
     ).toHaveLength(1);
   });
 
-  it("records handled throw separately from rethrown throw", async () => {
+  it("records handled throw with its catalog-specific completion values", async () => {
     const tracer = new RecordingTracer();
     const meter = new RecordingMeter();
     const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
     const token = { kind: "handled" };
     const handled = binding.instrumentDifference("eager-exclude", false, (observation) => {
+      observation.recordStepProcessed(2);
       observation.recordNodeYielded();
       let first = true;
       return {
@@ -464,28 +499,69 @@ describe("Git-owned DAG telemetry binding", () => {
     const handledIterator = handled[Symbol.asyncIterator]();
     await handledIterator.next();
     const handledResult = await handledIterator.throw?.(token);
-    expect(handledResult).toEqual({ value: token, done: true });
+    expect(handledResult?.value).toBe(token);
+    expect(handledResult?.done).toBe(true);
     expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("handled_throw");
-    expect(
-      meter.adds.find((call) => call.name === "gitlode.dag.operation.completion")?.attributes,
-    ).toMatchObject({ "gitlode.dag.operation.completion": "handled-throw" });
+    const handledCompletions = meter.adds.filter(
+      (call) => call.name === "gitlode.dag.operation.completion",
+    );
+    expect(handledCompletions).toHaveLength(1);
+    expect(handledCompletions[0]?.attributes).toEqual({
+      "gitlode.dag.operation": "difference",
+      "gitlode.dag.operation.completion": "handled-throw",
+      "gitlode.dag.strategy": "eager-exclude",
+      "gitlode.dag.has_exclusion": false,
+    });
+    expect(tracer.starts[0]?.span.status).toBeUndefined();
+    expect(tracer.starts[0]?.span.exceptions).toEqual([]);
+    expect(meter.adds.find((call) => call.name === "gitlode.dag.step.processed")?.value).toBe(2);
     expect(tracer.starts[0]?.span.endCount).toBe(1);
+    await handledIterator.return?.();
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
+    ).toHaveLength(1);
+  });
+
+  it("records rethrown throw with error completion and preserved identity", async () => {
+    const tracer = new RecordingTracer();
+    const meter = new RecordingMeter();
+    const binding = createDagTelemetryBinding(asTracer(tracer), asMeter(meter));
     const rethrowToken = { kind: "rethrow" };
-    const rethrown = binding.instrumentDifference("eager-exclude", false, () => ({
-      [Symbol.asyncIterator]() {
-        return {
-          next: async () => ({ value: "head", done: false }),
-          throw: async () => {
-            throw rethrowToken;
-          },
-        };
-      },
-    }));
+    const rethrown = binding.instrumentDifference("eager-exclude", false, (observation) => {
+      observation.recordStepProcessed();
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () => ({ value: "head", done: false }),
+            throw: async () => {
+              throw rethrowToken;
+            },
+          };
+        },
+      };
+    });
     const rethrowIterator = rethrown[Symbol.asyncIterator]();
     await rethrowIterator.next();
     await expect(rethrowIterator.throw?.(rethrowToken)).rejects.toBe(rethrowToken);
-    expect(tracer.starts[1]?.span.attributes["gitlode.stream.completion"]).toBe("error");
-    expect(tracer.starts[1]?.span.exceptions).toHaveLength(1);
+    expect(tracer.starts[0]?.span.attributes["gitlode.stream.completion"]).toBe("error");
+    expect(tracer.starts[0]?.span.status?.code).toBe(2);
+    expect(tracer.starts[0]?.span.exceptions).toHaveLength(1);
+    expect(tracer.starts[0]?.span.endCount).toBe(1);
+    const rethrowCompletions = meter.adds.filter(
+      (call) => call.name === "gitlode.dag.operation.completion",
+    );
+    expect(rethrowCompletions).toHaveLength(1);
+    expect(rethrowCompletions[0]?.attributes).toEqual({
+      "gitlode.dag.operation": "difference",
+      "gitlode.dag.operation.completion": "error",
+      "gitlode.dag.strategy": "eager-exclude",
+      "gitlode.dag.has_exclusion": false,
+    });
+    expect(meter.adds.find((call) => call.name === "gitlode.dag.step.processed")?.value).toBe(1);
+    await rethrowIterator.return?.();
+    expect(
+      meter.adds.filter((call) => call.name === "gitlode.dag.operation.completion"),
+    ).toHaveLength(1);
   });
 
   it("creates cataloged DAG instruments once across all binding operations", async () => {

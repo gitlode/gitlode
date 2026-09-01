@@ -52,11 +52,7 @@ export interface GitCliAdapterDependencies {
   readonly metricRecorder: GitMetricRecorder;
   readonly parentContext: Context;
   readonly gitExecutable?: string;
-  readonly processFactory?: GitCliProcessFactory;
-  readonly pipeline?: GitCliPipeline;
 }
-
-type GitCliPipeline = (source: Readable, destination: Writable) => Promise<void>;
 
 interface GitCliProcessStart {
   readonly kind: "rev-list" | "commit-batch";
@@ -64,7 +60,25 @@ interface GitCliProcessStart {
   readonly args: readonly string[];
 }
 
+type GitCliPipeline = (source: Readable, destination: Writable) => Promise<void>;
+
 export type { GitCliProcessFactory } from "./git-cli-cat-file-batch.js";
+
+interface GitCliProcessSeam {
+  readonly processFactory: GitCliProcessFactory;
+  readonly pipeline: GitCliPipeline;
+}
+
+const internalSeams = new WeakMap<GitCliAdapter, GitCliProcessSeam>();
+
+export function createGitCliAdapterForTesting(
+  dependencies: GitCliAdapterDependencies,
+  seam: GitCliProcessSeam,
+): GitCliAdapter {
+  const adapter = new GitCliAdapter(dependencies);
+  internalSeams.set(adapter, seam);
+  return adapter;
+}
 
 interface GitCommandResult {
   readonly stdout: string;
@@ -111,8 +125,8 @@ export class GitCliAdapter implements GitAdapter {
     this._parentContext = dependencies.parentContext;
     this._metricRecorder = dependencies.metricRecorder;
     this._gitExecutable = dependencies.gitExecutable ?? DEFAULT_GIT_EXECUTABLE;
-    this._processFactory = dependencies.processFactory ?? defaultGitCliProcessFactory;
-    this._pipeline = dependencies.pipeline ?? defaultGitCliPipeline;
+    this._processFactory = defaultGitCliProcessFactory;
+    this._pipeline = defaultGitCliPipeline;
     this._instrumentWalk = createAsyncIterableInstrumenter(
       (span, completion) => {
         span.setAttribute(attributeKey("stream_completion"), completion);
@@ -336,8 +350,8 @@ export class GitCliAdapter implements GitAdapter {
               args,
               revListSpan,
               catFileSpan,
-              this._processFactory,
-              this._pipeline,
+              internalSeams.get(this)?.processFactory ?? this._processFactory,
+              internalSeams.get(this)?.pipeline ?? this._pipeline,
             )) {
               if (object.type !== "commit") {
                 throw new GitAdapterError(`Commit not found: ${object.oid}`, "COMMIT_NOT_FOUND");
@@ -625,16 +639,32 @@ async function* streamRevListBatchObjects(
   const startedRevList = revList;
   const revListStderrChunks: Buffer[] = [];
   const catFileStderrChunks: Buffer[] = [];
-  revList.stderr.on("data", (chunk: Buffer) => revListStderrChunks.push(chunk));
-  catFile.stderr.on("data", (chunk: Buffer) => catFileStderrChunks.push(chunk));
-
-  if (catFile.stdin === null) throw new Error("Git commit-batch process has no stdin");
-  const pipeClosed = pipelineFactory(startedRevList.stdout, catFile.stdin).then(
-    () => undefined,
-    (error: unknown) => error,
-  );
-  const revListClosePromise = revListClosed;
   const catFileClosed = processClosed(catFile);
+  const revListClosePromise = revListClosed;
+  let pipeClosed: Promise<unknown>;
+  try {
+    revList.stderr.on("data", (chunk: Buffer) => revListStderrChunks.push(chunk));
+    catFile.stderr.on("data", (chunk: Buffer) => catFileStderrChunks.push(chunk));
+    if (catFile.stdin === null) throw new Error("Git commit-batch process has no stdin");
+    pipeClosed = pipelineFactory(startedRevList.stdout, catFile.stdin).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+  } catch (error) {
+    revList.kill();
+    catFile.kill();
+    await Promise.all([revListClosePromise, catFileClosed]);
+    revListSpan.setAttribute(attributeKey("git_cli_process_completion"), "cancelled");
+    catFileSpan.setAttribute(attributeKey("git_cli_process_completion"), "error");
+    setGitProcessError(catFileSpan, error);
+    revListSpan.end();
+    catFileSpan.end();
+    throw new GitAdapterError(
+      `Unexpected error starting Git commit walk: ${formatUnknownError(error)}`,
+      "UNKNOWN",
+      error,
+    );
+  }
   let finalized = false;
   const finalize = (
     revListCompletion: "exited" | "cancelled" | "error",

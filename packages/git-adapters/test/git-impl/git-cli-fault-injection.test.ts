@@ -11,7 +11,10 @@ import {
 } from "@opentelemetry/api";
 import { describe, expect, it } from "vitest";
 
-import { GitCliAdapter, type GitCliProcessFactory } from "../../src/git-impl/git-cli-adapter.js";
+import {
+  createGitCliAdapterForTesting,
+  type GitCliProcessFactory,
+} from "../../src/git-impl/git-cli-adapter.js";
 import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
 interface FakeProcess {
@@ -208,13 +211,14 @@ async function runScenario(
           throw runtimeFailure;
         }
       : undefined;
-  const adapter = new GitCliAdapter({
-    ...adapterTelemetry("git-cli"),
-    tracer: tracer as unknown as Tracer,
-    processFactory,
-    pipeline,
-    parentContext: parent,
-  });
+  const adapter = createGitCliAdapterForTesting(
+    {
+      ...adapterTelemetry("git-cli"),
+      tracer: tracer as unknown as Tracer,
+      parentContext: parent,
+    },
+    { processFactory, pipeline: pipeline ?? (async () => undefined) },
+  );
   const iterator = adapter.walkCommits("/repo", "a".repeat(40) as never)[Symbol.asyncIterator]();
   let outward: unknown;
   try {
@@ -271,9 +275,9 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
         });
       return kind === "rev-list" ? revList : catFile;
     };
-    const adapter = new GitCliAdapter({
-      ...adapterTelemetry("git-cli"),
+    const adapter = createGitCliAdapterForTesting(adapterTelemetry("git-cli"), {
       processFactory,
+      pipeline: async () => undefined,
     });
     expect(adapter).toBeDefined();
     await expect(
@@ -286,6 +290,35 @@ describe("GitCliAdapter deterministic process owner matrix", () => {
     expect(revList.killed).toBe(1);
     expect(catFile.closed).toBe(true);
   });
+
+  it.each(["rev-list", "commit-batch"] as const)(
+    "owns synchronous %s process-factory startup failure",
+    async (failedKind) => {
+      const tracer = new RecordingTracer();
+      const revList = fakeProcess();
+      const catFile = fakeProcess();
+      const startupFailure = new Error(`sentinel ${failedKind} startup failure`);
+      const processFactory: GitCliProcessFactory = ({ kind }) => {
+        if (kind === failedKind) throw startupFailure;
+        return kind === "rev-list" ? revList : catFile;
+      };
+      const adapter = createGitCliAdapterForTesting(
+        { ...adapterTelemetry("git-cli"), tracer: tracer as unknown as Tracer },
+        { processFactory, pipeline: async () => undefined },
+      );
+      const iterator = adapter
+        .walkCommits("sentinel repo path", "a".repeat(40) as never)
+        [Symbol.asyncIterator]();
+      const outward = await iterator.next().catch((error: unknown) => error);
+      expect(outward).toMatchObject({ code: "UNKNOWN" });
+      expect((outward as Error).cause).toBe(startupFailure);
+      if (failedKind === "commit-batch") {
+        expect(revList.killed).toBe(1);
+        expect(revList.reaped).toBe(true);
+      }
+      for (const entry of tracer.starts) expect(entry.span.endCount).toBe(1);
+    },
+  );
 
   it.each([
     ["success", "exhaust", "exhausted", "exited", "exited"],

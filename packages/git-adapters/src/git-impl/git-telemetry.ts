@@ -3,6 +3,7 @@ import {
   getTelemetryAttributeMetadata,
   type TelemetryAttributeId,
 } from "@gitlode/internal-contracts/telemetry";
+import { recordSpanError } from "@gitlode/internal-foundation/otel-support";
 import {
   context,
   SpanStatusCode,
@@ -33,11 +34,6 @@ export async function withGitAsyncSpan<T>(
   } finally {
     span.end();
   }
-}
-
-function recordSpanError(span: Span, error: unknown): void {
-  span.setStatus({ code: SpanStatusCode.ERROR });
-  span.recordException(error as Error);
 }
 
 export function setGitProcessError(span: Span, error: unknown): void {

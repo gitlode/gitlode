@@ -347,8 +347,11 @@ describe("production multi-change metric and lazy matrix", () => {
     expect(requests).toHaveLength(3);
     expect((await iterator.next()).value?.status).toBe("added");
     expect(requests).toHaveLength(4);
+    const requestSnapshot = requests.slice();
     await iterator.return?.();
-    expect(requests).toEqual(requests.slice());
+    await iterator.next();
+    await iterator.return?.();
+    expect(requests).toEqual(requestSnapshot);
     expect(
       gitCalls(meter, "gitlode.git.file_change.yielded").map(
         (call) => call.attributes["gitlode.git.file_change.type"],

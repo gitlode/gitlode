@@ -503,6 +503,7 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
           pipeline: async () => undefined,
         },
       );
+      const version = await adapter.validateGitExecutable();
       const iterator = adapter
         .getFileBlobChanges(data.path, data.child as never, data.parent as never)
         [Symbol.asyncIterator]();
@@ -516,6 +517,7 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
       return {
         starts,
         requests,
+        version,
         values: values.map((value) => ({
           status: value.status,
           before: value.before?.content,
@@ -527,6 +529,7 @@ describe("Git CLI blob failure and partial cancellation evidence", () => {
     const withTelemetry = await run(true);
     expect(withTelemetry.starts).toEqual(withoutTelemetry.starts);
     expect(withTelemetry.requests).toEqual(withoutTelemetry.requests);
+    expect(withTelemetry.version).toEqual(withoutTelemetry.version);
     expect(withTelemetry.values).toEqual(withoutTelemetry.values);
     expect(withTelemetry.starts).toEqual([
       { kind: "commit-batch", command: "git", args: ["-C", data.path, "cat-file", "--batch"] },

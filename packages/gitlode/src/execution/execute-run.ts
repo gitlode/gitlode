@@ -18,6 +18,7 @@ import {
 import { recordSpanError } from "@gitlode/internal-foundation/otel-support";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import {
+  createLineDiffMetricRecorder,
   JsLineDiffCalculator,
   type JsLineDiffCalculatorDependencies,
 } from "@gitlode/line-diff-adapters";
@@ -96,6 +97,7 @@ interface WorkerExecutionTelemetry {
   readonly executionTracer: Tracer;
   readonly extractionTracer: Tracer;
   readonly extractionMeter: Meter;
+  readonly lineDiffMeter: Meter;
   readonly rootContext: Context;
   readonly gitTracer: Tracer;
   readonly gitMetricRecorder: GitMetricRecorder;
@@ -110,6 +112,7 @@ function createDefaultWorkerExecutionTelemetry(
     executionTracer: trace.getTracer("gitlode.execution"),
     extractionTracer: trace.getTracer("gitlode.extraction"),
     extractionMeter: metrics.getMeter("gitlode.extraction"),
+    lineDiffMeter: metrics.getMeter("gitlode.line_diff"),
     rootContext: context.active(),
     gitTracer,
     gitMetricRecorder: createGitMetricRecorder(metrics.getMeter("gitlode.git"), adapter),
@@ -281,7 +284,9 @@ export async function executeWorkerRunRequest(
     const traversalExtractor = new CommitFactExtractor(gitAdapter, extractionTracer);
     const fileChangeExpander = new FileChangeFactExpander(
       gitAdapter,
-      new JsLineDiffCalculator({ instrumentation } satisfies JsLineDiffCalculatorDependencies),
+      new JsLineDiffCalculator({
+        metricRecorder: createLineDiffMetricRecorder(activeTelemetry.lineDiffMeter),
+      } satisfies JsLineDiffCalculatorDependencies),
       createFileChangeFactExpanderMetricRecorder(extractionMeter),
       extractionSettings.maxDiffSize,
     );

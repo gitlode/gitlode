@@ -1,5 +1,5 @@
 import { createMonotonicTiming, TELEMETRY_METRICS } from "@gitlode/internal-contracts/telemetry";
-import type { Meter, Span, Tracer } from "@opentelemetry/api";
+import type { Context, Meter, Span, SpanOptions, SpanStatus, Tracer } from "@opentelemetry/api";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -38,6 +38,8 @@ class FakeSpan {
   readonly attributes: Record<string, string | boolean | number> = {};
   readonly events: Array<{ name: string; attributes?: Record<string, unknown> }> = [];
   endCount = 0;
+  status: SpanStatus | undefined;
+  readonly exceptions: unknown[] = [];
   setAttribute(name: string, value: string | boolean | number) {
     this.attributes[name] = value;
     return this;
@@ -50,17 +52,22 @@ class FakeSpan {
     this.events.push({ name, attributes });
     return this;
   }
-  setStatus() {
+  setStatus(status: SpanStatus) {
+    this.status = status;
     return this;
   }
-  recordException() {}
+  recordException(exception: unknown) {
+    this.exceptions.push(exception);
+  }
   end() {
     this.endCount++;
   }
 }
 class FakeTracer {
   readonly spans: FakeSpan[] = [];
-  startSpan() {
+  readonly starts: Array<{ name: string; options?: SpanOptions; parent?: Context }> = [];
+  startSpan(name: string, options?: SpanOptions, parent?: Context) {
+    this.starts.push({ name, options, parent });
     const span = new FakeSpan();
     this.spans.push(span);
     return span as unknown as Span;
@@ -183,6 +190,10 @@ describe("Git and DAG instrument ownership", () => {
     const second = binding.instrumentReachable(graph, ["root"]);
     await collectAsync(second);
     expect(fakeMeter.creations).toHaveLength(8);
+    expect(fakeTracer.starts.map(({ name }) => name)).toEqual([
+      "gitlode.dag.reachable",
+      "gitlode.dag.reachable",
+    ]);
     expect(fakeTracer.spans[0]?.attributes).toEqual({
       "gitlode.dag.start.count": 1,
       "gitlode.stream.completion": "exhausted",
@@ -200,6 +211,11 @@ describe("Git and DAG instrument ownership", () => {
       hasExclusion: true,
     }).complete("exhausted");
     expect(differenceSpan.attributes).not.toHaveProperty("gitlode.dag.start.count");
+    await binding.instrumentCertifiedClosure(graph, "root");
+    expect(fakeTracer.starts[2]?.name).toBe("gitlode.dag.certified_closure");
+    expect(fakeTracer.spans[2]?.endCount).toBe(1);
+    expect(fakeTracer.spans[2]?.status).toBeUndefined();
+    expect(fakeTracer.spans[2]?.exceptions).toEqual([]);
   });
 });
 

@@ -188,32 +188,6 @@ export function createDagTelemetryBinding(tracer: Tracer, meter: Meter): DagTele
   };
 }
 
-export function instrumentDagReachable<NodeId extends PropertyKey, DomainHint = undefined>(
-  tracer: Tracer,
-  meter: Meter,
-  graph: DagTopologyPort<NodeId, DomainHint>,
-  nodeIds: Iterable<NodeId>,
-  options: WalkDagStrategyOptions<NodeId, BasicDagSchedulingContext, DomainHint> = {},
-): AsyncIterable<NodeId> {
-  return createDagTelemetryBinding(tracer, meter).instrumentReachable(graph, nodeIds, options);
-}
-
-export async function instrumentDagCertifiedClosure<
-  NodeId extends PropertyKey,
-  DomainHint = undefined,
->(
-  tracer: Tracer,
-  meter: Meter,
-  graph: DagTopologyPort<NodeId, DomainHint>,
-  nodeId: NodeId,
-  options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
-): Promise<CertifiedClosurePhaseResult<NodeId>> {
-  return createDagTelemetryBinding(tracer, meter).instrumentCertifiedClosure(
-    graph,
-    nodeId,
-    options,
-  );
-}
 export function normalizeDagCompletion(
   c: NeutralDagCompletion,
 ): TelemetryAttributeValue<"dag_operation_completion"> {

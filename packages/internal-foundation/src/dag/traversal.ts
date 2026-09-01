@@ -43,6 +43,8 @@ export async function* walkDagNodeIdsEagerExclude<
       excludeNodeId,
       options,
     );
+    context.observation?.setCertificationResult("certified");
+    context.observation?.setTerminationReason("frontier-exhausted");
     complete("exhausted");
   } catch (error) {
     complete("error");

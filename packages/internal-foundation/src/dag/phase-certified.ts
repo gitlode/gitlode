@@ -106,6 +106,12 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<
   excludeNodeId?: NodeId,
   options: PhaseCertifiedStrategyOptions<NodeId, DomainHint> = {},
 ): AsyncIterable<NodeId> {
+  let completed = false;
+  const complete = (completion: "exhausted" | "cancelled" | "handled_throw" | "error") => {
+    if (completed) return;
+    completed = true;
+    context.observation?.complete(completion);
+  };
   try {
     yield* walkDagNodeIdsPhaseCertifiedDifferenceCore(
       { ...context, telemetry: { observation: context.observation } },
@@ -113,12 +119,12 @@ export async function* walkDagNodeIdsPhaseCertifiedDifference<
       excludeNodeId,
       options,
     );
-    context.observation?.complete("exhausted");
+    complete("exhausted");
   } catch (error) {
-    context.observation?.complete("error");
+    complete("error");
     throw error;
   } finally {
-    context.observation?.complete("cancelled");
+    complete("cancelled");
   }
 }
 

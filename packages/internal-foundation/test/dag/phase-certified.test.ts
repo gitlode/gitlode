@@ -10,12 +10,8 @@ import {
   resolveDagCertifiedClosurePhase,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/dag/index.js";
+import type { DagOperationObservation } from "../../src/dag/observations.js";
 import { PhaseCertifiedDifferenceState } from "../../src/dag/phase-certified-difference-state.js";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-  type Instrumentation,
-} from "../../src/instrumentation/index.js";
 import { OrderedQueue, PriorityQueue } from "../../src/support/index.js";
 
 describe("resolveDagCertifiedClosurePhase", () => {
@@ -211,10 +207,9 @@ describe("resolveDagCertifiedClosurePhase", () => {
   });
 });
 
-// Legacy span-counter assertions were removed with the DAG owner migration.
-describe("phase-certified prototype telemetry", () => {
+describe("phase-certified observation measurement", () => {
   it("records standalone certified closure telemetry for exhausted closure", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation("dag.certified_closure");
 
     const result = await resolveDagCertifiedClosurePhase(
       createContext(
@@ -231,7 +226,7 @@ describe("phase-certified prototype telemetry", () => {
   });
 
   it("records common counters and yield source counters for a linear difference", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
 
     const yielded = await collect(
       walkDagNodeIdsPhaseCertifiedDifference(
@@ -253,7 +248,7 @@ describe("phase-certified prototype telemetry", () => {
   });
 
   it("uses the phase-certified strategy boundary for a walk without an exclude start", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
 
     const yielded = await collect(
       walkDagNodeIdsPhaseCertifiedDifference(
@@ -289,7 +284,7 @@ describe("phase-certified prototype telemetry", () => {
   });
 
   it("records multiple closed-boundary phases without double-counting certified nodes", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
 
     const yielded = await collect(
       walkDagNodeIdsPhaseCertifiedDifference(
@@ -314,7 +309,7 @@ describe("phase-certified prototype telemetry", () => {
   });
 
   it("records certified-hit classification counters and yielded-node source relationships", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
 
     const yielded = await collect(
       walkDagNodeIdsPhaseCertifiedDifference(
@@ -335,6 +330,43 @@ describe("phase-certified prototype telemetry", () => {
     );
 
     expect(new Set(yielded)).toEqual(new Set(["HEAD", "LEFT", "RIGHT", "NEW"]));
+  });
+
+  it("completes exhaustion, cancellation, and failure exactly once", async () => {
+    const exhausted = createRecordingObservation();
+    await collect(
+      walkDagNodeIdsPhaseCertifiedDifference(
+        createContext(createDagPort({ ROOT: [] }), exhausted),
+        "ROOT",
+      ),
+    );
+    expect(exhausted.completions).toEqual(["exhausted"]);
+
+    const cancelled = createRecordingObservation();
+    const iterator = walkDagNodeIdsPhaseCertifiedDifference(
+      createContext(createDagPort({ ROOT: ["LEAF"], LEAF: [] }), cancelled),
+      "ROOT",
+    )[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.return?.();
+    await iterator.next();
+    expect(cancelled.completions).toEqual(["cancelled"]);
+
+    const failure = new Error("phase failure");
+    const failed = createRecordingObservation();
+    const failing = walkDagNodeIdsPhaseCertifiedDifference(
+      createContext(
+        {
+          getSuccessors: async () => {
+            throw failure;
+          },
+        },
+        failed,
+      ),
+      "ROOT",
+    );
+    await expect(collect(failing)).rejects.toBe(failure);
+    expect(failed.completions).toEqual(["error"]);
   });
 });
 
@@ -680,7 +712,7 @@ describe("phase-certified DomainHint scheduling", () => {
   it("re-expands closure nodes through compliant FIFO scheduling and preserves successor hints", async () => {
     const frontiers: RecordingFrontier<ClosureFrontierItem<string, PathTimestampHint>>[] = [];
     const reads: string[] = [];
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
 
     const result = await resolveDagCertifiedClosurePhase<string, PathTimestampHint>(
       createContext(
@@ -1050,7 +1082,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
       ROOT: [],
     };
     const reads: string[] = [];
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
 
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference<string, PathTimestampHint>(
@@ -1093,7 +1125,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
       ROOT: [],
     };
     const reads: string[] = [];
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
 
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference(
@@ -1136,7 +1168,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
       EXCLUDE: ["E_ROOT"],
       E_ROOT: [],
     };
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
     const yielded = await collectNodeIds(
       walkDagNodeIdsPhaseCertifiedDifference(
         createContext(createDagPort(successors), recorder),
@@ -1180,7 +1212,7 @@ describe("walkDagPhaseCertifiedDifference", () => {
       OLD: [],
     };
     const reads: string[] = [];
-    const recorder = new LocalInstrumentationRecorder(() => 0);
+    const recorder = createRecordingObservation();
     const frontiers: RecordingFrontier<DifferenceFrontierItem<string>>[] = [];
 
     const yielded = await collectNodeIds(
@@ -1509,40 +1541,56 @@ function createDagPort(
 
 function createContext<NodeId extends PropertyKey>(
   graph: DagTopologyPort<NodeId>,
-  instrumentation: Instrumentation = noopInstrumentation,
+  observation?: RecordingObservation,
   spanName = "dag.traversal",
 ): WalkDagContext<NodeId> {
   return {
     graph,
-    observation:
-      instrumentation === noopInstrumentation
-        ? undefined
-        : createNeutralObservation(instrumentation, spanName),
+    observation: observation,
   };
 }
 
-function createNeutralObservation(recorder: Instrumentation, name: string) {
-  const span = recorder.startSpan(name);
-  span.setAttribute("strategy", "phaseCertified");
+type MeasurementRecord = {
+  name: string;
+  attributes: Record<string, string>;
+  counters: Record<string, number>;
+};
+type RecordingObservation = DagOperationObservation & {
+  records(): MeasurementRecord[];
+  completions: string[];
+};
+
+function createRecordingObservation(name = "dag.traversal"): RecordingObservation {
+  const record: MeasurementRecord = {
+    name,
+    attributes: name === "dag.traversal" ? { strategy: "phaseCertified" } : {},
+    counters: {},
+  };
+  const completions: string[] = [];
+  const add = (key: string, count = 1) => {
+    record.counters[key] = (record.counters[key] ?? 0) + count;
+  };
   return {
-    recordStepProcessed: (count = 1) => span.incrementCounter("traversal_steps", count),
-    recordStepStale: (count = 1) => span.incrementCounter("stale_steps", count),
+    recordStepProcessed: (count = 1) => add("traversal_steps", count),
+    recordStepStale: (count = 1) => add("stale_steps", count),
     recordSuccessorExpansion: (role: "main" | "exclude", count = 1) => {
-      span.incrementCounter("successor_expansions", count);
-      span.incrementCounter(`${role}_expansions`, count);
+      add("successor_expansions", count);
+      add(`${role}_expansions`, count);
     },
-    recordNodeYielded: (count = 1) => span.incrementCounter("yielded_nodes", count),
-    recordNodeExcluded: (count = 1) => span.incrementCounter("excluded_nodes", count),
+    recordNodeYielded: (count = 1) => add("yielded_nodes", count),
+    recordNodeExcluded: (count = 1) => add("excluded_nodes", count),
     markFallback: (reason: string) => {
-      span.setAttribute("result", "fallback");
-      span.setAttribute("fallback_reason", reason);
+      record.attributes.result = "fallback";
+      record.attributes.fallback_reason = reason;
     },
-    recordFallbackNodeRemoved: (count = 1) => span.incrementCounter("fallback_removed", count),
-    setCertificationResult: (result: string) => span.setAttribute("result", result),
-    setTerminationReason: (reason: string) => span.setAttribute("termination_reason", reason),
-    recordStartCount: (count: number) => span.setAttribute("start_count", count),
-    setCertifiedClosureResult: (result: string) => span.setAttribute("result", result),
-    complete: () => span.end(),
+    recordFallbackNodeRemoved: (count = 1) => add("fallback_removed", count),
+    setCertificationResult: (result: string) => (record.attributes.result = result),
+    setTerminationReason: (reason: string) => (record.attributes.termination_reason = reason),
+    recordStartCount: (count: number) => (record.attributes.start_count = String(count)),
+    setCertifiedClosureResult: (result: string) => (record.attributes.result = result),
+    complete: (completion) => completions.push(completion),
+    records: () => [record],
+    completions,
   };
 }
 

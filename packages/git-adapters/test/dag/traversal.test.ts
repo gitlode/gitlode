@@ -11,10 +11,7 @@ import {
   walkDagNodeIdsEagerExclude,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "@gitlode/internal-foundation/dag";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
+import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { OrderedQueue } from "@gitlode/internal-foundation/support";
 import * as git from "isomorphic-git";
 import { describe, expect, it } from "vitest";
@@ -279,38 +276,21 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
   });
 });
 
-// Legacy DAG span-counter assertions were removed with the DAG owner migration.
-describe("DAG traversal telemetry", () => {
+describe("DAG traversal observation behavior", () => {
   it("records a top-level reachable operation with yielded nodes", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagReachableNodeIds(
         {
           graph: stringTopology({ head: ["left", "right"], left: [], right: [] }),
-          observation: neutralObservation(recorder, "dag.reachable"),
         },
         ["head"],
       ),
     );
 
     expect(new Set(result)).toEqual(new Set(["head", "left", "right"]));
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.reachable",
-        counters: {
-          main_expansions: 3,
-          successor_expansions: 3,
-          traversal_steps: 3,
-          yielded_nodes: 3,
-        },
-      }),
-    ]);
   });
 
   it("records eager-exclude traversal output separately from excluded reachable collection", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagNodeIdsEagerExclude(
         {
@@ -319,7 +299,6 @@ describe("DAG traversal telemetry", () => {
             release: ["root"],
             head: ["release"],
           }),
-          observation: neutralObservation(recorder, "dag.traversal"),
         },
         "head",
         "release",
@@ -330,8 +309,6 @@ describe("DAG traversal telemetry", () => {
   });
 
   it("records certified-lazy certificate success without fallback counters", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagNodeIdsCertifiedLazy(
         {
@@ -341,7 +318,6 @@ describe("DAG traversal telemetry", () => {
             after: ["release"],
             head: ["after"],
           }),
-          observation: neutralObservation(recorder, "dag.traversal"),
         },
         "head",
         "release",
@@ -353,8 +329,6 @@ describe("DAG traversal telemetry", () => {
   });
 
   it("records certified-lazy fallback reason and removed candidates", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagNodeIdsCertifiedLazy(
         {
@@ -364,7 +338,6 @@ describe("DAG traversal telemetry", () => {
             excludeRoot: [],
             exclude: ["excludeRoot"],
           }),
-          observation: neutralObservation(recorder, "dag.traversal"),
         },
         "head",
         "exclude",
@@ -953,26 +926,3 @@ describe("DAG traversal certifiedLazy read trace", () => {
     expect(labelsRead).toEqual(new Set(Object.keys(definition.nodes)));
   });
 });
-function neutralObservation(recorder: LocalInstrumentationRecorder, name: string) {
-  const span = recorder.startSpan(name);
-  return {
-    recordStepProcessed: (count = 1) => span.incrementCounter("traversal_steps", count),
-    recordStepStale: (count = 1) => span.incrementCounter("stale_steps", count),
-    recordSuccessorExpansion: (role: "main" | "exclude", count = 1) => {
-      span.incrementCounter("successor_expansions", count);
-      span.incrementCounter(`${role}_expansions`, count);
-    },
-    recordNodeYielded: (count = 1) => span.incrementCounter("yielded_nodes", count),
-    recordNodeExcluded: (count = 1) => span.incrementCounter("excluded_nodes", count),
-    markFallback: (reason: string) => {
-      span.setAttribute("result", "fallback");
-      span.setAttribute("fallback_reason", reason);
-    },
-    recordFallbackNodeRemoved: (count = 1) => span.incrementCounter("fallback_removed", count),
-    setCertificationResult: (result: string) => span.setAttribute("result", result),
-    setTerminationReason: (reason: string) => span.setAttribute("termination_reason", reason),
-    recordStartCount: (count: number) => span.setAttribute("start_count", count),
-    setCertifiedClosureResult: (result: string) => span.setAttribute("result", result),
-    complete: () => span.end(),
-  };
-}

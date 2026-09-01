@@ -495,11 +495,15 @@ async function materializeFileBlobChange(
         after: await materializeFileBlobSnapshot(descriptor.after, recorder, readBlob),
       };
     case "modified": {
-      const [before, after] = await Promise.all([
+      const results = await Promise.allSettled([
         materializeFileBlobSnapshot(descriptor.before, recorder, readBlob),
         materializeFileBlobSnapshot(descriptor.after, recorder, readBlob),
       ]);
-      return { status: "modified", before, after };
+      const before = results[0];
+      const after = results[1];
+      if (before.status === "rejected") throw before.reason;
+      if (after.status === "rejected") throw after.reason;
+      return { status: "modified", before: before.value, after: after.value };
     }
     case "deleted":
       return {

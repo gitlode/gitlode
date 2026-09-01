@@ -383,6 +383,7 @@ describe("production multi-change metric and lazy matrix", () => {
     ["added blob", "added"],
     ["modified before blob", "modified-before"],
     ["modified after blob", "modified-after"],
+    ["both modified blobs", "modified-both"],
   ] as const)("preserves production metrics for %s failure", async (_caseName, failureKind) => {
     const volume = new Volume();
     const fs = createFsFromVolume(volume);
@@ -395,16 +396,19 @@ describe("production multi-change metric and lazy matrix", () => {
     const parentB = parentTree.tree.find((entry) => entry.path === "b.txt")!.oid;
     const childA = childTree.tree.find((entry) => entry.path === "a.txt")!.oid;
     const childC = childTree.tree.find((entry) => entry.path === "c.txt")!.oid;
-    const target =
+    const targets =
       failureKind === "deleted"
-        ? parentB
+        ? [parentB]
         : failureKind === "added"
-          ? childC
+          ? [childC]
           : failureKind === "modified-before"
-            ? parentA
-            : childA;
+            ? [parentA]
+            : failureKind === "modified-after"
+              ? [childA]
+              : [parentA, childA];
     const readOids: string[] = [];
     const failure = new Error("sentinel isomorphic blob failure");
+    const afterFailure = new Error("sentinel isomorphic after failure");
     const meter = new RecordingMeter();
     const adapter = createIsomorphicGitAdapterForTesting(
       {
@@ -427,7 +431,9 @@ describe("production multi-change metric and lazy matrix", () => {
         readBlob: async (entry) => {
           const oid = await entry.oid();
           readOids.push(oid);
-          if (oid === target) throw failure;
+          if (oid === parentA && failureKind === "modified-both") throw failure;
+          if (oid === childA && failureKind === "modified-both") throw afterFailure;
+          if (targets.includes(oid)) throw failure;
           return await entry.content();
         },
       },
@@ -450,34 +456,42 @@ describe("production multi-change metric and lazy matrix", () => {
     }
     expect(readOids).toEqual(snapshot);
     expect(JSON.stringify(meter.calls)).not.toMatch(/sentinel|blob-failure|\.txt/);
-    const successCount = failureKind === "deleted" ? 0 : failureKind === "added" ? 1 : 2;
+    const successCount =
+      failureKind === "deleted"
+        ? 0
+        : failureKind === "added"
+          ? 1
+          : failureKind === "modified-both"
+            ? 2
+            : 3;
     const completedSizes =
       failureKind === "deleted"
         ? []
         : failureKind === "added"
           ? [6]
           : failureKind === "modified-before"
-            ? [6, 7]
-            : [6, 7];
+            ? [6, 7, 10]
+            : failureKind === "modified-after"
+              ? [6, 7, 7]
+              : [6, 7];
     expect(
       gitCalls(meter, "gitlode.git.blob.read.duration").filter(
         (call) => call.attributes["gitlode.git.blob.read.outcome"] === "success",
       ),
     ).toHaveLength(successCount);
+    const errorDuration = {
+      name: "gitlode.git.blob.read.duration",
+      value: failureKind === "modified-before" || failureKind === "modified-both" ? 0.2 : 0.1,
+      attributes: {
+        "gitlode.git.adapter": "isomorphic-git",
+        "gitlode.git.blob.read.outcome": "error",
+      },
+    };
     expect(
       gitCalls(meter, "gitlode.git.blob.read.duration").filter(
         (call) => call.attributes["gitlode.git.blob.read.outcome"] === "error",
       ),
-    ).toEqual([
-      {
-        name: "gitlode.git.blob.read.duration",
-        value: failureKind === "modified-before" ? 0.2 : 0.1,
-        attributes: {
-          "gitlode.git.adapter": "isomorphic-git",
-          "gitlode.git.blob.read.outcome": "error",
-        },
-      },
-    ]);
+    ).toEqual(failureKind === "modified-both" ? [errorDuration, errorDuration] : [errorDuration]);
     expect(
       gitCalls(meter, "gitlode.git.blob.read.size")
         .sort((a, b) => a.value - b.value)

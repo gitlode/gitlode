@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { createMonotonicTiming, TELEMETRY_METRICS } from "@gitlode/internal-contracts/telemetry";
 import { context, ROOT_CONTEXT, trace, type Meter, type Tracer } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import type { FsClient } from "isomorphic-git";
@@ -48,7 +49,27 @@ const metricKinds = new Map([
   ["gitlode.git.blob.read.size", "histogram"],
   ["gitlode.git.blob.read.byte", "counter"],
 ]);
-const metricNames = [...metricKinds.keys()];
+const metricIds = [
+  "git_commit_yielded",
+  "git_object_read",
+  "git_object_cache_lookup",
+  "git_object_cache_hit",
+  "git_file_change_yielded",
+  "git_blob_read_duration",
+  "git_blob_read_size",
+  "git_blob_read_byte",
+] as const;
+const metricNames = metricIds.map(
+  (id) => TELEMETRY_METRICS.find((metadata) => metadata.id === id)!.name,
+);
+const deterministicTiming = () => {
+  let now = 0;
+  return createMonotonicTiming(() => {
+    const value = now;
+    now += 100;
+    return value;
+  });
+};
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -88,7 +109,7 @@ async function exercise(kind: "isomorphic-git" | "git-cli") {
     const adapter = new IsomorphicGitAdapter({
       fs,
       tracer: noopTracer,
-      metricRecorder: createGitMetricRecorder(asMeter(meter), kind),
+      metricRecorder: createGitMetricRecorder(asMeter(meter), kind, deterministicTiming()),
       dagTelemetryBinding: createDagTelemetryBinding(noopTracer, asMeter(meter)),
     });
     const walk = adapter.walkCommits(repo, head as never)[Symbol.asyncIterator]();
@@ -98,22 +119,77 @@ async function exercise(kind: "isomorphic-git" | "git-cli") {
     await changes.next();
     await changes.return?.();
     assertCatalog(meter, kind);
-    expect(meter.calls).toContainEqual({
-      name: "gitlode.git.commit.yielded",
-      value: 1,
-      attributes: {
-        "gitlode.git.adapter": kind,
-        "gitlode.git.commit.walk.strategy": "certified-lazy",
-        "gitlode.git.commit.walk.has_exclusion": false,
+    const gitCalls = (name: string) => meter.calls.filter((call) => call.name === name);
+    expect(gitCalls("gitlode.git.object.cache.lookup")).toEqual([
+      {
+        name: "gitlode.git.object.cache.lookup",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": kind,
+          "gitlode.git.object.type": "commit",
+          "gitlode.git.object.purpose": "materialize",
+        },
       },
-    });
+    ]);
+    expect(gitCalls("gitlode.git.object.cache.hit")).toEqual([]);
+    expect(gitCalls("gitlode.git.object.read")).toEqual([
+      {
+        name: "gitlode.git.object.read",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": kind,
+          "gitlode.git.object.type": "commit",
+          "gitlode.git.object.purpose": "materialize",
+        },
+      },
+      {
+        name: "gitlode.git.object.read",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": kind,
+          "gitlode.git.object.type": "blob",
+          "gitlode.git.object.purpose": "file-change",
+        },
+      },
+    ]);
+    expect(gitCalls("gitlode.git.commit.yielded")).toEqual([
+      {
+        name: "gitlode.git.commit.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": kind,
+          "gitlode.git.commit.walk.strategy": "certified-lazy",
+          "gitlode.git.commit.walk.has_exclusion": false,
+        },
+      },
+    ]);
+    expect(gitCalls("gitlode.git.file_change.yielded")).toEqual([
+      {
+        name: "gitlode.git.file_change.yielded",
+        value: 1,
+        attributes: { "gitlode.git.adapter": kind, "gitlode.git.file_change.type": "added" },
+      },
+    ]);
+    expect(gitCalls("gitlode.git.blob.read.duration")).toEqual([
+      {
+        name: "gitlode.git.blob.read.duration",
+        value: 0.1,
+        attributes: { "gitlode.git.adapter": kind, "gitlode.git.blob.read.outcome": "success" },
+      },
+    ]);
+    expect(gitCalls("gitlode.git.blob.read.size")).toEqual([
+      { name: "gitlode.git.blob.read.size", value: 6, attributes: { "gitlode.git.adapter": kind } },
+    ]);
+    expect(gitCalls("gitlode.git.blob.read.byte")).toEqual([
+      { name: "gitlode.git.blob.read.byte", value: 6, attributes: { "gitlode.git.adapter": kind } },
+    ]);
   } else {
     const repo = await mkdtemp(join(tmpdir(), "gitlode-metric-owner-"));
     tempDirs.push(repo);
     const head = await makeRepo(nodeFs, repo);
     const adapter = new GitCliAdapter({
       tracer: noopTracer,
-      metricRecorder: createGitMetricRecorder(asMeter(meter), kind),
+      metricRecorder: createGitMetricRecorder(asMeter(meter), kind, deterministicTiming()),
       parentContext: ROOT_CONTEXT,
     });
     const walk = adapter.walkCommits(repo, head as never)[Symbol.asyncIterator]();
@@ -123,24 +199,52 @@ async function exercise(kind: "isomorphic-git" | "git-cli") {
     await changes.next();
     await adapter[Symbol.asyncDispose]();
     assertCatalog(meter, kind);
-    expect(meter.calls).toContainEqual({
-      name: "gitlode.git.commit.yielded",
-      value: 1,
-      attributes: {
-        "gitlode.git.adapter": kind,
-        "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
-        "gitlode.git.commit.walk.has_exclusion": false,
+    const gitCalls = (name: string) => meter.calls.filter((call) => call.name === name);
+    expect(gitCalls("gitlode.git.object.cache.lookup")).toEqual([]);
+    expect(gitCalls("gitlode.git.object.cache.hit")).toEqual([]);
+    expect(gitCalls("gitlode.git.object.read")).toEqual([
+      {
+        name: "gitlode.git.object.read",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": kind,
+          "gitlode.git.object.type": "blob",
+          "gitlode.git.object.purpose": "file-change",
+        },
       },
-    });
+    ]);
+    expect(gitCalls("gitlode.git.commit.yielded")).toEqual([
+      {
+        name: "gitlode.git.commit.yielded",
+        value: 1,
+        attributes: {
+          "gitlode.git.adapter": kind,
+          "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
+          "gitlode.git.commit.walk.has_exclusion": false,
+        },
+      },
+    ]);
+    expect(gitCalls("gitlode.git.file_change.yielded")).toEqual([
+      {
+        name: "gitlode.git.file_change.yielded",
+        value: 1,
+        attributes: { "gitlode.git.adapter": kind, "gitlode.git.file_change.type": "added" },
+      },
+    ]);
+    expect(gitCalls("gitlode.git.blob.read.duration")).toEqual([
+      {
+        name: "gitlode.git.blob.read.duration",
+        value: 0.1,
+        attributes: { "gitlode.git.adapter": kind, "gitlode.git.blob.read.outcome": "success" },
+      },
+    ]);
+    expect(gitCalls("gitlode.git.blob.read.size")).toEqual([
+      { name: "gitlode.git.blob.read.size", value: 6, attributes: { "gitlode.git.adapter": kind } },
+    ]);
+    expect(gitCalls("gitlode.git.blob.read.byte")).toEqual([
+      { name: "gitlode.git.blob.read.byte", value: 6, attributes: { "gitlode.git.adapter": kind } },
+    ]);
   }
-  expect(meter.calls.some((call) => call.name === "gitlode.git.file_change.yielded")).toBe(true);
-  expect(meter.calls.some((call) => call.name === "gitlode.git.blob.read.duration")).toBe(true);
-  expect(
-    meter.calls.some((call) => call.name === "gitlode.git.blob.read.size" && call.value > 0),
-  ).toBe(true);
-  expect(
-    meter.calls.some((call) => call.name === "gitlode.git.blob.read.byte" && call.value > 0),
-  ).toBe(true);
 }
 
 describe("production Git adapter metric owners", () => {

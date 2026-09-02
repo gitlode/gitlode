@@ -494,6 +494,123 @@ describe("executeWorkerRunRequest profiling", () => {
     ).toBe("git-cli");
   });
 
+  it("connects production worker plugin telemetry to the run hierarchy", async () => {
+    const pluginRoot = await makeTempDir("gitlode-worker-plugin-");
+    await writeFile(
+      join(pluginRoot, "plugin.mjs"),
+      `export default function factory(config) {
+        return {
+          async init() { return { type: "ready" }; },
+          async project() { return { type: "success", data: { configured: config } }; }
+        };
+      }`,
+    );
+    const request = await createWorkerPluginRequest();
+    const telemetryTracer = makeTracer();
+    const manager = new AsyncLocalStorageContextManager().enable();
+    expect(context.setGlobalContextManager(manager)).toBe(true);
+    try {
+      const result = await executeWorkerRunRequest(
+        {
+          ...request,
+          input: {
+            ...request.input,
+            pluginBaseDirectory: pluginRoot,
+            pluginDeclarations: {
+              sample: { entrypoint: "./plugin.mjs", config: "worker", failurePolicy: "skip-fact" },
+            },
+          },
+        } as WorkerRunRequest,
+        { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+        { environment: {} },
+        {
+          ...testGitTelemetry,
+          executionTracer: telemetryTracer.tracer,
+          extractionTracer: telemetryTracer.tracer,
+          gitTracer: telemetryTracer.tracer,
+          extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+          pluginRuntimeTracer: telemetryTracer.tracer,
+          getPluginTracer: () => telemetryTracer.tracer,
+          getPluginMeter: () => metrics.getMeter("gitlode.test.plugin"),
+        },
+      );
+
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") return;
+      expect(result.success.recordsWritten).toBe(1);
+      const run = telemetryTracer.starts.find((start) => start.name === "gitlode.run")!;
+      const bootstrap = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.plugin.bootstrap",
+      )!;
+      const resolve = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.plugin.resolve",
+      )!;
+      const compatibility = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.plugin.compatibility.check",
+      )!;
+      const init = telemetryTracer.starts.find((start) => start.name === "gitlode.plugin.init")!;
+      const projection = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.projection",
+      )!;
+      expect(run).toBeDefined();
+      expect(trace.getSpan(bootstrap.parent!)).toBe(run.span);
+      expect(trace.getSpan(resolve.parent!)).toBe(bootstrap.span);
+      expect(trace.getSpan(compatibility.parent!)).toBe(bootstrap.span);
+      expect(trace.getSpan(init.parent!)).toBe(bootstrap.span);
+      expect(trace.getSpan(projection.parent!)).toBe(
+        telemetryTracer.starts.find((start) => start.name === "gitlode.extract")!.span,
+      );
+      for (const entry of [run, bootstrap, resolve, compatibility, init, projection]) {
+        expect(entry.span.statuses).toEqual([]);
+        expect(entry.span.exceptions).toHaveLength(0);
+        expect(entry.span.endCount).toBe(1);
+      }
+      const outputFile = (await readdir(request.input.outputDir))[0]!;
+      const output = await readFile(join(request.input.outputDir, outputFile), "utf8");
+      expect(output).toContain('"sample"');
+      expect(output).toContain('"configured":"worker"');
+    } finally {
+      context.disable();
+    }
+
+    async function createWorkerPluginRequest(): Promise<WorkerRunRequest> {
+      const repoDir = await makeTempDir("gitlode-worker-plugin-repo-");
+      const outputDir = await makeTempDir("gitlode-worker-plugin-output-");
+      await git.init({ fs: nodeFs, dir: repoDir, defaultBranch: "main" });
+      await git.setConfig({ fs: nodeFs, dir: repoDir, path: "user.name", value: "Tester" });
+      await git.setConfig({
+        fs: nodeFs,
+        dir: repoDir,
+        path: "user.email",
+        value: "test@example.com",
+      });
+      await writeFile(join(repoDir, "file.txt"), "hello\n");
+      await git.add({ fs: nodeFs, dir: repoDir, filepath: "file.txt" });
+      await git.commit({
+        fs: nodeFs,
+        dir: repoDir,
+        message: "initial",
+        author: { name: "Tester", email: "test@example.com", timestamp: 1_000, timezoneOffset: 0 },
+      });
+      return {
+        input: {
+          repositoryPath: repoDir as AbsolutePath,
+          refs: ["main"],
+          outputDir: outputDir as AbsolutePath,
+          rotation: {},
+          granularity: "commit",
+          profile: true,
+          gitAdapter: "isomorphic-git",
+        },
+        priorCheckpoint: {
+          generatedAt: "2026-01-01T00:00:00.000Z",
+          repositoryPath: repoDir as AbsolutePath,
+          refs: [],
+        },
+      };
+    }
+  });
+
   it.each([false, true])(
     "wires one concrete line-diff recorder through file execution with profile=%s",
     async (profile) => {

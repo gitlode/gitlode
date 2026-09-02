@@ -528,7 +528,7 @@ describe("formatProfileLines", () => {
     expect(formatProfileLines(emptyReport())).toEqual([]);
   });
 
-  it("sorts fallback spans and metrics by scope, name, then attributes", () => {
+  it("sorts fallback spans and metrics by canonical scope, name, then attributes", () => {
     const report = emptyReport();
     report.spans = [
       {
@@ -552,10 +552,31 @@ describe("formatProfileLines", () => {
     ];
     report.counters = [
       {
+        scope: { name: "gitlode.extraction", version: "1" },
+        name: "z",
+        unit: "u",
+        attributes: [{ key: "z", value: 1 }],
+        value: 1,
+      },
+      {
         scope: { name: "gitlode.execution", version: null },
         name: "z",
         unit: "u",
         attributes: [{ key: "z", value: 1 }],
+        value: 1,
+      },
+      {
+        scope: { name: "gitlode.execution", version: "1" },
+        name: "z",
+        unit: "u",
+        attributes: [{ key: "z", value: 1 }],
+        value: 1,
+      },
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "a",
+        unit: "u",
+        attributes: [{ key: "b", value: 1 }],
         value: 1,
       },
       {
@@ -568,10 +589,58 @@ describe("formatProfileLines", () => {
     ];
     report.histograms = [
       {
+        scope: { name: "gitlode.extraction", version: "1" },
+        name: "z",
+        unit: "s",
+        attributes: [{ key: "z", value: 1 }],
+        count: 1,
+        sum: 1,
+        minimum: null,
+        maximum: null,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+      {
+        scope: { name: "gitlode.execution", version: "1" },
+        name: "z",
+        unit: "s",
+        attributes: [{ key: "z", value: 1 }],
+        count: 1,
+        sum: 1,
+        minimum: null,
+        maximum: null,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+      {
         scope: { name: "gitlode.execution", version: null },
         name: "z",
         unit: "s",
-        attributes: [],
+        attributes: [{ key: "z", value: 1 }],
+        count: 1,
+        sum: 1,
+        minimum: null,
+        maximum: null,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "a",
+        unit: "s",
+        attributes: [{ key: "b", value: 1 }],
+        count: 1,
+        sum: 1,
+        minimum: null,
+        maximum: null,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "a",
+        unit: "s",
+        attributes: [{ key: "a", value: 1 }],
         count: 1,
         sum: 1,
         minimum: null,
@@ -580,12 +649,26 @@ describe("formatProfileLines", () => {
         bucketCounts: [],
       },
     ];
-    const output = formatProfileLines(report).join("\n");
-    expect(output.indexOf("gitlode.execution / a")).toBeLessThan(
-      output.indexOf("gitlode.execution@2 / z"),
-    );
-    expect(output.indexOf("Other counters")).toBeLessThan(output.indexOf("Other histograms"));
-    expect(output).not.toContain("projection");
+    const lines = formatProfileLines(report);
+    const rows = (heading: string, nextHeading?: string) => {
+      const start = lines.indexOf(heading);
+      const end = nextHeading === undefined ? lines.length : lines.indexOf(nextHeading);
+      return lines.slice(start, end).filter((line) => line.startsWith("      "));
+    };
+    expect(rows("    Other counters", "  Histograms")).toEqual([
+      "      gitlode.execution / a: 1 u, a=1",
+      "      gitlode.execution / a: 1 u, b=1",
+      "      gitlode.execution / z: 1 u, z=1",
+      "      gitlode.execution@1 / z: 1 u, z=1",
+      "      gitlode.extraction@1 / z: 1 u, z=1",
+    ]);
+    expect(rows("    Other histograms")).toEqual([
+      "      gitlode.execution / a: count=1, total=1 s, avg=1 s, min=—, max=—, a=1",
+      "      gitlode.execution / a: count=1, total=1 s, avg=1 s, min=—, max=—, b=1",
+      "      gitlode.execution / z: count=1, total=1 s, avg=1 s, min=—, max=—, z=1",
+      "      gitlode.execution@1 / z: count=1, total=1 s, avg=1 s, min=—, max=—, z=1",
+      "      gitlode.extraction@1 / z: count=1, total=1 s, avg=1 s, min=—, max=—, z=1",
+    ]);
   });
 
   it("renders valid histogram catalog groups independently from counters", () => {

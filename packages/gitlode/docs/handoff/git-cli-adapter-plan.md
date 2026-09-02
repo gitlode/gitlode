@@ -8,6 +8,7 @@ defined in the durable documentation:
 
 - [`../design/git-adapters.md`](../design/git-adapters.md)
 - [`../design/architecture.md`](../design/architecture.md)
+- [`../design/domain-design.md`](../design/domain-design.md)
 - [`../design/schema.md`](../design/schema.md)
 - [`../profiling.md`](../profiling.md)
 

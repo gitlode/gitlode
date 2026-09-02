@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
-import { ROOT_CONTEXT, metrics, trace } from "@opentelemetry/api";
+import { ROOT_CONTEXT, metrics, trace, type Meter } from "@opentelemetry/api";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -43,7 +43,31 @@ class RecordingGitMetricRecorder {
   completeBlobRead() {}
 }
 
+class RecordingLineDiffMeter {
+  readonly creations: Array<{ readonly kind: string; readonly name: string }> = [];
+  readonly calls: Array<{
+    readonly name: string;
+    readonly value: number;
+    readonly attributes: unknown;
+  }> = [];
+
+  createCounter(name: string) {
+    this.creations.push({ kind: "counter", name });
+    return {
+      add: (value: number, attributes: unknown) => this.calls.push({ name, value, attributes }),
+    };
+  }
+
+  createHistogram(name: string) {
+    this.creations.push({ kind: "histogram", name });
+    return {
+      record: (value: number, attributes: unknown) => this.calls.push({ name, value, attributes }),
+    };
+  }
+}
+
 const testGitTelemetry = {
+  lineDiffMeter: metrics.getMeter("gitlode.test.line_diff"),
   gitTracer: trace.getTracer("gitlode.test.git"),
   gitMetricRecorder: {
     recordCommitYielded() {},
@@ -439,6 +463,107 @@ describe("executeWorkerRunRequest profiling", () => {
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
   });
 
+  it.each([false, true])(
+    "wires one concrete line-diff recorder through file execution with profile=%s",
+    async (profile) => {
+      const repoDir = await makeTempDir("gitlode-line-diff-wiring-repo-");
+      const outputDir = await makeTempDir("gitlode-line-diff-wiring-output-");
+      await git.init({ fs: nodeFs, dir: repoDir, defaultBranch: "main" });
+      await git.setConfig({ fs: nodeFs, dir: repoDir, path: "user.name", value: "Tester" });
+      await git.setConfig({
+        fs: nodeFs,
+        dir: repoDir,
+        path: "user.email",
+        value: "test@example.com",
+      });
+      await writeFile(join(repoDir, "a.txt"), "a\n");
+      await writeFile(join(repoDir, "b.txt"), "bb\n");
+      await git.add({ fs: nodeFs, dir: repoDir, filepath: "a.txt" });
+      await git.add({ fs: nodeFs, dir: repoDir, filepath: "b.txt" });
+      await git.commit({
+        fs: nodeFs,
+        dir: repoDir,
+        message: "initial",
+        author: {
+          name: "Tester",
+          email: "test@example.com",
+          timestamp: 1_000,
+          timezoneOffset: 0,
+        },
+      });
+      const request: WorkerRunRequest = {
+        input: {
+          repositoryPath: repoDir as AbsolutePath,
+          refs: ["main"],
+          outputDir: outputDir as AbsolutePath,
+          rotation: {},
+          granularity: "file",
+          profile,
+          gitAdapter: "isomorphic-git",
+        },
+        priorCheckpoint: {
+          generatedAt: "2026-01-01T00:00:00.000Z",
+          repositoryPath: repoDir as AbsolutePath,
+          refs: [],
+        },
+      };
+      const telemetryTracer = makeTracer();
+      const lineDiffMeter = new RecordingLineDiffMeter();
+
+      const result = await executeWorkerRunRequest(
+        request,
+        { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+        { environment: {} },
+        {
+          executionTracer: telemetryTracer.tracer,
+          extractionTracer: telemetryTracer.tracer,
+          extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+          ...testGitTelemetry,
+          lineDiffMeter: lineDiffMeter as unknown as Meter,
+        },
+      );
+
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") return;
+      expect(result.success.recordsWritten).toBe(2);
+      expect(result.success.skippedDiffs).toBe(0);
+      expect(lineDiffMeter.creations).toEqual([
+        { kind: "counter", name: "gitlode.line_diff.compute.operation" },
+        { kind: "histogram", name: "gitlode.line_diff.compute.duration" },
+        { kind: "histogram", name: "gitlode.line_diff.compute.input.size" },
+      ]);
+      const operationCalls = lineDiffMeter.calls.filter(({ name }) => name.endsWith(".operation"));
+      expect(operationCalls).toEqual([
+        {
+          name: "gitlode.line_diff.compute.operation",
+          value: 1,
+          attributes: { "gitlode.line_diff.compute.outcome": "success" },
+        },
+        {
+          name: "gitlode.line_diff.compute.operation",
+          value: 1,
+          attributes: { "gitlode.line_diff.compute.outcome": "success" },
+        },
+      ]);
+      expect(
+        lineDiffMeter.calls
+          .filter(({ name }) => name.endsWith(".input.size"))
+          .map(({ value }) => value),
+      ).toEqual([2, 3]);
+      expect(telemetryTracer.starts.some(({ name }) => name === "line_diff.compute")).toBe(false);
+
+      const [outputFile] = await readdir(outputDir);
+      const records = (await readFile(join(outputDir, outputFile!), "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { readonly file: unknown });
+      expect(records.map(({ file }) => file)).toEqual([
+        { path: "a.txt", status: "added", additions: 1, deletions: 0 },
+        { path: "b.txt", status: "added", additions: 1, deletions: 0 },
+      ]);
+    },
+  );
+
   it("runs successfully with the git-cli adapter selected", async () => {
     const repoDir = await makeTempDir("gitlode-execution-repo-");
     const outputDir = await makeTempDir("gitlode-execution-output-");
@@ -564,6 +689,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
         executionTracer: telemetryTracer.tracer,
         extractionTracer: telemetryTracer.tracer,
         extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+        lineDiffMeter: metrics.getMeter("gitlode.test.line_diff"),
         gitTracer: telemetryTracer.tracer,
         gitMetricRecorder: metricRecorder as never,
         dagTelemetryBinding: testGitTelemetry.dagTelemetryBinding,

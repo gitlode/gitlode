@@ -160,8 +160,6 @@
             "packages/line-diff-adapters/src/line-diff-impl/**",
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/line-diff/index.ts",
             "packages/internal-contracts/dist/line-diff/index.js",
             "packages/internal-contracts/dist/telemetry/index.js"
@@ -402,7 +400,6 @@
           "allow": [
             "packages/line-diff-adapters/src/**",
             "packages/line-diff-adapters/test/**",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
@@ -420,7 +417,8 @@
             "packages/internal-contracts/dist/line-diff/index.js",
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/dist/progress/index.js",
-            "packages/internal-contracts/dist/telemetry/index.js"
+            "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/line-diff-adapters/dist/line-diff-impl/index.js"
           ]
         },
         {
@@ -600,12 +598,7 @@
         "graphExclude": ["../../**/dist/**"]
       },
       "unusedNodeModulesDetection": {
-        "excludeModules": [
-          "@types/*",
-          "@vitest/coverage-v8",
-          "@gitlode/internal-contracts",
-          "@gitlode/internal-foundation"
-        ],
+        "excludeModules": ["@types/*", "@vitest/coverage-v8", "@gitlode/internal-contracts"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
       "missingNodeModulesDetection": true,

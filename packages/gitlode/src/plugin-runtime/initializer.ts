@@ -1,27 +1,50 @@
-import type { PluginRuntimeContext } from "../plugin-api/index.js";
+import { getTelemetryAttributeMetadata } from "@gitlode/internal-contracts/telemetry";
+import { recordSpanError } from "@gitlode/internal-foundation/otel-support";
+import { context, SpanStatusCode, trace, type Context } from "@opentelemetry/api";
+
 import type {
-  PluginEntry,
   PluginInitializationOutcome,
   PluginInitializationFailure,
   PluginInitializationSuccess,
+  PluginRuntimeEntry,
 } from "./types.js";
 
 /** Invoke init() on each entry in parallel and return each plugin's normalized outcome. */
 export async function initializePlugins(
-  entries: readonly PluginEntry[],
-  createRuntimeContext: (entry: PluginEntry) => PluginRuntimeContext,
+  entries: readonly PluginRuntimeEntry[],
+  parentContext: Context,
 ): Promise<PluginInitializationOutcome[]> {
   return Promise.all(
     entries.map<Promise<PluginInitializationOutcome>>(async (entry) => {
-      let runtimeContext: PluginRuntimeContext | undefined;
+      const span = entry.tracer.startSpan("gitlode.plugin.init", undefined, parentContext);
+      const initContext = trace.setSpan(parentContext, span);
       try {
-        runtimeContext = createRuntimeContext(entry);
+        const result = await context.with(
+          initContext,
+          async () => await entry.plugin.init(entry.runtimeContext),
+        );
+        span.setAttribute(getTelemetryAttributeMetadata("plugin_init_result").key, result.type);
+        if (result.type === "fatal") {
+          span.setAttribute(
+            getTelemetryAttributeMetadata("plugin_init_failure_source").key,
+            "returned",
+          );
+          span.setStatus({ code: SpanStatusCode.ERROR });
+        }
+        span.end();
         return {
           entry,
-          ...(await entry.plugin.init(runtimeContext)),
+          ...result,
         } satisfies PluginInitializationSuccess | PluginInitializationFailure;
       } catch (error) {
-        runtimeContext?.error(error instanceof Error ? error.message : String(error));
+        span.setAttribute(getTelemetryAttributeMetadata("plugin_init_result").key, "fatal");
+        span.setAttribute(
+          getTelemetryAttributeMetadata("plugin_init_failure_source").key,
+          "thrown",
+        );
+        recordSpanError(span, error);
+        span.end();
+        entry.runtimeContext.error(error instanceof Error ? error.message : String(error));
         return {
           entry,
           type: "fatal",

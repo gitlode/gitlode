@@ -6,7 +6,7 @@ import type {
   ProjectedRecord,
 } from "@gitlode/internal-contracts/extraction";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
-import { trace } from "@opentelemetry/api";
+import { metrics, trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
 import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
@@ -19,7 +19,8 @@ import type {
 } from "../../src/plugin-api/index.js";
 import {
   EnrichingFactProjector as PluginEnrichingFactProjector,
-  type PluginEntry,
+  NOOP_PLUGIN_PROJECTION_METRIC_RECORDER,
+  type PluginRuntimeEntry,
 } from "../../src/plugin-runtime/index.js";
 
 // ---------------------------------------------------------------------------
@@ -72,7 +73,7 @@ const noopReporter: DiagnosticReporter = { report: () => {} };
 
 class EnrichingFactProjector extends PluginEnrichingFactProjector {
   constructor(
-    entries: readonly PluginEntry[],
+    entries: readonly PluginRuntimeEntry[],
     reporter: DiagnosticReporter,
     repoName: string,
     repoUrl: string | null,
@@ -83,9 +84,11 @@ class EnrichingFactProjector extends PluginEnrichingFactProjector {
         repoUrl,
         trace.getTracer("gitlode.extraction"),
         NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+        false,
       ),
       entries,
       reporter,
+      trace.getTracer("gitlode.extraction"),
     );
   }
 }
@@ -103,8 +106,20 @@ function makeEntry(
   namespace: string,
   plugin: ProjectorPlugin,
   failurePolicy: "skip-fact" | "fatal" = "skip-fact",
-): PluginEntry {
-  return { namespace: namespace as Namespace, plugin, failurePolicy };
+): PluginRuntimeEntry {
+  const tracer = trace.getTracer("test.plugin");
+  const meter = metrics.getMeter("test.plugin");
+  return {
+    namespace: namespace as Namespace,
+    plugin,
+    failurePolicy,
+    entrypoint: "./plugin.js",
+    resolvedEntrypointUrl: "file:///plugin.js",
+    tracer,
+    meter,
+    runtimeContext: { warn() {}, error() {}, tracer, meter },
+    projectionMetricRecorder: NOOP_PLUGIN_PROJECTION_METRIC_RECORDER,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +135,12 @@ describe("EnrichingFactProjector — basic enrichment", () => {
       NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
     );
     const projectSpy = vi.spyOn(baseProjector, "project");
-    const projector = new PluginEnrichingFactProjector(baseProjector, [], noopReporter);
+    const projector = new PluginEnrichingFactProjector(
+      baseProjector,
+      [],
+      noopReporter,
+      trace.getTracer("gitlode.extraction"),
+    );
 
     await collect(
       projector.project(toAsyncIter([makeCommitFact(), makeCommitFact({ oid: "b".repeat(40) })])),

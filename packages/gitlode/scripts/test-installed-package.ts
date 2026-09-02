@@ -228,12 +228,17 @@ try {
   await writeFile(
     join(consumerDirectory, "consumer.ts"),
     [
-      'import type { PluginFactory } from "gitlode/plugin-api";',
+      'import type { PluginFactory, PluginRuntimeContext } from "gitlode/plugin-api";',
+      "function useRuntime(runtime: PluginRuntimeContext) {",
+      "  runtime.tracer.startSpan('consumer.check').end();",
+      "  runtime.meter.createCounter('consumer.check').add(1);",
+      "}",
       "const factory: PluginFactory = async () => ({",
       "  async init() { return { type: 'ready' }; },",
       "  async project() { return { type: 'skip' }; },",
       "});",
       "void factory;",
+      "void useRuntime;",
       "",
     ].join("\n"),
   );
@@ -255,6 +260,21 @@ try {
     "node",
     [join(consumerDirectory, "node_modules", "typescript", "bin", "tsc")],
     consumerDirectory,
+  );
+
+  const pluginApiDeclaration = await readFile(
+    join(consumerDirectory, "node_modules", "gitlode", "dist", "plugin-api.d.ts"),
+    "utf8",
+  );
+  assert(
+    pluginApiDeclaration.includes("readonly tracer: Tracer") &&
+      pluginApiDeclaration.includes("readonly meter: Meter"),
+    "PluginRuntimeContext declaration does not expose Tracer and Meter",
+  );
+  assert(
+    !pluginApiDeclaration.includes("Instrumentation") &&
+      !pluginApiDeclaration.includes("PluginEntry"),
+    "Plugin API declaration exposes a removed telemetry or private runtime type",
   );
 
   process.stdout.write(

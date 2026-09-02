@@ -423,5 +423,5 @@ export function findProfileViewEntry(
 }
 
 export function isResolvedPluginScope(scope: string): boolean {
-  return !CORE_PROFILE_SCOPES.has(scope);
+  return scope.startsWith("@");
 }

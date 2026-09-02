@@ -83,6 +83,13 @@ describe("typed profile view drift", () => {
     );
     const layout = view.layout as Record<string, unknown>;
     expect(PROFILE_PRESENTATION_POLICY.signalSections).toEqual(layout.signal_sections);
+    const units = view.unit_rendering as Record<string, unknown>;
+    expect(PROFILE_PRESENTATION_POLICY.units).toEqual({
+      seconds: (units.s as Record<string, unknown>).human_units,
+      bytes: (units.By as Record<string, unknown>).human_units,
+      annotatedEntity: (units.annotated_entity as Record<string, unknown>).display,
+      unknown: (units.unknown as Record<string, unknown>).display,
+    });
     expect({
       complete_empty: PROFILE_PRESENTATION_POLICY.sectionPolicy.completeEmpty,
       partial: {
@@ -140,6 +147,33 @@ describe("typed profile view drift", () => {
           group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
       )?.remainder.order[0],
     }).toEqual(PROFILE_PRESENTATION_POLICY.plugin);
+    const metricPluginGroup = view.metric_groups.find(
+      (group: Record<string, unknown>) =>
+        group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+    ) as Record<string, unknown>;
+    expect({
+      outerGroup: metricPluginGroup.label,
+      subgroupOrder: (metricPluginGroup.scope_subgroups as Record<string, unknown>).order,
+      versionPresent: (
+        (metricPluginGroup.scope_subgroups as Record<string, unknown>).label as Record<
+          string,
+          unknown
+        >
+      ).version_present,
+      versionAbsent: (
+        (metricPluginGroup.scope_subgroups as Record<string, unknown>).label as Record<
+          string,
+          unknown
+        >
+      ).version_absent,
+      remainder: (metricPluginGroup.observations as Array<Record<string, unknown>>)[0].ref,
+    }).toEqual({
+      outerGroup: PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      subgroupOrder: PROFILE_PRESENTATION_POLICY.plugin.subgroupOrder,
+      versionPresent: PROFILE_PRESENTATION_POLICY.plugin.versionPresent,
+      versionAbsent: PROFILE_PRESENTATION_POLICY.plugin.versionAbsent,
+      remainder: "plugin_projection_operation",
+    });
     expect(PROFILE_VIEW_DIAGNOSTIC_LABELS).toEqual(
       (view.diagnostic_rendering as Record<string, unknown>).labels,
     );

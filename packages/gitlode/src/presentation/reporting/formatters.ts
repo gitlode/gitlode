@@ -161,9 +161,7 @@ function renderGroups(
   groups: Map<string, { order: number; rows: Array<{ order: number; key: string; text: string }> }>,
 ): void {
   let currentGroup: string | undefined;
-  for (const [key, bucket] of [...groups].sort(
-    (a, b) => a[1].order - b[1].order || a[0].localeCompare(b[0]),
-  )) {
+  for (const [key, bucket] of [...groups].sort((a, b) => compareGroupKeys(a, b))) {
     const [group, subgroup] = key.split("\0");
     if (group !== currentGroup) {
       lines.push(`    ${group}`);
@@ -173,6 +171,30 @@ function renderGroups(
     for (const row of bucket.rows.sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)))
       lines.push(`      ${subgroup !== group ? "  " : ""}${row.text}`);
   }
+}
+
+function compareGroupKeys(
+  a: [string, { order: number; rows: Array<{ order: number; key: string; text: string }> }],
+  b: [string, { order: number; rows: Array<{ order: number; key: string; text: string }> }],
+): number {
+  const [aGroup, aSubgroup] = a[0].split("\0");
+  const [bGroup, bSubgroup] = b[0].split("\0");
+  if (
+    aGroup === PROFILE_PRESENTATION_POLICY.plugin.outerGroup &&
+    bGroup === PROFILE_PRESENTATION_POLICY.plugin.outerGroup
+  ) {
+    return compareCodeUnits(aSubgroup ?? "", bSubgroup ?? "");
+  }
+  return a[1].order - b[1].order || compareCodeUnits(a[0], b[0]);
+}
+
+function compareCodeUnits(a: string, b: string): number {
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index++) {
+    const difference = a.charCodeAt(index) - b.charCodeAt(index);
+    if (difference !== 0) return difference;
+  }
+  return a.length - b.length;
 }
 
 function displayScope(scope: { name: string; version?: string | null }): string {

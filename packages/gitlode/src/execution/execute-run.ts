@@ -184,7 +184,7 @@ export async function executeWorkerRunRequest(
           throw new Error("Telemetry session was not created.");
         })(),
     );
-  const { executionTracer, extractionTracer, extractionMeter, rootContext } = activeTelemetry;
+  const { executionTracer, extractionTracer, extractionMeter } = activeTelemetry;
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
@@ -192,6 +192,7 @@ export async function executeWorkerRunRequest(
   const runSpan =
     activeTelemetry.rootSpan ??
     activeTelemetry.executionTracer.startSpan("gitlode.run", { root: true }, ROOT_CONTEXT);
+  const rootContext = trace.setSpan(activeTelemetry.rootContext, runSpan);
   runSpan.setAttributes({
     "gitlode.extraction.granularity": input.granularity,
     "gitlode.git.adapter": input.gitAdapter,
@@ -231,6 +232,7 @@ export async function executeWorkerRunRequest(
         async (span) => {
           const objectFormat = await resolveRepositoryObjectFormat(resolvedRepoPath, gitAdapter);
           span.setAttribute("gitlode.git.object_format", objectFormat);
+          runSpan.setAttribute("gitlode.git.object_format", objectFormat);
           return objectFormat;
         },
         rootContext,

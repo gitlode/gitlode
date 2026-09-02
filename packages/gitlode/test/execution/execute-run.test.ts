@@ -354,8 +354,9 @@ describe("executeWorkerRunRequest profiling", () => {
     ]);
     expect(telemetryTracer.starts.every(({ span }) => span.endCount === 1)).toBe(true);
     expect(telemetryTracer.starts.some(({ name }) => name === "gitlode.run")).toBe(true);
+    const runSpan = telemetryTracer.starts.find(({ name }) => name === "gitlode.run")!.span;
     for (const start of telemetryTracer.starts.slice(1, 6)) {
-      expect(start.parent).toBe(ROOT_CONTEXT);
+      expect(trace.getSpan(start.parent!)).toBe(runSpan);
       expect(start.span.statuses).toEqual([]);
       expect(start.span.exceptions).toHaveLength(0);
     }
@@ -389,8 +390,7 @@ describe("executeWorkerRunRequest profiling", () => {
     }
     expect(telemetryTracer.starts.filter(({ name }) => name.includes("write")).length).toBe(0);
 
-    const runSpan = telemetryTracer.starts.find(({ name }) => name === "gitlode.run")?.span;
-    expect(runSpan?.attributes["gitlode.git.adapter"]).toBe("isomorphic-git");
+    expect(runSpan.attributes["gitlode.git.adapter"]).toBe("isomorphic-git");
   });
 
   it("writes file-level records with the git-cli adapter selected", async () => {

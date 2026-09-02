@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   PROFILE_METRIC_VIEW,
+  PROFILE_PRESENTATION_POLICY,
   PROFILE_SPAN_VIEW,
   PROFILE_VIEW_DIAGNOSTIC_LABELS,
 } from "../../../src/presentation/reporting/profile-view.js";
@@ -80,32 +81,67 @@ describe("typed profile view drift", () => {
     expect(view.metric_groups).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "Plugins" })]),
     );
-    expect(view.fallback).toMatchObject({
-      include_unknown: true,
-      known_name_unexpected_scope: "treat_as_unknown",
-      spans: { group_label: "Other spans", order: ["scope", "name"] },
-      counters: { group_label: "Other counters", order: ["scope", "name", "attributes"] },
-      histograms: { group_label: "Other histograms", order: ["scope", "name", "attributes"] },
-    });
-    const pluginSubgroup = {
-      scope_subgroups: {
-        order: ["scope"],
-        label: { version_present: "<scope-name>@<version>", version_absent: "<scope-name>" },
+    const layout = view.layout as Record<string, unknown>;
+    expect(PROFILE_PRESENTATION_POLICY.signalSections).toEqual(layout.signal_sections);
+    expect({
+      complete_empty: PROFILE_PRESENTATION_POLICY.sectionPolicy.completeEmpty,
+      partial: {
+        show_section: PROFILE_PRESENTATION_POLICY.sectionPolicy.partial.showSection,
+        status_label: PROFILE_PRESENTATION_POLICY.sectionPolicy.partial.statusLabel,
       },
-    };
-    expect(view.span_groups).toEqual(
-      expect.arrayContaining([expect.objectContaining(pluginSubgroup)]),
-    );
-    expect(view.metric_groups).toEqual(
-      expect.arrayContaining([expect.objectContaining(pluginSubgroup)]),
-    );
+      unavailable: {
+        show_section: PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.showSection,
+        status_label: PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.statusLabel,
+        rows: PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.rows,
+      },
+    }).toEqual(layout.section_policy);
+    expect({
+      include_unknown: PROFILE_PRESENTATION_POLICY.fallback.includeUnknown,
+      identity_label: {
+        version_present: PROFILE_PRESENTATION_POLICY.fallback.identityVersionPresent,
+        version_absent: PROFILE_PRESENTATION_POLICY.fallback.identityVersionAbsent,
+      },
+      spans: {
+        group_label: PROFILE_PRESENTATION_POLICY.fallback.spans.group,
+        order: PROFILE_PRESENTATION_POLICY.fallback.spans.sort,
+        exception: {
+          plugin_scope_unknown_spans: PROFILE_PRESENTATION_POLICY.fallback.pluginUnknownSpans,
+        },
+      },
+      counters: {
+        group_label: PROFILE_PRESENTATION_POLICY.fallback.counters.group,
+        order: PROFILE_PRESENTATION_POLICY.fallback.counters.sort,
+      },
+      histograms: {
+        group_label: PROFILE_PRESENTATION_POLICY.fallback.histograms.group,
+        order: PROFILE_PRESENTATION_POLICY.fallback.histograms.sort,
+      },
+      known_name_unexpected_scope: PROFILE_PRESENTATION_POLICY.fallback.knownNameUnexpectedScope,
+    }).toEqual(view.fallback);
+    expect({
+      outerGroup: view.span_groups.find(
+        (group: Record<string, unknown>) =>
+          group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      )?.label,
+      subgroupOrder: view.span_groups.find(
+        (group: Record<string, unknown>) =>
+          group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      )?.scope_subgroups.order,
+      versionPresent: view.span_groups.find(
+        (group: Record<string, unknown>) =>
+          group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      )?.scope_subgroups.label.version_present,
+      versionAbsent: view.span_groups.find(
+        (group: Record<string, unknown>) =>
+          group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      )?.scope_subgroups.label.version_absent,
+      remainder: view.span_groups.find(
+        (group: Record<string, unknown>) =>
+          group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      )?.remainder.order[0],
+    }).toEqual(PROFILE_PRESENTATION_POLICY.plugin);
     expect(PROFILE_VIEW_DIAGNOSTIC_LABELS).toEqual(
       (view.diagnostic_rendering as Record<string, unknown>).labels,
     );
-    expect((view.layout as Record<string, unknown>).section_policy).toMatchObject({
-      complete_empty: "omit",
-      partial: { show_section: true },
-      unavailable: { show_section: true, rows: "none" },
-    });
   });
 });

@@ -366,6 +366,39 @@ export const PROFILE_VIEW_DIAGNOSTIC_LABELS: Readonly<Record<string, string>> = 
   diagnostic_overflow: "Additional diagnostics omitted",
 };
 
+export const PROFILE_PRESENTATION_POLICY = {
+  signalSections: ["spans", "counters", "histograms", "diagnostics"],
+  sectionPolicy: {
+    completeEmpty: "omit",
+    partial: { showSection: true, statusLabel: "partial" },
+    unavailable: { showSection: true, statusLabel: "unavailable", rows: "none" },
+  },
+  plugin: {
+    outerGroup: "Plugins",
+    subgroupOrder: ["scope"],
+    versionPresent: "<scope-name>@<version>",
+    versionAbsent: "<scope-name>",
+    remainder: "name",
+  },
+  fallback: {
+    includeUnknown: true,
+    identityVersionPresent: "<scope-name>@<version> / <observation-name>",
+    identityVersionAbsent: "<scope-name> / <observation-name>",
+    spans: { group: "Other spans", sort: ["scope", "name"] },
+    counters: { group: "Other counters", sort: ["scope", "name", "attributes"] },
+    histograms: { group: "Other histograms", sort: ["scope", "name", "attributes"] },
+    knownNameUnexpectedScope: "treat_as_unknown",
+    pluginUnknownSpans: "include_in_plugins_remainder",
+  },
+  units: {
+    seconds: ["ns", "µs", "ms", "s"],
+    bytes: ["B", "KiB", "MiB", "GiB"],
+    annotatedEntity: "human-readable plural label",
+    unknown: "canonical unit",
+  },
+  diagnosticLabels: PROFILE_VIEW_DIAGNOSTIC_LABELS,
+} as const;
+
 const CORE_PROFILE_SCOPES = new Set([
   "gitlode.execution",
   "gitlode.extraction",

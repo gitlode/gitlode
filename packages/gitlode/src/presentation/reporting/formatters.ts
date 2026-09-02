@@ -11,6 +11,7 @@ import { plainStyling, type Styling } from "../styling.js";
 import {
   findProfileViewEntry,
   isResolvedPluginScope,
+  PROFILE_PRESENTATION_POLICY,
   PROFILE_VIEW_DIAGNOSTIC_LABELS,
 } from "./profile-view.js";
 import type { SummaryData } from "./types.js";
@@ -83,7 +84,7 @@ function appendSpans(
 ): void {
   if (status === "complete" && !spans.length) return;
   lines.push(`  Spans${status === "complete" ? "" : ` (${status})`}`);
-  if (status === "unavailable") {
+  if (status === PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.statusLabel) {
     lines.push("    (no observations)");
     return;
   }
@@ -94,7 +95,11 @@ function appendSpans(
   for (const span of spans) {
     const view = findProfileViewEntry("span", span.name, span.scope.name);
     const plugin = isResolvedPluginScope(span.scope.name);
-    const group = view?.group ?? (plugin ? "Plugins" : "Other spans");
+    const group =
+      view?.group ??
+      (plugin
+        ? PROFILE_PRESENTATION_POLICY.plugin.outerGroup
+        : PROFILE_PRESENTATION_POLICY.fallback.spans.group);
     const subgroup = plugin ? displayScope(span.scope) : group;
     const key = `${displayScope(span.scope)}\0${span.name}`;
     const bucket = groups.get(`${group}\0${subgroup}`) ?? {
@@ -121,7 +126,7 @@ function appendMetrics<T extends { name: string; scope: { name: string } }>(
 ): void {
   if (status === "complete" && !points.length) return;
   lines.push(`  ${title}${status === "complete" ? "" : ` (${status})`}`);
-  if (status === "unavailable") {
+  if (status === PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.statusLabel) {
     lines.push("    (no observations)");
     return;
   }
@@ -132,7 +137,12 @@ function appendMetrics<T extends { name: string; scope: { name: string } }>(
   for (const point of points) {
     const view = findProfileViewEntry("metric", point.name, point.scope.name);
     const plugin = isResolvedPluginScope(point.scope.name);
-    const group = view?.group ?? (plugin ? "Plugins" : `Other ${title.toLowerCase()}`);
+    const fallback =
+      title === "Counters"
+        ? PROFILE_PRESENTATION_POLICY.fallback.counters.group
+        : PROFILE_PRESENTATION_POLICY.fallback.histograms.group;
+    const group =
+      view?.group ?? (plugin ? PROFILE_PRESENTATION_POLICY.plugin.outerGroup : fallback);
     const subgroup = plugin ? displayScope(point.scope) : group;
     const key = `${displayScope(point.scope)}\0${point.name}\0${attributesKey((point as T & { attributes: readonly ProfileAttribute[] }).attributes)}`;
     const bucket = groups.get(`${group}\0${subgroup}`) ?? {

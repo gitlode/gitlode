@@ -45,4 +45,36 @@ describe("formatSummaryLines", () => {
     expect(calls.filter((call) => call.startsWith("unit:")).length).toBe(2);
     expect(calls).toContain("refs:(none)");
   });
+
+  it("passes formatted nonzero values and refs through styling callbacks", () => {
+    const primary: string[] = [];
+    const units: string[] = [];
+    const refs: string[] = [];
+    const styling = {
+      summaryHeader: (value: string) => value,
+      fieldKey: (value: string) => value,
+      primaryValue: (value: string) => (primary.push(value), value),
+      unitSuffix: (value: string) => (units.push(value), value),
+      refsValue: (value: string) => (refs.push(value), value),
+      spinnerGlyph: (value: string) => value,
+      doneMarker: (value: string) => value,
+      stageLabel: (value: string) => value,
+      warnBadge: (value: string) => value,
+      errorBadge: (value: string) => value,
+    };
+    formatSummaryLines(
+      {
+        recordsWritten: 3,
+        commitsTraversed: 4,
+        filesCreated: 2,
+        bytesWritten: 2048,
+        elapsedMs: 1500,
+        refs: ["main", "v1"],
+      },
+      styling,
+    );
+    expect(primary).toEqual(["3", "4", "2", "2", "1.5"]);
+    expect(units).toEqual(["KiB", "s"]);
+    expect(refs).toEqual(["main, v1"]);
+  });
 });

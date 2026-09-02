@@ -158,8 +158,8 @@ export class WorkerTelemetrySession {
     this.#hooks = construction.hooks;
   }
 
-  static create(): Promise<WorkerTelemetrySession> {
-    return createSession();
+  static create(enabled = true): Promise<WorkerTelemetrySession> {
+    return createSession(enabled);
   }
 
   getTracer(scopeName: string, scopeVersion?: string): Tracer {
@@ -351,7 +351,18 @@ export class WorkerTelemetrySession {
   }
 }
 
-async function createSession(hooks?: WorkerTelemetryTestHooks): Promise<WorkerTelemetrySession> {
+async function createSession(
+  enabled = true,
+  hooks?: WorkerTelemetryTestHooks,
+): Promise<WorkerTelemetrySession> {
+  if (!enabled) {
+    const degraded = createDegradedProviders();
+    return new WorkerTelemetrySession({
+      ...degraded,
+      rootContext: ROOT_CONTEXT,
+      hooks,
+    });
+  }
   let tracerProvider: BasicTracerProvider | undefined;
   let meterProvider: MeterProvider | undefined;
   let spanProcessor: LocalSpanProcessor | undefined;
@@ -437,5 +448,5 @@ async function createSession(hooks?: WorkerTelemetryTestHooks): Promise<WorkerTe
 export function createWorkerTelemetrySessionForTest(
   hooks: WorkerTelemetryTestHooks,
 ): Promise<WorkerTelemetrySession> {
-  return createSession(hooks);
+  return createSession(true, hooks);
 }

@@ -21,7 +21,7 @@ function normalizeApplicationResult(value: unknown, repositoryPath?: string): un
     return value;
   const {
     elapsedMs: _elapsedMs,
-    profileEntries: _profileEntries,
+    profileReport: _profileReport,
     ...success
   } = result.success as Record<string, unknown>;
   return {

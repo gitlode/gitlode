@@ -30,7 +30,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 1,
         elapsedMs: 1,
         refs: ["main"],
-        profileEntries: [],
+        profileReport: undefined,
         skippedDiffs: 0,
       },
     });
@@ -52,7 +52,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 5,
         elapsedMs: 6,
         refs: ["main"],
-        profileEntries: [],
+        profileReport: undefined,
         skippedDiffs: 0,
       },
     });
@@ -74,7 +74,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 5,
         elapsedMs: 6,
         refs: ["main"],
-        profileEntries: [{ name: "gitlode.run", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 }],
+        profileReport: undefined,
         skippedDiffs: 2,
       },
     });

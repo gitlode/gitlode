@@ -5,6 +5,10 @@ gitlode extracts Git commit history from a local repository and writes it as
 ingestion into data warehouses, analytics platforms, or any system that consumes
 newline-delimited JSON.
 
+The `--profile` option collects a local, signal-separated diagnostic profile for successful runs.
+It does not select a different extraction path. Use `--quiet` to suppress summary, progress, and
+profile presentation.
+
 ---
 
 ## Extraction Modes

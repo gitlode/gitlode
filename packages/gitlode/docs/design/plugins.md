@@ -11,9 +11,9 @@ The public plugin-author surface remains `gitlode/plugin-api`. Its release decla
 private foundation and contract types they expose; plugin authors do not install or import the
 private `@gitlode/internal-*` workspaces.
 
-> **Telemetry migration status:** The `Tracer` and `Meter` runtime context below are the accepted
-> target contract and are not yet implemented. Current releases may still expose the transitional
-> profiler contract. Implementation work must follow this target and the canonical
+> **Telemetry migration status:** The `Tracer` and `Meter` runtime context below is implemented in
+> production worker execution. Plugins receive explicit session-owned OpenTelemetry instruments;
+> no transitional profiler contract is exposed. This document and the canonical
 > [telemetry design](telemetry.md).
 
 ---

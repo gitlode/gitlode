@@ -177,7 +177,7 @@ describe("executeRun state orchestration", () => {
             bytesWritten: 100,
             elapsedMs: 10,
             refs: ["main"],
-            profileEntries: [],
+            profileReport: undefined,
             skippedDiffs: 0,
           },
           checkpoint: returnedCheckpoint,
@@ -256,7 +256,7 @@ describe("executeRun state orchestration", () => {
             bytesWritten: 0,
             elapsedMs: 10,
             refs: [],
-            profileEntries: [],
+            profileReport: undefined,
             skippedDiffs: 0,
           },
           checkpoint: { generatedAt: "next", repositoryPath: "/repo", refs: [] },
@@ -388,7 +388,9 @@ describe("executeWorkerRunRequest profiling", () => {
     }
     expect(telemetryTracer.starts.filter(({ name }) => name.includes("write")).length).toBe(0);
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    const runEntry = result.success.profileReport?.spans.find(
+      (entry) => entry.name === "gitlode.run",
+    );
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
   });
 
@@ -462,7 +464,9 @@ describe("executeWorkerRunRequest profiling", () => {
       deletions: 0,
     });
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    const runEntry = result.success.profileReport?.spans.find(
+      (entry) => entry.name === "gitlode.run",
+    );
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
   });
 
@@ -619,7 +623,9 @@ describe("executeWorkerRunRequest profiling", () => {
     if (result.kind !== "success") return;
     expect(result.success.commitsTraversed).toBe(1);
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    const runEntry = result.success.profileReport?.spans.find(
+      (entry) => entry.name === "gitlode.run",
+    );
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
     expect(runEntry?.attributes?.["git.cli.version"]?.[0]).toMatch(/^git version /);
   });
@@ -836,7 +842,9 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     }
 
     expect(result.success.commitsTraversed).toBe(1);
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
+    const runEntry = result.success.profileReport?.spans.find(
+      (entry) => entry.name === "gitlode.run",
+    );
     expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
   });
 

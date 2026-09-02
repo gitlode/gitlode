@@ -227,8 +227,9 @@ injected `Meter`; they do not depend on another operation owner's implementation
 types. A third application-level telemetry-support domain under `packages/gitlode/src` is not part
 of this design. See [`telemetry.md`](telemetry.md).
 
-The pre-migration `internal-foundation/instrumentation` source is a transitional custom API, not the
-target domain described here. It remains available only until production owners migrate and is then
+The pre-migration `internal-foundation/instrumentation` source was a transitional custom API, not the
+target domain described here. Production owners now use explicit OpenTelemetry composition and the
+source/export has been removed.
 removed. `otel-support` is distinct from that legacy domain and must not acquire gitlode-specific
 observation names.
 

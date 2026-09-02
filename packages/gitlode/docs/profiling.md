@@ -5,6 +5,14 @@ developing extraction and traversal logic. It is exposed through the public `--p
 is not intended to be part of normal day-to-day extraction workflows or a stable machine-readable
 contract.
 
+`--profile` enables local OpenTelemetry collection without changing extraction or JSONL behavior.
+Successful runs render separate Spans, Counters, Histograms, and Diagnostics sections. Partial and
+unavailable signals are labeled; failed runs still finalize telemetry but do not render a profile.
+Plugin observations are grouped by resolved package scope and optional version. Durations and byte
+values may be humanized. Collection diagnostics remain inside the profile, and the CLI formatting is
+not a machine-readable contract. `--quiet` suppresses summary, progress, and profile output. If
+initialization degrades, extraction continues with one sanitized warning and no profile block.
+
 Use profiling when you need to answer questions such as:
 
 - Which phase dominates this run?

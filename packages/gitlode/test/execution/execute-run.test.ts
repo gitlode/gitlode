@@ -101,6 +101,9 @@ const testGitTelemetry = {
     },
   },
   rootContext: ROOT_CONTEXT,
+  pluginRuntimeTracer: trace.getTracer("gitlode.test.plugin_runtime"),
+  getPluginTracer: (name: string, version?: string) => trace.getTracer(name, version),
+  getPluginMeter: (name: string, version?: string) => metrics.getMeter(name, version),
 };
 
 afterEach(async () => {
@@ -694,6 +697,9 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
         gitMetricRecorder: metricRecorder as never,
         dagTelemetryBinding: testGitTelemetry.dagTelemetryBinding,
         rootContext: ROOT_CONTEXT,
+        pluginRuntimeTracer: trace.getTracer("gitlode.test.plugin_runtime"),
+        getPluginTracer: (name, version) => trace.getTracer(name, version),
+        getPluginMeter: (name, version) => metrics.getMeter(name, version),
       },
     );
     return { result, telemetryTracer, metricRecorder };

@@ -8,4 +8,9 @@ export {
   type PluginProjectionMetricRecorder,
   type PluginProjectionOutcome,
 } from "./plugin-projection-metric-recorder.js";
-export type { PluginDeclarations, PluginEntry, PluginInitializationFailure } from "./types.js";
+export type {
+  PluginDeclarations,
+  PluginEntry,
+  PluginInitializationFailure,
+  PluginRuntimeEntry,
+} from "./types.js";

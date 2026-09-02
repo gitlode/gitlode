@@ -77,20 +77,24 @@ export class BuiltInFactProjector implements FactProjector {
   private readonly repoUrl: string | null;
   private readonly tracer: Tracer;
   private readonly metricRecorder: BuiltInFactProjectorMetricRecorder;
+  private readonly instrumentStream: boolean;
 
   constructor(
     repoName: string,
     repoUrl: string | null,
     tracer: Tracer,
     metricRecorder: BuiltInFactProjectorMetricRecorder,
+    instrumentStream = true,
   ) {
     this.repoName = repoName;
     this.repoUrl = repoUrl;
     this.tracer = tracer;
     this.metricRecorder = metricRecorder;
+    this.instrumentStream = instrumentStream;
   }
 
   project(facts: AsyncIterable<Fact>, parentContext?: Context): AsyncIterable<ProjectedRecord> {
+    if (!this.instrumentStream) return this.projectRecords(facts);
     return instrumentAsyncIterable(
       this.tracer,
       "gitlode.projection",

@@ -102,6 +102,9 @@ interface WorkerExecutionTelemetry {
   readonly gitTracer: Tracer;
   readonly gitMetricRecorder: GitMetricRecorder;
   readonly dagTelemetryBinding: DagTelemetryBinding;
+  readonly pluginRuntimeTracer: Tracer;
+  readonly getPluginTracer: (name: string, version?: string) => Tracer;
+  readonly getPluginMeter: (name: string, version?: string) => Meter;
 }
 
 function createDefaultWorkerExecutionTelemetry(
@@ -120,6 +123,9 @@ function createDefaultWorkerExecutionTelemetry(
       trace.getTracer("gitlode.dag"),
       metrics.getMeter("gitlode.dag"),
     ),
+    pluginRuntimeTracer: trace.getTracer("gitlode.plugin_runtime"),
+    getPluginTracer: (name, version) => trace.getTracer(name, version),
+    getPluginMeter: (name, version) => metrics.getMeter(name, version),
   };
 }
 
@@ -306,13 +312,20 @@ export async function executeWorkerRunRequest(
         resolvedRepoUrl,
         extractionTracer,
         createBuiltInFactProjectorMetricRecorder(extractionMeter),
+        false,
       );
       const projectorResult = await buildPluginProjector(
         pluginDeclarations,
         pluginBaseDirectory,
         baseProjector,
         reporters,
-        instrumentation,
+        {
+          pluginRuntimeTracer: activeTelemetry.pluginRuntimeTracer,
+          projectionTracer: extractionTracer,
+          rootContext,
+          getPluginTracer: activeTelemetry.getPluginTracer,
+          getPluginMeter: activeTelemetry.getPluginMeter,
+        },
       );
       if (projectorResult.kind === "termination") {
         return await finishUserError(runSpan, projectorResult.message);

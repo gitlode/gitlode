@@ -1,4 +1,12 @@
-import type { Context, Exception, Span, SpanOptions, SpanStatus, Tracer } from "@opentelemetry/api";
+import {
+  context,
+  type Context,
+  type Exception,
+  type Span,
+  type SpanOptions,
+  type SpanStatus,
+  type Tracer,
+} from "@opentelemetry/api";
 
 export interface TestSpan extends Span {
   readonly attributes: Record<string, unknown>;
@@ -57,7 +65,7 @@ export function makeTracer(): {
   const tracer = {
     startSpan(name: string, options?: SpanOptions, parent?: Context) {
       const span = makeSpan();
-      starts.push({ name, options, parent, span });
+      starts.push({ name, options, parent: parent ?? context.active(), span });
       return span;
     },
   } as unknown as Tracer;

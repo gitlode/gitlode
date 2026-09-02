@@ -7,6 +7,7 @@ import type { Fact, FactProjector, ProjectedRecord } from "@gitlode/internal-con
 import type { CommitOid } from "@gitlode/internal-contracts/model";
 import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
 import { context, trace, type Meter, type Tracer } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildPluginProjector } from "../../src/execution/plugin-bootstrap.js";
@@ -109,7 +110,7 @@ async function collect<T>(source: AsyncIterable<T>): Promise<T[]> {
 }
 
 describe("plugin telemetry production owners", () => {
-  it("reuses one resolved package scope for init contexts, init spans, and projection metrics", async () => {
+  it("connects plugin bootstrap and projection to the execution run hierarchy", async () => {
     const root = await mkdtemp(join(tmpdir(), "gitlode-plugin-owner-"));
     temporaryDirectories.push(root);
     const entrypoint = await createPluginPackage(root, "shared", {
@@ -125,7 +126,7 @@ describe("plugin telemetry production owners", () => {
     const core = makeTracer();
     const projection = makeTracer();
     const rootTracer = makeTracer();
-    const rootSpan = rootTracer.tracer.startSpan("root");
+    const rootSpan = rootTracer.tracer.startSpan("gitlode.run");
     const rootContext = trace.setSpan(context.active(), rootSpan);
     const scopedTracers = new Map<string, ReturnType<typeof makeTracer>>();
     const scopedMeters = new Map<string, RecordingMeter>();
@@ -174,7 +175,15 @@ describe("plugin telemetry production owners", () => {
 
     expect(result.kind).toBe("success");
     if (result.kind !== "success") throw new Error(result.message);
-    const records = await collect(result.projector.project(oneFact()));
+    const manager = new AsyncLocalStorageContextManager().enable();
+    expect(context.setGlobalContextManager(manager)).toBe(true);
+    let records: ProjectedRecord[];
+    try {
+      records = await context.with(rootContext, () => collect(result.projector.project(oneFact())));
+    } finally {
+      manager.disable();
+      context.disable();
+    }
     expect(records[0]?.extensions).toEqual({
       alpha: { configured: "alpha" },
       beta: { configured: "beta" },
@@ -259,6 +268,8 @@ describe("plugin telemetry production owners", () => {
       },
     ]);
     expect(projection.starts.map((start) => start.name)).toEqual(["gitlode.projection"]);
+    expect(trace.getSpan(projection.starts[0]!.parent!)).toBe(rootSpan);
+    expect(projection.starts[0]!.span.endCount).toBe(1);
   });
 
   it.each([

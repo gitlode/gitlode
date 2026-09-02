@@ -77,6 +77,13 @@ interface WorkerExecutionReporters {
   readonly diagnosticReporter: DiagnosticReporter;
 }
 
+export function createExecutionDagTelemetryBinding(
+  tracer: Tracer,
+  meter: Meter,
+): DagTelemetryBinding {
+  return createDagTelemetryBinding(tracer, meter);
+}
+
 async function finishUserError(runSpan: Span, message: string): Promise<WorkerRunResult> {
   runSpan.setAttribute("gitlode.run.result", "user_error");
   runSpan.setStatus({ code: SpanStatusCode.ERROR });
@@ -115,7 +122,7 @@ function createDefaultWorkerExecutionTelemetry(
     rootContext: session.rootContext,
     gitTracer,
     gitMetricRecorder: createGitMetricRecorder(session.getMeter("gitlode.git"), adapter),
-    dagTelemetryBinding: createDagTelemetryBinding(
+    dagTelemetryBinding: createExecutionDagTelemetryBinding(
       session.getTracer("gitlode.dag"),
       session.getMeter("gitlode.dag"),
     ),

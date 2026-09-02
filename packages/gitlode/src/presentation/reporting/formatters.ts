@@ -22,7 +22,13 @@ type GroupBucket = {
   subgroup: string;
   scope?: { name: string; version: string | null };
   order: number;
-  rows: Array<{ order: number; key: string; text: string }>;
+  rows: Array<{
+    order: number;
+    key: string;
+    text: string;
+    scope: { name: string; version: string | null };
+    name: string;
+  }>;
 };
 
 export function formatSummaryLines(data: SummaryData, styling: Styling = plainStyling): string[] {
@@ -119,6 +125,8 @@ function appendSpans(
       order: view?.order ?? Number.MAX_SAFE_INTEGER,
       key,
       text: spanRow(span, view?.label, Boolean(view), plugin),
+      scope: span.scope,
+      name: span.name,
     });
     groups.set(`${group}\0${subgroup}`, bucket);
   }
@@ -158,7 +166,13 @@ function appendMetrics<T extends { name: string; scope: { name: string; version:
       order: view?.order ?? Number.MAX_SAFE_INTEGER,
       rows: [],
     };
-    bucket.rows.push({ order: view?.order ?? Number.MAX_SAFE_INTEGER, key, text: format(point) });
+    bucket.rows.push({
+      order: view?.order ?? Number.MAX_SAFE_INTEGER,
+      key,
+      text: format(point),
+      scope: point.scope,
+      name: point.name,
+    });
     groups.set(`${group}\0${subgroup}`, bucket);
   }
   renderGroups(lines, groups);
@@ -174,7 +188,13 @@ function renderGroups(lines: string[], groups: Map<string, GroupBucket>): void {
       currentGroup = group;
     }
     if (subgroup !== group) lines.push(`      ${subgroup}`);
-    for (const row of bucket.rows.sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)))
+    for (const row of bucket.rows.sort(
+      (a, b) =>
+        a.order - b.order ||
+        compareProfileScopes(a.scope, b.scope) ||
+        compareCodeUnits(a.name, b.name) ||
+        compareCodeUnits(a.key, b.key),
+    ))
       lines.push(`      ${subgroup !== group ? "  " : ""}${row.text}`);
   }
 }

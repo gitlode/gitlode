@@ -11,6 +11,7 @@ import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createExecutionDagTelemetryBinding,
   executeRun,
   executeWorkerRunRequest,
   type ExecuteRunDependencies,
@@ -659,6 +660,54 @@ describe("executeWorkerRunRequest profiling", () => {
 });
 
 describe("executeWorkerRunRequest commit traversal strategy environment", () => {
+  it("connects production DAG telemetry to the run hierarchy", async () => {
+    const manager = new AsyncLocalStorageContextManager().enable();
+    expect(context.setGlobalContextManager(manager)).toBe(true);
+    const telemetryTracer = makeTracer();
+    try {
+      const result = await executeWorkerRunRequest(
+        await createOneCommitRequest("isomorphic-git"),
+        { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+        { environment: {} },
+        {
+          ...testGitTelemetry,
+          executionTracer: telemetryTracer.tracer,
+          extractionTracer: telemetryTracer.tracer,
+          gitTracer: telemetryTracer.tracer,
+          extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+          dagTelemetryBinding: createExecutionDagTelemetryBinding(
+            telemetryTracer.tracer,
+            metrics.getMeter("gitlode.test.dag"),
+          ),
+          rootContext: ROOT_CONTEXT,
+        },
+      );
+      expect(result.kind).toBe("success");
+      const run = telemetryTracer.starts.find((start) => start.name === "gitlode.run")!.span;
+      const walk = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.git.commit.walk",
+      )!;
+      const dag = telemetryTracer.starts.filter((start) => start.name.startsWith("gitlode.dag."));
+      expect(dag.length).toBeGreaterThan(0);
+      expect(dag.every((start) => start.span.endCount === 1)).toBe(true);
+      expect(trace.getSpan(walk.parent!)).toBe(
+        telemetryTracer.starts.find((start) => start.name === "gitlode.traversal")!.span,
+      );
+      expect(
+        dag.every(
+          (start) =>
+            trace.getSpan(start.parent!) === walk.span ||
+            trace.getSpan(start.parent!) === run ||
+            dag.some((candidate) => candidate.span === trace.getSpan(start.parent!)),
+        ),
+      ).toBe(true);
+      expect(dag.every((start) => trace.getSpan(start.parent!) !== undefined)).toBe(true);
+    } finally {
+      manager.disable();
+      context.disable();
+    }
+  });
+
   async function createOneCommitRequest(
     gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
   ) {
@@ -833,6 +882,9 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       "git-cli",
     );
     expect(result.kind).toBe("success");
+    const run = telemetryTracer.starts.find((start) => start.name === "gitlode.run")!.span;
+    expect(run.attributes["gitlode.git.cli.version"]).toBeDefined();
+    expect(Object.keys(run.attributes).sort()).toContain("gitlode.git.cli.version");
     const walkSpans = telemetryTracer.starts.filter(
       ({ name }) => name === "gitlode.git.commit.walk",
     );

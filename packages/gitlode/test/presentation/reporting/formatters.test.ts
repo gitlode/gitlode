@@ -184,7 +184,6 @@ describe("formatProfileLines", () => {
         "DAG",
         "File expansion",
         "Line diff",
-        "Projection",
         "Output",
         "Plugins",
       ],
@@ -287,7 +286,6 @@ describe("formatProfileLines", () => {
         ["gitlode.dag", "gitlode.dag.node.yielded"],
         ["gitlode.extraction", "gitlode.file_change.expanded"],
         ["gitlode.line_diff", "gitlode.line_diff.compute.operation"],
-        ["gitlode.extraction", "gitlode.projection.duration"],
         ["gitlode.extraction", "gitlode.output.write.record"],
       ].map(([scope, name]) => ({
         scope: { name: scope!, version: null },
@@ -298,7 +296,7 @@ describe("formatProfileLines", () => {
       })),
       {
         scope: { name: "example-plugin", version: "2" },
-        name: "plugin.metric",
+        name: "gitlode.plugin.projection.operation",
         unit: "{commit}",
         attributes: [],
         value: 1,
@@ -319,7 +317,7 @@ describe("formatProfileLines", () => {
       },
       {
         scope: { name: "example-plugin", version: "2" },
-        name: "plugin.metric",
+        name: "gitlode.plugin.projection.duration",
         unit: "{commit}",
         attributes: [],
         count: 1,
@@ -399,5 +397,243 @@ describe("formatProfileLines", () => {
     expect(output).toContain("min=—");
     expect(output).not.toContain("bucket");
     expect(output).not.toContain("percentile");
+  });
+
+  it("renders every span reducer evidence contract", () => {
+    const report = emptyReport();
+    report.spans = [
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "gitlode.run",
+        callCount: 3,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [
+          {
+            key: "single_equal",
+            reducer: "single",
+            value: "ok",
+            observedCount: 3,
+            conflictCount: 0,
+          },
+          {
+            key: "single_partial",
+            reducer: "single",
+            value: "ok",
+            observedCount: 2,
+            conflictCount: 0,
+          },
+          {
+            key: "single_conflict",
+            reducer: "single",
+            value: "ok",
+            observedCount: 3,
+            conflictCount: 2,
+          },
+          {
+            key: "distinct",
+            reducer: "distinct",
+            values: [
+              { value: "a", count: 2 },
+              { value: "b", count: 1 },
+            ],
+            overflowCount: 4,
+          },
+          { key: "minmax", reducer: "min_max", minimum: 1, maximum: 9, observedCount: 2 },
+        ],
+      },
+    ];
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("single_equal=ok");
+    expect(output).not.toContain("single_equal=ok (observedCount=");
+    expect(output).toContain("single_partial=ok (observedCount=2)");
+    expect(output).toContain("single_conflict=ok (conflicts=2)");
+    expect(output).toContain("distinct=a(2),b(1) (overflow=4)");
+    expect(output).toContain("minmax=1…9 (observedCount=2)");
+  });
+
+  it("renders every canonical unit and preserves tiny nonzero values", () => {
+    const report = emptyReport();
+    report.counters = [
+      ["s", 1e-9],
+      ["s", 1e-6],
+      ["s", 0.001],
+      ["s", 1],
+      ["By", 1],
+      ["By", 1024],
+      ["By", 1024 ** 2],
+      ["By", 1024 ** 3],
+      ["{commit}", 2],
+      ["{operation}", 3],
+      ["custom-unit", 7],
+      ["s", 1e-12],
+    ].map(([unit, value], index) => ({
+      scope: { name: "gitlode.execution", version: null },
+      name: `custom.counter.${index}`,
+      unit: unit as string,
+      attributes: [],
+      value: value as number,
+    }));
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("1.000 ns");
+    expect(output).toContain("1.000 µs");
+    expect(output).toContain("1.000 ms");
+    expect(output).toContain("1 s");
+    expect(output).toContain("1 B");
+    expect(output).toContain("1 KiB");
+    expect(output).toContain("1 MiB");
+    expect(output).toContain("1 GiB");
+    expect(output).toContain("2 commits");
+    expect(output).toContain("3 operations");
+    expect(output).toContain("7 custom-unit");
+    expect(output).toContain("0.001000 ns");
+  });
+
+  it("keeps partial rows, suppresses unavailable rows, and omits absent complete signals", () => {
+    const partial = emptyReport();
+    partial.signalStatus.counters = "partial";
+    partial.counters = [
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "custom.counter",
+        unit: "{commit}",
+        attributes: [],
+        value: 0,
+      },
+    ];
+    const partialOutput = formatProfileLines(partial).join("\n");
+    expect(partialOutput).toContain("Counters (partial)");
+    expect(partialOutput).toContain("0 commits");
+    expect(partialOutput).toContain("Diagnostics");
+    expect(partialOutput).not.toContain("Histograms");
+
+    const unavailable = emptyReport();
+    unavailable.signalStatus.spans = "unavailable";
+    unavailable.spans = [
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "hidden",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+    ];
+    const unavailableOutput = formatProfileLines(unavailable).join("\n");
+    expect(unavailableOutput).toContain("Spans (unavailable)");
+    expect(unavailableOutput).toContain("(no observations)");
+    expect(unavailableOutput).not.toContain("hidden");
+    expect(formatProfileLines(emptyReport())).toEqual([]);
+  });
+
+  it("sorts fallback spans and metrics by scope, name, then attributes", () => {
+    const report = emptyReport();
+    report.spans = [
+      {
+        scope: { name: "gitlode.execution", version: "2" },
+        name: "z",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "a",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+    ];
+    report.counters = [
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "z",
+        unit: "u",
+        attributes: [{ key: "z", value: 1 }],
+        value: 1,
+      },
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "a",
+        unit: "u",
+        attributes: [{ key: "a", value: 1 }],
+        value: 1,
+      },
+    ];
+    report.histograms = [
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "z",
+        unit: "s",
+        attributes: [],
+        count: 1,
+        sum: 1,
+        minimum: null,
+        maximum: null,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+    ];
+    const output = formatProfileLines(report).join("\n");
+    expect(output.indexOf("gitlode.execution / a")).toBeLessThan(
+      output.indexOf("gitlode.execution@2 / z"),
+    );
+    expect(output.indexOf("Other counters")).toBeLessThan(output.indexOf("Other histograms"));
+    expect(output).not.toContain("projection");
+  });
+
+  it("renders valid histogram catalog groups independently from counters", () => {
+    const report = emptyReport();
+    report.histograms = [
+      {
+        scope: { name: "example-plugin", version: null },
+        name: "gitlode.plugin.projection.duration",
+        unit: "s",
+        attributes: [],
+        count: 1,
+        sum: 1,
+        minimum: 1,
+        maximum: 1,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+      {
+        scope: { name: "gitlode.extraction", version: null },
+        name: "gitlode.projection.duration",
+        unit: "s",
+        attributes: [],
+        count: 1,
+        sum: 1,
+        minimum: 1,
+        maximum: 1,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+      {
+        scope: { name: "gitlode.line_diff", version: null },
+        name: "gitlode.line_diff.compute.duration",
+        unit: "s",
+        attributes: [],
+        count: 1,
+        sum: 1,
+        minimum: 1,
+        maximum: 1,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
+    ];
+    const lines = formatProfileLines(report);
+    const start = lines.indexOf("  Histograms");
+    const headings = lines
+      .slice(start + 1)
+      .filter((line) => /^    [^ ]/.test(line))
+      .map((line) => line.trim());
+    expect(headings).toEqual(["Line diff", "Projection", "Plugins"]);
   });
 });

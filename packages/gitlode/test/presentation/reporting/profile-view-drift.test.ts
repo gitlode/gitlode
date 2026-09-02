@@ -89,6 +89,7 @@ describe("typed profile view drift", () => {
       bytes: (units.By as Record<string, unknown>).human_units,
       annotatedEntity: (units.annotated_entity as Record<string, unknown>).display,
       unknown: (units.unknown as Record<string, unknown>).display,
+      rounding: units.rounding,
     });
     expect({
       complete_empty: PROFILE_PRESENTATION_POLICY.sectionPolicy.completeEmpty,
@@ -151,28 +152,29 @@ describe("typed profile view drift", () => {
       (group: Record<string, unknown>) =>
         group.label === PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
     ) as Record<string, unknown>;
+    const metricScopeSubgroups = metricPluginGroup.scope_subgroups as Record<string, unknown>;
+    const metricLabels = metricScopeSubgroups.label as Record<string, unknown>;
+    const metricObservations = PROFILE_METRIC_VIEW.filter(
+      (entry) => entry.scope === "resolved_plugin_scope",
+    ).map(({ ref, label, order }) => ({ ref, label, order }));
     expect({
-      outerGroup: metricPluginGroup.label,
-      subgroupOrder: (metricPluginGroup.scope_subgroups as Record<string, unknown>).order,
-      versionPresent: (
-        (metricPluginGroup.scope_subgroups as Record<string, unknown>).label as Record<
-          string,
-          unknown
-        >
-      ).version_present,
-      versionAbsent: (
-        (metricPluginGroup.scope_subgroups as Record<string, unknown>).label as Record<
-          string,
-          unknown
-        >
-      ).version_absent,
-      remainder: (metricPluginGroup.observations as Array<Record<string, unknown>>)[0].ref,
+      label: metricPluginGroup.label,
+      matchScopeClass: (metricPluginGroup.match as Record<string, unknown>).scope_class,
+      subgroupOrder: metricScopeSubgroups.order,
+      versionPresent: metricLabels.version_present,
+      versionAbsent: metricLabels.version_absent,
+      observations: metricObservations,
     }).toEqual({
-      outerGroup: PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      label: PROFILE_PRESENTATION_POLICY.plugin.outerGroup,
+      matchScopeClass: "resolved_plugin_scope",
       subgroupOrder: PROFILE_PRESENTATION_POLICY.plugin.subgroupOrder,
       versionPresent: PROFILE_PRESENTATION_POLICY.plugin.versionPresent,
       versionAbsent: PROFILE_PRESENTATION_POLICY.plugin.versionAbsent,
-      remainder: "plugin_projection_operation",
+      observations: objects(metricPluginGroup.observations).map((observation, index) => ({
+        ref: observation.ref,
+        label: observation.label,
+        order: 90 + index,
+      })),
     });
     expect(PROFILE_VIEW_DIAGNOSTIC_LABELS).toEqual(
       (view.diagnostic_rendering as Record<string, unknown>).labels,

@@ -395,6 +395,10 @@ export const PROFILE_PRESENTATION_POLICY = {
     bytes: ["B", "KiB", "MiB", "GiB"],
     annotatedEntity: "human-readable plural label",
     unknown: "canonical unit",
+    rounding: {
+      fixed_decimal_places: false,
+      nonzero_must_not_render_as_plain_zero: true,
+    },
   },
   diagnosticLabels: PROFILE_VIEW_DIAGNOSTIC_LABELS,
 } as const;

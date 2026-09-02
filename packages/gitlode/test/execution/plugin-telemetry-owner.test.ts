@@ -181,7 +181,6 @@ describe("plugin telemetry production owners", () => {
     try {
       records = await context.with(rootContext, () => collect(result.projector.project(oneFact())));
     } finally {
-      manager.disable();
       context.disable();
     }
     expect(records[0]?.extensions).toEqual({

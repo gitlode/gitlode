@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { createDagTelemetryBinding } from "@gitlode/git-adapters";
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import { ROOT_CONTEXT, context, metrics, trace, type Meter } from "@opentelemetry/api";
@@ -11,7 +12,6 @@ import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  createExecutionDagTelemetryBinding,
   executeRun,
   executeWorkerRunRequest,
   type ExecuteRunDependencies,
@@ -675,7 +675,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
           extractionTracer: telemetryTracer.tracer,
           gitTracer: telemetryTracer.tracer,
           extractionMeter: metrics.getMeter("gitlode.test.extraction"),
-          dagTelemetryBinding: createExecutionDagTelemetryBinding(
+          dagTelemetryBinding: createDagTelemetryBinding(
             telemetryTracer.tracer,
             metrics.getMeter("gitlode.test.dag"),
           ),
@@ -703,7 +703,6 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       ).toBe(true);
       expect(dag.every((start) => trace.getSpan(start.parent!) !== undefined)).toBe(true);
     } finally {
-      manager.disable();
       context.disable();
     }
   });
@@ -789,7 +788,6 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       );
       return { result, telemetryTracer, metricRecorder };
     } finally {
-      manager.disable();
       context.disable();
     }
   }

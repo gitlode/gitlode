@@ -145,6 +145,39 @@ describe("initializePlugins", () => {
     ]);
   });
 
+  it.each([
+    { label: "unknown type", result: { type: "unknown" } },
+    { label: "unbounded type", result: { type: "x".repeat(1000) } },
+    { label: "null", result: null },
+    { label: "undefined", result: undefined },
+  ])("keeps $label normal returns outside init telemetry", async ({ result }) => {
+    const recording = makeTracer();
+    const errors: string[] = [];
+    const runtime = makeRuntimeContext({
+      tracer: recording.tracer,
+      error: (message) => errors.push(message),
+    });
+    const entry = bindEntry(
+      {
+        namespace: "invalid" as Namespace,
+        plugin: {
+          init: async () => result,
+          project: async () => ({ type: "skip" }),
+        } as unknown as UnboundPluginEntry["plugin"],
+        failurePolicy: "skip-fact",
+      },
+      runtime,
+    );
+    await expect(initializePlugins([entry], context.active())).resolves.toEqual([
+      { entry, ...(result ?? {}) },
+    ]);
+    expect(errors).toEqual([]);
+    expect(recording.starts[0]!.span.attributes).toEqual({});
+    expect(recording.starts[0]!.span.statuses).toEqual([]);
+    expect(recording.starts[0]!.span.exceptions).toEqual([]);
+    expect(recording.starts[0]!.span.endCount).toBe(1);
+  });
+
   it("passes runtime warn/error to plugin init", async () => {
     const warnings: string[] = [];
     const errors: string[] = [];

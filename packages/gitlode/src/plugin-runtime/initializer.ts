@@ -23,8 +23,11 @@ export async function initializePlugins(
           initContext,
           async () => await entry.plugin.init(entry.runtimeContext),
         );
-        span.setAttribute(getTelemetryAttributeMetadata("plugin_init_result").key, result.type);
-        if (result.type === "fatal") {
+        const outcome = { entry, ...result } as PluginInitializationOutcome;
+        if (outcome.type === "ready") {
+          span.setAttribute(getTelemetryAttributeMetadata("plugin_init_result").key, "ready");
+        } else if (outcome.type === "fatal") {
+          span.setAttribute(getTelemetryAttributeMetadata("plugin_init_result").key, "fatal");
           span.setAttribute(
             getTelemetryAttributeMetadata("plugin_init_failure_source").key,
             "returned",
@@ -32,10 +35,7 @@ export async function initializePlugins(
           span.setStatus({ code: SpanStatusCode.ERROR });
         }
         span.end();
-        return {
-          entry,
-          ...result,
-        } satisfies PluginInitializationSuccess | PluginInitializationFailure;
+        return outcome satisfies PluginInitializationSuccess | PluginInitializationFailure;
       } catch (error) {
         span.setAttribute(getTelemetryAttributeMetadata("plugin_init_result").key, "fatal");
         span.setAttribute(

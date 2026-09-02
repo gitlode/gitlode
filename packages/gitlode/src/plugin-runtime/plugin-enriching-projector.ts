@@ -8,13 +8,38 @@ import type {
 } from "@gitlode/internal-contracts/extraction";
 import {
   getTelemetryAttributeMetadata,
-  instrumentAsyncIterable,
+  STREAM_COMPLETION_ATTRIBUTE,
 } from "@gitlode/internal-contracts/telemetry";
+import {
+  createAsyncIterableInstrumenter,
+  recordSpanError,
+} from "@gitlode/internal-foundation/otel-support";
 import { assertNever } from "@gitlode/internal-foundation/support";
-import type { Context, Tracer } from "@opentelemetry/api";
+import { SpanStatusCode, type Context, type Span, type Tracer } from "@opentelemetry/api";
 
 import type { PluginProjectionResult, ProjectionContext } from "../plugin-api/index.js";
 import type { PluginRuntimeEntry } from "./types.js";
+
+class PluginProjectionAbort extends Error {
+  readonly failureSource: "returned" | "thrown";
+  readonly originalThrown: unknown;
+  constructor(message: string, failureSource: "returned" | "thrown", originalThrown?: unknown) {
+    super(message);
+    this.failureSource = failureSource;
+    this.originalThrown = originalThrown;
+  }
+}
+
+function recordProjectionError(span: Span, error: unknown): void {
+  if (!(error instanceof PluginProjectionAbort)) return recordSpanError(span, error);
+  if (error.failureSource === "thrown") return recordSpanError(span, error.originalThrown);
+  span.setStatus({ code: SpanStatusCode.ERROR });
+}
+
+const instrumentPluginProjection = createAsyncIterableInstrumenter(
+  (span, completion) => span.setAttribute(STREAM_COMPLETION_ATTRIBUTE, completion),
+  recordProjectionError,
+);
 
 async function* trackFacts(
   facts: AsyncIterable<Fact>,
@@ -50,7 +75,7 @@ export class EnrichingFactProjector implements FactProjector {
   }
 
   project(facts: AsyncIterable<Fact>, parentContext?: Context): AsyncIterable<ProjectedRecord> {
-    return instrumentAsyncIterable(
+    return instrumentPluginProjection(
       this.tracer,
       "gitlode.projection",
       (span) => {
@@ -123,11 +148,15 @@ export class EnrichingFactProjector implements FactProjector {
       const { namespace, plugin, failurePolicy, projectionMetricRecorder } = entry;
       let result: PluginProjectionResult;
       let callbackCompletionRecorded = false;
+      let failureSource: "returned" | "thrown" = "returned";
+      let originalThrown: unknown;
       const token = projectionMetricRecorder.startProjection();
 
       try {
         result = await plugin.project(context);
       } catch (error) {
+        failureSource = "thrown";
+        originalThrown = error;
         projectionMetricRecorder.completeProjection(
           token,
           fact.type,
@@ -159,7 +188,11 @@ export class EnrichingFactProjector implements FactProjector {
             );
           }
           if (failurePolicy === "fatal") {
-            throw new Error(`Plugin "${namespace}" fatal error on fact ${this.factId(fact)}`);
+            throw new PluginProjectionAbort(
+              `Plugin "${namespace}" fatal error on fact ${this.factId(fact)}`,
+              failureSource,
+              originalThrown,
+            );
           }
           extensions[namespace] = null;
           this.diagnosticReporter.report({

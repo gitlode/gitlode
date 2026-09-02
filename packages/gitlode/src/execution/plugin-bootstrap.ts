@@ -172,7 +172,8 @@ export async function buildPluginProjector(
 
     const pluginInitResults = await initializePlugins(runtimeEntries, bootstrapContext);
     const pluginInitFailures = pluginInitResults.filter((result) => result.type === "fatal");
-    bootstrapSpan.setAttribute(readyCountKey, pluginInitResults.length - pluginInitFailures.length);
+    const pluginInitSuccesses = pluginInitResults.filter((result) => result.type === "ready");
+    bootstrapSpan.setAttribute(readyCountKey, pluginInitSuccesses.length);
     bootstrapSpan.setAttribute(failedCountKey, pluginInitFailures.length);
     if (pluginInitFailures.length > 0) {
       bootstrapSpan.setStatus({ code: SpanStatusCode.ERROR });

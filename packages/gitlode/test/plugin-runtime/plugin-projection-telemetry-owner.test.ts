@@ -153,6 +153,7 @@ describe("EnrichingFactProjector telemetry owner", () => {
       outcome: "failure_aborted",
       rejects: true,
       error: true,
+      exceptions: 0,
     },
     {
       label: "thrown continued",
@@ -173,46 +174,51 @@ describe("EnrichingFactProjector telemetry owner", () => {
       outcome: "failure_aborted",
       rejects: true,
       error: true,
+      exceptions: 1,
     },
-  ])("records $label exactly once", async ({ policy, invoke, outcome, rejects, error }) => {
-    const meter = new RecordingMeter();
-    const tracer = makeTracer();
-    const plugin: ProjectorPlugin = {
-      init: async () => ({ type: "ready" }),
-      project: invoke,
-    };
-    const projector = new EnrichingFactProjector(
-      baseProjector(),
-      [runtimeEntry(plugin, policy, meter)],
-      { report() {} },
-      tracer.tracer,
-    );
-    const operation = collect(projector.project(facts(), context.active()));
-    if (rejects) await expect(operation).rejects.toThrow();
-    else await expect(operation).resolves.toHaveLength(1);
+  ])(
+    "records $label exactly once",
+    async ({ policy, invoke, outcome, rejects, error, exceptions }) => {
+      const meter = new RecordingMeter();
+      const tracer = makeTracer();
+      const plugin: ProjectorPlugin = {
+        init: async () => ({ type: "ready" }),
+        project: invoke,
+      };
+      const projector = new EnrichingFactProjector(
+        baseProjector(),
+        [runtimeEntry(plugin, policy, meter)],
+        { report() {} },
+        tracer.tracer,
+      );
+      const operation = collect(projector.project(facts(), context.active()));
+      if (rejects) await expect(operation).rejects.toThrow();
+      else await expect(operation).resolves.toHaveLength(1);
 
-    const attributes = {
-      "gitlode.projection.fact.type": "commit",
-      "gitlode.plugin.projection.outcome": outcome,
-    };
-    expect(meter.calls).toEqual([
-      { name: "gitlode.plugin.projection.operation", value: 1, attributes },
-      { name: "gitlode.plugin.projection.duration", value: 1, attributes },
-    ]);
-    expect(meter.creations).toEqual([
-      "gitlode.plugin.projection.operation",
-      "gitlode.plugin.projection.duration",
-    ]);
-    expect(tracer.starts.map((start) => start.name)).toEqual(["gitlode.projection"]);
-    const span = tracer.starts[0]!.span;
-    expect(span.attributes).toEqual({
-      "gitlode.projection.mode": "plugin_enriched",
-      "gitlode.stream.completion": rejects ? "error" : "exhausted",
-    });
-    expect(span.endCount).toBe(1);
-    expect(span.statuses).toEqual(error ? [{ code: SpanStatusCode.ERROR }] : []);
-    expect(span.exceptions).toHaveLength(error ? 1 : 0);
-  });
+      const attributes = {
+        "gitlode.projection.fact.type": "commit",
+        "gitlode.plugin.projection.outcome": outcome,
+      };
+      expect(meter.calls).toEqual([
+        { name: "gitlode.plugin.projection.operation", value: 1, attributes },
+        { name: "gitlode.plugin.projection.duration", value: 1, attributes },
+      ]);
+      expect(meter.creations).toEqual([
+        "gitlode.plugin.projection.operation",
+        "gitlode.plugin.projection.duration",
+      ]);
+      expect(tracer.starts.map((start) => start.name)).toEqual(["gitlode.projection"]);
+      const span = tracer.starts[0]!.span;
+      expect(span.attributes).toEqual({
+        "gitlode.projection.mode": "plugin_enriched",
+        "gitlode.stream.completion": rejects ? "error" : "exhausted",
+      });
+      expect(span.endCount).toBe(1);
+      expect(span.statuses).toEqual(error ? [{ code: SpanStatusCode.ERROR }] : []);
+      expect(span.exceptions).toHaveLength(exceptions ?? (error ? 1 : 0));
+      if (exceptions === 1) expect(span.exceptions[0]).toBe("aborted");
+    },
+  );
 
   it("does not invent metrics for a contract-invalid return", async () => {
     const meter = new RecordingMeter();

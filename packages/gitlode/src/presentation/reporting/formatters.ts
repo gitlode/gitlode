@@ -1,3 +1,4 @@
+import { compareProfileScopes } from "@gitlode/internal-contracts/telemetry";
 import type {
   ProfileAttribute,
   ProfileDiagnostic,
@@ -15,6 +16,14 @@ import {
   PROFILE_VIEW_DIAGNOSTIC_LABELS,
 } from "./profile-view.js";
 import type { SummaryData } from "./types.js";
+
+type GroupBucket = {
+  group: string;
+  subgroup: string;
+  scope?: { name: string; version: string | null };
+  order: number;
+  rows: Array<{ order: number; key: string; text: string }>;
+};
 
 export function formatSummaryLines(data: SummaryData, styling: Styling = plainStyling): string[] {
   const bytes = humanizeBytes(data.bytesWritten);
@@ -88,10 +97,7 @@ function appendSpans(
     lines.push("    (no observations)");
     return;
   }
-  const groups = new Map<
-    string,
-    { order: number; rows: Array<{ order: number; key: string; text: string }> }
-  >();
+  const groups = new Map<string, GroupBucket>();
   for (const span of spans) {
     const view = findProfileViewEntry("span", span.name, span.scope.name);
     const plugin = isResolvedPluginScope(span.scope.name);
@@ -102,7 +108,10 @@ function appendSpans(
         : PROFILE_PRESENTATION_POLICY.fallback.spans.group);
     const subgroup = plugin ? displayScope(span.scope) : group;
     const key = `${displayScope(span.scope)}\0${span.name}`;
-    const bucket = groups.get(`${group}\0${subgroup}`) ?? {
+    const bucket: GroupBucket = groups.get(`${group}\0${subgroup}`) ?? {
+      group,
+      subgroup,
+      scope: plugin ? span.scope : undefined,
       order: view?.order ?? Number.MAX_SAFE_INTEGER,
       rows: [],
     };
@@ -117,7 +126,7 @@ function appendSpans(
   if (!spans.length) lines.push("    (no observations)");
 }
 
-function appendMetrics<T extends { name: string; scope: { name: string } }>(
+function appendMetrics<T extends { name: string; scope: { name: string; version: string | null } }>(
   lines: string[],
   title: string,
   status: string,
@@ -130,10 +139,7 @@ function appendMetrics<T extends { name: string; scope: { name: string } }>(
     lines.push("    (no observations)");
     return;
   }
-  const groups = new Map<
-    string,
-    { order: number; rows: Array<{ order: number; key: string; text: string }> }
-  >();
+  const groups = new Map<string, GroupBucket>();
   for (const point of points) {
     const view = findProfileViewEntry("metric", point.name, point.scope.name);
     const plugin = isResolvedPluginScope(point.scope.name);
@@ -145,7 +151,10 @@ function appendMetrics<T extends { name: string; scope: { name: string } }>(
       view?.group ?? (plugin ? PROFILE_PRESENTATION_POLICY.plugin.outerGroup : fallback);
     const subgroup = plugin ? displayScope(point.scope) : group;
     const key = `${displayScope(point.scope)}\0${point.name}\0${attributesKey((point as T & { attributes: readonly ProfileAttribute[] }).attributes)}`;
-    const bucket = groups.get(`${group}\0${subgroup}`) ?? {
+    const bucket: GroupBucket = groups.get(`${group}\0${subgroup}`) ?? {
+      group,
+      subgroup,
+      scope: plugin ? point.scope : undefined,
       order: view?.order ?? Number.MAX_SAFE_INTEGER,
       rows: [],
     };
@@ -156,13 +165,10 @@ function appendMetrics<T extends { name: string; scope: { name: string } }>(
   if (!points.length) lines.push("    (no observations)");
 }
 
-function renderGroups(
-  lines: string[],
-  groups: Map<string, { order: number; rows: Array<{ order: number; key: string; text: string }> }>,
-): void {
+function renderGroups(lines: string[], groups: Map<string, GroupBucket>): void {
   let currentGroup: string | undefined;
-  for (const [key, bucket] of [...groups].sort((a, b) => compareGroupKeys(a, b))) {
-    const [group, subgroup] = key.split("\0");
+  for (const [, bucket] of [...groups].sort((a, b) => compareGroupKeys(a, b))) {
+    const { group, subgroup } = bucket;
     if (group !== currentGroup) {
       lines.push(`    ${group}`);
       currentGroup = group;
@@ -173,17 +179,14 @@ function renderGroups(
   }
 }
 
-function compareGroupKeys(
-  a: [string, { order: number; rows: Array<{ order: number; key: string; text: string }> }],
-  b: [string, { order: number; rows: Array<{ order: number; key: string; text: string }> }],
-): number {
-  const [aGroup, aSubgroup] = a[0].split("\0");
-  const [bGroup, bSubgroup] = b[0].split("\0");
+function compareGroupKeys(a: [string, GroupBucket], b: [string, GroupBucket]): number {
   if (
-    aGroup === PROFILE_PRESENTATION_POLICY.plugin.outerGroup &&
-    bGroup === PROFILE_PRESENTATION_POLICY.plugin.outerGroup
+    a[1].group === PROFILE_PRESENTATION_POLICY.plugin.outerGroup &&
+    b[1].group === PROFILE_PRESENTATION_POLICY.plugin.outerGroup
   ) {
-    return compareCodeUnits(aSubgroup ?? "", bSubgroup ?? "");
+    return a[1].scope && b[1].scope
+      ? compareProfileScopes(a[1].scope, b[1].scope)
+      : compareCodeUnits(a[1].subgroup, b[1].subgroup);
   }
   return a[1].order - b[1].order || compareCodeUnits(a[0], b[0]);
 }

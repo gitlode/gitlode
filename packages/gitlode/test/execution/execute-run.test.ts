@@ -772,15 +772,15 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     );
     expect(walkSpans).toHaveLength(1);
     const walk = walkSpans[0]!;
+    const parent = trace.getSpan(walk.parent!);
+    expect(telemetryTracer.starts.find(({ span }) => span === parent)?.name).toBe(
+      "gitlode.traversal",
+    );
     expect(walk.options?.attributes).toEqual({
       "gitlode.git.adapter": "isomorphic-git",
       "gitlode.git.commit.walk.strategy": strategy,
       "gitlode.git.commit.walk.has_exclusion": false,
     });
-    expect(trace.getSpan(walk.parent!)).toBeDefined();
-    expect(trace.getSpan(walk.parent!)).not.toBe(
-      telemetryTracer.starts.find(({ name }) => name === "gitlode.run")!.span,
-    );
     expect(walk.span.attributes).toEqual({
       "gitlode.stream.completion": "exhausted",
     });
@@ -838,15 +838,27 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     );
     expect(walkSpans).toHaveLength(1);
     const walk = walkSpans[0]!;
+    const parent = trace.getSpan(walk.parent!);
+    expect(telemetryTracer.starts.find(({ span }) => span === parent)?.name).toBe(
+      "gitlode.traversal",
+    );
+    const revList = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.cli.rev_list",
+    );
+    const commitBatch = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.cli.commit_batch",
+    );
+    expect(revList).toHaveLength(1);
+    expect(commitBatch).toHaveLength(1);
+    expect(trace.getSpan(revList[0]!.parent!)).toBe(walk.span);
+    expect(trace.getSpan(commitBatch[0]!.parent!)).toBe(walk.span);
+    expect(revList[0]!.span.endCount).toBe(1);
+    expect(commitBatch[0]!.span.endCount).toBe(1);
     expect(walk.options?.attributes).toEqual({
       "gitlode.git.adapter": "git-cli",
       "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
       "gitlode.git.commit.walk.has_exclusion": false,
     });
-    expect(trace.getSpan(walk.parent!)).toBeDefined();
-    expect(trace.getSpan(walk.parent!)).not.toBe(
-      telemetryTracer.starts.find(({ name }) => name === "gitlode.run")!.span,
-    );
     expect(walk.span.attributes).toEqual({
       "gitlode.stream.completion": "exhausted",
     });

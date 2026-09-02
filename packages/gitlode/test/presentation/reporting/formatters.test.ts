@@ -113,7 +113,7 @@ describe("formatProfileLines", () => {
     report.signalStatus.counters = "unavailable";
     report.counters = [
       {
-        scope: { name: "wrong", version: null },
+        scope: { name: "gitlode.extraction", version: null },
         name: "hidden",
         unit: "unit",
         attributes: [],
@@ -124,6 +124,40 @@ describe("formatProfileLines", () => {
     expect(output).toContain("Counters (unavailable)");
     expect(output).not.toContain("hidden");
     expect(output).toContain("Diagnostics");
+  });
+
+  it("classifies every non-core scope as a plugin and sorts canonical scope identities", () => {
+    const report = emptyReport();
+    report.spans = [
+      ...[
+        ["a-foo", null],
+        ["a", "2"],
+        ["gitlode.plugin.namespace", "1"],
+        ["example-plugin", null],
+        ["a", null],
+      ].map(([name, version]) => ({
+        scope: { name: name!, version },
+        name: `custom.${name}`,
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      })),
+    ];
+    const output = formatProfileLines(report).join("\n");
+    expect(output.match(/^    Plugins$/gm)).toHaveLength(1);
+    const scopes = [
+      "      a",
+      "      a@2",
+      "      a-foo",
+      "      example-plugin",
+      "      gitlode.plugin.namespace@1",
+    ];
+    for (let index = 1; index < scopes.length; index++) {
+      expect(output.indexOf(scopes[index - 1]!)).toBeLessThan(output.indexOf(scopes[index]!));
+    }
+    expect(output).not.toContain("a / custom.a");
   });
 
   it.each([
@@ -137,6 +171,7 @@ describe("formatProfileLines", () => {
         "Git traversal",
         "Git file access",
         "DAG",
+        "Plugins",
       ],
     ],
     [
@@ -151,6 +186,7 @@ describe("formatProfileLines", () => {
         "Line diff",
         "Projection",
         "Output",
+        "Plugins",
       ],
     ],
   ])("renders %s in catalog order regardless of input order", (kind, expectedGroups) => {
@@ -192,6 +228,42 @@ describe("formatProfileLines", () => {
         maxDurationSeconds: 1,
         attributes: [],
       },
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "gitlode.state.validate",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+      {
+        scope: { name: "gitlode.git", version: null },
+        name: "gitlode.git.resolve_ref",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+      {
+        scope: { name: "gitlode.git", version: null },
+        name: "gitlode.git.cli.file_blob_batch",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+      {
+        scope: { name: "example-plugin", version: null },
+        name: "plugin.span",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
     ];
     report.counters = [
       {
@@ -208,6 +280,29 @@ describe("formatProfileLines", () => {
         attributes: [],
         value: 0,
       },
+      ...[
+        ["gitlode.git", "gitlode.git.commit.yielded"],
+        ["gitlode.git", "gitlode.git.object.read"],
+        ["gitlode.git", "gitlode.git.file_change.yielded"],
+        ["gitlode.dag", "gitlode.dag.node.yielded"],
+        ["gitlode.extraction", "gitlode.file_change.expanded"],
+        ["gitlode.line_diff", "gitlode.line_diff.compute.operation"],
+        ["gitlode.extraction", "gitlode.projection.duration"],
+        ["gitlode.extraction", "gitlode.output.write.record"],
+      ].map(([scope, name]) => ({
+        scope: { name: scope!, version: null },
+        name: name!,
+        unit: "{operation}",
+        attributes: [],
+        value: 1,
+      })),
+      {
+        scope: { name: "example-plugin", version: "2" },
+        name: "plugin.metric",
+        unit: "{commit}",
+        attributes: [],
+        value: 1,
+      },
     ];
     report.histograms = [
       {
@@ -222,26 +317,36 @@ describe("formatProfileLines", () => {
         explicitBounds: [1],
         bucketCounts: [1],
       },
+      {
+        scope: { name: "example-plugin", version: "2" },
+        name: "plugin.metric",
+        unit: "{commit}",
+        attributes: [],
+        count: 1,
+        sum: 1,
+        minimum: 1,
+        maximum: 1,
+        explicitBounds: [],
+        bucketCounts: [],
+      },
     ];
     const lines = formatProfileLines(report);
-    const relevant = [
-      ...new Set(
-        lines
-          .filter((line) => expectedGroups.some((group) => line.trim() === group))
-          .map((line) => line.trim()),
-      ),
-    ];
-    expect(relevant).toEqual(
-      expectedGroups.filter((group) => lines.some((line) => line.trim() === group)),
-    );
-    expect(kind).toBeTruthy();
+    const sectionTitle = kind === "span groups" ? "  Spans" : "  Counters";
+    const start = lines.indexOf(sectionTitle);
+    const end =
+      kind === "span groups" ? lines.indexOf("  Counters") : lines.indexOf("  Histograms");
+    const headings = lines
+      .slice(start + 1, end)
+      .filter((line) => /^    [^ ]/.test(line))
+      .map((line) => line.trim());
+    expect(headings).toEqual(expectedGroups);
   });
 
   it("routes exact core observations, wrong scopes, and independent fallbacks", () => {
     const report = emptyReport();
     report.spans = [
       {
-        scope: { name: "wrong", version: null },
+        scope: { name: "gitlode.extraction", version: null },
         name: "gitlode.run",
         callCount: 1,
         errorCount: 0,
@@ -250,7 +355,7 @@ describe("formatProfileLines", () => {
         attributes: [],
       },
       {
-        scope: { name: "custom", version: null },
+        scope: { name: "gitlode.execution", version: null },
         name: "other",
         callCount: 1,
         errorCount: 0,
@@ -261,7 +366,7 @@ describe("formatProfileLines", () => {
     ];
     report.counters = [
       {
-        scope: { name: "custom", version: null },
+        scope: { name: "gitlode.execution", version: null },
         name: "counter",
         unit: "mystery",
         attributes: [
@@ -273,7 +378,7 @@ describe("formatProfileLines", () => {
     ];
     report.histograms = [
       {
-        scope: { name: "custom", version: null },
+        scope: { name: "gitlode.execution", version: null },
         name: "histogram",
         unit: "s",
         attributes: [],
@@ -289,7 +394,7 @@ describe("formatProfileLines", () => {
     expect(output).toContain("Other spans");
     expect(output).toContain("Other counters");
     expect(output).toContain("Other histograms");
-    expect(output).toContain("wrong / gitlode.run");
+    expect(output).toContain("gitlode.extraction / gitlode.run");
     expect(output).toContain("0 mystery");
     expect(output).toContain("min=—");
     expect(output).not.toContain("bucket");

@@ -73,8 +73,8 @@ describe("formatSummaryLines", () => {
       },
       styling,
     );
-    expect(primary).toEqual(["3", "4", "2", "2", "1.5"]);
-    expect(units).toEqual(["KiB", "s"]);
+    expect(primary).toEqual(["3", "4", "2", "2.0", "1.5"]);
+    expect(units).toEqual(["KB", "s"]);
     expect(refs).toEqual(["main, v1"]);
   });
 });

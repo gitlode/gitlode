@@ -76,4 +76,61 @@ describe("formatProfileLines", () => {
     expect(formatProfileLines(report).join("\n")).toContain("unavailable");
     expect(formatProfileLines(report).join("\n")).toContain("Telemetry lifecycle stage failed");
   });
+
+  it("renders plugin scopes under one Plugins group and sorts independent of input order", () => {
+    const report = emptyReport();
+    report.spans = [
+      {
+        scope: { name: "@example/z", version: "1" },
+        name: "custom.z",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+      {
+        scope: { name: "@example/a", version: null },
+        name: "gitlode.plugin.init",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+      {
+        scope: { name: "@example/a", version: null },
+        name: "custom.a",
+        callCount: 1,
+        errorCount: 0,
+        totalDurationSeconds: 1,
+        maxDurationSeconds: 1,
+        attributes: [],
+      },
+    ];
+    const output = formatProfileLines(report).join("\n");
+    expect(output.match(/^    Plugins$/gm)).toHaveLength(1);
+    expect(output).toContain("      @example/a");
+    expect(output).toContain("      @example/z@1");
+    expect(output).toContain("        Initialization:");
+    expect(output).toContain("        custom.a:");
+  });
+
+  it("suppresses rows for unavailable signals while retaining headings and diagnostics", () => {
+    const report = emptyReport();
+    report.signalStatus.counters = "unavailable";
+    report.counters = [
+      {
+        scope: { name: "wrong", version: null },
+        name: "hidden",
+        unit: "unit",
+        attributes: [],
+        value: 1,
+      },
+    ];
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("Counters (unavailable)");
+    expect(output).not.toContain("hidden");
+    expect(output).toContain("Diagnostics");
+  });
 });

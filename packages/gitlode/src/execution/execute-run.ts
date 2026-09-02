@@ -405,7 +405,7 @@ export async function executeWorkerRunRequest(
   };
   const applicationResult = await (session
     ? session.runInRootContext(applicationWork)
-    : applicationWork());
+    : context.with(rootContext, applicationWork));
 
   if (applicationResult.kind === "success") {
     runSpan.setAttributes({

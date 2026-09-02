@@ -48,7 +48,10 @@ export function formatProfileLines(
   appendMetrics(lines, "Counters", report.signalStatus.counters, report.counters, (point) => {
     const view = findProfileViewEntry("metric", point.name, point.scope.name);
     return metric(
-      view?.label ?? `${displayScope(point.scope)} / ${point.name}`,
+      view?.label ??
+        (isResolvedPluginScope(point.scope.name)
+          ? point.name
+          : `${displayScope(point.scope)} / ${point.name}`),
       point.value,
       point.unit,
       point.attributes,
@@ -56,7 +59,13 @@ export function formatProfileLines(
   });
   appendMetrics(lines, "Histograms", report.signalStatus.histograms, report.histograms, (point) => {
     const view = findProfileViewEntry("metric", point.name, point.scope.name);
-    return histogram(point, view?.label ?? `${displayScope(point.scope)} / ${point.name}`);
+    return histogram(
+      point,
+      view?.label ??
+        (isResolvedPluginScope(point.scope.name)
+          ? point.name
+          : `${displayScope(point.scope)} / ${point.name}`),
+    );
   });
   if (report.diagnostics.length || incomplete.length) {
     lines.push("  Diagnostics");
@@ -74,6 +83,10 @@ function appendSpans(
 ): void {
   if (status === "complete" && !spans.length) return;
   lines.push(`  Spans${status === "complete" ? "" : ` (${status})`}`);
+  if (status === "unavailable") {
+    lines.push("    (no observations)");
+    return;
+  }
   const groups = new Map<
     string,
     { order: number; rows: Array<{ order: number; key: string; text: string }> }
@@ -91,7 +104,7 @@ function appendSpans(
     bucket.rows.push({
       order: view?.order ?? Number.MAX_SAFE_INTEGER,
       key,
-      text: spanRow(span, view?.label, Boolean(view)),
+      text: spanRow(span, view?.label, Boolean(view), plugin),
     });
     groups.set(`${group}\0${subgroup}`, bucket);
   }
@@ -108,6 +121,10 @@ function appendMetrics<T extends { name: string; scope: { name: string } }>(
 ): void {
   if (status === "complete" && !points.length) return;
   lines.push(`  ${title}${status === "complete" ? "" : ` (${status})`}`);
+  if (status === "unavailable") {
+    lines.push("    (no observations)");
+    return;
+  }
   const groups = new Map<
     string,
     { order: number; rows: Array<{ order: number; key: string; text: string }> }
@@ -133,12 +150,18 @@ function renderGroups(
   lines: string[],
   groups: Map<string, { order: number; rows: Array<{ order: number; key: string; text: string }> }>,
 ): void {
+  let currentGroup: string | undefined;
   for (const [key, bucket] of [...groups].sort(
     (a, b) => a[1].order - b[1].order || a[0].localeCompare(b[0]),
   )) {
-    lines.push(`    ${key.split("\0")[1]}`);
+    const [group, subgroup] = key.split("\0");
+    if (group !== currentGroup) {
+      lines.push(`    ${group}`);
+      currentGroup = group;
+    }
+    if (subgroup !== group) lines.push(`      ${subgroup}`);
     for (const row of bucket.rows.sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)))
-      lines.push(`      ${row.text}`);
+      lines.push(`      ${subgroup !== group ? "  " : ""}${row.text}`);
   }
 }
 
@@ -147,9 +170,18 @@ function displayScope(scope: { name: string; version?: string | null }): string 
     ? scope.name
     : `${scope.name}@${scope.version}`;
 }
-function spanRow(span: ProfileSpanAggregate, label: string | undefined, known: boolean): string {
+function spanRow(
+  span: ProfileSpanAggregate,
+  label: string | undefined,
+  known: boolean,
+  plugin: boolean,
+): string {
   const average = span.callCount ? span.totalDurationSeconds / span.callCount : 0;
-  const identity = known ? label : `${displayScope(span.scope)} / ${span.name}`;
+  const identity = known
+    ? label
+    : plugin
+      ? span.name
+      : `${displayScope(span.scope)} / ${span.name}`;
   const attrs = span.attributes
     .map((attribute) => attributeSummary(attribute, span.callCount))
     .join(", ");

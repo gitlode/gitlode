@@ -1,155 +1,39 @@
 # gitlode Profiling Guide
 
-gitlode's profiling output is a local diagnostic view for troubleshooting slow runs and for
-developing extraction and traversal logic. It is exposed through the public `--profile` flag, but it
-is not intended to be part of normal day-to-day extraction workflows or a stable machine-readable
-contract.
+`--profile` enables one local OpenTelemetry collection session for the worker run. It uses the
+same application path, Git operations, plugin callbacks, and JSONL output as an unprofiled run.
+The report is SDK-independent and is created after application resources have been disposed.
 
-`--profile` enables local OpenTelemetry collection without changing extraction or JSONL behavior.
-Successful runs render separate Spans, Counters, Histograms, and Diagnostics sections. Partial and
-unavailable signals are labeled; failed runs still finalize telemetry but do not render a profile.
-Plugin observations are grouped by resolved package scope and optional version. Durations and byte
-values may be humanized. Collection diagnostics remain inside the profile, and the CLI formatting is
-not a machine-readable contract. `--quiet` suppresses summary, progress, and profile output. If
-initialization degrades, extraction continues with one sanitized warning and no profile block.
+## CLI behavior
 
-Use profiling when you need to answer questions such as:
+The application summary is printed first. A successful, non-quiet run may then print a Profile block.
+Failed runs finalize telemetry but do not display a profile. `--quiet` suppresses progress, summary,
+and profile output; warnings and errors retain their normal behavior. If local initialization
+degrades, extraction continues with a sanitized warning and no profile block.
 
-- Which phase dominates this run?
-- How much time is spent walking commits?
-- Did file-level extraction spend time in blob reads, diff computation, or output writing?
+## Profile sections
 
-Profiling is deterministic and local. It does not require an external telemetry collector.
+Observations are kept separate and presented in the diagnostic order defined by
+[`design/telemetry-catalog/profile-view.yaml`](design/telemetry-catalog/profile-view.yaml):
 
-## Enabling Profiling
+- Spans: label, total duration, calls, average, maximum, errors, and bounded attribute summaries.
+- Counters: one row per observed datapoint, including explicit zero values, with unit and sorted attributes.
+- Histograms: count, total, average, nullable minimum/maximum, and unit. Buckets remain in the report
+  but are not expanded, and percentiles are not calculated.
+- Diagnostics: severity, signal, stage, cataloged label, repeated count, and bounded message.
 
-Pass `--profile` on the command line:
+Groups without observations are omitted. Unknown observations remain visible in deterministic fallback
+groups. Plugin observations are grouped by resolved scope name and optional version (`name@version`;
+otherwise `name`); namespace and configuration are not reconstructed as identities.
 
-```bash
-gitlode --profile -r main ./my-repo
-```
+When spans, counters, or histograms are partial or unavailable, a compact status summary appears
+before the signal sections and the affected section repeats its state. Complete empty signals are
+omitted. Collection overflow and lifecycle failures are profile diagnostics, not application warnings.
 
-You can also enable it from a configuration file with `runtime.profile: true`. The effective value is
-`CLI --profile OR config runtime.profile`.
+Durations use canonical seconds and may render as ns, µs, ms, or s. Byte values use B, KiB, MiB, or
+GiB. Entity units use readable plural labels and unknown units remain canonical. Nonzero values are
+never rendered as an unqualified zero.
 
-When profiling is enabled and the run succeeds, gitlode appends the profile block to stderr after
-the normal completion summary. `--quiet` suppresses the profile block together with progress and
-summary output.
-
-## Output Shape
-
-Example:
-
-```text
-Profile
-  span                       :   total  calls     avg     max  details
-  gitlode.run                :  18.40ms      1  18.40ms  18.40ms  git.adapter=isomorphic-git gitlode.granularity=commit gitlode.profile gitlode.result=success commits=120 records=120
-  git.walk_commits           :   8.25ms      1   8.25ms   8.25ms
-  gitlode.projection         :   3.75ms    120   0.03ms   0.20ms
-  gitlode.output.write       :   2.10ms    120   0.02ms   0.10ms
-```
-
-Each row is an aggregate summary for spans with the same name:
-
-| Column    | Meaning                                          |
-| --------- | ------------------------------------------------ |
-| `span`    | Stable span name for the measured operation      |
-| `total`   | Total elapsed duration across all matching spans |
-| `calls`   | Number of observed spans with that name          |
-| `avg`     | Average duration per call                        |
-| `max`     | Slowest observed call                            |
-| `details` | Low-cardinality attributes, counters, and errors |
-
-Rows are shown in the order their span names first appeared during the run. The output is designed
-for quick comparison between runs, not as a stable machine-readable export format.
-
-## Span Names
-
-Useful span names include:
-
-| Span name                                       | What it measures                                                                   |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `gitlode.run`                                   | Overall extraction request                                                         |
-| `gitlode.planning`                              | Branch-planning work before traversal begins                                       |
-| `gitlode.traversal`                             | Commit traversal and commit-fact materialization                                   |
-| `gitlode.projection`                            | Fact-to-output-record mapping in the active projector                              |
-| `gitlode.output.write` / `gitlode.output.close` | `OutputSink.write()` and `OutputSink.close()`                                      |
-| `git.walk_commits`                              | Adapter-level commit walk operation                                                |
-| `gitlode.file_change_expansion`                 | Extraction-side file-change expansion for one commit                               |
-| `git.file_blob_changes`                         | Adapter blob-fact stream for one commit                                            |
-| `git.blob_read`                                 | Individual blob reads in either Git adapter                                        |
-| `line_diff.compute`                             | Concrete calculation in the default production `LineDiffCalculator` implementation |
-| `git.*` children                                | Additional Git-internal operations such as ref resolution and merge-base           |
-
-Span names are intentionally compact and dot-separated. A deeper name usually represents a local
-sub-operation that only exists as part of the parent operation.
-
-## Details
-
-The `details` column can contain three kinds of diagnostic data:
-
-- attributes: low-cardinality decisions or execution modes, such as `git.adapter=isomorphic-git`;
-- counters: accumulated operational counts, such as `records=120` or `skipped_diffs=2`;
-- errors: `errors=<n>` reports how many spans with that name ended with an error.
-
-Boolean attributes are printed as a bare key when `true`, for example `gitlode.profile`. A boolean
-`false` value is printed only when the code intentionally records it as meaningful.
-
-## Adapter Diagnostics
-
-The run-level `gitlode.run` span records `git.adapter` so profiling output shows which Git
-implementation was selected. The current default is `isomorphic-git`. When `runtime.gitAdapter` is
-set to `git-cli`, the same run-level span also records `git.cli.version` after validating the Git
-executable with `git --version`.
-
-`git.walk_commits` is the adapter-level span for commit traversal. For the isomorphic-git adapter, it records `strategy` as the full Git commit traversal mode (`certified-lazy`, `phase-certified-fifo`, or `phase-certified-timestamp`) plus commit-object diagnostics such as `commits_yielded`, total backend `commit_reads`, and
-purpose-specific read/cache counters. `topology_commit_reads` and `topology_commit_cache_hits`
-describe commit access while projecting DAG successors. `materialize_commit_reads` and
-`materialize_commit_cache_hits` describe commit access while turning yielded OIDs into `RawCommit`
-objects. Comparing `commit_reads` with `commits_yielded` is a useful way to spot commit-read
-overshoot during DAG traversal.
-
-The generic DAG traversal core records strategy diagnostics on `dag.traversal`. These use graph
-vocabulary rather than Git object vocabulary. Useful details include `strategy`,
-`result=certified|fallback`, `fallback_reason`, `yielded_nodes`, `successor_expansions`,
-`main_expansions`, `exclude_expansions`, `excluded_nodes`, and `fallback_removed`. For the
-experimental `phaseCertified` DAG strategy, normal completion also records `termination_reason`:
-`frontier-exhausted` means the difference frontier naturally emptied (including reachable-only walks
-and ties where include resolution happened as the frontier emptied), while `include-resolved` means
-the include graph became fully resolved with pending scheduling work left unprocessed. Existing
-expansion counters still describe actual `getSuccessors()` calls, not queued work that was skipped
-after result finality. The counters are intended for developer comparison between traversal
-strategies; they are not a stable machine-readable contract.
-
-Top-level reachable-set walks use `dag.reachable`. In normal commit extraction, reachable walks are
-usually part of a larger `dag.traversal` operation and are summarized there instead.
-
-For `runtime.gitAdapter: "git-cli"`, commit traversal uses `git.cli.rev_list` and
-`git.cli.cat_file_batch`. File-level extraction additionally records `git.cli.diff_tree` for raw
-change discovery and one `git.cli.file_blob_batch` span for the repository-scoped persistent blob
-session. Its `objects_read` and `blob_bytes` counters describe completed blob responses.
-
-Long-lived async-iterator and process spans measure wall-clock lifetime, including time suspended
-while downstream consumers work. For example, `git.cli.file_blob_batch` is not exclusive Git CPU
-time, and `git.file_blob_changes` can remain open while its consumer computes a line diff. Do not
-sum nested span totals as if they were disjoint. Use `git.blob_read`, `line_diff.compute`, and
-`git.cli.diff_tree` for the narrower work categories.
-
-For cross-adapter benchmarks, keep the repository snapshot and extraction request identical and
-compare final counts rather than JSONL line ordering. See
-[`design/git-adapters.md`](design/git-adapters.md) for adapter-specific benchmarking guidance.
-
-## File-Level Extraction
-
-In commit-granularity mode, file-expansion spans such as `git.blob_read` and `line_diff.compute` do not
-appear because `getFileBlobChanges()` is never called.
-
-In file-level mode (`--per-file`), these spans can help separate Git blob-read cost from diff-stat
-cost. `gitlode.file_change_expansion` records `changes` for processed adapter changes, `diffs` for
-valid calculations after the guards, `skipped_size` for the maximum-size guard, and
-`skipped_binary` for the binary heuristic. The default production calculator records
-`line_diff.compute`; the `LineDiffCalculator` contract does not require alternate or test
-implementations to create that span. Adapter-level `git.file_blob_changes` records yielded A/M/D
-facts and blob bytes. The
-`skipped_diffs` counter on `gitlode.extract` reports how many file-level diffs were emitted with
-`null` additions/deletions due to either binary content or the `--max-diff-size` guardrail.
+The terminal formatting is intended for human diagnosis and is not a machine-readable compatibility
+contract. Consumers requiring a protocol should use the structured `ProfileReport` at the worker
+boundary rather than parsing CLI spacing or punctuation.

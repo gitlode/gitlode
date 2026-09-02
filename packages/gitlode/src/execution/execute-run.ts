@@ -18,6 +18,7 @@ import {
   type JsLineDiffCalculatorDependencies,
 } from "@gitlode/line-diff-adapters";
 import {
+  ROOT_CONTEXT,
   context,
   SpanStatusCode,
   trace,
@@ -86,6 +87,7 @@ async function finishUserError(runSpan: Span, message: string): Promise<WorkerRu
 }
 
 interface WorkerExecutionTelemetry {
+  readonly rootSpan?: Span;
   readonly executionTracer: Tracer;
   readonly extractionTracer: Tracer;
   readonly extractionMeter: Meter;
@@ -105,6 +107,7 @@ function createDefaultWorkerExecutionTelemetry(
 ): WorkerExecutionTelemetry {
   const gitTracer = session.getTracer("gitlode.git");
   return {
+    rootSpan: session.rootSpan,
     executionTracer: session.getTracer("gitlode.execution"),
     extractionTracer: session.getTracer("gitlode.extraction"),
     extractionMeter: session.getMeter("gitlode.extraction"),
@@ -171,22 +174,31 @@ export async function executeWorkerRunRequest(
   telemetry?: WorkerExecutionTelemetry,
 ): Promise<WorkerRunResult> {
   const { input, priorCheckpoint } = request;
-  const session = await WorkerTelemetrySession.create(input.profile);
+  const session = telemetry ? undefined : await WorkerTelemetrySession.create(input.profile);
   const activeTelemetry =
-    telemetry ?? createDefaultWorkerExecutionTelemetry(input.gitAdapter, session);
+    telemetry ??
+    createDefaultWorkerExecutionTelemetry(
+      input.gitAdapter,
+      session ??
+        (() => {
+          throw new Error("Telemetry session was not created.");
+        })(),
+    );
   const { executionTracer, extractionTracer, extractionMeter, rootContext } = activeTelemetry;
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
   const resolvedRepoPath: AbsolutePath = input.repositoryPath;
-  const runSpan = session.rootSpan;
+  const runSpan =
+    activeTelemetry.rootSpan ??
+    activeTelemetry.executionTracer.startSpan("gitlode.run", { root: true }, ROOT_CONTEXT);
   runSpan.setAttributes({
     "gitlode.extraction.granularity": input.granularity,
     "gitlode.git.adapter": input.gitAdapter,
     "gitlode.extraction.range.kind": input.range?.type ?? "none",
   });
 
-  const applicationResult = await (async (): Promise<WorkerRunResult> => {
+  const applicationWork = async (): Promise<WorkerRunResult> => {
     try {
       const gitAdapterResult = await buildGitAdapter(
         input.gitAdapter,
@@ -202,7 +214,7 @@ export async function executeWorkerRunRequest(
         return await finishUserError(runSpan, gitAdapterResult.message);
       }
       if (gitAdapterResult.gitVersion !== undefined) {
-        runSpan.setAttribute("git.cli.version", gitAdapterResult.gitVersion);
+        runSpan.setAttribute("gitlode.git.cli.version", gitAdapterResult.gitVersion);
       }
       await using gitAdapter = gitAdapterResult.adapter;
 
@@ -377,15 +389,21 @@ export async function executeWorkerRunRequest(
         return await finishUserError(runSpan, error.message);
       }
       runSpan.setAttribute("gitlode.run.result", "runtime_error");
-      runSpan.setStatus({ code: SpanStatusCode.ERROR });
       recordSpanError(runSpan, error);
+      if (telemetry) {
+        runSpan.end();
+        throw error;
+      }
       return {
         kind: "runtime-error",
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       };
     }
-  })();
+  };
+  const applicationResult = await (session
+    ? session.runInRootContext(applicationWork)
+    : applicationWork());
 
   if (applicationResult.kind === "success") {
     runSpan.setAttributes({
@@ -395,6 +413,10 @@ export async function executeWorkerRunRequest(
       "gitlode.output.file.count": applicationResult.success.filesCreated,
       "gitlode.output.size": applicationResult.success.bytesWritten,
     });
+  }
+  if (!session) {
+    runSpan.end();
+    return applicationResult;
   }
   const finalized = await session.finalize(applicationResult);
   if (finalized.initializationWarning) {

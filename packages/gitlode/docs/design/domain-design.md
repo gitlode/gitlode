@@ -514,7 +514,7 @@ The accepted post-migration production package dependency envelope is:
   worker-side local profiling.
 
 This envelope describes the accepted telemetry target. Until the migration is complete, package
-manifests may still reflect the current custom instrumentation implementation. A workspace that
+manifests reflect the implemented OpenTelemetry composition. A workspace that
 directly imports `@opentelemetry/api` must declare it directly; transitive reachability is not
 sufficient. OpenTelemetry SDK packages must not become dependencies of private foundation,
 contract, or adapter packages.

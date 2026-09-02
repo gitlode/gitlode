@@ -356,10 +356,10 @@ gitlode [options] <repository-path>
 
 ### Control
 
-| Parameter   | Alias | Type    | Default | Description                                                                                          |
-| ----------- | ----- | ------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.        |
-| `--profile` |       | boolean | `false` | Print per-stage timing information to stderr after a successful extraction. Suppressed by `--quiet`. |
+| Parameter   | Alias | Type    | Default | Description                                                                                                  |
+| ----------- | ----- | ------- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.                |
+| `--profile` |       | boolean | `false` | Collect and display a local signal-separated profile after a successful extraction. Suppressed by `--quiet`. |
 
 ### Configuration File
 
@@ -392,7 +392,7 @@ Conflict rule:
 
 ### Profiling
 
-`--profile` appends a local timing and diagnostic summary to stderr after a successful run:
+`--profile` appends a local signal-separated diagnostic profile to stderr after a successful run:
 
 ```bash
 gitlode --profile -r main ./my-repo

@@ -359,7 +359,7 @@ async function createSession(
     const degraded = createDegradedProviders();
     return new WorkerTelemetrySession({
       ...degraded,
-      rootContext: ROOT_CONTEXT,
+      rootContext: trace.setSpan(ROOT_CONTEXT, degraded.rootSpan),
       hooks,
     });
   }
@@ -435,7 +435,7 @@ async function createSession(
     const degraded = createDegradedProviders();
     return new WorkerTelemetrySession({
       ...degraded,
-      rootContext: ROOT_CONTEXT,
+      rootContext: trace.setSpan(ROOT_CONTEXT, degraded.rootSpan),
       initializationWarning: {
         code: "telemetry_initialization_failed",
         message: null,

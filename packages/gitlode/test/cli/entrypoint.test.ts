@@ -100,7 +100,6 @@ function mockEntrypointModules(
         elapsedMs: 10,
         refs: ["main"],
         profileReport: undefined,
-        skippedDiffs: 0,
       },
     }));
   const executeRunMock = vi.fn(async (..._args: unknown[]) => {
@@ -322,7 +321,6 @@ describe("CLI entrypoint orchestration", () => {
           elapsedMs: 10,
           refs: ["main"],
           profileReport: undefined,
-          skippedDiffs: 0,
         },
       })),
     });
@@ -352,7 +350,6 @@ describe("CLI entrypoint orchestration", () => {
           elapsedMs: 10,
           refs: ["main"],
           profileReport: undefined,
-          skippedDiffs: 0,
         },
       }),
     );

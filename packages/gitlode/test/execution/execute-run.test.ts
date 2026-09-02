@@ -340,6 +340,7 @@ describe("executeWorkerRunRequest profiling", () => {
     if (result.kind !== "success") return;
 
     expect(telemetryTracer.starts.map(({ name }) => name)).toEqual([
+      "gitlode.run",
       "gitlode.repository.access.validate",
       "gitlode.repository.object_format.resolve",
       "gitlode.state.validate",
@@ -352,27 +353,27 @@ describe("executeWorkerRunRequest profiling", () => {
       "gitlode.output.close",
     ]);
     expect(telemetryTracer.starts.every(({ span }) => span.endCount === 1)).toBe(true);
-    expect(telemetryTracer.starts.some(({ name }) => name === "gitlode.run")).toBe(false);
-    for (const start of telemetryTracer.starts.slice(0, 5)) {
+    expect(telemetryTracer.starts.some(({ name }) => name === "gitlode.run")).toBe(true);
+    for (const start of telemetryTracer.starts.slice(1, 6)) {
       expect(start.parent).toBe(ROOT_CONTEXT);
       expect(start.span.statuses).toEqual([]);
       expect(start.span.exceptions).toHaveLength(0);
     }
-    expect(telemetryTracer.starts[1]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[2]!.span.attributes).toMatchObject({
       "gitlode.git.object_format": "sha1",
     });
-    expect(telemetryTracer.starts[2]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[3]!.span.attributes).toMatchObject({
       "gitlode.ref.prior.count": 0,
     });
-    expect(telemetryTracer.starts[3]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[4]!.span.attributes).toMatchObject({
       "gitlode.repository.name.source": "path",
       "gitlode.repository.url.source": "missing",
     });
-    expect(telemetryTracer.starts[4]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[5]!.span.attributes).toMatchObject({
       "gitlode.extraction.range.kind": "none",
     });
     const serializedAttributes = JSON.stringify(
-      telemetryTracer.starts.slice(0, 5).map(({ span }) => span.attributes),
+      telemetryTracer.starts.slice(1, 6).map(({ span }) => span.attributes),
     );
     expect(serializedAttributes).not.toContain("gitlode-execution");
     expect(serializedAttributes).not.toContain("fixture-repository");
@@ -388,10 +389,8 @@ describe("executeWorkerRunRequest profiling", () => {
     }
     expect(telemetryTracer.starts.filter(({ name }) => name.includes("write")).length).toBe(0);
 
-    const runEntry = result.success.profileReport?.spans.find(
-      (entry) => entry.name === "gitlode.run",
-    );
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
+    const runSpan = telemetryTracer.starts.find(({ name }) => name === "gitlode.run")?.span;
+    expect(runSpan?.attributes["gitlode.git.adapter"]).toBe("isomorphic-git");
   });
 
   it("writes file-level records with the git-cli adapter selected", async () => {
@@ -467,7 +466,9 @@ describe("executeWorkerRunRequest profiling", () => {
     const runEntry = result.success.profileReport?.spans.find(
       (entry) => entry.name === "gitlode.run",
     );
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.adapter")?.value,
+    ).toBe("git-cli");
   });
 
   it.each([false, true])(
@@ -626,8 +627,12 @@ describe("executeWorkerRunRequest profiling", () => {
     const runEntry = result.success.profileReport?.spans.find(
       (entry) => entry.name === "gitlode.run",
     );
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
-    expect(runEntry?.attributes?.["git.cli.version"]?.[0]).toMatch(/^git version /);
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.adapter")?.value,
+    ).toBe("git-cli");
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.cli.version")?.value,
+    ).toMatch(/^git version /);
   });
 });
 
@@ -787,7 +792,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       [],
     );
     expect(metricRecorder.calls).toEqual([]);
-    expect(JSON.stringify(telemetryTracer.starts)).not.toContain("exception");
+    expect(telemetryTracer.starts.flatMap(({ span }) => span.exceptions)).toEqual([]);
   });
 
   it("records the ignored invalid environment on the actual Git CLI owner", async () => {
@@ -845,7 +850,9 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     const runEntry = result.success.profileReport?.spans.find(
       (entry) => entry.name === "gitlode.run",
     );
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.adapter")?.value,
+    ).toBe("git-cli");
   });
 
   it("records typed setup failures without exception events", async () => {
@@ -868,17 +875,18 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
 
     expect(result.kind).toBe("user-error");
     expect(telemetryTracer.starts.map(({ name }) => name)).toEqual([
+      "gitlode.run",
       "gitlode.repository.access.validate",
       "gitlode.repository.object_format.resolve",
       "gitlode.state.validate",
       "gitlode.repository.metadata.resolve",
       "gitlode.extraction.range.resolve",
     ]);
-    const rangeSpan = telemetryTracer.starts[4]!.span;
+    const rangeSpan = telemetryTracer.starts[5]!.span;
     expect(rangeSpan.statuses).toEqual([{ code: 2 }]);
     expect(rangeSpan.exceptions).toHaveLength(0);
     expect(rangeSpan.endCount).toBe(1);
-    expect(telemetryTracer.starts.slice(0, 4).every(({ span }) => span.statuses.length === 0)).toBe(
+    expect(telemetryTracer.starts.slice(1, 5).every(({ span }) => span.statuses.length === 0)).toBe(
       true,
     );
   });

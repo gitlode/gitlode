@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { renderSuccessReport } from "../../src/presentation/success-report.js";
 
+const profileReport = {
+  schemaVersion: 1 as const,
+  signalStatus: {
+    spans: "complete" as const,
+    counters: "complete" as const,
+    histograms: "complete" as const,
+  },
+  spans: [],
+  counters: [],
+  histograms: [],
+  diagnostics: [],
+};
+
 function makePresenter() {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   return {
@@ -31,7 +44,6 @@ describe("renderSuccessReport", () => {
         elapsedMs: 1,
         refs: ["main"],
         profileReport: undefined,
-        skippedDiffs: 0,
       },
     });
 
@@ -53,7 +65,6 @@ describe("renderSuccessReport", () => {
         elapsedMs: 6,
         refs: ["main"],
         profileReport: undefined,
-        skippedDiffs: 0,
       },
     });
 
@@ -74,8 +85,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 5,
         elapsedMs: 6,
         refs: ["main"],
-        profileReport: undefined,
-        skippedDiffs: 2,
+        profileReport,
       },
     });
 

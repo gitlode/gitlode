@@ -8,6 +8,11 @@ import type {
 
 import { formatCount, formatElapsed, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
+import {
+  profileMetricViewEntry,
+  profileViewEntry,
+  PROFILE_VIEW_DIAGNOSTIC_LABELS,
+} from "./profile-view.js";
 import type { SummaryData } from "./types.js";
 
 export function formatSummaryLines(data: SummaryData, styling: Styling = plainStyling): string[] {
@@ -17,15 +22,13 @@ export function formatSummaryLines(data: SummaryData, styling: Styling = plainSt
     ["Records written", formatCount(data.recordsWritten)],
     ["Commits traversed", formatCount(data.commitsTraversed)],
     ["Files created", formatCount(data.filesCreated)],
-    ["Bytes written", `${bytes.value}${bytes.unit}`],
-    ["Elapsed time", `${elapsed.value}${elapsed.unit}`],
-    ["Refs", data.refs.join(", ") || "(none)"],
+    ["Bytes written", styling.primaryValue(bytes.value) + styling.unitSuffix(bytes.unit)],
+    ["Elapsed time", styling.primaryValue(elapsed.value) + styling.unitSuffix(elapsed.unit)],
+    ["Refs", styling.refsValue(data.refs.join(", ") || "(none)")],
   ];
   return [
     styling.summaryHeader("Extraction complete"),
-    ...fields.map(
-      ([label, value]) => `  ${styling.fieldKey(label.padEnd(18))}: ${styling.primaryValue(value)}`,
-    ),
+    ...fields.map(([label, value]) => `  ${styling.fieldKey(label.padEnd(18))}: ${value}`),
   ];
 }
 
@@ -39,20 +42,12 @@ export function formatProfileLines(
   );
   if (incomplete.length)
     lines.push(`  Status: ${incomplete.map((s) => `${s}=${report.signalStatus[s]}`).join(", ")}`);
-  append(lines, "Spans", report.signalStatus.spans, report.spans.map(formatSpan));
-  append(
-    lines,
-    "Counters",
-    report.signalStatus.counters,
-    report.counters.map((p) =>
-      metric(`${scope(p.scope)} / ${p.name}`, p.value, p.unit, p.attributes),
-    ),
+  appendSpans(lines, report.signalStatus.spans, report.spans);
+  appendMetrics(lines, "Counters", report.signalStatus.counters, report.counters, (p) =>
+    metric(`${scope(p.scope)} / ${metricLabel(p.name)}`, p.value, p.unit, p.attributes),
   );
-  append(
-    lines,
-    "Histograms",
-    report.signalStatus.histograms,
-    report.histograms.map(formatHistogram),
+  appendMetrics(lines, "Histograms", report.signalStatus.histograms, report.histograms, (p) =>
+    formatHistogram(p, metricLabel(p.name)),
   );
   if (report.diagnostics.length) {
     lines.push("  Diagnostics");
@@ -61,10 +56,51 @@ export function formatProfileLines(
   return lines.length === 1 ? [] : lines;
 }
 
-function append(lines: string[], title: string, status: string, rows: string[]): void {
-  if (status === "complete" && !rows.length) return;
+function appendMetrics<T extends { name: string }>(
+  lines: string[],
+  title: string,
+  status: string,
+  points: readonly T[],
+  format: (point: T) => string,
+): void {
+  if (status === "complete" && points.length === 0) return;
   lines.push(`  ${title}${status === "complete" ? "" : ` (${status})`}`);
-  lines.push(...(rows.length ? rows.map((r) => `    ${r}`) : ["    (no observations)"]));
+  const groups = new Map<string, { order: number; rows: string[] }>();
+  for (const point of points) {
+    const view = profileMetricViewEntry(profileRef(point.name));
+    const group = view?.group ?? "Other metrics";
+    const value = groups.get(group) ?? { order: view?.order ?? Number.MAX_SAFE_INTEGER, rows: [] };
+    value.rows.push(format(point));
+    groups.set(group, value);
+  }
+  for (const [group, value] of [...groups.entries()].sort((a, b) => a[1].order - b[1].order)) {
+    lines.push(`    ${group}`);
+    lines.push(...value.rows.map((row) => `      ${row}`));
+  }
+  if (points.length === 0) lines.push("    (no observations)");
+}
+
+function appendSpans(
+  lines: string[],
+  status: string,
+  spans: readonly ProfileSpanAggregate[],
+): void {
+  if (status === "complete" && spans.length === 0) return;
+  lines.push(`  Spans${status === "complete" ? "" : ` (${status})`}`);
+  const groups = new Map<string, { order: number; rows: string[] }>();
+  for (const span of spans) {
+    const view = PROFILE_VIEW_ENTRIES_BY_NAME(span.name);
+    const group = view?.group ?? "Other spans";
+    const order = view?.order ?? Number.MAX_SAFE_INTEGER;
+    const value = groups.get(group) ?? { order, rows: [] };
+    value.rows.push(formatSpan(span));
+    groups.set(group, value);
+  }
+  for (const [group, value] of [...groups.entries()].sort((a, b) => a[1].order - b[1].order)) {
+    lines.push(`    ${group}`);
+    for (const row of value.rows) lines.push(`      ${row}`);
+  }
+  if (spans.length === 0) lines.push("    (no observations)");
 }
 function scope(s: { name: string; version: string | null }): string {
   return s.version === null ? s.name : `${s.name}@${s.version}`;
@@ -72,7 +108,9 @@ function scope(s: { name: string; version: string | null }): string {
 function formatSpan(s: ProfileSpanAggregate): string {
   const avg = s.callCount ? s.totalDurationSeconds / s.callCount : 0;
   const attrs = s.attributes.map((a) => `${a.key}=${spanValue(a)}`).join(", ");
-  return `${scope(s.scope)} / ${s.name}: total=${unit(s.totalDurationSeconds, "s")}, calls=${formatCount(s.callCount)}, avg=${unit(avg, "s")}, max=${unit(s.maxDurationSeconds, "s")}, errors=${formatCount(s.errorCount)}${attrs ? `, ${attrs}` : ""}`;
+  const view = PROFILE_VIEW_ENTRIES_BY_NAME(s.name);
+  const label = view?.label ?? s.name;
+  return `${scope(s.scope)} / ${label}: total=${unit(s.totalDurationSeconds, "s")}, calls=${formatCount(s.callCount)}, avg=${unit(avg, "s")}, max=${unit(s.maxDurationSeconds, "s")}, errors=${formatCount(s.errorCount)}${attrs ? `, ${attrs}` : ""}`;
 }
 function metric(
   name: string,
@@ -82,12 +120,23 @@ function metric(
 ): string {
   return `${name}: ${unit(value, unitName)}${attrs.length ? `, ${attrs.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
 }
-function formatHistogram(p: ProfileHistogramPoint): string {
+function formatHistogram(p: ProfileHistogramPoint, label = p.name): string {
   const avg = p.count ? p.sum / p.count : 0;
-  return `${scope(p.scope)} / ${p.name}: count=${formatCount(p.count)}, total=${unit(p.sum, p.unit)}, avg=${unit(avg, p.unit)}, min=${p.minimum === null ? "—" : unit(p.minimum, p.unit)}, max=${p.maximum === null ? "—" : unit(p.maximum, p.unit)}${p.attributes.length ? `, ${p.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
+  return `${scope(p.scope)} / ${label}: count=${formatCount(p.count)}, total=${unit(p.sum, p.unit)}, avg=${unit(avg, p.unit)}, min=${p.minimum === null ? "—" : unit(p.minimum, p.unit)}, max=${p.maximum === null ? "—" : unit(p.maximum, p.unit)}${p.attributes.length ? `, ${p.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
 }
 function diagnostic(d: ProfileDiagnostic): string {
-  return `${d.severity} ${d.signal}/${d.stage}: ${d.code}${d.count > 1 ? ` x${d.count}` : ""}${d.message ? ` (${d.message})` : ""}`;
+  const label = PROFILE_VIEW_DIAGNOSTIC_LABELS[d.code] ?? d.code;
+  return `${d.severity} ${d.signal}/${d.stage}: ${label}${d.count > 1 ? ` x${d.count}` : ""}${d.message ? ` (${d.message})` : ""}`;
+}
+
+function PROFILE_VIEW_ENTRIES_BY_NAME(name: string) {
+  return profileViewEntry(profileRef(name));
+}
+function metricLabel(name: string): string {
+  return profileMetricViewEntry(profileRef(name))?.label ?? name;
+}
+function profileRef(name: string): string {
+  return name.replace(/^gitlode\./, "").replaceAll(".", "_");
 }
 function spanValue(a: ProfileSpanAggregate["attributes"][number]): string {
   if (a.reducer === "single")

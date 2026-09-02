@@ -9,10 +9,6 @@ export function formatCount(n: number): string {
 }
 
 // Format a millisecond timing value with thousands separators and fixed 2 decimal places.
-export function formatMs(ms: number): string {
-  return ms.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 export function humanizeBytes(bytes: number): MeasuredValue {
   if (bytes < 1024) return { value: String(bytes), unit: "B" };
   if (bytes < 1024 * 1024) return { value: (bytes / 1024).toFixed(1), unit: "KB" };

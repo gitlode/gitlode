@@ -44,7 +44,10 @@ function file(content: string, name = "baseline-20240203T040506000Z-000001.jsonl
 
 function artifacts(overrides: Partial<BehavioralArtifacts> = {}): BehavioralArtifacts {
   return {
-    result: { kind: "success", success: { recordsWritten: 1, elapsedMs: 1, profileEntries: [] } },
+    result: {
+      kind: "success",
+      success: { recordsWritten: 1, elapsedMs: 1, profileReport: undefined },
+    },
     checkpoint: { repositoryPath: "/tmp/repo", refs: [{ ref: "main", tipOid: "a" }] },
     jsonl: [file('{"oid":"a"}\n')],
     ...overrides,
@@ -81,7 +84,7 @@ describe("deterministic telemetry behavioral baseline support", () => {
             success: {
               recordsWritten: 1,
               elapsedMs: profile ? 99 : 1,
-              profileEntries: profile ? [{ name: "legacy" }] : [],
+              profileReport: undefined,
             },
           },
         }),
@@ -90,7 +93,12 @@ describe("deterministic telemetry behavioral baseline support", () => {
     const changed = artifacts({
       result: {
         kind: "success",
-        success: { recordsWritten: 1, elapsedMs: 1, profileEntries: [], diagnostics: ["changed"] },
+        success: {
+          recordsWritten: 1,
+          elapsedMs: 1,
+          profileReport: undefined,
+          diagnostics: ["changed"],
+        },
       },
     });
     expect(compareBehavioralArtifacts(artifacts(), changed)).toContain(
@@ -110,7 +118,7 @@ describe("deterministic telemetry behavioral baseline support", () => {
     const correct = artifacts({
       result: {
         kind: "success",
-        success: { recordsWritten: 1, elapsedMs: 1, profileEntries: [] },
+        success: { recordsWritten: 1, elapsedMs: 1, profileReport: undefined },
         checkpoint: { repositoryPath: "/fixture", refs: [] },
       },
       checkpoint: { repositoryPath: "/fixture", refs: [] },
@@ -118,7 +126,7 @@ describe("deterministic telemetry behavioral baseline support", () => {
     const wrong = artifacts({
       result: {
         kind: "success",
-        success: { recordsWritten: 1, elapsedMs: 2, profileEntries: [] },
+        success: { recordsWritten: 1, elapsedMs: 2, profileReport: undefined },
         checkpoint: { repositoryPath: "/wrong", refs: [] },
       },
       checkpoint: { repositoryPath: "/wrong", refs: [] },
@@ -135,7 +143,12 @@ describe("deterministic telemetry behavioral baseline support", () => {
     const left = artifacts({
       result: {
         kind: "success",
-        success: { recordsWritten: 1, refs: ["main", "topic"], elapsedMs: 1, profileEntries: [] },
+        success: {
+          recordsWritten: 1,
+          refs: ["main", "topic"],
+          elapsedMs: 1,
+          profileReport: undefined,
+        },
       },
       checkpoint: {
         repositoryPath: "/fixture",
@@ -145,7 +158,12 @@ describe("deterministic telemetry behavioral baseline support", () => {
     });
     const reordered = artifacts({
       result: {
-        success: { profileEntries: [], elapsedMs: 2, refs: ["main", "topic"], recordsWritten: 1 },
+        success: {
+          profileReport: undefined,
+          elapsedMs: 2,
+          refs: ["main", "topic"],
+          recordsWritten: 1,
+        },
         kind: "success",
       },
       checkpoint: {
@@ -159,7 +177,12 @@ describe("deterministic telemetry behavioral baseline support", () => {
       ...reordered,
       result: {
         kind: "success",
-        success: { recordsWritten: 1, refs: ["topic", "main"], elapsedMs: 2, profileEntries: [] },
+        success: {
+          recordsWritten: 1,
+          refs: ["topic", "main"],
+          elapsedMs: 2,
+          profileReport: undefined,
+        },
       },
     });
     expect(compareBehavioralArtifacts(left, changedArray, "same-adapter", "/fixture")).toContain(
@@ -333,12 +356,15 @@ describe("frozen migration-before legacy behavioral baselines", () => {
   it("rejects identical drift applied to both profile modes against the frozen baseline", () => {
     const original = frozenBehavioralBaseline(artifacts(), "/tmp/repo");
     const driftedOff = artifacts({
-      result: { kind: "success", success: { recordsWritten: 2, elapsedMs: 1, profileEntries: [] } },
+      result: {
+        kind: "success",
+        success: { recordsWritten: 2, elapsedMs: 1, profileReport: undefined },
+      },
     });
     const driftedOn = artifacts({
       result: {
         kind: "success",
-        success: { recordsWritten: 2, elapsedMs: 2, profileEntries: [{ name: "profile" }] },
+        success: { recordsWritten: 2, elapsedMs: 2, profileReport: undefined },
       },
     });
     expect(compareBehavioralArtifacts(driftedOff, driftedOn, "same-adapter", "/tmp/repo")).toEqual(

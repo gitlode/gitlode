@@ -1,111 +1,305 @@
+import { compareProfileScopes } from "@gitlode/internal-contracts/telemetry";
 import type {
-  InstrumentAttributeValue,
-  ProfileSummaryEntry,
-} from "@gitlode/internal-foundation/instrumentation";
-import { firstOrThrow } from "@gitlode/internal-foundation/support";
+  ProfileAttribute,
+  ProfileDiagnostic,
+  ProfileHistogramPoint,
+  ProfileReport,
+  ProfileSpanAggregate,
+} from "@gitlode/internal-contracts/telemetry";
 
-import { formatCount, formatElapsed, formatMs, humanizeBytes } from "../format-utils.js";
+import { formatCount, formatElapsed, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
+import {
+  findProfileViewEntry,
+  isResolvedPluginScope,
+  PROFILE_PRESENTATION_POLICY,
+  PROFILE_VIEW_DIAGNOSTIC_LABELS,
+} from "./profile-view.js";
 import type { SummaryData } from "./types.js";
 
-export function formatSummaryLines(data: SummaryData, styling: Styling = plainStyling): string[] {
-  const header = styling.summaryHeader("Extraction complete");
-  const { value: bytesVal, unit: bytesUnit } = humanizeBytes(data.bytesWritten);
-  const bytesStr = styling.primaryValue(bytesVal) + styling.unitSuffix(bytesUnit);
-  const { value: elapsedVal, unit: elapsedUnit } = formatElapsed(data.elapsedMs);
-  const elapsedStr = styling.primaryValue(elapsedVal) + styling.unitSuffix(elapsedUnit);
-  const refsStr = styling.refsValue(data.refs.join(", ") || "(none)");
+type GroupBucket = {
+  group: string;
+  subgroup: string;
+  scope?: { name: string; version: string | null };
+  order: number;
+  rows: Array<{
+    order: number;
+    key: string;
+    text: string;
+    scope: { name: string; version: string | null };
+    name: string;
+  }>;
+};
 
+export function formatSummaryLines(data: SummaryData, styling: Styling = plainStyling): string[] {
+  const bytes = humanizeBytes(data.bytesWritten);
+  const elapsed = formatElapsed(data.elapsedMs);
   const fields: Array<[string, string]> = [
     ["Records written", styling.primaryValue(formatCount(data.recordsWritten))],
     ["Commits traversed", styling.primaryValue(formatCount(data.commitsTraversed))],
     ["Files created", styling.primaryValue(formatCount(data.filesCreated))],
-    ["Bytes written", bytesStr],
-    ["Elapsed time", elapsedStr],
-    ["Refs", refsStr],
+    ["Bytes written", styling.primaryValue(bytes.value) + styling.unitSuffix(bytes.unit)],
+    ["Elapsed time", styling.primaryValue(elapsed.value) + styling.unitSuffix(elapsed.unit)],
+    ["Refs", styling.refsValue(data.refs.join(", ") || "(none)")],
   ];
-  const lines: string[] = [header];
-  for (const [label, value] of fields) {
-    lines.push(`  ${styling.fieldKey(label.padEnd(18))}: ${value}`);
-  }
-  return lines;
+  return [
+    styling.summaryHeader("Extraction complete"),
+    ...fields.map(([label, value]) => `  ${styling.fieldKey(label.padEnd(18))}: ${value}`),
+  ];
 }
 
 export function formatProfileLines(
-  entries: readonly ProfileSummaryEntry[],
-  _skippedDiffs?: number,
+  report: ProfileReport,
   styling: Styling = plainStyling,
 ): string[] {
-  if (entries.length === 0) return [];
-  const nameWidth = Math.max(...entries.map((e) => e.name.length));
-  const timeUnit = "ms";
-  const totalWidth = Math.max(...entries.map((e) => formatMs(e.totalMs).length), "total".length);
-  const callsWidth = Math.max(...entries.map((e) => formatCount(e.calls).length), "calls".length);
-  const averageWidth = Math.max(...entries.map((e) => formatMs(e.averageMs).length), "avg".length);
-  const maxWidth = Math.max(...entries.map((e) => formatMs(e.maxMs).length), "max".length);
-  const header =
-    `  ${styling.fieldKey("span".padEnd(nameWidth))} : ` +
-    `${styling.fieldKey("total".padStart(totalWidth + timeUnit.length))}  ` +
-    `${styling.fieldKey("calls".padStart(callsWidth))}  ` +
-    `${styling.fieldKey("avg".padStart(averageWidth + timeUnit.length))}  ` +
-    `${styling.fieldKey("max".padStart(maxWidth + timeUnit.length))}` +
-    (entries.some((e) => formatProfileDetails(e) !== "") ? `  ${styling.fieldKey("details")}` : "");
-  const lines = [
-    styling.summaryHeader("Profile"),
-    header,
-    ...entries.map((e) => {
-      const label = styling.fieldKey(e.name.padEnd(nameWidth));
-      const total =
-        styling.primaryValue(formatMs(e.totalMs).padStart(totalWidth)) +
-        styling.unitSuffix(timeUnit);
-      const calls = styling.primaryValue(formatCount(e.calls).padStart(callsWidth));
-      const average =
-        styling.primaryValue(formatMs(e.averageMs).padStart(averageWidth)) +
-        styling.unitSuffix(timeUnit);
-      const max =
-        styling.primaryValue(formatMs(e.maxMs).padStart(maxWidth)) + styling.unitSuffix(timeUnit);
-      const details = formatProfileDetails(e);
-      return (
-        `  ${label} : ${total}  ${calls}  ${average}  ${max}` +
-        (details === "" ? "" : `  ${details}`)
-      );
-    }),
-  ];
-  return lines;
-}
-
-function formatProfileDetails(entry: ProfileSummaryEntry): string {
-  const details: string[] = [];
-
-  for (const [key, values] of Object.entries(entry.attributes ?? {}).sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    details.push(formatAttributeDetail(key, values));
+  const incomplete = (["spans", "counters", "histograms"] as const).filter(
+    (signal) => report.signalStatus[signal] !== "complete",
+  );
+  const lines = [styling.summaryHeader("Profile")];
+  if (incomplete.length)
+    lines.push(
+      `  Status: ${incomplete.map((signal) => `${signal}=${report.signalStatus[signal]}`).join(", ")}`,
+    );
+  appendSpans(lines, report.signalStatus.spans, report.spans);
+  appendMetrics(lines, "Counters", report.signalStatus.counters, report.counters, (point) => {
+    const view = findProfileViewEntry("metric", point.name, point.scope.name);
+    return metric(
+      view?.label ??
+        (isResolvedPluginScope(point.scope.name)
+          ? point.name
+          : `${displayScope(point.scope)} / ${point.name}`),
+      point.value,
+      point.unit,
+      point.attributes,
+    );
+  });
+  appendMetrics(lines, "Histograms", report.signalStatus.histograms, report.histograms, (point) => {
+    const view = findProfileViewEntry("metric", point.name, point.scope.name);
+    return histogram(
+      point,
+      view?.label ??
+        (isResolvedPluginScope(point.scope.name)
+          ? point.name
+          : `${displayScope(point.scope)} / ${point.name}`),
+    );
+  });
+  if (report.diagnostics.length || incomplete.length) {
+    lines.push("  Diagnostics");
+    if (report.diagnostics.length)
+      for (const item of report.diagnostics) lines.push(`    ${diagnostic(item)}`);
+    else lines.push("    (none)");
   }
+  return lines.length === 1 ? [] : lines;
+}
 
-  for (const [key, value] of Object.entries(entry.counters ?? {}).sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    details.push(`${key}=${formatCount(value)}`);
+function appendSpans(
+  lines: string[],
+  status: string,
+  spans: readonly ProfileSpanAggregate[],
+): void {
+  if (status === "complete" && !spans.length) return;
+  lines.push(`  Spans${status === "complete" ? "" : ` (${status})`}`);
+  if (status === PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.statusLabel) {
+    lines.push("    (no observations)");
+    return;
   }
-
-  if (entry.errors !== undefined) {
-    details.push(`errors=${formatCount(entry.errors)}`);
+  const groups = new Map<string, GroupBucket>();
+  for (const span of spans) {
+    const view = findProfileViewEntry("span", span.name, span.scope.name);
+    const plugin = isResolvedPluginScope(span.scope.name);
+    const group =
+      view?.group ??
+      (plugin
+        ? PROFILE_PRESENTATION_POLICY.plugin.outerGroup
+        : PROFILE_PRESENTATION_POLICY.fallback.spans.group);
+    const subgroup = plugin ? displayScope(span.scope) : group;
+    const key = `${displayScope(span.scope)}\0${span.name}`;
+    const bucket: GroupBucket = groups.get(`${group}\0${subgroup}`) ?? {
+      group,
+      subgroup,
+      scope: plugin ? span.scope : undefined,
+      order: view?.order ?? Number.MAX_SAFE_INTEGER,
+      rows: [],
+    };
+    bucket.rows.push({
+      order: view?.order ?? Number.MAX_SAFE_INTEGER,
+      key,
+      text: spanRow(span, view?.label, Boolean(view), plugin),
+      scope: span.scope,
+      name: span.name,
+    });
+    groups.set(`${group}\0${subgroup}`, bucket);
   }
-
-  return details.join(" ");
+  renderGroups(lines, groups);
+  if (!spans.length) lines.push("    (no observations)");
 }
 
-function formatAttributeDetail(key: string, values: readonly InstrumentAttributeValue[]): string {
-  if (values.length === 1 && firstOrThrow(values) === true) return key;
-  return `${key}=${formatAttributeValues(values)}`;
+function appendMetrics<T extends { name: string; scope: { name: string; version: string | null } }>(
+  lines: string[],
+  title: string,
+  status: string,
+  points: readonly T[],
+  format: (point: T) => string,
+): void {
+  if (status === "complete" && !points.length) return;
+  lines.push(`  ${title}${status === "complete" ? "" : ` (${status})`}`);
+  if (status === PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.statusLabel) {
+    lines.push("    (no observations)");
+    return;
+  }
+  const groups = new Map<string, GroupBucket>();
+  for (const point of points) {
+    const view = findProfileViewEntry("metric", point.name, point.scope.name);
+    const plugin = isResolvedPluginScope(point.scope.name);
+    const fallback =
+      title === "Counters"
+        ? PROFILE_PRESENTATION_POLICY.fallback.counters.group
+        : PROFILE_PRESENTATION_POLICY.fallback.histograms.group;
+    const group =
+      view?.group ?? (plugin ? PROFILE_PRESENTATION_POLICY.plugin.outerGroup : fallback);
+    const subgroup = plugin ? displayScope(point.scope) : group;
+    const key = `${displayScope(point.scope)}\0${point.name}\0${attributesKey((point as T & { attributes: readonly ProfileAttribute[] }).attributes)}`;
+    const bucket: GroupBucket = groups.get(`${group}\0${subgroup}`) ?? {
+      group,
+      subgroup,
+      scope: plugin ? point.scope : undefined,
+      order: view?.order ?? Number.MAX_SAFE_INTEGER,
+      rows: [],
+    };
+    bucket.rows.push({
+      order: view?.order ?? Number.MAX_SAFE_INTEGER,
+      key,
+      text: format(point),
+      scope: point.scope,
+      name: point.name,
+    });
+    groups.set(`${group}\0${subgroup}`, bucket);
+  }
+  renderGroups(lines, groups);
+  if (!points.length) lines.push("    (no observations)");
 }
 
-function formatAttributeValues(values: readonly InstrumentAttributeValue[]): string {
-  if (values.length === 1) return formatAttributeValue(firstOrThrow(values));
-  return `[${values.map(formatAttributeValue).join(",")}]`;
+function renderGroups(lines: string[], groups: Map<string, GroupBucket>): void {
+  let currentGroup: string | undefined;
+  for (const [, bucket] of [...groups].sort((a, b) => compareGroupKeys(a, b))) {
+    const { group, subgroup } = bucket;
+    if (group !== currentGroup) {
+      lines.push(`    ${group}`);
+      currentGroup = group;
+    }
+    if (subgroup !== group) lines.push(`      ${subgroup}`);
+    for (const row of bucket.rows.sort(
+      (a, b) =>
+        a.order - b.order ||
+        compareProfileScopes(a.scope, b.scope) ||
+        compareCodeUnits(a.name, b.name) ||
+        compareCodeUnits(a.key, b.key),
+    ))
+      lines.push(`      ${subgroup !== group ? "  " : ""}${row.text}`);
+  }
 }
 
-function formatAttributeValue(value: InstrumentAttributeValue): string {
-  return typeof value === "number" ? formatCount(value) : String(value);
+function compareGroupKeys(a: [string, GroupBucket], b: [string, GroupBucket]): number {
+  if (
+    a[1].group === PROFILE_PRESENTATION_POLICY.plugin.outerGroup &&
+    b[1].group === PROFILE_PRESENTATION_POLICY.plugin.outerGroup
+  ) {
+    return a[1].scope && b[1].scope
+      ? compareProfileScopes(a[1].scope, b[1].scope)
+      : compareCodeUnits(a[1].subgroup, b[1].subgroup);
+  }
+  return a[1].order - b[1].order || compareCodeUnits(a[0], b[0]);
+}
+
+function compareCodeUnits(a: string, b: string): number {
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index++) {
+    const difference = a.charCodeAt(index) - b.charCodeAt(index);
+    if (difference !== 0) return difference;
+  }
+  return a.length - b.length;
+}
+
+function displayScope(scope: { name: string; version?: string | null }): string {
+  return scope.version === null || scope.version === undefined
+    ? scope.name
+    : `${scope.name}@${scope.version}`;
+}
+function spanRow(
+  span: ProfileSpanAggregate,
+  label: string | undefined,
+  known: boolean,
+  plugin: boolean,
+): string {
+  const average = span.callCount ? span.totalDurationSeconds / span.callCount : 0;
+  const identity = known
+    ? label
+    : plugin
+      ? span.name
+      : `${displayScope(span.scope)} / ${span.name}`;
+  const attrs = span.attributes
+    .map((attribute) => attributeSummary(attribute, span.callCount))
+    .join(", ");
+  return `${identity}: total=${unit(span.totalDurationSeconds, "s")}, calls=${formatCount(span.callCount)}, avg=${unit(average, "s")}, max=${unit(span.maxDurationSeconds, "s")}, errors=${formatCount(span.errorCount)}${attrs ? `, ${attrs}` : ""}`;
+}
+function metric(
+  name: string,
+  value: number,
+  unitName: string,
+  attrs: readonly ProfileAttribute[],
+): string {
+  return `${name}: ${unit(value, unitName)}${attrs.length ? `, ${attrs.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
+}
+function histogram(point: ProfileHistogramPoint, label: string): string {
+  const average = point.count ? point.sum / point.count : 0;
+  return `${label}: count=${formatCount(point.count)}, total=${unit(point.sum, point.unit)}, avg=${unit(average, point.unit)}, min=${point.minimum === null ? "—" : unit(point.minimum, point.unit)}, max=${point.maximum === null ? "—" : unit(point.maximum, point.unit)}${point.attributes.length ? `, ${point.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
+}
+function attributeSummary(
+  attribute: ProfileSpanAggregate["attributes"][number],
+  callCount: number,
+): string {
+  const observed =
+    attribute.observedCount < callCount ? ` (observedCount=${attribute.observedCount})` : "";
+  if (attribute.reducer === "single")
+    return `${attribute.key}=${attribute.value}${observed}${attribute.conflictCount > 0 ? ` (conflicts=${attribute.conflictCount})` : ""}`;
+  if (attribute.reducer === "distinct")
+    return `${attribute.key}=${attribute.values.map((value) => `${value.value}(${value.count})`).join(",")}${attribute.overflowCount > 0 ? ` (overflow=${attribute.overflowCount})` : ""}`;
+  return `${attribute.key}=${attribute.minimum}…${attribute.maximum}${observed}`;
+}
+function diagnostic(item: ProfileDiagnostic): string {
+  const label = PROFILE_VIEW_DIAGNOSTIC_LABELS[item.code] ?? item.code;
+  return `${item.severity} ${item.signal}/${item.stage}: ${label}${item.count > 1 ? ` x${item.count}` : ""}${item.message ? ` (${item.message})` : ""}`;
+}
+function attributesKey(attributes: readonly ProfileAttribute[]): string {
+  return attributes.map((a) => `${a.key}=${String(a.value)}`).join("\0");
+}
+function unit(value: number, unitName: string): string {
+  if (unitName === "s") {
+    const n = Math.abs(value);
+    if (n && n < 1e-6) return `${(value * 1e9).toPrecision(4)} ns`;
+    if (n && n < 1e-3) return `${(value * 1e6).toPrecision(4)} µs`;
+    if (n && n < 1) return `${(value * 1e3).toPrecision(4)} ms`;
+  }
+  if (unitName === "By") {
+    const units = ["B", "KiB", "MiB", "GiB"];
+    let index = 0;
+    while (Math.abs(value) >= 1024 && index < 3) {
+      value /= 1024;
+      index++;
+    }
+    return `${Number(value.toPrecision(4))} ${units[index]}`;
+  }
+  const annotated: Record<string, string> = {
+    "{commit}": "commits",
+    "{record}": "records",
+    "{file}": "files",
+    "{object}": "objects",
+    "{change}": "changes",
+    "{node}": "nodes",
+    "{step}": "steps",
+    "{operation}": "operations",
+    "{expansion}": "expansions",
+    "{fallback}": "fallbacks",
+  };
+  return `${value} ${annotated[unitName] ?? unitName}`;
 }

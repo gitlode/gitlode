@@ -11,7 +11,6 @@ import {
   walkDagNodeIdsEagerExclude,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "@gitlode/internal-foundation/dag";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { OrderedQueue } from "@gitlode/internal-foundation/support";
 import * as git from "isomorphic-git";
 import { describe, expect, it } from "vitest";
@@ -41,7 +40,6 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of eagerExcludeStrategy(
         {
           graph: rawCommitTopologyPort(dag),
-          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -58,7 +56,6 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of certifiedLazyStrategy(
         {
           graph: rawCommitTopologyPort(dag),
-          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -75,7 +72,6 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of phaseCertifiedStrategy(
         {
           graph: rawCommitTopologyPort(dag),
-          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -213,7 +209,6 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
         walkDagReachableNodeIds(
           {
             graph: stringTopology({ left: ["root"], right: ["root"], root: [] }),
-            instrumentation: noopInstrumentation,
           },
           ["left", "right"],
         ),
@@ -226,12 +221,8 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
   it("yields deterministic order for identical input and topology", async () => {
     const graph = stringTopology({ left: ["root"], right: ["root"], root: [] });
 
-    const first = await collect(
-      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
-    );
-    const second = await collect(
-      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
-    );
+    const first = await collect(walkDagReachableNodeIds({ graph }, ["left", "right"]));
+    const second = await collect(walkDagReachableNodeIds({ graph }, ["left", "right"]));
 
     expect(first).toEqual(second);
   });
@@ -252,12 +243,7 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
     };
 
     const yielded = await collect(
-      walkDagNodeIdsEagerExclude(
-        { graph, instrumentation: noopInstrumentation },
-        "head",
-        undefined,
-        { createFrontier: () => frontier },
-      ),
+      walkDagNodeIdsEagerExclude({ graph }, "head", undefined, { createFrontier: () => frontier }),
     );
 
     expect(new Set(yielded)).toEqual(new Set(["head", "first", "second"]));
@@ -723,7 +709,6 @@ describe("DAG traversal eagerExclude read trace", () => {
     const commits = walkDagNodeIdsEagerExclude(
       {
         graph: rawCommitTopologyPort(dag, requests),
-        instrumentation: noopInstrumentation,
       },
       head,
       exclude,
@@ -828,7 +813,6 @@ describe("DAG traversal certifiedLazy read trace", () => {
     const commits = walkDagNodeIdsCertifiedLazy(
       {
         graph: rawCommitTopologyPort(dag, requests),
-        instrumentation: noopInstrumentation,
       },
       head,
       exclude,

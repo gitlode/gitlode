@@ -99,8 +99,7 @@ function mockEntrypointModules(
         bytesWritten: 100,
         elapsedMs: 10,
         refs: ["main"],
-        profileEntries: [],
-        skippedDiffs: 0,
+        profileReport: undefined,
       },
     }));
   const executeRunMock = vi.fn(async (..._args: unknown[]) => {
@@ -321,8 +320,7 @@ describe("CLI entrypoint orchestration", () => {
           bytesWritten: 100,
           elapsedMs: 10,
           refs: ["main"],
-          profileEntries: [],
-          skippedDiffs: 0,
+          profileReport: undefined,
         },
       })),
     });
@@ -351,8 +349,7 @@ describe("CLI entrypoint orchestration", () => {
           bytesWritten: 100,
           elapsedMs: 10,
           refs: ["main"],
-          profileEntries: [],
-          skippedDiffs: 0,
+          profileReport: undefined,
         },
       }),
     );

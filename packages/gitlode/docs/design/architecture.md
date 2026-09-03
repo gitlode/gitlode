@@ -210,15 +210,15 @@ line-diff port. Detailed Git implementation choices are documented in
    execution request.
 3. Execution loads prior state when configured and dispatches a worker request carrying only
    version-independent values.
-4. Worker-side execution constructs concrete adapters, the extraction pipeline, output, and plugin
-   runtime.
+4. Worker-side execution creates one explicit telemetry session, then constructs concrete adapters,
+   the extraction pipeline, output, and plugin runtime from that session's providers and root context.
 5. Plugins are loaded and initialized when configured, and their projector decorates the built-in
    projector.
 6. For each requested ref, extraction resolves the head and exclusion boundary, traverses commits,
    deduplicates them, applies filters, expands facts when required, projects records, and streams
    them to the sink.
-7. The worker returns progress, diagnostics, the extraction result, and profiling data to the main
-   process.
+7. After application resources are disposed, the session finalizes and the worker returns progress,
+   diagnostics, the extraction result, and an optional structured profile report to the main process.
 8. After successful output completion, execution atomically persists the new checkpoint.
 9. The process boundary maps the execution result to presentation data and determines the exit
    behavior.

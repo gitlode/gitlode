@@ -3,9 +3,11 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { createDagTelemetryBinding } from "@gitlode/git-adapters";
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
-import { ROOT_CONTEXT, metrics, trace, type Meter } from "@opentelemetry/api";
+import { ROOT_CONTEXT, context, metrics, trace, type Meter } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import * as git from "isomorphic-git";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -177,7 +179,7 @@ describe("executeRun state orchestration", () => {
             bytesWritten: 100,
             elapsedMs: 10,
             refs: ["main"],
-            profileEntries: [],
+            profileReport: undefined,
             skippedDiffs: 0,
           },
           checkpoint: returnedCheckpoint,
@@ -256,7 +258,7 @@ describe("executeRun state orchestration", () => {
             bytesWritten: 0,
             elapsedMs: 10,
             refs: [],
-            profileEntries: [],
+            profileReport: undefined,
             skippedDiffs: 0,
           },
           checkpoint: { generatedAt: "next", repositoryPath: "/repo", refs: [] },
@@ -340,6 +342,7 @@ describe("executeWorkerRunRequest profiling", () => {
     if (result.kind !== "success") return;
 
     expect(telemetryTracer.starts.map(({ name }) => name)).toEqual([
+      "gitlode.run",
       "gitlode.repository.access.validate",
       "gitlode.repository.object_format.resolve",
       "gitlode.state.validate",
@@ -352,27 +355,28 @@ describe("executeWorkerRunRequest profiling", () => {
       "gitlode.output.close",
     ]);
     expect(telemetryTracer.starts.every(({ span }) => span.endCount === 1)).toBe(true);
-    expect(telemetryTracer.starts.some(({ name }) => name === "gitlode.run")).toBe(false);
-    for (const start of telemetryTracer.starts.slice(0, 5)) {
-      expect(start.parent).toBe(ROOT_CONTEXT);
+    expect(telemetryTracer.starts.some(({ name }) => name === "gitlode.run")).toBe(true);
+    const runSpan = telemetryTracer.starts.find(({ name }) => name === "gitlode.run")!.span;
+    for (const start of telemetryTracer.starts.slice(1, 6)) {
+      expect(trace.getSpan(start.parent!)).toBe(runSpan);
       expect(start.span.statuses).toEqual([]);
       expect(start.span.exceptions).toHaveLength(0);
     }
-    expect(telemetryTracer.starts[1]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[2]!.span.attributes).toMatchObject({
       "gitlode.git.object_format": "sha1",
     });
-    expect(telemetryTracer.starts[2]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[3]!.span.attributes).toMatchObject({
       "gitlode.ref.prior.count": 0,
     });
-    expect(telemetryTracer.starts[3]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[4]!.span.attributes).toMatchObject({
       "gitlode.repository.name.source": "path",
       "gitlode.repository.url.source": "missing",
     });
-    expect(telemetryTracer.starts[4]!.span.attributes).toMatchObject({
+    expect(telemetryTracer.starts[5]!.span.attributes).toMatchObject({
       "gitlode.extraction.range.kind": "none",
     });
     const serializedAttributes = JSON.stringify(
-      telemetryTracer.starts.slice(0, 5).map(({ span }) => span.attributes),
+      telemetryTracer.starts.slice(1, 6).map(({ span }) => span.attributes),
     );
     expect(serializedAttributes).not.toContain("gitlode-execution");
     expect(serializedAttributes).not.toContain("fixture-repository");
@@ -388,8 +392,28 @@ describe("executeWorkerRunRequest profiling", () => {
     }
     expect(telemetryTracer.starts.filter(({ name }) => name.includes("write")).length).toBe(0);
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["isomorphic-git"]);
+    expect(runSpan.attributes["gitlode.git.adapter"]).toBe("isomorphic-git");
+    expect(runSpan.attributes).toMatchObject({
+      "gitlode.extraction.granularity": "commit",
+      "gitlode.extraction.range.kind": "none",
+      "gitlode.git.object_format": "sha1",
+      "gitlode.run.result": "success",
+      "gitlode.commit.unique.count": result.success.commitsTraversed,
+      "gitlode.output.record.count": result.success.recordsWritten,
+      "gitlode.output.file.count": result.success.filesCreated,
+      "gitlode.output.size": result.success.bytesWritten,
+    });
+    expect(Object.keys(runSpan.attributes).sort()).toEqual([
+      "gitlode.commit.unique.count",
+      "gitlode.extraction.granularity",
+      "gitlode.extraction.range.kind",
+      "gitlode.git.adapter",
+      "gitlode.git.object_format",
+      "gitlode.output.file.count",
+      "gitlode.output.record.count",
+      "gitlode.output.size",
+      "gitlode.run.result",
+    ]);
   });
 
   it("writes file-level records with the git-cli adapter selected", async () => {
@@ -462,8 +486,129 @@ describe("executeWorkerRunRequest profiling", () => {
       deletions: 0,
     });
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    const runEntry = result.success.profileReport?.spans.find(
+      (entry) => entry.name === "gitlode.run",
+    );
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.adapter")?.value,
+    ).toBe("git-cli");
+  });
+
+  it("connects production worker plugin telemetry to the run hierarchy", async () => {
+    const pluginRoot = await makeTempDir("gitlode-worker-plugin-");
+    await writeFile(
+      join(pluginRoot, "plugin.mjs"),
+      `export default function factory(config) {
+        return {
+          async init() { return { type: "ready" }; },
+          async project() { return { type: "success", data: { configured: config } }; }
+        };
+      }`,
+    );
+    const request = await createWorkerPluginRequest();
+    const telemetryTracer = makeTracer();
+    const manager = new AsyncLocalStorageContextManager().enable();
+    expect(context.setGlobalContextManager(manager)).toBe(true);
+    try {
+      const result = await executeWorkerRunRequest(
+        {
+          ...request,
+          input: {
+            ...request.input,
+            pluginBaseDirectory: pluginRoot,
+            pluginDeclarations: {
+              sample: { entrypoint: "./plugin.mjs", config: "worker", failurePolicy: "skip-fact" },
+            },
+          },
+        } as WorkerRunRequest,
+        { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+        { environment: {} },
+        {
+          ...testGitTelemetry,
+          executionTracer: telemetryTracer.tracer,
+          extractionTracer: telemetryTracer.tracer,
+          gitTracer: telemetryTracer.tracer,
+          extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+          pluginRuntimeTracer: telemetryTracer.tracer,
+          getPluginTracer: () => telemetryTracer.tracer,
+          getPluginMeter: () => metrics.getMeter("gitlode.test.plugin"),
+        },
+      );
+
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") return;
+      expect(result.success.recordsWritten).toBe(1);
+      const run = telemetryTracer.starts.find((start) => start.name === "gitlode.run")!;
+      const bootstrap = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.plugin.bootstrap",
+      )!;
+      const resolve = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.plugin.resolve",
+      )!;
+      const compatibility = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.plugin.compatibility.check",
+      )!;
+      const init = telemetryTracer.starts.find((start) => start.name === "gitlode.plugin.init")!;
+      const projection = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.projection",
+      )!;
+      expect(run).toBeDefined();
+      expect(trace.getSpan(bootstrap.parent!)).toBe(run.span);
+      expect(trace.getSpan(resolve.parent!)).toBe(bootstrap.span);
+      expect(trace.getSpan(compatibility.parent!)).toBe(bootstrap.span);
+      expect(trace.getSpan(init.parent!)).toBe(bootstrap.span);
+      expect(trace.getSpan(projection.parent!)).toBe(
+        telemetryTracer.starts.find((start) => start.name === "gitlode.extract")!.span,
+      );
+      for (const entry of [run, bootstrap, resolve, compatibility, init, projection]) {
+        expect(entry.span.statuses).toEqual([]);
+        expect(entry.span.exceptions).toHaveLength(0);
+        expect(entry.span.endCount).toBe(1);
+      }
+      const outputFile = (await readdir(request.input.outputDir))[0]!;
+      const output = await readFile(join(request.input.outputDir, outputFile), "utf8");
+      expect(output).toContain('"sample"');
+      expect(output).toContain('"configured":"worker"');
+    } finally {
+      context.disable();
+    }
+
+    async function createWorkerPluginRequest(): Promise<WorkerRunRequest> {
+      const repoDir = await makeTempDir("gitlode-worker-plugin-repo-");
+      const outputDir = await makeTempDir("gitlode-worker-plugin-output-");
+      await git.init({ fs: nodeFs, dir: repoDir, defaultBranch: "main" });
+      await git.setConfig({ fs: nodeFs, dir: repoDir, path: "user.name", value: "Tester" });
+      await git.setConfig({
+        fs: nodeFs,
+        dir: repoDir,
+        path: "user.email",
+        value: "test@example.com",
+      });
+      await writeFile(join(repoDir, "file.txt"), "hello\n");
+      await git.add({ fs: nodeFs, dir: repoDir, filepath: "file.txt" });
+      await git.commit({
+        fs: nodeFs,
+        dir: repoDir,
+        message: "initial",
+        author: { name: "Tester", email: "test@example.com", timestamp: 1_000, timezoneOffset: 0 },
+      });
+      return {
+        input: {
+          repositoryPath: repoDir as AbsolutePath,
+          refs: ["main"],
+          outputDir: outputDir as AbsolutePath,
+          rotation: {},
+          granularity: "commit",
+          profile: true,
+          gitAdapter: "isomorphic-git",
+        },
+        priorCheckpoint: {
+          generatedAt: "2026-01-01T00:00:00.000Z",
+          repositoryPath: repoDir as AbsolutePath,
+          refs: [],
+        },
+      };
+    }
   });
 
   it.each([false, true])(
@@ -619,13 +764,66 @@ describe("executeWorkerRunRequest profiling", () => {
     if (result.kind !== "success") return;
     expect(result.success.commitsTraversed).toBe(1);
 
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
-    expect(runEntry?.attributes?.["git.cli.version"]?.[0]).toMatch(/^git version /);
+    const runEntry = result.success.profileReport?.spans.find(
+      (entry) => entry.name === "gitlode.run",
+    );
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.adapter")?.value,
+    ).toBe("git-cli");
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.cli.version")?.value,
+    ).toMatch(/^git version /);
   });
 });
 
 describe("executeWorkerRunRequest commit traversal strategy environment", () => {
+  it("connects production DAG telemetry to the run hierarchy", async () => {
+    const manager = new AsyncLocalStorageContextManager().enable();
+    expect(context.setGlobalContextManager(manager)).toBe(true);
+    const telemetryTracer = makeTracer();
+    try {
+      const result = await executeWorkerRunRequest(
+        await createOneCommitRequest("isomorphic-git"),
+        { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+        { environment: {} },
+        {
+          ...testGitTelemetry,
+          executionTracer: telemetryTracer.tracer,
+          extractionTracer: telemetryTracer.tracer,
+          gitTracer: telemetryTracer.tracer,
+          extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+          dagTelemetryBinding: createDagTelemetryBinding(
+            telemetryTracer.tracer,
+            metrics.getMeter("gitlode.test.dag"),
+          ),
+          rootContext: ROOT_CONTEXT,
+        },
+      );
+      expect(result.kind).toBe("success");
+      const run = telemetryTracer.starts.find((start) => start.name === "gitlode.run")!.span;
+      const walk = telemetryTracer.starts.find(
+        (start) => start.name === "gitlode.git.commit.walk",
+      )!;
+      const dag = telemetryTracer.starts.filter((start) => start.name.startsWith("gitlode.dag."));
+      expect(dag.length).toBeGreaterThan(0);
+      expect(dag.every((start) => start.span.endCount === 1)).toBe(true);
+      expect(trace.getSpan(walk.parent!)).toBe(
+        telemetryTracer.starts.find((start) => start.name === "gitlode.traversal")!.span,
+      );
+      expect(
+        dag.every(
+          (start) =>
+            trace.getSpan(start.parent!) === walk.span ||
+            trace.getSpan(start.parent!) === run ||
+            dag.some((candidate) => candidate.span === trace.getSpan(start.parent!)),
+        ),
+      ).toBe(true);
+      expect(dag.every((start) => trace.getSpan(start.parent!) !== undefined)).toBe(true);
+    } finally {
+      context.disable();
+    }
+  });
+
   async function createOneCommitRequest(
     gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
   ) {
@@ -682,27 +880,33 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     environment: Readonly<Record<string, string | undefined>>,
     gitAdapter: "isomorphic-git" | "git-cli" = "isomorphic-git",
   ) {
+    const manager = new AsyncLocalStorageContextManager().enable();
+    expect(context.setGlobalContextManager(manager)).toBe(true);
     const telemetryTracer = makeTracer();
     const metricRecorder = new RecordingGitMetricRecorder(gitAdapter);
-    const result = await executeWorkerRunRequest(
-      await createOneCommitRequest(gitAdapter),
-      { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
-      { environment },
-      {
-        executionTracer: telemetryTracer.tracer,
-        extractionTracer: telemetryTracer.tracer,
-        extractionMeter: metrics.getMeter("gitlode.test.extraction"),
-        lineDiffMeter: metrics.getMeter("gitlode.test.line_diff"),
-        gitTracer: telemetryTracer.tracer,
-        gitMetricRecorder: metricRecorder as never,
-        dagTelemetryBinding: testGitTelemetry.dagTelemetryBinding,
-        rootContext: ROOT_CONTEXT,
-        pluginRuntimeTracer: trace.getTracer("gitlode.test.plugin_runtime"),
-        getPluginTracer: (name, version) => trace.getTracer(name, version),
-        getPluginMeter: (name, version) => metrics.getMeter(name, version),
-      },
-    );
-    return { result, telemetryTracer, metricRecorder };
+    try {
+      const result = await executeWorkerRunRequest(
+        await createOneCommitRequest(gitAdapter),
+        { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+        { environment },
+        {
+          executionTracer: telemetryTracer.tracer,
+          extractionTracer: telemetryTracer.tracer,
+          extractionMeter: metrics.getMeter("gitlode.test.extraction"),
+          lineDiffMeter: metrics.getMeter("gitlode.test.line_diff"),
+          gitTracer: telemetryTracer.tracer,
+          gitMetricRecorder: metricRecorder as never,
+          dagTelemetryBinding: testGitTelemetry.dagTelemetryBinding,
+          rootContext: ROOT_CONTEXT,
+          pluginRuntimeTracer: trace.getTracer("gitlode.test.plugin_runtime"),
+          getPluginTracer: (name, version) => trace.getTracer(name, version),
+          getPluginMeter: (name, version) => metrics.getMeter(name, version),
+        },
+      );
+      return { result, telemetryTracer, metricRecorder };
+    } finally {
+      context.disable();
+    }
   }
 
   it.each([
@@ -732,12 +936,15 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     );
     expect(walkSpans).toHaveLength(1);
     const walk = walkSpans[0]!;
+    const parent = trace.getSpan(walk.parent!);
+    expect(telemetryTracer.starts.find(({ span }) => span === parent)?.name).toBe(
+      "gitlode.traversal",
+    );
     expect(walk.options?.attributes).toEqual({
       "gitlode.git.adapter": "isomorphic-git",
       "gitlode.git.commit.walk.strategy": strategy,
       "gitlode.git.commit.walk.has_exclusion": false,
     });
-    expect(walk.parent).toBe(ROOT_CONTEXT);
     expect(walk.span.attributes).toEqual({
       "gitlode.stream.completion": "exhausted",
     });
@@ -781,7 +988,7 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       [],
     );
     expect(metricRecorder.calls).toEqual([]);
-    expect(JSON.stringify(telemetryTracer.starts)).not.toContain("exception");
+    expect(telemetryTracer.starts.flatMap(({ span }) => span.exceptions)).toEqual([]);
   });
 
   it("records the ignored invalid environment on the actual Git CLI owner", async () => {
@@ -790,17 +997,35 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
       "git-cli",
     );
     expect(result.kind).toBe("success");
+    const run = telemetryTracer.starts.find((start) => start.name === "gitlode.run")!.span;
+    expect(run.attributes["gitlode.git.cli.version"]).toBeDefined();
+    expect(Object.keys(run.attributes).sort()).toContain("gitlode.git.cli.version");
     const walkSpans = telemetryTracer.starts.filter(
       ({ name }) => name === "gitlode.git.commit.walk",
     );
     expect(walkSpans).toHaveLength(1);
     const walk = walkSpans[0]!;
+    const parent = trace.getSpan(walk.parent!);
+    expect(telemetryTracer.starts.find(({ span }) => span === parent)?.name).toBe(
+      "gitlode.traversal",
+    );
+    const revList = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.cli.rev_list",
+    );
+    const commitBatch = telemetryTracer.starts.filter(
+      ({ name }) => name === "gitlode.git.cli.commit_batch",
+    );
+    expect(revList).toHaveLength(1);
+    expect(commitBatch).toHaveLength(1);
+    expect(trace.getSpan(revList[0]!.parent!)).toBe(walk.span);
+    expect(trace.getSpan(commitBatch[0]!.parent!)).toBe(walk.span);
+    expect(revList[0]!.span.endCount).toBe(1);
+    expect(commitBatch[0]!.span.endCount).toBe(1);
     expect(walk.options?.attributes).toEqual({
       "gitlode.git.adapter": "git-cli",
       "gitlode.git.commit.walk.strategy": "git-cli-rev-list-stream",
       "gitlode.git.commit.walk.has_exclusion": false,
     });
-    expect(walk.parent).toBe(ROOT_CONTEXT);
     expect(walk.span.attributes).toEqual({
       "gitlode.stream.completion": "exhausted",
     });
@@ -836,8 +1061,12 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     }
 
     expect(result.success.commitsTraversed).toBe(1);
-    const runEntry = result.success.profileEntries.find((entry) => entry.name === "gitlode.run");
-    expect(runEntry?.attributes?.["git.adapter"]).toEqual(["git-cli"]);
+    const runEntry = result.success.profileReport?.spans.find(
+      (entry) => entry.name === "gitlode.run",
+    );
+    expect(
+      runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.adapter")?.value,
+    ).toBe("git-cli");
   });
 
   it("records typed setup failures without exception events", async () => {
@@ -860,19 +1089,31 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
 
     expect(result.kind).toBe("user-error");
     expect(telemetryTracer.starts.map(({ name }) => name)).toEqual([
+      "gitlode.run",
       "gitlode.repository.access.validate",
       "gitlode.repository.object_format.resolve",
       "gitlode.state.validate",
       "gitlode.repository.metadata.resolve",
       "gitlode.extraction.range.resolve",
     ]);
-    const rangeSpan = telemetryTracer.starts[4]!.span;
+    const rangeSpan = telemetryTracer.starts[5]!.span;
     expect(rangeSpan.statuses).toEqual([{ code: 2 }]);
     expect(rangeSpan.exceptions).toHaveLength(0);
     expect(rangeSpan.endCount).toBe(1);
-    expect(telemetryTracer.starts.slice(0, 4).every(({ span }) => span.statuses.length === 0)).toBe(
+    expect(telemetryTracer.starts.slice(1, 5).every(({ span }) => span.statuses.length === 0)).toBe(
       true,
     );
+    const runSpan = telemetryTracer.starts[0]!.span;
+    expect(runSpan.attributes).toEqual({
+      "gitlode.extraction.granularity": "commit",
+      "gitlode.git.adapter": "isomorphic-git",
+      "gitlode.extraction.range.kind": "ref",
+      "gitlode.git.object_format": "sha1",
+      "gitlode.run.result": "user_error",
+    });
+    expect(runSpan.statuses).toEqual([{ code: 2 }]);
+    expect(runSpan.exceptions).toHaveLength(0);
+    expect(runSpan.endCount).toBe(1);
   });
 
   it("records ordinary setup failures with the original exception", async () => {
@@ -899,5 +1140,10 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     expect(rangeSpan.exceptions).toHaveLength(1);
     expect(rangeSpan.exceptions[0]).toBeInstanceOf(Error);
     expect(rangeSpan.endCount).toBe(1);
+    const runSpan = telemetryTracer.starts[0]!.span;
+    expect(runSpan.attributes["gitlode.run.result"]).toBe("runtime_error");
+    expect(runSpan.statuses).toEqual([{ code: 2 }]);
+    expect(runSpan.exceptions).toHaveLength(1);
+    expect(runSpan.endCount).toBe(1);
   });
 });

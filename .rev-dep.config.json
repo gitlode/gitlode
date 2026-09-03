@@ -35,15 +35,6 @@
           ]
         },
         {
-          "name": "instrumentation",
-          "pattern": "packages/internal-foundation/src/instrumentation/**",
-          "allow": [
-            "packages/internal-foundation/src/instrumentation/**",
-            "packages/internal-foundation/src/type-utils/index.ts",
-            "packages/internal-foundation/dist/type-utils/index.js"
-          ]
-        },
-        {
           "name": "otel-support",
           "pattern": "packages/internal-foundation/src/otel-support/**",
           "allow": ["packages/internal-foundation/src/otel-support/**"]
@@ -141,8 +132,6 @@
             "packages/internal-foundation/dist/dag/index.js",
             "packages/internal-foundation/src/otel-support/index.ts",
             "packages/internal-foundation/dist/otel-support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/src/git/index.ts",
@@ -194,8 +183,6 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
@@ -291,12 +278,12 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/progress/index.ts",
-            "packages/internal-contracts/dist/progress/index.js"
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -313,8 +300,6 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
@@ -355,8 +340,6 @@
             "packages/gitlode/src/plugin-api/index.ts",
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/model/index.ts",
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
@@ -384,7 +367,6 @@
             "packages/git-adapters/src/**",
             "packages/git-adapters/test/**",
             "packages/internal-foundation/dist/dag/index.js",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/dist/git/index.js",
             "packages/internal-contracts/dist/model/index.js",
@@ -407,7 +389,6 @@
           "allow": [
             "packages/gitlode/src/**",
             "packages/gitlode/test/**",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/dist/extraction-api/index.js",
@@ -416,6 +397,7 @@
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/dist/progress/index.js",
             "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/git-adapters/dist/git-impl/index.js",
             "packages/line-diff-adapters/dist/line-diff-impl/index.js"
           ]
         },
@@ -540,7 +522,6 @@
       "prodEntryPoints": [
         "src/type-utils/index.ts",
         "src/support/index.ts",
-        "src/instrumentation/index.ts",
         "src/otel-support/index.ts",
         "src/dag/index.ts"
       ],
@@ -682,7 +663,7 @@
     },
     {
       "path": "packages/plugin-assay-metrics",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -706,7 +687,7 @@
     },
     {
       "path": "packages/plugin-conventional-commits",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -730,7 +711,7 @@
     },
     {
       "path": "packages/plugin-custom-field",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -754,7 +735,7 @@
     },
     {
       "path": "packages/plugin-file-type",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -778,7 +759,7 @@
     },
     {
       "path": "packages/plugin-identity-profile",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {

@@ -1,6 +1,6 @@
 import type { Diagnostic } from "@gitlode/internal-contracts/diagnostics";
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
-import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
+import type { ProfileReport } from "@gitlode/internal-contracts/telemetry";
 
 import { writeDiagnosticLines, splitMessageLines } from "./diagnostics.js";
 import {
@@ -19,7 +19,7 @@ export interface RunPresenter {
   renderUserError(message: string): void;
   renderRuntimeError(error: unknown): void;
   renderSummary(data: SummaryData): void;
-  renderProfile(entries: readonly ProfileSummaryEntry[], skippedDiffs?: number): void;
+  renderProfile(report: ProfileReport): void;
 }
 
 interface CreateRunPresenterOptions {
@@ -85,8 +85,8 @@ export function createRunPresenter(options: CreateRunPresenterOptions): RunPrese
         sink.writeLine(line);
       }
     },
-    renderProfile(entries, skippedDiffs) {
-      const lines = formatProfileLines(entries, skippedDiffs, styling);
+    renderProfile(report) {
+      const lines = formatProfileLines(report, styling);
       if (lines.length === 0) {
         return;
       }

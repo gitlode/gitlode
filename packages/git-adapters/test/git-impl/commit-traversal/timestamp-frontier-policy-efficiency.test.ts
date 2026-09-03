@@ -1,6 +1,5 @@
 import type { DagTopologyPort, WalkDagContext } from "@gitlode/internal-foundation/dag";
 import { walkDagNodeIdsPhaseCertifiedDifference } from "@gitlode/internal-foundation/dag";
-import { LocalInstrumentationRecorder } from "@gitlode/internal-foundation/instrumentation";
 import { describe, expect, it } from "vitest";
 
 import { createCommitTimestampPhaseCertifiedStrategyOptions } from "../../../src/git-impl/commit-traversal/index.js";
@@ -192,7 +191,8 @@ function createNonMonotonicFixture(): Fixture {
 }
 
 async function runFixture(fixture: Fixture, policy: "fifo" | "priority"): Promise<RunResult> {
-  const recorder = new LocalInstrumentationRecorder(() => 0);
+  const counters: Record<string, number> = {};
+  let terminationReason: unknown;
   const reads: string[] = [];
   const yielded: string[] = [];
   const options =
@@ -204,7 +204,10 @@ async function runFixture(fixture: Fixture, policy: "fifo" | "priority"): Promis
   >(
     createContext(
       createCommitTimestampDagPort(fixture.successors, fixture.timestamps, reads),
-      recorder,
+      counters,
+      (reason) => {
+        terminationReason = reason;
+      },
     ),
     fixture.start,
     fixture.exclude,
@@ -213,12 +216,11 @@ async function runFixture(fixture: Fixture, policy: "fifo" | "priority"): Promis
     yielded.push(nodeId);
   }
 
-  const record = recorder.records()[0];
   return {
     yielded,
-    counters: normalizeCounters(record?.counters ?? {}),
+    counters: normalizeCounters(counters),
     reads,
-    terminationReason: record?.attributes["termination_reason"],
+    terminationReason,
   };
 }
 
@@ -243,27 +245,30 @@ function createCommitTimestampDagPort(
 
 function createContext<NodeId extends PropertyKey, DomainHint>(
   graph: DagTopologyPort<NodeId, DomainHint>,
-  instrumentation: LocalInstrumentationRecorder,
+  counters: Record<string, number>,
+  setTerminationReason: (reason: unknown) => void,
 ): WalkDagContext<NodeId, DomainHint> {
-  const span = instrumentation.startSpan("dag.traversal");
+  const increment = (name: string, count: number) => {
+    counters[name] = (counters[name] ?? 0) + count;
+  };
   return {
     graph,
     observation: {
-      recordStepProcessed: (count = 1) => span.incrementCounter("traversal_steps", count),
-      recordStepStale: (count = 1) => span.incrementCounter("stale_steps", count),
+      recordStepProcessed: (count = 1) => increment("traversal_steps", count),
+      recordStepStale: (count = 1) => increment("stale_steps", count),
       recordSuccessorExpansion: (role, count = 1) => {
-        span.incrementCounter("successor_expansions", count);
-        span.incrementCounter(`${role}_expansions`, count);
+        increment("successor_expansions", count);
+        increment(`${role}_expansions`, count);
       },
-      recordNodeYielded: (count = 1) => span.incrementCounter("yielded_nodes", count),
-      recordNodeExcluded: (count = 1) => span.incrementCounter("excluded_nodes", count),
+      recordNodeYielded: (count = 1) => increment("yielded_nodes", count),
+      recordNodeExcluded: (count = 1) => increment("excluded_nodes", count),
       markFallback: () => {},
       recordFallbackNodeRemoved: () => {},
       setCertificationResult: () => {},
-      setTerminationReason: (reason) => span.setAttribute("termination_reason", reason),
+      setTerminationReason,
       recordStartCount: () => {},
       setCertifiedClosureResult: () => {},
-      complete: () => span.end(),
+      complete: () => {},
     },
   };
 }

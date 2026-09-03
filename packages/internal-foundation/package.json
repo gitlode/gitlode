@@ -23,10 +23,6 @@
       "types": "./dist/support/index.d.ts",
       "default": "./dist/support/index.js"
     },
-    "./instrumentation": {
-      "types": "./dist/instrumentation/index.d.ts",
-      "default": "./dist/instrumentation/index.js"
-    },
     "./otel-support": {
       "types": "./dist/otel-support/index.d.ts",
       "default": "./dist/otel-support/index.js"

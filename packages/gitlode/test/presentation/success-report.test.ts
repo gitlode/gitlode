@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { renderSuccessReport } from "../../src/presentation/success-report.js";
 
+const profileReport = {
+  schemaVersion: 1 as const,
+  signalStatus: {
+    spans: "complete" as const,
+    counters: "complete" as const,
+    histograms: "complete" as const,
+  },
+  spans: [],
+  counters: [],
+  histograms: [],
+  diagnostics: [],
+};
+
 function makePresenter() {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   return {
@@ -30,8 +43,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 1,
         elapsedMs: 1,
         refs: ["main"],
-        profileEntries: [],
-        skippedDiffs: 0,
+        profileReport: undefined,
       },
     });
 
@@ -52,8 +64,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 5,
         elapsedMs: 6,
         refs: ["main"],
-        profileEntries: [],
-        skippedDiffs: 0,
+        profileReport: undefined,
       },
     });
 
@@ -74,8 +85,7 @@ describe("renderSuccessReport", () => {
         bytesWritten: 5,
         elapsedMs: 6,
         refs: ["main"],
-        profileEntries: [{ name: "gitlode.run", totalMs: 1, calls: 1, averageMs: 1, maxMs: 1 }],
-        skippedDiffs: 2,
+        profileReport,
       },
     });
 

@@ -6,7 +6,6 @@ import {
   type WalkDagContext,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "@gitlode/internal-foundation/dag";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -395,11 +394,9 @@ class RecordingFrontier<T> implements DagFrontier<T> {
 
 function createContext<NodeId extends PropertyKey>(
   graph: DagTopologyPort<NodeId>,
-  instrumentation = noopInstrumentation,
 ): WalkDagContext<NodeId> {
   return {
     graph,
-    instrumentation,
   };
 }
 

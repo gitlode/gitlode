@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
-import { buildAggregationCollectorBundle } from "../../scripts/telemetry-aggregation.js";
+import { buildAggregationCollectorBundle } from "../../src/execution/telemetry/aggregation-collector-bundle.js";
 
 const execFileAsync = promisify(execFile);
 

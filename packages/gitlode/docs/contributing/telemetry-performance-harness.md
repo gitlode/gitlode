@@ -12,12 +12,13 @@ multiple namespaces, and exercises success and skip without network, IPC, or inj
 `aggregation_scale` is a fixed Git-independent recipe. Run it with the dedicated
 `performance:aggregate` development-only workflow; it launches four independent collector
 children, records reports and RSS evidence separately, and returns inconclusive/nonzero when RSS or
-child evidence is unavailable. Repository target sidecar integration remains pending until its
-caller is wired into the timed target workflow.
+child evidence is unavailable. Repository target profiling uses a separate development-only sidecar
+child around the release `worker-entry.js`; its output and checkpoint are isolated from the timed
+CLI workflow.
 
 The aggregation command requires `--fixture aggregation_scale` and `--artifacts <directory>` and
 writes `aggregation-scale.json`. Each artifact records the manifest recipe hash, source revision,
-built collector runner path, four raw child outcomes, N/4N report measurements, RSS deltas, volume
+built collector runner identity/hash, four raw child outcomes, N/4N report measurements, RSS deltas, volume
 evaluation, and pass/fail/inconclusive reasons. Children execute built JavaScript with `node`; the
 timed repository CLI is never used for collector timing or memory evidence. Missing, malformed,
 failed, or signal-terminated children are inconclusive. A supported RSS measurement that violates

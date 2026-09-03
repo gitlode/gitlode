@@ -8,7 +8,7 @@ import { performance } from "node:perf_hooks";
 import { TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
 
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
-export { resolveSourceRevision } from "../../scripts/source-revision.js";
+export { resolveSourceRevision } from "../../src/support/source-revision.js";
 
 export type ProfileState = "legacy_off" | "target_off" | "target_on";
 export type Availability<T> =
@@ -367,8 +367,6 @@ export async function launchMeasuredChild(input: {
   readonly pairIndex?: number;
   readonly env?: NodeJS.ProcessEnv;
   readonly rssReader?: RssReader;
-  /** Development-only report sidecar; never passed to the release CLI. */
-  readonly profileReportPath?: string;
 }): Promise<RawRun> {
   const args = [...input.args, "--quiet", ...(input.state === "target_on" ? ["--profile"] : [])];
   const start = performance.now();
@@ -420,16 +418,7 @@ export async function launchMeasuredChild(input: {
       (file as Record<string, unknown>).deletions === null
     );
   }).length;
-  let telemetry = unavailableTargetTelemetry(input.state);
-  if (input.state === "target_on" && input.profileReportPath) {
-    try {
-      telemetry = extractProfileReportMeasurements(
-        JSON.parse(await readFile(input.profileReportPath, "utf8")) as unknown,
-      );
-    } catch {
-      captureErrors.push("collector output is missing or malformed");
-    }
-  }
+  const telemetry = unavailableTargetTelemetry(input.state);
   return {
     state: input.state,
     phase: input.phase,
@@ -600,6 +589,7 @@ export interface VolumeObservation {
   readonly gitCommandSpans: number;
   readonly gitCommandStarts: number;
   readonly pluginSpans: number;
+  readonly fixtureOwnedScopes?: readonly string[];
   readonly reportBytes: number;
   readonly totalEndedSpanCount?: number;
   readonly diagnosticCount?: number;
@@ -607,7 +597,10 @@ export interface VolumeObservation {
 
 export function volumeObservationFromProfileReport(
   report: unknown,
-  evidence: Pick<VolumeObservation, "scale" | "profileRssDeltaBytes" | "gitCommandStarts">,
+  evidence: Pick<
+    VolumeObservation,
+    "scale" | "profileRssDeltaBytes" | "gitCommandStarts" | "fixtureOwnedScopes"
+  >,
 ): VolumeObservation {
   const measurements = extractProfileReportMeasurements(report);
   const value = report as Record<string, readonly Record<string, unknown>[]>;
@@ -616,16 +609,31 @@ export function volumeObservationFromProfileReport(
   const acceptedCoreScopes = new Set(
     TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map((span) => span.scope.name),
   );
-  const acceptedCoreNames = new Set(
-    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map((span) => span.name),
+  const acceptedCorePairs = new Set(
+    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map(
+      (span) => `${span.scope.name}\u0000${span.name}`,
+    ),
   );
-  const gitCliNames = new Set(
+  const gitCliPairs = new Set(
     TELEMETRY_SPANS.filter(
       (span) => span.scope.type === "core" && span.name.startsWith("gitlode.git.cli."),
-    ).map((span) => span.name),
+    ).map((span) => `${span.scope.name}\u0000${span.name}`),
   );
   const gitCommandSpans = spans
-    .filter((span) => typeof span.name === "string" && gitCliNames.has(span.name))
+    .filter((span) => {
+      const scope = span.scope;
+      const scopeName =
+        typeof scope === "object" &&
+        scope !== null &&
+        typeof (scope as Record<string, unknown>).name === "string"
+          ? ((scope as Record<string, unknown>).name as string)
+          : undefined;
+      return (
+        typeof span.name === "string" &&
+        scopeName !== undefined &&
+        gitCliPairs.has(`${scopeName}\u0000${span.name}`)
+      );
+    })
     .reduce((sum, span) => sum + (span.callCount as number), 0);
   const pluginSpans = spans
     .filter((span) => {
@@ -639,7 +647,7 @@ export function volumeObservationFromProfileReport(
       return (
         scopeName !== undefined &&
         !acceptedCoreScopes.has(scopeName) &&
-        scopeName !== "gitlode.performance.aggregation"
+        !evidence.fixtureOwnedScopes?.includes(scopeName)
       );
     })
     .reduce((sum, span) => sum + (span.callCount as number), 0);
@@ -666,7 +674,7 @@ export function volumeObservationFromProfileReport(
         return (
           scopeName !== undefined &&
           acceptedCoreScopes.has(scopeName) &&
-          !acceptedCoreNames.has(span.name)
+          !acceptedCorePairs.has(`${scopeName}\u0000${span.name}`)
         );
       })
       .reduce((sum, span) => sum + (span.callCount as number), 0),

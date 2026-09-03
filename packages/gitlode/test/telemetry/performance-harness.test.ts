@@ -29,6 +29,7 @@ import {
   pairPlan,
   sampleChildRss,
   unavailableTargetTelemetry,
+  volumeObservationFromProfileReport,
   type EnvironmentFingerprint,
   type FixtureManifest,
   type RawRun,
@@ -392,6 +393,32 @@ describe("performance harness contracts", () => {
         "Git command span/start mismatch",
       ]),
     );
+  });
+  it("classifies report spans by exact metadata pairs and fixture-owned scopes", () => {
+    const report = {
+      schemaVersion: 1,
+      spans: [
+        { scope: { name: "gitlode.git" }, name: "gitlode.git.cli.rev_list", callCount: 3 },
+        { scope: { name: "gitlode.execution" }, name: "gitlode.git.cli.rev_list", callCount: 2 },
+        { scope: { name: "gitlode.git" }, name: "gitlode.unknown", callCount: 4 },
+        { scope: { name: "plugin.scoped" }, name: "gitlode.git.cli.rev_list", callCount: 5 },
+        { scope: { name: "plugin.unscoped" }, name: "plugin.project", callCount: 7 },
+        { scope: { name: "plugin.fallback" }, name: "plugin.fallback", callCount: 11 },
+        { scope: { name: "fixture.synthetic" }, name: "synthetic.operation", callCount: 13 },
+      ],
+      counters: [],
+      histograms: [],
+      diagnostics: [],
+    };
+    const observation = volumeObservationFromProfileReport(report, {
+      scale: 1,
+      profileRssDeltaBytes: 0,
+      gitCommandStarts: 3,
+      fixtureOwnedScopes: ["fixture.synthetic"],
+    });
+    expect(observation.gitCommandSpans).toBe(3);
+    expect(observation.pluginSpans).toBe(23);
+    expect(observation.prohibitedScalingSpanCount).toBe(6);
   });
   it("generates deterministic Git-independent aggregation and plugin inputs", async () => {
     expect(createAggregationFixture(4)).toEqual(createAggregationFixture(4));

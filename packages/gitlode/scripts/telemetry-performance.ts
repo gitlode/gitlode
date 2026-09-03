@@ -6,6 +6,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { buildAggregationCollectorBundle } from "../src/execution/telemetry/aggregation-collector-bundle.js";
+import { createEmptyCheckpoint } from "../src/state/index.js";
 import {
   comparePerformanceBehavior,
   performanceBehaviorEvidence,
@@ -51,7 +53,7 @@ import {
 } from "../test/support/performance-workflow.js";
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
 import { resolveSourceRevision } from "./source-revision.js";
-import { buildAggregationCollectorBundle, runAggregationChild } from "./telemetry-aggregation.js";
+import { runAggregationChild } from "./telemetry-aggregation.js";
 
 const exec = promisify(execFile);
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -140,11 +142,13 @@ async function main() {
               scale,
               profileRssDeltaBytes: nDelta,
               gitCommandStarts: 0,
+              fixtureOwnedScopes: ["gitlode.performance.aggregation"],
             }),
             volumeObservationFromProfileReport(reports[3], {
               scale: scale * 4,
               profileRssDeltaBytes: fourNDelta,
               gitCommandStarts: 0,
+              fixtureOwnedScopes: ["gitlode.performance.aggregation"],
             }),
           )
         : {
@@ -413,9 +417,12 @@ async function main() {
           formalTargetRecipeHash,
         )
       : undefined;
-    const behaviorErrors = candidate
-      ? await compareAll(workflow, target.quantities, fixture)
-      : await validateLegacy(workflow, target.quantities, fixture);
+    const behaviorErrors = [
+      ...(candidate
+        ? await compareAll(workflow, target.quantities, fixture)
+        : await validateLegacy(workflow, target.quantities, fixture)),
+      ...sidecarErrors(workflow),
+    ];
     const evaluation = candidate
       ? evaluateComparison({
           kind: comparison as "disabled_overhead" | "profile_overhead",
@@ -473,6 +480,10 @@ async function main() {
       },
       expectedQuantities: target.quantities,
       runs: { baseline: workflow.baseline, candidate: candidate ? workflow.candidate : undefined },
+      sidecars: {
+        baseline: sidecarEvidence(workflow, workflow.baseline),
+        candidate: candidate ? sidecarEvidence(workflow, workflow.candidate) : undefined,
+      },
       evaluation,
     };
     await mkdir(artifacts, { recursive: true });
@@ -523,13 +534,182 @@ async function makeFingerprint(
     measuredPairCount: 7,
   });
 }
+function sidecarErrors(workflow: Execution): string[] {
+  const errors: string[] = [];
+  for (const sidecar of workflow.sidecars.values()) {
+    if (sidecar.status === "inconclusive") errors.push(sidecar.error ?? "collector sidecar failed");
+    if (sidecar.status === "available") {
+      try {
+        extractProfileReportMeasurements(sidecar.report);
+      } catch {
+        errors.push("collector sidecar report is malformed or has the wrong schema");
+      }
+    }
+  }
+  return [...new Set(errors)];
+}
+function sidecarEvidence(workflow: Execution, runs: readonly RawRun[]) {
+  return runs.map((run) => {
+    const sidecar = workflow.sidecars.get(run.runId);
+    if (!sidecar || sidecar.status !== "available") return sidecar ?? null;
+    const measurements = extractProfileReportMeasurements(sidecar.report);
+    const initial = volumeObservationFromProfileReport(sidecar.report, {
+      scale: 1,
+      profileRssDeltaBytes: undefined,
+      gitCommandStarts: 0,
+      fixtureOwnedScopes: [],
+    });
+    const observation = { ...initial, gitCommandStarts: initial.gitCommandSpans };
+    return {
+      ...sidecar,
+      reportMeasurements: measurements,
+      volumeObservation: observation,
+      volumeEvaluation: evaluateVolume(observation, observation),
+      reportSize: {
+        bytes: measurements.reportJsonBytes.value,
+        limitBytes: 1_048_576,
+        status: measurements.reportJsonBytes.value <= 1_048_576 ? "pass" : "fail",
+      },
+      prohibitedHostSpanCount: observation.prohibitedScalingSpanCount,
+      gitCliCommandSpanCount: observation.gitCommandSpans,
+      pluginSpanCount: observation.pluginSpans,
+    };
+  });
+}
 type Execution = {
   baseline: RawRun[];
   candidate: RawRun[];
   behavior: Map<string, PerformanceBehavior>;
+  sidecars: Map<string, RepositorySidecarCapture>;
   repositoryPath: string;
   cleanup(): Promise<void>;
 };
+type RepositorySidecarCapture = {
+  readonly status: "available" | "inconclusive" | "not-applicable";
+  readonly report?: unknown;
+  readonly resultKind?: string;
+  readonly error?: string;
+  readonly provenance: {
+    readonly workerBundle: "worker-entry.js";
+    readonly workerBundleSha256: string;
+    readonly configSha256: string;
+    readonly fixture: RepositoryFixture;
+    readonly adapter: "isomorphic-git" | "git-cli";
+    readonly revision: string;
+    readonly recipeHash: string;
+  };
+};
+
+export async function runRepositoryProfileSidecar(input: {
+  readonly cli: string;
+  readonly repository: string;
+  readonly config: string;
+  readonly fixture: RepositoryFixture;
+  readonly adapter: "isomorphic-git" | "git-cli";
+  readonly revision: string;
+  readonly recipeHash: string;
+  readonly quantities: FixtureQuantities;
+  readonly rotationLines?: number;
+}): Promise<RepositorySidecarCapture> {
+  const provenance = {
+    workerBundle: "worker-entry.js" as const,
+    workerBundleSha256: "",
+    configSha256: "",
+    fixture: input.fixture,
+    adapter: input.adapter,
+    revision: input.revision,
+    recipeHash: input.recipeHash,
+  };
+  const root = await mkdtemp(join(tmpdir(), "gitlode-profile-sidecar-"));
+  try {
+    const outputDir = join(root, "output"),
+      requestPath = join(root, "request.json");
+    await mkdir(outputDir);
+    const configBytes = await readFile(input.config);
+    const config = JSON.parse(await readFile(input.config, "utf8")) as {
+      extensions?: Record<string, { entrypoint: string; config?: unknown; failurePolicy?: string }>;
+    };
+    const pluginDeclarations = config.extensions
+      ? Object.fromEntries(
+          Object.entries(config.extensions).map(([namespace, declaration]) => [
+            namespace,
+            {
+              ...declaration,
+              entrypoint: declaration.entrypoint.startsWith(".")
+                ? resolve(dirname(input.config), declaration.entrypoint)
+                : declaration.entrypoint,
+            },
+          ]),
+        )
+      : undefined;
+    const workerEntryPath = resolve(dirname(input.cli), "worker-entry.js");
+    const resolvedProvenance = {
+      ...provenance,
+      workerBundleSha256: createHash("sha256")
+        .update(await readFile(workerEntryPath))
+        .digest("hex"),
+      configSha256: createHash("sha256").update(configBytes).digest("hex"),
+    };
+    await writeFile(
+      requestPath,
+      JSON.stringify({
+        workerEntryPath,
+        request: {
+          input: {
+            repositoryPath: input.repository,
+            refs: ["main"],
+            outputDir,
+            outputPrefix: "sidecar",
+            rotation: { maxLines: input.rotationLines },
+            granularity: input.fixture === "commit_heavy_repository" ? "commit" : "file",
+            maxDiffSize: input.fixture === "file_heavy_repository" ? 16 : undefined,
+            profile: true,
+            gitAdapter: input.adapter,
+            pluginBaseDirectory: config.extensions ? dirname(input.config) : undefined,
+            pluginDeclarations,
+          },
+          priorCheckpoint: createEmptyCheckpoint(input.repository),
+        },
+      }),
+    );
+    const sidecarScript = fileURLToPath(
+      new URL("./telemetry-repository-sidecar.mjs", import.meta.url),
+    );
+    const result = JSON.parse(
+      (await exec(process.execPath, [sidecarScript, requestPath])).stdout,
+    ) as {
+      result?: {
+        kind?: string;
+        message?: string;
+        success?: { profileReport?: unknown };
+        profileReport?: unknown;
+      };
+    };
+    const workerResult = result.result;
+    const report = workerResult?.success?.profileReport ?? workerResult?.profileReport;
+    if (!workerResult || workerResult.kind !== "success" || !report)
+      return {
+        status: "inconclusive",
+        resultKind: workerResult?.kind,
+        error: workerResult?.message ?? "sidecar result has no ProfileReport",
+        provenance: resolvedProvenance,
+      };
+    return {
+      status: "available",
+      resultKind: workerResult.kind,
+      report,
+      provenance: resolvedProvenance,
+    };
+  } catch (error) {
+    return {
+      status: "inconclusive",
+      error: error instanceof Error ? error.message : String(error),
+      provenance,
+    };
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
 async function executePaired(
   manifest: FixtureManifest,
   fixture: RepositoryFixture,
@@ -566,7 +746,8 @@ async function executePaired(
         : undefined;
     const baseline: RawRun[] = [],
       candidates: RawRun[] = [],
-      behavior = new Map<string, PerformanceBehavior>();
+      behavior = new Map<string, PerformanceBehavior>(),
+      sidecars = new Map<string, RepositorySidecarCapture>();
     let ordinal = 0;
     for (const planned of pairPlan()) {
       const states = candidate
@@ -609,6 +790,33 @@ async function executePaired(
           ...planned,
         });
         destination.push(raw);
+        sidecars.set(
+          raw.runId,
+          state === "target_on"
+            ? await runRepositoryProfileSidecar({
+                cli,
+                repository,
+                config,
+                fixture,
+                adapter,
+                revision: candidate?.state === state ? candidate.revision : baselineSpec.revision,
+                recipeHash: fixtureRecipeHash(manifest),
+                quantities,
+                rotationLines,
+              })
+            : {
+                status: "not-applicable",
+                provenance: {
+                  workerBundle: "worker-entry.js",
+                  workerBundleSha256: "",
+                  configSha256: "",
+                  fixture,
+                  adapter,
+                  revision: candidate?.state === state ? candidate.revision : baselineSpec.revision,
+                  recipeHash: fixtureRecipeHash(manifest),
+                },
+              },
+        );
         behavior.set(raw.runId, await behaviorFor(raw, output, checkpoint));
         ordinal++;
       }
@@ -617,6 +825,7 @@ async function executePaired(
       baseline,
       candidate: candidates,
       behavior,
+      sidecars,
       repositoryPath: repository,
       cleanup: async () => {
         await rm(root, { recursive: true, force: true });

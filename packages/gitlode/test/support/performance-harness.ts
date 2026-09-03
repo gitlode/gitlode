@@ -1,11 +1,26 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { cpus, release, totalmem } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { promisify } from "node:util";
 
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
+
+const execFileAsync = promisify(execFile);
+
+export async function resolveSourceRevision(checkoutRoot: string): Promise<string> {
+  const safeDirectory = checkoutRoot.replaceAll("\\", "/");
+  const result = await execFileAsync(
+    "git",
+    ["-c", `safe.directory=${safeDirectory}`, "-C", checkoutRoot, "rev-parse", "HEAD"],
+    { windowsHide: true },
+  );
+  const revision = result.stdout.trim();
+  if (!/^[0-9a-f]{7,64}$/i.test(revision)) throw new Error("Git returned an invalid HEAD revision");
+  return revision;
+}
 
 export type ProfileState = "legacy_off" | "target_off" | "target_on";
 export type Availability<T> =
@@ -26,7 +41,7 @@ export interface FixtureManifest {
   readonly calibrationTargets: Readonly<Record<string, CalibrationTarget>>;
   readonly aggregationScale: {
     readonly status: "fixed-recipe";
-    readonly integration: "pending-target-collector";
+    readonly integration: "implemented-target-collector";
     readonly quantities: { readonly scale: number };
   };
 }
@@ -280,6 +295,37 @@ export interface TargetTelemetryMeasurements {
   readonly histogramDatapointCount: Availability<number>;
   readonly diagnosticCount: Availability<number>;
 }
+export function extractProfileReportMeasurements(report: unknown): TargetTelemetryMeasurements {
+  if (!report || typeof report !== "object") throw new Error("collector output is not an object");
+  const value = report as Record<string, unknown>;
+  const spans = value.spans,
+    counters = value.counters,
+    histograms = value.histograms,
+    diagnostics = value.diagnostics;
+  if (
+    !Array.isArray(spans) ||
+    !Array.isArray(counters) ||
+    !Array.isArray(histograms) ||
+    !Array.isArray(diagnostics)
+  )
+    throw new Error("collector output is missing ProfileReport arrays");
+  const ended = spans.reduce((sum, item) => {
+    const calls =
+      item && typeof item === "object" ? (item as Record<string, unknown>).callCount : undefined;
+    return sum + (Number.isSafeInteger(calls) && (calls as number) >= 0 ? (calls as number) : 0);
+  }, 0);
+  return {
+    reportJsonBytes: {
+      status: "available",
+      value: Buffer.byteLength(JSON.stringify(report), "utf8"),
+    },
+    spanAggregateGroupCount: { status: "available", value: spans.length },
+    totalEndedSpanCount: { status: "available", value: ended },
+    counterDatapointCount: { status: "available", value: counters.length },
+    histogramDatapointCount: { status: "available", value: histograms.length },
+    diagnosticCount: { status: "available", value: diagnostics.length },
+  };
+}
 export const unavailableTargetTelemetry = (state: ProfileState): TargetTelemetryMeasurements => {
   const value: Availability<number> =
     state === "legacy_off"
@@ -289,7 +335,7 @@ export const unavailableTargetTelemetry = (state: ProfileState): TargetTelemetry
         }
       : {
           status: "unavailable",
-          reason: "target ProfileReport observation seam is not implemented yet",
+          reason: "development-only ProfileReport collector was not requested for this run",
         };
   return {
     reportJsonBytes: value,
@@ -328,6 +374,8 @@ export async function launchMeasuredChild(input: {
   readonly pairIndex?: number;
   readonly env?: NodeJS.ProcessEnv;
   readonly rssReader?: RssReader;
+  /** Development-only report sidecar; never passed to the release CLI. */
+  readonly profileReportPath?: string;
 }): Promise<RawRun> {
   const args = [...input.args, "--quiet", ...(input.state === "target_on" ? ["--profile"] : [])];
   const start = performance.now();
@@ -379,6 +427,16 @@ export async function launchMeasuredChild(input: {
       (file as Record<string, unknown>).deletions === null
     );
   }).length;
+  let telemetry = unavailableTargetTelemetry(input.state);
+  if (input.state === "target_on" && input.profileReportPath) {
+    try {
+      telemetry = extractProfileReportMeasurements(
+        JSON.parse(await readFile(input.profileReportPath, "utf8")) as unknown,
+      );
+    } catch {
+      captureErrors.push("collector output is missing or malformed");
+    }
+  }
   return {
     state: input.state,
     phase: input.phase,
@@ -392,7 +450,7 @@ export async function launchMeasuredChild(input: {
     records: { status: "available", value: records.length },
     commits: { status: "available", value: commitOids.size },
     skippedDiffs: { status: "available", value: skippedDiffs },
-    telemetry: unavailableTargetTelemetry(input.state),
+    telemetry,
     runId: `${input.phase}-${input.pairIndex ?? 0}-${input.state}`,
     captureErrors,
   };
@@ -550,6 +608,10 @@ export interface VolumeObservation {
   readonly gitCommandStarts: number;
   readonly pluginSpans: number;
   readonly reportBytes: number;
+  readonly totalEndedSpanCount?: number;
+  readonly diagnosticCount?: number;
+  readonly rawSpanCount?: number;
+  readonly rawHistogramSampleCount?: number;
 }
 export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
   const reasons: string[] = [];
@@ -564,6 +626,10 @@ export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
     reasons.push("Git command span/start mismatch");
   if (n.reportBytes > 1_048_576 || fourN.reportBytes > 1_048_576)
     reasons.push("ProfileReport exceeds 1 MiB");
+  if ((n.rawSpanCount ?? 0) !== 0 || (fourN.rawSpanCount ?? 0) !== 0)
+    reasons.push("collector retained raw spans");
+  if ((n.rawHistogramSampleCount ?? 0) !== 0 || (fourN.rawHistogramSampleCount ?? 0) !== 0)
+    reasons.push("collector retained raw histogram samples");
   return {
     status: reasons.length ? ("fail" as const) : ("pass" as const),
     reasons,

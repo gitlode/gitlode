@@ -40,7 +40,7 @@ const manifest = (status: "complete" | "incomplete"): FixtureManifest => ({
   recipeRevision: "test",
   aggregationScale: {
     status: "fixed-recipe",
-    integration: "pending-target-collector",
+    integration: "implemented-target-collector",
     quantities: { scale: 4 },
   },
   calibrationTargets: Object.fromEntries(

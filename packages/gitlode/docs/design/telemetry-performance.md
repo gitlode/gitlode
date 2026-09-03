@@ -54,7 +54,7 @@ Trace-volume checks reject the return of per-record, per-write, per-blob, per-di
 file-expansion spans. Git CLI command spans may scale only with actual command invocations and must
 not cause additional commands. Plugin-created spans are reported separately from host volume.
 
-For each fixed performance fixture, the JSON UTF-8 representation of `ProfileReport` must remain at
+For each fixed performance fixture, the development-only collector's JSON UTF-8 representation of `ProfileReport` must remain at
 or below 1 MiB. This is a fixture acceptance limit, not a claim that an unbounded number of configured
 plugin scopes consumes constant space.
 

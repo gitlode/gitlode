@@ -46,6 +46,8 @@ import {
   type RepositoryFixture,
 } from "../test/support/performance-workflow.js";
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
+import { resolveSourceRevision } from "./source-revision.js";
+import { collectAggregationScale } from "./telemetry-aggregation.js";
 
 const exec = promisify(execFile);
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -70,10 +72,25 @@ async function main() {
   const matrixErrors = validateFixtureManifest(manifest);
   if (matrixErrors.length) throw new Error(matrixErrors.join("; "));
   const fixture = parseFixture(option("fixture"));
-  if (fixture === "aggregation_scale")
-    throw new Error(
-      "aggregation_scale is a fixed recipe pending the T13 target collector child runner; repository measurement is unavailable",
+  if (fixture === "aggregation_scale") {
+    const scale = manifest.aggregationScale.quantities.scale;
+    const output = await collectAggregationScale(scale);
+    const artifact = {
+      schemaVersion: 2,
+      kind: "aggregation-scale",
+      fixture,
+      scale,
+      source: "development-only WorkerTelemetrySession collector",
+      evidence: output,
+    };
+    await mkdir(option("artifacts"), { recursive: true });
+    await writeFile(
+      join(option("artifacts"), "aggregation-scale.json"),
+      `${JSON.stringify(artifact, undefined, 2)}\n`,
     );
+    process.stdout.write(`captured aggregation_scale at N=${scale}\n`);
+    return;
+  }
   const adapter = parseAdapter(option("adapter"));
   const target = requireTarget(manifest, fixture, adapter, mode !== "calibrate");
   const comparison = mode === "measure" ? parseComparison(option("comparison")) : undefined;
@@ -161,9 +178,7 @@ async function main() {
     const safeKey = key.replace("/", "-");
     const environmentRef = `${safeKey}-environment.json`;
     const artifactRef = `${safeKey}-calibration.json`;
-    const scriptRevision = (
-      await exec("git", ["-C", resolve(packageDirectory, "../.."), "rev-parse", "HEAD"])
-    ).stdout.trim();
+    const scriptRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
     const updated: FixtureManifest = {
       ...manifest,
       calibrationTargets: {
@@ -198,9 +213,7 @@ async function main() {
     process.stdout.write(`calibrated ${key}; allComplete=${calibrationComplete(updated)}\n`);
     return;
   }
-  const benchmarkScriptRevision = (
-    await exec("git", ["-C", resolve(packageDirectory, "../.."), "rev-parse", "HEAD"])
-  ).stdout.trim();
+  const benchmarkScriptRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
   const baselineSpec =
     mode === "capture-legacy"
       ? {

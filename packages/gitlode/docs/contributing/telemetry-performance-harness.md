@@ -9,8 +9,8 @@ supports the bundled release CLI, adds `--quiet` to every child, and adds `--pro
 Repository targets are commit-heavy and file-heavy with either adapter, plus plugin-heavy fixed to
 `isomorphic-git`. The plugin recipe creates one deterministic local package, registers it under
 multiple namespaces, and exercises success and skip without network, IPC, or injected scripts.
-`aggregation_scale` is a fixed Git-independent N/4N recipe and pure evaluator; selecting it in a
-command reports that its dedicated T13 collector child runner is not implemented rather than
+`aggregation_scale` is a fixed Git-independent recipe. Its dedicated development-only collector
+child uses `WorkerTelemetrySession` and records the report as a separate artifact rather than
 routing it through a repository benchmark.
 
 ## Reference workflow

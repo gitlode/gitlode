@@ -20,6 +20,7 @@ import {
   environmentCompatibility,
   evaluateComparison,
   evaluateVolume,
+  extractProfileReportMeasurements,
   launchMeasuredChild,
   mad,
   manifestHash,
@@ -42,7 +43,7 @@ const manifest: FixtureManifest = {
   recipeRevision: "performance-v1",
   aggregationScale: {
     status: "fixed-recipe",
-    integration: "pending-target-collector",
+    integration: "implemented-target-collector",
     quantities: { scale: 4 },
   },
   calibrationTargets: {
@@ -253,6 +254,25 @@ describe("performance harness contracts", () => {
     expect(roundTrip.value).toBe(1.23456789);
     expect(artifact.runs[0].telemetry.reportJsonBytes.status).toBe("not-applicable");
     expect(unavailableTargetTelemetry("target_on").reportJsonBytes.status).toBe("unavailable");
+  });
+  it("extracts ProfileReport measurements without inventing unavailable values", () => {
+    const measurements = extractProfileReportMeasurements({
+      schemaVersion: 1,
+      spans: [{ callCount: 3 }],
+      counters: [{}],
+      histograms: [{ count: 2, bucketCounts: [1, 1] }],
+      diagnostics: [{ code: "x" }],
+    });
+    expect(measurements).toMatchObject({
+      reportJsonBytes: { status: "available" },
+      spanAggregateGroupCount: { value: 1 },
+      totalEndedSpanCount: { value: 3 },
+      counterDatapointCount: { value: 1 },
+      histogramDatapointCount: { value: 1 },
+      diagnosticCount: { value: 1 },
+    });
+    expect(unavailableTargetTelemetry("target_off").reportJsonBytes.status).toBe("unavailable");
+    expect(() => extractProfileReportMeasurements({ spans: [] })).toThrow(/missing/);
   });
   it("marks unsupported platforms and empty RSS readers inconclusive", async () => {
     const child = new EventEmitter() as EventEmitter & { pid: number };

@@ -355,6 +355,7 @@ export interface RawRun {
   readonly skippedDiffs: Availability<number>;
   readonly telemetry: TargetTelemetryMeasurements;
   readonly runId: string;
+  readonly outputDirectory: string;
   readonly captureErrors: readonly string[];
 }
 export async function launchMeasuredChild(input: {
@@ -434,6 +435,7 @@ export async function launchMeasuredChild(input: {
     skippedDiffs: { status: "available", value: skippedDiffs },
     telemetry,
     runId: `${input.phase}-${input.pairIndex ?? 0}-${input.state}`,
+    outputDirectory: input.outputDirectory,
     captureErrors,
   };
 }
@@ -595,17 +597,9 @@ export interface VolumeObservation {
   readonly diagnosticCount?: number;
 }
 
-export function volumeObservationFromProfileReport(
-  report: unknown,
-  evidence: Pick<
-    VolumeObservation,
-    "scale" | "profileRssDeltaBytes" | "gitCommandStarts" | "fixtureOwnedScopes"
-  >,
-): VolumeObservation {
-  const measurements = extractProfileReportMeasurements(report);
-  const value = report as Record<string, readonly Record<string, unknown>[]>;
-  const spans = value.spans;
-  if (!spans || !value.histograms) throw new Error("collector output is missing report signals");
+function classifyProfileReportSpans(report: unknown) {
+  const value = report as { spans?: readonly Record<string, unknown>[] };
+  const spans = value.spans ?? [];
   const acceptedCoreScopes = new Set(
     TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map((span) => span.scope.name),
   );
@@ -619,22 +613,52 @@ export function volumeObservationFromProfileReport(
       (span) => span.scope.type === "core" && span.name.startsWith("gitlode.git.cli."),
     ).map((span) => `${span.scope.name}\u0000${span.name}`),
   );
-  const gitCommandSpans = spans
-    .filter((span) => {
-      const scope = span.scope;
-      const scopeName =
-        typeof scope === "object" &&
-        scope !== null &&
-        typeof (scope as Record<string, unknown>).name === "string"
-          ? ((scope as Record<string, unknown>).name as string)
-          : undefined;
-      return (
-        typeof span.name === "string" &&
-        scopeName !== undefined &&
-        gitCliPairs.has(`${scopeName}\u0000${span.name}`)
-      );
-    })
-    .reduce((sum, span) => sum + (span.callCount as number), 0);
+  const scopeName = (span: Record<string, unknown>) => {
+    const scope = span.scope;
+    return typeof scope === "object" &&
+      scope !== null &&
+      typeof (scope as { name?: unknown }).name === "string"
+      ? (scope as { name: string }).name
+      : undefined;
+  };
+  const callCount = (span: Record<string, unknown>) =>
+    typeof span.callCount === "number" ? span.callCount : 0;
+  return {
+    prohibitedScalingSpanCount: spans
+      .filter((span) => {
+        const name = scopeName(span);
+        return (
+          name !== undefined &&
+          acceptedCoreScopes.has(name) &&
+          !acceptedCorePairs.has(`${name}\u0000${String(span.name)}`)
+        );
+      })
+      .reduce((sum, span) => sum + callCount(span), 0),
+    gitCommandSpans: spans
+      .filter((span) => {
+        const name = scopeName(span);
+        return (
+          name !== undefined &&
+          typeof span.name === "string" &&
+          gitCliPairs.has(`${name}\u0000${span.name}`)
+        );
+      })
+      .reduce((sum, span) => sum + callCount(span), 0),
+  };
+}
+
+export function volumeObservationFromProfileReport(
+  report: unknown,
+  evidence: Pick<
+    VolumeObservation,
+    "scale" | "profileRssDeltaBytes" | "gitCommandStarts" | "fixtureOwnedScopes"
+  >,
+): VolumeObservation {
+  const measurements = extractProfileReportMeasurements(report);
+  const value = report as Record<string, readonly Record<string, unknown>[]>;
+  const spans = value.spans;
+  if (!spans || !value.histograms) throw new Error("collector output is missing report signals");
+  const classification = classifyProfileReportSpans(report);
   const pluginSpans = spans
     .filter((span) => {
       const scope = span.scope;
@@ -646,7 +670,9 @@ export function volumeObservationFromProfileReport(
           : undefined;
       return (
         scopeName !== undefined &&
-        !acceptedCoreScopes.has(scopeName) &&
+        !TELEMETRY_SPANS.some(
+          (item) => item.scope.type === "core" && item.scope.name === scopeName,
+        ) &&
         !evidence.fixtureOwnedScopes?.includes(scopeName)
       );
     })
@@ -662,23 +688,8 @@ export function volumeObservationFromProfileReport(
     metricDatapoints:
       measurements.counterDatapointCount.value + measurements.histogramDatapointCount.value,
     histogramBuckets,
-    prohibitedScalingSpanCount: spans
-      .filter((span) => {
-        const scope = span.scope;
-        const scopeName =
-          typeof scope === "object" &&
-          scope !== null &&
-          typeof (scope as Record<string, unknown>).name === "string"
-            ? ((scope as Record<string, unknown>).name as string)
-            : undefined;
-        return (
-          scopeName !== undefined &&
-          acceptedCoreScopes.has(scopeName) &&
-          !acceptedCorePairs.has(`${scopeName}\u0000${span.name}`)
-        );
-      })
-      .reduce((sum, span) => sum + (span.callCount as number), 0),
-    gitCommandSpans,
+    prohibitedScalingSpanCount: classification.prohibitedScalingSpanCount,
+    gitCommandSpans: classification.gitCommandSpans,
     pluginSpans,
     reportBytes: measurements.reportJsonBytes.value,
     totalEndedSpanCount: measurements.totalEndedSpanCount.value,
@@ -736,7 +747,7 @@ export function evaluateRepositoryProfileReport(report: unknown) {
   const inconclusiveReasons: string[] = [];
   if (measurements.reportJsonBytes.value > 1_048_576)
     failureReasons.push("ProfileReport exceeds 1 MiB");
-  const prohibited = measurements.prohibitedScalingSpanCount.value;
+  const prohibited = classifyProfileReportSpans(report).prohibitedScalingSpanCount;
   if (prohibited > 0) failureReasons.push("prohibited scaling spans observed");
   const signalStatus = value.signalStatus;
   if (

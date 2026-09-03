@@ -36,8 +36,14 @@ describe("repository profile sidecar", () => {
         config,
         adapter: "isomorphic-git",
         fixture: "commit_heavy_repository",
+        revision: "revision-isomorphic",
+        recipeHash: "recipe-isomorphic",
         quantities: { commits: 5, files: 1, plugins: 0, rotations: 1, scale: 0 },
+        revision: "revision-isomorphic",
+        recipeHash: "recipe-isomorphic",
       });
+      expect(result.provenance.workerBundleSha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.provenance.configSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(result.status).toBe("available");
       expect(result.report).toMatchObject({
         schemaVersion: 1,
@@ -74,6 +80,8 @@ describe("repository profile sidecar", () => {
         adapter: "git-cli",
         fixture: "file_heavy_repository",
         quantities: { commits: 5, files: 2, plugins: 0, rotations: 1, scale: 0 },
+        revision: "revision-git-cli",
+        recipeHash: "recipe-git-cli",
         fileFixture: true,
         rotationLines: 2,
       });
@@ -84,7 +92,11 @@ describe("repository profile sidecar", () => {
         fixture: "file_heavy_repository",
         adapter: "git-cli",
         quantities: { commits: 5, files: 2, plugins: 0, rotations: 1, scale: 0 },
+        revision: "revision-git-cli",
+        recipeHash: "recipe-git-cli",
       });
+      expect(result.provenance.workerBundleSha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.provenance.configSha256).toMatch(/^[0-9a-f]{64}$/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -115,6 +127,8 @@ describe("repository profile sidecar", () => {
         adapter: "isomorphic-git",
         fixture: "plugin_heavy_projection",
         quantities: { commits: 5, files: 1, plugins: 2, rotations: 1, scale: 0 },
+        revision: "revision-plugin",
+        recipeHash: "recipe-plugin",
         fileFixture: true,
       });
       expect(result.status).toBe("available");
@@ -124,7 +138,11 @@ describe("repository profile sidecar", () => {
         fixture: "plugin_heavy_projection",
         adapter: "isomorphic-git",
         quantities: { commits: 5, files: 1, plugins: 2, rotations: 1, scale: 0 },
+        revision: "revision-plugin",
+        recipeHash: "recipe-plugin",
       });
+      expect(result.provenance.workerBundleSha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.provenance.configSha256).toMatch(/^[0-9a-f]{64}$/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

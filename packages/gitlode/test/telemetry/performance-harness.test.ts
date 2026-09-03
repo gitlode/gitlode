@@ -19,6 +19,7 @@ import {
   canonicalManifest,
   environmentCompatibility,
   evaluateComparison,
+  evaluateRepositoryProfileReport,
   evaluateVolume,
   extractProfileReportMeasurements,
   launchMeasuredChild,
@@ -274,6 +275,45 @@ describe("performance harness contracts", () => {
     });
     expect(unavailableTargetTelemetry("target_off").reportJsonBytes.status).toBe("unavailable");
     expect(() => extractProfileReportMeasurements({ spans: [] })).toThrow(/missing/);
+  });
+  it("formally evaluates repository reports without leaking malformed input", () => {
+    const report = (overrides: Record<string, unknown> = {}) => ({
+      schemaVersion: 1,
+      spans: [],
+      counters: [],
+      histograms: [],
+      diagnostics: [],
+      signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
+      ...overrides,
+    });
+    expect(evaluateRepositoryProfileReport(report()).status).toBe("pass");
+    expect(
+      evaluateRepositoryProfileReport({ schemaVersion: 1, spans: [{ callCount: "bad" }] }).status,
+    ).toBe("inconclusive");
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          signalStatus: { spans: "unavailable", counters: "complete", histograms: "complete" },
+        }),
+      ).status,
+    ).toBe("inconclusive");
+    expect(
+      evaluateRepositoryProfileReport(report({ diagnostics: [{ code: "overflow" }] })).status,
+    ).toBe("fail");
+    expect(evaluateRepositoryProfileReport(report({ payload: "x".repeat(1_048_577) })).status).toBe(
+      "fail",
+    );
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          spans: [{ scope: { name: "gitlode.git" }, name: "gitlode.unknown", callCount: 1 }],
+        }),
+      ).status,
+    ).toBe("fail");
+    expect(evaluateRepositoryProfileReport({ nope: true })).toMatchObject({
+      status: "inconclusive",
+      reasons: ["collector output is missing ProfileReport arrays"],
+    });
   });
   it("marks unsupported platforms and empty RSS readers inconclusive", async () => {
     const child = new EventEmitter() as EventEmitter & { pid: number };

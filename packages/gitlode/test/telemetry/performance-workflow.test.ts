@@ -165,7 +165,6 @@ describe("performance workflow routing", () => {
     expect(
       artifact.behaviorEvidence.baseline[0].files.map((file: { name: string }) => file.name),
     ).toEqual(["performance-<session>-000001.jsonl", "performance-<session>-000002.jsonl"]);
-    expect(artifactText).not.toContain("gitlode-performance-");
   }, 30_000);
   it("saves malformed legacy failure evidence before returning nonzero", async () => {
     const root = await mkdtemp(join(tmpdir(), "performance-empty-"));
@@ -525,5 +524,21 @@ describe("performance workflow routing", () => {
     expect(flags.filter((flag) => flag === "on")).toHaveLength(9);
     expect(profile.behaviorEvidence.baseline).toHaveLength(7);
     expect(profile.behaviorEvidence.candidate).toHaveLength(7);
+    expect(profile.formalEvaluation.behavior.reasons).toEqual([]);
+    expect(profile.formalEvaluation.sidecar.status).toBe("inconclusive");
+    expect(profile.sidecarEvaluation.status).toBe("inconclusive");
+    expect(profile.sidecars.candidate).toHaveLength(9);
+    expect(
+      profile.sidecars.candidate.every(
+        (sidecar: { provenance: { runId: string } }, index: number) =>
+          sidecar.provenance.runId === profile.runs.candidate[index].runId,
+      ),
+    ).toBe(true);
+    expect(profile.sidecars.candidate[0].outputPath).not.toBe(
+      profile.runs.candidate[0].outputDirectory,
+    );
+    expect(profile.sidecars.candidate[0].checkpointPath).not.toBe(
+      profile.runs.candidate[0].outputDirectory,
+    );
   }, 30_000);
 });

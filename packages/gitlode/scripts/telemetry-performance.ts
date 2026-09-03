@@ -417,11 +417,13 @@ async function main() {
         )
       : undefined;
     const behaviorErrors = [
-      ...(candidate
-        ? await compareAll(workflow, target.quantities, fixture)
-        : await validateLegacy(workflow, target.quantities, fixture)),
-      ...sidecarErrors(workflow),
-    ];
+      ...new Set([
+        ...(candidate
+          ? await compareAll(workflow, target.quantities, fixture)
+          : await validateLegacy(workflow, target.quantities, fixture)),
+      ]),
+    ].sort();
+    const sidecarCompletenessErrors = validateSidecarCompleteness(workflow);
     const sidecarEvaluations = [...workflow.sidecars.values()]
       .filter((sidecar) => sidecar.status !== "not-applicable")
       .map((sidecar) =>
@@ -432,11 +434,13 @@ async function main() {
               reasons: [sidecar.error ?? "collector sidecar failed"],
             },
       );
-    const sidecarStatus = sidecarEvaluations.some((item) => item.status === "fail")
-      ? "fail"
-      : sidecarEvaluations.some((item) => item.status === "inconclusive")
-        ? "inconclusive"
-        : "pass";
+    const sidecarStatus = sidecarCompletenessErrors.length
+      ? "inconclusive"
+      : sidecarEvaluations.some((item) => item.status === "fail")
+        ? "fail"
+        : sidecarEvaluations.some((item) => item.status === "inconclusive")
+          ? "inconclusive"
+          : "pass";
     const evaluation = candidate
       ? evaluateComparison({
           kind: comparison as "disabled_overhead" | "profile_overhead",
@@ -446,13 +450,16 @@ async function main() {
             environment,
             candidateEnvironment as EnvironmentFingerprint,
           ),
-          behavioralErrors: behaviorErrors,
         })
       : undefined;
-    if (evaluation && sidecarStatus !== "pass") {
-      evaluation.status = sidecarStatus;
-      evaluation.reasons.push(...sidecarEvaluations.flatMap((item) => item.reasons));
-    }
+    if (evaluation) evaluation.reasons = [...new Set(evaluation.reasons)].sort();
+    const behavioralStatus = behaviorErrors.length ? "inconclusive" : "pass";
+    const statusRank = { pass: 0, inconclusive: 1, fail: 2 } as const;
+    const statuses = [evaluation?.status ?? "pass", behavioralStatus, sidecarStatus] as const;
+    const finalStatus = statuses.reduce(
+      (current, status) => (statusRank[status] > statusRank[current] ? status : current),
+      "pass" as "pass" | "inconclusive" | "fail",
+    );
     const measuredEvidence = workflow.baseline
       .filter((run) => run.phase === "measured")
       .map((run) =>
@@ -481,8 +488,21 @@ async function main() {
       },
       environment: { baseline: environment, candidate: candidateEnvironment },
       pairOrder: pairPlan(),
-      behavioralValidation: { passed: behaviorErrors.length === 0, errors: behaviorErrors },
-      failureStage: behaviorErrors.length ? "behavior-validation" : undefined,
+      behavioralValidation: {
+        status: behavioralStatus,
+        passed: behaviorErrors.length === 0,
+        errors: behaviorErrors,
+      },
+      failureStage:
+        sidecarStatus === "fail"
+          ? "sidecar-evaluation"
+          : evaluation?.status === "fail"
+            ? "performance-evaluation"
+            : sidecarStatus === "inconclusive"
+              ? "sidecar-evaluation"
+              : behaviorErrors.length
+                ? "behavior-validation"
+                : undefined,
       behaviorEvidence: {
         baseline: measuredEvidence,
         candidate: candidate
@@ -502,7 +522,25 @@ async function main() {
         baseline: sidecarEvidence(workflow, workflow.baseline),
         candidate: candidate ? sidecarEvidence(workflow, workflow.candidate) : undefined,
       },
-      sidecarEvaluation: { status: sidecarStatus, evaluations: sidecarEvaluations },
+      sidecarEvaluation: {
+        status: sidecarStatus,
+        errors: sidecarCompletenessErrors,
+        evaluations: sidecarEvaluations,
+      },
+      formalEvaluation: {
+        status: finalStatus,
+        performance: evaluation,
+        behavior: { status: behavioralStatus, reasons: behaviorErrors },
+        sidecar: {
+          status: sidecarStatus,
+          reasons: [
+            ...new Set([
+              ...sidecarCompletenessErrors,
+              ...sidecarEvaluations.flatMap((item) => item.reasons),
+            ]),
+          ].sort(),
+        },
+      },
       evaluation,
     };
     await mkdir(artifacts, { recursive: true });
@@ -512,7 +550,7 @@ async function main() {
     );
     if (!Buffer.from(await readFile(manifestPath)).equals(originalManifest))
       throw new Error("formal workflow changed manifest");
-    if (behaviorErrors.length || (evaluation && evaluation.status !== "pass")) process.exitCode = 2;
+    if (finalStatus !== "pass") process.exitCode = 2;
   } finally {
     await workflow.cleanup();
   }
@@ -553,15 +591,28 @@ async function makeFingerprint(
     measuredPairCount: 7,
   });
 }
-function sidecarErrors(workflow: Execution): string[] {
+function validateSidecarCompleteness(workflow: Execution): string[] {
   const errors: string[] = [];
-  for (const sidecar of workflow.sidecars.values()) {
-    if (sidecar.status === "inconclusive") errors.push(sidecar.error ?? "collector sidecar failed");
-    if (sidecar.status === "available") {
-      errors.push(...evaluateRepositoryProfileReport(sidecar.report).reasons);
+  const runs = [...workflow.baseline, ...workflow.candidate];
+  const expected = new Set(runs.map((run) => run.runId));
+  for (const run of runs) {
+    const sidecar = workflow.sidecars.get(run.runId);
+    if (!sidecar) errors.push(`missing sidecar for runId ${run.runId}`);
+    else if (sidecar.provenance.runId !== run.runId)
+      errors.push(`sidecar runId mismatch for ${run.runId}`);
+    if (run.state === "target_on") {
+      if (sidecar?.status === "not-applicable")
+        errors.push(`target_on sidecar is not-applicable for ${run.runId}`);
+      if (sidecar?.status === "inconclusive" && sidecar.error) errors.push(sidecar.error);
+      if (sidecar?.status === "available" && !sidecar.report)
+        errors.push(`target_on sidecar report is missing for ${run.runId}`);
+    } else if (sidecar?.status !== "not-applicable") {
+      errors.push(`${run.state} sidecar must be not-applicable for ${run.runId}`);
     }
   }
-  return [...new Set(errors)];
+  for (const runId of workflow.sidecars.keys())
+    if (!expected.has(runId)) errors.push(`unexpected sidecar for runId ${runId}`);
+  return [...new Set(errors)].sort();
 }
 function sidecarEvidence(workflow: Execution, runs: readonly RawRun[]) {
   return runs.map((run) => {
@@ -602,6 +653,8 @@ type RepositorySidecarCapture = {
   readonly report?: unknown;
   readonly resultKind?: string;
   readonly error?: string;
+  readonly outputPath?: string;
+  readonly checkpointPath?: string;
   readonly provenance: {
     readonly workerBundle: "worker-entry.js";
     readonly workerBundleSha256?: string;
@@ -639,9 +692,10 @@ export async function runRepositoryProfileSidecar(input: {
     runId: input.runId,
   };
   const root = await mkdtemp(join(tmpdir(), "gitlode-profile-sidecar-"));
+  const outputDir = join(root, "output");
+  const checkpointPath = join(root, "checkpoint.json");
   try {
-    const outputDir = join(root, "output"),
-      requestPath = join(root, "request.json");
+    const requestPath = join(root, "request.json");
     await mkdir(outputDir);
     const configBytes = await readFile(input.config);
     const config = JSON.parse(await readFile(input.config, "utf8")) as {
@@ -701,27 +755,36 @@ export async function runRepositoryProfileSidecar(input: {
         message?: string;
         success?: { profileReport?: unknown };
         profileReport?: unknown;
+        checkpoint?: unknown;
       };
     };
     const workerResult = result.result;
+    if (workerResult?.checkpoint)
+      await writeFile(checkpointPath, `${JSON.stringify(workerResult.checkpoint)}\n`);
     const report = workerResult?.success?.profileReport ?? workerResult?.profileReport;
     if (!workerResult || workerResult.kind !== "success" || !report)
       return {
         status: "inconclusive",
         resultKind: workerResult?.kind,
         error: workerResult?.message ?? "sidecar result has no ProfileReport",
+        outputPath: outputDir,
+        checkpointPath,
         provenance: resolvedProvenance,
       };
     return {
       status: "available",
       resultKind: workerResult.kind,
       report,
+      outputPath: outputDir,
+      checkpointPath,
       provenance: resolvedProvenance,
     };
   } catch (error) {
     return {
       status: "inconclusive",
       error: error instanceof Error ? error.message : String(error),
+      outputPath: outputDir,
+      checkpointPath,
       provenance,
     };
   } finally {
@@ -827,6 +890,7 @@ async function executePaired(
                 status: "not-applicable",
                 provenance: {
                   workerBundle: "worker-entry.js",
+                  runId: raw.runId,
                   fixture,
                   adapter,
                   revision: candidate?.state === state ? candidate.revision : baselineSpec.revision,

@@ -5,11 +5,11 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { runRepositoryProfileSidecar } from "../../scripts/telemetry-performance.js";
 import {
   createPerformanceRepository,
   createPluginProjectionFixture,
 } from "../support/performance-fixtures.js";
-import { runRepositorySidecarForTest } from "../support/repository-sidecar-runner.js";
 
 const cli = fileURLToPath(new URL("../../dist/index.js", import.meta.url));
 
@@ -29,16 +29,25 @@ describe("repository profile sidecar", () => {
         config,
         JSON.stringify({ version: 1, runtime: { gitAdapter: "isomorphic-git" } }),
       );
-      const result = await runRepositorySidecarForTest({
+      const result = await runRepositoryProfileSidecar({
         cli,
+        runId: "test-isomorphic",
         repository: root,
         config,
         adapter: "isomorphic-git",
+        fixture: "commit_heavy_repository",
+        quantities: { commits: 5, files: 1, plugins: 0, rotations: 1, scale: 0 },
       });
-      expect(result.result.kind).toBe("success");
-      expect(result.result.success?.profileReport).toMatchObject({
+      expect(result.status).toBe("available");
+      expect(result.report).toMatchObject({
         schemaVersion: 1,
         diagnostics: [],
+      });
+      expect(result.provenance).toMatchObject({
+        runId: "test-isomorphic",
+        fixture: "commit_heavy_repository",
+        adapter: "isomorphic-git",
+        quantities: { commits: 5, files: 1, plugins: 0, rotations: 1, scale: 0 },
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -57,16 +66,25 @@ describe("repository profile sidecar", () => {
       });
       const config = join(root, "config.json");
       await writeFile(config, JSON.stringify({ version: 1, runtime: { gitAdapter: "git-cli" } }));
-      const result = await runRepositorySidecarForTest({
+      const result = await runRepositoryProfileSidecar({
         cli,
+        runId: "test-git-cli",
         repository: root,
         config,
         adapter: "git-cli",
+        fixture: "file_heavy_repository",
+        quantities: { commits: 5, files: 2, plugins: 0, rotations: 1, scale: 0 },
         fileFixture: true,
         rotationLines: 2,
       });
-      expect(result.result.kind).toBe("success");
-      expect(result.result.success?.profileReport).toMatchObject({ schemaVersion: 1 });
+      expect(result.status).toBe("available");
+      expect(result.report).toMatchObject({ schemaVersion: 1 });
+      expect(result.provenance).toMatchObject({
+        runId: "test-git-cli",
+        fixture: "file_heavy_repository",
+        adapter: "git-cli",
+        quantities: { commits: 5, files: 2, plugins: 0, rotations: 1, scale: 0 },
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -89,15 +107,24 @@ describe("repository profile sidecar", () => {
         rotations: 1,
         scale: 0,
       });
-      const result = await runRepositorySidecarForTest({
+      const result = await runRepositoryProfileSidecar({
         cli,
+        runId: "test-plugin",
         repository: root,
         config: fixture.configPath,
         adapter: "isomorphic-git",
+        fixture: "plugin_heavy_projection",
+        quantities: { commits: 5, files: 1, plugins: 2, rotations: 1, scale: 0 },
         fileFixture: true,
       });
-      expect(result.result.kind).toBe("success");
-      expect(result.result.success?.profileReport).toMatchObject({ schemaVersion: 1 });
+      expect(result.status).toBe("available");
+      expect(result.report).toMatchObject({ schemaVersion: 1 });
+      expect(result.provenance).toMatchObject({
+        runId: "test-plugin",
+        fixture: "plugin_heavy_projection",
+        adapter: "isomorphic-git",
+        quantities: { commits: 5, files: 1, plugins: 2, rotations: 1, scale: 0 },
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -14,7 +14,12 @@ multiple namespaces, and exercises success and skip without network, IPC, or inj
 children, records reports and RSS evidence separately, and returns inconclusive/nonzero when RSS or
 child evidence is unavailable. Repository target profiling uses a separate development-only sidecar
 child around the release `worker-entry.js`; its output and checkpoint are isolated from the timed
-CLI workflow.
+CLI workflow. For `target_on`, this sidecar and its `ProfileReport` are required. `target_off` and
+`legacy_off` record a not-applicable sidecar. Repository acceptance is evaluated independently of
+aggregation N/4N/RSS growth: report schema, signal status, diagnostics, the 1 MiB report limit,
+and prohibited host spans are propagated into the top-level evaluation. Runtime Git command-start
+counts are not inferred from span counts; T09 command-parity tests remain separate contract
+evidence.
 
 The aggregation command requires `--fixture aggregation_scale` and `--artifacts <directory>` and
 writes `aggregation-scale.json`. Each artifact records the manifest recipe hash, source revision,

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { resolveSourceRevision } from "../../src/support/source-revision.js";
+import { resolveSourceRevision } from "../../scripts/tooling/source-revision.js";
 
 describe("source revision resolution", () => {
   it("resolves the actual HEAD using process-local safe.directory", async () => {

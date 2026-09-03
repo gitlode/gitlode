@@ -1,1 +1,1 @@
-export { resolveSourceRevision } from "../src/support/source-revision.js";
+export { resolveSourceRevision } from "./tooling/source-revision.js";

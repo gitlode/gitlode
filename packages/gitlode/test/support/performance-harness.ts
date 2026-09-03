@@ -8,7 +8,7 @@ import { performance } from "node:perf_hooks";
 import { TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
 
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
-export { resolveSourceRevision } from "../../src/support/source-revision.js";
+export { resolveSourceRevision } from "../../scripts/tooling/source-revision.js";
 
 export type ProfileState = "legacy_off" | "target_off" | "target_on";
 export type Availability<T> =
@@ -587,7 +587,7 @@ export interface VolumeObservation {
   readonly profileRssDeltaBytes: number | undefined;
   readonly prohibitedScalingSpanCount: number;
   readonly gitCommandSpans: number;
-  readonly gitCommandStarts: number;
+  readonly gitCommandStarts?: number;
   readonly pluginSpans: number;
   readonly fixtureOwnedScopes?: readonly string[];
   readonly reportBytes: number;
@@ -701,7 +701,10 @@ export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
     failureReasons.push("profile RSS delta grew by more than 8 MiB");
   if (fourN.prohibitedScalingSpanCount || n.prohibitedScalingSpanCount)
     failureReasons.push("prohibited scaling spans observed");
-  if (fourN.gitCommandSpans !== fourN.gitCommandStarts || n.gitCommandSpans !== n.gitCommandStarts)
+  if (
+    (fourN.gitCommandStarts !== undefined && fourN.gitCommandSpans !== fourN.gitCommandStarts) ||
+    (n.gitCommandStarts !== undefined && n.gitCommandSpans !== n.gitCommandStarts)
+  )
     failureReasons.push("Git command span/start mismatch");
   if (n.reportBytes > 1_048_576 || fourN.reportBytes > 1_048_576)
     failureReasons.push("ProfileReport exceeds 1 MiB");
@@ -714,5 +717,45 @@ export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
         : ("pass" as const),
     reasons,
     pluginSpans: { n: n.pluginSpans, fourN: fourN.pluginSpans },
+  };
+}
+
+export function evaluateRepositoryProfileReport(report: unknown) {
+  let measurements: ReturnType<typeof extractProfileReportMeasurements>;
+  try {
+    measurements = extractProfileReportMeasurements(report);
+  } catch (error) {
+    return {
+      status: "inconclusive" as const,
+      reasons: [error instanceof Error ? error.message : "ProfileReport schema is invalid"],
+      reportMeasurements: undefined,
+    };
+  }
+  const value = report as { signalStatus?: Record<string, unknown>; diagnostics?: unknown[] };
+  const failureReasons: string[] = [];
+  const inconclusiveReasons: string[] = [];
+  if (measurements.reportJsonBytes.value > 1_048_576)
+    failureReasons.push("ProfileReport exceeds 1 MiB");
+  const prohibited = measurements.prohibitedScalingSpanCount.value;
+  if (prohibited > 0) failureReasons.push("prohibited scaling spans observed");
+  const signalStatus = value.signalStatus;
+  if (
+    !signalStatus ||
+    ["spans", "counters", "histograms"].some((key) => signalStatus[key] !== "complete")
+  )
+    inconclusiveReasons.push("ProfileReport signal status is incomplete");
+  if (!Array.isArray(value.diagnostics))
+    inconclusiveReasons.push("ProfileReport diagnostics are missing");
+  else if (value.diagnostics.length > 0) failureReasons.push("ProfileReport contains diagnostics");
+  const reasons = [...failureReasons, ...inconclusiveReasons];
+  return {
+    status: failureReasons.length
+      ? ("fail" as const)
+      : inconclusiveReasons.length
+        ? ("inconclusive" as const)
+        : ("pass" as const),
+    reasons,
+    reportMeasurements: measurements,
+    prohibitedHostSpanCount: prohibited,
   };
 }

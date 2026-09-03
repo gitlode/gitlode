@@ -6,7 +6,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { buildAggregationCollectorBundle } from "../src/execution/telemetry/aggregation-collector-bundle.js";
 import { createEmptyCheckpoint } from "../src/state/index.js";
 import {
   comparePerformanceBehavior,
@@ -30,6 +29,7 @@ import {
   launchMeasuredChild,
   median,
   evaluateVolume,
+  evaluateRepositoryProfileReport,
   volumeObservationFromProfileReport,
   nextCalibrationQuantity,
   pairPlan,
@@ -52,8 +52,9 @@ import {
   type RepositoryFixture,
 } from "../test/support/performance-workflow.js";
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
-import { resolveSourceRevision } from "./source-revision.js";
 import { runAggregationChild } from "./telemetry-aggregation.js";
+import { buildAggregationCollectorBundle } from "./tooling/aggregation-collector-bundle.js";
+import { resolveSourceRevision } from "./tooling/source-revision.js";
 
 const exec = promisify(execFile);
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -141,13 +142,11 @@ async function main() {
             volumeObservationFromProfileReport(reports[1], {
               scale,
               profileRssDeltaBytes: nDelta,
-              gitCommandStarts: 0,
               fixtureOwnedScopes: ["gitlode.performance.aggregation"],
             }),
             volumeObservationFromProfileReport(reports[3], {
               scale: scale * 4,
               profileRssDeltaBytes: fourNDelta,
-              gitCommandStarts: 0,
               fixtureOwnedScopes: ["gitlode.performance.aggregation"],
             }),
           )
@@ -423,6 +422,21 @@ async function main() {
         : await validateLegacy(workflow, target.quantities, fixture)),
       ...sidecarErrors(workflow),
     ];
+    const sidecarEvaluations = [...workflow.sidecars.values()]
+      .filter((sidecar) => sidecar.status !== "not-applicable")
+      .map((sidecar) =>
+        sidecar.status === "available"
+          ? evaluateRepositoryProfileReport(sidecar.report)
+          : {
+              status: "inconclusive" as const,
+              reasons: [sidecar.error ?? "collector sidecar failed"],
+            },
+      );
+    const sidecarStatus = sidecarEvaluations.some((item) => item.status === "fail")
+      ? "fail"
+      : sidecarEvaluations.some((item) => item.status === "inconclusive")
+        ? "inconclusive"
+        : "pass";
     const evaluation = candidate
       ? evaluateComparison({
           kind: comparison as "disabled_overhead" | "profile_overhead",
@@ -435,6 +449,10 @@ async function main() {
           behavioralErrors: behaviorErrors,
         })
       : undefined;
+    if (evaluation && sidecarStatus !== "pass") {
+      evaluation.status = sidecarStatus;
+      evaluation.reasons.push(...sidecarEvaluations.flatMap((item) => item.reasons));
+    }
     const measuredEvidence = workflow.baseline
       .filter((run) => run.phase === "measured")
       .map((run) =>
@@ -484,6 +502,7 @@ async function main() {
         baseline: sidecarEvidence(workflow, workflow.baseline),
         candidate: candidate ? sidecarEvidence(workflow, workflow.candidate) : undefined,
       },
+      sidecarEvaluation: { status: sidecarStatus, evaluations: sidecarEvaluations },
       evaluation,
     };
     await mkdir(artifacts, { recursive: true });
@@ -539,11 +558,7 @@ function sidecarErrors(workflow: Execution): string[] {
   for (const sidecar of workflow.sidecars.values()) {
     if (sidecar.status === "inconclusive") errors.push(sidecar.error ?? "collector sidecar failed");
     if (sidecar.status === "available") {
-      try {
-        extractProfileReportMeasurements(sidecar.report);
-      } catch {
-        errors.push("collector sidecar report is malformed or has the wrong schema");
-      }
+      errors.push(...evaluateRepositoryProfileReport(sidecar.report).reasons);
     }
   }
   return [...new Set(errors)];
@@ -552,23 +567,21 @@ function sidecarEvidence(workflow: Execution, runs: readonly RawRun[]) {
   return runs.map((run) => {
     const sidecar = workflow.sidecars.get(run.runId);
     if (!sidecar || sidecar.status !== "available") return sidecar ?? null;
-    const measurements = extractProfileReportMeasurements(sidecar.report);
-    const initial = volumeObservationFromProfileReport(sidecar.report, {
+    const formalEvaluation = evaluateRepositoryProfileReport(sidecar.report);
+    const observation = volumeObservationFromProfileReport(sidecar.report, {
       scale: 1,
       profileRssDeltaBytes: undefined,
-      gitCommandStarts: 0,
       fixtureOwnedScopes: [],
     });
-    const observation = { ...initial, gitCommandStarts: initial.gitCommandSpans };
     return {
       ...sidecar,
-      reportMeasurements: measurements,
+      reportMeasurements: formalEvaluation.reportMeasurements,
       volumeObservation: observation,
-      volumeEvaluation: evaluateVolume(observation, observation),
+      repositoryEvaluation: formalEvaluation,
       reportSize: {
-        bytes: measurements.reportJsonBytes.value,
+        bytes: observation.reportBytes,
         limitBytes: 1_048_576,
-        status: measurements.reportJsonBytes.value <= 1_048_576 ? "pass" : "fail",
+        status: observation.reportBytes <= 1_048_576 ? "pass" : "fail",
       },
       prohibitedHostSpanCount: observation.prohibitedScalingSpanCount,
       gitCliCommandSpanCount: observation.gitCommandSpans,
@@ -591,16 +604,19 @@ type RepositorySidecarCapture = {
   readonly error?: string;
   readonly provenance: {
     readonly workerBundle: "worker-entry.js";
-    readonly workerBundleSha256: string;
-    readonly configSha256: string;
+    readonly workerBundleSha256?: string;
+    readonly configSha256?: string;
+    readonly runId?: string;
     readonly fixture: RepositoryFixture;
     readonly adapter: "isomorphic-git" | "git-cli";
     readonly revision: string;
     readonly recipeHash: string;
+    readonly quantities: FixtureQuantities;
   };
 };
 
 export async function runRepositoryProfileSidecar(input: {
+  readonly runId: string;
   readonly cli: string;
   readonly repository: string;
   readonly config: string;
@@ -619,6 +635,8 @@ export async function runRepositoryProfileSidecar(input: {
     adapter: input.adapter,
     revision: input.revision,
     recipeHash: input.recipeHash,
+    quantities: input.quantities,
+    runId: input.runId,
   };
   const root = await mkdtemp(join(tmpdir(), "gitlode-profile-sidecar-"));
   try {
@@ -795,6 +813,7 @@ async function executePaired(
           state === "target_on"
             ? await runRepositoryProfileSidecar({
                 cli,
+                runId: raw.runId,
                 repository,
                 config,
                 fixture,
@@ -808,12 +827,11 @@ async function executePaired(
                 status: "not-applicable",
                 provenance: {
                   workerBundle: "worker-entry.js",
-                  workerBundleSha256: "",
-                  configSha256: "",
                   fixture,
                   adapter,
                   revision: candidate?.state === state ? candidate.revision : baselineSpec.revision,
                   recipeHash: fixtureRecipeHash(manifest),
+                  quantities,
                 },
               },
         );

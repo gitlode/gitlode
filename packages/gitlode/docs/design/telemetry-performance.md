@@ -54,7 +54,15 @@ Trace-volume checks reject the return of per-record, per-write, per-blob, per-di
 file-expansion spans. Git CLI command spans may scale only with actual command invocations and must
 not cause additional commands. Plugin-created spans are reported separately from host volume.
 
-For each fixed performance fixture, the JSON UTF-8 representation of `ProfileReport` must remain at
+Repository sidecar acceptance is a separate formal workflow. For `target_on`, the sidecar and a
+valid `ProfileReport` are required; `legacy_off` and `target_off` are not-applicable. The repository
+checks report schema, signal status, diagnostics, the 1 MiB report limit, and prohibited host
+spans, and propagates fail or inconclusive to the top-level evaluation after saving the artifact.
+It does not reuse aggregation N/4N/RSS evaluation. Git CLI command-start counts are not inferred
+from runtime spans; any T09 command-parity result is explicitly contract evidence unless an
+independent development-only command-start measurement is available.
+
+For each fixed performance fixture, the development-only collector's JSON UTF-8 representation of `ProfileReport` must remain at
 or below 1 MiB. This is a fixture acceptance limit, not a claim that an unbounded number of configured
 plugin scopes consumes constant space.
 

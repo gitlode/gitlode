@@ -5,7 +5,10 @@ import { cpus, release, totalmem } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
+import { TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
+
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
+export { resolveSourceRevision } from "../../scripts/tooling/source-revision.js";
 
 export type ProfileState = "legacy_off" | "target_off" | "target_on";
 export type Availability<T> =
@@ -26,7 +29,7 @@ export interface FixtureManifest {
   readonly calibrationTargets: Readonly<Record<string, CalibrationTarget>>;
   readonly aggregationScale: {
     readonly status: "fixed-recipe";
-    readonly integration: "pending-target-collector";
+    readonly integration: "pending-target-collector" | "implemented-target-collector";
     readonly quantities: { readonly scale: number };
   };
 }
@@ -280,6 +283,42 @@ export interface TargetTelemetryMeasurements {
   readonly histogramDatapointCount: Availability<number>;
   readonly diagnosticCount: Availability<number>;
 }
+export function extractProfileReportMeasurements(report: unknown): TargetTelemetryMeasurements {
+  if (!report || typeof report !== "object") throw new Error("collector output is not an object");
+  const value = report as Record<string, unknown>;
+  const spans = value.spans,
+    counters = value.counters,
+    histograms = value.histograms,
+    diagnostics = value.diagnostics;
+  if (
+    value.schemaVersion !== 1 ||
+    "rawSpans" in value ||
+    "rawHistogramSamples" in value ||
+    !Array.isArray(spans) ||
+    !Array.isArray(counters) ||
+    !Array.isArray(histograms) ||
+    !Array.isArray(diagnostics)
+  )
+    throw new Error("collector output is missing ProfileReport arrays");
+  const ended = spans.reduce((sum, item) => {
+    const calls =
+      item && typeof item === "object" ? (item as Record<string, unknown>).callCount : undefined;
+    if (!Number.isSafeInteger(calls) || (calls as number) < 0)
+      throw new Error("collector output has an invalid callCount");
+    return sum + (calls as number);
+  }, 0);
+  return {
+    reportJsonBytes: {
+      status: "available",
+      value: Buffer.byteLength(JSON.stringify(report), "utf8"),
+    },
+    spanAggregateGroupCount: { status: "available", value: spans.length },
+    totalEndedSpanCount: { status: "available", value: ended },
+    counterDatapointCount: { status: "available", value: counters.length },
+    histogramDatapointCount: { status: "available", value: histograms.length },
+    diagnosticCount: { status: "available", value: diagnostics.length },
+  };
+}
 export const unavailableTargetTelemetry = (state: ProfileState): TargetTelemetryMeasurements => {
   const value: Availability<number> =
     state === "legacy_off"
@@ -289,7 +328,7 @@ export const unavailableTargetTelemetry = (state: ProfileState): TargetTelemetry
         }
       : {
           status: "unavailable",
-          reason: "target ProfileReport observation seam is not implemented yet",
+          reason: "development-only ProfileReport collector was not requested for this run",
         };
   return {
     reportJsonBytes: value,
@@ -316,6 +355,8 @@ export interface RawRun {
   readonly skippedDiffs: Availability<number>;
   readonly telemetry: TargetTelemetryMeasurements;
   readonly runId: string;
+  readonly outputDirectory: string;
+  readonly checkpointPath?: string;
   readonly captureErrors: readonly string[];
 }
 export async function launchMeasuredChild(input: {
@@ -328,6 +369,7 @@ export async function launchMeasuredChild(input: {
   readonly pairIndex?: number;
   readonly env?: NodeJS.ProcessEnv;
   readonly rssReader?: RssReader;
+  readonly checkpointPath?: string;
 }): Promise<RawRun> {
   const args = [...input.args, "--quiet", ...(input.state === "target_on" ? ["--profile"] : [])];
   const start = performance.now();
@@ -379,6 +421,7 @@ export async function launchMeasuredChild(input: {
       (file as Record<string, unknown>).deletions === null
     );
   }).length;
+  const telemetry = unavailableTargetTelemetry(input.state);
   return {
     state: input.state,
     phase: input.phase,
@@ -392,10 +435,99 @@ export async function launchMeasuredChild(input: {
     records: { status: "available", value: records.length },
     commits: { status: "available", value: commitOids.size },
     skippedDiffs: { status: "available", value: skippedDiffs },
-    telemetry: unavailableTargetTelemetry(input.state),
+    telemetry,
     runId: `${input.phase}-${input.pairIndex ?? 0}-${input.state}`,
+    outputDirectory: input.outputDirectory,
+    checkpointPath: input.checkpointPath,
     captureErrors,
   };
+}
+
+export function pathIsolationEvidence(
+  timedOutput: string | undefined,
+  timedCheckpoint: string | undefined,
+  sidecarOutput: string | undefined,
+  sidecarCheckpoint: string | undefined,
+) {
+  const values = [timedOutput, timedCheckpoint, sidecarOutput, sidecarCheckpoint];
+  return {
+    outputPathsDiffer:
+      timedOutput !== undefined && sidecarOutput !== undefined && timedOutput !== sidecarOutput,
+    checkpointPathsDiffer:
+      timedCheckpoint !== undefined &&
+      sidecarCheckpoint !== undefined &&
+      timedCheckpoint !== sidecarCheckpoint,
+    crossPathsDiffer: values.every(
+      (value, index) => value !== undefined && values.indexOf(value) === index,
+    ),
+  };
+}
+
+export type FormalStatus = "pass" | "inconclusive" | "fail";
+export function composeFormalStatus(
+  statuses: readonly FormalStatus[],
+  reasons: readonly string[] = [],
+) {
+  const rank = { pass: 0, inconclusive: 1, fail: 2 } as const;
+  const status = statuses.reduce(
+    (current, value) => (rank[value] > rank[current] ? value : current),
+    "pass" as FormalStatus,
+  );
+  return { status, reasons: [...new Set(reasons)].sort() };
+}
+
+export function composeSidecarEvaluationStatus(
+  reportStatuses: readonly FormalStatus[],
+  completenessErrors: readonly string[] = [],
+) {
+  return composeFormalStatus(
+    [...reportStatuses, ...(completenessErrors.length ? ["inconclusive" as const] : [])],
+    completenessErrors,
+  );
+}
+
+export interface SidecarMatrixEntry {
+  readonly runId: string;
+  readonly state: ProfileState;
+}
+export interface SidecarMatrixCapture {
+  readonly runId: string;
+  readonly status: "available" | "inconclusive" | "not-applicable";
+  readonly provenanceRunId?: string;
+  readonly report?: unknown;
+}
+export function validateSidecarMatrix(
+  runs: readonly SidecarMatrixEntry[],
+  sidecars: readonly SidecarMatrixCapture[],
+) {
+  const errors: string[] = [];
+  const grouped = new Map<string, SidecarMatrixCapture[]>();
+  for (const sidecar of sidecars)
+    grouped.set(sidecar.runId, [...(grouped.get(sidecar.runId) ?? []), sidecar]);
+  for (const [runId, matches] of grouped)
+    if (matches.length > 1) errors.push(`duplicate sidecar for runId ${runId}`);
+  for (const run of runs) {
+    const matches = grouped.get(run.runId) ?? [];
+    if (!matches.length) errors.push(`missing sidecar for runId ${run.runId}`);
+    const sidecar = matches[0];
+    if (!sidecar) continue;
+    if (sidecar.provenanceRunId !== run.runId)
+      errors.push(`sidecar runId mismatch for ${run.runId}`);
+    if (run.state === "target_on") {
+      if (sidecar.status === "not-applicable")
+        errors.push(`target_on sidecar is not-applicable for ${run.runId}`);
+      if (sidecar.status === "inconclusive")
+        errors.push(`target_on sidecar is inconclusive for ${run.runId}`);
+      if (sidecar.status === "available" && sidecar.report === undefined)
+        errors.push(`target_on sidecar report is missing for ${run.runId}`);
+    } else if (sidecar.status !== "not-applicable") {
+      errors.push(`${run.state} sidecar must be not-applicable for ${run.runId}`);
+    }
+  }
+  for (const runId of grouped.keys())
+    if (!runs.some((run) => run.runId === runId))
+      errors.push(`unexpected sidecar for runId ${runId}`);
+  return [...new Set(errors)].sort();
 }
 
 export function pairPlan(
@@ -544,29 +676,187 @@ export interface VolumeObservation {
   readonly spanGroups: number;
   readonly metricDatapoints: number;
   readonly histogramBuckets: number;
-  readonly profileRssDeltaBytes: number;
+  readonly profileRssDeltaBytes: number | undefined;
   readonly prohibitedScalingSpanCount: number;
   readonly gitCommandSpans: number;
-  readonly gitCommandStarts: number;
+  readonly gitCommandStarts?: number;
   readonly pluginSpans: number;
+  readonly fixtureOwnedScopes?: readonly string[];
   readonly reportBytes: number;
+  readonly totalEndedSpanCount?: number;
+  readonly diagnosticCount?: number;
+}
+
+function classifyProfileReportSpans(report: unknown) {
+  const value = report as { spans?: readonly Record<string, unknown>[] };
+  const spans = value.spans ?? [];
+  const acceptedCoreScopes = new Set(
+    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map((span) => span.scope.name),
+  );
+  const acceptedCorePairs = new Set(
+    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map(
+      (span) => `${span.scope.name}\u0000${span.name}`,
+    ),
+  );
+  const gitCliPairs = new Set(
+    TELEMETRY_SPANS.filter(
+      (span) => span.scope.type === "core" && span.name.startsWith("gitlode.git.cli."),
+    ).map((span) => `${span.scope.name}\u0000${span.name}`),
+  );
+  const scopeName = (span: Record<string, unknown>) => {
+    const scope = span.scope;
+    return typeof scope === "object" &&
+      scope !== null &&
+      typeof (scope as { name?: unknown }).name === "string"
+      ? (scope as { name: string }).name
+      : undefined;
+  };
+  const callCount = (span: Record<string, unknown>) =>
+    typeof span.callCount === "number" ? span.callCount : 0;
+  return {
+    prohibitedScalingSpanCount: spans
+      .filter((span) => {
+        const name = scopeName(span);
+        return (
+          name !== undefined &&
+          acceptedCoreScopes.has(name) &&
+          !acceptedCorePairs.has(`${name}\u0000${String(span.name)}`)
+        );
+      })
+      .reduce((sum, span) => sum + callCount(span), 0),
+    gitCommandSpans: spans
+      .filter((span) => {
+        const name = scopeName(span);
+        return (
+          name !== undefined &&
+          typeof span.name === "string" &&
+          gitCliPairs.has(`${name}\u0000${span.name}`)
+        );
+      })
+      .reduce((sum, span) => sum + callCount(span), 0),
+  };
+}
+
+export function volumeObservationFromProfileReport(
+  report: unknown,
+  evidence: Pick<
+    VolumeObservation,
+    "scale" | "profileRssDeltaBytes" | "gitCommandStarts" | "fixtureOwnedScopes"
+  >,
+): VolumeObservation {
+  const measurements = extractProfileReportMeasurements(report);
+  const value = report as Record<string, readonly Record<string, unknown>[]>;
+  const spans = value.spans;
+  if (!spans || !value.histograms) throw new Error("collector output is missing report signals");
+  const classification = classifyProfileReportSpans(report);
+  const pluginSpans = spans
+    .filter((span) => {
+      const scope = span.scope;
+      const scopeName =
+        typeof scope === "object" &&
+        scope !== null &&
+        typeof (scope as Record<string, unknown>).name === "string"
+          ? ((scope as Record<string, unknown>).name as string)
+          : undefined;
+      return (
+        scopeName !== undefined &&
+        !TELEMETRY_SPANS.some(
+          (item) => item.scope.type === "core" && item.scope.name === scopeName,
+        ) &&
+        !evidence.fixtureOwnedScopes?.includes(scopeName)
+      );
+    })
+    .reduce((sum, span) => sum + (span.callCount as number), 0);
+  const histogramBuckets = value.histograms.reduce(
+    (sum, histogram) =>
+      sum + (Array.isArray(histogram.bucketCounts) ? histogram.bucketCounts.length : 0),
+    0,
+  );
+  return {
+    ...evidence,
+    spanGroups: measurements.spanAggregateGroupCount.value,
+    metricDatapoints:
+      measurements.counterDatapointCount.value + measurements.histogramDatapointCount.value,
+    histogramBuckets,
+    prohibitedScalingSpanCount: classification.prohibitedScalingSpanCount,
+    gitCommandSpans: classification.gitCommandSpans,
+    pluginSpans,
+    reportBytes: measurements.reportJsonBytes.value,
+    totalEndedSpanCount: measurements.totalEndedSpanCount.value,
+    diagnosticCount: measurements.diagnosticCount.value,
+  };
 }
 export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
-  const reasons: string[] = [];
-  if (fourN.spanGroups !== n.spanGroups) reasons.push("span aggregate groups grew");
-  if (fourN.metricDatapoints !== n.metricDatapoints) reasons.push("metric datapoints grew");
-  if (fourN.histogramBuckets !== n.histogramBuckets) reasons.push("histogram buckets grew");
-  if (fourN.profileRssDeltaBytes - n.profileRssDeltaBytes > 8 * 1024 ** 2)
-    reasons.push("profile RSS delta grew by more than 8 MiB");
+  const failureReasons: string[] = [];
+  const inconclusiveReasons: string[] = [];
+  if (n.profileRssDeltaBytes === undefined || fourN.profileRssDeltaBytes === undefined)
+    inconclusiveReasons.push("profile RSS delta is unsupported or incomplete");
+  if (fourN.spanGroups !== n.spanGroups) failureReasons.push("span aggregate groups grew");
+  if (fourN.metricDatapoints !== n.metricDatapoints) failureReasons.push("metric datapoints grew");
+  if (fourN.histogramBuckets !== n.histogramBuckets) failureReasons.push("histogram buckets grew");
+  if (
+    n.profileRssDeltaBytes !== undefined &&
+    fourN.profileRssDeltaBytes !== undefined &&
+    fourN.profileRssDeltaBytes - n.profileRssDeltaBytes > 8 * 1024 ** 2
+  )
+    failureReasons.push("profile RSS delta grew by more than 8 MiB");
   if (fourN.prohibitedScalingSpanCount || n.prohibitedScalingSpanCount)
-    reasons.push("prohibited scaling spans observed");
-  if (fourN.gitCommandSpans !== fourN.gitCommandStarts || n.gitCommandSpans !== n.gitCommandStarts)
-    reasons.push("Git command span/start mismatch");
+    failureReasons.push("prohibited scaling spans observed");
+  if (
+    (fourN.gitCommandStarts !== undefined && fourN.gitCommandSpans !== fourN.gitCommandStarts) ||
+    (n.gitCommandStarts !== undefined && n.gitCommandSpans !== n.gitCommandStarts)
+  )
+    failureReasons.push("Git command span/start mismatch");
   if (n.reportBytes > 1_048_576 || fourN.reportBytes > 1_048_576)
-    reasons.push("ProfileReport exceeds 1 MiB");
+    failureReasons.push("ProfileReport exceeds 1 MiB");
+  const reasons = [...failureReasons, ...inconclusiveReasons];
   return {
-    status: reasons.length ? ("fail" as const) : ("pass" as const),
+    status: failureReasons.length
+      ? ("fail" as const)
+      : inconclusiveReasons.length
+        ? ("inconclusive" as const)
+        : ("pass" as const),
     reasons,
     pluginSpans: { n: n.pluginSpans, fourN: fourN.pluginSpans },
+  };
+}
+
+export function evaluateRepositoryProfileReport(report: unknown) {
+  let measurements: ReturnType<typeof extractProfileReportMeasurements>;
+  try {
+    measurements = extractProfileReportMeasurements(report);
+  } catch (error) {
+    return {
+      status: "inconclusive" as const,
+      reasons: [error instanceof Error ? error.message : "ProfileReport schema is invalid"],
+      reportMeasurements: undefined,
+    };
+  }
+  const value = report as { signalStatus?: Record<string, unknown>; diagnostics?: unknown[] };
+  const failureReasons: string[] = [];
+  const inconclusiveReasons: string[] = [];
+  if (measurements.reportJsonBytes.value > 1_048_576)
+    failureReasons.push("ProfileReport exceeds 1 MiB");
+  const prohibited = classifyProfileReportSpans(report).prohibitedScalingSpanCount;
+  if (prohibited > 0) failureReasons.push("prohibited scaling spans observed");
+  const signalStatus = value.signalStatus;
+  if (
+    !signalStatus ||
+    ["spans", "counters", "histograms"].some((key) => signalStatus[key] !== "complete")
+  )
+    inconclusiveReasons.push("ProfileReport signal status is incomplete");
+  if (!Array.isArray(value.diagnostics))
+    inconclusiveReasons.push("ProfileReport diagnostics are missing");
+  else if (value.diagnostics.length > 0) failureReasons.push("ProfileReport contains diagnostics");
+  const reasons = [...failureReasons, ...inconclusiveReasons];
+  return {
+    status: failureReasons.length
+      ? ("fail" as const)
+      : inconclusiveReasons.length
+        ? ("inconclusive" as const)
+        : ("pass" as const),
+    reasons,
+    reportMeasurements: measurements,
+    prohibitedHostSpanCount: prohibited,
   };
 }

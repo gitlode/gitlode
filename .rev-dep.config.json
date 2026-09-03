@@ -389,6 +389,7 @@
           "allow": [
             "packages/gitlode/src/**",
             "packages/gitlode/test/**",
+            "packages/gitlode/scripts/**",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/dist/extraction-api/index.js",

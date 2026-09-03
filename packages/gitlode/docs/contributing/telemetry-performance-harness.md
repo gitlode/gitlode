@@ -9,9 +9,26 @@ supports the bundled release CLI, adds `--quiet` to every child, and adds `--pro
 Repository targets are commit-heavy and file-heavy with either adapter, plus plugin-heavy fixed to
 `isomorphic-git`. The plugin recipe creates one deterministic local package, registers it under
 multiple namespaces, and exercises success and skip without network, IPC, or injected scripts.
-`aggregation_scale` is a fixed Git-independent N/4N recipe and pure evaluator; selecting it in a
-command reports that its dedicated T13 collector child runner is not implemented rather than
-routing it through a repository benchmark.
+`aggregation_scale` is a fixed Git-independent recipe. Run it with the dedicated
+`performance:aggregate` development-only workflow; it launches four independent collector
+children, records reports and RSS evidence separately, and returns inconclusive/nonzero when RSS or
+child evidence is unavailable. Repository target profiling uses a separate development-only sidecar
+child around the release `worker-entry.js`; its output and checkpoint are isolated from the timed
+CLI workflow. For `target_on`, this sidecar and its `ProfileReport` are required. `target_off` and
+`legacy_off` record a not-applicable sidecar. Repository acceptance is evaluated independently of
+aggregation N/4N/RSS growth: report schema, signal status, diagnostics, the 1 MiB report limit,
+and prohibited host spans are propagated into the top-level evaluation. Runtime Git command-start
+counts are not inferred from span counts; T09 command-parity tests remain separate contract
+evidence.
+
+The aggregation command requires `--fixture aggregation_scale` and `--artifacts <directory>` and
+writes `aggregation-scale.json`. Each artifact records the manifest recipe hash, source revision,
+built collector runner identity/hash, four raw child outcomes, N/4N report measurements, RSS deltas, volume
+evaluation, and pass/fail/inconclusive reasons. Children execute built JavaScript with `node`; the
+timed repository CLI is never used for collector timing or memory evidence. Missing, malformed,
+failed, or signal-terminated children are inconclusive. A supported RSS measurement that violates
+the 8 MiB N-to-4N growth limit is a failure. Platforms without external child RSS support, such as
+the current Windows test environment, therefore produce an inconclusive artifact and nonzero exit.
 
 ## Reference workflow
 

@@ -593,7 +593,7 @@ export interface VolumeObservation {
   readonly spanGroups: number;
   readonly metricDatapoints: number;
   readonly histogramBuckets: number;
-  readonly profileRssDeltaBytes: number;
+  readonly profileRssDeltaBytes: number | undefined;
   readonly prohibitedScalingSpanCount: number;
   readonly gitCommandSpans: number;
   readonly gitCommandStarts: number;
@@ -647,10 +647,16 @@ export function volumeObservationFromProfileReport(
 }
 export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
   const reasons: string[] = [];
+  if (n.profileRssDeltaBytes === undefined || fourN.profileRssDeltaBytes === undefined)
+    reasons.push("profile RSS delta is unsupported or incomplete");
   if (fourN.spanGroups !== n.spanGroups) reasons.push("span aggregate groups grew");
   if (fourN.metricDatapoints !== n.metricDatapoints) reasons.push("metric datapoints grew");
   if (fourN.histogramBuckets !== n.histogramBuckets) reasons.push("histogram buckets grew");
-  if (fourN.profileRssDeltaBytes - n.profileRssDeltaBytes > 8 * 1024 ** 2)
+  if (
+    n.profileRssDeltaBytes !== undefined &&
+    fourN.profileRssDeltaBytes !== undefined &&
+    fourN.profileRssDeltaBytes - n.profileRssDeltaBytes > 8 * 1024 ** 2
+  )
     reasons.push("profile RSS delta grew by more than 8 MiB");
   if (fourN.prohibitedScalingSpanCount || n.prohibitedScalingSpanCount)
     reasons.push("prohibited scaling spans observed");

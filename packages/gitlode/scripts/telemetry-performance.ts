@@ -25,6 +25,8 @@ import {
   fixtureRecipeHash,
   launchMeasuredChild,
   median,
+  evaluateVolume,
+  volumeObservationFromProfileReport,
   nextCalibrationQuantity,
   pairPlan,
   sealedManifestHash,
@@ -81,7 +83,7 @@ async function main() {
     if (fixture !== "aggregation_scale")
       throw new Error("aggregate mode requires --fixture aggregation_scale");
     const scale = manifest.aggregationScale.quantities.scale;
-    const scriptPath = fileURLToPath(new URL("./telemetry-aggregation.ts", import.meta.url));
+    const scriptPath = fileURLToPath(new URL("./telemetry-aggregation-child.mjs", import.meta.url));
     const runs = [];
     for (const [runScale, enabled] of [
       [scale, false],
@@ -104,6 +106,42 @@ async function main() {
     const errors = runs
       .flatMap((run) => (run.error ? [run.error] : []))
       .concat(rssReady ? [] : ["RSS evidence is unsupported or incomplete"]);
+    const reports = runs.map((run) => run.output?.report);
+    for (let index = 0; index < runs.length; index += 1) {
+      const run = runs[index];
+      if (!run || run.output?.scale !== run.scale) errors.push("collector scale mismatch");
+      if (
+        run?.enabled &&
+        (!run.output?.report ||
+          run.output.report.signalStatus.spans !== "complete" ||
+          run.output.report.signalStatus.counters !== "complete" ||
+          run.output.report.signalStatus.histograms !== "complete" ||
+          run.output.report.diagnostics.length !== 0)
+      )
+        errors.push("enabled collector report is invalid");
+      if (!run?.enabled && run.output?.report !== null)
+        errors.push("disabled collector unexpectedly returned a report");
+    }
+    const volume =
+      reports[1] && reports[3]
+        ? evaluateVolume(
+            volumeObservationFromProfileReport(reports[1], {
+              scale,
+              profileRssDeltaBytes: nDelta,
+              gitCommandStarts: 0,
+            }),
+            volumeObservationFromProfileReport(reports[3], {
+              scale: scale * 4,
+              profileRssDeltaBytes: fourNDelta,
+              gitCommandStarts: 0,
+            }),
+          )
+        : {
+            status: "inconclusive" as const,
+            reasons: ["collector report is missing"],
+            pluginSpans: { n: 0, fourN: 0 },
+          };
+    errors.push(...volume.reasons);
     if (fourNDelta !== undefined && nDelta !== undefined && fourNDelta - nDelta > 8 * 1024 ** 2)
       errors.push("profile RSS delta grew by more than 8 MiB");
     const artifact = {
@@ -114,6 +152,9 @@ async function main() {
       recipeHash: fixtureRecipeHash(manifest),
       benchmarkScriptRevision: await resolveSourceRevision(resolve(packageDirectory, "../..")),
       runs,
+      runnerPath: scriptPath,
+      buildProvenance: { mode: "build:dev", source: "packages/gitlode/dist" },
+      volumeEvaluation: volume,
       rssDeltaBytes: {
         n: nDelta,
         fourN: fourNDelta,

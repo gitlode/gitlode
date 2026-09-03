@@ -15,6 +15,15 @@ children, records reports and RSS evidence separately, and returns inconclusive/
 child evidence is unavailable. Repository target sidecar integration remains pending until its
 caller is wired into the timed target workflow.
 
+The aggregation command requires `--fixture aggregation_scale` and `--artifacts <directory>` and
+writes `aggregation-scale.json`. Each artifact records the manifest recipe hash, source revision,
+built collector runner path, four raw child outcomes, N/4N report measurements, RSS deltas, volume
+evaluation, and pass/fail/inconclusive reasons. Children execute built JavaScript with `node`; the
+timed repository CLI is never used for collector timing or memory evidence. Missing, malformed,
+failed, or signal-terminated children are inconclusive. A supported RSS measurement that violates
+the 8 MiB N-to-4N growth limit is a failure. Platforms without external child RSS support, such as
+the current Windows test environment, therefore produce an inconclusive artifact and nonzero exit.
+
 ## Reference workflow
 
 After preserving a clean legacy release bundle, calibrate all five manifest targets separately:

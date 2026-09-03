@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getTelemetryMetricMetadata } from "@gitlode/internal-contracts/telemetry";
@@ -92,13 +92,7 @@ export async function runAggregationChild(
 ): Promise<AggregationChildRun> {
   const child = spawn(
     process.execPath,
-    [
-      resolve(dirname(scriptPath), "../../../node_modules/tsx/dist/cli.mjs"),
-      scriptPath,
-      "--scale",
-      String(scale),
-      ...(enabled ? ["--profile"] : []),
-    ],
+    [scriptPath, "--scale", String(scale), ...(enabled ? ["--profile"] : [])],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
   let stdout = "";

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -21,6 +22,7 @@ import {
   canonicalManifest,
   environmentCompatibility,
   evaluateComparison,
+  extractProfileReportMeasurements,
   fingerprint,
   fixtureRecipeHash,
   launchMeasuredChild,
@@ -49,7 +51,7 @@ import {
 } from "../test/support/performance-workflow.js";
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
 import { resolveSourceRevision } from "./source-revision.js";
-import { runAggregationChild } from "./telemetry-aggregation.js";
+import { buildAggregationCollectorBundle, runAggregationChild } from "./telemetry-aggregation.js";
 
 const exec = promisify(execFile);
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -83,15 +85,22 @@ async function main() {
     if (fixture !== "aggregation_scale")
       throw new Error("aggregate mode requires --fixture aggregation_scale");
     const scale = manifest.aggregationScale.quantities.scale;
-    const scriptPath = fileURLToPath(new URL("./telemetry-aggregation-child.mjs", import.meta.url));
-    const runs = [];
-    for (const [runScale, enabled] of [
-      [scale, false],
-      [scale, true],
-      [scale * 4, false],
-      [scale * 4, true],
-    ] as const)
-      runs.push(await runAggregationChild(scriptPath, runScale, enabled));
+    const bundleDirectory = await mkdtemp(join(tmpdir(), "gitlode-aggregation-bundle-"));
+    let bundle;
+    let runs;
+    try {
+      bundle = await buildAggregationCollectorBundle(bundleDirectory);
+      runs = [];
+      for (const [runScale, enabled] of [
+        [scale, false],
+        [scale, true],
+        [scale * 4, false],
+        [scale * 4, true],
+      ] as const)
+        runs.push(await runAggregationChild(bundle.path, runScale, enabled));
+    } finally {
+      await rm(bundleDirectory, { recursive: true, force: true });
+    }
     const disabled = runs.filter((run) => !run.enabled),
       enabled = runs.filter((run) => run.enabled);
     const rssReady = runs.every(
@@ -103,13 +112,15 @@ async function main() {
     };
     const nDelta = rssReady ? peak(enabled[0]) - peak(disabled[0]) : undefined;
     const fourNDelta = rssReady ? peak(enabled[1]) - peak(disabled[1]) : undefined;
-    const errors = runs
+    const inconclusiveReasons = runs
       .flatMap((run) => (run.error ? [run.error] : []))
       .concat(rssReady ? [] : ["RSS evidence is unsupported or incomplete"]);
+    const failureReasons: string[] = [];
     const reports = runs.map((run) => run.output?.report);
     for (let index = 0; index < runs.length; index += 1) {
       const run = runs[index];
-      if (!run || run.output?.scale !== run.scale) errors.push("collector scale mismatch");
+      if (!run || run.output?.scale !== run.scale)
+        inconclusiveReasons.push("collector scale mismatch");
       if (
         run?.enabled &&
         (!run.output?.report ||
@@ -118,9 +129,9 @@ async function main() {
           run.output.report.signalStatus.histograms !== "complete" ||
           run.output.report.diagnostics.length !== 0)
       )
-        errors.push("enabled collector report is invalid");
+        inconclusiveReasons.push("enabled collector report is invalid");
       if (!run?.enabled && run.output?.report !== null)
-        errors.push("disabled collector unexpectedly returned a report");
+        inconclusiveReasons.push("disabled collector unexpectedly returned a report");
     }
     const volume =
       reports[1] && reports[3]
@@ -141,35 +152,67 @@ async function main() {
             reasons: ["collector report is missing"],
             pluginSpans: { n: 0, fourN: 0 },
           };
-    errors.push(...volume.reasons);
+    if (volume.status === "fail") failureReasons.push(...volume.reasons);
+    else inconclusiveReasons.push(...volume.reasons);
     if (fourNDelta !== undefined && nDelta !== undefined && fourNDelta - nDelta > 8 * 1024 ** 2)
-      errors.push("profile RSS delta grew by more than 8 MiB");
+      failureReasons.push("profile RSS delta grew by more than 8 MiB");
+    const sourceRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
+    const environment = await fingerprint({
+      npmVersion: (await exec("npm", ["--version"])).stdout.trim(),
+      gitVersion: (await exec("git", ["--version"])).stdout.trim(),
+      gitAdapter: "none",
+      buildMode: "release-bundled",
+      repositoryRevision: sourceRevision,
+      calibrationTargetRecipeHash: fixtureRecipeHash(manifest),
+      benchmarkScriptRevision: sourceRevision,
+      profileState: "target_on",
+      warmupCount: 0,
+      measuredPairCount: runs.length,
+    });
     const artifact = {
       schemaVersion: 2,
       kind: "aggregation-scale",
       fixture,
       scale,
       recipeHash: fixtureRecipeHash(manifest),
-      benchmarkScriptRevision: await resolveSourceRevision(resolve(packageDirectory, "../..")),
+      sourceRevision,
+      candidateRevision: sourceRevision,
+      benchmarkScriptRevision: sourceRevision,
+      environment,
       runs,
-      runnerPath: scriptPath,
-      buildProvenance: { mode: "build:dev", source: "packages/gitlode/dist" },
+      collectorBundle: {
+        identity: bundle.identity,
+        sha256: createHash("sha256").update(bundle.bytesContent).digest("hex"),
+        bytes: bundle.bytes,
+      },
       volumeEvaluation: volume,
+      reportMeasurements: reports.map((report) =>
+        report ? extractProfileReportMeasurements(report) : null,
+      ),
       rssDeltaBytes: {
         n: nDelta,
         fourN: fourNDelta,
         growth: nDelta !== undefined && fourNDelta !== undefined ? fourNDelta - nDelta : undefined,
       },
-      evaluation: { status: errors.length ? "inconclusive" : "pass", reasons: errors },
+      evaluation: {
+        status: failureReasons.length
+          ? "fail"
+          : inconclusiveReasons.length
+            ? "inconclusive"
+            : "pass",
+        failureReasons,
+        inconclusiveReasons,
+        reasons: [...failureReasons, ...inconclusiveReasons],
+      },
     };
     await mkdir(option("artifacts"), { recursive: true });
     await writeFile(
       join(option("artifacts"), "aggregation-scale.json"),
       `${JSON.stringify(artifact, undefined, 2)}\n`,
     );
-    if (errors.length) process.exitCode = 2;
+    if (failureReasons.length || inconclusiveReasons.length) process.exitCode = 2;
     process.stdout.write(
-      `captured aggregation_scale at N=${scale}; status=${errors.length ? "inconclusive" : "pass"}\n`,
+      `captured aggregation_scale at N=${scale}; status=${failureReasons.length ? "fail" : inconclusiveReasons.length ? "inconclusive" : "pass"}\n`,
     );
     return;
   }

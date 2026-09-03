@@ -5,6 +5,8 @@ import { cpus, release, totalmem } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
+import { TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
+
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
 export { resolveSourceRevision } from "../../scripts/source-revision.js";
 
@@ -611,18 +613,36 @@ export function volumeObservationFromProfileReport(
   const value = report as Record<string, readonly Record<string, unknown>[]>;
   const spans = value.spans;
   if (!spans || !value.histograms) throw new Error("collector output is missing report signals");
+  const acceptedCoreScopes = new Set(
+    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map((span) => span.scope.name),
+  );
+  const acceptedCoreNames = new Set(
+    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map((span) => span.name),
+  );
+  const gitCliNames = new Set(
+    TELEMETRY_SPANS.filter(
+      (span) => span.scope.type === "core" && span.name.startsWith("gitlode.git.cli."),
+    ).map((span) => span.name),
+  );
   const gitCommandSpans = spans
-    .filter((span) => typeof span.name === "string" && span.name.includes("gitlode.git.cli."))
+    .filter((span) => typeof span.name === "string" && gitCliNames.has(span.name))
     .reduce((sum, span) => sum + (span.callCount as number), 0);
-  const pluginSpans = spans.filter((span) => {
-    const scope = span.scope;
-    return (
-      typeof scope === "object" &&
-      scope !== null &&
-      typeof (scope as Record<string, unknown>).name === "string" &&
-      ((scope as Record<string, unknown>).name as string).startsWith("gitlode.plugin")
-    );
-  }).length;
+  const pluginSpans = spans
+    .filter((span) => {
+      const scope = span.scope;
+      const scopeName =
+        typeof scope === "object" &&
+        scope !== null &&
+        typeof (scope as Record<string, unknown>).name === "string"
+          ? ((scope as Record<string, unknown>).name as string)
+          : undefined;
+      return (
+        scopeName !== undefined &&
+        !acceptedCoreScopes.has(scopeName) &&
+        scopeName !== "gitlode.performance.aggregation"
+      );
+    })
+    .reduce((sum, span) => sum + (span.callCount as number), 0);
   const histogramBuckets = value.histograms.reduce(
     (sum, histogram) =>
       sum + (Array.isArray(histogram.bucketCounts) ? histogram.bucketCounts.length : 0),
@@ -634,10 +654,22 @@ export function volumeObservationFromProfileReport(
     metricDatapoints:
       measurements.counterDatapointCount.value + measurements.histogramDatapointCount.value,
     histogramBuckets,
-    prohibitedScalingSpanCount: spans.filter(
-      (span) =>
-        typeof span.name === "string" && /per-(record|output|blob|diff|commit)/i.test(span.name),
-    ).length,
+    prohibitedScalingSpanCount: spans
+      .filter((span) => {
+        const scope = span.scope;
+        const scopeName =
+          typeof scope === "object" &&
+          scope !== null &&
+          typeof (scope as Record<string, unknown>).name === "string"
+            ? ((scope as Record<string, unknown>).name as string)
+            : undefined;
+        return (
+          scopeName !== undefined &&
+          acceptedCoreScopes.has(scopeName) &&
+          !acceptedCoreNames.has(span.name)
+        );
+      })
+      .reduce((sum, span) => sum + (span.callCount as number), 0),
     gitCommandSpans,
     pluginSpans,
     reportBytes: measurements.reportJsonBytes.value,
@@ -646,26 +678,32 @@ export function volumeObservationFromProfileReport(
   };
 }
 export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
-  const reasons: string[] = [];
+  const failureReasons: string[] = [];
+  const inconclusiveReasons: string[] = [];
   if (n.profileRssDeltaBytes === undefined || fourN.profileRssDeltaBytes === undefined)
-    reasons.push("profile RSS delta is unsupported or incomplete");
-  if (fourN.spanGroups !== n.spanGroups) reasons.push("span aggregate groups grew");
-  if (fourN.metricDatapoints !== n.metricDatapoints) reasons.push("metric datapoints grew");
-  if (fourN.histogramBuckets !== n.histogramBuckets) reasons.push("histogram buckets grew");
+    inconclusiveReasons.push("profile RSS delta is unsupported or incomplete");
+  if (fourN.spanGroups !== n.spanGroups) failureReasons.push("span aggregate groups grew");
+  if (fourN.metricDatapoints !== n.metricDatapoints) failureReasons.push("metric datapoints grew");
+  if (fourN.histogramBuckets !== n.histogramBuckets) failureReasons.push("histogram buckets grew");
   if (
     n.profileRssDeltaBytes !== undefined &&
     fourN.profileRssDeltaBytes !== undefined &&
     fourN.profileRssDeltaBytes - n.profileRssDeltaBytes > 8 * 1024 ** 2
   )
-    reasons.push("profile RSS delta grew by more than 8 MiB");
+    failureReasons.push("profile RSS delta grew by more than 8 MiB");
   if (fourN.prohibitedScalingSpanCount || n.prohibitedScalingSpanCount)
-    reasons.push("prohibited scaling spans observed");
+    failureReasons.push("prohibited scaling spans observed");
   if (fourN.gitCommandSpans !== fourN.gitCommandStarts || n.gitCommandSpans !== n.gitCommandStarts)
-    reasons.push("Git command span/start mismatch");
+    failureReasons.push("Git command span/start mismatch");
   if (n.reportBytes > 1_048_576 || fourN.reportBytes > 1_048_576)
-    reasons.push("ProfileReport exceeds 1 MiB");
+    failureReasons.push("ProfileReport exceeds 1 MiB");
+  const reasons = [...failureReasons, ...inconclusiveReasons];
   return {
-    status: reasons.length ? ("fail" as const) : ("pass" as const),
+    status: failureReasons.length
+      ? ("fail" as const)
+      : inconclusiveReasons.length
+        ? ("inconclusive" as const)
+        : ("pass" as const),
     reasons,
     pluginSpans: { n: n.pluginSpans, fourN: fourN.pluginSpans },
   };

@@ -1,9 +1,9 @@
 import { getTelemetryMetricMetadata } from "@gitlode/internal-contracts/telemetry";
 
-import { WorkerTelemetrySession } from "../dist/execution/telemetry/worker-telemetry-session.js";
+import { WorkerTelemetrySession } from "../src/execution/telemetry/worker-telemetry-session.js";
 
 const args = process.argv.slice(2);
-const value = (name) => args[args.indexOf(name) + 1];
+const value = (name: string) => args[args.indexOf(name) + 1];
 const scale = Number(value("--scale"));
 const enabled = args.includes("--profile");
 if (!Number.isSafeInteger(scale) || scale <= 0) throw new Error("invalid aggregation scale");
@@ -34,5 +34,6 @@ for (let index = 0; index < scale; index += 1) {
   });
 }
 const result = await session.finalize({ kind: "success" });
-const report = result.profileReport;
-process.stdout.write(`${JSON.stringify({ scale, enabled, report: report ?? null })}\n`);
+process.stdout.write(
+  `${JSON.stringify({ scale, enabled, report: result.profileReport ?? null })}\n`,
+);

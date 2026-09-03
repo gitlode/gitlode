@@ -1,26 +1,12 @@
-import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { cpus, release, totalmem } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { promisify } from "node:util";
 
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
-
-const execFileAsync = promisify(execFile);
-
-export async function resolveSourceRevision(checkoutRoot: string): Promise<string> {
-  const safeDirectory = checkoutRoot.replaceAll("\\", "/");
-  const result = await execFileAsync(
-    "git",
-    ["-c", `safe.directory=${safeDirectory}`, "-C", checkoutRoot, "rev-parse", "HEAD"],
-    { windowsHide: true },
-  );
-  const revision = result.stdout.trim();
-  if (!/^[0-9a-f]{7,64}$/i.test(revision)) throw new Error("Git returned an invalid HEAD revision");
-  return revision;
-}
+export { resolveSourceRevision } from "../../scripts/source-revision.js";
 
 export type ProfileState = "legacy_off" | "target_off" | "target_on";
 export type Availability<T> =
@@ -41,7 +27,7 @@ export interface FixtureManifest {
   readonly calibrationTargets: Readonly<Record<string, CalibrationTarget>>;
   readonly aggregationScale: {
     readonly status: "fixed-recipe";
-    readonly integration: "implemented-target-collector";
+    readonly integration: "pending-target-collector" | "implemented-target-collector";
     readonly quantities: { readonly scale: number };
   };
 }
@@ -303,6 +289,9 @@ export function extractProfileReportMeasurements(report: unknown): TargetTelemet
     histograms = value.histograms,
     diagnostics = value.diagnostics;
   if (
+    value.schemaVersion !== 1 ||
+    "rawSpans" in value ||
+    "rawHistogramSamples" in value ||
     !Array.isArray(spans) ||
     !Array.isArray(counters) ||
     !Array.isArray(histograms) ||
@@ -312,7 +301,9 @@ export function extractProfileReportMeasurements(report: unknown): TargetTelemet
   const ended = spans.reduce((sum, item) => {
     const calls =
       item && typeof item === "object" ? (item as Record<string, unknown>).callCount : undefined;
-    return sum + (Number.isSafeInteger(calls) && (calls as number) >= 0 ? (calls as number) : 0);
+    if (!Number.isSafeInteger(calls) || (calls as number) < 0)
+      throw new Error("collector output has an invalid callCount");
+    return sum + (calls as number);
   }, 0);
   return {
     reportJsonBytes: {
@@ -610,8 +601,49 @@ export interface VolumeObservation {
   readonly reportBytes: number;
   readonly totalEndedSpanCount?: number;
   readonly diagnosticCount?: number;
-  readonly rawSpanCount?: number;
-  readonly rawHistogramSampleCount?: number;
+}
+
+export function volumeObservationFromProfileReport(
+  report: unknown,
+  evidence: Pick<VolumeObservation, "scale" | "profileRssDeltaBytes" | "gitCommandStarts">,
+): VolumeObservation {
+  const measurements = extractProfileReportMeasurements(report);
+  const value = report as Record<string, readonly Record<string, unknown>[]>;
+  const spans = value.spans;
+  if (!spans || !value.histograms) throw new Error("collector output is missing report signals");
+  const gitCommandSpans = spans
+    .filter((span) => typeof span.name === "string" && span.name.includes("gitlode.git.cli."))
+    .reduce((sum, span) => sum + (span.callCount as number), 0);
+  const pluginSpans = spans.filter((span) => {
+    const scope = span.scope;
+    return (
+      typeof scope === "object" &&
+      scope !== null &&
+      typeof (scope as Record<string, unknown>).name === "string" &&
+      ((scope as Record<string, unknown>).name as string).startsWith("gitlode.plugin")
+    );
+  }).length;
+  const histogramBuckets = value.histograms.reduce(
+    (sum, histogram) =>
+      sum + (Array.isArray(histogram.bucketCounts) ? histogram.bucketCounts.length : 0),
+    0,
+  );
+  return {
+    ...evidence,
+    spanGroups: measurements.spanAggregateGroupCount.value,
+    metricDatapoints:
+      measurements.counterDatapointCount.value + measurements.histogramDatapointCount.value,
+    histogramBuckets,
+    prohibitedScalingSpanCount: spans.filter(
+      (span) =>
+        typeof span.name === "string" && /per-(record|output|blob|diff|commit)/i.test(span.name),
+    ).length,
+    gitCommandSpans,
+    pluginSpans,
+    reportBytes: measurements.reportJsonBytes.value,
+    totalEndedSpanCount: measurements.totalEndedSpanCount.value,
+    diagnosticCount: measurements.diagnosticCount.value,
+  };
 }
 export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
   const reasons: string[] = [];
@@ -626,10 +658,6 @@ export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
     reasons.push("Git command span/start mismatch");
   if (n.reportBytes > 1_048_576 || fourN.reportBytes > 1_048_576)
     reasons.push("ProfileReport exceeds 1 MiB");
-  if ((n.rawSpanCount ?? 0) !== 0 || (fourN.rawSpanCount ?? 0) !== 0)
-    reasons.push("collector retained raw spans");
-  if ((n.rawHistogramSampleCount ?? 0) !== 0 || (fourN.rawHistogramSampleCount ?? 0) !== 0)
-    reasons.push("collector retained raw histogram samples");
   return {
     status: reasons.length ? ("fail" as const) : ("pass" as const),
     reasons,

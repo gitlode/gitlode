@@ -49,6 +49,7 @@
     "performance:calibrate": "tsx ./scripts/telemetry-performance.ts calibrate",
     "performance:capture-legacy": "tsx ./scripts/telemetry-performance.ts capture-legacy",
     "performance:measure": "tsx ./scripts/telemetry-performance.ts measure",
+    "performance:aggregate": "tsx ./scripts/telemetry-performance.ts aggregate",
     "test": "npm run build:dev && vitest run",
     "test:watch": "npm run build:dev && vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage",

@@ -59,7 +59,7 @@
   "recipeRevision": "performance-v2-final-total-commits",
   "schemaVersion": 2,
   "aggregationScale": {
-    "integration": "implemented-target-collector",
+    "integration": "pending-target-collector",
     "status": "fixed-recipe",
     "quantities": { "scale": 1024 }
   }

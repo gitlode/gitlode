@@ -47,7 +47,7 @@ import {
 } from "../test/support/performance-workflow.js";
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
 import { resolveSourceRevision } from "./source-revision.js";
-import { collectAggregationScale } from "./telemetry-aggregation.js";
+import { runAggregationChild } from "./telemetry-aggregation.js";
 
 const exec = promisify(execFile);
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -63,8 +63,13 @@ if (invokedDirectly) await main();
 
 async function main() {
   const mode = process.argv[2];
-  if (mode !== "calibrate" && mode !== "capture-legacy" && mode !== "measure")
-    throw new Error("mode must be calibrate, capture-legacy, or measure");
+  if (
+    mode !== "calibrate" &&
+    mode !== "capture-legacy" &&
+    mode !== "measure" &&
+    mode !== "aggregate"
+  )
+    throw new Error("mode must be calibrate, capture-legacy, measure, or aggregate");
   const manifestPath = resolve(
     option("manifest", join(packageDirectory, "test/fixtures/performance/manifest.json")),
   );
@@ -72,25 +77,62 @@ async function main() {
   const matrixErrors = validateFixtureManifest(manifest);
   if (matrixErrors.length) throw new Error(matrixErrors.join("; "));
   const fixture = parseFixture(option("fixture"));
-  if (fixture === "aggregation_scale") {
+  if (mode === "aggregate") {
+    if (fixture !== "aggregation_scale")
+      throw new Error("aggregate mode requires --fixture aggregation_scale");
     const scale = manifest.aggregationScale.quantities.scale;
-    const output = await collectAggregationScale(scale);
+    const scriptPath = fileURLToPath(new URL("./telemetry-aggregation.ts", import.meta.url));
+    const runs = [];
+    for (const [runScale, enabled] of [
+      [scale, false],
+      [scale, true],
+      [scale * 4, false],
+      [scale * 4, true],
+    ] as const)
+      runs.push(await runAggregationChild(scriptPath, runScale, enabled));
+    const disabled = runs.filter((run) => !run.enabled),
+      enabled = runs.filter((run) => run.enabled);
+    const rssReady = runs.every(
+      (run) => run.rss.status === "supported" && run.rss.peakBytes !== undefined,
+    );
+    const peak = (run: (typeof runs)[number]) => {
+      if (run.rss.peakBytes === undefined) throw new Error("RSS peak is missing");
+      return run.rss.peakBytes;
+    };
+    const nDelta = rssReady ? peak(enabled[0]) - peak(disabled[0]) : undefined;
+    const fourNDelta = rssReady ? peak(enabled[1]) - peak(disabled[1]) : undefined;
+    const errors = runs
+      .flatMap((run) => (run.error ? [run.error] : []))
+      .concat(rssReady ? [] : ["RSS evidence is unsupported or incomplete"]);
+    if (fourNDelta !== undefined && nDelta !== undefined && fourNDelta - nDelta > 8 * 1024 ** 2)
+      errors.push("profile RSS delta grew by more than 8 MiB");
     const artifact = {
       schemaVersion: 2,
       kind: "aggregation-scale",
       fixture,
       scale,
-      source: "development-only WorkerTelemetrySession collector",
-      evidence: output,
+      recipeHash: fixtureRecipeHash(manifest),
+      benchmarkScriptRevision: await resolveSourceRevision(resolve(packageDirectory, "../..")),
+      runs,
+      rssDeltaBytes: {
+        n: nDelta,
+        fourN: fourNDelta,
+        growth: nDelta !== undefined && fourNDelta !== undefined ? fourNDelta - nDelta : undefined,
+      },
+      evaluation: { status: errors.length ? "inconclusive" : "pass", reasons: errors },
     };
     await mkdir(option("artifacts"), { recursive: true });
     await writeFile(
       join(option("artifacts"), "aggregation-scale.json"),
       `${JSON.stringify(artifact, undefined, 2)}\n`,
     );
-    process.stdout.write(`captured aggregation_scale at N=${scale}\n`);
+    if (errors.length) process.exitCode = 2;
+    process.stdout.write(
+      `captured aggregation_scale at N=${scale}; status=${errors.length ? "inconclusive" : "pass"}\n`,
+    );
     return;
   }
+  if (fixture === "aggregation_scale") throw new Error("use aggregate mode for aggregation_scale");
   const adapter = parseAdapter(option("adapter"));
   const target = requireTarget(manifest, fixture, adapter, mode !== "calibrate");
   const comparison = mode === "measure" ? parseComparison(option("comparison")) : undefined;

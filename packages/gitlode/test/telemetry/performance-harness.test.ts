@@ -435,13 +435,23 @@ describe("performance harness contracts", () => {
       }).reasons,
     ).toContain("candidate measured pair indexes are missing or duplicated");
   });
-  it("normalizes only filename session timestamps and exact checkpoint timestamps", () => {
+  it("normalizes only session timestamps in filenames and checkpoints", () => {
     expect(normalizePerformanceFilename("prefix-20240101T010203Z-000001.jsonl")).toBe(
       "prefix-<session>-000001.jsonl",
     );
-    const artifact = (name: string, bytes = "same", generatedAt = "2024-01-01T01:02:03.000Z") => ({
+    const artifact = (
+      name: string,
+      bytes = "same",
+      generatedAt = "2024-01-01T01:02:03.000Z",
+      refUpdatedAt = generatedAt,
+      tipOid = "fixed-tip",
+    ) => ({
       exit: { code: 0, signal: null },
-      checkpoint: { repositoryPath: "/repo", generatedAt },
+      checkpoint: {
+        repositoryPath: "/repo",
+        generatedAt,
+        refs: [{ ref: "main", refType: "branch", tipOid, updatedAt: refUpdatedAt }],
+      },
       jsonl: [{ name, bytes: Buffer.from(bytes) }],
       derived: { records: 1, commits: 1, skippedDiffs: 0, files: 1, bytes: 4 },
       captureErrors: [],
@@ -455,10 +465,28 @@ describe("performance harness contracts", () => {
     expect(
       comparePerformanceBehavior(
         left,
-        artifact("prefix-20240201T010203Z-000001.jsonl", "same", input.candidateGeneratedAt),
+        artifact(
+          "prefix-20240201T010203Z-000001.jsonl",
+          "same",
+          input.candidateGeneratedAt,
+          "2024-02-01T02:03:04.000Z",
+        ),
         input,
       ),
     ).toEqual([]);
+    expect(
+      comparePerformanceBehavior(
+        left,
+        artifact(
+          "prefix-20240201T010203Z-000001.jsonl",
+          "same",
+          input.candidateGeneratedAt,
+          input.candidateGeneratedAt,
+          "changed-tip",
+        ),
+        input,
+      ),
+    ).toContain("checkpoint differs");
     expect(
       comparePerformanceBehavior(
         left,

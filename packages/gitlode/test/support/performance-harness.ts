@@ -356,6 +356,7 @@ export interface RawRun {
   readonly telemetry: TargetTelemetryMeasurements;
   readonly runId: string;
   readonly outputDirectory: string;
+  readonly checkpointPath?: string;
   readonly captureErrors: readonly string[];
 }
 export async function launchMeasuredChild(input: {
@@ -368,6 +369,7 @@ export async function launchMeasuredChild(input: {
   readonly pairIndex?: number;
   readonly env?: NodeJS.ProcessEnv;
   readonly rssReader?: RssReader;
+  readonly checkpointPath?: string;
 }): Promise<RawRun> {
   const args = [...input.args, "--quiet", ...(input.state === "target_on" ? ["--profile"] : [])];
   const start = performance.now();
@@ -436,8 +438,86 @@ export async function launchMeasuredChild(input: {
     telemetry,
     runId: `${input.phase}-${input.pairIndex ?? 0}-${input.state}`,
     outputDirectory: input.outputDirectory,
+    checkpointPath: input.checkpointPath,
     captureErrors,
   };
+}
+
+export function pathIsolationEvidence(
+  timedOutput: string | undefined,
+  timedCheckpoint: string | undefined,
+  sidecarOutput: string | undefined,
+  sidecarCheckpoint: string | undefined,
+) {
+  const values = [timedOutput, timedCheckpoint, sidecarOutput, sidecarCheckpoint];
+  return {
+    outputPathsDiffer:
+      timedOutput !== undefined && sidecarOutput !== undefined && timedOutput !== sidecarOutput,
+    checkpointPathsDiffer:
+      timedCheckpoint !== undefined &&
+      sidecarCheckpoint !== undefined &&
+      timedCheckpoint !== sidecarCheckpoint,
+    crossPathsDiffer: values.every(
+      (value, index) => value !== undefined && values.indexOf(value) === index,
+    ),
+  };
+}
+
+export type FormalStatus = "pass" | "inconclusive" | "fail";
+export function composeFormalStatus(
+  statuses: readonly FormalStatus[],
+  reasons: readonly string[] = [],
+) {
+  const rank = { pass: 0, inconclusive: 1, fail: 2 } as const;
+  const status = statuses.reduce(
+    (current, value) => (rank[value] > rank[current] ? value : current),
+    "pass" as FormalStatus,
+  );
+  return { status, reasons: [...new Set(reasons)].sort() };
+}
+
+export interface SidecarMatrixEntry {
+  readonly runId: string;
+  readonly state: ProfileState;
+}
+export interface SidecarMatrixCapture {
+  readonly runId: string;
+  readonly status: "available" | "inconclusive" | "not-applicable";
+  readonly provenanceRunId?: string;
+  readonly report?: unknown;
+}
+export function validateSidecarMatrix(
+  runs: readonly SidecarMatrixEntry[],
+  sidecars: readonly SidecarMatrixCapture[],
+) {
+  const errors: string[] = [];
+  const grouped = new Map<string, SidecarMatrixCapture[]>();
+  for (const sidecar of sidecars)
+    grouped.set(sidecar.runId, [...(grouped.get(sidecar.runId) ?? []), sidecar]);
+  for (const [runId, matches] of grouped)
+    if (matches.length > 1) errors.push(`duplicate sidecar for runId ${runId}`);
+  for (const run of runs) {
+    const matches = grouped.get(run.runId) ?? [];
+    if (!matches.length) errors.push(`missing sidecar for runId ${run.runId}`);
+    const sidecar = matches[0];
+    if (!sidecar) continue;
+    if (sidecar.provenanceRunId !== run.runId)
+      errors.push(`sidecar runId mismatch for ${run.runId}`);
+    if (run.state === "target_on") {
+      if (sidecar.status === "not-applicable")
+        errors.push(`target_on sidecar is not-applicable for ${run.runId}`);
+      if (sidecar.status === "inconclusive")
+        errors.push(`target_on sidecar is inconclusive for ${run.runId}`);
+      if (sidecar.status === "available" && sidecar.report === undefined)
+        errors.push(`target_on sidecar report is missing for ${run.runId}`);
+    } else if (sidecar.status !== "not-applicable") {
+      errors.push(`${run.state} sidecar must be not-applicable for ${run.runId}`);
+    }
+  }
+  for (const runId of grouped.keys())
+    if (!runs.some((run) => run.runId === runId))
+      errors.push(`unexpected sidecar for runId ${runId}`);
+  return [...new Set(errors)].sort();
 }
 
 export function pairPlan(

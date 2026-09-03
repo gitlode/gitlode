@@ -534,11 +534,15 @@ describe("performance workflow routing", () => {
           sidecar.provenance.runId === profile.runs.candidate[index].runId,
       ),
     ).toBe(true);
-    expect(profile.sidecars.candidate[0].outputPath).not.toBe(
-      profile.runs.candidate[0].outputDirectory,
-    );
-    expect(profile.sidecars.candidate[0].checkpointPath).not.toBe(
-      profile.runs.candidate[0].outputDirectory,
-    );
+    expect(
+      profile.sidecars.candidate.every(
+        (sidecar: { isolationEvidence: Record<string, boolean> }) =>
+          sidecar.isolationEvidence.outputPathsDiffer &&
+          sidecar.isolationEvidence.checkpointPathsDiffer &&
+          sidecar.isolationEvidence.crossPathsDiffer,
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(profile)).not.toContain("gitlode-performance-");
+    expect(JSON.stringify(profile)).not.toContain("gitlode-profile-sidecar-");
   }, 30_000);
 });

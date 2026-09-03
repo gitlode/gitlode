@@ -26,9 +26,12 @@ const futurePrivateWorkspacePackages = [
 const activePrivateWorkspacePackages = futurePrivateWorkspacePackages
   .filter(([, directory]) => existsSync(resolve(import.meta.dirname, directory, "package.json")))
   .map(([packageName]) => packageName);
+const privateWorkspacePackageMatcher = (id: string) =>
+  activePrivateWorkspacePackages.some((name) => id === name || id.startsWith(`${name}/`));
 
 export default defineConfig({
   name: "gitlode",
+  pkg: { name: "gitlode", dependencies: {} },
   entry: {
     index: "./src/index.ts",
     "plugin-api": "./src/plugin-api.ts",
@@ -52,12 +55,12 @@ export default defineConfig({
   },
   deps: {
     neverBundle: [...externalRuntimePackages],
-    alwaysBundle: activePrivateWorkspacePackages,
+    alwaysBundle: privateWorkspacePackageMatcher,
     onlyBundle: activePrivateWorkspacePackages,
     onlyImport: [...externalRuntimePackages],
     dts: {
       neverBundle: [...externalRuntimePackages],
-      alwaysBundle: activePrivateWorkspacePackages,
+      alwaysBundle: privateWorkspacePackageMatcher,
     },
   },
   dts: {

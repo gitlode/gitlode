@@ -39,8 +39,6 @@ describe("repository profile sidecar", () => {
         revision: "revision-isomorphic",
         recipeHash: "recipe-isomorphic",
         quantities: { commits: 5, files: 1, plugins: 0, rotations: 1, scale: 0 },
-        revision: "revision-isomorphic",
-        recipeHash: "recipe-isomorphic",
       });
       expect(result.provenance.workerBundleSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(result.provenance.configSha256).toMatch(/^[0-9a-f]{64}$/);
@@ -82,7 +80,6 @@ describe("repository profile sidecar", () => {
         quantities: { commits: 5, files: 2, plugins: 0, rotations: 1, scale: 0 },
         revision: "revision-git-cli",
         recipeHash: "recipe-git-cli",
-        fileFixture: true,
         rotationLines: 2,
       });
       expect(result.status).toBe("available");
@@ -129,7 +126,6 @@ describe("repository profile sidecar", () => {
         quantities: { commits: 5, files: 1, plugins: 2, rotations: 1, scale: 0 },
         revision: "revision-plugin",
         recipeHash: "recipe-plugin",
-        fileFixture: true,
       });
       expect(result.status).toBe("available");
       expect(result.report).toMatchObject({ schemaVersion: 1 });

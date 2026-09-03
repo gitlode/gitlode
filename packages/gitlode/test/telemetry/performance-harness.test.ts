@@ -17,6 +17,7 @@ import {
 } from "../support/performance-fixtures.js";
 import {
   canonicalManifest,
+  composeFormalStatus,
   environmentCompatibility,
   evaluateComparison,
   evaluateRepositoryProfileReport,
@@ -31,6 +32,7 @@ import {
   sampleChildRss,
   unavailableTargetTelemetry,
   volumeObservationFromProfileReport,
+  validateSidecarMatrix,
   type EnvironmentFingerprint,
   type FixtureManifest,
   type RawRun,
@@ -102,6 +104,56 @@ const run = (elapsedMs: number, rss = 100 * 1024 ** 2, code = 0, pairIndex = 0):
 });
 
 describe("performance harness contracts", () => {
+  it("composes formal status with fail precedence and deterministic deduplication", () => {
+    expect(composeFormalStatus(["pass", "pass", "pass"], ["z", "a", "z"])).toEqual({
+      status: "pass",
+      reasons: ["a", "z"],
+    });
+    expect(composeFormalStatus(["fail", "inconclusive", "pass"]).status).toBe("fail");
+    expect(composeFormalStatus(["inconclusive", "fail", "pass"]).status).toBe("fail");
+    expect(composeFormalStatus(["inconclusive", "pass", "pass"]).status).toBe("inconclusive");
+  });
+  it("validates every target_on sidecar completeness branch", () => {
+    const targetOn = { runId: "on", state: "target_on" as const };
+    expect(validateSidecarMatrix([targetOn], [])).toContain("missing sidecar for runId on");
+    expect(
+      validateSidecarMatrix(
+        [targetOn],
+        [{ ...targetOn, status: "not-applicable", provenanceRunId: "on" }],
+      ),
+    ).toContain("target_on sidecar is not-applicable for on");
+    expect(
+      validateSidecarMatrix(
+        [targetOn],
+        [{ ...targetOn, status: "inconclusive", provenanceRunId: "on" }],
+      ),
+    ).toContain("target_on sidecar is inconclusive for on");
+    expect(
+      validateSidecarMatrix(
+        [targetOn],
+        [{ ...targetOn, status: "available", provenanceRunId: "on" }],
+      ),
+    ).toContain("target_on sidecar report is missing for on");
+    expect(
+      validateSidecarMatrix(
+        [
+          { runId: "off", state: "target_off" },
+          { runId: "legacy", state: "legacy_off" },
+        ],
+        [
+          { runId: "off", status: "available", provenanceRunId: "off", report: {} },
+          { runId: "legacy", status: "not-applicable", provenanceRunId: "wrong" },
+          { runId: "extra", status: "not-applicable", provenanceRunId: "extra" },
+          { runId: "extra", status: "not-applicable", provenanceRunId: "extra" },
+        ],
+      ),
+    ).toEqual([
+      "duplicate sidecar for runId extra",
+      "sidecar runId mismatch for legacy",
+      "target_off sidecar must be not-applicable for off",
+      "unexpected sidecar for runId extra",
+    ]);
+  });
   it("separates two warmups from seven alternating measured pairs", () => {
     const plan = pairPlan();
     expect(plan.slice(0, 2).every((p) => p.phase === "warmup")).toBe(true);
@@ -290,6 +342,11 @@ describe("performance harness contracts", () => {
     expect(
       evaluateRepositoryProfileReport({ schemaVersion: 1, spans: [{ callCount: "bad" }] }).status,
     ).toBe("inconclusive");
+    expect(evaluateRepositoryProfileReport(report({ spans: null })).status).toBe("inconclusive");
+    expect(evaluateRepositoryProfileReport(report({ counters: null })).status).toBe("inconclusive");
+    expect(evaluateRepositoryProfileReport(report({ histograms: null })).status).toBe(
+      "inconclusive",
+    );
     expect(
       evaluateRepositoryProfileReport(
         report({
@@ -300,9 +357,17 @@ describe("performance harness contracts", () => {
     expect(
       evaluateRepositoryProfileReport(report({ diagnostics: [{ code: "overflow" }] })).status,
     ).toBe("fail");
-    expect(evaluateRepositoryProfileReport(report({ payload: "x".repeat(1_048_577) })).status).toBe(
-      "fail",
-    );
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          spans: Array.from({ length: 30_000 }, () => ({
+            scope: { name: "plugin.valid" },
+            name: "plugin.operation",
+            callCount: 0,
+          })),
+        }),
+      ).status,
+    ).toBe("fail");
     expect(
       evaluateRepositoryProfileReport(
         report({

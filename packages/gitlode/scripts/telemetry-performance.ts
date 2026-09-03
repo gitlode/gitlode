@@ -30,7 +30,10 @@ import {
   median,
   evaluateVolume,
   evaluateRepositoryProfileReport,
+  composeFormalStatus,
+  validateSidecarMatrix,
   volumeObservationFromProfileReport,
+  pathIsolationEvidence,
   nextCalibrationQuantity,
   pairPlan,
   sealedManifestHash,
@@ -454,12 +457,11 @@ async function main() {
       : undefined;
     if (evaluation) evaluation.reasons = [...new Set(evaluation.reasons)].sort();
     const behavioralStatus = behaviorErrors.length ? "inconclusive" : "pass";
-    const statusRank = { pass: 0, inconclusive: 1, fail: 2 } as const;
-    const statuses = [evaluation?.status ?? "pass", behavioralStatus, sidecarStatus] as const;
-    const finalStatus = statuses.reduce(
-      (current, status) => (statusRank[status] > statusRank[current] ? status : current),
-      "pass" as "pass" | "inconclusive" | "fail",
-    );
+    const finalStatus = composeFormalStatus([
+      evaluation?.status ?? "pass",
+      behavioralStatus,
+      sidecarStatus,
+    ]).status;
     const measuredEvidence = workflow.baseline
       .filter((run) => run.phase === "measured")
       .map((run) =>
@@ -517,7 +519,10 @@ async function main() {
           : undefined,
       },
       expectedQuantities: target.quantities,
-      runs: { baseline: workflow.baseline, candidate: candidate ? workflow.candidate : undefined },
+      runs: {
+        baseline: workflow.baseline.map(artifactRun),
+        candidate: candidate ? workflow.candidate.map(artifactRun) : undefined,
+      },
       sidecars: {
         baseline: sidecarEvidence(workflow, workflow.baseline),
         candidate: candidate ? sidecarEvidence(workflow, workflow.candidate) : undefined,
@@ -592,40 +597,49 @@ async function makeFingerprint(
   });
 }
 function validateSidecarCompleteness(workflow: Execution): string[] {
-  const errors: string[] = [];
   const runs = [...workflow.baseline, ...workflow.candidate];
-  const expected = new Set(runs.map((run) => run.runId));
-  for (const run of runs) {
-    const sidecar = workflow.sidecars.get(run.runId);
-    if (!sidecar) errors.push(`missing sidecar for runId ${run.runId}`);
-    else if (sidecar.provenance.runId !== run.runId)
-      errors.push(`sidecar runId mismatch for ${run.runId}`);
-    if (run.state === "target_on") {
-      if (sidecar?.status === "not-applicable")
-        errors.push(`target_on sidecar is not-applicable for ${run.runId}`);
-      if (sidecar?.status === "inconclusive" && sidecar.error) errors.push(sidecar.error);
-      if (sidecar?.status === "available" && !sidecar.report)
-        errors.push(`target_on sidecar report is missing for ${run.runId}`);
-    } else if (sidecar?.status !== "not-applicable") {
-      errors.push(`${run.state} sidecar must be not-applicable for ${run.runId}`);
-    }
-  }
-  for (const runId of workflow.sidecars.keys())
-    if (!expected.has(runId)) errors.push(`unexpected sidecar for runId ${runId}`);
-  return [...new Set(errors)].sort();
+  const captures = [...workflow.sidecars.entries()].map(([runId, sidecar]) => ({
+    runId,
+    status: sidecar.status,
+    provenanceRunId: sidecar.provenance.runId,
+    report: sidecar.report,
+  }));
+  return validateSidecarMatrix(runs, captures);
 }
 function sidecarEvidence(workflow: Execution, runs: readonly RawRun[]) {
   return runs.map((run) => {
     const sidecar = workflow.sidecars.get(run.runId);
-    if (!sidecar || sidecar.status !== "available") return sidecar ?? null;
+    if (!sidecar) return null;
+    const { outputPath, checkpointPath, ...safeSidecar } = sidecar;
+    if (sidecar.status !== "available")
+      return {
+        ...safeSidecar,
+        isolationEvidence: pathIsolationEvidence(
+          run.outputDirectory,
+          run.checkpointPath,
+          outputPath,
+          checkpointPath,
+        ),
+      };
     const formalEvaluation = evaluateRepositoryProfileReport(sidecar.report);
+    if (formalEvaluation.status === "inconclusive")
+      return {
+        ...safeSidecar,
+        repositoryEvaluation: formalEvaluation,
+        isolationEvidence: pathIsolationEvidence(
+          run.outputDirectory,
+          run.checkpointPath,
+          outputPath,
+          checkpointPath,
+        ),
+      };
     const observation = volumeObservationFromProfileReport(sidecar.report, {
       scale: 1,
       profileRssDeltaBytes: undefined,
       fixtureOwnedScopes: [],
     });
     return {
-      ...sidecar,
+      ...safeSidecar,
       reportMeasurements: formalEvaluation.reportMeasurements,
       volumeObservation: observation,
       repositoryEvaluation: formalEvaluation,
@@ -637,8 +651,18 @@ function sidecarEvidence(workflow: Execution, runs: readonly RawRun[]) {
       prohibitedHostSpanCount: observation.prohibitedScalingSpanCount,
       gitCliCommandSpanCount: observation.gitCommandSpans,
       pluginSpanCount: observation.pluginSpans,
+      isolationEvidence: pathIsolationEvidence(
+        run.outputDirectory,
+        run.checkpointPath,
+        outputPath,
+        checkpointPath,
+      ),
     };
   });
+}
+function artifactRun(run: RawRun) {
+  const { outputDirectory, checkpointPath, ...safeRun } = run;
+  return safeRun;
 }
 type Execution = {
   baseline: RawRun[];
@@ -867,6 +891,7 @@ async function executePaired(
               : []),
           ],
           outputDirectory: output,
+          checkpointPath: checkpoint,
           state,
           ...planned,
         });

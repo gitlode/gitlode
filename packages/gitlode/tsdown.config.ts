@@ -31,7 +31,12 @@ const privateWorkspacePackageMatcher = (id: string) =>
 
 export default defineConfig({
   name: "gitlode",
-  pkg: { name: "gitlode", dependencies: {} },
+  pkg: {
+    name: "gitlode",
+    dependencies: Object.fromEntries(
+      activePrivateWorkspacePackages.map((name) => [name, "workspace:*"]),
+    ),
+  },
   entry: {
     index: "./src/index.ts",
     "plugin-api": "./src/plugin-api.ts",
@@ -45,6 +50,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   minify: false,
+  sourcemap: false,
   shims: false,
   treeshake: true,
   hash: true,

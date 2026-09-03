@@ -618,23 +618,72 @@ Scope:
 Exit gate: Phase 4 and Phase 5 acceptance are complete, repository-wide search finds no removed
 contract, profile reports cross the worker boundary, and all CI-tier checks pass.
 
-### T13: Performance, full verification, and handoff closure
+### T13A: Performance-readiness and clean verification
 
-Prerequisites: T12 and completed T00B fixture calibration and `legacy_off` artifacts.
+Prerequisites: T12.
 
 Scope:
 
-- run the complete cataloged functional, owner, fault, equivalence, volume, bounded-growth,
-  wall-clock, RSS, report-size, architecture, type, lint, test, build, package, and format checks;
-- compare target disabled performance with the frozen legacy baseline and target enabled with target
-  disabled using the accepted paired protocol;
-- investigate failures without silently relaxing thresholds or observations;
-- record any explicitly reviewed exception with every required field; and
-- migrate all remaining stable facts to durable documentation, remove transitional status text, and
-  delete this handoff when no unfinished item remains.
+- complete the development-only target `ProfileReport` observation path and the dedicated
+  `aggregation_scale` collector child runner without adding a public CLI option, external export, or
+  production telemetry backend seam;
+- cover the cataloged report-size, observation-volume, prohibited-span, Git-command parity, and N
+  versus 4N bounded-growth requirements with deterministic test-scale evidence;
+- make the performance workflow and the repository-wide test suite independent of ambient Git
+  ownership configuration, without mutating global or repository Git configuration and without
+  weakening revision provenance checks;
+- verify that release build followed by architecture, package, type, lint, test, schema, syncpack,
+  and format checks succeeds; and
+- update performance-harness documentation and the incomplete manifest marker to describe the
+  implemented readiness state accurately, while leaving reference quantities and artifact
+  references incomplete.
+
+Do not calibrate on an unapproved host, capture or invent `legacy_off` results, change accepted
+thresholds, remove observations, or delete this handoff in this slice.
+
+Exit gate: every formal measurement path is implemented and testable, the aggregation-scale path
+produces all required telemetry measurements, the full CI/package verification passes without
+ambient Git configuration changes, and the checked-in manifest still truthfully records that
+reference calibration is incomplete.
+
+### T13B: Reference calibration and performance acceptance
+
+Prerequisites: T13A, an approved reference environment, and a preserved pre-migration release CLI
+with its exact Git revision.
+
+Scope:
+
+- calibrate and freeze all five repository targets using the accepted 10–30 second legacy-disabled
+  procedure and record target-scoped environment and calibration artifact references;
+- capture the complete `legacy_off` artifact matrix and verify its deterministic behavior evidence;
+- build the redesigned release candidate and run all cataloged `disabled_overhead` and
+  `profile_overhead` comparisons with the paired protocol;
+- run the fixed N and 4N aggregation-scale comparison and the cataloged report-size, trace-volume,
+  command-count, RSS, and bounded-growth checks;
+- investigate failed or inconclusive results with the unchanged manifest and thresholds; and
+- preserve and report raw artifacts and provenance outside normal package contents, recording any
+  proposed exception with every catalog-required field for trunk review.
+
+Exit gate: calibration, legacy capture, and every formal comparison either pass or have a complete
+exception proposal awaiting explicit trunk acceptance. No result may be inferred from test-scale
+fixtures or an incompatible environment.
+
+### T13C: Consolidation and handoff closure
+
+Prerequisites: T13B acceptance, including explicit trunk approval of any performance exception.
+
+Scope:
+
+- run the final cataloged functional, owner, fault, equivalence, volume, bounded-growth,
+  architecture, type, lint, test, build, package, schema, syncpack, and format checks;
+- migrate all remaining stable performance and implementation facts into their durable design,
+  contributing, profiling, usage, architecture, domain, and plugin documentation homes;
+- remove migration-status and transitional wording that no longer describes the implementation;
+- verify by repository-wide search that no removed contract or migration-only code remains; and
+- delete this handoff after its remaining facts have durable homes.
 
 Exit gate: Phase 6 acceptance passes or a trunk-reviewed exception is documented, no migration-only
-code or note remains, and the trunk session confirms the redesign complete.
+code or note remains, this handoff is deleted, and the trunk session confirms the redesign complete.
 
 ## Unit status
 
@@ -654,7 +703,9 @@ code or note remains, and the trunk session confirms the redesign complete.
 | T10  | complete | Concrete line-diff instrumentation migrated from the legacy span shape to implementation-owned OTel metrics with exact success/error, input-size, guard-order, and production-wiring evidence; 1,025 full-suite tests pass with only 5 known sandbox Git ownership failures                                                                 |
 | T11  | complete | Public plugin API and runtime migrated to package-scoped OTel Tracer/Meter ownership with bounded bootstrap/init/projection semantics, declaration and architecture compatibility, and official-plugin equivalence evidence; 1,054 full-suite tests pass with only 5 known sandbox Git ownership failures                                   |
 | T12  | complete | WorkerTelemetrySession production activation, structured ProfileReport transport, canonical signal-separated presentation, root/plugin/DAG hierarchy, legacy instrumentation removal, documentation, and release-build-safe architecture enforcement reviewed; 1,064 full-suite tests pass with only 5 known sandbox Git ownership failures |
-| T13  | pending  | —                                                                                                                                                                                                                                                                                                                                           |
+| T13A | pending  | —                                                                                                                                                                                                                                                                                                                                           |
+| T13B | pending  | Requires an approved reference environment and preserved pre-migration release CLI/revision                                                                                                                                                                                                                                                 |
+| T13C | pending  | —                                                                                                                                                                                                                                                                                                                                           |
 
 ## Required verification matrix
 

@@ -663,7 +663,7 @@
     },
     {
       "path": "packages/plugin-assay-metrics",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -687,7 +687,7 @@
     },
     {
       "path": "packages/plugin-conventional-commits",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -711,7 +711,7 @@
     },
     {
       "path": "packages/plugin-custom-field",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -735,7 +735,7 @@
     },
     {
       "path": "packages/plugin-file-type",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -759,7 +759,7 @@
     },
     {
       "path": "packages/plugin-identity-profile",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {

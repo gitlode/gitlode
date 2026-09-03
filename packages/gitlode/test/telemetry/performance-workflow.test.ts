@@ -527,6 +527,7 @@ describe("performance workflow routing", () => {
     expect(profile.formalEvaluation.behavior.reasons).toEqual([]);
     expect(profile.formalEvaluation.sidecar.status).toBe("inconclusive");
     expect(profile.sidecarEvaluation.status).toBe("inconclusive");
+    expect(profile.formalEvaluation.status).toBe(profile.sidecarEvaluation.status);
     expect(profile.sidecars.candidate).toHaveLength(9);
     expect(
       profile.sidecars.candidate.every(

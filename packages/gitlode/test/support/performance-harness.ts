@@ -476,6 +476,16 @@ export function composeFormalStatus(
   return { status, reasons: [...new Set(reasons)].sort() };
 }
 
+export function composeSidecarEvaluationStatus(
+  reportStatuses: readonly FormalStatus[],
+  completenessErrors: readonly string[] = [],
+) {
+  return composeFormalStatus(
+    [...reportStatuses, ...(completenessErrors.length ? ["inconclusive" as const] : [])],
+    completenessErrors,
+  );
+}
+
 export interface SidecarMatrixEntry {
   readonly runId: string;
   readonly state: ProfileState;

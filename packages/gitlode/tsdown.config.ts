@@ -50,7 +50,6 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   minify: false,
-  sourcemap: false,
   shims: false,
   treeshake: true,
   hash: true,

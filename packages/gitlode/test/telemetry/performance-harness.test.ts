@@ -18,6 +18,7 @@ import {
 import {
   canonicalManifest,
   composeFormalStatus,
+  composeSidecarEvaluationStatus,
   environmentCompatibility,
   evaluateComparison,
   evaluateRepositoryProfileReport,
@@ -113,6 +114,17 @@ describe("performance harness contracts", () => {
     expect(composeFormalStatus(["inconclusive", "fail", "pass"]).status).toBe("fail");
     expect(composeFormalStatus(["inconclusive", "pass", "pass"]).status).toBe("inconclusive");
   });
+  it.each([
+    [["fail"], ["missing sidecar"], "fail"],
+    [["inconclusive"], ["missing sidecar"], "inconclusive"],
+    [["fail", "inconclusive"], [], "fail"],
+    [["pass"], [], "pass"],
+  ])(
+    "composes sidecar status for reports=%j completeness=%j => %s",
+    (reports, errors, expected) => {
+      expect(composeSidecarEvaluationStatus(reports, errors).status).toBe(expected);
+    },
+  );
   it("validates every target_on sidecar completeness branch", () => {
     const targetOn = { runId: "on", state: "target_on" as const };
     expect(validateSidecarMatrix([targetOn], [])).toContain("missing sidecar for runId on");

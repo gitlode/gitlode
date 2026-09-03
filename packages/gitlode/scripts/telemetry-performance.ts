@@ -31,6 +31,7 @@ import {
   evaluateVolume,
   evaluateRepositoryProfileReport,
   composeFormalStatus,
+  composeSidecarEvaluationStatus,
   validateSidecarMatrix,
   volumeObservationFromProfileReport,
   pathIsolationEvidence,
@@ -437,13 +438,10 @@ async function main() {
               reasons: [sidecar.error ?? "collector sidecar failed"],
             },
       );
-    const sidecarStatus = sidecarCompletenessErrors.length
-      ? "inconclusive"
-      : sidecarEvaluations.some((item) => item.status === "fail")
-        ? "fail"
-        : sidecarEvaluations.some((item) => item.status === "inconclusive")
-          ? "inconclusive"
-          : "pass";
+    const sidecarStatus = composeSidecarEvaluationStatus(
+      sidecarEvaluations.map((item) => item.status),
+      sidecarCompletenessErrors,
+    ).status;
     const evaluation = candidate
       ? evaluateComparison({
           kind: comparison as "disabled_overhead" | "profile_overhead",

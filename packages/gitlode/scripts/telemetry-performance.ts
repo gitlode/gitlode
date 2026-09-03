@@ -693,6 +693,7 @@ type RepositorySidecarCapture = {
 export async function runRepositoryProfileSidecar(input: {
   readonly runId: string;
   readonly cli: string;
+  readonly workerEntryPath?: string;
   readonly repository: string;
   readonly config: string;
   readonly fixture: RepositoryFixture;
@@ -736,7 +737,7 @@ export async function runRepositoryProfileSidecar(input: {
           ]),
         )
       : undefined;
-    const workerEntryPath = resolve(dirname(input.cli), "worker-entry.js");
+    const workerEntryPath = input.workerEntryPath ?? resolve(dirname(input.cli), "worker-entry.js");
     const resolvedProvenance = {
       ...provenance,
       workerBundleSha256: createHash("sha256")

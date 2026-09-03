@@ -12,6 +12,9 @@ import {
 } from "../support/performance-fixtures.js";
 
 const cli = fileURLToPath(new URL("../../dist/index.js", import.meta.url));
+const workerEntryPath = fileURLToPath(
+  new URL("../../dist/execution/worker-entry.js", import.meta.url),
+);
 
 describe("repository profile sidecar", () => {
   it("collects an isomorphic-git commit fixture outside the timed CLI", async () => {
@@ -31,6 +34,7 @@ describe("repository profile sidecar", () => {
       );
       const result = await runRepositoryProfileSidecar({
         cli,
+        workerEntryPath,
         runId: "test-isomorphic",
         repository: root,
         config,
@@ -72,6 +76,7 @@ describe("repository profile sidecar", () => {
       await writeFile(config, JSON.stringify({ version: 1, runtime: { gitAdapter: "git-cli" } }));
       const result = await runRepositoryProfileSidecar({
         cli,
+        workerEntryPath,
         runId: "test-git-cli",
         repository: root,
         config,
@@ -118,6 +123,7 @@ describe("repository profile sidecar", () => {
       });
       const result = await runRepositoryProfileSidecar({
         cli,
+        workerEntryPath,
         runId: "test-plugin",
         repository: root,
         config: fixture.configPath,

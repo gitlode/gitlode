@@ -653,6 +653,16 @@ with its exact Git revision.
 
 Scope:
 
+- before formal measurement resumes, repair and review the calibration workflow discovered by the
+  first reference-host attempt: replace terminal doubling overshoot with exponential bracketing and
+  deterministic integer binary refinement, atomically preserve every completed pilot and every
+  expected terminal failure, reject unstable or non-monotonic evidence, and exclude temporary paths;
+- change the still-incomplete fixture manifest recipe revision from
+  `performance-v2-final-total-commits` to `performance-v3-bracketed-calibration`, update its derived
+  hashes through the existing helpers, and do not reuse any pre-change pilot as formal evidence;
+- add focused tests for direct-window selection, overshoot refinement, minimum-quantity selection,
+  no acceptable adjacent integer, unstable and non-monotonic pilots, safe-integer exhaustion,
+  child/behavior failure, atomic progress, terminal failure evidence, and path exclusion;
 - calibrate and freeze all five repository targets using the accepted 10–30 second legacy-disabled
   procedure and record target-scoped environment and calibration artifact references;
 - capture the complete `legacy_off` artifact matrix and verify its deterministic behavior evidence;
@@ -704,7 +714,7 @@ code or note remains, this handoff is deleted, and the trunk session confirms th
 | T11  | complete | Public plugin API and runtime migrated to package-scoped OTel Tracer/Meter ownership with bounded bootstrap/init/projection semantics, declaration and architecture compatibility, and official-plugin equivalence evidence; 1,054 full-suite tests pass with only 5 known sandbox Git ownership failures                                     |
 | T12  | complete | WorkerTelemetrySession production activation, structured ProfileReport transport, canonical signal-separated presentation, root/plugin/DAG hierarchy, legacy instrumentation removal, documentation, and release-build-safe architecture enforcement reviewed; 1,064 full-suite tests pass with only 5 known sandbox Git ownership failures   |
 | T13A | complete | Development-only repository sidecar and aggregation-scale collection, formal report/volume evaluation, deterministic provenance and path isolation, Git-independent revision capture, release-safe private-workspace bundling, and the full CI/package verification matrix reviewed; 1,086 full-suite tests and installed-package checks pass |
-| T13B | pending  | Requires an approved reference environment and preserved pre-migration release CLI/revision                                                                                                                                                                                                                                                   |
+| T13B | pending  | Reference environment and legacy release are approved; the first calibration exposed a doubling-overshoot and evidence-loss defect that must be repaired and reviewed before formal measurement resumes                                                                                                                                       |
 | T13C | pending  | —                                                                                                                                                                                                                                                                                                                                             |
 
 ## Required verification matrix

@@ -125,11 +125,48 @@ fixtures:
 
 fixture_calibration:
   phase: 0
+  permitted_quantity:
+    type: integer
+    minimum: target initial manifest quantity
   procedure:
-    - double candidate workload size for each pilot
-    - select the smallest size whose legacy_off median is between 10 and 30 seconds on the reference environment
+    - run every pilot with the cataloged warmup and measured-run counts
+    - validate child success and deterministic behavior before using a pilot for selection
+    - double the candidate workload until the first legacy_off median at or above 10 seconds brackets the lower threshold
+    - refine the bracket with deterministic integer binary search
+    - select the smallest permitted quantity whose observed legacy_off median is at least 10 seconds
+    - require the selected quantity's median to be no more than 30 seconds
     - record commit, file, plugin, and rotation quantities in the manifest
     - do not recalibrate during migration comparisons
+  stability:
+    maximum_median_absolute_deviation_ratio: 0.05
+    unstable_pilot: inconclusive
+    non_monotonic_lower_threshold_classification: inconclusive
+    automatic_retry_or_cherry_pick: prohibited
+  no_acceptable_quantity:
+    conditions:
+      - the initial permitted quantity exceeds 30 seconds
+      - adjacent integer quantities bracket the window below 10 seconds and above 30 seconds
+      - integer doubling cannot continue safely before reaching 10 seconds
+    result: failed calibration with preserved evidence
+  evidence:
+    progress_write: atomic after every completed pilot
+    atomic_write: replace a temporary sibling on the artifact filesystem
+    progress_filename: <fixture>-<adapter>-calibration-progress.json
+    failure_filename: <fixture>-<adapter>-calibration-failure.json
+    attempt_order: execution order
+    progress_fields:
+      - fixture and adapter
+      - baseline and benchmark revisions
+      - calibration target recipe hash
+      - quantity
+      - unrounded median and median absolute deviation
+      - artifact-safe warmup and measured runs
+      - child and behavioral validation
+      - normalized behavioral evidence
+    terminal_failure_write: required after workflow preparation begins
+    successful_artifact_pilot_history: complete
+    temporary_output_and_checkpoint_paths: prohibited
+    interrupted_attempt_reuse: prohibited
   shorter_fixture_policy: semantic or volume evidence only; not a wall-clock gate
 
 execution:

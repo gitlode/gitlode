@@ -165,7 +165,7 @@ export async function runCalibrationWorkflow<Manifest>(
       const madRatio = medianMs === 0 ? Number.POSITIVE_INFINITY : madMs / medianMs;
       const childValidation = pilot.childErrors ?? [];
       const behavioralValidation = pilot.behaviorErrors ?? [];
-      attempts.push({
+      const candidate: CalibrationWorkflowAttempt = {
         ordinal: attempts.length + 1,
         quantity: planned.quantity,
         medianMs,
@@ -180,18 +180,10 @@ export async function runCalibrationWorkflow<Manifest>(
         measuredRuns: pilot.evidence.measuredRuns,
         behaviorEvidence: pilot.evidence.behaviorEvidence,
         calibrationTargetRecipeHash: dependencies.recipeHash(planned.quantity),
-      });
-    } catch {
-      return persistTerminal(
-        "inconclusive",
-        "attempt-processing",
-        "attempt-processing-failed",
-        planned,
-        planned.quantity,
-      );
-    }
-    try {
-      action = planCalibration(initialQuantity, attempts);
+      };
+      const next = planCalibration(initialQuantity, [...attempts, candidate]);
+      attempts.push(candidate);
+      action = next;
     } catch {
       return persistTerminal(
         "inconclusive",

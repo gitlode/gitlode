@@ -206,4 +206,49 @@ describe("calibration workflow", () => {
     expect(failures[0]).not.toHaveProperty("failedQuantity");
     expect(JSON.stringify(failures[0])).not.toContain("checkpoint.tmp");
   });
+
+  it.each([
+    ["empty", []],
+    ["NaN", [Number.NaN]],
+    ["Infinity", [Number.POSITIVE_INFINITY]],
+    ["negative", [-1]],
+    ["zero MAD ratio", [0]],
+  ])("keeps invalid %s measurements out of completed JSON history", async (_name, measuredMs) => {
+    const artifacts: Record<string, unknown>[] = [];
+    const result = await runCalibrationWorkflow({
+      initialQuantity: 8,
+      fixture: "fixture",
+      adapter: "git-cli",
+      manifest: {},
+      dependencies: {
+        executePilot: async () => ({
+          measuredMs,
+          evidence: {
+            warmupRuns: [{ safe: true }],
+            measuredRuns: [{ safe: true }],
+            behaviorEvidence: [],
+          },
+        }),
+        writeProgress: async (value) => artifacts.push(value),
+        writeFailure: async (value) => artifacts.push(value),
+        writeEnvironment: async () => undefined,
+        writeSuccess: async () => undefined,
+        writeManifest: async () => undefined,
+        updateManifest: () => ({}),
+        recipeHash: (quantity) => `hash-${quantity}`,
+        revisions: async () => ({ legacyRevision: "legacy", benchmarkScriptRevision: "script" }),
+      },
+    });
+    expect(result).toMatchObject({ status: "inconclusive", exitCode: 2, attempts: [] });
+    const failure = artifacts.at(-1)!;
+    expect(failure).toMatchObject({
+      failureStage: "attempt-processing",
+      reason: "attempt-processing-failed",
+      failedQuantity: 8,
+      failedQuantityRecipeHash: "hash-8",
+    });
+    const json = JSON.stringify(failure);
+    expect(json).not.toContain("null");
+    expect(JSON.parse(json).attempts).toEqual([]);
+  });
 });

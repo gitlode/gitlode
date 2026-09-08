@@ -57,6 +57,7 @@ import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
 import { runAggregationChild } from "./telemetry-aggregation.js";
 import { buildAggregationCollectorBundle } from "./tooling/aggregation-collector-bundle.js";
 import { writeAtomicJson, writeAtomicText } from "./tooling/atomic-json.js";
+import { projectCalibrationPilot } from "./tooling/calibration-pilot-projection.js";
 import { runCalibrationWorkflow } from "./tooling/calibration-workflow.js";
 import { createProductionCalibrationArtifactAdapter } from "./tooling/production-calibration-artifacts.js";
 import { resolveSourceRevision } from "./tooling/source-revision.js";
@@ -520,32 +521,21 @@ async function runProductionCalibration(input: {
           quantity,
         );
         try {
-          const measured = pilot.baseline.filter((run) => run.phase === "measured");
           const behaviorErrors = await validateLegacy(
             pilot,
             { ...input.target.quantities, commits: quantity },
             input.fixture,
           );
-          const childErrors = measured.some(
-            (run) => run.exit.code !== 0 || run.exit.signal !== null,
-          )
-            ? ["calibration child failed"]
-            : [];
-          return {
-            measuredMs: measured.map((run) => run.elapsedMs),
-            childErrors,
-            behaviorErrors,
-            evidence: {
-              warmupRuns: pilot.baseline.filter((run) => run.phase === "warmup").map(artifactRun),
-              measuredRuns: measured.map(artifactRun),
-              behaviorEvidence: measured.map((run) =>
-                performanceBehaviorEvidence(
-                  pilot.behavior.get(run.runId) as PerformanceBehavior,
-                  pilot.repositoryPath,
-                ),
+          return projectCalibrationPilot({
+            runs: pilot.baseline,
+            artifactRun,
+            behavioralValidation: behaviorErrors,
+            behaviorEvidence: (run) =>
+              performanceBehaviorEvidence(
+                pilot.behavior.get(run.runId) as PerformanceBehavior,
+                pilot.repositoryPath,
               ),
-            },
-          };
+          });
         } finally {
           await pilot.cleanup();
         }

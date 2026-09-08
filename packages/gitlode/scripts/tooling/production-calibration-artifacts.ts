@@ -7,7 +7,6 @@ import type {
 
 /** The production calibration artifact composition, with I/O injected for exact tests. */
 export function createProductionCalibrationArtifactAdapter<Manifest, Environment>(input: {
-  readonly artifacts: string;
   readonly safeKey: string;
   readonly quantities: (selectedQuantity: number) => unknown;
   readonly environmentRef: string;

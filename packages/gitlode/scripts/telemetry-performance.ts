@@ -551,7 +551,6 @@ async function runProductionCalibration(input: {
         }
       },
       ...createProductionCalibrationArtifactAdapter({
-        artifacts: input.artifacts,
         safeKey,
         quantities: (selectedQuantity) => ({
           ...input.target.quantities,

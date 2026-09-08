@@ -6,10 +6,10 @@ import { createProductionCalibrationArtifactAdapter } from "../../scripts/toolin
 describe("production calibration artifact adapter", () => {
   it("persists the production success sequence with exact filenames and final manifest", async () => {
     const writes: { name: string; value: Record<string, unknown> }[] = [];
+    const events: string[] = [];
     const manifests: unknown[] = [];
     const quantities: number[] = [];
     const adapter = createProductionCalibrationArtifactAdapter({
-      artifacts: "ignored",
       safeKey: "fixture-git-cli",
       quantities: (commits) => ({ commits, files: 2 }),
       environmentRef: "fixture-git-cli-environment.json",
@@ -17,9 +17,14 @@ describe("production calibration artifact adapter", () => {
       recipeHash: (manifest) => `selected-${manifest.commits}`,
       sealedManifestHash: () => "sealed",
       makeEnvironment: async (manifest) => ({ fingerprint: manifest.commits }),
-      writeJson: async (name, value) =>
-        writes.push({ name, value: value as Record<string, unknown> }),
-      writeManifest: async (manifest) => manifests.push(manifest),
+      writeJson: async (name, value) => {
+        events.push(name);
+        writes.push({ name, value: value as Record<string, unknown> });
+      },
+      writeManifest: async (manifest) => {
+        events.push("manifest");
+        manifests.push(manifest);
+      },
     });
     const values = new Map([
       [8, 9_000],
@@ -64,6 +69,9 @@ describe("production calibration artifact adapter", () => {
       "fixture-git-cli-calibration.json",
       "fixture-git-cli-calibration-progress.json",
     ]);
+    expect(events).toEqual([...writes.map((entry) => entry.name), "manifest"]);
+    expect(events.at(-1)).toBe("manifest");
+    expect(events.filter((event) => event === "manifest")).toHaveLength(1);
     const success = writes.at(-2)!.value;
     expect(success).toMatchObject({
       schemaVersion: 3,

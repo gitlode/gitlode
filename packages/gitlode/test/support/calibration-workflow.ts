@@ -62,7 +62,8 @@ export async function runCalibrationWorkflow<Manifest>(
     action = planCalibration(initialQuantity, []);
     revisions = await dependencies.revisions();
   } catch {
-    return terminal("inconclusive", "preparation", {
+    revisions = { legacyRevision: "unavailable", benchmarkScriptRevision: "unavailable" };
+    return await persistTerminal("inconclusive", "revision-resolution", {
       kind: "inconclusive-evidence",
       code: "behavior-validation-failed",
     });

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { createEmptyCheckpoint } from "../src/state/index.js";
+import { runCalibrationWorkflow } from "../test/support/calibration-workflow.js";
 import {
   comparePerformanceBehavior,
   performanceBehaviorEvidence,
@@ -243,6 +244,19 @@ async function main() {
   const candidateRevision = mode === "measure" ? option("candidate-revision") : undefined;
   const artifacts = resolve(option("artifacts", join(packageDirectory, ".benchmark-artifacts")));
   const originalManifest = await readFile(manifestPath);
+  if (mode === "calibrate") {
+    await runProductionCalibration({
+      manifest,
+      manifestPath,
+      fixture,
+      adapter,
+      target,
+      artifacts,
+      legacyCli: legacyCli as string,
+      legacyRevision: legacyRevision as string,
+    });
+    return;
+  }
   if (mode === "calibrate") {
     const key = calibrationKey(fixture, adapter);
     const safeKey = key.replace("/", "-");
@@ -625,6 +639,150 @@ async function writeWorkflowFailureArtifact(
     join(directory, name),
     `${JSON.stringify({ schemaVersion: 2, ...value, error: error instanceof Error ? error.message : String(error) }, undefined, 2)}\n`,
   );
+}
+
+async function runProductionCalibration(input: {
+  manifest: FixtureManifest;
+  manifestPath: string;
+  fixture: RepositoryFixture;
+  adapter: "isomorphic-git" | "git-cli";
+  target: CalibrationTarget;
+  artifacts: string;
+  legacyCli: string;
+  legacyRevision: string;
+}) {
+  const key = calibrationKey(input.fixture, input.adapter);
+  const safeKey = key.replace("/", "-");
+  let scriptRevision = "unavailable";
+  const updateManifest = (selectedQuantity: number): FixtureManifest => ({
+    ...input.manifest,
+    calibrationTargets: {
+      ...input.manifest.calibrationTargets,
+      [key]: {
+        status: "complete",
+        quantities: { ...input.target.quantities, commits: selectedQuantity },
+        environmentRef: `${safeKey}-environment.json`,
+        artifactRef: `${safeKey}-calibration.json`,
+      },
+    },
+  });
+  const result = await runCalibrationWorkflow({
+    initialQuantity: input.target.quantities.commits,
+    fixture: input.fixture,
+    adapter: input.adapter,
+    manifest: input.manifest,
+    dependencies: {
+      executePilot: async (quantity) => {
+        const pilot = await executeSingle(
+          input.manifest,
+          input.fixture,
+          input.adapter,
+          input.legacyCli,
+          "legacy_off",
+          quantity,
+        );
+        try {
+          const measured = pilot.baseline.filter((run) => run.phase === "measured");
+          const behaviorErrors = await validateLegacy(
+            pilot,
+            { ...input.target.quantities, commits: quantity },
+            input.fixture,
+          );
+          const childErrors = measured.some(
+            (run) => run.exit.code !== 0 || run.exit.signal !== null,
+          )
+            ? ["calibration child failed"]
+            : [];
+          return {
+            measuredMs: measured.map((run) => run.elapsedMs),
+            childErrors,
+            behaviorErrors,
+            evidence: {
+              warmupRuns: pilot.baseline.filter((run) => run.phase === "warmup").map(artifactRun),
+              measuredRuns: measured.map(artifactRun),
+              behaviorEvidence: measured.map((run) =>
+                performanceBehaviorEvidence(
+                  pilot.behavior.get(run.runId) as PerformanceBehavior,
+                  pilot.repositoryPath,
+                ),
+              ),
+            },
+          };
+        } finally {
+          await pilot.cleanup();
+        }
+      },
+      writeArtifact: async (kind, value) => {
+        const artifact = value as Record<string, unknown>;
+        if (kind === "progress") {
+          await writeAtomicJson(input.artifacts, `${safeKey}-calibration-progress.json`, {
+            ...artifact,
+            kind: "calibration-progress",
+          });
+          const attempts = artifact.attempts as {
+            quantity?: unknown;
+            medianMs?: unknown;
+            madMs?: unknown;
+            classification?: unknown;
+          }[];
+          const attempt = attempts.at(-1);
+          if (attempt)
+            process.stdout.write(
+              `calibration quantity=${attempt.quantity} medianMs=${attempt.medianMs} madMs=${attempt.madMs} classification=${attempt.classification} next=${(artifact.action as { kind: string }).kind}\n`,
+            );
+          return;
+        }
+        if (kind === "failure")
+          return await writeAtomicJson(input.artifacts, `${safeKey}-calibration-failure.json`, {
+            ...artifact,
+            kind: "calibration-failure",
+            status: artifact.status === "failed" ? "fail" : "inconclusive",
+          });
+        if (kind === "environment") {
+          const action = artifact.action as { quantity: number };
+          const updated = updateManifest(action.quantity);
+          return await writeAtomicJson(
+            input.artifacts,
+            `${safeKey}-environment.json`,
+            await makeFingerprint(
+              updated,
+              input.adapter,
+              "legacy_off",
+              input.legacyRevision,
+              scriptRevision,
+              calibrationTargetRecipeHash(updated, key),
+            ),
+          );
+        }
+        const action = artifact.action as { quantity: number };
+        const updated = updateManifest(action.quantity);
+        return await writeAtomicJson(input.artifacts, `${safeKey}-calibration.json`, {
+          ...artifact,
+          kind: "calibration",
+          status: "complete",
+          selectedQuantity: action.quantity,
+          calibrationTargetRecipeHash: calibrationTargetRecipeHash(updated, key),
+        });
+      },
+      writeManifest: async (updated) =>
+        await writeFile(input.manifestPath, canonicalManifest(updated)),
+      updateManifest,
+      recipeHash: (quantity) =>
+        calibrationTargetRecipeHash(input.manifest, key, {
+          ...input.target.quantities,
+          commits: quantity,
+        }),
+      revisions: async () => {
+        scriptRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
+        return { legacyRevision: input.legacyRevision, benchmarkScriptRevision: scriptRevision };
+      },
+    },
+  });
+  if (result.exitCode === 2) process.exitCode = 2;
+  else
+    process.stdout.write(
+      `calibrated ${key}; allComplete=${calibrationComplete(result.manifest as FixtureManifest)}\n`,
+    );
 }
 
 type CalibrationAttemptEvidence = {

@@ -52,4 +52,25 @@ describe("atomic calibration artifact writer", () => {
     expect(JSON.parse(await readFile(destination, "utf8"))).toEqual({ previous: true });
     expect(await readdir(directory)).toEqual(["progress.json"]);
   });
+  it("preserves the original write failure when cleanup also fails", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "atomic-calibration-"));
+    directories.push(directory);
+    await expect(
+      writeAtomicJson(
+        directory,
+        "progress.json",
+        { replacement: true },
+        {
+          mkdir: async () => undefined,
+          writeFile: async () => {
+            throw new Error("write failed");
+          },
+          rename: async () => undefined,
+          rm: async () => {
+            throw new Error("cleanup failed");
+          },
+        },
+      ),
+    ).rejects.toThrow("write failed");
+  });
 });

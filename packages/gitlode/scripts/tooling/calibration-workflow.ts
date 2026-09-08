@@ -8,6 +8,19 @@ import {
 } from "../../test/support/performance-harness.js";
 
 export type CalibrationWorkflowStatus = "complete" | "failed" | "inconclusive";
+export type CalibrationFailureReason =
+  | "planner-initialization-failed"
+  | "revision-resolution-failed"
+  | "preparation-or-capture-failed"
+  | "attempt-processing-failed"
+  | "progress-persistence-failed"
+  | "environment-persistence-failed"
+  | "success-persistence-failed"
+  | "manifest-persistence-failed"
+  | CalibrationPlannerAction["code"];
+export type CalibrationArtifactAction =
+  | CalibrationPlannerAction
+  | { readonly kind: "planner-initialization-unavailable" };
 export type CalibrationPilotEvidence = {
   readonly warmupRuns: readonly unknown[];
   readonly measuredRuns: readonly unknown[];
@@ -38,7 +51,9 @@ type ArtifactBase = {
   readonly benchmarkScriptRevision: string;
   readonly initialQuantity: number;
   readonly attempts: readonly CalibrationWorkflowAttempt[];
-  readonly action: CalibrationPlannerAction;
+  readonly action: CalibrationArtifactAction;
+  /** Omitted only before a quantity can be safely determined. */
+  readonly calibrationTargetRecipeHash?: string;
 };
 export type CalibrationProgressArtifact = ArtifactBase & {
   readonly kind: "calibration-progress";
@@ -48,7 +63,7 @@ export type CalibrationFailureArtifact = ArtifactBase & {
   readonly kind: "calibration-failure";
   readonly status: "fail" | "inconclusive";
   readonly failureStage: string;
-  readonly reason: string;
+  readonly reason: CalibrationFailureReason;
   readonly failedQuantity?: number;
   readonly failedQuantityRecipeHash?: string;
 };
@@ -88,11 +103,11 @@ export type CalibrationWorkflowResult<Manifest> = {
   readonly status: CalibrationWorkflowStatus;
   readonly exitCode: 0 | 2;
   readonly attempts: readonly CalibrationWorkflowAttempt[];
-  readonly action: CalibrationPlannerAction;
+  readonly action: CalibrationArtifactAction;
   readonly manifest?: Manifest;
 };
 
-/** Production calibration orchestration. All terminal outcomes retain safe evidence. */
+/** Production calibration orchestration. Raw failures never become artifact metadata. */
 export async function runCalibrationWorkflow<Manifest>(
   input: CalibrationWorkflowInput<Manifest>,
 ): Promise<CalibrationWorkflowResult<Manifest>> {
@@ -102,12 +117,23 @@ export async function runCalibrationWorkflow<Manifest>(
   let revisions = { legacyRevision: "unavailable", benchmarkScriptRevision: "unavailable" };
   try {
     action = planCalibration(initialQuantity, []);
+  } catch {
+    return persistTerminal(
+      "inconclusive",
+      "planner-initialization",
+      "planner-initialization-failed",
+      { kind: "planner-initialization-unavailable" },
+    );
+  }
+  try {
     revisions = await dependencies.revisions();
   } catch {
-    return persistTerminal("inconclusive", "revision-resolution", {
-      kind: "inconclusive-evidence",
-      code: "behavior-validation-failed",
-    });
+    return persistTerminal(
+      "inconclusive",
+      "revision-resolution",
+      "revision-resolution-failed",
+      action,
+    );
   }
   for (;;) {
     if (action.kind === "complete") break;
@@ -115,14 +141,22 @@ export async function runCalibrationWorkflow<Manifest>(
       return persistTerminal(
         action.kind.startsWith("inconclusive-") ? "inconclusive" : "failed",
         "planner",
+        action.code,
         action,
+        attempts.at(-1)?.quantity,
       );
     const planned = action;
     let pilot: CalibrationPilot;
     try {
       pilot = await dependencies.executePilot(planned.quantity);
     } catch {
-      return persistTerminal("inconclusive", "preparation-or-capture", planned, planned.quantity);
+      return persistTerminal(
+        "inconclusive",
+        "preparation-or-capture",
+        "preparation-or-capture-failed",
+        planned,
+        planned.quantity,
+      );
     }
     try {
       if (!pilot.measuredMs.length) throw new Error("empty measured runs");
@@ -147,10 +181,36 @@ export async function runCalibrationWorkflow<Manifest>(
         behaviorEvidence: pilot.evidence.behaviorEvidence,
         calibrationTargetRecipeHash: dependencies.recipeHash(planned.quantity),
       });
-      action = planCalibration(initialQuantity, attempts);
-      await dependencies.writeProgress(progress(statusFor(action), action));
     } catch {
-      return persistTerminal("inconclusive", "attempt-processing", planned, planned.quantity);
+      return persistTerminal(
+        "inconclusive",
+        "attempt-processing",
+        "attempt-processing-failed",
+        planned,
+        planned.quantity,
+      );
+    }
+    try {
+      action = planCalibration(initialQuantity, attempts);
+    } catch {
+      return persistTerminal(
+        "inconclusive",
+        "attempt-processing",
+        "attempt-processing-failed",
+        planned,
+        planned.quantity,
+      );
+    }
+    try {
+      await dependencies.writeProgress(progress(statusFor(action), action, planned.quantity));
+    } catch {
+      return persistTerminal(
+        "inconclusive",
+        "progress-persistence",
+        "progress-persistence-failed",
+        action,
+        planned.quantity,
+      );
     }
   }
   const selectedQuantity = action.quantity;
@@ -158,26 +218,50 @@ export async function runCalibrationWorkflow<Manifest>(
   try {
     await dependencies.writeEnvironment(environment(action));
   } catch {
-    return persistTerminal("inconclusive", "environment-persistence", action, selectedQuantity);
+    return persistTerminal(
+      "inconclusive",
+      "environment-persistence",
+      "environment-persistence-failed",
+      action,
+      selectedQuantity,
+    );
   }
   try {
     await dependencies.writeSuccess(success(action));
   } catch {
-    return persistTerminal("inconclusive", "success-persistence", action, selectedQuantity);
+    return persistTerminal(
+      "inconclusive",
+      "success-persistence",
+      "success-persistence-failed",
+      action,
+      selectedQuantity,
+    );
   }
   try {
-    await dependencies.writeProgress(progress("complete", action));
+    await dependencies.writeProgress(progress("complete", action, selectedQuantity));
   } catch {
-    return persistTerminal("inconclusive", "progress-persistence", action, selectedQuantity);
+    return persistTerminal(
+      "inconclusive",
+      "progress-persistence",
+      "progress-persistence-failed",
+      action,
+      selectedQuantity,
+    );
   }
   try {
     await dependencies.writeManifest(updated);
   } catch {
-    return persistTerminal("inconclusive", "manifest-persistence", action, selectedQuantity);
+    return persistTerminal(
+      "inconclusive",
+      "manifest-persistence",
+      "manifest-persistence-failed",
+      action,
+      selectedQuantity,
+    );
   }
   return { status: "complete", exitCode: 0, attempts, action, manifest: updated };
 
-  function base(current: CalibrationPlannerAction): ArtifactBase {
+  function base(current: CalibrationArtifactAction, quantity?: number): ArtifactBase {
     return {
       schemaVersion: 3,
       fixture: input.fixture,
@@ -187,17 +271,20 @@ export async function runCalibrationWorkflow<Manifest>(
       initialQuantity,
       attempts: [...attempts],
       action: current,
+      calibrationTargetRecipeHash:
+        quantity === undefined ? undefined : dependencies.recipeHash(quantity),
     };
   }
   function progress(
     status: CalibrationProgressArtifact["status"],
-    current: CalibrationPlannerAction,
+    current: CalibrationArtifactAction,
+    quantity?: number,
   ): CalibrationProgressArtifact {
-    return { ...base(current), kind: "calibration-progress", status };
+    return { ...base(current, quantity), kind: "calibration-progress", status };
   }
   function environment(current: CalibrationPlannerAction): CalibrationEnvironmentArtifact {
     return {
-      ...base(current),
+      ...base(current, current.quantity),
       kind: "calibration-environment",
       status: "complete",
       selectedQuantity: current.quantity,
@@ -205,7 +292,7 @@ export async function runCalibrationWorkflow<Manifest>(
   }
   function success(current: CalibrationPlannerAction): CalibrationSuccessArtifact {
     return {
-      ...base(current),
+      ...base(current, current.quantity),
       kind: "calibration",
       status: "complete",
       selectedQuantity: current.quantity,
@@ -215,21 +302,27 @@ export async function runCalibrationWorkflow<Manifest>(
   async function persistTerminal(
     status: "failed" | "inconclusive",
     failureStage: string,
-    current: CalibrationPlannerAction,
+    reason: CalibrationFailureReason,
+    current: CalibrationArtifactAction,
     failedQuantity?: number,
   ): Promise<CalibrationWorkflowResult<Manifest>> {
+    const provenanceQuantity = failedQuantity ?? attempts.at(-1)?.quantity;
     const failure: CalibrationFailureArtifact = {
-      ...base(current),
+      ...base(current, provenanceQuantity),
       kind: "calibration-failure",
       status: status === "failed" ? "fail" : "inconclusive",
       failureStage,
-      reason: "code" in current ? current.code : current.kind,
-      failedQuantity,
-      failedQuantityRecipeHash:
-        failedQuantity === undefined ? undefined : dependencies.recipeHash(failedQuantity),
+      reason,
+      ...(provenanceQuantity === undefined
+        ? {}
+        : {
+            failedQuantity: provenanceQuantity,
+            failedQuantityRecipeHash: dependencies.recipeHash(provenanceQuantity),
+          }),
     };
-    // A failed progress write must not prevent an independent terminal failure attempt.
-    await dependencies.writeProgress(progress(status, current)).catch(() => undefined);
+    await dependencies
+      .writeProgress(progress(status, current, provenanceQuantity))
+      .catch(() => undefined);
     await dependencies.writeFailure(failure).catch(() => undefined);
     return { status, exitCode: 2, attempts, action: current };
   }

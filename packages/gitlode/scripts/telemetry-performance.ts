@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -62,7 +62,7 @@ import {
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
 import { runAggregationChild } from "./telemetry-aggregation.js";
 import { buildAggregationCollectorBundle } from "./tooling/aggregation-collector-bundle.js";
-import { writeAtomicJson } from "./tooling/atomic-json.js";
+import { writeAtomicJson, writeAtomicText } from "./tooling/atomic-json.js";
 import { resolveSourceRevision } from "./tooling/source-revision.js";
 
 const exec = promisify(execFile);
@@ -765,7 +765,11 @@ async function runProductionCalibration(input: {
         });
       },
       writeManifest: async (updated) =>
-        await writeFile(input.manifestPath, canonicalManifest(updated)),
+        await writeAtomicText(
+          dirname(input.manifestPath),
+          basename(input.manifestPath),
+          canonicalManifest(updated),
+        ),
       updateManifest,
       recipeHash: (quantity) =>
         calibrationTargetRecipeHash(input.manifest, key, {

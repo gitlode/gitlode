@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { writeAtomicJson } from "../../scripts/tooling/atomic-json.js";
+import { writeAtomicJson, writeAtomicText } from "../../scripts/tooling/atomic-json.js";
 
 const directories: string[] = [];
 afterEach(async () =>
@@ -72,5 +72,13 @@ describe("atomic calibration artifact writer", () => {
         },
       ),
     ).rejects.toThrow("write failed");
+  });
+  it("atomically replaces canonical manifest text", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "atomic-calibration-"));
+    directories.push(directory);
+    await writeAtomicText(directory, "manifest.json", "old\n");
+    await writeAtomicText(directory, "manifest.json", "new\n");
+    expect(await readFile(join(directory, "manifest.json"), "utf8")).toBe("new\n");
+    expect(await readdir(directory)).toEqual(["manifest.json"]);
   });
 });

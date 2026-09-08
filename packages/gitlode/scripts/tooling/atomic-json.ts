@@ -17,11 +17,21 @@ export async function writeAtomicJson(
   value: unknown,
   injected: AtomicJsonOperations = operations,
 ) {
+  await writeAtomicText(directory, name, `${JSON.stringify(value, undefined, 2)}\n`, injected);
+}
+
+/** Atomic sibling replacement shared by JSON artifacts and canonical manifest text. */
+export async function writeAtomicText(
+  directory: string,
+  name: string,
+  contents: string,
+  injected: AtomicJsonOperations = operations,
+) {
   await injected.mkdir(directory, { recursive: true });
   const destination = join(directory, name);
   const temporary = join(directory, `.${name}.${process.pid}.${Date.now()}.tmp`);
   try {
-    await injected.writeFile(temporary, `${JSON.stringify(value, undefined, 2)}\n`);
+    await injected.writeFile(temporary, contents);
     await injected.rename(temporary, destination);
   } catch (error) {
     await injected.rm(temporary, { force: true }).catch(() => undefined);

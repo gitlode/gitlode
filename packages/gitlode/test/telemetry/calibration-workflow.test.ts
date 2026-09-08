@@ -224,9 +224,9 @@ describe("calibration workflow", () => {
         executePilot: async () => ({
           measuredMs,
           evidence: {
-            warmupRuns: [{ safe: true }],
-            measuredRuns: [{ safe: true }],
-            behaviorEvidence: [],
+            warmupRuns: [{ elapsedMs: 1 }],
+            measuredRuns: [{ elapsedMs: 2 }],
+            behaviorEvidence: [{ normalized: true }],
           },
         }),
         writeProgress: async (value) => artifacts.push(value),
@@ -246,6 +246,14 @@ describe("calibration workflow", () => {
       reason: "attempt-processing-failed",
       failedQuantity: 8,
       failedQuantityRecipeHash: "hash-8",
+      failedPilotEvidence: {
+        quantity: 8,
+        warmupRuns: [{ elapsedMs: 1 }],
+        measuredRuns: [{ elapsedMs: 2 }],
+        childValidation: [],
+        behavioralValidation: [],
+        behaviorEvidence: [{ normalized: true }],
+      },
     });
     const json = JSON.stringify(failure);
     expect(json).not.toContain("null");

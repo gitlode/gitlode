@@ -32,6 +32,14 @@ export type CalibrationPilot = {
   readonly behaviorErrors?: readonly string[];
   readonly evidence: CalibrationPilotEvidence;
 };
+export type CalibrationFailedPilotEvidence = {
+  readonly quantity: number;
+  readonly warmupRuns: readonly unknown[];
+  readonly measuredRuns: readonly unknown[];
+  readonly childValidation: readonly string[];
+  readonly behavioralValidation: readonly string[];
+  readonly behaviorEvidence: readonly unknown[];
+};
 export type CalibrationWorkflowAttempt = CalibrationPlannerAttempt & {
   readonly ordinal: number;
   readonly madMs: number;
@@ -66,6 +74,7 @@ export type CalibrationFailureArtifact = ArtifactBase & {
   readonly reason: CalibrationFailureReason;
   readonly failedQuantity?: number;
   readonly failedQuantityRecipeHash?: string;
+  readonly failedPilotEvidence?: CalibrationFailedPilotEvidence;
 };
 export type CalibrationEnvironmentArtifact = ArtifactBase & {
   readonly kind: "calibration-environment";
@@ -191,6 +200,7 @@ export async function runCalibrationWorkflow<Manifest>(
         "attempt-processing-failed",
         planned,
         planned.quantity,
+        safePilotEvidence(planned.quantity, pilot),
       );
     }
     try {
@@ -297,6 +307,7 @@ export async function runCalibrationWorkflow<Manifest>(
     reason: CalibrationFailureReason,
     current: CalibrationArtifactAction,
     failedQuantity?: number,
+    failedPilotEvidence?: CalibrationFailedPilotEvidence,
   ): Promise<CalibrationWorkflowResult<Manifest>> {
     const provenanceQuantity = failedQuantity ?? attempts.at(-1)?.quantity;
     const failure: CalibrationFailureArtifact = {
@@ -311,12 +322,26 @@ export async function runCalibrationWorkflow<Manifest>(
             failedQuantity: provenanceQuantity,
             failedQuantityRecipeHash: dependencies.recipeHash(provenanceQuantity),
           }),
+      ...(failedPilotEvidence === undefined ? {} : { failedPilotEvidence }),
     };
     await dependencies
       .writeProgress(progress(status, current, provenanceQuantity))
       .catch(() => undefined);
     await dependencies.writeFailure(failure).catch(() => undefined);
     return { status, exitCode: 2, attempts, action: current };
+  }
+  function safePilotEvidence(
+    quantity: number,
+    pilot: CalibrationPilot,
+  ): CalibrationFailedPilotEvidence {
+    return {
+      quantity,
+      warmupRuns: pilot.evidence.warmupRuns,
+      measuredRuns: pilot.evidence.measuredRuns,
+      childValidation: pilot.childErrors ?? [],
+      behavioralValidation: pilot.behaviorErrors ?? [],
+      behaviorEvidence: pilot.evidence.behaviorEvidence,
+    };
   }
 }
 function statusFor(action: CalibrationPlannerAction): CalibrationProgressArtifact["status"] {

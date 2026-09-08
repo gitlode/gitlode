@@ -371,6 +371,14 @@ describe("performance harness contracts", () => {
     expect(classifyCalibrationMedian(9_999)).toBe("lower");
     expect(classifyCalibrationMedian(10_000)).toBe("accepted");
     expect(classifyCalibrationMedian(30_001)).toBe("upper");
+    expect(() => classifyCalibrationMedian(Number.NaN)).toThrow(/finite/);
+    expect(() => planCalibration(0, [])).toThrow(/positive safe integer/);
+    expect(() => planCalibration(8, [{ ...valid(8, Number.POSITIVE_INFINITY) }])).toThrow(/median/);
+    expect(() => planCalibration(8, [{ ...valid(8, -1) }])).toThrow(/median/);
+    expect(() => planCalibration(8, [{ ...valid(8, 10_000), madRatio: Number.NaN }])).toThrow(
+      /MAD/,
+    );
+    expect(() => planCalibration(8, [{ ...valid(8, 10_000), madRatio: -1 }])).toThrow(/MAD/);
   });
   it("samples only injected child RSS and cleans up after exit", async () => {
     const child = new EventEmitter() as EventEmitter & { pid: number };

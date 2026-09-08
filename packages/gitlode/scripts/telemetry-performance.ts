@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,6 +61,7 @@ import {
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
 import { runAggregationChild } from "./telemetry-aggregation.js";
 import { buildAggregationCollectorBundle } from "./tooling/aggregation-collector-bundle.js";
+import { writeAtomicJson } from "./tooling/atomic-json.js";
 import { resolveSourceRevision } from "./tooling/source-revision.js";
 
 const exec = promisify(execFile);
@@ -245,8 +246,9 @@ async function main() {
   if (mode === "calibrate") {
     const key = calibrationKey(fixture, adapter);
     const safeKey = key.replace("/", "-");
+    const initialQuantity = target.quantities.commits;
     const attempts: CalibrationAttemptEvidence[] = [];
-    let action = planCalibration(target.quantities.commits, []);
+    let action = planCalibration(initialQuantity, []);
     const scriptRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
     for (;;) {
       if (action.kind === "complete") break;
@@ -260,6 +262,7 @@ async function main() {
           scriptRevision,
           manifest,
           target,
+          initialQuantity,
           attempts,
           action,
         });
@@ -277,22 +280,20 @@ async function main() {
           "legacy_off",
           quantity,
         );
-      } catch (error) {
-        await writeWorkflowFailureArtifact(artifacts, `${safeKey}-calibration-failure.json`, {
-          kind: "calibration-failure",
-          failureStage: "preparation-or-capture",
+      } catch {
+        await writeCalibrationTerminalArtifact({
+          artifacts,
+          safeKey,
           fixture,
           adapter,
-          revisions: { baseline: legacyRevision },
-          calibrationTargetRecipeHash: calibrationTargetRecipeHash(
-            manifest,
-            calibrationKey(fixture, adapter),
-            { ...target.quantities, commits: quantity },
-          ),
-          quantities: { ...target.quantities, commits: quantity },
+          legacyRevision: legacyRevision as string,
+          scriptRevision,
+          manifest,
+          target,
+          initialQuantity,
           attempts,
-          search: action,
-          error,
+          action: { kind: "inconclusive-evidence", code: "child-validation-failed" },
+          failureStage: "preparation-or-capture",
         });
         process.exitCode = 2;
         return;
@@ -328,7 +329,7 @@ async function main() {
           ),
         };
         attempts.push(attempt);
-        action = planCalibration(target.quantities.commits, attempts.map(plannerAttempt));
+        action = planCalibration(initialQuantity, attempts.map(plannerAttempt));
         await writeCalibrationProgressArtifact({
           artifacts,
           safeKey,
@@ -338,6 +339,7 @@ async function main() {
           scriptRevision,
           manifest,
           target,
+          initialQuantity,
           attempts,
           action,
         });
@@ -380,7 +382,7 @@ async function main() {
     );
     await writeFile(
       join(artifacts, artifactRef),
-      `${JSON.stringify({ schemaVersion: 2, fixture, adapter, legacyRevision, benchmarkScriptRevision: scriptRevision, calibrationTargetRecipeHash: targetRecipeHash, sealedManifestHash: sealedManifestHash(updated), quantities: { ...target.quantities, commits: quantity }, environmentRef, selectedQuantity: quantity, attempts }, undefined, 2)}\n`,
+      `${JSON.stringify({ schemaVersion: 3, kind: "calibration", status: "complete", fixture, adapter, legacyRevision, benchmarkScriptRevision: scriptRevision, initialQuantity, selectedQuantity: quantity, calibrationTargetRecipeHash: targetRecipeHash, sealedManifestHash: sealedManifestHash(updated), quantities: { ...target.quantities, commits: quantity }, environmentRef, attempts: attempts.map((attempt) => ({ ...attempt, calibrationTargetRecipeHash: calibrationTargetRecipeHash(manifest, key, { ...target.quantities, commits: attempt.quantity }) })) }, undefined, 2)}\n`,
     );
     await writeFile(manifestPath, canonicalManifest(updated));
     await writeCalibrationProgressArtifact({
@@ -392,6 +394,7 @@ async function main() {
       scriptRevision,
       manifest: updated,
       target: updated.calibrationTargets[key] as CalibrationTarget,
+      initialQuantity,
       attempts,
       action,
     });
@@ -646,13 +649,6 @@ function plannerAttempt(attempt: CalibrationAttemptEvidence): CalibrationPlanner
     behaviorValid: attempt.behavioralValidation.length === 0,
   };
 }
-async function writeAtomicJson(directory: string, name: string, value: unknown) {
-  await mkdir(directory, { recursive: true });
-  const destination = join(directory, name);
-  const temporary = join(directory, `.${name}.${process.pid}.${Date.now()}.tmp`);
-  await writeFile(temporary, `${JSON.stringify(value, undefined, 2)}\n`);
-  await rename(temporary, destination);
-}
 function calibrationArtifactBase(input: {
   fixture: RepositoryFixture;
   adapter: "isomorphic-git" | "git-cli";
@@ -660,6 +656,7 @@ function calibrationArtifactBase(input: {
   scriptRevision: string;
   manifest: FixtureManifest;
   target: CalibrationTarget;
+  initialQuantity: number;
   attempts: readonly CalibrationAttemptEvidence[];
   action: ReturnType<typeof planCalibration>;
 }) {
@@ -674,8 +671,15 @@ function calibrationArtifactBase(input: {
       calibrationKey(input.fixture, input.adapter),
       input.target.quantities,
     ),
-    initialQuantity: input.target.quantities.commits,
-    attempts: input.attempts,
+    initialQuantity: input.initialQuantity,
+    attempts: input.attempts.map((attempt) => ({
+      ...attempt,
+      calibrationTargetRecipeHash: calibrationTargetRecipeHash(
+        input.manifest,
+        calibrationKey(input.fixture, input.adapter),
+        { ...input.target.quantities, commits: attempt.quantity },
+      ),
+    })),
     search: input.action,
   };
 }
@@ -688,12 +692,20 @@ async function writeCalibrationProgressArtifact(input: {
   scriptRevision: string;
   manifest: FixtureManifest;
   target: CalibrationTarget;
+  initialQuantity: number;
   attempts: readonly CalibrationAttemptEvidence[];
   action: ReturnType<typeof planCalibration>;
 }) {
   await writeAtomicJson(input.artifacts, `${input.safeKey}-calibration-progress.json`, {
     kind: "calibration-progress",
-    status: input.action.kind === "complete" ? "complete" : "in-progress",
+    status:
+      input.action.kind === "complete"
+        ? "complete"
+        : input.action.kind.startsWith("fail-")
+          ? "failed"
+          : input.action.kind.startsWith("inconclusive-")
+            ? "inconclusive"
+            : "in-progress",
     ...calibrationArtifactBase(input),
   });
 }
@@ -706,13 +718,15 @@ async function writeCalibrationTerminalArtifact(input: {
   scriptRevision: string;
   manifest: FixtureManifest;
   target: CalibrationTarget;
+  initialQuantity: number;
   attempts: readonly CalibrationAttemptEvidence[];
   action: ReturnType<typeof planCalibration>;
+  failureStage?: string;
 }) {
   await writeAtomicJson(input.artifacts, `${input.safeKey}-calibration-failure.json`, {
     kind: "calibration-failure",
     status: input.action.kind.startsWith("inconclusive-") ? "inconclusive" : "fail",
-    failureStage: "calibration-search",
+    failureStage: input.failureStage ?? "calibration-search",
     reason: "code" in input.action ? input.action.code : input.action.kind,
     ...calibrationArtifactBase(input),
   });

@@ -696,6 +696,8 @@ export interface CalibrationPlannerAttempt {
   readonly behaviorValid: boolean;
 }
 export function classifyCalibrationMedian(medianMs: number): CalibrationClassification {
+  if (!Number.isFinite(medianMs) || medianMs < 0)
+    throw new Error("calibration median must be a finite non-negative number");
   return medianMs < 10_000 ? "lower" : medianMs <= 30_000 ? "accepted" : "upper";
 }
 /** Pure deterministic calibration decision; callers append exactly one completed pilot per turn. */
@@ -710,6 +712,10 @@ export function planCalibration(
   for (const attempt of attempts) {
     if (!Number.isSafeInteger(attempt.quantity) || attempt.quantity < initialQuantity)
       throw new Error("calibration attempt quantity is outside the permitted range");
+    if (!Number.isFinite(attempt.medianMs) || attempt.medianMs < 0)
+      throw new Error("calibration attempt median must be a finite non-negative number");
+    if (!Number.isFinite(attempt.madRatio) || attempt.madRatio < 0)
+      throw new Error("calibration attempt MAD ratio must be a finite non-negative number");
     if (quantities.has(attempt.quantity))
       throw new Error("calibration quantity was measured twice");
     quantities.add(attempt.quantity);

@@ -58,6 +58,7 @@ import { runAggregationChild } from "./telemetry-aggregation.js";
 import { buildAggregationCollectorBundle } from "./tooling/aggregation-collector-bundle.js";
 import { writeAtomicJson, writeAtomicText } from "./tooling/atomic-json.js";
 import { runCalibrationWorkflow } from "./tooling/calibration-workflow.js";
+import { createProductionCalibrationArtifactAdapter } from "./tooling/production-calibration-artifacts.js";
 import { resolveSourceRevision } from "./tooling/source-revision.js";
 
 const exec = promisify(execFile);
@@ -549,21 +550,18 @@ async function runProductionCalibration(input: {
           await pilot.cleanup();
         }
       },
-      writeProgress: async (artifact) => {
-        await writeAtomicJson(input.artifacts, `${safeKey}-calibration-progress.json`, artifact);
-        const attempt = artifact.attempts.at(-1);
-        if (attempt)
-          process.stdout.write(
-            `calibration quantity=${attempt.quantity} medianMs=${attempt.medianMs} madMs=${attempt.madMs} classification=${attempt.classification} next=${artifact.action.kind}\n`,
-          );
-      },
-      writeFailure: async (artifact) =>
-        await writeAtomicJson(input.artifacts, `${safeKey}-calibration-failure.json`, artifact),
-      writeEnvironment: async (artifact) => {
-        const updated = updateManifest(artifact.selectedQuantity);
-        await writeAtomicJson(
-          input.artifacts,
-          `${safeKey}-environment.json`,
+      ...createProductionCalibrationArtifactAdapter({
+        artifacts: input.artifacts,
+        safeKey,
+        quantities: (selectedQuantity) => ({
+          ...input.target.quantities,
+          commits: selectedQuantity,
+        }),
+        environmentRef: `${safeKey}-environment.json`,
+        updateManifest,
+        recipeHash: (updated) => calibrationTargetRecipeHash(updated, key),
+        sealedManifestHash,
+        makeEnvironment: async (updated, artifact) =>
           await makeFingerprint(
             updated,
             input.adapter,
@@ -572,24 +570,21 @@ async function runProductionCalibration(input: {
             scriptRevision,
             calibrationTargetRecipeHash(updated, key),
           ),
-        );
-      },
-      writeSuccess: async (artifact) => {
-        const updated = updateManifest(artifact.selectedQuantity);
-        await writeAtomicJson(input.artifacts, `${safeKey}-calibration.json`, {
-          ...artifact,
-          quantities: { ...input.target.quantities, commits: artifact.selectedQuantity },
-          environmentRef: `${safeKey}-environment.json`,
-          calibrationTargetRecipeHash: calibrationTargetRecipeHash(updated, key),
-          sealedManifestHash: sealedManifestHash(updated),
-        });
-      },
-      writeManifest: async (updated) =>
-        await writeAtomicText(
-          dirname(input.manifestPath),
-          basename(input.manifestPath),
-          canonicalManifest(updated),
-        ),
+        writeJson: async (name, value) => await writeAtomicJson(input.artifacts, name, value),
+        writeManifest: async (updated) =>
+          await writeAtomicText(
+            dirname(input.manifestPath),
+            basename(input.manifestPath),
+            canonicalManifest(updated),
+          ),
+        onProgress: (artifact) => {
+          const attempt = artifact.attempts.at(-1);
+          if (attempt)
+            process.stdout.write(
+              `calibration quantity=${attempt.quantity} medianMs=${attempt.medianMs} madMs=${attempt.madMs} classification=${attempt.classification} next=${artifact.action.kind}\n`,
+            );
+        },
+      }),
       updateManifest,
       recipeHash: (quantity) =>
         calibrationTargetRecipeHash(input.manifest, key, {

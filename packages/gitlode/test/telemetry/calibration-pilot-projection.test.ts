@@ -12,6 +12,7 @@ describe("production calibration pilot projection", () => {
         exit: { code: 0, signal: null },
         outputDirectory: "C:/sentinel/output",
         checkpointPath: "C:/sentinel/checkpoint",
+        runId: "warmup",
       },
       {
         phase: "measured" as const,
@@ -19,22 +20,46 @@ describe("production calibration pilot projection", () => {
         exit: { code: 1, signal: null },
         outputDirectory: "C:/sentinel/output",
         checkpointPath: "C:/sentinel/checkpoint",
+        runId: "measured",
       },
     ];
     const projected = projectCalibrationPilot({
       runs,
-      artifactRun: ({ outputDirectory: _output, checkpointPath: _checkpoint, ...safe }) => safe,
       behavioralValidation: ["behavior failed"],
-      behaviorEvidence: () => ({ normalizedRepository: "<repository>", result: "same" }),
+      repositoryPath: repository,
+      behavior: new Map([
+        [
+          "measured",
+          {
+            exit: { code: 1, signal: null },
+            checkpoint: { repositoryPath: repository, generatedAt: "now" },
+            jsonl: [],
+            derived: { records: 1, commits: 1, skippedDiffs: 0, files: 1, bytes: 1 },
+            captureErrors: [],
+          },
+        ],
+      ]),
     });
     expect(projected).toEqual({
       measuredMs: [7],
       childErrors: ["calibration child failed"],
       behaviorErrors: ["behavior failed"],
       evidence: {
-        warmupRuns: [{ phase: "warmup", elapsedMs: 3, exit: { code: 0, signal: null } }],
-        measuredRuns: [{ phase: "measured", elapsedMs: 7, exit: { code: 1, signal: null } }],
-        behaviorEvidence: [{ normalizedRepository: "<repository>", result: "same" }],
+        warmupRuns: [
+          { phase: "warmup", elapsedMs: 3, exit: { code: 0, signal: null }, runId: "warmup" },
+        ],
+        measuredRuns: [
+          { phase: "measured", elapsedMs: 7, exit: { code: 1, signal: null }, runId: "measured" },
+        ],
+        behaviorEvidence: [
+          {
+            exit: { code: 1, signal: null },
+            checkpoint: { repositoryPath: "<repository>", generatedAt: "<session>" },
+            files: [],
+            derived: { records: 1, commits: 1, skippedDiffs: 0, files: 1, bytes: 1 },
+            captureErrors: [],
+          },
+        ],
       },
     });
     const serialized = JSON.stringify(projected);

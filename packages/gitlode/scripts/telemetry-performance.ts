@@ -9,7 +9,6 @@ import { promisify } from "node:util";
 import { createEmptyCheckpoint } from "../src/state/index.js";
 import {
   comparePerformanceBehavior,
-  performanceBehaviorEvidence,
   type DerivedOutput,
   type PerformanceBehavior,
 } from "../test/support/performance-equivalence.js";
@@ -528,13 +527,9 @@ async function runProductionCalibration(input: {
           );
           return projectCalibrationPilot({
             runs: pilot.baseline,
-            artifactRun,
             behavioralValidation: behaviorErrors,
-            behaviorEvidence: (run) =>
-              performanceBehaviorEvidence(
-                pilot.behavior.get(run.runId) as PerformanceBehavior,
-                pilot.repositoryPath,
-              ),
+            behavior: pilot.behavior,
+            repositoryPath: pilot.repositoryPath,
           });
         } finally {
           await pilot.cleanup();

@@ -1,14 +1,20 @@
-/** Converts completed production child runs into artifact-safe calibration pilot evidence. */
-export function projectCalibrationPilot<
-  Run extends {
-    readonly phase: "warmup" | "measured";
-    readonly elapsedMs: number;
-    readonly exit: { readonly code: number | null; readonly signal: string | null };
-  },
->(input: {
-  readonly runs: readonly Run[];
-  readonly artifactRun: (run: Run) => unknown;
-  readonly behaviorEvidence: (run: Run) => unknown;
+import {
+  performanceBehaviorEvidence,
+  type PerformanceBehavior,
+} from "../../test/support/performance-equivalence.js";
+import type { RawRun } from "../../test/support/performance-harness.js";
+
+/** Artifact-safe production RawRun projection. */
+export function calibrationArtifactRun(run: RawRun) {
+  const { outputDirectory: _outputDirectory, checkpointPath: _checkpointPath, ...safeRun } = run;
+  return safeRun;
+}
+
+/** Converts completed production child runs to calibration evidence without test callbacks. */
+export function projectCalibrationPilot(input: {
+  readonly runs: readonly RawRun[];
+  readonly behavior: ReadonlyMap<string, PerformanceBehavior>;
+  readonly repositoryPath: string;
   readonly behavioralValidation: readonly string[];
 }) {
   const warmup = input.runs.filter((run) => run.phase === "warmup");
@@ -20,9 +26,14 @@ export function projectCalibrationPilot<
       : [],
     behaviorErrors: [...input.behavioralValidation],
     evidence: {
-      warmupRuns: warmup.map(input.artifactRun),
-      measuredRuns: measured.map(input.artifactRun),
-      behaviorEvidence: measured.map(input.behaviorEvidence),
+      warmupRuns: warmup.map(calibrationArtifactRun),
+      measuredRuns: measured.map(calibrationArtifactRun),
+      behaviorEvidence: measured.map((run) =>
+        performanceBehaviorEvidence(
+          input.behavior.get(run.runId) as PerformanceBehavior,
+          input.repositoryPath,
+        ),
+      ),
     },
   };
 }

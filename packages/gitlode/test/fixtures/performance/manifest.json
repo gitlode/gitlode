@@ -56,7 +56,7 @@
       "status": "incomplete"
     }
   },
-  "recipeRevision": "performance-v2-final-total-commits",
+  "recipeRevision": "performance-v3-bracketed-calibration",
   "schemaVersion": 2,
   "aggregationScale": {
     "integration": "implemented-target-collector",

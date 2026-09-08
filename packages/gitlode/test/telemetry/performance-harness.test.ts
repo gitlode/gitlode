@@ -28,7 +28,8 @@ import {
   mad,
   manifestHash,
   median,
-  nextCalibrationQuantity,
+  classifyCalibrationMedian,
+  planCalibration,
   pairPlan,
   sampleChildRss,
   unavailableTargetTelemetry,
@@ -281,11 +282,95 @@ describe("performance harness contracts", () => {
     expect(await readFile(path, "utf8")).toBe(before);
     expect(JSON.parse(before)).toEqual(manifest);
   });
-  it("doubles calibration candidates and stops only in the window", () => {
-    expect(nextCalibrationQuantity(8, 9_999)).toEqual({ quantity: 16, complete: false });
-    expect(nextCalibrationQuantity(16, 10_000)).toEqual({ quantity: 16, complete: true });
-    expect(nextCalibrationQuantity(16, 30_000)).toEqual({ quantity: 16, complete: true });
-    expect(() => nextCalibrationQuantity(16, 30_001)).toThrow();
+  it("plans calibration boundaries, direct selection, and exponential expansion", () => {
+    const attempt = (quantity: number, medianMs: number, options = {}) => ({
+      quantity,
+      medianMs,
+      madRatio: 0.05,
+      childValid: true,
+      behaviorValid: true,
+      ...options,
+    });
+    expect(planCalibration(8, [])).toEqual({ kind: "run-initial", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 10_000)])).toEqual({ kind: "complete", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 30_000)])).toEqual({ kind: "complete", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 20_000)])).toEqual({ kind: "complete", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 30_001)])).toMatchObject({
+      kind: "fail-no-acceptable-quantity",
+      code: "initial-above-window",
+    });
+    expect(planCalibration(8, [attempt(8, 9_999)])).toEqual({ kind: "expand-upper", quantity: 16 });
+  });
+  it("refines overshoots to the smallest accepted integer without repeats", () => {
+    const attempt = (quantity: number, medianMs: number) => ({
+      quantity,
+      medianMs,
+      madRatio: 0,
+      childValid: true,
+      behaviorValid: true,
+    });
+    expect(planCalibration(8, [attempt(8, 9_000), attempt(16, 31_000)])).toEqual({
+      kind: "refine-bracket",
+      quantity: 12,
+      lower: 8,
+      upper: 16,
+    });
+    expect(
+      planCalibration(8, [attempt(8, 9_000), attempt(16, 31_000), attempt(12, 9_500)]),
+    ).toEqual({ kind: "refine-bracket", quantity: 14, lower: 12, upper: 16 });
+    expect(
+      planCalibration(8, [
+        attempt(8, 9_000),
+        attempt(16, 31_000),
+        attempt(12, 9_500),
+        attempt(14, 10_000),
+      ]),
+    ).toEqual({ kind: "refine-bracket", quantity: 13, lower: 12, upper: 14 });
+    expect(
+      planCalibration(8, [
+        attempt(8, 9_000),
+        attempt(16, 31_000),
+        attempt(12, 9_500),
+        attempt(14, 10_000),
+        attempt(13, 9_999),
+      ]),
+    ).toEqual({ kind: "complete", quantity: 14 });
+    expect(planCalibration(8, [attempt(8, 9_000), attempt(9, 30_001)])).toMatchObject({
+      kind: "fail-no-acceptable-quantity",
+      code: "adjacent-integers-skip-window",
+    });
+  });
+  it("makes unstable, invalid, inverted, and unsafe calibration evidence terminal", () => {
+    const valid = (quantity: number, medianMs: number) => ({
+      quantity,
+      medianMs,
+      madRatio: 0,
+      childValid: true,
+      behaviorValid: true,
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), madRatio: 0.05 }])).toMatchObject({
+      kind: "complete",
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), madRatio: 0.050001 }])).toMatchObject({
+      kind: "inconclusive-unstable",
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), childValid: false }])).toMatchObject({
+      kind: "inconclusive-evidence",
+      code: "child-validation-failed",
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), behaviorValid: false }])).toMatchObject({
+      kind: "inconclusive-evidence",
+      code: "behavior-validation-failed",
+    });
+    expect(planCalibration(8, [valid(8, 10_000), valid(16, 9_999)])).toMatchObject({
+      kind: "inconclusive-non-monotonic",
+    });
+    expect(
+      planCalibration(Number.MAX_SAFE_INTEGER, [valid(Number.MAX_SAFE_INTEGER, 9_999)]),
+    ).toMatchObject({ kind: "fail-safe-integer-expansion" });
+    expect(classifyCalibrationMedian(9_999)).toBe("lower");
+    expect(classifyCalibrationMedian(10_000)).toBe("accepted");
+    expect(classifyCalibrationMedian(30_001)).toBe("upper");
   });
   it("samples only injected child RSS and cleans up after exit", async () => {
     const child = new EventEmitter() as EventEmitter & { pid: number };

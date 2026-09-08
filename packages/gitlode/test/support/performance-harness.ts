@@ -660,15 +660,107 @@ export function verifyMeasuredBehavior(
 ): string[] {
   return compareBehavioralArtifacts(baseline, candidate, "same-adapter", repositoryPath);
 }
-export function nextCalibrationQuantity(
-  current: number,
-  legacyMedianMs: number,
-): { quantity: number; complete: boolean } {
-  if (legacyMedianMs >= 10_000 && legacyMedianMs <= 30_000)
-    return { quantity: current, complete: true };
-  if (legacyMedianMs > 30_000)
-    throw new Error("candidate skipped the accepted 10-30 second calibration window");
-  return { quantity: current * 2, complete: false };
+export type CalibrationClassification = "lower" | "accepted" | "upper";
+export type CalibrationPlannerAction =
+  | { readonly kind: "run-initial"; readonly quantity: number }
+  | { readonly kind: "expand-upper"; readonly quantity: number }
+  | {
+      readonly kind: "refine-bracket";
+      readonly quantity: number;
+      readonly lower: number;
+      readonly upper: number;
+    }
+  | { readonly kind: "complete"; readonly quantity: number }
+  | {
+      readonly kind: "fail-no-acceptable-quantity";
+      readonly code: "initial-above-window" | "adjacent-integers-skip-window";
+    }
+  | {
+      readonly kind: "fail-safe-integer-expansion";
+      readonly code: "safe-integer-expansion-exhausted";
+    }
+  | { readonly kind: "inconclusive-unstable"; readonly code: "mad-ratio-exceeds-limit" }
+  | {
+      readonly kind: "inconclusive-non-monotonic";
+      readonly code: "lower-threshold-classification-inversion";
+    }
+  | {
+      readonly kind: "inconclusive-evidence";
+      readonly code: "child-validation-failed" | "behavior-validation-failed";
+    };
+export interface CalibrationPlannerAttempt {
+  readonly quantity: number;
+  readonly medianMs: number;
+  readonly madRatio: number;
+  readonly childValid: boolean;
+  readonly behaviorValid: boolean;
+}
+export function classifyCalibrationMedian(medianMs: number): CalibrationClassification {
+  return medianMs < 10_000 ? "lower" : medianMs <= 30_000 ? "accepted" : "upper";
+}
+/** Pure deterministic calibration decision; callers append exactly one completed pilot per turn. */
+export function planCalibration(
+  initialQuantity: number,
+  attempts: readonly CalibrationPlannerAttempt[],
+): CalibrationPlannerAction {
+  if (!Number.isSafeInteger(initialQuantity) || initialQuantity < 1)
+    throw new Error("initial calibration quantity must be a positive safe integer");
+  if (!attempts.length) return { kind: "run-initial", quantity: initialQuantity };
+  const quantities = new Set<number>();
+  for (const attempt of attempts) {
+    if (!Number.isSafeInteger(attempt.quantity) || attempt.quantity < initialQuantity)
+      throw new Error("calibration attempt quantity is outside the permitted range");
+    if (quantities.has(attempt.quantity))
+      throw new Error("calibration quantity was measured twice");
+    quantities.add(attempt.quantity);
+    if (attempt.madRatio > 0.05)
+      return { kind: "inconclusive-unstable", code: "mad-ratio-exceeds-limit" };
+    if (!attempt.childValid)
+      return { kind: "inconclusive-evidence", code: "child-validation-failed" };
+    if (!attempt.behaviorValid)
+      return { kind: "inconclusive-evidence", code: "behavior-validation-failed" };
+  }
+  const classified = attempts.map((attempt) => ({
+    ...attempt,
+    classification: classifyCalibrationMedian(attempt.medianMs),
+  }));
+  if (
+    classified.some(
+      (small) =>
+        small.classification !== "lower" &&
+        classified.some(
+          (large) => large.quantity > small.quantity && large.classification === "lower",
+        ),
+    )
+  )
+    return { kind: "inconclusive-non-monotonic", code: "lower-threshold-classification-inversion" };
+  const initial = classified.find((attempt) => attempt.quantity === initialQuantity);
+  if (!initial) throw new Error("initial calibration quantity was not measured");
+  if (initial.classification === "accepted") return { kind: "complete", quantity: initialQuantity };
+  if (initial.classification === "upper")
+    return { kind: "fail-no-acceptable-quantity", code: "initial-above-window" };
+  const lowers = classified.filter((attempt) => attempt.classification === "lower");
+  const uppers = classified.filter((attempt) => attempt.classification !== "lower");
+  if (!uppers.length) {
+    const lower = Math.max(...lowers.map((attempt) => attempt.quantity));
+    if (lower > Math.floor(Number.MAX_SAFE_INTEGER / 2))
+      return { kind: "fail-safe-integer-expansion", code: "safe-integer-expansion-exhausted" };
+    return { kind: "expand-upper", quantity: lower * 2 };
+  }
+  let lower = Math.max(...lowers.map((attempt) => attempt.quantity));
+  let upper = Math.min(...uppers.map((attempt) => attempt.quantity));
+  while (upper - lower > 1) {
+    const quantity = lower + Math.floor((upper - lower) / 2);
+    const known = classified.find((attempt) => attempt.quantity === quantity);
+    if (!known) return { kind: "refine-bracket", quantity, lower, upper };
+    if (known.classification === "lower") lower = quantity;
+    else upper = quantity;
+  }
+  const selected = classified.find((attempt) => attempt.quantity === upper);
+  if (!selected) throw new Error("calibration upper bound is missing");
+  return selected.classification === "accepted"
+    ? { kind: "complete", quantity: upper }
+    : { kind: "fail-no-acceptable-quantity", code: "adjacent-integers-skip-window" };
 }
 
 export interface VolumeObservation {

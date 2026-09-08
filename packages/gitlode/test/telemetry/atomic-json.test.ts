@@ -81,4 +81,23 @@ describe("atomic calibration artifact writer", () => {
     expect(await readFile(join(directory, "manifest.json"), "utf8")).toBe("new\n");
     expect(await readdir(directory)).toEqual(["manifest.json"]);
   });
+  it("preserves text destinations and the original write identity on cleanup failure", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "atomic-calibration-"));
+    directories.push(directory);
+    const destination = join(directory, "manifest.json");
+    await writeFile(destination, "previous\n");
+    await expect(
+      writeAtomicText(directory, "manifest.json", "replacement\n", {
+        mkdir: async () => undefined,
+        writeFile: async () => {
+          throw new Error("text write failed");
+        },
+        rename: async () => undefined,
+        rm: async () => {
+          throw new Error("cleanup failed");
+        },
+      }),
+    ).rejects.toThrow("text write failed");
+    expect(await readFile(destination, "utf8")).toBe("previous\n");
+  });
 });

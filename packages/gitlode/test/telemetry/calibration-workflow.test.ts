@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runCalibrationWorkflow } from "../support/calibration-workflow.js";
+import { runCalibrationWorkflow } from "../../scripts/tooling/calibration-workflow.js";
 
 describe("calibration workflow", () => {
   it("persists bracketed attempts and separates initial from selected provenance", async () => {
@@ -19,10 +19,14 @@ describe("calibration workflow", () => {
       adapter: "git-cli",
       manifest: { complete: false },
       dependencies: {
-        executePilot: async (quantity) => ({ measuredMs: Array(7).fill(values.get(quantity)) }),
-        writeArtifact: async (kind, value) => {
-          artifacts.push({ kind, value });
-        },
+        executePilot: async (quantity) => ({
+          measuredMs: Array(7).fill(values.get(quantity)),
+          evidence: { warmupRuns: [], measuredRuns: [], behaviorEvidence: [] },
+        }),
+        writeProgress: async (value) => artifacts.push({ kind: "progress", value }),
+        writeFailure: async (value) => artifacts.push({ kind: "failure", value }),
+        writeEnvironment: async (value) => artifacts.push({ kind: "environment", value }),
+        writeSuccess: async (value) => artifacts.push({ kind: "success", value }),
         writeManifest: async () => {
           manifestWrites++;
         },
@@ -76,11 +80,13 @@ describe("calibration workflow", () => {
       dependencies: {
         executePilot: async (quantity) => ({
           measuredMs: Array(7).fill(values.get(quantity)),
+          evidence: { warmupRuns: [], measuredRuns: [], behaviorEvidence: [] },
           ...(expected === "inconclusive" ? { childErrors: ["nonzero"] } : {}),
         }),
-        writeArtifact: async (_kind, value) => {
-          artifacts.push(value);
-        },
+        writeProgress: async (value) => artifacts.push(value),
+        writeFailure: async (value) => artifacts.push(value),
+        writeEnvironment: async (value) => artifacts.push(value),
+        writeSuccess: async (value) => artifacts.push(value),
         writeManifest: async () => {
           throw new Error("must not write");
         },
@@ -92,10 +98,48 @@ describe("calibration workflow", () => {
     expect(result.status).toBe(expected);
     expect(result.exitCode).toBe(2);
     expect(artifacts.at(-1)).toMatchObject({
-      status: expected,
+      status: expected === "failed" ? "fail" : expected,
       initialQuantity: 8,
       legacyRevision: "legacy",
       benchmarkScriptRevision: "script",
     });
+  });
+
+  it("attempts failure persistence even when terminal progress persistence fails", async () => {
+    const writes: string[] = [];
+    const result = await runCalibrationWorkflow({
+      initialQuantity: 8,
+      fixture: "fixture",
+      adapter: "git-cli",
+      manifest: {},
+      dependencies: {
+        executePilot: async () => ({
+          measuredMs: [10_000],
+          evidence: { warmupRuns: [], measuredRuns: [], behaviorEvidence: [] },
+          childErrors: ["child failed"],
+        }),
+        writeProgress: async () => {
+          writes.push("progress");
+          throw new Error("storage sentinel");
+        },
+        writeFailure: async (artifact) => {
+          writes.push("failure");
+          expect(artifact).toMatchObject({
+            kind: "calibration-failure",
+            status: "inconclusive",
+            failedQuantity: 8,
+            failedQuantityRecipeHash: "hash-8",
+          });
+        },
+        writeEnvironment: async () => undefined,
+        writeSuccess: async () => undefined,
+        writeManifest: async () => undefined,
+        updateManifest: () => ({}),
+        recipeHash: (quantity) => `hash-${quantity}`,
+        revisions: async () => ({ legacyRevision: "legacy", benchmarkScriptRevision: "script" }),
+      },
+    });
+    expect(result).toMatchObject({ status: "inconclusive", exitCode: 2 });
+    expect(writes).toEqual(["progress", "progress", "failure"]);
   });
 });

@@ -120,4 +120,107 @@ describe("atomic calibration artifact writer", () => {
     expect(await readFile(destination, "utf8")).toBe("previous\n");
     expect((await readdir(directory)).some((name) => name.endsWith(".tmp"))).toBe(true);
   });
+
+  it.each([
+    [
+      "JSON",
+      "progress.json",
+      (directory: string, name: string, operations: Parameters<typeof writeAtomicText>[3]) =>
+        writeAtomicJson(directory, name, { replacement: true }, operations),
+    ],
+    [
+      "text",
+      "manifest.json",
+      (directory: string, name: string, operations: Parameters<typeof writeAtomicText>[3]) =>
+        writeAtomicText(directory, name, "replacement\n", operations),
+    ],
+  ])(
+    "keeps no destination or temporary sibling after %s rename failure and successful cleanup",
+    async (_kind, name, write) => {
+      const directory = await mkdtemp(join(tmpdir(), "atomic-calibration-"));
+      directories.push(directory);
+      const renameFailure = new Error("rename identity");
+      await expect(
+        write(directory, name, {
+          mkdir: async () => undefined,
+          writeFile: async (path, contents) => writeFile(path, contents),
+          rename: async () => {
+            throw renameFailure;
+          },
+          rm: async (path) => rm(path, { force: true }),
+        }),
+      ).rejects.toBe(renameFailure);
+      expect(await readdir(directory)).toEqual([]);
+    },
+  );
+
+  it.each([
+    [
+      "JSON",
+      "progress.json",
+      '{"previous":true}\n',
+      (directory: string, name: string, operations: Parameters<typeof writeAtomicText>[3]) =>
+        writeAtomicJson(directory, name, { replacement: true }, operations),
+    ],
+    [
+      "text",
+      "manifest.json",
+      "previous\n",
+      (directory: string, name: string, operations: Parameters<typeof writeAtomicText>[3]) =>
+        writeAtomicText(directory, name, "replacement\n", operations),
+    ],
+  ])(
+    "preserves an existing %s destination after rename failure and successful cleanup",
+    async (_kind, name, previous, write) => {
+      const directory = await mkdtemp(join(tmpdir(), "atomic-calibration-"));
+      directories.push(directory);
+      const destination = join(directory, name);
+      await writeFile(destination, previous);
+      const renameFailure = new Error("rename identity");
+      await expect(
+        write(directory, name, {
+          mkdir: async () => undefined,
+          writeFile: async (path, contents) => writeFile(path, contents),
+          rename: async () => {
+            throw renameFailure;
+          },
+          rm: async (path) => rm(path, { force: true }),
+        }),
+      ).rejects.toBe(renameFailure);
+      expect(await readFile(destination, "utf8")).toBe(previous);
+      expect(await readdir(directory)).toEqual([name]);
+    },
+  );
+
+  it.each([
+    [
+      "JSON",
+      "progress.json",
+      (directory: string, name: string, operations: Parameters<typeof writeAtomicText>[3]) =>
+        writeAtomicJson(directory, name, { replacement: true }, operations),
+    ],
+    [
+      "text",
+      "manifest.json",
+      (directory: string, name: string, operations: Parameters<typeof writeAtomicText>[3]) =>
+        writeAtomicText(directory, name, "replacement\n", operations),
+    ],
+  ])("retains the original rename failure when %s cleanup fails", async (_kind, name, write) => {
+    const directory = await mkdtemp(join(tmpdir(), "atomic-calibration-"));
+    directories.push(directory);
+    const renameFailure = new Error("rename identity");
+    await expect(
+      write(directory, name, {
+        mkdir: async () => undefined,
+        writeFile: async (path, contents) => writeFile(path, contents),
+        rename: async () => {
+          throw renameFailure;
+        },
+        rm: async () => {
+          throw new Error("cleanup failure");
+        },
+      }),
+    ).rejects.toBe(renameFailure);
+    expect((await readdir(directory)).some((entry) => entry.endsWith(".tmp"))).toBe(true);
+  });
 });

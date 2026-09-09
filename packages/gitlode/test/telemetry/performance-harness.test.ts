@@ -362,8 +362,9 @@ describe("performance harness contracts", () => {
       kind: "inconclusive-evidence",
       code: "behavior-validation-failed",
     });
-    expect(planCalibration(8, [valid(8, 10_000), valid(16, 9_999)])).toMatchObject({
+    expect(planCalibration(8, [valid(8, 10_000), valid(16, 9_999)])).toEqual({
       kind: "inconclusive-non-monotonic",
+      code: "lower-threshold-classification-inversion",
     });
     expect(
       planCalibration(Number.MAX_SAFE_INTEGER, [valid(Number.MAX_SAFE_INTEGER, 9_999)]),

@@ -3,6 +3,13 @@ import { describe, expect, it } from "vitest";
 import { runCalibrationWorkflow } from "../../scripts/tooling/calibration-workflow.js";
 
 describe("calibration workflow", () => {
+  function expectFiniteNumbers(value: unknown): void {
+    if (typeof value === "number") expect(Number.isFinite(value)).toBe(true);
+    else if (Array.isArray(value)) value.forEach(expectFiniteNumbers);
+    else if (value !== null && typeof value === "object")
+      Object.values(value).forEach(expectFiniteNumbers);
+  }
+
   it("persists bracketed attempts and separates initial from selected provenance", async () => {
     const artifacts: { kind: string; value: Record<string, unknown> }[] = [];
     let manifestWrites = 0;
@@ -259,4 +266,267 @@ describe("calibration workflow", () => {
     expect(json).not.toContain("null");
     expect(JSON.parse(json).attempts).toEqual([]);
   });
+
+  it.each([
+    {
+      name: "safe integer expansion exhaustion",
+      initialQuantity: Number.MAX_SAFE_INTEGER,
+      measuredMs: [9_999],
+      childErrors: undefined,
+      behaviorErrors: undefined,
+      status: "failed",
+      failureStage: "planner",
+      reason: "safe-integer-expansion-exhausted",
+      action: { kind: "fail-safe-integer-expansion", code: "safe-integer-expansion-exhausted" },
+      failedQuantity: Number.MAX_SAFE_INTEGER,
+    },
+    {
+      name: "MAD ratio exceeds the limit",
+      initialQuantity: 8,
+      measuredMs: [9_000, 10_000, 11_000],
+      childErrors: undefined,
+      behaviorErrors: undefined,
+      status: "inconclusive",
+      failureStage: "planner",
+      reason: "mad-ratio-exceeds-limit",
+      action: { kind: "inconclusive-unstable", code: "mad-ratio-exceeds-limit" },
+      failedQuantity: 8,
+    },
+    {
+      name: "behavior validation failure",
+      initialQuantity: 8,
+      measuredMs: [10_000],
+      childErrors: undefined,
+      behaviorErrors: ["behavior sentinel"],
+      status: "inconclusive",
+      failureStage: "planner",
+      reason: "behavior-validation-failed",
+      action: { kind: "inconclusive-evidence", code: "behavior-validation-failed" },
+      failedQuantity: 8,
+    },
+  ])("persists exact terminal planner evidence for $name", async (testCase) => {
+    const artifacts: Record<string, unknown>[] = [];
+    const pilots: number[] = [];
+    const result = await runCalibrationWorkflow({
+      initialQuantity: testCase.initialQuantity,
+      fixture: "fixture",
+      adapter: "git-cli",
+      manifest: { preserved: true },
+      dependencies: {
+        executePilot: async (quantity) => {
+          pilots.push(quantity);
+          return {
+            measuredMs: testCase.measuredMs,
+            ...(testCase.childErrors === undefined ? {} : { childErrors: testCase.childErrors }),
+            ...(testCase.behaviorErrors === undefined
+              ? {}
+              : { behaviorErrors: testCase.behaviorErrors }),
+            evidence: { warmupRuns: [], measuredRuns: [], behaviorEvidence: [] },
+          };
+        },
+        writeProgress: async (value) => artifacts.push(value),
+        writeFailure: async (value) => artifacts.push(value),
+        writeEnvironment: async () => {
+          throw new Error("must not write");
+        },
+        writeSuccess: async () => {
+          throw new Error("must not write");
+        },
+        writeManifest: async () => {
+          throw new Error("must not write");
+        },
+        updateManifest: () => ({ changed: true }),
+        recipeHash: (quantity) => `hash-${quantity}`,
+        revisions: async () => ({ legacyRevision: "legacy", benchmarkScriptRevision: "script" }),
+      },
+    });
+    const failure = artifacts.at(-1)!;
+    expect(result.status).toBe(testCase.status);
+    expect(result.exitCode).toBe(2);
+    expect(result.action).toEqual(testCase.action);
+    expect(result.attempts).toHaveLength(1);
+    expect(new Set(pilots).size).toBe(pilots.length);
+    expect(failure).toEqual(
+      expect.objectContaining({
+        kind: "calibration-failure",
+        status: testCase.status === "failed" ? "fail" : "inconclusive",
+        failureStage: testCase.failureStage,
+        reason: testCase.reason,
+        action: testCase.action,
+        failedQuantity: testCase.failedQuantity,
+        failedQuantityRecipeHash: `hash-${testCase.failedQuantity}`,
+        calibrationTargetRecipeHash: `hash-${testCase.failedQuantity}`,
+      }),
+    );
+    expectFiniteNumbers(JSON.parse(JSON.stringify(failure)));
+  });
+
+  it.each([
+    [
+      "planner initialization",
+      0,
+      "planner-initialization",
+      "planner-initialization-failed",
+      undefined,
+    ],
+    ["revision resolution", 8, "revision-resolution", "revision-resolution-failed", undefined],
+    ["preparation", 8, "preparation-or-capture", "preparation-or-capture-failed", 8],
+  ] as const)(
+    "preserves safe terminal artifacts for %s failure",
+    async (_name, initialQuantity, stage, reason, quantity) => {
+      const artifacts: Record<string, unknown>[] = [];
+      const result = await runCalibrationWorkflow({
+        initialQuantity,
+        fixture: "fixture",
+        adapter: "git-cli",
+        manifest: { preserved: true },
+        dependencies: {
+          executePilot: async () => {
+            throw new Error("C:/sentinel/temp-file");
+          },
+          writeProgress: async (value) => artifacts.push(value),
+          writeFailure: async (value) => artifacts.push(value),
+          writeEnvironment: async () => undefined,
+          writeSuccess: async () => undefined,
+          writeManifest: async () => undefined,
+          updateManifest: () => ({ changed: true }),
+          recipeHash: (value) => `hash-${value}`,
+          revisions: async () => {
+            if (stage === "revision-resolution") throw new Error("C:/sentinel/temp-file");
+            return { legacyRevision: "legacy", benchmarkScriptRevision: "script" };
+          },
+        },
+      });
+      const failure = artifacts.at(-1)!;
+      expect(result.status).toBe("inconclusive");
+      expect(result.exitCode).toBe(2);
+      expect(failure).toEqual(expect.objectContaining({ failureStage: stage, reason }));
+      if (quantity === undefined) {
+        expect(failure).not.toHaveProperty("failedQuantity");
+        expect(failure).toHaveProperty("calibrationTargetRecipeHash", undefined);
+        expect(JSON.parse(JSON.stringify(failure))).not.toHaveProperty(
+          "calibrationTargetRecipeHash",
+        );
+      } else {
+        expect(failure).toHaveProperty("failedQuantity", quantity);
+        expect(failure).toEqual(
+          expect.objectContaining({
+            failedQuantityRecipeHash: "hash-8",
+            calibrationTargetRecipeHash: "hash-8",
+          }),
+        );
+      }
+      expect(JSON.stringify(failure)).not.toContain("sentinel");
+      expectFiniteNumbers(JSON.parse(JSON.stringify(failure)));
+    },
+  );
+
+  it.each([
+    [
+      "environment",
+      "environment-persistence",
+      "environment-persistence-failed",
+      ["progress:complete", "environment", "progress:inconclusive", "failure"],
+    ],
+    [
+      "success",
+      "success-persistence",
+      "success-persistence-failed",
+      ["progress:complete", "environment", "success", "progress:inconclusive", "failure"],
+    ],
+    [
+      "final progress",
+      "progress-persistence",
+      "progress-persistence-failed",
+      [
+        "progress:complete",
+        "environment",
+        "success",
+        "progress:complete",
+        "progress:inconclusive",
+        "failure",
+      ],
+    ],
+    [
+      "manifest",
+      "manifest-persistence",
+      "manifest-persistence-failed",
+      [
+        "progress:complete",
+        "environment",
+        "success",
+        "progress:complete",
+        "manifest",
+        "progress:inconclusive",
+        "failure",
+      ],
+    ],
+  ] as const)(
+    "stops success persistence after %s writer failure",
+    async (failurePoint, stage, reason, expectedEvents) => {
+      const events: string[] = [];
+      const failures: Record<string, unknown>[] = [];
+      let completeProgressWrites = 0;
+      const result = await runCalibrationWorkflow({
+        initialQuantity: 8,
+        fixture: "fixture",
+        adapter: "git-cli",
+        manifest: { preserved: true },
+        dependencies: {
+          executePilot: async () => ({
+            measuredMs: [10_000],
+            evidence: { warmupRuns: [], measuredRuns: [], behaviorEvidence: [] },
+          }),
+          writeProgress: async (artifact) => {
+            events.push(`progress:${artifact.status}`);
+            if (artifact.status === "complete") completeProgressWrites++;
+            if (failurePoint === "final progress" && completeProgressWrites === 2)
+              throw new Error("C:/sentinel/progress.tmp");
+          },
+          writeFailure: async (artifact) => {
+            events.push("failure");
+            failures.push(artifact);
+          },
+          writeEnvironment: async () => {
+            events.push("environment");
+            if (failurePoint === "environment") throw new Error("C:/sentinel/environment.tmp");
+          },
+          writeSuccess: async () => {
+            events.push("success");
+            if (failurePoint === "success") throw new Error("C:/sentinel/success.tmp");
+          },
+          writeManifest: async () => {
+            events.push("manifest");
+            if (failurePoint === "manifest") throw new Error("C:/sentinel/manifest.tmp");
+          },
+          updateManifest: () => ({ selectedQuantity: 8 }),
+          recipeHash: (quantity) => `hash-${quantity}`,
+          revisions: async () => ({ legacyRevision: "legacy", benchmarkScriptRevision: "script" }),
+        },
+      });
+      expect(result).toEqual({
+        status: "inconclusive",
+        exitCode: 2,
+        attempts: expect.any(Array),
+        action: { kind: "complete", quantity: 8 },
+      });
+      expect(events).toEqual(expectedEvents);
+      expect(events.at(-1)).toBe("failure");
+      expect(events.filter((event) => event === "manifest")).toHaveLength(
+        failurePoint === "manifest" ? 1 : 0,
+      );
+      expect(events.includes("success")).toBe(failurePoint !== "environment");
+      if (failurePoint !== "manifest") expect(events).not.toContain("manifest");
+      expect(failures).toEqual([
+        expect.objectContaining({
+          failureStage: stage,
+          reason,
+          failedQuantity: 8,
+          failedQuantityRecipeHash: "hash-8",
+          calibrationTargetRecipeHash: "hash-8",
+          action: { kind: "complete", quantity: 8 },
+        }),
+      ]);
+    },
+  );
 });

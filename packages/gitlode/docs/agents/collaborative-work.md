@@ -200,3 +200,36 @@ A good completion summary includes:
 - Whether any remaining issues are blockers or future considerations
 
 The agent should help close the loop cleanly.
+
+## Bounded implementation and measurement sessions
+
+For work combining implementation and empirical acceptance, divide sessions by responsibility:
+
+- planning owns decisions, milestone status, blockers, and the next bounded task packet;
+- implementation changes a named code slice and supplies verification evidence;
+- measurement executes an immutable candidate and harness and returns artifacts and classifications;
+- diagnosis explains a specific failed or inconclusive result before proposing a correction; and
+- review checks a fixed revision/diff against its accepted contracts.
+
+These are responsibility boundaries, not a requirement to launch concurrent agents. Avoid concurrent
+work on dependent implementations or rebuilding a bundle that a measurement session is using.
+
+Each task packet identifies the base revision, scope, exclusions, required reading, commands, exit
+evidence, and decisions outside the session's authority. Handoffs carry concise findings, exact
+revisions, artifact paths, and remaining blockers rather than complete conversation histories.
+
+A formal measurement session does not edit code, change thresholds, resize frozen fixtures, or retry
+until a favorable result appears. It saves evidence and returns a repair or diagnosis request when
+needed. Distinguish preparation deadlines and execution failures from measured performance failures.
+Do not wait indefinitely without checking the owned process and current stage.
+
+Review required corrections in one batch where possible. Link each blocker to an accepted contract
+and explain which behavior or evidence it invalidates; list optional improvements separately.
+Follow-up review focuses on corrections and their affected dependencies without ignoring newly found
+material defects. After two correction rounds involving the same underlying issue, use a fresh,
+bounded diagnosis session to reconcile ownership or contract interpretation before repeating local
+patches. This is a convergence check, not permission to accept unresolved defects.
+
+Track integration acceptance separately from release acceptance when a human-approved plan permits
+staged integration. Never turn deferred evidence into an implicit pass or exception. Carry release
+blockers across session and branch boundaries until their explicit exit evidence is accepted.

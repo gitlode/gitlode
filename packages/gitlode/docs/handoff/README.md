@@ -6,6 +6,13 @@ investigations that may be resumed by human developers or coding agents.
 Handoff documents are useful working context, but they are not durable source-of-truth design
 documents.
 
+## Active OpenTelemetry work
+
+Read the [redesign plan](instrumentation-opentelemetry-redesign-plan.md) for original implementation
+units and reviewed evidence, then the
+[recovery plan](instrumentation-opentelemetry-recovery-plan.md) for the accepted M0–M3 sequence,
+integration/release distinction, current blockers, and next session assignment.
+
 ## Lifecycle
 
 Use handoff documents for:

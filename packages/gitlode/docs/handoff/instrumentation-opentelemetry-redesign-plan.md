@@ -7,9 +7,16 @@ redesign. The accepted target contract is
 [`../design/telemetry.md`](../design/telemetry.md). Do not reconstruct design decisions from chat
 history or treat this handoff as a competing telemetry specification.
 
-The redesign has not yet been implemented. Current source and
-[`../profiling.md`](../profiling.md) still describe the custom instrumentation behavior. Other durable
-documents may contain explicitly marked target sections so implementation can proceed design-first.
+Runtime migration through T12 and performance-readiness work through T13A are complete. Reference
+performance acceptance and final consolidation remain incomplete. The unit table below records
+reviewed evidence; it does not establish that the redesign is ready for release.
+
+The human accepted the staged recovery in
+[`instrumentation-opentelemetry-recovery-plan.md`](instrumentation-opentelemetry-recovery-plan.md)
+on 2026-09-09. That plan owns the remaining work sequence and the distinction between integration
+and release acceptance. It permits an M1 merge into `integration/v0.13.0` before T13B/T13C are
+complete, without treating that merge as performance acceptance or a reviewed exception. Existing
+telemetry and performance design contracts remain authoritative.
 
 Delete this handoff after all design gates, implementation phases, documentation updates, and
 verification are complete.
@@ -271,10 +278,15 @@ For every unit, use this gate:
 5. The trunk session marks a unit complete only when the diff, tests, documentation, and unit exit
    gate all pass. Only then may a dependent unit start.
 
-All implementation branches are sequential and cumulative. Do not implement two units concurrently,
+The original implementation branches through T13A were sequential and cumulative. Do not implement two dependent units concurrently,
 because later units deliberately depend on types and migration state established by earlier ones.
 The trunk session must preserve unrelated worktree changes and distinguish them from the reviewed
 unit.
+
+For remaining work, use the recovery plan's milestone and session boundaries and the durable
+[bounded session guidance](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
+After M1, start remaining branches from `integration/v0.13.0`; do not maintain a second accumulating
+redesign trunk. Functional and performance obligations deferred to M2 remain release blockers.
 
 ### Intermediate migration policy
 
@@ -651,6 +663,11 @@ reference calibration is incomplete.
 Prerequisites: T13A, an approved reference environment, and a preserved pre-migration release CLI
 with its exact Git revision.
 
+Recovery mapping: M0 establishes the usable Linux/WSL2 measurement path; M2 completes this unit's
+full acceptance. M1 integration alone does not complete this unit. Windows pilot artifacts are
+diagnostic history, not formal evidence for the newly selected Linux/WSL2 environment. The reviewed
+calibration repairs below need not be reopened without a concrete defect or an approved design change.
+
 Scope:
 
 - before formal measurement resumes, repair and review the calibration workflow discovered by the
@@ -681,6 +698,9 @@ fixtures or an incompatible environment.
 ### T13C: Consolidation and handoff closure
 
 Prerequisites: T13B acceptance, including explicit trunk approval of any performance exception.
+
+Recovery mapping: complete this unit at M2, after the additional pre-release obligations in the
+recovery plan are accepted. An M1 merge does not authorize deleting either handoff.
 
 Scope:
 
@@ -714,7 +734,7 @@ code or note remains, this handoff is deleted, and the trunk session confirms th
 | T11  | complete | Public plugin API and runtime migrated to package-scoped OTel Tracer/Meter ownership with bounded bootstrap/init/projection semantics, declaration and architecture compatibility, and official-plugin equivalence evidence; 1,054 full-suite tests pass with only 5 known sandbox Git ownership failures                                     |
 | T12  | complete | WorkerTelemetrySession production activation, structured ProfileReport transport, canonical signal-separated presentation, root/plugin/DAG hierarchy, legacy instrumentation removal, documentation, and release-build-safe architecture enforcement reviewed; 1,064 full-suite tests pass with only 5 known sandbox Git ownership failures   |
 | T13A | complete | Development-only repository sidecar and aggregation-scale collection, formal report/volume evaluation, deterministic provenance and path isolation, Git-independent revision capture, release-safe private-workspace bundling, and the full CI/package verification matrix reviewed; 1,086 full-suite tests and installed-package checks pass |
-| T13B | pending  | Reference environment and legacy release are approved; bracketed calibration, atomic progress/failure persistence, production artifact composition, path-safe pilot projection, and terminal fault evidence are reviewed; formal reference calibration and performance acceptance remain                                                      |
+| T13B | pending  | Calibration repairs are reviewed; recovery M0 now prepares the accepted Linux/WSL2 environment and preserved legacy release there; full reference calibration and formal acceptance remain M2 obligations                                                                                                                                     |
 | T13C | pending  | —                                                                                                                                                                                                                                                                                                                                             |
 
 ## Required verification matrix

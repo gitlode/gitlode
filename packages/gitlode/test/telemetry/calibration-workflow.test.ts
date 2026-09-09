@@ -529,4 +529,93 @@ describe("calibration workflow", () => {
       ]);
     },
   );
+
+  it("keeps a planner terminal result when the failure writer rejects", async () => {
+    const events: string[] = [];
+    const progressArtifacts: Record<string, unknown>[] = [];
+    const failureSentinel = new Error("C:/sentinel/failure-writer.tmp");
+    let forbiddenWrites = 0;
+    const result = await runCalibrationWorkflow({
+      initialQuantity: 8,
+      fixture: "fixture",
+      adapter: "git-cli",
+      manifest: { preserved: true },
+      dependencies: {
+        executePilot: async () => ({
+          measuredMs: [10_000],
+          childErrors: ["child validation failed"],
+          evidence: { warmupRuns: [], measuredRuns: [], behaviorEvidence: [] },
+        }),
+        writeProgress: async (artifact) => {
+          events.push(`progress:${artifact.status}`);
+          progressArtifacts.push(artifact);
+        },
+        writeFailure: async () => {
+          events.push("failure");
+          throw failureSentinel;
+        },
+        writeEnvironment: async () => forbiddenWrites++,
+        writeSuccess: async () => forbiddenWrites++,
+        writeManifest: async () => forbiddenWrites++,
+        updateManifest: () => ({ changed: true }),
+        recipeHash: (quantity) => `hash-${quantity}`,
+        revisions: async () => ({ legacyRevision: "legacy", benchmarkScriptRevision: "script" }),
+      },
+    });
+    expect(result).toEqual({
+      status: "inconclusive",
+      exitCode: 2,
+      attempts: expect.any(Array),
+      action: { kind: "inconclusive-evidence", code: "child-validation-failed" },
+    });
+    expect(result.attempts).toHaveLength(1);
+    expect(events).toEqual(["progress:inconclusive", "progress:inconclusive", "failure"]);
+    expect(events.filter((event) => event === "failure")).toHaveLength(1);
+    expect(forbiddenWrites).toBe(0);
+    expect(JSON.stringify(progressArtifacts)).not.toContain("sentinel");
+  });
+
+  it("attempts failure persistence after terminal progress and failure writers both reject", async () => {
+    const events: string[] = [];
+    const progressSentinel = new Error("C:/sentinel/progress-writer.tmp");
+    const failureSentinel = new Error("C:/sentinel/failure-writer.tmp");
+    let forbiddenWrites = 0;
+    const result = await runCalibrationWorkflow({
+      initialQuantity: 8,
+      fixture: "fixture",
+      adapter: "git-cli",
+      manifest: { preserved: true },
+      dependencies: {
+        executePilot: async () => ({
+          measuredMs: [10_000],
+          behaviorErrors: ["behavior validation failed"],
+          evidence: { warmupRuns: [], measuredRuns: [], behaviorEvidence: [] },
+        }),
+        writeProgress: async (artifact) => {
+          events.push(`progress:${artifact.status}`);
+          throw progressSentinel;
+        },
+        writeFailure: async () => {
+          events.push("failure");
+          throw failureSentinel;
+        },
+        writeEnvironment: async () => forbiddenWrites++,
+        writeSuccess: async () => forbiddenWrites++,
+        writeManifest: async () => forbiddenWrites++,
+        updateManifest: () => ({ changed: true }),
+        recipeHash: (quantity) => `hash-${quantity}`,
+        revisions: async () => ({ legacyRevision: "legacy", benchmarkScriptRevision: "script" }),
+      },
+    });
+    expect(result).toEqual({
+      status: "inconclusive",
+      exitCode: 2,
+      attempts: expect.any(Array),
+      action: { kind: "inconclusive-evidence", code: "behavior-validation-failed" },
+    });
+    expect(result.attempts).toHaveLength(1);
+    expect(events).toEqual(["progress:inconclusive", "progress:inconclusive", "failure"]);
+    expect(events.filter((event) => event === "failure")).toHaveLength(1);
+    expect(forbiddenWrites).toBe(0);
+  });
 });

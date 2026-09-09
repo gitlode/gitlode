@@ -38,12 +38,12 @@ without reading the entire telemetry design to understand extraction.
 
 ## Milestones
 
-| Milestone                                  | Status                                   | Exit evidence                                                                                                                                |
-| ------------------------------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Executable and diagnosable measurement | in progress: initial WSL inspection only | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
-| M1: Integration-ready                      | pending M0                               | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
-| M2: v0.13.0 release-ready                  | pending M1                               | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
-| M3: Future capabilities                    | deferred beyond v0.13.0                  | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
+| Milestone                                  | Status                                        | Exit evidence                                                                                                                                |
+| ------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Executable and diagnosable measurement | in progress: environment preparation complete | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
+| M1: Integration-ready                      | pending M0                                    | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
+| M2: v0.13.0 release-ready                  | pending M1                                    | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
+| M3: Future capabilities                    | deferred beyond v0.13.0                       | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
 
 ### M0: Establish the measurement path
 
@@ -138,14 +138,14 @@ Measurement operators do not repair code or alter fixtures during a formal run. 
 session handles a concrete failed/inconclusive result. Reviewers inspect the fixed diff and return
 contract-linked required corrections separately from optional improvements.
 
-The next assignment is **M0 environment preparation**, not formal calibration:
+M0 environment preparation is complete. The
+[environment handoff](opentelemetry-m0-environment.md) records toolchain activation, immutable release
+snapshots, successful child RSS and behavioral smoke probes, archive provenance, and limitations.
 
-- use the already-installed Ubuntu/WSL2 distribution;
-- locate or prepare Linux Node/npm compatible with the candidate and preserved legacy release;
-- prepare isolated Linux-native working and bundle locations plus the D-drive artifact archive;
-- verify legacy and candidate provenance, tool versions, filesystem locations, and a child RSS probe;
-- report a concrete readiness checklist and remaining setup/approval needs; and
-- stop at that exit boundary so harness supervision work starts with a fresh bounded packet.
+The next assignment is **M0 harness supervision**, not formal calibration. Use a fresh bounded
+implementation session to establish and implement observable stages, execution deadlines, owned
+process cleanup, and failure evidence. Its exit packet goes to a separate one-target measurement
+session. The environment handoff gives the detailed scope and exclusions.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
 share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.
@@ -165,6 +165,7 @@ share that directory. Do not install into or reconfigure Docker Desktop's manage
 - The D-drive archive contains Windows pilot evidence from 2026-09-03 with unsupported RSS and a
   checkpoint-comparison failure. It contains no newly accepted Linux calibration evidence.
 
-Remaining M0 blockers: explicit Linux Node/npm and bundle preparation; actual child RSS verification;
-harness supervision/diagnostics; one-target calibration and comparisons. Neither M0 nor any formal
+The initial toolchain and child RSS blockers were resolved by the subsequent
+[environment preparation](opentelemetry-m0-environment.md). Remaining M0 blockers are harness
+supervision/diagnostics and one-target calibration and comparisons. Neither M0 nor any formal
 performance gate is complete.

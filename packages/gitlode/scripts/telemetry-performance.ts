@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { createEmptyCheckpoint } from "../src/state/index.js";
 import {
   comparePerformanceBehavior,
+  performanceBehaviorEvidence,
   type DerivedOutput,
   type PerformanceBehavior,
 } from "../test/support/performance-equivalence.js";

@@ -18,8 +18,7 @@ function expectJsonSafe(value: unknown): void {
 
 describe("production calibration artifact adapter", () => {
   it("persists the exact bracketed success sequence without mutating the input manifest", async () => {
-    const stream: { name: string; value: JsonRecord }[] = [];
-    const manifestWrites: JsonRecord[] = [];
+    const events: { name: string; value: JsonRecord }[] = [];
     const environmentCalls: { manifest: JsonRecord; artifact: JsonRecord }[] = [];
     const quantities: number[] = [];
     const inputManifest = {
@@ -50,8 +49,8 @@ describe("production calibration artifact adapter", () => {
           },
         };
       },
-      writeJson: async (name, value) => stream.push({ name, value: value as JsonRecord }),
-      writeManifest: async (manifest) => manifestWrites.push(manifest),
+      writeJson: async (name, value) => events.push({ name, value: value as JsonRecord }),
+      writeManifest: async (manifest) => events.push({ name: "manifest", value: manifest }),
     });
     const values = new Map([
       [8, 9_000],
@@ -192,7 +191,7 @@ describe("production calibration artifact adapter", () => {
     });
     expect(quantities).toEqual([8, 16, 12, 14, 13]);
     expect(new Set(quantities).size).toBe(quantities.length);
-    expect(stream).toEqual([
+    expect(events).toEqual([
       { name: "fixture-git-cli-calibration-progress.json", value: progress[0] },
       { name: "fixture-git-cli-calibration-progress.json", value: progress[1] },
       { name: "fixture-git-cli-calibration-progress.json", value: progress[2] },
@@ -213,17 +212,17 @@ describe("production calibration artifact adapter", () => {
       },
       { name: "fixture-git-cli-calibration.json", value: success },
       { name: "fixture-git-cli-calibration-progress.json", value: progress[5] },
+      { name: "manifest", value: updateManifest(14) },
     ]);
     expect(environmentCalls).toEqual([
       { manifest: updateManifest(14), artifact: environmentArtifact },
     ]);
-    expect(manifestWrites).toEqual([updateManifest(14)]);
     expect(inputManifest).toEqual({
       target: { quantity: 8, status: "pending", thresholdMs: 10_000 },
       rawRepositoryPath: "C:/sentinel/repository",
     });
 
-    const eventNames = [...stream.map(({ name }) => name), "manifest"];
+    const eventNames = events.map(({ name }) => name);
     expect(eventNames).toEqual([
       "fixture-git-cli-calibration-progress.json",
       "fixture-git-cli-calibration-progress.json",
@@ -238,11 +237,7 @@ describe("production calibration artifact adapter", () => {
     expect(eventNames.filter((name) => name === "manifest")).toHaveLength(1);
     expect(eventNames.at(-1)).toBe("manifest");
 
-    for (const artifact of [
-      ...stream.map(({ value }) => value),
-      environmentArtifact,
-      ...manifestWrites,
-    ]) {
+    for (const artifact of [...events.map(({ value }) => value), environmentArtifact]) {
       const serialized = JSON.stringify(artifact);
       expect(serialized).not.toContain("C:/sentinel");
       expect(serialized).not.toContain("rawRepositoryPath");

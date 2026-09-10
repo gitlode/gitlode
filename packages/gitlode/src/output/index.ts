@@ -5,4 +5,4 @@ export {
   createJsonlFileWriterMetricRecorder,
   NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
   type JsonlFileWriterMetricRecorder,
-} from "./jsonl-file-writer-metric-recorder.js";
+} from "./telemetry/jsonl-file-writer-metric-recorder.js";

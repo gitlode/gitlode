@@ -9,8 +9,8 @@ import type { CommitOid } from "@gitlode/internal-contracts/model";
 import { metrics, trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
-import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
 import { BuiltInFactProjector } from "../../src/extraction/built-in-fact-projector.js";
+import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/telemetry/built-in-fact-projector-metric-recorder.js";
 import type {
   Namespace,
   PluginProjectionResult,

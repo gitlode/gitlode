@@ -15,7 +15,7 @@ import type {
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
 import type { Context, Tracer } from "@opentelemetry/api";
 
-import type { ExtractionPipelineMetricRecorder } from "./extraction-pipeline-metric-recorder.js";
+import type { ExtractionPipelineMetricRecorder } from "./telemetry/extraction-pipeline-metric-recorder.js";
 
 /** Constructor dependencies injected into the extraction coordinator. */
 export interface CoordinatorDependencies {

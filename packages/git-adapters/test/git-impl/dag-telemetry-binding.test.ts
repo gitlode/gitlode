@@ -20,9 +20,9 @@ import { Volume, createFsFromVolume } from "memfs";
 import { describe, expect, it } from "vitest";
 
 import { createCommitTraversalStrategy } from "../../src/git-impl/commit-traversal/index.js";
-import { createDagTelemetryBinding } from "../../src/git-impl/dag-metric-recorder.js";
-import { createGitMetricRecorder } from "../../src/git-impl/git-metric-recorder.js";
 import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+import { createDagTelemetryBinding } from "../../src/git-impl/telemetry/dag-metric-recorder.js";
+import { createGitMetricRecorder } from "../../src/git-impl/telemetry/git-metric-recorder.js";
 import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
 class RecordingSpan {

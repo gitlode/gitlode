@@ -17,7 +17,7 @@ import type { GitCliProcess } from "../../src/git-impl/git-cli-cat-file-batch.js
 import {
   NOOP_GIT_METRIC_RECORDER,
   type GitMetricRecorder,
-} from "../../src/git-impl/git-metric-recorder.js";
+} from "../../src/git-impl/telemetry/git-metric-recorder.js";
 import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
 class RecordingSpan {

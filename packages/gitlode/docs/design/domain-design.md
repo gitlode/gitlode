@@ -749,6 +749,9 @@ implementation dependency.
 
 - A top-level directory under a production workspace's `src/` represents a domain. Nested
   directories organize modules within that domain unless explicitly documented otherwise.
+- A nested `telemetry/` directory groups telemetry-only helpers within its owning domain. It is not
+  a separate domain, has no independent barrel, and must not absorb recording calls from the product
+  control flow that owns the observed operation.
 - Cross-domain imports use the target domain's supported barrel. Direct module imports are allowed
   within a domain.
 - Cross-workspace imports use only package exports. Relative imports into another workspace's

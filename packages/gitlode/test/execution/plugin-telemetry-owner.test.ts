@@ -11,8 +11,8 @@ import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-ho
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildPluginProjector } from "../../src/execution/plugin-bootstrap.js";
-import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
 import { BuiltInFactProjector } from "../../src/extraction/built-in-fact-projector.js";
+import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/telemetry/built-in-fact-projector-metric-recorder.js";
 import type { Namespace } from "../../src/plugin-api/index.js";
 import { makeTracer } from "../support/otel-fakes.js";
 

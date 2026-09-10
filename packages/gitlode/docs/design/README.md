@@ -33,6 +33,16 @@ maintain changes safely.
 Coding agents should treat these documents as the durable design source. Agent-specific entrypoints
 may summarize key guardrails for readability, but they should not become independent specifications.
 
+## Telemetry change routes
+
+For changes to product operations or their domain-owned recorders, start with
+[`telemetry.md`](telemetry.md), then use
+[`telemetry-verification.md`](telemetry-verification.md) for owner and recorder evidence and
+[`domain-design.md`](domain-design.md) when placement or imports change. For worker-side collection
+and lifecycle changes, also follow [`architecture.md`](architecture.md). For presentation changes,
+use [`telemetry.md`](telemetry.md) for signal and report contracts and
+[`../profiling.md`](../profiling.md) for the implemented user-visible interpretation.
+
 ## Relationship to user documentation
 
 Use [`../usage.md`](../usage.md) for end-user workflows, examples, and user-facing CLI behavior. Use

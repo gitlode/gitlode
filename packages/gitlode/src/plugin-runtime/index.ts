@@ -7,7 +7,7 @@ export {
   NOOP_PLUGIN_PROJECTION_METRIC_RECORDER,
   type PluginProjectionMetricRecorder,
   type PluginProjectionOutcome,
-} from "./plugin-projection-metric-recorder.js";
+} from "./telemetry/plugin-projection-metric-recorder.js";
 export type {
   PluginDeclarations,
   PluginEntry,

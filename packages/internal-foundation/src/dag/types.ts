@@ -1,6 +1,6 @@
 import type { WorkQueue } from "../support/index.js";
-import type { DagOperationObservation, DagTraversalRole } from "./observations.js";
-export type { DagTraversalRole } from "./observations.js";
+import type { DagOperationObservation, DagTraversalRole } from "./telemetry/observations.js";
+export type { DagTraversalRole } from "./telemetry/observations.js";
 
 export interface BasicDagSchedulingContext {
   readonly role: DagTraversalRole;

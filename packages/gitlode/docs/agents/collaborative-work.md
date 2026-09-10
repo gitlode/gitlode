@@ -214,6 +214,18 @@ For work combining implementation and empirical acceptance, divide sessions by r
 These are responsibility boundaries, not a requirement to launch concurrent agents. Avoid concurrent
 work on dependent implementations or rebuilding a bundle that a measurement session is using.
 
+When the human delegates session planning, the agent owns these assignments within the agreed scope.
+A generic instruction such as "continue" or "next step" preserves the current session plan unless
+the human explicitly changes it. State any agent-selected reassignment and its reason before doing
+the affected work. Do not retroactively redo completed work solely to match a session boundary.
+
+Distinguish a planned handoff from an actually started session. A new turn, context compaction, or
+a separate shell process does not establish a new agent conversation. Identify whether a handoff
+uses a separate user conversation or an available delegated agent with a bounded input. If the
+required session cannot be started with available tools and authorization, prepare its complete
+task packet and explain the one launch action needed from the human; do not silently execute the
+assigned work in the current session instead.
+
 Each task packet identifies the base revision, scope, exclusions, required reading, commands, exit
 evidence, and decisions outside the session's authority. Handoffs carry concise findings, exact
 revisions, artifact paths, and remaining blockers rather than complete conversation histories.
@@ -233,3 +245,8 @@ patches. This is a convergence check, not permission to accept unresolved defect
 Track integration acceptance separately from release acceptance when a human-approved plan permits
 staged integration. Never turn deferred evidence into an implicit pass or exception. Carry release
 blockers across session and branch boundaries until their explicit exit evidence is accepted.
+
+When checkpoint commits are authorized, preserve meaningful intermediate states without waiting for
+a plan unit to finish. Record outstanding review or acceptance blockers in the checkpoint handoff;
+a commit alone does not imply review acceptance, measurement freeze, integration, or release.
+Later squashing may organize history, but should not delay preserving current work.

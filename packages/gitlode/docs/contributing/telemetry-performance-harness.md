@@ -32,6 +32,32 @@ the current Windows test environment, therefore produce an inconclusive artifact
 
 ## Reference workflow
 
+Run the `performance:*` npm commands in Linux (including WSL2), with Linux-native Node, Git,
+temporary storage, and release snapshots. These commands enter `telemetry-performance-supervised.ts`;
+`telemetry-performance.ts` is the internal worker, not the supervised operator entrypoint.
+The supervisor prints stage, fixture, adapter, quantity, iteration, state, PID, and elapsed time,
+including a heartbeat every five seconds. Preparation defaults to a 30-minute deadline; each
+execution or processing stage defaults to five minutes. Explicit positive-integer overrides are
+`--preparation-timeout-ms`, `--execution-timeout-ms`, and `--processing-timeout-ms`. The chosen limits
+are recorded. Do not increase them as an automatic retry after an unexplained stall.
+
+Use a fresh artifact directory per command. Inspect its `supervision-*.json` file with
+`kind: performance-supervision` together with the normal workflow artifact. `completed` only means
+the worker finished its protocol; a formally inconclusive worker can still exit 2 with completed
+supervision. Deadline, interruption, or abnormal-exit evidence invalidates the attempt even if some
+formal-looking files were written earlier. Completed raw runs remain diagnostic evidence and cannot
+be stitched into another attempt. Bounded `.diagnostic.log` files may contain local paths; keep them
+separate from formal evidence. For cleanup and evidence contracts see
+[execution supervision](../design/telemetry-performance.md#execution-supervision).
+
+Final evidence persistence is also supervised. A raw diagnostic-log failure produces exit 2 but
+still permits a terminal inconclusive snapshot. If the first terminal snapshot write fails, the
+supervisor makes one recovery write with the persistence failure identified; it does not rerun any
+workflow stage. When snapshot storage remains unwritable, stderr says that the terminal artifact is
+unavailable and exit 2 remains authoritative. A previously written `running` snapshot must not be
+treated as finalized in that case. Preserve earlier completed workflow artifacts for diagnosis, but
+do not admit them into a formal attempt whose supervision did not finish.
+
 After preserving a clean legacy release bundle, calibrate all five manifest targets separately:
 
 ```bash

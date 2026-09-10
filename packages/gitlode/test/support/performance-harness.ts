@@ -7,6 +7,11 @@ import { performance } from "node:perf_hooks";
 
 import { TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
 
+import {
+  performanceChild,
+  performanceDiagnostic,
+  performanceStage,
+} from "../../scripts/tooling/performance-progress.js";
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
 export { resolveSourceRevision } from "../../scripts/tooling/source-revision.js";
 
@@ -247,9 +252,15 @@ export function sampleChildRss(
     const poll = async () => {
       if (active || finished) return;
       active = true;
-      const rss = await reader(child.pid as number);
-      if (rss !== undefined) samples.push({ elapsedMs: now() - started, rssBytes: rss });
-      active = false;
+      try {
+        const rss = await reader(child.pid as number);
+        if (!finished && rss !== undefined)
+          samples.push({ elapsedMs: now() - started, rssBytes: rss });
+      } catch {
+        // A sampling failure leaves missing evidence; it must not reject outside the workflow.
+      } finally {
+        active = false;
+      }
     };
     void poll();
     const timer = setInterval(() => void poll(), intervalMs);
@@ -373,7 +384,17 @@ export async function launchMeasuredChild(input: {
 }): Promise<RawRun> {
   const args = [...input.args, "--quiet", ...(input.state === "target_on" ? ["--profile"] : [])];
   const start = performance.now();
-  const child = spawn(input.executable, args, { env: input.env, stdio: "ignore" });
+  const child = spawn(input.executable, args, {
+    env: input.env,
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  performanceChild(child.pid);
+  let diagnosticBytesRemaining = 16 * 1024;
+  child.stderr?.on("data", (chunk: Buffer) => {
+    const retained = chunk.subarray(0, diagnosticBytesRemaining);
+    diagnosticBytesRemaining -= retained.length;
+    if (retained.length) performanceDiagnostic(retained.toString("utf8"));
+  });
   const rss = sampleChildRss(child, { reader: input.rssReader });
   const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
     (resolve) => {
@@ -382,6 +403,7 @@ export async function launchMeasuredChild(input: {
     },
   );
   const elapsedMs = performance.now() - start;
+  performanceStage({ stage: "processing", operation: "read-cli-output" });
   const captureErrors: string[] = [];
   let outputFiles: string[] = [];
   try {

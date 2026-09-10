@@ -170,6 +170,34 @@ fixture_calibration:
   shorter_fixture_policy: semantic or volume evidence only; not a wall-clock gate
 
 execution:
+  supervision:
+    platform: linux_including_wsl2
+    ownership: separate_supervisor_owns_detached_workflow_process_group
+    deadlines_ms:
+      preparation: 1800000
+      execution: 300000
+      processing: 300000
+    heartbeat_ms: 5000
+    termination_grace_ms: 2000
+    cleanup_wait_ms: 3000
+    retained_diagnostic_bytes: 16384
+    retained_stage_events: 256
+    deadline_override: explicit_positive_integer_cli_option_recorded_in_supervision_evidence
+    expiry_or_interruption: inconclusive_and_nonzero_with_owned_process_group_cleanup
+    completion: independent_of_formal_performance_acceptance
+    evidence:
+      - unique atomic supervisor snapshot with stage, quantity, iteration, PID, elapsed time, limits, exit and cleanup errors
+      - completed run and normalized behavioral evidence persisted before starting the next child
+      - completed pilot artifacts remain authoritative and are never fabricated by the supervisor
+      - bounded raw diagnostics in a separate local log, not formal calibration or comparison artifacts
+    notes:
+      - Heartbeats and child PID notifications do not extend a stage deadline.
+      - Deadline supervision must work even when the workflow event loop is blocked.
+      - An inconclusive supervisor result makes associated formal artifacts inadmissible.
+      - A final diagnostic-log or snapshot write failure is inconclusive with exit code 2 after owned-process cleanup.
+      - Diagnostic-log failure does not block a terminal snapshot; terminal snapshot recovery is attempted once and never repeats the measured workflow.
+      - Persistent terminal storage failure is reported through bounded stderr and may leave the prior running snapshot on disk; that snapshot is not terminal evidence.
+      - SIGKILL of the supervisor, host shutdown, and uninterruptible kernel I/O are outside recoverable cleanup guarantees.
   build: clean release build
   subject: installed or bundled CLI as a child process
   cli:

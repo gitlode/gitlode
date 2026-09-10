@@ -32,6 +32,41 @@ High variation, environment mismatch, failed child execution, or failed output e
 measurement inconclusive rather than passing or failing. Inconclusive measurements are rerun under
 controlled conditions.
 
+## Execution supervision
+
+The supported reference commands run the workflow in an owned Linux process group under a separate
+supervisor. WSL2 with Linux-native tools and storage is supported. The supervisor observes preparation,
+child execution, and processing stages without depending on the workflow's event loop. The exact
+limits, retained diagnostics, and termination policy are in the performance catalog. These deadlines
+are operational safeguards, not the wall-clock performance thresholds.
+
+Stage changes identify the fixture, adapter, quantity, warmup/measured iteration, and profile state;
+child PID updates and periodic elapsed-time messages expose progress without extending deadlines.
+Deadline expiry, operator SIGINT/SIGTERM, unexpected workflow termination, or supervision failure
+makes the attempt inconclusive and nonzero. Cleanup targets only the supervisor-owned process group,
+including descendants after the workflow exits. A grace period precedes forced termination.
+
+Each invocation writes uniquely named atomic supervision snapshots. Completed raw runs and normalized
+behavior are saved between children, alongside the existing complete-pilot artifacts. The supervisor
+does not invent a pilot result when a child or repository preparation has not completed. Partial
+evidence is diagnostic and cannot be resumed into a later formal attempt. Supervision completion
+does not imply performance acceptance; both supervision and formal artifacts must be inspected.
+
+Structured supervision evidence contains identifiers rather than temporary paths or raw arguments.
+Bounded raw child diagnostics are kept in a separate local log that may contain paths. They are not
+embedded in, or treated as, formal calibration/comparison evidence. Abrupt supervisor SIGKILL, host
+shutdown, or uninterruptible kernel I/O cannot promise orderly cleanup; remaining progress is only
+diagnostic evidence in those cases.
+
+A final raw-diagnostic or supervision-snapshot write failure is itself an inconclusive supervision
+result with exit code 2. The two destinations remain independent: losing the raw log does not prevent
+the supervisor from recording a structured terminal failure when snapshot storage is still writable.
+After cleanup, a failed terminal snapshot receives one bounded recovery write as inconclusive
+evidence; the measured workflow is never repeated to repair evidence. If persistent storage failure
+also prevents that recovery, the operator receives bounded stderr diagnostics and no claim that the
+last on-disk `running` snapshot is terminal. No software path can guarantee replacement of that
+snapshot while its storage remains unwritable.
+
 ## Fixtures
 
 The suite contains commit-heavy and file-heavy deterministic repositories for both Git adapters, a

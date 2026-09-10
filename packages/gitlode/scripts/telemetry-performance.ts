@@ -59,6 +59,12 @@ import { buildAggregationCollectorBundle } from "./tooling/aggregation-collector
 import { writeAtomicJson, writeAtomicText } from "./tooling/atomic-json.js";
 import { projectCalibrationPilot } from "./tooling/calibration-pilot-projection.js";
 import { runCalibrationWorkflow } from "./tooling/calibration-workflow.js";
+import {
+  performanceChild,
+  performanceEvidence,
+  performanceFinished,
+  performanceStage,
+} from "./tooling/performance-progress.js";
 import { createProductionCalibrationArtifactAdapter } from "./tooling/production-calibration-artifacts.js";
 import { resolveSourceRevision } from "./tooling/source-revision.js";
 
@@ -72,9 +78,13 @@ function option(name: string, fallback?: string): string {
 }
 const invokedDirectly =
   process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (invokedDirectly) await main();
+if (invokedDirectly) {
+  await main();
+  await performanceFinished();
+}
 
 async function main() {
+  performanceStage({ stage: "preparation", operation: "validate-inputs" });
   const mode = process.argv[2];
   if (
     mode !== "calibrate" &&
@@ -98,6 +108,7 @@ async function main() {
     let bundle;
     let runs;
     try {
+      performanceStage({ stage: "preparation", operation: "build-aggregation-runner", fixture });
       bundle = await buildAggregationCollectorBundle(bundleDirectory);
       runs = [];
       for (const [runScale, enabled] of [
@@ -105,9 +116,13 @@ async function main() {
         [scale, true],
         [scale * 4, false],
         [scale * 4, true],
-      ] as const)
-        runs.push(await runAggregationChild(bundle.path, runScale, enabled));
+      ] as const) {
+        const run = await runAggregationChild(bundle.path, runScale, enabled);
+        runs.push(run);
+        await performanceEvidence(`aggregation-${runScale}-${enabled}`, run);
+      }
     } finally {
+      performanceStage({ stage: "processing", operation: "aggregation-cleanup", fixture });
       await rm(bundleDirectory, { recursive: true, force: true });
     }
     const disabled = runs.filter((run) => !run.enabled),
@@ -521,6 +536,13 @@ async function runProductionCalibration(input: {
           quantity,
         );
         try {
+          performanceStage({
+            stage: "processing",
+            operation: "validate-pilot",
+            fixture: input.fixture,
+            adapter: input.adapter,
+            quantity,
+          });
           const behaviorErrors = await validateLegacy(
             pilot,
             { ...input.target.quantities, commits: quantity },
@@ -533,6 +555,13 @@ async function runProductionCalibration(input: {
             repositoryPath: pilot.repositoryPath,
           });
         } finally {
+          performanceStage({
+            stage: "processing",
+            operation: "pilot-cleanup",
+            fixture: input.fixture,
+            adapter: input.adapter,
+            quantity,
+          });
           await pilot.cleanup();
         }
       },
@@ -621,7 +650,7 @@ function validateSidecarCompleteness(workflow: Execution): string[] {
   }));
   return validateSidecarMatrix(runs, captures);
 }
-function sidecarEvidence(workflow: Execution, runs: readonly RawRun[]) {
+function sidecarEvidence(workflow: Pick<Execution, "sidecars">, runs: readonly RawRun[]) {
   return runs.map((run) => {
     const sidecar = workflow.sidecars.get(run.runId);
     if (!sidecar) return null;
@@ -720,6 +749,12 @@ export async function runRepositoryProfileSidecar(input: {
   readonly quantities: FixtureQuantities;
   readonly rotationLines?: number;
 }): Promise<RepositorySidecarCapture> {
+  const context = {
+    fixture: input.fixture,
+    adapter: input.adapter,
+    quantity: input.quantities.commits,
+  };
+  performanceStage({ stage: "processing", operation: "prepare-sidecar", ...context });
   const provenance = {
     workerBundle: "worker-entry.js" as const,
     workerBundleSha256: "",
@@ -787,9 +822,12 @@ export async function runRepositoryProfileSidecar(input: {
     const sidecarScript = fileURLToPath(
       new URL("./telemetry-repository-sidecar.mjs", import.meta.url),
     );
-    const result = JSON.parse(
-      (await exec(process.execPath, [sidecarScript, requestPath])).stdout,
-    ) as {
+    performanceStage({ stage: "execution", operation: "repository-sidecar", ...context });
+    const pending = exec(process.execPath, [sidecarScript, requestPath]);
+    performanceChild(pending.child.pid);
+    const response = await pending;
+    performanceStage({ stage: "processing", operation: "read-sidecar", ...context });
+    const result = JSON.parse(response.stdout) as {
       result?: {
         kind?: string;
         message?: string;
@@ -828,6 +866,7 @@ export async function runRepositoryProfileSidecar(input: {
       provenance,
     };
   } finally {
+    performanceStage({ stage: "processing", operation: "sidecar-cleanup", ...context });
     await rm(root, { recursive: true, force: true });
   }
 }
@@ -838,10 +877,12 @@ async function executePaired(
   baselineSpec: { cli: string; state: ProfileState; revision: string },
   candidate?: { cli: string; state: ProfileState; revision: string },
 ): Promise<Execution> {
+  const quantities = requireTarget(manifest, fixture, adapter, true).quantities;
+  const context = { fixture, adapter, quantity: quantities.commits };
+  performanceStage({ stage: "preparation", operation: "repository-generation", ...context });
   const root = await mkdtemp(join(tmpdir(), "gitlode-performance-"));
   try {
     const repository = join(root, "repository");
-    const quantities = requireTarget(manifest, fixture, adapter, true).quantities;
     await createPerformanceRepository(
       repository,
       fixture === "commit_heavy_repository" ? fixture : "file_heavy_repository",
@@ -883,9 +924,17 @@ async function executePaired(
             ]
         : [[baselineSpec.state, baselineSpec.cli, baseline]];
       for (const [state, cli, destination] of states as [ProfileState, string, RawRun[]][]) {
+        const runContext = {
+          ...context,
+          phase: planned.phase,
+          iteration: (planned.pairIndex ?? 0) + 1,
+          state,
+        };
+        performanceStage({ stage: "processing", operation: "prepare-run-output", ...runContext });
         const output = join(root, `output-${ordinal}`),
           checkpoint = join(root, `state-${ordinal}.json`);
         await mkdir(output);
+        performanceStage({ stage: "execution", operation: "release-cli", ...runContext });
         const raw = await launchMeasuredChild({
           executable: process.execPath,
           args: [
@@ -912,6 +961,24 @@ async function executePaired(
           ...planned,
         });
         destination.push(raw);
+        performanceStage({ stage: "processing", operation: "capture-run", ...runContext });
+        const capturedBehavior = await behaviorFor(raw, output, checkpoint);
+        behavior.set(raw.runId, capturedBehavior);
+        const evidenceLabel = `run-${fixture}-${adapter}-${quantities.commits}-${raw.runId}`;
+        await performanceEvidence(evidenceLabel, {
+          kind: "completed-performance-run",
+          formalAcceptance: "pending-workflow-evaluation",
+          fixture,
+          adapter,
+          quantities,
+          revision: state === baselineSpec.state ? baselineSpec.revision : candidate?.revision,
+          calibrationTargetRecipeHash: calibrationTargetRecipeHash(
+            manifest,
+            calibrationKey(fixture, adapter),
+          ),
+          run: artifactRun(raw),
+          behavior: performanceBehaviorEvidence(capturedBehavior, repository),
+        });
         sidecars.set(
           raw.runId,
           state === "target_on"
@@ -940,7 +1007,7 @@ async function executePaired(
                 },
               },
         );
-        behavior.set(raw.runId, await behaviorFor(raw, output, checkpoint));
+        await performanceEvidence(`${evidenceLabel}-sidecar`, sidecarEvidence({ sidecars }, [raw]));
         ordinal++;
       }
     }
@@ -951,10 +1018,12 @@ async function executePaired(
       sidecars,
       repositoryPath: repository,
       cleanup: async () => {
+        performanceStage({ stage: "processing", operation: "repository-cleanup", ...context });
         await rm(root, { recursive: true, force: true });
       },
     };
   } catch (error) {
+    performanceStage({ stage: "processing", operation: "repository-failure-cleanup", ...context });
     await rm(root, { recursive: true, force: true });
     throw error;
   }

@@ -142,10 +142,20 @@ M0 environment preparation is complete. The
 [environment handoff](opentelemetry-m0-environment.md) records toolchain activation, immutable release
 snapshots, successful child RSS and behavioral smoke probes, archive provenance, and limitations.
 
-The next assignment is **M0 harness supervision**, not formal calibration. Use a fresh bounded
-implementation session to establish and implement observable stages, execution deadlines, owned
-process cleanup, and failure evidence. Its exit packet goes to a separate one-target measurement
-session. The environment handoff gives the detailed scope and exclusions.
+M0 harness supervision has been implemented and exercised with Linux fault-injection and real
+command-entrypoint tests. The [supervision exit packet](opentelemetry-m0-supervision.md) records the
+bounded scope and next assignment. Review and freeze this harness change, then use a separate
+execution session for one-target calibration and comparisons. Do not interpret supervision tests
+as completed M0 or formal performance acceptance.
+
+The [independent supervision review](opentelemetry-m0-supervision-review.md) identified R1: final
+evidence-write failures bypassed supervision failure handling. Correction round 1 is implemented and
+Linux focused validation passed; see the [correction outcome](opentelemetry-m0-supervision.md#r1-correction-result).
+The immediate next assignment is focused re-review in the existing review conversation. The planning
+conversation preserves the implementation and R1 in a checkpoint commit; this is not measurement
+freeze. Freeze and the separate one-target measurement follow only after R1 is accepted. Generic
+continuation instructions preserve this assignment. The existing two-round diagnosis rule applies
+if the same underlying issue persists.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
 share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.
@@ -167,5 +177,5 @@ share that directory. Do not install into or reconfigure Docker Desktop's manage
 
 The initial toolchain and child RSS blockers were resolved by the subsequent
 [environment preparation](opentelemetry-m0-environment.md). Remaining M0 blockers are harness
-supervision/diagnostics and one-target calibration and comparisons. Neither M0 nor any formal
+review/freeze of supervision and one-target calibration and comparisons. Neither M0 nor any formal
 performance gate is complete.

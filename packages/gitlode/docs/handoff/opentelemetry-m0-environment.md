@@ -100,7 +100,7 @@ their mutable installation directory is not part of the archive.
 Preserve this evidence. Any repeat must use a new attempt directory; the archived probe script
 records this original environment and is not an instruction to overwrite the original run.
 
-## Next bounded assignment: M0 harness supervision
+## M0 harness supervision implementation
 
 Read the recovery plan, this environment record, and the canonical telemetry performance design,
 catalog, and contributor harness guide. Inspect the current source diff before choosing the next
@@ -116,5 +116,9 @@ quantities, profile presentation, or workspace layout. Do not start full formal 
 implementation session. Return the fixed harness revision, required test evidence, and an exact
 one-target measurement packet for a separate execution session using Linux-native paths.
 
-The preparation probe had its own outer deadline and child cleanup. Those temporary probe safeguards
-do not repair the production development harness; its indefinite-waiting risk is still open.
+The supervision implementation now has separate Linux process-group ownership, stage deadlines,
+bounded diagnostics, and completed-run preservation. Linux fault-injection and command-entrypoint
+tests cover stalled stages, abrupt exits, retained descendants, and partial evidence. The implementation
+is not itself formal performance acceptance. See the
+[supervision exit packet](opentelemetry-m0-supervision.md) for validation and the next one-target
+assignment. Review and freeze the actual harness revision before that assignment.

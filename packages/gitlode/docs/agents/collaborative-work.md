@@ -230,6 +230,12 @@ Each task packet identifies the base revision, scope, exclusions, required readi
 evidence, and decisions outside the session's authority. Handoffs carry concise findings, exact
 revisions, artifact paths, and remaining blockers rather than complete conversation histories.
 
+Before starting or handing off work with potentially long external execution (for example repeated
+calibration, measurements, large builds, or transfers), tell the human that the work itself may take
+substantial time independently of model reasoning. Include that notice in the task packet. Numeric
+duration estimates are optional; do not spend extra effort estimating them unless useful or requested.
+Continue stage/progress reporting during execution and distinguish a known long operation from a stall.
+
 A formal measurement session does not edit code, change thresholds, resize frozen fixtures, or retry
 until a favorable result appears. It saves evidence and returns a repair or diagnosis request when
 needed. Distinguish preparation deadlines and execution failures from measured performance failures.

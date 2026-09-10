@@ -38,12 +38,12 @@ without reading the entire telemetry design to understand extraction.
 
 ## Milestones
 
-| Milestone                                  | Status                                         | Exit evidence                                                                                                                                |
-| ------------------------------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Executable and diagnosable measurement | in progress: environment ready, harness frozen | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
-| M1: Integration-ready                      | pending M0                                     | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
-| M2: v0.13.0 release-ready                  | pending M1                                     | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
-| M3: Future capabilities                    | deferred beyond v0.13.0                        | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
+| Milestone                                  | Status                        | Exit evidence                                                                                                                                |
+| ------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Executable and diagnosable measurement | complete: one target accepted | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
+| M1: Integration-ready                      | in preparation                | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
+| M2: v0.13.0 release-ready                  | pending M1                    | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
+| M3: Future capabilities                    | deferred beyond v0.13.0       | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
 
 ### M0: Establish the measurement path
 
@@ -142,22 +142,17 @@ M0 environment preparation is complete. The
 [environment handoff](opentelemetry-m0-environment.md) records toolchain activation, immutable release
 snapshots, successful child RSS and behavioral smoke probes, archive provenance, and limitations.
 
-M0 harness supervision has been implemented and exercised with Linux fault-injection and real
-command-entrypoint tests. The [supervision exit packet](opentelemetry-m0-supervision.md) records the
-bounded scope and next assignment. The harness is now reviewed and frozen; use a separate
-execution session for one-target calibration and comparisons. Do not interpret supervision tests
-as completed M0 or formal performance acceptance.
+M0 is complete: environment preparation, harness supervision and R1 review/freeze, and the
+one-target calibration/capture/comparison path are accepted. The
+[M0 result](opentelemetry-m0-result.md) records the exact revisions, passing target results,
+independently verified archive, and observed execution duration. Full T13B/M2 acceptance remains
+open; this evidence covers one target and the preserved candidate only.
 
-The [independent supervision review](opentelemetry-m0-supervision-review.md) identified R1: final
-evidence-write failures bypassed supervision failure handling. Correction round 1, Linux focused
-validation, and independent re-review are complete. R1 is accepted with no required corrections.
-The planning owner freezes `a53a5b83d18f9e493ebb39c4db481b762448743f` as the measurement harness.
-The immediate next assignment is a new, separate execution conversation for
-`commit_heavy_repository/isomorphic-git`: calibration, legacy capture, disabled comparison, and
-profile comparison, inspecting evidence between stages. The
-[measurement packet](opentelemetry-m0-supervision.md#next-bounded-assignment-one-repository-target)
-owns exact commands and stop conditions. The current conversation owns planning and acceptance;
-it has not started measurement. Generic continuation instructions preserve this assignment.
+The immediate next assignment is a separate branch conversation for
+[M1 placement and release-gate preparation](opentelemetry-m1-preparation.md). It inspects actual
+source placement and publish paths and returns a bounded implementation proposal. No repeated
+performance run is planned in that assignment. The current conversation owns planning and M1
+acceptance. Generic continuation instructions preserve this assignment.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
 share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.
@@ -178,6 +173,5 @@ share that directory. Do not install into or reconfigure Docker Desktop's manage
   checkpoint-comparison failure. It contains no newly accepted Linux calibration evidence.
 
 The initial toolchain and child RSS blockers were resolved by the subsequent
-[environment preparation](opentelemetry-m0-environment.md). Harness review/freeze is complete;
-remaining M0 work is one-target calibration and comparisons. Neither M0 nor any formal
-performance gate is complete.
+[environment preparation](opentelemetry-m0-environment.md). M0 is now complete with the accepted
+[one-target result](opentelemetry-m0-result.md); full-matrix and release acceptance remain open.

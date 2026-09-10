@@ -1,11 +1,15 @@
 # M0 supervision exit packet
 
+Current status: the one-target assignment below has completed and M0 is accepted. See the
+[M0 result](opentelemetry-m0-result.md) for outcomes and preserved evidence. The assignment text is
+historical, not an instruction to repeat calibration. Next is [M1 preparation](opentelemetry-m1-preparation.md).
+
 ## Scope and status
 
 The development harness now runs under a separate Linux supervisor. This slice changes harness
 execution and diagnostic evidence only; it does not change production telemetry, performance
-thresholds, fixture selection, profile presentation, or workspace layout. M0 remains open until
-one target completes the calibration and comparison path. M1 integration is not authorized by these
+thresholds, fixture selection, profile presentation, or workspace layout. M0 subsequently completed
+the calibration and comparison path for one target. M1 integration is not authorized by these
 tests alone. Canonical behavior lives in the [performance design](../design/telemetry-performance.md)
 and [operator guide](../contributing/telemetry-performance-harness.md).
 

@@ -1,5 +1,33 @@
 # OpenTelemetry M1 implementation proposal
 
+## Planning disposition
+
+The planning owner accepts the ten-file placement map and minimal contributor navigation changes
+within the already approved M1 direction. The next bounded assignment is
+[placement and navigation](opentelemetry-m1-placement.md). It does not include the gate-related
+build/test/release documentation until that gate is implemented.
+
+Session allocation below is superseded: placement/navigation and the publish gate have no direct
+implementation dependency and use separate implementation sessions. Each supplies a checkpoint for
+review before cumulative M1 validation. No full-matrix performance run is part of either slice.
+
+The human accepted blocking the entire supported Changesets publish operation, including independent
+plugin-only releases, until M2 is complete. Ordinary CI and integration development remain usable.
+Gate details below remain proposed, not an approved schema or implementation.
+The gate assignment must resolve these concrete implementation questions without broadening scope:
+
+- Separate validation of committed acceptance metadata from verification of external artifact bytes.
+  Define exactly which evidence is available in CI; local `D:` archives are not automatically
+  accessible there. A recorded hash alone does not mean CI has verified the archived bytes.
+- Permit version/changelog metadata changes by semantic field restrictions, not a blanket allowlist
+  of `package.json` or lockfiles that would also permit scripts, exports, or dependency changes.
+- Specify the gate's lifetime and reviewed retirement after v0.13.0 so an accepted migration record
+  does not indefinitely bind unrelated later releases to one old final candidate.
+- Establish ancestry from sufficient Git history in the release checkout. Missing history must not
+  be treated as candidate acceptance; use the existing workflow's actual checkout behavior.
+- Keep the validator proportional to enforcing M2 obligations. Reuse canonical target identities and
+  exception contracts; do not introduce an archive service or another performance evaluator.
+
 ## Scope and inspected state
 
 This proposal is the bounded M1 preparation requested by
@@ -223,9 +251,7 @@ M1 implementation diff.
 
 ## Release-authority decision
 
-The planning owner should confirm that the v0.13.0 gate intentionally blocks the entire Changesets
-publish operation, including an otherwise independent plugin-only publish, until M2 is accepted.
-This proposal recommends that fail-closed boundary because the current release workflow has one
-shared publish callback and one Trusted Publishing authority. Permitting plugin-only publication
-would require an explicit release-product policy and a reliably tested package-selection rule; it
-must not be inferred by the implementation owner.
+Resolved: the human explicitly accepted blocking the entire Changesets publish operation, including
+an otherwise independent plugin-only publish, until M2 is accepted. The gate implementation must
+cover the shared publish callback and supported manual scripts; no package-selection exception is
+required. This decision does not block ordinary CI, integration development, or Version PR creation.

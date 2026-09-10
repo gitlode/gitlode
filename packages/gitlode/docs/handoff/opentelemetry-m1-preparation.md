@@ -1,5 +1,10 @@
 # M1 preparation: placement and release-gate proposal
 
+Status: completed in proposal commit `571a65c14e9e001c142884b4289660e84d68970a`. The planning
+disposition is recorded in the [proposal](opentelemetry-m1-implementation-proposal.md#planning-disposition).
+Next is [placement/navigation implementation](opentelemetry-m1-placement.md). The original inspection
+assignment below is historical and does not instruct another proposal-only session.
+
 ## Session assignment
 
 Use a new bounded branch conversation for repository inspection and a concrete implementation

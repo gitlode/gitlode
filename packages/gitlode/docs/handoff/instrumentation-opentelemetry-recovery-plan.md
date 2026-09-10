@@ -148,11 +148,15 @@ one-target calibration/capture/comparison path are accepted. The
 independently verified archive, and observed execution duration. Full T13B/M2 acceptance remains
 open; this evidence covers one target and the preserved candidate only.
 
-The immediate next assignment is a separate branch conversation for
-[M1 placement and release-gate preparation](opentelemetry-m1-preparation.md). It inspects actual
-source placement and publish paths and returns a bounded implementation proposal. No repeated
-performance run is planned in that assignment. The current conversation owns planning and M1
-acceptance. Generic continuation instructions preserve this assignment.
+M1 preparation is complete in proposal commit `571a65c14e9e001c142884b4289660e84d68970a`. The planning
+owner accepts its ten-file placement map and minimal contributor routes. The immediate next
+assignment is [placement/navigation implementation](opentelemetry-m1-placement.md) in a separate
+branch conversation. No repeated performance run is planned. The publish gate uses a separate
+implementation session. The human accepted blocking the entire supported Changesets publish operation,
+including independent plugin-only releases, until M2 is accepted; ordinary CI and integration work
+remain usable. See the [proposal disposition](opentelemetry-m1-implementation-proposal.md#planning-disposition)
+for remaining gate details. Gate implementation does not block mechanical placement work. The current
+conversation owns planning and M1 acceptance. Generic continuation instructions preserve this assignment.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
 share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.

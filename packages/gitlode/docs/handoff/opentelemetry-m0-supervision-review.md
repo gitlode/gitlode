@@ -2,6 +2,19 @@
 
 ## Focused re-review after R1
 
+Completed: the independent reviewer accepted R1 and approved freeze at
+`a53a5b83d18f9e493ebb39c4db481b762448743f`, with no required corrections. The reviewer reported
+matching HEAD, a clean worktree, archive/checkpoint implementation parity, all 24 evidence-manifest
+entries verified, and successful saved Linux checks. Supervisor finalization fault tests combined
+with thin entrypoint code review and real entrypoint tests were judged sufficient; the setup-failure
+test was not misrepresented as a finalization E2E test. No new tests or code changes were needed.
+The planning owner confirmed matching HEAD and a clean worktree on receipt, accepts this outcome,
+and freezes that OID as the measurement harness. M0 and formal performance acceptance remain open.
+The next assignment is the [one-target measurement](opentelemetry-m0-supervision.md#next-bounded-assignment-one-repository-target).
+
+The instructions below record the completed re-review assignment; pending/blocked wording in those
+historical instructions is superseded by this outcome.
+
 Resume the existing review conversation. R1 implementation and Linux focused checks are complete;
 review acceptance is still pending. The original assignment and initial findings below are history.
 The planning owner is preserving the implementation, correction, and updated handoffs in a checkpoint

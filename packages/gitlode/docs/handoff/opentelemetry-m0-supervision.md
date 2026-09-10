@@ -10,22 +10,22 @@ tests alone. Canonical behavior lives in the [performance design](../design/tele
 and [operator guide](../contributing/telemetry-performance-harness.md).
 
 Implementation started from `2d164d9483c60d5f9c68a54da6b445a527d4ff01`; that base does not contain
-supervision. The planning checkpoint containing this update preserves supervision and R1 while
-focused re-review is pending. Record its actual OID for review. Before measurement, explicitly
-accept and freeze the reviewed harness OID; keep it distinct from the immutable release candidate
-OID below. A checkpoint commit is preservation, not acceptance.
+supervision. Following independent focused re-review, the planning owner accepts R1 and freezes
+`a53a5b83d18f9e493ebb39c4db481b762448743f` as the measurement harness revision. There are no remaining
+required review corrections. Keep this OID distinct from the immutable production release candidate
+OID below. This acceptance covers the harness implementation, not formal performance results.
 
 The independent review has now completed with one required correction, R1 (final evidence-write
-failure handling). R1 implementation and focused validation are complete; freeze remains blocked
-pending [focused re-review](opentelemetry-m0-supervision-review.md#focused-re-review-after-r1).
+failure handling). R1 implementation, focused validation, and
+[focused re-review](opentelemetry-m0-supervision-review.md#focused-re-review-after-r1) are complete.
 The original 1,147-test result predates R1; use the correction evidence below for the new failure paths.
 
 ## R1 correction result
 
 R1 was implemented and verified from the unchanged base
 `2d164d9483c60d5f9c68a54da6b445a527d4ff01` in the separate Linux correction checkout
-`/home/t-wakabayashi/gitlode-performance/m0-supervision-r1-20260910-2d164d9/source`. Freeze remains
-blocked pending focused re-review; no formal calibration or performance measurement was run.
+`/home/t-wakabayashi/gitlode-performance/m0-supervision-r1-20260910-2d164d9/source`. The subsequent
+focused re-review accepted the correction; no formal calibration or performance measurement was run.
 
 Final diagnostic-log failure now produces an identifiable inconclusive snapshot and exit code 2
 when snapshot storage remains writable. A failed final snapshot is retried once as an inconclusive
@@ -84,22 +84,32 @@ diff, and copies/hashes of changed files, including new files absent from a plai
 
 ## Next bounded assignment: one repository target
 
-Prerequisite: complete the [separate supervision review](opentelemetry-m0-supervision-review.md),
-address its required corrections, and freeze the reviewed harness revision. This section is the
-subsequent measurement packet, not an instruction to skip that review.
+Prerequisites are satisfied: independent review and R1 re-review are accepted, and the harness OID
+is frozen at `a53a5b83d18f9e493ebb39c4db481b762448743f`. The measurement conversation has not yet
+started. Use this updated packet from the planning branch even though the frozen checkout's older
+handoff text still says review is pending. Later documentation-only commits do not change the frozen
+code identity. Do not use the latest branch HEAD as an implicit substitute for the frozen OID.
 
 Use a separate execution session. Read this packet, the environment handoff, the recovery plan,
 the performance design/catalog, and the operator guide. Own only environment verification,
 one-target execution, and evidence preservation. Do not repair the harness, change thresholds,
 retry inconclusive results, or start the full matrix in that session.
 
-Create a new Linux-native attempt directory, check out the reviewed harness OID into its `source/`,
+Create a new Linux-native attempt directory, check out exactly
+`a53a5b83d18f9e493ebb39c4db481b762448743f` detached into its `source/`,
 run `npm ci` and `npm run build:dev`, and verify the tracked checkout is clean. Record the harness
 OID, toolchain/environment inventory, CLI tree hashes/provenance, and explicit deadline settings.
 Use the existing immutable installed release trees, after checking their archived provenance.
 They contain the production code under test; the newer harness revision is intentionally separate.
 If production code changes before measurement, prepare and identify a new immutable release tree
 instead of relabeling an existing snapshot.
+
+Transfer the frozen commit through a Git bundle from the Windows repository if needed; clone it
+into the new ext4 directory and verify `git rev-parse HEAD` before building. Keep setup operations
+bounded and inspect failures before continuing. Activate the private Linux toolchain before npm
+installation/build as well as before measurement. The operator owns these preparation steps; ask
+for infrastructure help only for a concrete missing capability or approval, not to reconfirm the
+already approved Linux/WSL2 choice. Do not run concurrent builds or measurements on this host.
 
 From that new checkout, activate the prepared environment and create a new attempt directory:
 
@@ -111,6 +121,7 @@ mkdir "$attempt"
 mkdir "$attempt/tmp"
 export TMPDIR="$attempt/tmp"
 cp packages/gitlode/test/fixtures/performance/manifest.json "$attempt/manifest.json"
+cp "$attempt/manifest.json" "$attempt/manifest-before.json"
 legacy=/home/t-wakabayashi/gitlode-performance/m0-20260909-a97829b/releases/legacy-0.12.0/dist/index.js
 candidate=/home/t-wakabayashi/gitlode-performance/m0-20260909-a97829b/releases/candidate/node_modules/gitlode/dist/index.js
 legacy_revision=76b124e23fcc069be1278629cf01b62ae1456c7a
@@ -120,7 +131,9 @@ common=(--manifest "$attempt/manifest.json" --fixture commit_heavy_repository
   --execution-timeout-ms 300000 --processing-timeout-ms 300000)
 ```
 
-Run each command separately, with a tool session that permits progress inspection. Review its
+Run each command separately, capturing stdout/stderr and exit status outside the timed CLI while
+retaining live progress inspection. Read output at intervals no longer than 60 seconds; a running
+tool process is not a reason to wait indefinitely. Review its
 supervision snapshot and formal artifact before starting the next command. Do not paste all stages
 into an unattended script or treat an exit code alone as acceptance.
 

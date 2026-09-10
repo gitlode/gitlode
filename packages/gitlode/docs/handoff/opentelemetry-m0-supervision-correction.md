@@ -1,9 +1,9 @@
 # M0 supervision: R1 correction packet
 
-Status: implementation and Linux focused verification are complete. The original assignment below
-is historical. The planning owner is preserving a checkpoint under the human's subsequent commit
-authorization; the implementation session's no-commit boundary below does not prohibit that action.
-Next: [focused re-review](opentelemetry-m0-supervision-review.md#focused-re-review-after-r1).
+Status: implementation, Linux focused verification, and independent re-review are complete. R1 is
+accepted and harness `a53a5b83d18f9e493ebb39c4db481b762448743f` is frozen for measurement. The original
+assignment below is historical, including its no-commit and pending-review instructions.
+Next: [one-target measurement](opentelemetry-m0-supervision.md#next-bounded-assignment-one-repository-target).
 
 ## Assignment
 

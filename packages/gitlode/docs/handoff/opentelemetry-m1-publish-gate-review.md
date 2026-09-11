@@ -1,5 +1,20 @@
 # M1 publish gate: independent review packet
 
+## Final slice acceptance
+
+Independent re-review accepted G1 at `681a1a5b53bd0aa957dae72d9fd9684da7ff467a`, retained G2
+acceptance, and accepted the gate slice with no remaining concrete failure path. The reviewer
+confirmed the five-file scope, complete per-target report identity/subcheck matrix, fail-closed
+negative cases, independent literal test oracle, preserved exception paths, and unchanged G2/wiring.
+The live record remained blocked. Independent checks: focused gate suite 50/50 with no skips,
+strict validator typecheck, and target diff check. Format results were not rerun in this review.
+
+The planning owner confirmed HEAD `f00c22c418ad2999cfcc404b479ebb39fce1d28a`, a clean worktree and
+the blocked record on receipt, and accepts this outcome. Next is
+[cumulative M1 validation and candidate preservation](opentelemetry-m1-cumulative-validation.md)
+in a new conversation. This acceptance does not complete M1 or permit publishing. The review
+instructions and rejected intermediate outcomes below are history, not outstanding correction tasks.
+
 ## Focused re-review after correction round 2
 
 Resume the existing gate review conversation. Target `681a1a5b53bd0aa957dae72d9fd9684da7ff467a`

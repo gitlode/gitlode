@@ -2,6 +2,11 @@
 
 ## Implementation outcome
 
+Current disposition: G1, G2 and the complete gate slice are independently accepted at
+`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`. The live release record remains blocked because M2
+obligations are not complete. Next is [cumulative M1 validation](opentelemetry-m1-cumulative-validation.md).
+The rejected checkpoint and implementation notes below are historical.
+
 Independent review rejected the initial checkpoint for G1 (obligation coverage) and G2 (provenance
 integrity). Correction round 1 is implemented at `f7d8a01bd75231b15136707ab40e2b21adf16b1b`; next is
 [focused re-review](opentelemetry-m1-publish-gate-review.md#focused-re-review-after-correction-round-1).

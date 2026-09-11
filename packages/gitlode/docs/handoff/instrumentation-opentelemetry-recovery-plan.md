@@ -148,32 +148,19 @@ one-target calibration/capture/comparison path are accepted. The
 independently verified archive, and observed execution duration. Full T13B/M2 acceptance remains
 open; this evidence covers one target and the preserved candidate only.
 
-M1 preparation is complete in proposal commit `571a65c14e9e001c142884b4289660e84d68970a`. The planning
-owner accepted its ten-file placement map and minimal contributor routes. Placement/navigation is
-implemented at `97235c37a518c829170568f9c32d5ffe2318803b`; the [outcome](opentelemetry-m1-placement.md)
-records intake checks and reported verification. Independent review accepted the slice with no
-required corrections; see the [review outcome](opentelemetry-m1-placement-review.md#accepted-outcome).
-The publish gate is implemented at `21a6c4d8f602eececcf189e756c4c4e5e093359f` with the acceptance
-record blocked. Independent gate review found two required corrections: G1, incomplete explicit M2
-obligation coverage, and G2, insufficient revision/provenance integrity. Both findings are accepted;
-gate acceptance is blocked. Correction round 1 is implemented at
-`f7d8a01bd75231b15136707ab40e2b21adf16b1b`; the outcome records the obligation mapping and Windows
-verification (87 passed / 17 Linux-only skipped). Focused re-review accepted G2 but left G1 open:
-required repository-sidecar schema/signal/diagnostics outcomes are still missing. Bounded diagnosis
-completed at `d654a640d2afcc1a716d69b957a28452a9a0457c`: the gate and positive fixture shared the same
-incomplete inventory. The accepted minimal resolution was implemented in correction-round-2 commit
-`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`, limited to the five planned files. The implementation
-reports 50 passing focused tests and successful strict typecheck/format/Git checks. The immediate
-next assignment is [focused round-2 re-review](opentelemetry-m1-publish-gate-review.md#focused-re-review-after-correction-round-2)
-in the existing gate review conversation. G1/gate acceptance remains pending; G2 remains accepted.
-No repeated performance run or actual publish is planned. See the
-[implementation outcome](opentelemetry-m1-publish-gate.md#implementation-outcome) for reported checks
-and remaining cumulative Windows/Linux validation.
-The human accepted blocking the entire supported Changesets publish operation,
-including independent plugin-only releases, until M2 is accepted; ordinary CI and integration work
-remain usable. See the [proposal disposition](opentelemetry-m1-implementation-proposal.md#planning-disposition)
-for remaining gate details. Gate implementation does not block mechanical placement work. The current
-conversation owns planning and M1 acceptance. Generic continuation instructions preserve this assignment.
+M1 placement/navigation is independently accepted at `97235c37a518c829170568f9c32d5ffe2318803b`.
+The publish gate, including G1 and G2, is independently accepted at
+`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`; see the
+[final review outcome](opentelemetry-m1-publish-gate-review.md#final-slice-acceptance). The live record
+remains blocked. The human-approved policy stops all supported Changesets publishing, including
+plugin-only releases, until M2 is accepted while leaving ordinary CI and Version PR creation usable.
+
+The immediate next assignment is [cumulative M1 validation](opentelemetry-m1-cumulative-validation.md)
+in a new conversation, using source/harness `681a1a5b53bd0aa957dae72d9fd9684da7ff467a` on Windows and
+Linux, then preserving the prospective immutable migration candidate. Builds, tests and temporary
+consumer installations may take substantial execution time; no formal performance runs are assigned.
+Cumulative integration review and merge-result checks follow; M1 is not yet complete. The current
+conversation owns planning and acceptance. Generic continuation instructions preserve this assignment.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
 share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.

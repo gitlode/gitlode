@@ -1,5 +1,21 @@
 # M1 cumulative integration review and merge rehearsal
 
+## Current bounded amendment
+
+The original cumulative review is complete. The planning owner subsequently verified the authoritative
+remote base differs from the local reviewed base by one handoff-link commit. Resume the existing
+review conversation for the [recorded reconciliation](opentelemetry-m1-integration-review-result.md#authoritative-ref-reconciliation-after-review)
+only: base `1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`, source
+`134e475b2de9559007e11fb724298395f832c6cf`, staged merge tree
+`619c389da8a12e36fa8465a611a0c8f28eaad0ea`. Confirm the one added link is preserved and there is no
+implementation/packaging delta from validated inputs. Return an amended merge recommendation with
+these exact parents/tree, not the superseded old-base fast-forward instruction.
+
+This is a short Git/document check with no full tests or formal measurement planned. Do not create
+another broad review packet or implementation cycle. Record the amendment in the existing result
+document and a documentation checkpoint; do not merge/push live branches. The executor must recheck
+the remote base again before acting. The original instructions below describe completed work.
+
 ## Assignment and fixed inputs
 
 Use a new independent review conversation. Review cumulative integration readiness and rehearse

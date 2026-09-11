@@ -162,7 +162,12 @@ The immediate next assignment is [cumulative integration review and rehearsal](o
 in a new conversation, with proposed source `134e475b2de9559007e11fb724298395f832c6cf`. This reviews
 the cumulative redesign and rehearses the result in an isolated clone without changing live refs.
 Reuse passed validation if implementation trees match; do not start formal measurements. M1 remains
-open until the reviewed integration actually occurs. The current
+open until the reviewed integration actually occurs. Cumulative review accepted the original source,
+but final authoritative-ref verification found remote integration at `1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`,
+one handoff-link commit beyond the reviewed local base. Planning rehearsed a conflict-free merge with
+result tree `619c389da8a12e36fa8465a611a0c8f28eaad0ea`; implementation inputs are unchanged.
+The immediate next action is the [bounded review amendment](opentelemetry-m1-integration-review.md#current-bounded-amendment)
+in the existing integration review conversation. No live refs have been changed. The current
 conversation owns planning and acceptance. Generic continuation instructions preserve this assignment.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds

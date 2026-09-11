@@ -1,5 +1,35 @@
 # M1 cumulative integration review and merge rehearsal result
 
+## Authoritative-ref reconciliation after review
+
+The planning owner successfully queried GitHub after retrying the read-only `ls-remote` outside
+the network-restricted sandbox. Actual remote `integration/v0.13.0` is
+`1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`, not the locally reviewed `745d3d5...`.
+Remote `feature/otel-redesign` is `5a6a810b8621759fb9723d0617aabdf1fbbac631`. No remote T13B head
+was returned by the exact requested ref query. The original fast-forward execution condition below
+is therefore not satisfied. No shared integration/redesign ref has been changed or pushed.
+
+The remote commit is one child of the old base and adds only a domain-design link to
+`packages/gitlode/docs/handoff/git-cli-adapter-plan.md`. That file is unchanged between the old base
+and proposed source. An isolated bundle clone at
+`C:\Users\t-wakabayashi\source\gitlode\.cache\m1-authoritative-base-20260911\rehearsal`
+checked out the remote commit detached and ran `merge --no-ff --no-commit 134e475...` successfully.
+It has no object alternates and does not share refs with the planning repository. No merge commit
+was created. The staged result tree is `619c389da8a12e36fa8465a611a0c8f28eaad0ea`.
+
+Against the originally reviewed source/tree, this result contains exactly the remote's one added
+link. Against validated `681a1a5...`, it differs only in the original seven handoffs plus this eighth
+handoff. Staged whitespace checks passed and the added relative link target exists. The input
+bundle SHA-256 is `40783a7b3e962e3faeaca2351a01162da54b7831302b53882bc932b8f2d685cd`.
+Functional/package checks were not repeated because implementation and packaging inputs match.
+
+Next is a narrowly scoped review amendment in the existing integration review conversation. Verify
+the actual base `1664798...`, unchanged source `134e475...`, and result tree `619c389...`, then return
+whether a merge commit preserving both histories is accepted. Do not repeat cumulative source review
+or change live refs. After acceptance the executor rechecks authoritative refs, reproduces the exact
+tree and records the actual merge commit; only completed integration closes M1. The prior cumulative
+acceptance remains valid for its scope, but its old-base fast-forward recommendation is superseded.
+
 ## Outcome
 
 The cumulative redesign at proposed source

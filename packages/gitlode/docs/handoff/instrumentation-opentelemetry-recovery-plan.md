@@ -154,8 +154,11 @@ implemented at `97235c37a518c829170568f9c32d5ffe2318803b`; the [outcome](opentel
 records intake checks and reported verification. Independent review accepted the slice with no
 required corrections; see the [review outcome](opentelemetry-m1-placement-review.md#accepted-outcome).
 The publish gate is implemented at `21a6c4d8f602eececcf189e756c4c4e5e093359f` with the acceptance
-record blocked. The immediate next assignment is
-[independent gate review](opentelemetry-m1-publish-gate-review.md) in a new conversation.
+record blocked. Independent gate review found two required corrections: G1, incomplete explicit M2
+obligation coverage, and G2, insufficient revision/provenance integrity. Both findings are accepted;
+gate acceptance is blocked. The immediate next assignment is
+[gate correction round 1](opentelemetry-m1-publish-gate-correction.md) in a new implementation
+conversation, followed by focused re-review in the existing gate review conversation.
 No repeated performance run or actual publish is planned. See the
 [implementation outcome](opentelemetry-m1-publish-gate.md#implementation-outcome) for reported checks
 and remaining cumulative Windows/Linux validation.

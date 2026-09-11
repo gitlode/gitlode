@@ -1,5 +1,26 @@
 # M1 publish gate: independent review packet
 
+## Review outcome
+
+Not accepted at `21a6c4d8f602eececcf189e756c4c4e5e093359f`. The independent reviewer returned two
+required corrections: G1, missing explicit coverage of M2 performance obligations; G2, frozen
+candidate/harness provenance checked only as hexadecimal strings. The planning owner inspected
+the corresponding schema and candidate checks and accepted both findings. The live record stays
+blocked. Next: [correction round 1](opentelemetry-m1-publish-gate-correction.md), followed by focused
+re-review in this review conversation. The original review assignment below is history.
+
+Reviewer-reported evidence: target/parent existence and ancestry, handoff-only later changes, clean
+worktree, diff check, strict typecheck, gate suite 19 passed, workflow suite 13 passed / 3 skipped,
+and gate plus harness suites 46 passed. The three workflow skips are Linux-only supervision integration
+on Windows; gate tests have no skips. The reviewer also reported the real root publish command in
+an Actions-main-like context exited at the blocked guard without reaching Changesets. This is evidence
+already obtained, not an instruction to repeat a real publisher-capable command in correction.
+
+The full suite, release build, lint/format, publint/installed-package and Linux results were not rerun
+in review. Earlier totals remain implementation reports, not cumulative cross-platform acceptance.
+The Windows `safe.directory` path issue failed closed and is an optional diagnostic improvement,
+not a security bypass or a third mandatory correction.
+
 ## Assignment and identity
 
 Use a new independent review conversation. Target `21a6c4d8f602eececcf189e756c4c4e5e093359f` against

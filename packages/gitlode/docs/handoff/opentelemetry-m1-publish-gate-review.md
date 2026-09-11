@@ -1,5 +1,43 @@
 # M1 publish gate: independent review packet
 
+## Focused re-review after correction round 1
+
+Resume the existing gate review conversation. Review correction checkpoint
+`f7d8a01bd75231b15136707ab40e2b21adf16b1b` and its correction diff, using the initially reviewed
+`21a6c4d8f602eececcf189e756c4c4e5e093359f` for context. Record actual HEAD and separate later
+planning-only edits. The planning owner confirmed the correction HEAD, clean worktree and live
+blocked record on receipt. G1/G2 implementation is reported complete; acceptance remains pending.
+
+Read the [correction outcome/mapping](opentelemetry-m1-publish-gate-correction.md) and the original
+G1/G2 findings below. Focus on the corrected paths and affected dependencies:
+
+- G1: exact applicable calibration/capture/comparison and report/aggregation/parity/behavior/RSS
+  obligations; omission, duplicate, unknown, wrong-scope and non-accepting-state rejection. Check
+  positive fixtures against the canonical obligations, not just the validator's own constants.
+- G2: actual Git commits and appropriate ancestry; legacy baseline and reused candidate evidence
+  remain distinct; evidence ID/source product/harness/destination match individual approvals.
+  Reject dangling/mismatched reuse without requiring harness ancestry against product history.
+- Confirm no blanket exception now waives missing calibration or behavior, no unnecessary evidence
+  matrix was added, and that gate code still validates attestations rather than recomputing results.
+  Assess maintainability where it affects correctness, without turning optional refactoring into
+  another mandatory redesign.
+- Preserve the previously checked command wiring, blocked live record, main context, final-candidate
+  record-only diff and ordinary CI independence. Inspect any affected shared-target definitions.
+
+Reported Windows checks: four suites (`release-acceptance`, `performance-harness`,
+`performance-workflow`, `performance-supervisor`) with 87 passing tests and 17 Linux-only skips;
+14 supervision cases and 3 supervised-workflow cases account for the skips. Strict validator
+typecheck, gitlode lint, formatting and Git checks passed. Identify evidence actually inspected
+or rerun; do not treat these counts as Linux execution. Reproduce a concrete concern with bounded
+tests if needed, not the full release pipeline. Cumulative Windows/Linux installed-package and
+Linux-only execution remain the later M1 validation assignment.
+
+Return exact OID, separate G1/G2 acceptance decisions, any remaining concrete failure path and
+contract reference, checked evidence, and whether this gate slice is accepted. No code changes,
+commit, publish-capable command, Version PR, merge, formal measurement, or candidate freeze.
+There is no planned long empirical workload. The planning owner assigns cumulative validation only
+after acceptance. If the same issue remains, report it for the bounded correction/diagnosis process.
+
 ## Review outcome
 
 Not accepted at `21a6c4d8f602eececcf189e756c4c4e5e093359f`. The independent reviewer returned two

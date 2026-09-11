@@ -2,10 +2,11 @@
 
 ## Implementation outcome
 
-Independent review rejected this checkpoint for G1 (obligation coverage) and G2 (provenance integrity).
-The planning owner accepted both findings; next is the
-[bounded correction packet](opentelemetry-m1-publish-gate-correction.md). Implementation completion
-and passing existing tests do not constitute gate acceptance. Original intake notes below are history.
+Independent review rejected the initial checkpoint for G1 (obligation coverage) and G2 (provenance
+integrity). Correction round 1 is implemented at `f7d8a01bd75231b15136707ab40e2b21adf16b1b`; next is
+[focused re-review](opentelemetry-m1-publish-gate-review.md#focused-re-review-after-correction-round-1).
+Implementation completion and passing tests do not constitute gate acceptance. Original intake
+notes below are history.
 
 Implemented at `21a6c4d8f602eececcf189e756c4c4e5e093359f`, parent
 `651f0a53001405b752beef52b31ac21b50c311ac`. The planning owner confirmed matching HEAD and a clean

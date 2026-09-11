@@ -156,9 +156,11 @@ required corrections; see the [review outcome](opentelemetry-m1-placement-review
 The publish gate is implemented at `21a6c4d8f602eececcf189e756c4c4e5e093359f` with the acceptance
 record blocked. Independent gate review found two required corrections: G1, incomplete explicit M2
 obligation coverage, and G2, insufficient revision/provenance integrity. Both findings are accepted;
-gate acceptance is blocked. The immediate next assignment is
-[gate correction round 1](opentelemetry-m1-publish-gate-correction.md) in a new implementation
-conversation, followed by focused re-review in the existing gate review conversation.
+gate acceptance is blocked. Correction round 1 is implemented at
+`f7d8a01bd75231b15136707ab40e2b21adf16b1b`; the outcome records the obligation mapping and Windows
+verification (87 passed / 17 Linux-only skipped). The immediate next assignment is
+[focused re-review](opentelemetry-m1-publish-gate-review.md#focused-re-review-after-correction-round-1)
+in the existing gate review conversation. No new implementation assignment starts before that result.
 No repeated performance run or actual publish is planned. See the
 [implementation outcome](opentelemetry-m1-publish-gate.md#implementation-outcome) for reported checks
 and remaining cumulative Windows/Linux validation.

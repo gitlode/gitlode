@@ -155,11 +155,14 @@ The publish gate, including G1 and G2, is independently accepted at
 remains blocked. The human-approved policy stops all supported Changesets publishing, including
 plugin-only releases, until M2 is accepted while leaving ordinary CI and Version PR creation usable.
 
-The immediate next assignment is [cumulative M1 validation](opentelemetry-m1-cumulative-validation.md)
-in a new conversation, using source/harness `681a1a5b53bd0aa957dae72d9fd9684da7ff467a` on Windows and
-Linux, then preserving the prospective immutable migration candidate. Builds, tests and temporary
-consumer installations may take substantial execution time; no formal performance runs are assigned.
-Cumulative integration review and merge-result checks follow; M1 is not yet complete. The current
+Cumulative Windows/Linux validation and immutable candidate preservation are accepted for source/harness
+`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`; the
+[result](opentelemetry-m1-validation-result.md) records test coverage, reruns and verified archives.
+The immediate next assignment is [cumulative integration review and rehearsal](opentelemetry-m1-integration-review.md)
+in a new conversation, with proposed source `134e475b2de9559007e11fb724298395f832c6cf`. This reviews
+the cumulative redesign and rehearses the result in an isolated clone without changing live refs.
+Reuse passed validation if implementation trees match; do not start formal measurements. M1 remains
+open until the reviewed integration actually occurs. The current
 conversation owns planning and acceptance. Generic continuation instructions preserve this assignment.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds

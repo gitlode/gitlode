@@ -10,6 +10,7 @@ import {
   requiredTelemetryPerformanceComparisons,
   requiredTelemetryPerformanceTargets,
   requiredTelemetryRepositoryChecks,
+  requiredTelemetryRepositoryProfileReportSubchecks,
 } from "./tooling/telemetry-performance-targets.js";
 
 const execFileAsync = promisify(execFile);
@@ -190,6 +191,22 @@ function validatePerformanceOutcome(
   else if ("exception" in item)
     throw new Error(`${label}.exception is only valid for an exception`);
   return item.status;
+}
+
+function validateRepositoryProfileReportOutcome(item: JsonObject, label: string): void {
+  exactString(item.status, "pass", `${label}.status`);
+  if ("exception" in item)
+    throw new Error(`${label}.exception is not valid for repository_profile_report`);
+  const subchecks = object(
+    item.subchecks,
+    `${label}.subchecks`,
+    requiredTelemetryRepositoryProfileReportSubchecks,
+  );
+  for (const subcheck of requiredTelemetryRepositoryProfileReportSubchecks) {
+    if (!(subcheck in subchecks))
+      throw new Error(`${label}.subchecks is missing required subcheck: ${subcheck}`);
+    exactString(subchecks[subcheck], "pass", `${label}.subchecks.${subcheck}`);
+  }
 }
 
 function acceptedSection(
@@ -409,6 +426,7 @@ function validateAcceptedRecord(record: JsonObject): AcceptedRecord {
       "status",
       "comparisonEvidenceId",
       "attestation",
+      "subchecks",
       "exception",
     ]);
     const check = nonempty(item.check, `${label}.check`);
@@ -419,7 +437,12 @@ function validateAcceptedRecord(record: JsonObject): AcceptedRecord {
       throw new Error(`${label} has unknown or wrong-scope check identity: ${identity}`);
     if (actualChecks.has(identity)) throw new Error(`duplicate performance check: ${identity}`);
     actualChecks.add(identity);
-    validatePerformanceOutcome(item, label, candidateOid, target);
+    if (check === "repository_profile_report") validateRepositoryProfileReportOutcome(item, label);
+    else {
+      if ("subchecks" in item)
+        throw new Error(`${label}.subchecks is only valid for repository_profile_report`);
+      validatePerformanceOutcome(item, label, candidateOid, target);
+    }
     if (scope === "target_on") {
       const expectedEvidence = comparisons.get(`${target}:profile_overhead`);
       if (!expectedEvidence)

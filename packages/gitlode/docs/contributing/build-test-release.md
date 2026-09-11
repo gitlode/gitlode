@@ -203,15 +203,21 @@ checkout fetches complete history so the validator can prove candidate ancestry.
 
 The versioned record at `.release/telemetry-migration-acceptance.json` starts in `blocked` state. An
 `accepted` record must contain reviewed attestations for all five calibrations and legacy captures,
-the ten canonical comparisons, aggregation N/4N bounded-growth checks, per-target report-size and
-prohibited-host-span checks, applicable Git CLI command parity, and explicit behavioral outcomes. It
-must also cover profile readability (including partial and unavailable output), staged system-test
-and contributor-navigation work, final Windows/Linux functional and installed-package checks, bundle
+the ten canonical comparisons, aggregation N/4N bounded-growth checks, and three `target_on` checks
+for every repository target. Those repository checks attest to profile-report validity, report size,
+and prohibited host spans. The profile-report validity attestation requires literal `pass` outcomes
+for sidecar availability, report presence, schema validity, complete spans, complete counters,
+complete histograms, diagnostics presence, and empty diagnostics. It cannot carry a performance
+exception. Report size and prohibited host spans retain the reviewed performance-exception path.
+The record also requires applicable Git CLI command parity and explicit behavioral outcomes, and it
+must cover profile readability (including partial and unavailable output), staged system-test and
+contributor-navigation work, final Windows/Linux functional and installed-package checks, bundle
 identity, candidate delta assessment, T13C closure, and release-authority approval. Each attestation
 identifies its evidence and archive, records a SHA-256, names the exact final candidate for which it
 is accepted, and identifies the reviewer and review date. A performance exception must also contain
 every exception field in the telemetry performance catalog and a separate release-authority approval;
-it cannot waive calibration, missing or inconclusive evidence, or behavioral correctness.
+it cannot waive calibration, missing or inconclusive evidence, report validity, or behavioral
+correctness.
 
 Performance attestations separately name the product and harness revisions that generated their
 evidence. Those revisions, the preserved legacy revision and the frozen migration candidate must be

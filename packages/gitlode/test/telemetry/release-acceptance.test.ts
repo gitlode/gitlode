@@ -13,11 +13,27 @@ import {
   requiredTelemetryPerformanceComparisons,
   requiredTelemetryPerformanceTargets,
   requiredTelemetryRepositoryChecks,
+  requiredTelemetryRepositoryProfileReportSubchecks,
 } from "../../scripts/tooling/telemetry-performance-targets.js";
 
 const execFileAsync = promisify(execFile);
 const temporaryDirectories: string[] = [];
 const hash = "a".repeat(64);
+const repositoryCheckOracle = [
+  "repository_profile_report",
+  "report_size",
+  "prohibited_host_spans",
+] as const;
+const repositoryProfileReportSubcheckOracle = [
+  "sidecarAvailable",
+  "reportPresent",
+  "schemaValid",
+  "spansComplete",
+  "countersComplete",
+  "histogramsComplete",
+  "diagnosticsPresent",
+  "diagnosticsEmpty",
+] as const;
 
 interface Revisions {
   legacy: string;
@@ -98,6 +114,12 @@ function performanceResult(
   };
 }
 
+function repositoryProfileReportSubchecks(): Record<string, "pass"> {
+  return Object.fromEntries(
+    repositoryProfileReportSubcheckOracle.map((subcheck) => [subcheck, "pass"]),
+  );
+}
+
 function acceptedRecord(revisions: Revisions) {
   const calibrationId = (target: string) => `calibration:${target}`;
   const captureId = (target: string) => `legacy:${target}`;
@@ -157,12 +179,15 @@ function acceptedRecord(revisions: Revisions) {
           ),
         })),
         ...requiredTelemetryPerformanceTargets.flatMap((target) =>
-          requiredTelemetryRepositoryChecks.map((check) => ({
+          repositoryCheckOracle.map((check) => ({
             check,
             target,
             scope: "target_on",
             comparisonEvidenceId: comparisonId(target, "profile_overhead"),
             ...performanceResult(revisions, `check:${check}:${target}`, target),
+            ...(check === "repository_profile_report"
+              ? { subchecks: repositoryProfileReportSubchecks() }
+              : {}),
           })),
         ),
         ...requiredTelemetryGitCommandParityTargets.map((target) => ({
@@ -207,6 +232,17 @@ function acceptedRecord(revisions: Revisions) {
     t13c: section(revisions.candidate, "t13c"),
     releaseAuthority: section(revisions.candidate, "release-authority"),
   };
+}
+
+function repositoryProfileReportCheck(
+  record: ReturnType<typeof acceptedRecord>,
+  target = requiredTelemetryPerformanceTargets[0],
+) {
+  const check = record.performance.checks.find(
+    (item) => item.check === "repository_profile_report" && item.target === target,
+  );
+  if (!check) throw new Error(`missing repository_profile_report fixture for ${target}`);
+  return check;
 }
 
 async function writeRecord(repository: string, record: unknown): Promise<void> {
@@ -275,6 +311,13 @@ afterEach(async () => {
 });
 
 describe("telemetry release acceptance schema and obligation coverage", () => {
+  it("keeps the production repository-check inventories equal to literal test oracles", () => {
+    expect(requiredTelemetryRepositoryChecks).toEqual(repositoryCheckOracle);
+    expect(requiredTelemetryRepositoryProfileReportSubchecks).toEqual(
+      repositoryProfileReportSubcheckOracle,
+    );
+  });
+
   it.each([
     ["missing", undefined, "absent or unreadable"],
     ["malformed", "{", "malformed JSON"],
@@ -302,6 +345,112 @@ describe("telemetry release acceptance schema and obligation coverage", () => {
   it("accepts the complete obligation inventory and separately versioned newer harness", async () => {
     const { repository } = await repositoryFixture();
     await expect(validateTelemetryReleaseAcceptance(repository)).resolves.toBeUndefined();
+  });
+
+  it("rejects the round-1 shape with only the two exception-capable repository checks", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    record.performance.checks = record.performance.checks.filter(
+      (item) => item.check !== "repository_profile_report",
+    );
+    await writeRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "missing performance check: repository_profile_report:",
+    );
+  });
+
+  it("rejects a missing repository profile report and each missing required subcheck", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const missingReport = acceptedRecord(revisions);
+    missingReport.performance.checks = missingReport.performance.checks.filter(
+      (item) =>
+        !(
+          item.check === "repository_profile_report" &&
+          item.target === requiredTelemetryPerformanceTargets[0]
+        ),
+    );
+    await writeRecord(repository, missingReport);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      `missing performance check: repository_profile_report:${requiredTelemetryPerformanceTargets[0]}:target_on`,
+    );
+
+    for (const subcheck of repositoryProfileReportSubcheckOracle) {
+      const record = acceptedRecord(revisions);
+      const item = repositoryProfileReportCheck(record) as unknown as Record<string, unknown>;
+      delete (item.subchecks as Record<string, unknown>)[subcheck];
+      await writeRecord(repository, record);
+      await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+        `missing required subcheck: ${subcheck}`,
+      );
+    }
+  });
+
+  it.each(["inconclusive", "failed"])(
+    "rejects every repository profile report subcheck with a %s outcome",
+    async (status) => {
+      const { repository, revisions } = await repositoryFixture();
+      for (const subcheck of repositoryProfileReportSubcheckOracle) {
+        const record = acceptedRecord(revisions);
+        const item = repositoryProfileReportCheck(record) as unknown as Record<string, unknown>;
+        (item.subchecks as Record<string, unknown>)[subcheck] = status;
+        await writeRecord(repository, record);
+        await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+          `subchecks.${subcheck} must be pass`,
+        );
+      }
+    },
+  );
+
+  it.each(["inconclusive", "failed", "exception"])(
+    "rejects a repository profile report with grouped status %s",
+    async (status) => {
+      const { repository, revisions } = await repositoryFixture();
+      const record = acceptedRecord(revisions);
+      const item = repositoryProfileReportCheck(record) as unknown as Record<string, unknown>;
+      item.status = status;
+      if (status === "exception") {
+        Object.assign(
+          item,
+          performanceResult(
+            revisions,
+            "replacement-profile-report",
+            requiredTelemetryPerformanceTargets[0],
+            "exception",
+          ),
+        );
+      }
+      await writeRecord(repository, record);
+      await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+        ".status must be pass",
+      );
+    },
+  );
+
+  it("rejects unknown repository profile subchecks and an exception field on a passing group", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const unknown = acceptedRecord(revisions);
+    const unknownItem = repositoryProfileReportCheck(unknown) as unknown as Record<string, unknown>;
+    (unknownItem.subchecks as Record<string, unknown>).unknownSubcheck = "pass";
+    await writeRecord(repository, unknown);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "subchecks has unknown field: unknownSubcheck",
+    );
+
+    const excepted = acceptedRecord(revisions);
+    const exceptedItem = repositoryProfileReportCheck(excepted) as unknown as Record<
+      string,
+      unknown
+    >;
+    exceptedItem.exception = performanceResult(
+      revisions,
+      "unused-profile-report-exception",
+      requiredTelemetryPerformanceTargets[0],
+      "exception",
+    ).exception;
+    await writeRecord(repository, excepted);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "exception is not valid for repository_profile_report",
+    );
   });
 
   it("rejects the original incomplete-positive performance shape", async () => {
@@ -361,6 +510,90 @@ describe("telemetry release acceptance schema and obligation coverage", () => {
     await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
       "unknown or wrong-scope",
     );
+  });
+
+  it("rejects invalid repository profile report identities and comparison links", async () => {
+    const { repository, revisions } = await repositoryFixture();
+
+    const duplicate = acceptedRecord(revisions);
+    duplicate.performance.checks.push(repositoryProfileReportCheck(duplicate));
+    await writeRecord(repository, duplicate);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "duplicate performance check: repository_profile_report:",
+    );
+
+    for (const mutate of [
+      (item: Record<string, unknown>) => (item.check = "unknown_profile_report"),
+      (item: Record<string, unknown>) => (item.target = "unknown_repository/none"),
+      (item: Record<string, unknown>) => (item.scope = "n_to_4n"),
+    ]) {
+      const record = acceptedRecord(revisions);
+      mutate(repositoryProfileReportCheck(record) as unknown as Record<string, unknown>);
+      await writeRecord(repository, record);
+      await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+        "unknown or wrong-scope",
+      );
+    }
+
+    const missingLink = acceptedRecord(revisions);
+    delete (repositoryProfileReportCheck(missingLink) as unknown as Record<string, unknown>)
+      .comparisonEvidenceId;
+    await writeRecord(repository, missingLink);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "comparisonEvidenceId",
+    );
+
+    const mismatchedLink = acceptedRecord(revisions);
+    (
+      repositoryProfileReportCheck(mismatchedLink) as unknown as Record<string, unknown>
+    ).comparisonEvidenceId = "comparison:mismatched";
+    await writeRecord(repository, mismatchedLink);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "comparisonEvidenceId must be",
+    );
+  });
+
+  it("preserves pass and reviewed exceptions for report size and prohibited host spans", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const excepted = acceptedRecord(revisions);
+    for (const check of ["report_size", "prohibited_host_spans"] as const) {
+      const item = excepted.performance.checks.find(
+        (candidate) =>
+          candidate.check === check && candidate.target === requiredTelemetryPerformanceTargets[0],
+      );
+      if (!item) throw new Error(`missing ${check} fixture`);
+      Object.assign(
+        item,
+        performanceResult(
+          revisions,
+          `excepted-${check}`,
+          requiredTelemetryPerformanceTargets[0],
+          "exception",
+        ),
+      );
+    }
+    await commitRecord(repository, excepted);
+    await expect(validateTelemetryReleaseAcceptance(repository)).resolves.toBeUndefined();
+
+    const incomplete = acceptedRecord(revisions);
+    const reportSize = incomplete.performance.checks.find(
+      (item) =>
+        item.check === "report_size" && item.target === requiredTelemetryPerformanceTargets[0],
+    );
+    if (!reportSize) throw new Error("missing report_size fixture");
+    Object.assign(
+      reportSize,
+      performanceResult(
+        revisions,
+        "incomplete-report-size",
+        requiredTelemetryPerformanceTargets[0],
+        "exception",
+      ),
+    );
+    if (!reportSize.exception) throw new Error("missing exception fixture");
+    reportSize.exception.cause = "";
+    await writeRecord(repository, incomplete);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow("cause");
   });
 
   it.each(["pending", "failed", "inconclusive"])(

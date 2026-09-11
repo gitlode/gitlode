@@ -19,7 +19,22 @@ export const requiredTelemetryAggregationChecks = [
   "aggregation_profile_rss_growth",
 ] as const;
 
-export const requiredTelemetryRepositoryChecks = ["report_size", "prohibited_host_spans"] as const;
+export const requiredTelemetryRepositoryChecks = [
+  "repository_profile_report",
+  "report_size",
+  "prohibited_host_spans",
+] as const;
+
+export const requiredTelemetryRepositoryProfileReportSubchecks = [
+  "sidecarAvailable",
+  "reportPresent",
+  "schemaValid",
+  "spansComplete",
+  "countersComplete",
+  "histogramsComplete",
+  "diagnosticsPresent",
+  "diagnosticsEmpty",
+] as const;
 
 export const requiredTelemetryGitCommandParityTargets = [
   "commit_heavy_repository/git-cli",

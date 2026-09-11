@@ -1,9 +1,49 @@
 # M1 publish gate: correction round 1
 
-Current disposition: independent re-review accepted G2 and left G1 open for missing repository-sidecar
-report obligations. Gate acceptance remains blocked. The next assignment is
-[G1 coverage diagnosis](opentelemetry-m1-g1-coverage-diagnosis.md), not repetition of this correction.
-The implementation outcome below records what round 1 delivered, not complete G1 acceptance.
+Current disposition: the accepted G1 coverage diagnosis has been implemented as correction round 2
+and is ready for focused re-review. G1 and M1 remain unaccepted, G2 remains accepted, and gate
+acceptance remains blocked. The round-1 implementation outcome below remains historical context, not
+complete G1 acceptance.
+
+## Correction round 2 outcome
+
+Correction round 2 started from `77d49f3711368b4bc1ac9d5047c5bd6d90123298` with a clean
+worktree. The checkpoint OID is reported in the implementation response because a commit cannot
+contain its own OID. This checkpoint returns G1 for focused re-review; it does not declare G1 or M1
+accepted. G2 remains accepted and its provenance rules were not reopened. The live acceptance record
+remains blocked, and publish wiring is unchanged. No formal measurement, release pipeline, installed-
+package test, publisher, Version PR, merge, or candidate freeze was run.
+
+The repository-check inventory now contains exactly `repository_profile_report`, `report_size`, and
+`prohibited_host_spans` for each of the five canonical `target_on` targets. The grouped profile-report
+attestation requires exactly eight literal-pass subchecks: `sidecarAvailable`, `reportPresent`,
+`schemaValid`, `spansComplete`, `countersComplete`, `histogramsComplete`, `diagnosticsPresent`, and
+`diagnosticsEmpty`. Missing, unknown, inconclusive, or failed subchecks fail closed. The grouped
+status itself must be `pass`, and an `exception` field is rejected. Report size and prohibited host
+spans retain their complete reviewed-performance-exception path.
+
+The accepted test fixture uses independent literal repository-check and profile-report-subcheck
+oracles and asserts that both production inventories agree with them. Bounded mutations cover the
+round-1 incomplete shape, missing grouped and individual outcomes, every non-pass subcheck, invalid
+grouped outcomes, unknown subchecks, forbidden exceptions, duplicate/unknown/wrong-target/wrong-scope
+identities, missing or mismatched comparison links, and preservation of the two exception-capable
+checks. The fully complete record still resolves through the unchanged real-commit G2 provenance.
+
+### Round 2 local verification
+
+Platform: Windows (`win32`). Evidence is the focused test fixture and validator at
+`test/telemetry/release-acceptance.test.ts` and
+`scripts/check-telemetry-release-acceptance.ts`, together with the canonical inventory at
+`scripts/tooling/telemetry-performance-targets.ts`.
+
+- `npm test -w gitlode -- --run test/telemetry/release-acceptance.test.ts`: passed; 1 file and 50
+  tests passed.
+- `npm run typecheck:telemetry-release-acceptance -w gitlode`: passed with `noCheck: false`.
+- `npm run format:write`: passed for the root and all workspaces, including documentation.
+- `npm run format:check`: passed for the root and all workspaces.
+- `git diff --check`: passed before the checkpoint commit.
+
+The checkpoint contains only the five files authorized by the G1 coverage-resolution assignment.
 
 ## Correction outcome
 

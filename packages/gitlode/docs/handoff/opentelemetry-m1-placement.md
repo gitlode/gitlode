@@ -1,5 +1,21 @@
 # M1 placement and navigation implementation packet
 
+## Implementation outcome
+
+Implemented in checkpoint `97235c37a518c829170568f9c32d5ffe2318803b`; independent review is pending.
+The planning owner confirmed matching HEAD and a clean worktree on receipt, all ten renames at
+100% similarity, and that the `.rev-dep.config.json` diff only updates five explicit entrypoint paths
+to their new locations. No dependency allowlist or domain rule was relaxed. The checkpoint's
+`git show --check` passed. This intake check does not replace the independent review.
+
+The implementation owner reported 21 focused test files / 321 passing tests, architecture check,
+lint, format write/check, diff check, no stale paths, and no nested telemetry barrels. These checks
+were not repeated by the planning owner. Full Windows/Linux installed-package and cumulative
+integration validation remain later M1 obligations. No publish gate, measurement, merge, or new
+candidate freeze was performed. Next: [fixed-checkpoint review](opentelemetry-m1-placement-review.md).
+
+The original implementation instructions below are historical; do not repeat the moves.
+
 ## Assignment and identity
 
 Use a separate implementation branch conversation. Implement the ten-file map in the accepted

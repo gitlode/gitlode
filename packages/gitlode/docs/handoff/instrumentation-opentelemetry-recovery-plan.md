@@ -149,9 +149,11 @@ independently verified archive, and observed execution duration. Full T13B/M2 ac
 open; this evidence covers one target and the preserved candidate only.
 
 M1 preparation is complete in proposal commit `571a65c14e9e001c142884b4289660e84d68970a`. The planning
-owner accepts its ten-file placement map and minimal contributor routes. The immediate next
-assignment is [placement/navigation implementation](opentelemetry-m1-placement.md) in a separate
-branch conversation. No repeated performance run is planned. The publish gate uses a separate
+owner accepted its ten-file placement map and minimal contributor routes. Placement/navigation is
+implemented at `97235c37a518c829170568f9c32d5ffe2318803b`; the [outcome](opentelemetry-m1-placement.md)
+records intake checks and reported verification. The immediate next assignment is
+[independent fixed-checkpoint review](opentelemetry-m1-placement-review.md) in a new conversation.
+No repeated performance run is planned. The publish gate uses a separate
 implementation session. The human accepted blocking the entire supported Changesets publish operation,
 including independent plugin-only releases, until M2 is accepted; ordinary CI and integration work
 remain usable. See the [proposal disposition](opentelemetry-m1-implementation-proposal.md#planning-disposition)

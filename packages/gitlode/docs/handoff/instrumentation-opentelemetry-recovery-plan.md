@@ -38,12 +38,12 @@ without reading the entire telemetry design to understand extraction.
 
 ## Milestones
 
-| Milestone                                  | Status                            | Exit evidence                                                                                                                                |
-| ------------------------------------------ | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Executable and diagnosable measurement | complete: one target accepted     | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
-| M1: Integration-ready                      | integrated; CI correction pending | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
-| M2: v0.13.0 release-ready                  | pending M1                        | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
-| M3: Future capabilities                    | deferred beyond v0.13.0           | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
+| Milestone                                  | Status                        | Exit evidence                                                                                                                                |
+| ------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Executable and diagnosable measurement | complete: one target accepted | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
+| M1: Integration-ready                      | complete                      | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
+| M2: v0.13.0 release-ready                  | ready for bounded planning    | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
+| M3: Future capabilities                    | deferred beyond v0.13.0       | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
 
 ### M0: Establish the measurement path
 
@@ -162,10 +162,19 @@ The accepted integration was pushed as `506b657b6de9bb6e896846e2e7fc3454833296d8
 parents and tree. Its source-test CI exposed ambient Actions environment leakage into gate tests.
 The [integration result](opentelemetry-m1-integration-review-result.md#actual-integration-and-ci-follow-up-2026-09-11)
 records the merge, branch-rule bypass disclosure, diagnosis, and bounded test-only correction.
-M1 remains open until that correction passes CI and is integrated through the normal PR path.
-The immediate assignment is owned by the current planning conversation on
-`fix/otel-release-tests-ci-context`; no formal measurement or production gate change is required.
-Generic continuation instructions preserve this assignment. All subsequent work starts from integration.
+The correction passed the required Actions check and was integrated through
+[PR #107](https://github.com/gitlode/gitlode/pull/107) at
+`0519de6d9c94a622278143f62c3a610411829b96`. M1 is complete; the original frozen candidate and archive
+identities remain unchanged. The follow-up implementation delta is confined to test environment isolation.
+
+The next assignment is a separate M2 planning conversation from current `integration/v0.13.0`.
+Read this plan, the accepted integration result, and the existing M2 obligations before proposing
+bounded slices for profile presentation, staged `tests/system` organization, final performance
+execution, and T13C. Identify changes that affect timed execution before freezing the next measurement
+inputs. Produce the slice order, dependencies, acceptance criteria, and session assignments; do not
+implement those slices or launch formal measurements in that planning conversation. The current
+conversation closes M1 only. Generic continuation instructions preserve this separation.
+Other feature work can now branch from integration; M2/T13B/T13C and publishing remain unaccepted.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
 share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.

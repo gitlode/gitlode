@@ -1,5 +1,21 @@
 # M1 cumulative integration review and merge rehearsal result
 
+## M1 closure
+
+M1 is complete. The test environment correction at `a6a7073f09231df94e1275b237e3bb276b591c03`
+passed the required [PR Actions run](https://github.com/gitlode/gitlode/actions/runs/34570822554),
+including source tests, release build, packed-package metadata, and installed-package system tests.
+GitHub reported a clean merge state after the check succeeded. The normal merge of
+[PR #107](https://github.com/gitlode/gitlode/pull/107) created
+`0519de6d9c94a622278143f62c3a610411829b96`, with first parent `506b657...`, second parent `a6a7073...`,
+and tree `81aefad02deb6a2fe005283d64f7afbb6e8f436d`. Its tree matches the tested correction branch.
+The local integration branch was synchronized by fast-forward after fetching the merged remote ref.
+
+The pending statements in the chronological record below are superseded by this closure. M0/M1
+archives remain immutable; M2 must assess the later test-only delta without relabeling those archives.
+Further work starts from integration using the [next assignment](instrumentation-opentelemetry-recovery-plan.md#session-packets-and-current-next-assignment).
+This closure does not accept T13B/M2/T13C or authorize publishing; the acceptance record stays blocked.
+
 ## Actual integration and CI follow-up (2026-09-11)
 
 The planning owner rechecked the authoritative remote base and created and pushed merge

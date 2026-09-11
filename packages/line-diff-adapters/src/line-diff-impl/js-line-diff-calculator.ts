@@ -1,7 +1,7 @@
 import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
 import { diffLines } from "diff";
 
-import type { LineDiffMetricRecorder } from "./line-diff-metric-recorder.js";
+import type { LineDiffMetricRecorder } from "./telemetry/line-diff-metric-recorder.js";
 
 export interface JsLineDiffCalculatorDependencies {
   readonly metricRecorder: LineDiffMetricRecorder;

@@ -5,6 +5,11 @@ import { getTelemetryMetricMetadata } from "@gitlode/internal-contracts/telemetr
 
 import { WorkerTelemetrySession } from "../src/execution/telemetry/worker-telemetry-session.js";
 import { sampleChildRss, type RssMeasurement } from "../test/support/performance-harness.js";
+import {
+  performanceChild,
+  performanceDiagnostic,
+  performanceStage,
+} from "./tooling/performance-progress.js";
 
 export const AGGREGATION_OBSERVATION_IDENTITIES = [
   "observation-0",
@@ -89,11 +94,19 @@ export async function runAggregationChild(
   scale: number,
   enabled: boolean,
 ): Promise<AggregationChildRun> {
+  performanceStage({
+    stage: "execution",
+    operation: "aggregation-child",
+    fixture: "aggregation_scale",
+    quantity: scale,
+    state: enabled ? "target_on" : "target_off",
+  });
   const child = spawn(
     process.execPath,
     [scriptPath, "--scale", String(scale), ...(enabled ? ["--profile"] : [])],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
+  performanceChild(child.pid);
   let stdout = "";
   let stderr = "";
   child.stdout?.setEncoding("utf8");
@@ -102,7 +115,11 @@ export async function runAggregationChild(
   });
   child.stderr?.setEncoding("utf8");
   child.stderr?.on("data", (chunk: string) => {
-    stderr += chunk;
+    const retained = Buffer.from(chunk)
+      .subarray(0, Math.max(0, 16 * 1024 - Buffer.byteLength(stderr)))
+      .toString("utf8");
+    stderr += retained;
+    if (retained) performanceDiagnostic(retained);
   });
   const rssPromise = sampleChildRss(child);
   const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
@@ -111,6 +128,12 @@ export async function runAggregationChild(
       child.once("close", (code, signal) => resolveExit({ code, signal }));
     },
   );
+  performanceStage({
+    stage: "processing",
+    operation: "read-aggregation",
+    fixture: "aggregation_scale",
+    quantity: scale,
+  });
   const result: AggregationChildRun = { scale, enabled, exit, rss: await rssPromise };
   if (exit.code !== 0)
     return {

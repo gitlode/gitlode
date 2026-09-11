@@ -7,8 +7,8 @@ import type { BlobOid } from "@gitlode/internal-contracts/model";
 import { captureGroupOrThrow } from "@gitlode/internal-foundation/support";
 import { type Context, type Span, type Tracer } from "@opentelemetry/api";
 
-import type { GitMetricRecorder } from "./git-metric-recorder.js";
-import { attributeKey, setGitProcessError } from "./git-telemetry.js";
+import type { GitMetricRecorder } from "./telemetry/git-metric-recorder.js";
+import { attributeKey, setGitProcessError } from "./telemetry/git-telemetry.js";
 
 export interface GitBatchObject {
   readonly oid: string;

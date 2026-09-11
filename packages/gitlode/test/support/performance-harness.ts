@@ -7,6 +7,12 @@ import { performance } from "node:perf_hooks";
 
 import { TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
 
+import {
+  performanceChild,
+  performanceDiagnostic,
+  performanceStage,
+} from "../../scripts/tooling/performance-progress.js";
+import { requiredTelemetryPerformanceTargets } from "../../scripts/tooling/telemetry-performance-targets.js";
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
 export { resolveSourceRevision } from "../../scripts/tooling/source-revision.js";
 
@@ -40,13 +46,7 @@ export interface CalibrationTarget {
   readonly artifactRef?: string;
   readonly reason?: string;
 }
-export const requiredCalibrationTargets = [
-  "commit_heavy_repository/isomorphic-git",
-  "commit_heavy_repository/git-cli",
-  "file_heavy_repository/isomorphic-git",
-  "file_heavy_repository/git-cli",
-  "plugin_heavy_projection/isomorphic-git",
-] as const;
+export const requiredCalibrationTargets = requiredTelemetryPerformanceTargets;
 export function validateCalibrationMatrix(manifest: FixtureManifest): string[] {
   const actual = Object.keys(manifest.calibrationTargets);
   return [
@@ -247,9 +247,15 @@ export function sampleChildRss(
     const poll = async () => {
       if (active || finished) return;
       active = true;
-      const rss = await reader(child.pid as number);
-      if (rss !== undefined) samples.push({ elapsedMs: now() - started, rssBytes: rss });
-      active = false;
+      try {
+        const rss = await reader(child.pid as number);
+        if (!finished && rss !== undefined)
+          samples.push({ elapsedMs: now() - started, rssBytes: rss });
+      } catch {
+        // A sampling failure leaves missing evidence; it must not reject outside the workflow.
+      } finally {
+        active = false;
+      }
     };
     void poll();
     const timer = setInterval(() => void poll(), intervalMs);
@@ -373,7 +379,17 @@ export async function launchMeasuredChild(input: {
 }): Promise<RawRun> {
   const args = [...input.args, "--quiet", ...(input.state === "target_on" ? ["--profile"] : [])];
   const start = performance.now();
-  const child = spawn(input.executable, args, { env: input.env, stdio: "ignore" });
+  const child = spawn(input.executable, args, {
+    env: input.env,
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  performanceChild(child.pid);
+  let diagnosticBytesRemaining = 16 * 1024;
+  child.stderr?.on("data", (chunk: Buffer) => {
+    const retained = chunk.subarray(0, diagnosticBytesRemaining);
+    diagnosticBytesRemaining -= retained.length;
+    if (retained.length) performanceDiagnostic(retained.toString("utf8"));
+  });
   const rss = sampleChildRss(child, { reader: input.rssReader });
   const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
     (resolve) => {
@@ -382,6 +398,7 @@ export async function launchMeasuredChild(input: {
     },
   );
   const elapsedMs = performance.now() - start;
+  performanceStage({ stage: "processing", operation: "read-cli-output" });
   const captureErrors: string[] = [];
   let outputFiles: string[] = [];
   try {
@@ -660,15 +677,113 @@ export function verifyMeasuredBehavior(
 ): string[] {
   return compareBehavioralArtifacts(baseline, candidate, "same-adapter", repositoryPath);
 }
-export function nextCalibrationQuantity(
-  current: number,
-  legacyMedianMs: number,
-): { quantity: number; complete: boolean } {
-  if (legacyMedianMs >= 10_000 && legacyMedianMs <= 30_000)
-    return { quantity: current, complete: true };
-  if (legacyMedianMs > 30_000)
-    throw new Error("candidate skipped the accepted 10-30 second calibration window");
-  return { quantity: current * 2, complete: false };
+export type CalibrationClassification = "lower" | "accepted" | "upper";
+export type CalibrationPlannerAction =
+  | { readonly kind: "run-initial"; readonly quantity: number }
+  | { readonly kind: "expand-upper"; readonly quantity: number }
+  | {
+      readonly kind: "refine-bracket";
+      readonly quantity: number;
+      readonly lower: number;
+      readonly upper: number;
+    }
+  | { readonly kind: "complete"; readonly quantity: number }
+  | {
+      readonly kind: "fail-no-acceptable-quantity";
+      readonly code: "initial-above-window" | "adjacent-integers-skip-window";
+    }
+  | {
+      readonly kind: "fail-safe-integer-expansion";
+      readonly code: "safe-integer-expansion-exhausted";
+    }
+  | { readonly kind: "inconclusive-unstable"; readonly code: "mad-ratio-exceeds-limit" }
+  | {
+      readonly kind: "inconclusive-non-monotonic";
+      readonly code: "lower-threshold-classification-inversion";
+    }
+  | {
+      readonly kind: "inconclusive-evidence";
+      readonly code: "child-validation-failed" | "behavior-validation-failed";
+    };
+export interface CalibrationPlannerAttempt {
+  readonly quantity: number;
+  readonly medianMs: number;
+  readonly madRatio: number;
+  readonly childValid: boolean;
+  readonly behaviorValid: boolean;
+}
+export function classifyCalibrationMedian(medianMs: number): CalibrationClassification {
+  if (!Number.isFinite(medianMs) || medianMs < 0)
+    throw new Error("calibration median must be a finite non-negative number");
+  return medianMs < 10_000 ? "lower" : medianMs <= 30_000 ? "accepted" : "upper";
+}
+/** Pure deterministic calibration decision; callers append exactly one completed pilot per turn. */
+export function planCalibration(
+  initialQuantity: number,
+  attempts: readonly CalibrationPlannerAttempt[],
+): CalibrationPlannerAction {
+  if (!Number.isSafeInteger(initialQuantity) || initialQuantity < 1)
+    throw new Error("initial calibration quantity must be a positive safe integer");
+  if (!attempts.length) return { kind: "run-initial", quantity: initialQuantity };
+  const quantities = new Set<number>();
+  for (const attempt of attempts) {
+    if (!Number.isSafeInteger(attempt.quantity) || attempt.quantity < initialQuantity)
+      throw new Error("calibration attempt quantity is outside the permitted range");
+    if (!Number.isFinite(attempt.medianMs) || attempt.medianMs < 0)
+      throw new Error("calibration attempt median must be a finite non-negative number");
+    if (!Number.isFinite(attempt.madRatio) || attempt.madRatio < 0)
+      throw new Error("calibration attempt MAD ratio must be a finite non-negative number");
+    if (quantities.has(attempt.quantity))
+      throw new Error("calibration quantity was measured twice");
+    quantities.add(attempt.quantity);
+    if (attempt.madRatio > 0.05)
+      return { kind: "inconclusive-unstable", code: "mad-ratio-exceeds-limit" };
+    if (!attempt.childValid)
+      return { kind: "inconclusive-evidence", code: "child-validation-failed" };
+    if (!attempt.behaviorValid)
+      return { kind: "inconclusive-evidence", code: "behavior-validation-failed" };
+  }
+  const classified = attempts.map((attempt) => ({
+    ...attempt,
+    classification: classifyCalibrationMedian(attempt.medianMs),
+  }));
+  if (
+    classified.some(
+      (small) =>
+        small.classification !== "lower" &&
+        classified.some(
+          (large) => large.quantity > small.quantity && large.classification === "lower",
+        ),
+    )
+  )
+    return { kind: "inconclusive-non-monotonic", code: "lower-threshold-classification-inversion" };
+  const initial = classified.find((attempt) => attempt.quantity === initialQuantity);
+  if (!initial) throw new Error("initial calibration quantity was not measured");
+  if (initial.classification === "accepted") return { kind: "complete", quantity: initialQuantity };
+  if (initial.classification === "upper")
+    return { kind: "fail-no-acceptable-quantity", code: "initial-above-window" };
+  const lowers = classified.filter((attempt) => attempt.classification === "lower");
+  const uppers = classified.filter((attempt) => attempt.classification !== "lower");
+  if (!uppers.length) {
+    const lower = Math.max(...lowers.map((attempt) => attempt.quantity));
+    if (lower > Math.floor(Number.MAX_SAFE_INTEGER / 2))
+      return { kind: "fail-safe-integer-expansion", code: "safe-integer-expansion-exhausted" };
+    return { kind: "expand-upper", quantity: lower * 2 };
+  }
+  let lower = Math.max(...lowers.map((attempt) => attempt.quantity));
+  let upper = Math.min(...uppers.map((attempt) => attempt.quantity));
+  while (upper - lower > 1) {
+    const quantity = lower + Math.floor((upper - lower) / 2);
+    const known = classified.find((attempt) => attempt.quantity === quantity);
+    if (!known) return { kind: "refine-bracket", quantity, lower, upper };
+    if (known.classification === "lower") lower = quantity;
+    else upper = quantity;
+  }
+  const selected = classified.find((attempt) => attempt.quantity === upper);
+  if (!selected) throw new Error("calibration upper bound is missing");
+  return selected.classification === "accepted"
+    ? { kind: "complete", quantity: upper }
+    : { kind: "fail-no-acceptable-quantity", code: "adjacent-integers-skip-window" };
 }
 
 export interface VolumeObservation {

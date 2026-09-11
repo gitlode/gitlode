@@ -1,6 +1,6 @@
 import type { Brand } from "@gitlode/internal-foundation/type-utils";
 
-import type { DagOperationObservation } from "./observations.js";
+import type { DagOperationObservation } from "./telemetry/observations.js";
 import type { DagFrontier } from "./types.js";
 
 /** Shared contracts for the phase-certified prototype facade and internal state modules. */

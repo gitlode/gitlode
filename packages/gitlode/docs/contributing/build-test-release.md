@@ -175,7 +175,7 @@ Package manifests define dependency ownership. The Rev-dep configuration verifie
 not rely on undeclared root development dependencies, while the domain rules documented in
 `domain-design.md` constrain which declared dependencies may actually be used.
 
-## CI and publish gate
+## CI and publish gates
 
 CI runs source validation and then exercises the release pipeline as explicit steps: development
 build, generated-artifact checks, source tests, release build, packed metadata validation, and the
@@ -185,10 +185,63 @@ installed-package system test. Coverage is intentionally absent.
 npm run validate:release
 ```
 
-`validate:release` is the complete local and publish gate. It checks dependency consistency,
-formatting, lint, architecture, generated schema consistency, and source tests before building the
-release and running publint and the installed-package system test. The release workflow runs this
-gate before Changesets publishes packages.
+`validate:release` is the functional and package-validation half of release readiness. It checks
+dependency consistency, formatting, lint, architecture, generated schema consistency, and source
+tests before building the release and running publint and the installed-package system test. It does
+not establish empirical telemetry acceptance by itself.
 
-Use the narrower commands while developing, but use `validate:release` when assessing whether the
-repository is ready to publish.
+The supported Changesets publish path has a second, migration-specific gate:
+
+```bash
+npm run validate:telemetry-release-acceptance -w gitlode
+```
+
+The root `changeset:publish` command runs this validator immediately before `changeset publish`, and
+the Changesets Action publish callback continues to converge through `npm run release`. Ordinary CI,
+`validate:release`, release builds, and Version PR creation do not run the migration gate. The release
+checkout fetches complete history so the validator can prove candidate ancestry.
+
+The versioned record at `.release/telemetry-migration-acceptance.json` starts in `blocked` state. An
+`accepted` record must contain reviewed attestations for all five calibrations and legacy captures,
+the ten canonical comparisons, aggregation N/4N bounded-growth checks, and three `target_on` checks
+for every repository target. Those repository checks attest to profile-report validity, report size,
+and prohibited host spans. The profile-report validity attestation requires literal `pass` outcomes
+for sidecar availability, report presence, schema validity, complete spans, complete counters,
+complete histograms, diagnostics presence, and empty diagnostics. It cannot carry a performance
+exception. Report size and prohibited host spans retain the reviewed performance-exception path.
+The record also requires applicable Git CLI command parity and explicit behavioral outcomes, and it
+must cover profile readability (including partial and unavailable output), staged system-test and
+contributor-navigation work, final Windows/Linux functional and installed-package checks, bundle
+identity, candidate delta assessment, T13C closure, and release-authority approval. Each attestation
+identifies its evidence and archive, records a SHA-256, names the exact final candidate for which it
+is accepted, and identifies the reviewer and review date. A performance exception must also contain
+every exception field in the telemetry performance catalog and a separate release-authority approval;
+it cannot waive calibration, missing or inconclusive evidence, report validity, or behavioral
+correctness.
+
+Performance attestations separately name the product and harness revisions that generated their
+evidence. Those revisions, the preserved legacy revision and the frozen migration candidate must be
+available Git commits. The legacy revision must precede the frozen candidate, and the frozen candidate
+must be an ancestor of the final candidate; separately versioned harness commits need only exist.
+Calibration and legacy capture remain baseline evidence. Reuse of evidence from an older redesigned
+candidate requires a reviewed, evidence-specific delta binding over its evidence ID, source product
+and harness OIDs, and final destination OID. The gate rejects absent, mismatched and dangling reuse
+claims without attempting to judge the reviewer's semantic rationale.
+
+The reviewer is responsible for verifying the referenced bytes and deciding whether the evidence is
+acceptable. The repository gate verifies only that committed attestations are complete and
+consistent; it neither has access to external archives nor proves artifact authenticity from a hash
+alone. The final candidate must be an ancestor of the publish checkout, and their trees may differ
+only at the acceptance-record path. Any tracked or untracked checkout change fails closed. Ignored
+generated build output is omitted by normal Git status handling and therefore does not appear as a
+source edit. Actions publishing is accepted only from `refs/heads/main`; local publishing reads
+the attached branch from Git and requires `main` rather than trusting an environment override.
+
+The record remains enforced after the initial v0.13.0 publication until a separate reviewed change
+retires this temporary migration gate while preserving accepted evidence in history. Repository
+enforcement cannot prevent a credential holder from bypassing the supported command or modifying the
+guard; branch review and npm Trusted Publishing remain the authority boundary for those actions.
+
+Use the narrower commands while developing. Assess publish readiness from both `validate:release`
+and an accepted telemetry migration record; do not change a blocked record without the required
+independent review evidence.

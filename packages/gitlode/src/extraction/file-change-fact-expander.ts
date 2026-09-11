@@ -6,7 +6,7 @@ import type {
 import type { FileBlobChange, GitAdapter } from "@gitlode/internal-contracts/git";
 import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
 
-import type { FileChangeFactExpanderMetricRecorder } from "./file-change-fact-expander-metric-recorder.js";
+import type { FileChangeFactExpanderMetricRecorder } from "./telemetry/file-change-fact-expander-metric-recorder.js";
 
 const EMPTY_CONTENT = new Uint8Array(0);
 const BINARY_SCAN_LIMIT = 8_000;

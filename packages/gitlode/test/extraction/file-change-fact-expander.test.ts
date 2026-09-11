@@ -4,8 +4,8 @@ import type { LineDiffCalculator } from "@gitlode/internal-contracts/line-diff";
 import type { BlobOid, CommitOid } from "@gitlode/internal-contracts/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER } from "../../src/extraction/file-change-fact-expander-metric-recorder.js";
 import { FileChangeFactExpander } from "../../src/extraction/file-change-fact-expander.js";
+import { NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER } from "../../src/extraction/telemetry/file-change-fact-expander-metric-recorder.js";
 
 const REPO_PATH = "/fake/repo";
 const encoder = new TextEncoder();

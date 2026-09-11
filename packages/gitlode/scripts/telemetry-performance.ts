@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -27,7 +27,6 @@ import {
   fingerprint,
   fixtureRecipeHash,
   launchMeasuredChild,
-  median,
   evaluateVolume,
   evaluateRepositoryProfileReport,
   composeFormalStatus,
@@ -35,7 +34,6 @@ import {
   validateSidecarMatrix,
   volumeObservationFromProfileReport,
   pathIsolationEvidence,
-  nextCalibrationQuantity,
   pairPlan,
   sealedManifestHash,
   type CalibrationTarget,
@@ -58,6 +56,16 @@ import {
 import { readJsonlArtifacts } from "../test/support/profile-equivalence.js";
 import { runAggregationChild } from "./telemetry-aggregation.js";
 import { buildAggregationCollectorBundle } from "./tooling/aggregation-collector-bundle.js";
+import { writeAtomicJson, writeAtomicText } from "./tooling/atomic-json.js";
+import { projectCalibrationPilot } from "./tooling/calibration-pilot-projection.js";
+import { runCalibrationWorkflow } from "./tooling/calibration-workflow.js";
+import {
+  performanceChild,
+  performanceEvidence,
+  performanceFinished,
+  performanceStage,
+} from "./tooling/performance-progress.js";
+import { createProductionCalibrationArtifactAdapter } from "./tooling/production-calibration-artifacts.js";
 import { resolveSourceRevision } from "./tooling/source-revision.js";
 
 const exec = promisify(execFile);
@@ -70,9 +78,13 @@ function option(name: string, fallback?: string): string {
 }
 const invokedDirectly =
   process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (invokedDirectly) await main();
+if (invokedDirectly) {
+  await main();
+  await performanceFinished();
+}
 
 async function main() {
+  performanceStage({ stage: "preparation", operation: "validate-inputs" });
   const mode = process.argv[2];
   if (
     mode !== "calibrate" &&
@@ -96,6 +108,7 @@ async function main() {
     let bundle;
     let runs;
     try {
+      performanceStage({ stage: "preparation", operation: "build-aggregation-runner", fixture });
       bundle = await buildAggregationCollectorBundle(bundleDirectory);
       runs = [];
       for (const [runScale, enabled] of [
@@ -103,9 +116,13 @@ async function main() {
         [scale, true],
         [scale * 4, false],
         [scale * 4, true],
-      ] as const)
-        runs.push(await runAggregationChild(bundle.path, runScale, enabled));
+      ] as const) {
+        const run = await runAggregationChild(bundle.path, runScale, enabled);
+        runs.push(run);
+        await performanceEvidence(`aggregation-${runScale}-${enabled}`, run);
+      }
     } finally {
+      performanceStage({ stage: "processing", operation: "aggregation-cleanup", fixture });
       await rm(bundleDirectory, { recursive: true, force: true });
     }
     const disabled = runs.filter((run) => !run.enabled),
@@ -240,110 +257,16 @@ async function main() {
   const artifacts = resolve(option("artifacts", join(packageDirectory, ".benchmark-artifacts")));
   const originalManifest = await readFile(manifestPath);
   if (mode === "calibrate") {
-    let quantity = target.quantities.commits;
-    let calibrationRuns: readonly RawRun[] = [];
-    for (;;) {
-      let pilot: Execution;
-      try {
-        pilot = await executeSingle(
-          manifest,
-          fixture,
-          adapter,
-          legacyCli as string,
-          "legacy_off",
-          quantity,
-        );
-      } catch (error) {
-        await writeWorkflowFailureArtifact(
-          artifacts,
-          `${calibrationKey(fixture, adapter).replace("/", "-")}-calibration-failure.json`,
-          {
-            kind: "calibration-failure",
-            failureStage: "preparation-or-capture",
-            fixture,
-            adapter,
-            revisions: { baseline: legacyRevision },
-            calibrationTargetRecipeHash: calibrationTargetRecipeHash(
-              manifest,
-              calibrationKey(fixture, adapter),
-              { ...target.quantities, commits: quantity },
-            ),
-            quantities: { ...target.quantities, commits: quantity },
-            error,
-          },
-        );
-        throw error;
-      }
-      try {
-        const measured = pilot.baseline.filter((run) => run.phase === "measured");
-        const pilotErrors = await validateLegacy(
-          pilot,
-          { ...target.quantities, commits: quantity },
-          fixture,
-        );
-        if (measured.some((run) => run.exit.code !== 0))
-          pilotErrors.push("calibration child failed");
-        if (pilotErrors.length) {
-          await mkdir(artifacts, { recursive: true });
-          await writeFile(
-            join(
-              artifacts,
-              `${calibrationKey(fixture, adapter).replace("/", "-")}-calibration-failure.json`,
-            ),
-            `${JSON.stringify({ schemaVersion: 2, kind: "calibration-failure", fixture, adapter, legacyRevision, quantities: { ...target.quantities, commits: quantity }, calibrationTargetRecipeHash: calibrationTargetRecipeHash(manifest, calibrationKey(fixture, adapter), { ...target.quantities, commits: quantity }), errors: [...new Set(pilotErrors)], runs: pilot.baseline, behaviorEvidence: pilot.baseline.filter((run) => run.phase === "measured").map((run) => performanceBehaviorEvidence(pilot.behavior.get(run.runId) as PerformanceBehavior, pilot.repositoryPath)) }, undefined, 2)}\n`,
-          );
-          throw new Error(`calibration behavior validation failed: ${pilotErrors.join("; ")}`);
-        }
-        const decision = nextCalibrationQuantity(
-          quantity,
-          median(measured.map((run) => run.elapsedMs)),
-        );
-        if (decision.complete) {
-          calibrationRuns = pilot.baseline;
-          break;
-        }
-        quantity = decision.quantity;
-      } finally {
-        await pilot.cleanup();
-      }
-    }
-    const key = calibrationKey(fixture, adapter);
-    const safeKey = key.replace("/", "-");
-    const environmentRef = `${safeKey}-environment.json`;
-    const artifactRef = `${safeKey}-calibration.json`;
-    const scriptRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
-    const updated: FixtureManifest = {
-      ...manifest,
-      calibrationTargets: {
-        ...manifest.calibrationTargets,
-        [key]: {
-          status: "complete",
-          quantities: { ...target.quantities, commits: quantity },
-          environmentRef,
-          artifactRef,
-        },
-      },
-    };
-    const targetRecipeHash = calibrationTargetRecipeHash(updated, key);
-    const calibrationEnvironment = await makeFingerprint(
-      updated,
+    await runProductionCalibration({
+      manifest,
+      manifestPath,
+      fixture,
       adapter,
-      "legacy_off",
-      legacyRevision as string,
-      scriptRevision,
-      targetRecipeHash,
-    );
-    await mkdir(artifacts, { recursive: true });
-    await writeFile(
-      join(artifacts, environmentRef),
-      `${JSON.stringify(calibrationEnvironment, undefined, 2)}\n`,
-    );
-    await writeFile(
-      join(artifacts, artifactRef),
-      `${JSON.stringify({ schemaVersion: 2, fixture, adapter, legacyRevision, benchmarkScriptRevision: scriptRevision, calibrationTargetRecipeHash: targetRecipeHash, sealedManifestHash: sealedManifestHash(updated), quantities: { ...target.quantities, commits: quantity }, environmentRef, runs: calibrationRuns }, undefined, 2)}\n`,
-    );
-    await writeFile(manifestPath, canonicalManifest(updated));
-    process.stdout.write(`calibrated ${key}; allComplete=${calibrationComplete(updated)}\n`);
+      target,
+      artifacts,
+      legacyCli: legacyCli as string,
+      legacyRevision: legacyRevision as string,
+    });
     return;
   }
   const benchmarkScriptRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
@@ -572,6 +495,129 @@ async function writeWorkflowFailureArtifact(
   );
 }
 
+async function runProductionCalibration(input: {
+  manifest: FixtureManifest;
+  manifestPath: string;
+  fixture: RepositoryFixture;
+  adapter: "isomorphic-git" | "git-cli";
+  target: CalibrationTarget;
+  artifacts: string;
+  legacyCli: string;
+  legacyRevision: string;
+}) {
+  const key = calibrationKey(input.fixture, input.adapter);
+  const safeKey = key.replace("/", "-");
+  let scriptRevision = "unavailable";
+  const updateManifest = (selectedQuantity: number): FixtureManifest => ({
+    ...input.manifest,
+    calibrationTargets: {
+      ...input.manifest.calibrationTargets,
+      [key]: {
+        status: "complete",
+        quantities: { ...input.target.quantities, commits: selectedQuantity },
+        environmentRef: `${safeKey}-environment.json`,
+        artifactRef: `${safeKey}-calibration.json`,
+      },
+    },
+  });
+  const result = await runCalibrationWorkflow({
+    initialQuantity: input.target.quantities.commits,
+    fixture: input.fixture,
+    adapter: input.adapter,
+    manifest: input.manifest,
+    dependencies: {
+      executePilot: async (quantity) => {
+        const pilot = await executeSingle(
+          input.manifest,
+          input.fixture,
+          input.adapter,
+          input.legacyCli,
+          "legacy_off",
+          quantity,
+        );
+        try {
+          performanceStage({
+            stage: "processing",
+            operation: "validate-pilot",
+            fixture: input.fixture,
+            adapter: input.adapter,
+            quantity,
+          });
+          const behaviorErrors = await validateLegacy(
+            pilot,
+            { ...input.target.quantities, commits: quantity },
+            input.fixture,
+          );
+          return projectCalibrationPilot({
+            runs: pilot.baseline,
+            behavioralValidation: behaviorErrors,
+            behavior: pilot.behavior,
+            repositoryPath: pilot.repositoryPath,
+          });
+        } finally {
+          performanceStage({
+            stage: "processing",
+            operation: "pilot-cleanup",
+            fixture: input.fixture,
+            adapter: input.adapter,
+            quantity,
+          });
+          await pilot.cleanup();
+        }
+      },
+      ...createProductionCalibrationArtifactAdapter({
+        safeKey,
+        quantities: (selectedQuantity) => ({
+          ...input.target.quantities,
+          commits: selectedQuantity,
+        }),
+        environmentRef: `${safeKey}-environment.json`,
+        updateManifest,
+        recipeHash: (updated) => calibrationTargetRecipeHash(updated, key),
+        sealedManifestHash,
+        makeEnvironment: async (updated, artifact) =>
+          await makeFingerprint(
+            updated,
+            input.adapter,
+            "legacy_off",
+            input.legacyRevision,
+            scriptRevision,
+            calibrationTargetRecipeHash(updated, key),
+          ),
+        writeJson: async (name, value) => await writeAtomicJson(input.artifacts, name, value),
+        writeManifest: async (updated) =>
+          await writeAtomicText(
+            dirname(input.manifestPath),
+            basename(input.manifestPath),
+            canonicalManifest(updated),
+          ),
+        onProgress: (artifact) => {
+          const attempt = artifact.attempts.at(-1);
+          if (attempt)
+            process.stdout.write(
+              `calibration quantity=${attempt.quantity} medianMs=${attempt.medianMs} madMs=${attempt.madMs} classification=${attempt.classification} next=${artifact.action.kind}\n`,
+            );
+        },
+      }),
+      updateManifest,
+      recipeHash: (quantity) =>
+        calibrationTargetRecipeHash(input.manifest, key, {
+          ...input.target.quantities,
+          commits: quantity,
+        }),
+      revisions: async () => {
+        scriptRevision = await resolveSourceRevision(resolve(packageDirectory, "../.."));
+        return { legacyRevision: input.legacyRevision, benchmarkScriptRevision: scriptRevision };
+      },
+    },
+  });
+  if (result.exitCode === 2) process.exitCode = 2;
+  else
+    process.stdout.write(
+      `calibrated ${key}; allComplete=${calibrationComplete(result.manifest as FixtureManifest)}\n`,
+    );
+}
+
 async function makeFingerprint(
   manifest: FixtureManifest,
   adapter: "isomorphic-git" | "git-cli",
@@ -604,7 +650,7 @@ function validateSidecarCompleteness(workflow: Execution): string[] {
   }));
   return validateSidecarMatrix(runs, captures);
 }
-function sidecarEvidence(workflow: Execution, runs: readonly RawRun[]) {
+function sidecarEvidence(workflow: Pick<Execution, "sidecars">, runs: readonly RawRun[]) {
   return runs.map((run) => {
     const sidecar = workflow.sidecars.get(run.runId);
     if (!sidecar) return null;
@@ -703,6 +749,12 @@ export async function runRepositoryProfileSidecar(input: {
   readonly quantities: FixtureQuantities;
   readonly rotationLines?: number;
 }): Promise<RepositorySidecarCapture> {
+  const context = {
+    fixture: input.fixture,
+    adapter: input.adapter,
+    quantity: input.quantities.commits,
+  };
+  performanceStage({ stage: "processing", operation: "prepare-sidecar", ...context });
   const provenance = {
     workerBundle: "worker-entry.js" as const,
     workerBundleSha256: "",
@@ -770,9 +822,12 @@ export async function runRepositoryProfileSidecar(input: {
     const sidecarScript = fileURLToPath(
       new URL("./telemetry-repository-sidecar.mjs", import.meta.url),
     );
-    const result = JSON.parse(
-      (await exec(process.execPath, [sidecarScript, requestPath])).stdout,
-    ) as {
+    performanceStage({ stage: "execution", operation: "repository-sidecar", ...context });
+    const pending = exec(process.execPath, [sidecarScript, requestPath]);
+    performanceChild(pending.child.pid);
+    const response = await pending;
+    performanceStage({ stage: "processing", operation: "read-sidecar", ...context });
+    const result = JSON.parse(response.stdout) as {
       result?: {
         kind?: string;
         message?: string;
@@ -811,6 +866,7 @@ export async function runRepositoryProfileSidecar(input: {
       provenance,
     };
   } finally {
+    performanceStage({ stage: "processing", operation: "sidecar-cleanup", ...context });
     await rm(root, { recursive: true, force: true });
   }
 }
@@ -821,10 +877,12 @@ async function executePaired(
   baselineSpec: { cli: string; state: ProfileState; revision: string },
   candidate?: { cli: string; state: ProfileState; revision: string },
 ): Promise<Execution> {
+  const quantities = requireTarget(manifest, fixture, adapter, true).quantities;
+  const context = { fixture, adapter, quantity: quantities.commits };
+  performanceStage({ stage: "preparation", operation: "repository-generation", ...context });
   const root = await mkdtemp(join(tmpdir(), "gitlode-performance-"));
   try {
     const repository = join(root, "repository");
-    const quantities = requireTarget(manifest, fixture, adapter, true).quantities;
     await createPerformanceRepository(
       repository,
       fixture === "commit_heavy_repository" ? fixture : "file_heavy_repository",
@@ -866,9 +924,17 @@ async function executePaired(
             ]
         : [[baselineSpec.state, baselineSpec.cli, baseline]];
       for (const [state, cli, destination] of states as [ProfileState, string, RawRun[]][]) {
+        const runContext = {
+          ...context,
+          phase: planned.phase,
+          iteration: (planned.pairIndex ?? 0) + 1,
+          state,
+        };
+        performanceStage({ stage: "processing", operation: "prepare-run-output", ...runContext });
         const output = join(root, `output-${ordinal}`),
           checkpoint = join(root, `state-${ordinal}.json`);
         await mkdir(output);
+        performanceStage({ stage: "execution", operation: "release-cli", ...runContext });
         const raw = await launchMeasuredChild({
           executable: process.execPath,
           args: [
@@ -895,6 +961,24 @@ async function executePaired(
           ...planned,
         });
         destination.push(raw);
+        performanceStage({ stage: "processing", operation: "capture-run", ...runContext });
+        const capturedBehavior = await behaviorFor(raw, output, checkpoint);
+        behavior.set(raw.runId, capturedBehavior);
+        const evidenceLabel = `run-${fixture}-${adapter}-${quantities.commits}-${raw.runId}`;
+        await performanceEvidence(evidenceLabel, {
+          kind: "completed-performance-run",
+          formalAcceptance: "pending-workflow-evaluation",
+          fixture,
+          adapter,
+          quantities,
+          revision: state === baselineSpec.state ? baselineSpec.revision : candidate?.revision,
+          calibrationTargetRecipeHash: calibrationTargetRecipeHash(
+            manifest,
+            calibrationKey(fixture, adapter),
+          ),
+          run: artifactRun(raw),
+          behavior: performanceBehaviorEvidence(capturedBehavior, repository),
+        });
         sidecars.set(
           raw.runId,
           state === "target_on"
@@ -923,7 +1007,7 @@ async function executePaired(
                 },
               },
         );
-        behavior.set(raw.runId, await behaviorFor(raw, output, checkpoint));
+        await performanceEvidence(`${evidenceLabel}-sidecar`, sidecarEvidence({ sidecars }, [raw]));
         ordinal++;
       }
     }
@@ -934,10 +1018,12 @@ async function executePaired(
       sidecars,
       repositoryPath: repository,
       cleanup: async () => {
+        performanceStage({ stage: "processing", operation: "repository-cleanup", ...context });
         await rm(root, { recursive: true, force: true });
       },
     };
   } catch (error) {
+    performanceStage({ stage: "processing", operation: "repository-failure-cleanup", ...context });
     await rm(root, { recursive: true, force: true });
     throw error;
   }

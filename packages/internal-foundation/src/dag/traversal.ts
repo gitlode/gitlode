@@ -1,5 +1,5 @@
 import { collectAsyncIterableToSet, firstOrThrow, OrderedQueue } from "../support/index.js";
-import type { DagFallbackReason } from "./observations.js";
+import type { DagFallbackReason } from "./telemetry/observations.js";
 import type {
   BasicDagSchedulingContext,
   DagFrontier,

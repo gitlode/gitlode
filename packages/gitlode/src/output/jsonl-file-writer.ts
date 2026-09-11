@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import type { ProjectedRecord } from "@gitlode/internal-contracts/extraction";
 
-import type { JsonlFileWriterMetricRecorder } from "./jsonl-file-writer-metric-recorder.js";
+import type { JsonlFileWriterMetricRecorder } from "./telemetry/jsonl-file-writer-metric-recorder.js";
 
 interface RotationOptions {
   readonly maxLines?: number;

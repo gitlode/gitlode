@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noCheck": false,
+    "noEmit": true,
+    "sourceMap": false
+  },
+  "include": [
+    "scripts/check-telemetry-release-acceptance.ts",
+    "scripts/tooling/telemetry-performance-targets.ts"
+  ]
+}

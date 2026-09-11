@@ -28,7 +28,7 @@ import type { GitCliProcess } from "../../src/git-impl/git-cli-cat-file-batch.js
 import {
   NOOP_GIT_METRIC_RECORDER,
   createGitMetricRecorder,
-} from "../../src/git-impl/git-metric-recorder.js";
+} from "../../src/git-impl/telemetry/git-metric-recorder.js";
 
 type Call = { name: string; value: number; attributes: Record<string, unknown> };
 

@@ -25,9 +25,12 @@ import {
   type CommitPathSchedulingHint,
   type CommitTraversalStrategy,
 } from "./commit-traversal/index.js";
-import type { DagTelemetryBinding } from "./dag-metric-recorder.js";
-import { type GitCommitWalkStrategy, type GitMetricRecorder } from "./git-metric-recorder.js";
-import { attributeKey, withGitAsyncSpan } from "./git-telemetry.js";
+import type { DagTelemetryBinding } from "./telemetry/dag-metric-recorder.js";
+import {
+  type GitCommitWalkStrategy,
+  type GitMetricRecorder,
+} from "./telemetry/git-metric-recorder.js";
+import { attributeKey, withGitAsyncSpan } from "./telemetry/git-telemetry.js";
 
 export interface IsomorphicGitAdapterDependencies {
   readonly fs: FsClient;

@@ -19,8 +19,8 @@ import type { ProgressEvent, ProgressReporter } from "@gitlode/internal-contract
 import { ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
-import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "../../src/extraction/extraction-pipeline-metric-recorder.js";
 import { ExtractionPipeline } from "../../src/extraction/extraction-pipeline.js";
+import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "../../src/extraction/telemetry/extraction-pipeline-metric-recorder.js";
 import type { CoordinatorDependencies } from "../../src/extraction/types.js";
 import { makeTracer } from "../support/otel-fakes.js";
 

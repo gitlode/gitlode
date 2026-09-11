@@ -10,11 +10,11 @@ import {
   normalizeDagCompletion,
   type DagMetricRecorder,
   type NeutralDagCompletion,
-} from "../../src/git-impl/dag-metric-recorder.js";
+} from "../../src/git-impl/telemetry/dag-metric-recorder.js";
 import {
   createGitMetricRecorder,
   NOOP_GIT_METRIC_RECORDER,
-} from "../../src/git-impl/git-metric-recorder.js";
+} from "../../src/git-impl/telemetry/git-metric-recorder.js";
 
 type Call = { name: string; value: number; attributes: unknown };
 type Creation = { kind: "counter" | "histogram"; name: string; options: unknown };

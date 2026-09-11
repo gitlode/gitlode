@@ -8,7 +8,7 @@ import type {
   PluginRuntimeContext,
   ProjectorPlugin,
 } from "../plugin-api/index.js";
-import type { PluginProjectionMetricRecorder } from "./plugin-projection-metric-recorder.js";
+import type { PluginProjectionMetricRecorder } from "./telemetry/plugin-projection-metric-recorder.js";
 
 interface PluginDeclaration {
   readonly entrypoint: string;

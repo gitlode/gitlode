@@ -1,5 +1,70 @@
 # M1 publish gate: correction round 1
 
+## Correction outcome
+
+Implemented and locally verified on Windows. The checkpoint OID is reported with the implementation
+handoff because a commit cannot contain its own OID. The live acceptance record remains blocked;
+no publish, formal measurement, Version PR, merge or candidate freeze was performed.
+
+Before G1, the synthetic positive record could omit calibration, legacy capture and individual
+catalog checks while two generic results stood in for the remaining obligations. After G1, five
+calibrations, five legacy captures, ten comparisons and the scoped check inventory below are exact,
+duplicate-free, fail-closed sets. Performance exceptions apply only to explicit performance outcomes;
+child and behavioral correctness still require `pass`.
+
+Before G2, frozen and harness OIDs were syntax-only values and every attestation was labeled only
+with the final candidate. After G2, temporary-repository tests use real commits; the validator checks
+legacy/frozen/final product ancestry, commit existence for every evidence and harness revision, and
+exact reviewed reuse bindings for older redesigned-candidate evidence. Harness history remains
+separately versioned and has no product-ancestry requirement.
+
+### Obligation-to-schema mapping
+
+The accepted record maps the existing performance contract to explicit evidence identities as
+follows. An attestation may reference the same archive for several entries, but every listed entry
+must be present once with its own identity and accepting outcome.
+
+| Contract obligation                | Accepted-record identity and scope                                                                                                                                                                      | Required outcome and evidence binding                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Repository calibration             | `performance.calibrations[]`, one for each of the five canonical repository targets                                                                                                                     | `status: accepted`, plus passing child and behavioral validation; legacy product revision, harness revision, target-recipe SHA-256 and evidence ID                                   |
+| Preserved legacy capture           | `performance.legacyCaptures[]`, one for each canonical target                                                                                                                                           | `status: pass` and passing behavioral validation; same legacy revision and target-recipe hash as its calibration, with an explicit calibration evidence link                         |
+| Disabled/profile comparison matrix | `performance.comparisons[]`, both canonical comparison types for each canonical target (ten identities)                                                                                                 | Wall-clock and peak-RSS outcomes are each `pass` or a fully reviewed `exception`; behavioral outcome must be `pass`; links name the target's calibration and legacy-capture evidence |
+| Aggregation N/4N bounded growth    | `performance.checks[]` at `aggregation_scale/none` and scope `n_to_4n`, with check IDs for span groups, metric datapoints, histogram buckets, raw-observation retention and profile-specific RSS growth | Each check is `pass` or a fully reviewed performance exception; repository calibration/capture links are not applicable                                                              |
+| Profile report size                | `performance.checks[]` with `report_size`, scope `target_on`, once for each canonical repository target                                                                                                 | `pass` or a fully reviewed performance exception, bound to the target's profile-comparison evidence                                                                                  |
+| Prohibited host spans              | `performance.checks[]` with `prohibited_host_spans`, scope `target_on`, once for each canonical repository target                                                                                       | `pass` or a fully reviewed performance exception, bound to the target's profile-comparison evidence                                                                                  |
+| Git command parity                 | `performance.checks[]` with `git_command_parity`, scope `target_on`, for the two `git-cli` repository targets only                                                                                      | `pass` or a fully reviewed performance exception, bound to the target's profile-comparison evidence; non-CLI and plugin targets are not applicable                                   |
+| Behavioral acceptance              | Explicit `behavioralStatus: pass` within every calibration, legacy capture and comparison                                                                                                               | Cannot be waived by a performance exception; the containing evidence attestation supplies the evidence reference                                                                     |
+
+All performance evidence attestations distinguish `sourceProductOid` and `harnessOid` from the
+`candidateOid` for which the evidence is accepted. Calibration and legacy capture use the preserved
+legacy revision and are not candidate-evidence reuse. Older redesigned-candidate evidence requires
+an exact `deltaAssessment.evidenceReuse[]` binding over evidence ID, source product OID, source
+harness OID and final destination OID, with a separate reviewed approval. The validator checks that
+all declared revisions are commits, that legacy and redesigned product revisions have the required
+ancestry, and that reuse claims are neither missing nor dangling. The reviewer remains responsible
+for the referenced artifact bytes and the semantic adequacy of each rationale.
+
+### Local verification
+
+Platform: Windows (`win32`).
+
+- `npm run format:write`: passed.
+- `npm run format:check`: passed for the root and all workspaces.
+- `npm run lint -w gitlode`: passed.
+- `npm run typecheck:telemetry-release-acceptance -w gitlode`: passed with `noCheck: false`.
+- Focused gate plus shared harness/workflow regression run: 4 files passed, 87 tests passed and 17
+  Linux-only cases skipped. The files were `release-acceptance.test.ts`,
+  `performance-harness.test.ts`, `performance-workflow.test.ts` and
+  `performance-supervisor.test.ts`.
+- A separate verbose classification run for the platform skips passed 21 cases and skipped 17:
+  14 cases in `Linux process supervision` and 3 cases in `supervised workflow integration`.
+- `git diff --check` and the committed-tree checks are performed immediately before and after the
+  checkpoint commit.
+
+No full release pipeline or installed-package suite was repeated. Cumulative Windows/Linux
+installed-package validation, Linux execution of the 17 platform-specific cases, formal performance
+measurement and independent focused re-review remain later work.
+
 ## Assignment
 
 Use a new bounded implementation conversation. Correct G1 (obligation coverage) and G2 (provenance

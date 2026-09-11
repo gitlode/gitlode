@@ -202,13 +202,25 @@ the Changesets Action publish callback continues to converge through `npm run re
 checkout fetches complete history so the validator can prove candidate ancestry.
 
 The versioned record at `.release/telemetry-migration-acceptance.json` starts in `blocked` state. An
-`accepted` record must contain reviewed attestations for the complete performance matrix and volume
-checks, profile readability (including partial and unavailable output), staged system-test and
-contributor-navigation work, final Windows/Linux functional and installed-package checks, bundle
+`accepted` record must contain reviewed attestations for all five calibrations and legacy captures,
+the ten canonical comparisons, aggregation N/4N bounded-growth checks, per-target report-size and
+prohibited-host-span checks, applicable Git CLI command parity, and explicit behavioral outcomes. It
+must also cover profile readability (including partial and unavailable output), staged system-test
+and contributor-navigation work, final Windows/Linux functional and installed-package checks, bundle
 identity, candidate delta assessment, T13C closure, and release-authority approval. Each attestation
-identifies its evidence and archive, records a SHA-256, names the exact final candidate, and identifies
-the reviewer and review date. A performance exception must also contain every exception field in the
-telemetry performance catalog and a separate release-authority approval.
+identifies its evidence and archive, records a SHA-256, names the exact final candidate for which it
+is accepted, and identifies the reviewer and review date. A performance exception must also contain
+every exception field in the telemetry performance catalog and a separate release-authority approval;
+it cannot waive calibration, missing or inconclusive evidence, or behavioral correctness.
+
+Performance attestations separately name the product and harness revisions that generated their
+evidence. Those revisions, the preserved legacy revision and the frozen migration candidate must be
+available Git commits. The legacy revision must precede the frozen candidate, and the frozen candidate
+must be an ancestor of the final candidate; separately versioned harness commits need only exist.
+Calibration and legacy capture remain baseline evidence. Reuse of evidence from an older redesigned
+candidate requires a reviewed, evidence-specific delta binding over its evidence ID, source product
+and harness OIDs, and final destination OID. The gate rejects absent, mismatched and dangling reuse
+claims without attempting to judge the reviewer's semantic rationale.
 
 The reviewer is responsible for verifying the referenced bytes and deciding whether the evidence is
 acceptable. The repository gate verifies only that committed attestations are complete and

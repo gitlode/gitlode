@@ -1,20 +1,30 @@
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { validateTelemetryReleaseAcceptance } from "../../scripts/check-telemetry-release-acceptance.js";
 import {
+  requiredTelemetryAggregationChecks,
+  requiredTelemetryGitCommandParityTargets,
   requiredTelemetryPerformanceComparisons,
   requiredTelemetryPerformanceTargets,
+  requiredTelemetryRepositoryChecks,
 } from "../../scripts/tooling/telemetry-performance-targets.js";
 
 const execFileAsync = promisify(execFile);
 const temporaryDirectories: string[] = [];
 const hash = "a".repeat(64);
+
+interface Revisions {
+  legacy: string;
+  frozen: string;
+  candidate: string;
+  harness: string;
+}
 
 async function temporaryDirectory(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "gitlode-release-acceptance-"));
@@ -31,10 +41,10 @@ async function git(repository: string, ...args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-function attestation(candidateOid: string) {
+function reviewAttestation(candidateOid: string, evidenceId = "review-evidence") {
   return {
     candidateOid,
-    evidenceId: "evidence-1",
+    evidenceId,
     archiveId: "archive-1",
     sha256: hash,
     reviewer: "independent-reviewer",
@@ -42,19 +52,32 @@ function attestation(candidateOid: string) {
   };
 }
 
-function section(candidateOid: string) {
-  return { status: "accepted", attestation: attestation(candidateOid) };
+function evidenceAttestation(
+  revisions: Revisions,
+  evidenceId: string,
+  sourceProductOid = revisions.candidate,
+) {
+  return {
+    ...reviewAttestation(revisions.candidate, evidenceId),
+    sourceProductOid,
+    harnessOid: revisions.harness,
+  };
 }
 
-function result(
-  candidateOid: string,
+function section(candidateOid: string, evidenceId: string) {
+  return { status: "accepted", attestation: reviewAttestation(candidateOid, evidenceId) };
+}
+
+function performanceResult(
+  revisions: Revisions,
+  evidenceId: string,
+  target: string,
   status: "pass" | "exception" = "pass",
-  exceptionTarget = "commit_heavy_repository/git-cli",
 ) {
-  const [fixture, adapter] = exceptionTarget.split("/") as [string, string];
+  const [fixture, adapter] = target.split("/") as [string, string];
   return {
     status,
-    attestation: attestation(candidateOid),
+    attestation: evidenceAttestation(revisions, evidenceId),
     ...(status === "exception"
       ? {
           exception: {
@@ -65,68 +88,124 @@ function result(
             acceptanceRationale: "bounded impact accepted for v0.13.0",
             impact: "one percent over the threshold",
             reevaluationCondition: "repeat for the next telemetry redesign",
-            releaseAuthorityApproval: attestation(candidateOid),
+            releaseAuthorityApproval: reviewAttestation(
+              revisions.candidate,
+              `${evidenceId}-authority`,
+            ),
           },
         }
       : {}),
   };
 }
 
-function acceptedRecord(candidateOid: string) {
+function acceptedRecord(revisions: Revisions) {
+  const calibrationId = (target: string) => `calibration:${target}`;
+  const captureId = (target: string) => `legacy:${target}`;
+  const comparisonId = (target: string, comparison: string) => `comparison:${target}:${comparison}`;
   return {
     schemaVersion: 1,
     state: "accepted",
     candidate: {
-      oid: candidateOid,
-      frozenMigrationCandidateOid: "b".repeat(40),
-      harnessOid: "c".repeat(40),
+      oid: revisions.candidate,
+      frozenMigrationCandidateOid: revisions.frozen,
+      legacyBaselineOid: revisions.legacy,
+      harnessOid: revisions.harness,
       bundleId: "gitlode-v0.13.0.tgz",
       bundleSha256: hash,
       fixtureManifestSha256: "d".repeat(64),
-      attestation: attestation(candidateOid),
+      attestation: reviewAttestation(revisions.candidate, "candidate"),
     },
     performance: {
+      calibrations: requiredTelemetryPerformanceTargets.map((target) => ({
+        target,
+        status: "accepted",
+        childStatus: "pass",
+        behavioralStatus: "pass",
+        targetRecipeSha256: hash,
+        attestation: evidenceAttestation(revisions, calibrationId(target), revisions.legacy),
+      })),
+      legacyCaptures: requiredTelemetryPerformanceTargets.map((target) => ({
+        target,
+        status: "pass",
+        behavioralStatus: "pass",
+        targetRecipeSha256: hash,
+        calibrationEvidenceId: calibrationId(target),
+        attestation: evidenceAttestation(revisions, captureId(target), revisions.legacy),
+      })),
       comparisons: requiredTelemetryPerformanceTargets.flatMap((target) =>
         requiredTelemetryPerformanceComparisons.map((comparison) => ({
           target,
           comparison,
-          ...result(candidateOid),
+          ...performanceResult(revisions, comparisonId(target, comparison), target),
+          wallClockStatus: "pass",
+          peakRssStatus: "pass",
+          behavioralStatus: "pass",
+          targetRecipeSha256: hash,
+          calibrationEvidenceId: calibrationId(target),
+          legacyCaptureEvidenceId: captureId(target),
         })),
       ),
-      aggregationScale: result(candidateOid),
-      traceVolume: result(candidateOid),
+      checks: [
+        ...requiredTelemetryAggregationChecks.map((check) => ({
+          check,
+          target: "aggregation_scale/none",
+          scope: "n_to_4n",
+          ...performanceResult(
+            revisions,
+            `check:${check}:aggregation_scale/none`,
+            "aggregation_scale/none",
+          ),
+        })),
+        ...requiredTelemetryPerformanceTargets.flatMap((target) =>
+          requiredTelemetryRepositoryChecks.map((check) => ({
+            check,
+            target,
+            scope: "target_on",
+            comparisonEvidenceId: comparisonId(target, "profile_overhead"),
+            ...performanceResult(revisions, `check:${check}:${target}`, target),
+          })),
+        ),
+        ...requiredTelemetryGitCommandParityTargets.map((target) => ({
+          check: "git_command_parity",
+          target,
+          scope: "target_on",
+          comparisonEvidenceId: comparisonId(target, "profile_overhead"),
+          ...performanceResult(revisions, `check:git_command_parity:${target}`, target),
+        })),
+      ],
     },
     profileReadability: {
       cases: ["commit", "file", "plugin", "partial", "unavailable"].map((profileCase) => ({
         case: profileCase,
-        ...section(candidateOid),
+        ...section(revisions.candidate, `profile:${profileCase}`),
       })),
     },
-    systemTestOrganization: section(candidateOid),
-    contributorNavigation: section(candidateOid),
+    systemTestOrganization: section(revisions.candidate, "system-tests"),
+    contributorNavigation: section(revisions.candidate, "navigation"),
     finalValidation: {
       windows: {
-        functional: section(candidateOid),
-        installedPackage: section(candidateOid),
+        functional: section(revisions.candidate, "windows-functional"),
+        installedPackage: section(revisions.candidate, "windows-package"),
       },
       linux: {
-        functional: section(candidateOid),
-        installedPackage: section(candidateOid),
+        functional: section(revisions.candidate, "linux-functional"),
+        installedPackage: section(revisions.candidate, "linux-package"),
       },
       bundleIdentity: {
         bundleId: "gitlode-v0.13.0.tgz",
         sha256: hash,
-        attestation: attestation(candidateOid),
+        attestation: reviewAttestation(revisions.candidate, "bundle"),
       },
     },
     deltaAssessment: {
       status: "accepted",
-      fromFrozenMigrationCandidateOid: "b".repeat(40),
+      fromFrozenMigrationCandidateOid: revisions.frozen,
       justification: "All changes since the frozen migration candidate were reviewed.",
-      attestation: attestation(candidateOid),
+      evidenceReuse: [] as Array<Record<string, unknown>>,
+      attestation: reviewAttestation(revisions.candidate, "delta"),
     },
-    t13c: section(candidateOid),
-    releaseAuthority: section(candidateOid),
+    t13c: section(revisions.candidate, "t13c"),
+    releaseAuthority: section(revisions.candidate, "release-authority"),
   };
 }
 
@@ -138,20 +217,53 @@ async function writeRecord(repository: string, record: unknown): Promise<void> {
   );
 }
 
-async function repositoryFixture(branch = "main") {
+async function commitRecord(repository: string, record: unknown): Promise<void> {
+  const tracked = await git(
+    repository,
+    "ls-tree",
+    "--name-only",
+    "HEAD",
+    ".release/telemetry-migration-acceptance.json",
+  );
+  await writeRecord(repository, record);
+  await git(repository, "add", ".release/telemetry-migration-acceptance.json");
+  await git(
+    repository,
+    "commit",
+    tracked ? "--amend" : "-m",
+    tracked ? "--no-edit" : "accept telemetry migration",
+  );
+}
+
+async function repositoryFixture(options: { frozenIsFinal?: boolean } = {}) {
   const repository = await temporaryDirectory();
-  await git(repository, "init", "--initial-branch", branch);
+  await git(repository, "init", "--initial-branch", "main");
   await git(repository, "config", "user.name", "Release Gate Test");
   await git(repository, "config", "user.email", "release-gate@example.invalid");
-  await writeFile(join(repository, "README.md"), "candidate\n");
   await writeFile(join(repository, ".gitignore"), "dist/\n");
-  await git(repository, "add", "README.md", ".gitignore");
-  await git(repository, "commit", "-m", "candidate");
-  const candidateOid = await git(repository, "rev-parse", "HEAD");
-  await writeRecord(repository, acceptedRecord(candidateOid));
-  await git(repository, "add", ".release/telemetry-migration-acceptance.json");
-  await git(repository, "commit", "-m", "accept telemetry migration");
-  return { repository, candidateOid };
+  await writeFile(join(repository, "README.md"), "legacy\n");
+  await git(repository, "add", ".gitignore", "README.md");
+  await git(repository, "commit", "-m", "legacy baseline");
+  const legacy = await git(repository, "rev-parse", "HEAD");
+  await writeFile(join(repository, "README.md"), "frozen\n");
+  await git(repository, "add", "README.md");
+  await git(repository, "commit", "-m", "frozen migration candidate");
+  const frozen = await git(repository, "rev-parse", "HEAD");
+  if (!options.frozenIsFinal) {
+    await writeFile(join(repository, "README.md"), "final\n");
+    await git(repository, "add", "README.md");
+    await git(repository, "commit", "-m", "final candidate");
+  }
+  const candidate = await git(repository, "rev-parse", "HEAD");
+  await git(repository, "checkout", "-b", "harness");
+  await writeFile(join(repository, "HARNESS.md"), "separately versioned harness\n");
+  await git(repository, "add", "HARNESS.md");
+  await git(repository, "commit", "-m", "harness revision");
+  const harness = await git(repository, "rev-parse", "HEAD");
+  await git(repository, "checkout", "main");
+  const revisions = { legacy, frozen, candidate, harness };
+  await commitRecord(repository, acceptedRecord(revisions));
+  return { repository, revisions };
 }
 
 afterEach(async () => {
@@ -162,7 +274,7 @@ afterEach(async () => {
   );
 });
 
-describe("telemetry release acceptance schema", () => {
+describe("telemetry release acceptance schema and obligation coverage", () => {
   it.each([
     ["missing", undefined, "absent or unreadable"],
     ["malformed", "{", "malformed JSON"],
@@ -187,119 +299,327 @@ describe("telemetry release acceptance schema", () => {
     ).rejects.toThrow(message);
   });
 
-  it("accepts the exact target/comparison matrix and a complete reviewed exception", async () => {
+  it("accepts the complete obligation inventory and separately versioned newer harness", async () => {
     const { repository } = await repositoryFixture();
-    const candidateOid = await git(repository, "rev-parse", "HEAD~1");
-    const record = acceptedRecord(candidateOid);
-    record.performance.comparisons[0] = {
-      ...record.performance.comparisons[0]!,
-      ...result(candidateOid, "exception", "commit_heavy_repository/isomorphic-git"),
-    };
-    await writeRecord(repository, record);
-    await git(repository, "add", ".release/telemetry-migration-acceptance.json");
-    await git(repository, "commit", "--amend", "--no-edit");
     await expect(validateTelemetryReleaseAcceptance(repository)).resolves.toBeUndefined();
   });
 
-  it("rejects missing and duplicate matrix identities", async () => {
-    const { repository, candidateOid } = await repositoryFixture();
-    const missing = acceptedRecord(candidateOid);
-    missing.performance.comparisons.pop();
-    await writeRecord(repository, missing);
-    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
-      "missing performance comparison",
-    );
-    const duplicate = acceptedRecord(candidateOid);
-    duplicate.performance.comparisons[1] = duplicate.performance.comparisons[0]!;
-    await writeRecord(repository, duplicate);
-    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
-      "duplicate performance comparison",
-    );
-  });
-
-  it("rejects incomplete exceptions, unknown fields, and candidate identity mismatches", async () => {
-    const { repository, candidateOid } = await repositoryFixture();
-    const invalid = acceptedRecord(candidateOid);
-    invalid.performance.aggregationScale = result(candidateOid, "exception");
-    invalid.performance.aggregationScale.exception!.cause = "";
-    await writeRecord(repository, invalid);
-    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow("cause");
-
-    const unknown = acceptedRecord(candidateOid) as ReturnType<typeof acceptedRecord> & {
-      extra?: boolean;
+  it("rejects the original incomplete-positive performance shape", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    (record as Record<string, unknown>).performance = {
+      comparisons: record.performance.comparisons,
+      aggregationScale: performanceResult(revisions, "aggregation", "aggregation_scale/none"),
+      traceVolume: performanceResult(
+        revisions,
+        "trace-volume",
+        "commit_heavy_repository/isomorphic-git",
+      ),
     };
-    unknown.extra = true;
-    await writeRecord(repository, unknown);
+    await writeRecord(repository, record);
     await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow("unknown field");
+  });
 
-    const mismatch = acceptedRecord(candidateOid);
-    mismatch.t13c.attestation.candidateOid = "e".repeat(40);
-    await writeRecord(repository, mismatch);
+  it.each([
+    ["calibration", "calibrations", "missing calibration target"],
+    ["legacy capture", "legacyCaptures", "missing legacy capture target"],
+    ["comparison", "comparisons", "missing performance comparison"],
+    ["individual check", "checks", "missing performance check"],
+  ])("rejects a missing %s obligation", async (_name, key, message) => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    record.performance[key as keyof typeof record.performance].pop();
+    await writeRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(message);
+  });
+
+  it.each([
+    ["calibration", "calibrations", "duplicate calibration target"],
+    ["legacy capture", "legacyCaptures", "duplicate legacy capture target"],
+    ["comparison", "comparisons", "duplicate performance comparison"],
+    ["individual check", "checks", "duplicate performance check"],
+  ])("rejects a duplicate %s identity", async (_name, key, message) => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    const items = record.performance[key as keyof typeof record.performance];
+    items[1] = items[0]!;
+    await writeRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(message);
+  });
+
+  it("rejects unknown and wrong-scope checks", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const unknown = acceptedRecord(revisions);
+    unknown.performance.checks[0]!.check = "unknown_check";
+    await writeRecord(repository, unknown);
     await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
-      "does not match candidate.oid",
+      "unknown or wrong-scope",
+    );
+    const wrongScope = acceptedRecord(revisions);
+    wrongScope.performance.checks.at(-1)!.scope = "n_to_4n";
+    await writeRecord(repository, wrongScope);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "unknown or wrong-scope",
     );
   });
 
-  it("rejects non-accepting outcomes and malformed or incomplete attestations", async () => {
-    const { repository, candidateOid } = await repositoryFixture();
-    for (const status of ["pending", "failed", "inconclusive"]) {
-      const record = acceptedRecord(candidateOid);
-      (record.performance.traceVolume as { status: string }).status = status;
+  it.each(["pending", "failed", "inconclusive"])(
+    "rejects %s calibration, behavior, comparison, and check outcomes",
+    async (status) => {
+      const { repository, revisions } = await repositoryFixture();
+      for (const mutate of [
+        (record: ReturnType<typeof acceptedRecord>) =>
+          (record.performance.calibrations[0]!.status = status),
+        (record: ReturnType<typeof acceptedRecord>) =>
+          (record.performance.legacyCaptures[0]!.behavioralStatus = status),
+        (record: ReturnType<typeof acceptedRecord>) =>
+          (record.performance.comparisons[0]!.behavioralStatus = status),
+        (record: ReturnType<typeof acceptedRecord>) =>
+          (record.performance.checks[0]!.status = status),
+      ]) {
+        const record = acceptedRecord(revisions);
+        mutate(record);
+        await writeRecord(repository, record);
+        await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow();
+      }
+    },
+  );
+
+  it("rejects missing links, mismatched recipes, and incomplete exceptions", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const missingLink = acceptedRecord(revisions);
+    delete (missingLink.performance.comparisons[0] as Record<string, unknown>)
+      .calibrationEvidenceId;
+    await writeRecord(repository, missingLink);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "calibrationEvidenceId",
+    );
+
+    const wrongRecipe = acceptedRecord(revisions);
+    wrongRecipe.performance.legacyCaptures[0]!.targetRecipeSha256 = "b".repeat(64);
+    await writeRecord(repository, wrongRecipe);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "does not match calibration",
+    );
+
+    const invalidException = acceptedRecord(revisions);
+    invalidException.performance.checks[0] = {
+      ...invalidException.performance.checks[0]!,
+      ...performanceResult(revisions, "replacement", "aggregation_scale/none", "exception"),
+    };
+    invalidException.performance.checks[0]!.exception!.cause = "";
+    await writeRecord(repository, invalidException);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow("cause");
+  });
+
+  it("rejects every missing required performance-entry key", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const cases: Array<["calibrations" | "legacyCaptures" | "comparisons" | "checks", string]> = [
+      ...[
+        "target",
+        "status",
+        "childStatus",
+        "behavioralStatus",
+        "targetRecipeSha256",
+        "attestation",
+      ].map((key) => ["calibrations", key] as const),
+      ...[
+        "target",
+        "status",
+        "behavioralStatus",
+        "targetRecipeSha256",
+        "calibrationEvidenceId",
+        "attestation",
+      ].map((key) => ["legacyCaptures", key] as const),
+      ...[
+        "target",
+        "comparison",
+        "status",
+        "wallClockStatus",
+        "peakRssStatus",
+        "behavioralStatus",
+        "targetRecipeSha256",
+        "calibrationEvidenceId",
+        "legacyCaptureEvidenceId",
+        "attestation",
+      ].map((key) => ["comparisons", key] as const),
+      ...["check", "target", "scope", "status", "attestation"].map(
+        (key) => ["checks", key] as const,
+      ),
+    ];
+    for (const [collection, key] of cases) {
+      const record = acceptedRecord(revisions);
+      delete (record.performance[collection][0] as unknown as Record<string, unknown>)[key];
+      await writeRecord(repository, record);
+      await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow();
+    }
+    const missingRepositoryLink = acceptedRecord(revisions);
+    const repositoryCheck = missingRepositoryLink.performance.checks.find(
+      (item) => item.scope === "target_on",
+    )!;
+    delete (repositoryCheck as unknown as Record<string, unknown>).comparisonEvidenceId;
+    await writeRecord(repository, missingRepositoryLink);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "comparisonEvidenceId",
+    );
+  });
+});
+
+describe("telemetry release revision and evidence provenance", () => {
+  it("accepts identical frozen/final candidates", async () => {
+    const { repository } = await repositoryFixture({ frozenIsFinal: true });
+    await expect(validateTelemetryReleaseAcceptance(repository)).resolves.toBeUndefined();
+  });
+
+  it.each([
+    ["frozen migration candidate", "frozenMigrationCandidateOid"],
+    ["candidate harness", "harnessOid"],
+  ])("rejects a missing %s commit", async (_name, key) => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    record.candidate[key as "frozenMigrationCandidateOid" | "harnessOid"] = "f".repeat(40);
+    if (key === "frozenMigrationCandidateOid")
+      record.deltaAssessment.fromFrozenMigrationCandidateOid = "f".repeat(40);
+    await writeRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "missing from available Git history",
+    );
+  });
+
+  it("rejects a missing final candidate commit", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord({ ...revisions, candidate: "f".repeat(40) });
+    await writeRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "candidate commit is missing from available Git history",
+    );
+  });
+
+  it("rejects missing harness and product revisions declared by evidence", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    for (const key of ["harnessOid", "sourceProductOid"] as const) {
+      const record = acceptedRecord(revisions);
+      record.performance.comparisons[0]!.attestation[key] = "f".repeat(40);
       await writeRecord(repository, record);
       await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
-        "status must be pass or exception",
+        "missing from available Git history",
       );
     }
+  });
 
-    const malformedOid = acceptedRecord(candidateOid);
-    (malformedOid.candidate as { oid: string }).oid = "short";
-    await writeRecord(repository, malformedOid);
+  it("rejects unrelated frozen and final candidates", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    await git(repository, "checkout", "--orphan", "unrelated-product");
+    await writeFile(join(repository, "UNRELATED.md"), "unrelated\n");
+    await git(repository, "add", "UNRELATED.md");
+    await git(repository, "commit", "-m", "unrelated product");
+    const unrelated = await git(repository, "rev-parse", "HEAD");
+    await git(repository, "checkout", "main");
+    const record = acceptedRecord(revisions);
+    record.candidate.frozenMigrationCandidateOid = unrelated;
+    record.deltaAssessment.fromFrozenMigrationCandidateOid = unrelated;
+    await writeRecord(repository, record);
     await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
-      "full lowercase Git OID",
+      "not an ancestor of the final candidate",
     );
 
-    const malformedHash = acceptedRecord(candidateOid);
-    (malformedHash.candidate as { bundleSha256: string }).bundleSha256 = "not-a-hash";
-    await writeRecord(repository, malformedHash);
+    const unrelatedFinal = acceptedRecord({ ...revisions, candidate: revisions.harness });
+    await writeRecord(repository, unrelatedFinal);
     await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
-      "lowercase SHA-256",
+      "candidate commit is not an ancestor of the publish checkout",
+    );
+  });
+
+  it("preserves baseline provenance without treating it as candidate reuse", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    record.performance.calibrations[0]!.attestation.sourceProductOid = revisions.frozen;
+    await writeRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "must be the legacy baseline",
+    );
+  });
+
+  it("rejects an existing but unrelated redesigned evidence source", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    record.performance.comparisons[0]!.attestation.sourceProductOid = revisions.harness;
+    await writeRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "not an ancestor of the final candidate",
+    );
+  });
+
+  it("accepts exact reviewed reuse of ancestor candidate evidence", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const record = acceptedRecord(revisions);
+    const evidence = record.performance.comparisons[0]!.attestation;
+    evidence.sourceProductOid = revisions.frozen;
+    record.deltaAssessment.evidenceReuse.push({
+      evidenceId: evidence.evidenceId,
+      sourceProductOid: revisions.frozen,
+      sourceHarnessOid: evidence.harnessOid,
+      destinationCandidateOid: revisions.candidate,
+      justification: "The candidate delta was reviewed for this exact comparison evidence.",
+      approval: reviewAttestation(revisions.candidate, "reuse-approval"),
+    });
+    await commitRecord(repository, record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).resolves.toBeUndefined();
+  });
+
+  it("rejects absent approval, dangling reuse, source mismatch, and missing reuse", async () => {
+    const { repository, revisions } = await repositoryFixture();
+    const makeReuse = () => {
+      const record = acceptedRecord(revisions);
+      const evidence = record.performance.comparisons[0]!.attestation;
+      evidence.sourceProductOid = revisions.frozen;
+      const claim = {
+        evidenceId: evidence.evidenceId,
+        sourceProductOid: revisions.frozen,
+        sourceHarnessOid: evidence.harnessOid,
+        destinationCandidateOid: revisions.candidate,
+        justification: "Reviewed exact reuse.",
+        approval: reviewAttestation(revisions.candidate, "reuse-approval"),
+      };
+      return { record, claim };
+    };
+
+    const missing = makeReuse();
+    await writeRecord(repository, missing.record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "requires reviewed evidence-specific reuse",
     );
 
-    const missingReviewer = acceptedRecord(candidateOid);
-    (missingReviewer.releaseAuthority.attestation as { reviewer: string }).reviewer = "";
-    await writeRecord(repository, missingReviewer);
-    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow("reviewer");
+    const absentApproval = makeReuse();
+    absentApproval.record.deltaAssessment.evidenceReuse.push(absentApproval.claim);
+    delete (absentApproval.claim as Record<string, unknown>).approval;
+    await writeRecord(repository, absentApproval.record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow("approval");
+
+    const dangling = makeReuse();
+    dangling.claim.evidenceId = "unknown-evidence";
+    dangling.record.deltaAssessment.evidenceReuse.push(dangling.claim);
+    await writeRecord(repository, dangling.record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow("dangling");
+
+    const mismatch = makeReuse();
+    mismatch.claim.sourceHarnessOid = revisions.legacy;
+    mismatch.record.deltaAssessment.evidenceReuse.push(mismatch.claim);
+    await writeRecord(repository, mismatch.record);
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "does not match its evidence provenance",
+    );
   });
 });
 
 describe("telemetry release Git and publishing context", () => {
   it("accepts an ancestor candidate with only the committed acceptance record changed", async () => {
     const { repository } = await repositoryFixture();
-    await expect(validateTelemetryReleaseAcceptance(repository)).resolves.toBeUndefined();
     await expect(
       validateTelemetryReleaseAcceptance(repository, {
         environment: { GITHUB_ACTIONS: "true", GITHUB_REF: "refs/heads/main" },
       }),
     ).resolves.toBeUndefined();
-  });
-
-  it("rejects absent candidate history and non-ancestor candidates", async () => {
-    const { repository, candidateOid } = await repositoryFixture();
-    await writeRecord(repository, acceptedRecord("f".repeat(40)));
-    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
-      "missing or is not an ancestor",
-    );
-
-    await git(repository, "checkout", "--orphan", "unrelated");
-    await writeFile(join(repository, "README.md"), "unrelated\n");
-    await writeRecord(repository, acceptedRecord(candidateOid));
-    await git(repository, "add", "README.md", ".release/telemetry-migration-acceptance.json");
-    await git(repository, "commit", "-m", "unrelated publish tree");
-    await expect(
-      validateTelemetryReleaseAcceptance(repository, {
-        environment: { GITHUB_ACTIONS: "true", GITHUB_REF: "refs/heads/main" },
-      }),
-    ).rejects.toThrow("missing or is not an ancestor");
   });
 
   it.each([
@@ -308,22 +628,19 @@ describe("telemetry release Git and publishing context", () => {
     "packages/gitlode/CHANGELOG.md",
     "src/index.ts",
     ".github/workflows/release.yml",
-    "packages/gitlode/test/example.test.ts",
   ])("rejects a committed post-candidate change to %s", async (path) => {
-    const { repository, candidateOid } = await repositoryFixture();
-    await mkdir(join(repository, ...path.split("/").slice(0, -1)), { recursive: true });
+    const { repository, revisions } = await repositoryFixture();
+    await mkdir(join(repository, dirname(path)), { recursive: true });
     await writeFile(join(repository, path), "changed\n");
     await git(repository, "add", path);
     await git(repository, "commit", "-m", `change ${path}`);
-    await writeRecord(repository, acceptedRecord(candidateOid));
-    await git(repository, "add", ".release/telemetry-migration-acceptance.json");
-    await git(repository, "commit", "--amend", "--no-edit");
+    await commitRecord(repository, acceptedRecord(revisions));
     await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
       "differs from candidate outside acceptance record",
     );
   });
 
-  it("rejects dirty relevant files while ignored build output remains irrelevant", async () => {
+  it("rejects dirty files while ignored build output remains irrelevant", async () => {
     const { repository } = await repositoryFixture();
     await mkdir(join(repository, "dist"));
     await writeFile(join(repository, "dist", "index.js"), "generated\n");
@@ -335,17 +652,16 @@ describe("telemetry release Git and publishing context", () => {
   });
 
   it("requires main in Actions and resolves the local branch from Git", async () => {
-    const { repository } = await repositoryFixture("feature/release");
+    const { repository } = await repositoryFixture();
     await expect(
       validateTelemetryReleaseAcceptance(repository, {
         environment: { GITHUB_ACTIONS: "true", GITHUB_REF: "refs/heads/feature/release" },
       }),
     ).rejects.toThrow("Actions publishing is allowed only");
-    await expect(
-      validateTelemetryReleaseAcceptance(repository, {
-        environment: { GITHUB_REF: "refs/heads/main" },
-      }),
-    ).rejects.toThrow("local publishing is allowed only");
+    await git(repository, "checkout", "-b", "feature/release");
+    await expect(validateTelemetryReleaseAcceptance(repository)).rejects.toThrow(
+      "local publishing is allowed only",
+    );
   });
 });
 
@@ -377,7 +693,7 @@ describe("release command wiring", () => {
     expect(ciWorkflow).not.toContain("validate:telemetry-release-acceptance");
   });
 
-  it("does not invoke a publisher stub when the record is blocked", async () => {
+  it("does not invoke a publisher stub when the live record is blocked", async () => {
     const repositoryRoot = resolve(import.meta.dirname, "../../../..");
     const publisher = vi.fn();
     await expect(

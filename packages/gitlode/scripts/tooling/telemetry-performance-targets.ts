@@ -10,3 +10,18 @@ export const requiredTelemetryPerformanceComparisons = [
   "disabled_overhead",
   "profile_overhead",
 ] as const;
+
+export const requiredTelemetryAggregationChecks = [
+  "aggregation_span_groups",
+  "aggregation_metric_datapoints",
+  "aggregation_histogram_buckets",
+  "aggregation_raw_observation_retention",
+  "aggregation_profile_rss_growth",
+] as const;
+
+export const requiredTelemetryRepositoryChecks = ["report_size", "prohibited_host_spans"] as const;
+
+export const requiredTelemetryGitCommandParityTargets = [
+  "commit_heavy_repository/git-cli",
+  "file_heavy_repository/git-cli",
+] as const;

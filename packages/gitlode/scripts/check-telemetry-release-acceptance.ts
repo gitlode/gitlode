@@ -5,8 +5,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import {
+  requiredTelemetryAggregationChecks,
+  requiredTelemetryGitCommandParityTargets,
   requiredTelemetryPerformanceComparisons,
   requiredTelemetryPerformanceTargets,
+  requiredTelemetryRepositoryChecks,
 } from "./tooling/telemetry-performance-targets.js";
 
 const execFileAsync = promisify(execFile);
@@ -17,6 +20,33 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 type JsonObject = Record<string, unknown>;
 type GitRunner = (args: readonly string[]) => Promise<string>;
+type EvidenceKind = "baseline" | "redesigned";
+
+interface EvidenceProvenance {
+  readonly label: string;
+  readonly evidenceId: string;
+  readonly sourceProductOid: string;
+  readonly harnessOid: string;
+  readonly candidateOid: string;
+  readonly kind: EvidenceKind;
+}
+
+interface EvidenceReuse {
+  readonly label: string;
+  readonly evidenceId: string;
+  readonly sourceProductOid: string;
+  readonly sourceHarnessOid: string;
+  readonly destinationCandidateOid: string;
+}
+
+interface AcceptedRecord {
+  readonly candidateOid: string;
+  readonly frozenMigrationCandidateOid: string;
+  readonly legacyBaselineOid: string;
+  readonly candidateHarnessOid: string;
+  readonly evidence: readonly EvidenceProvenance[];
+  readonly reuse: readonly EvidenceReuse[];
+}
 
 export interface AcceptanceValidationOptions {
   readonly environment?: NodeJS.ProcessEnv;
@@ -48,23 +78,14 @@ function oid(value: unknown, label: string): string {
   return result;
 }
 
-function sha256(value: unknown, label: string): void {
+function sha256(value: unknown, label: string): string {
   if (typeof value !== "string" || !sha256Pattern.test(value))
     throw new Error(`${label} must be a lowercase SHA-256`);
+  return value;
 }
 
-function attestation(value: unknown, label: string, candidateOid: string): void {
-  const item = object(value, label, [
-    "candidateOid",
-    "evidenceId",
-    "archiveId",
-    "sha256",
-    "reviewer",
-    "reviewedAt",
-  ]);
-  if (oid(item.candidateOid, `${label}.candidateOid`) !== candidateOid)
-    throw new Error(`${label}.candidateOid does not match candidate.oid`);
-  nonempty(item.evidenceId, `${label}.evidenceId`);
+function validateAttestationDetails(item: JsonObject, label: string): string {
+  const evidenceId = nonempty(item.evidenceId, `${label}.evidenceId`);
   nonempty(item.archiveId, `${label}.archiveId`);
   sha256(item.sha256, `${label}.sha256`);
   nonempty(item.reviewer, `${label}.reviewer`);
@@ -76,13 +97,57 @@ function attestation(value: unknown, label: string, candidateOid: string): void 
     parsedDate.toISOString().slice(0, 10) !== reviewedAt
   )
     throw new Error(`${label}.reviewedAt must be an ISO calendar date`);
+  return evidenceId;
 }
 
-function exception(
+function reviewAttestation(value: unknown, label: string, candidateOid: string): void {
+  const item = object(value, label, [
+    "candidateOid",
+    "evidenceId",
+    "archiveId",
+    "sha256",
+    "reviewer",
+    "reviewedAt",
+  ]);
+  if (oid(item.candidateOid, `${label}.candidateOid`) !== candidateOid)
+    throw new Error(`${label}.candidateOid does not match candidate.oid`);
+  validateAttestationDetails(item, label);
+}
+
+function evidenceAttestation(
   value: unknown,
   label: string,
   candidateOid: string,
-  expectedTarget?: string,
+  kind: EvidenceKind,
+): EvidenceProvenance {
+  const item = object(value, label, [
+    "candidateOid",
+    "sourceProductOid",
+    "harnessOid",
+    "evidenceId",
+    "archiveId",
+    "sha256",
+    "reviewer",
+    "reviewedAt",
+  ]);
+  const destination = oid(item.candidateOid, `${label}.candidateOid`);
+  if (destination !== candidateOid)
+    throw new Error(`${label}.candidateOid does not match candidate.oid`);
+  return {
+    label,
+    evidenceId: validateAttestationDetails(item, label),
+    sourceProductOid: oid(item.sourceProductOid, `${label}.sourceProductOid`),
+    harnessOid: oid(item.harnessOid, `${label}.harnessOid`),
+    candidateOid: destination,
+    kind,
+  };
+}
+
+function performanceException(
+  value: unknown,
+  label: string,
+  candidateOid: string,
+  expectedTarget: string,
 ): void {
   const item = object(value, label, [
     "fixture",
@@ -102,34 +167,29 @@ function exception(
     "reevaluationCondition",
   ] as const)
     nonempty(item[key], `${label}.${key}`);
-  const exceptionTarget = `${nonempty(item.fixture, `${label}.fixture`)}/${nonempty(item.adapter, `${label}.adapter`)}`;
-  const knownTargets = new Set<string>([
-    ...requiredTelemetryPerformanceTargets,
-    "aggregation_scale/none",
-  ]);
-  if (!knownTargets.has(exceptionTarget))
-    throw new Error(`${label} has unknown fixture/adapter: ${exceptionTarget}`);
-  if (expectedTarget !== undefined && exceptionTarget !== expectedTarget)
+  const target = `${nonempty(item.fixture, `${label}.fixture`)}/${nonempty(item.adapter, `${label}.adapter`)}`;
+  if (target !== expectedTarget)
     throw new Error(`${label} fixture/adapter does not match ${expectedTarget}`);
-  attestation(item.releaseAuthorityApproval, `${label}.releaseAuthorityApproval`, candidateOid);
+  reviewAttestation(
+    item.releaseAuthorityApproval,
+    `${label}.releaseAuthorityApproval`,
+    candidateOid,
+  );
 }
 
-function acceptedResult(
-  value: unknown,
+function validatePerformanceOutcome(
+  item: JsonObject,
   label: string,
   candidateOid: string,
-  identityFields: readonly string[] = [],
-  expectedExceptionTarget?: string,
-): JsonObject {
-  const item = object(value, label, ["status", "attestation", "exception", ...identityFields]);
+  expectedTarget: string,
+): "pass" | "exception" {
   if (item.status !== "pass" && item.status !== "exception")
     throw new Error(`${label}.status must be pass or exception`);
-  attestation(item.attestation, `${label}.attestation`, candidateOid);
   if (item.status === "exception")
-    exception(item.exception, `${label}.exception`, candidateOid, expectedExceptionTarget);
+    performanceException(item.exception, `${label}.exception`, candidateOid, expectedTarget);
   else if ("exception" in item)
     throw new Error(`${label}.exception is only valid for an exception`);
-  return item;
+  return item.status;
 }
 
 function acceptedSection(
@@ -140,13 +200,26 @@ function acceptedSection(
 ): void {
   const item = object(value, label, ["status", "attestation", ...identityFields]);
   exactString(item.status, "accepted", `${label}.status`);
-  attestation(item.attestation, `${label}.attestation`, candidateOid);
+  reviewAttestation(item.attestation, `${label}.attestation`, candidateOid);
 }
 
-function validateAcceptedRecord(record: JsonObject): string {
+function requiredCheckIdentities(): Set<string> {
+  const result = new Set<string>();
+  for (const check of requiredTelemetryAggregationChecks)
+    result.add(`${check}:aggregation_scale/none:n_to_4n`);
+  for (const target of requiredTelemetryPerformanceTargets)
+    for (const check of requiredTelemetryRepositoryChecks)
+      result.add(`${check}:${target}:target_on`);
+  for (const target of requiredTelemetryGitCommandParityTargets)
+    result.add(`git_command_parity:${target}:target_on`);
+  return result;
+}
+
+function validateAcceptedRecord(record: JsonObject): AcceptedRecord {
   const candidate = object(record.candidate, "candidate", [
     "oid",
     "frozenMigrationCandidateOid",
+    "legacyBaselineOid",
     "harnessOid",
     "bundleId",
     "bundleSha256",
@@ -154,54 +227,213 @@ function validateAcceptedRecord(record: JsonObject): string {
     "attestation",
   ]);
   const candidateOid = oid(candidate.oid, "candidate.oid");
-  oid(candidate.frozenMigrationCandidateOid, "candidate.frozenMigrationCandidateOid");
-  oid(candidate.harnessOid, "candidate.harnessOid");
+  const frozenMigrationCandidateOid = oid(
+    candidate.frozenMigrationCandidateOid,
+    "candidate.frozenMigrationCandidateOid",
+  );
+  const legacyBaselineOid = oid(candidate.legacyBaselineOid, "candidate.legacyBaselineOid");
+  const candidateHarnessOid = oid(candidate.harnessOid, "candidate.harnessOid");
   nonempty(candidate.bundleId, "candidate.bundleId");
   sha256(candidate.bundleSha256, "candidate.bundleSha256");
   sha256(candidate.fixtureManifestSha256, "candidate.fixtureManifestSha256");
-  attestation(candidate.attestation, "candidate.attestation", candidateOid);
+  reviewAttestation(candidate.attestation, "candidate.attestation", candidateOid);
 
   const performance = object(record.performance, "performance", [
+    "calibrations",
+    "legacyCaptures",
     "comparisons",
-    "aggregationScale",
-    "traceVolume",
+    "checks",
   ]);
+  const evidence: EvidenceProvenance[] = [];
+  const evidenceIds = new Set<string>();
+  const addEvidence = (item: EvidenceProvenance): void => {
+    if (evidenceIds.has(item.evidenceId))
+      throw new Error(`duplicate performance evidence identity: ${item.evidenceId}`);
+    evidenceIds.add(item.evidenceId);
+    evidence.push(item);
+  };
+
+  if (!Array.isArray(performance.calibrations))
+    throw new Error("performance.calibrations must be an array");
+  const calibrations = new Map<string, { evidenceId: string; recipe: string }>();
+  for (const [index, value] of performance.calibrations.entries()) {
+    const label = `performance.calibrations[${index}]`;
+    const item = object(value, label, [
+      "target",
+      "status",
+      "childStatus",
+      "behavioralStatus",
+      "targetRecipeSha256",
+      "attestation",
+    ]);
+    const target = nonempty(item.target, `${label}.target`);
+    if (!(requiredTelemetryPerformanceTargets as readonly string[]).includes(target))
+      throw new Error(`${label} has unknown target: ${target}`);
+    if (calibrations.has(target)) throw new Error(`duplicate calibration target: ${target}`);
+    exactString(item.status, "accepted", `${label}.status`);
+    exactString(item.childStatus, "pass", `${label}.childStatus`);
+    exactString(item.behavioralStatus, "pass", `${label}.behavioralStatus`);
+    const attested = evidenceAttestation(
+      item.attestation,
+      `${label}.attestation`,
+      candidateOid,
+      "baseline",
+    );
+    addEvidence(attested);
+    calibrations.set(target, {
+      evidenceId: attested.evidenceId,
+      recipe: sha256(item.targetRecipeSha256, `${label}.targetRecipeSha256`),
+    });
+  }
+  const missingCalibration = requiredTelemetryPerformanceTargets.find(
+    (target) => !calibrations.has(target),
+  );
+  if (missingCalibration) throw new Error(`missing calibration target: ${missingCalibration}`);
+
+  if (!Array.isArray(performance.legacyCaptures))
+    throw new Error("performance.legacyCaptures must be an array");
+  const captures = new Map<string, { evidenceId: string; recipe: string }>();
+  for (const [index, value] of performance.legacyCaptures.entries()) {
+    const label = `performance.legacyCaptures[${index}]`;
+    const item = object(value, label, [
+      "target",
+      "status",
+      "behavioralStatus",
+      "targetRecipeSha256",
+      "calibrationEvidenceId",
+      "attestation",
+    ]);
+    const target = nonempty(item.target, `${label}.target`);
+    const calibration = calibrations.get(target);
+    if (!calibration) throw new Error(`${label} has unknown target: ${target}`);
+    if (captures.has(target)) throw new Error(`duplicate legacy capture target: ${target}`);
+    exactString(item.status, "pass", `${label}.status`);
+    exactString(item.behavioralStatus, "pass", `${label}.behavioralStatus`);
+    exactString(
+      item.calibrationEvidenceId,
+      calibration.evidenceId,
+      `${label}.calibrationEvidenceId`,
+    );
+    const recipe = sha256(item.targetRecipeSha256, `${label}.targetRecipeSha256`);
+    if (recipe !== calibration.recipe)
+      throw new Error(`${label}.targetRecipeSha256 does not match calibration`);
+    const attested = evidenceAttestation(
+      item.attestation,
+      `${label}.attestation`,
+      candidateOid,
+      "baseline",
+    );
+    addEvidence(attested);
+    captures.set(target, { evidenceId: attested.evidenceId, recipe });
+  }
+  const missingCapture = requiredTelemetryPerformanceTargets.find(
+    (target) => !captures.has(target),
+  );
+  if (missingCapture) throw new Error(`missing legacy capture target: ${missingCapture}`);
+
   if (!Array.isArray(performance.comparisons))
     throw new Error("performance.comparisons must be an array");
-  const expected = new Set(
+  const expectedComparisons = new Set(
     requiredTelemetryPerformanceTargets.flatMap((target) =>
       requiredTelemetryPerformanceComparisons.map((comparison) => `${target}:${comparison}`),
     ),
   );
-  const actual = new Set<string>();
+  const comparisons = new Map<string, string>();
   for (const [index, value] of performance.comparisons.entries()) {
     const label = `performance.comparisons[${index}]`;
     const item = object(value, label, [
       "target",
       "comparison",
       "status",
+      "wallClockStatus",
+      "peakRssStatus",
+      "behavioralStatus",
+      "targetRecipeSha256",
+      "calibrationEvidenceId",
+      "legacyCaptureEvidenceId",
       "attestation",
       "exception",
     ]);
     const target = nonempty(item.target, `${label}.target`);
     const comparison = nonempty(item.comparison, `${label}.comparison`);
     const identity = `${target}:${comparison}`;
-    if (!expected.has(identity))
+    if (!expectedComparisons.has(identity))
       throw new Error(`${label} has unknown matrix identity: ${identity}`);
-    if (actual.has(identity)) throw new Error(`duplicate performance comparison: ${identity}`);
-    actual.add(identity);
-    acceptedResult(item, label, candidateOid, ["target", "comparison"], target);
+    if (comparisons.has(identity)) throw new Error(`duplicate performance comparison: ${identity}`);
+    const calibration = calibrations.get(target);
+    const capture = captures.get(target);
+    if (!calibration || !capture)
+      throw new Error(`${label} has no matching calibration and legacy capture`);
+    exactString(
+      item.calibrationEvidenceId,
+      calibration.evidenceId,
+      `${label}.calibrationEvidenceId`,
+    );
+    exactString(
+      item.legacyCaptureEvidenceId,
+      capture.evidenceId,
+      `${label}.legacyCaptureEvidenceId`,
+    );
+    if (sha256(item.targetRecipeSha256, `${label}.targetRecipeSha256`) !== calibration.recipe)
+      throw new Error(`${label}.targetRecipeSha256 does not match calibration`);
+    exactString(item.behavioralStatus, "pass", `${label}.behavioralStatus`);
+    const status = validatePerformanceOutcome(item, label, candidateOid, target);
+    if (item.wallClockStatus !== "pass" && item.wallClockStatus !== "exception")
+      throw new Error(`${label}.wallClockStatus must be pass or exception`);
+    if (item.peakRssStatus !== "pass" && item.peakRssStatus !== "exception")
+      throw new Error(`${label}.peakRssStatus must be pass or exception`);
+    const hasException = item.wallClockStatus === "exception" || item.peakRssStatus === "exception";
+    if ((status === "exception") !== hasException)
+      throw new Error(`${label}.status must reflect wall-clock and peak-RSS outcomes`);
+    const attested = evidenceAttestation(
+      item.attestation,
+      `${label}.attestation`,
+      candidateOid,
+      "redesigned",
+    );
+    addEvidence(attested);
+    comparisons.set(identity, attested.evidenceId);
   }
-  const missing = [...expected].filter((identity) => !actual.has(identity));
-  if (missing.length) throw new Error(`missing performance comparison: ${missing[0]}`);
-  acceptedResult(
-    performance.aggregationScale,
-    "performance.aggregationScale",
-    candidateOid,
-    [],
-    "aggregation_scale/none",
-  );
-  acceptedResult(performance.traceVolume, "performance.traceVolume", candidateOid);
+  const missingComparison = [...expectedComparisons].find((identity) => !comparisons.has(identity));
+  if (missingComparison) throw new Error(`missing performance comparison: ${missingComparison}`);
+
+  if (!Array.isArray(performance.checks)) throw new Error("performance.checks must be an array");
+  const expectedChecks = requiredCheckIdentities();
+  const actualChecks = new Set<string>();
+  for (const [index, value] of performance.checks.entries()) {
+    const label = `performance.checks[${index}]`;
+    const item = object(value, label, [
+      "check",
+      "target",
+      "scope",
+      "status",
+      "comparisonEvidenceId",
+      "attestation",
+      "exception",
+    ]);
+    const check = nonempty(item.check, `${label}.check`);
+    const target = nonempty(item.target, `${label}.target`);
+    const scope = nonempty(item.scope, `${label}.scope`);
+    const identity = `${check}:${target}:${scope}`;
+    if (!expectedChecks.has(identity))
+      throw new Error(`${label} has unknown or wrong-scope check identity: ${identity}`);
+    if (actualChecks.has(identity)) throw new Error(`duplicate performance check: ${identity}`);
+    actualChecks.add(identity);
+    validatePerformanceOutcome(item, label, candidateOid, target);
+    if (scope === "target_on") {
+      const expectedEvidence = comparisons.get(`${target}:profile_overhead`);
+      if (!expectedEvidence)
+        throw new Error(`${label} has no matching profile-overhead comparison`);
+      exactString(item.comparisonEvidenceId, expectedEvidence, `${label}.comparisonEvidenceId`);
+    } else if ("comparisonEvidenceId" in item) {
+      throw new Error(`${label}.comparisonEvidenceId is not applicable to aggregation`);
+    }
+    addEvidence(
+      evidenceAttestation(item.attestation, `${label}.attestation`, candidateOid, "redesigned"),
+    );
+  }
+  const missingCheck = [...expectedChecks].find((identity) => !actualChecks.has(identity));
+  if (missingCheck) throw new Error(`missing performance check: ${missingCheck}`);
 
   const readability = object(record.profileReadability, "profileReadability", ["cases"]);
   if (!Array.isArray(readability.cases))
@@ -250,10 +482,12 @@ function validateAcceptedRecord(record: JsonObject): string {
     candidate.bundleId
   )
     throw new Error("finalValidation.bundleIdentity.bundleId does not match candidate.bundleId");
-  sha256(bundleIdentity.sha256, "finalValidation.bundleIdentity.sha256");
-  if (bundleIdentity.sha256 !== candidate.bundleSha256)
+  if (
+    sha256(bundleIdentity.sha256, "finalValidation.bundleIdentity.sha256") !==
+    candidate.bundleSha256
+  )
     throw new Error("finalValidation.bundleIdentity.sha256 does not match candidate.bundleSha256");
-  attestation(
+  reviewAttestation(
     bundleIdentity.attestation,
     "finalValidation.bundleIdentity.attestation",
     candidateOid,
@@ -263,6 +497,7 @@ function validateAcceptedRecord(record: JsonObject): string {
     "status",
     "fromFrozenMigrationCandidateOid",
     "justification",
+    "evidenceReuse",
     "attestation",
   ]);
   exactString(delta.status, "accepted", "deltaAssessment.status");
@@ -270,19 +505,61 @@ function validateAcceptedRecord(record: JsonObject): string {
     oid(
       delta.fromFrozenMigrationCandidateOid,
       "deltaAssessment.fromFrozenMigrationCandidateOid",
-    ) !== candidate.frozenMigrationCandidateOid
+    ) !== frozenMigrationCandidateOid
   )
     throw new Error("deltaAssessment frozen candidate does not match candidate provenance");
   nonempty(delta.justification, "deltaAssessment.justification");
-  attestation(delta.attestation, "deltaAssessment.attestation", candidateOid);
+  reviewAttestation(delta.attestation, "deltaAssessment.attestation", candidateOid);
+  if (!Array.isArray(delta.evidenceReuse))
+    throw new Error("deltaAssessment.evidenceReuse must be an array");
+  const reuse: EvidenceReuse[] = [];
+  const reuseIds = new Set<string>();
+  for (const [index, value] of delta.evidenceReuse.entries()) {
+    const label = `deltaAssessment.evidenceReuse[${index}]`;
+    const item = object(value, label, [
+      "evidenceId",
+      "sourceProductOid",
+      "sourceHarnessOid",
+      "destinationCandidateOid",
+      "justification",
+      "approval",
+    ]);
+    const evidenceId = nonempty(item.evidenceId, `${label}.evidenceId`);
+    if (reuseIds.has(evidenceId))
+      throw new Error(`duplicate evidence reuse identity: ${evidenceId}`);
+    reuseIds.add(evidenceId);
+    const destinationCandidateOid = oid(
+      item.destinationCandidateOid,
+      `${label}.destinationCandidateOid`,
+    );
+    if (destinationCandidateOid !== candidateOid)
+      throw new Error(`${label}.destinationCandidateOid does not match candidate.oid`);
+    nonempty(item.justification, `${label}.justification`);
+    reviewAttestation(item.approval, `${label}.approval`, candidateOid);
+    reuse.push({
+      label,
+      evidenceId,
+      sourceProductOid: oid(item.sourceProductOid, `${label}.sourceProductOid`),
+      sourceHarnessOid: oid(item.sourceHarnessOid, `${label}.sourceHarnessOid`),
+      destinationCandidateOid,
+    });
+  }
+
   acceptedSection(record.t13c, "t13c", candidateOid);
   acceptedSection(record.releaseAuthority, "releaseAuthority", candidateOid);
-  return candidateOid;
+  return {
+    candidateOid,
+    frozenMigrationCandidateOid,
+    legacyBaselineOid,
+    candidateHarnessOid,
+    evidence,
+    reuse,
+  };
 }
 
 function parseRecord(
   text: string,
-): { readonly state: "blocked" } | { readonly state: "accepted"; readonly candidateOid: string } {
+): { readonly state: "blocked" } | ({ readonly state: "accepted" } & AcceptedRecord) {
   let value: unknown;
   try {
     value = JSON.parse(text);
@@ -328,7 +605,7 @@ function parseRecord(
     "t13c",
     "releaseAuthority",
   ]);
-  return { state: "accepted", candidateOid: validateAcceptedRecord(base) };
+  return { state: "accepted", ...validateAcceptedRecord(base) };
 }
 
 function defaultGit(repositoryRoot: string): GitRunner {
@@ -360,6 +637,102 @@ async function validatePublishingContext(
   if (branch !== "main") throw new Error("local publishing is allowed only from the main branch");
 }
 
+async function requireCommit(git: GitRunner, revision: string, label: string): Promise<void> {
+  try {
+    await git(["cat-file", "-e", `${revision}^{commit}`]);
+  } catch {
+    throw new Error(`${label} is missing from available Git history`);
+  }
+}
+
+async function requireAncestor(
+  git: GitRunner,
+  ancestor: string,
+  descendant: string,
+  label: string,
+): Promise<void> {
+  try {
+    await git(["merge-base", "--is-ancestor", ancestor, descendant]);
+  } catch {
+    throw new Error(label);
+  }
+}
+
+async function validateRevisionProvenance(git: GitRunner, record: AcceptedRecord): Promise<void> {
+  await requireCommit(git, record.candidateOid, "candidate commit");
+  await requireCommit(git, record.frozenMigrationCandidateOid, "frozen migration candidate commit");
+  await requireCommit(git, record.legacyBaselineOid, "legacy baseline commit");
+  await requireCommit(git, record.candidateHarnessOid, "candidate harness commit");
+  await requireAncestor(
+    git,
+    record.frozenMigrationCandidateOid,
+    record.candidateOid,
+    "frozen migration candidate is not an ancestor of the final candidate",
+  );
+  await requireAncestor(
+    git,
+    record.legacyBaselineOid,
+    record.frozenMigrationCandidateOid,
+    "legacy baseline is not an ancestor of the frozen migration candidate",
+  );
+
+  const evidenceById = new Map(record.evidence.map((item) => [item.evidenceId, item]));
+  const productSources = new Map<string, string>();
+  const harnessSources = new Map<string, string>();
+  for (const item of record.evidence) {
+    productSources.set(item.sourceProductOid, `${item.label}.sourceProductOid`);
+    harnessSources.set(item.harnessOid, `${item.label}.harnessOid`);
+  }
+  for (const [revision, label] of productSources) await requireCommit(git, revision, label);
+  for (const [revision, label] of harnessSources) await requireCommit(git, revision, label);
+
+  const redesignedSources = new Map<string, string>();
+  for (const item of record.evidence) {
+    if (item.kind === "baseline") {
+      if (item.sourceProductOid !== record.legacyBaselineOid)
+        throw new Error(`${item.label}.sourceProductOid must be the legacy baseline`);
+      continue;
+    }
+    redesignedSources.set(item.sourceProductOid, item.label);
+  }
+  for (const [sourceProductOid, label] of redesignedSources) {
+    await requireAncestor(
+      git,
+      record.frozenMigrationCandidateOid,
+      sourceProductOid,
+      `${label}.sourceProductOid predates or is unrelated to the frozen candidate`,
+    );
+    await requireAncestor(
+      git,
+      sourceProductOid,
+      record.candidateOid,
+      `${label}.sourceProductOid is not an ancestor of the final candidate`,
+    );
+  }
+
+  const reuseById = new Map<string, EvidenceReuse>();
+  for (const claim of record.reuse) {
+    const evidence = evidenceById.get(claim.evidenceId);
+    if (!evidence || evidence.kind !== "redesigned")
+      throw new Error(`${claim.label} is a dangling evidence reuse claim`);
+    if (
+      claim.sourceProductOid !== evidence.sourceProductOid ||
+      claim.sourceHarnessOid !== evidence.harnessOid ||
+      claim.destinationCandidateOid !== evidence.candidateOid
+    )
+      throw new Error(`${claim.label} does not match its evidence provenance`);
+    reuseById.set(claim.evidenceId, claim);
+  }
+  for (const item of record.evidence) {
+    if (item.kind !== "redesigned") continue;
+    const requiresReuse = item.sourceProductOid !== record.candidateOid;
+    if (requiresReuse && !reuseById.has(item.evidenceId))
+      throw new Error(`${item.label} requires reviewed evidence-specific reuse`);
+    if (!requiresReuse && reuseById.has(item.evidenceId))
+      throw new Error(`${item.label} has an unnecessary evidence reuse claim`);
+  }
+}
+
 export async function validateTelemetryReleaseAcceptance(
   repositoryRoot: string,
   options: AcceptanceValidationOptions = {},
@@ -376,12 +749,13 @@ export async function validateTelemetryReleaseAcceptance(
   const record = parseRecord(text);
   if (record.state === "blocked")
     throw new Error("telemetry migration release acceptance is blocked");
-  try {
-    await git(["cat-file", "-e", `${record.candidateOid}^{commit}`]);
-    await git(["merge-base", "--is-ancestor", record.candidateOid, "HEAD"]);
-  } catch {
-    throw new Error("candidate commit is missing or is not an ancestor of the publish checkout");
-  }
+  await validateRevisionProvenance(git, record);
+  await requireAncestor(
+    git,
+    record.candidateOid,
+    "HEAD",
+    "candidate commit is not an ancestor of the publish checkout",
+  );
   let changedOutput: string;
   try {
     changedOutput = await git(["diff", "--name-only", record.candidateOid, "HEAD", "--"]);

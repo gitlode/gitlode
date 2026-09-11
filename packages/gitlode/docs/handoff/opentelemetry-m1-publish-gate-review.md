@@ -1,5 +1,33 @@
 # M1 publish gate: independent review packet
 
+## Focused re-review after correction round 2
+
+Resume the existing gate review conversation. Target `681a1a5b53bd0aa957dae72d9fd9684da7ff467a`
+against parent `77d49f3711368b4bc1ac9d5047c5bd6d90123298`. G2 remains accepted; only G1 and directly
+affected paths need review. The planning owner confirmed matching HEAD, clean worktree, the blocked
+live record, the five-file scope, and `git show --check` on receipt. This is intake, not acceptance.
+
+Use the accepted [diagnosis and finite checklist](opentelemetry-m1-g1-coverage-resolution.md) as the
+review boundary, with the [round-2 outcome](opentelemetry-m1-publish-gate-correction.md#correction-round-2-outcome).
+Verify all five target_on report-validity identities, the eight exact pass-only subchecks, forbidden
+exceptions/unknown keys, and exact comparison-evidence linkage. Check that the independent literal
+test oracle closes the earlier shared-incomplete-inventory gap. Preserve complete reviewed exceptions
+for report_size/prohibited_host_spans and confirm G2/wiring stayed unchanged. Do not reopen unrelated
+accepted obligations or add a new evaluator/measurement requirement.
+
+Reported Windows validation is one focused file / 50 passing tests, strict validator typecheck,
+format write/check, and pre/post-commit Git checks. Inspect or rerun only focused evidence needed
+to judge the correction, identifying actual checks versus implementation reports. No full suite,
+release pipeline, installed-package validation, formal measurement, or long empirical workload is
+planned. Do not invoke publisher-capable commands, change files, commit, merge, or freeze a candidate.
+
+Return reviewed OID, G1 accepted or the remaining concrete failure path, gate-slice acceptance with
+G2 retained, and evidence checked. If accepted, the planning owner assigns cumulative M1 validation.
+If the same coverage issue remains after this second correction round, invoke bounded diagnosis
+on that exact discrepancy rather than another automatic local patch or broader checklist expansion.
+
+The routing and review assignments below are historical; they do not supersede this round-2 request.
+
 Current assignment: diagnosis is complete and its
 [minimal resolution](opentelemetry-m1-g1-coverage-resolution.md#planning-acceptance-and-next-assignment)
 is accepted for correction round 2. Await that fixed implementation checkpoint before focused

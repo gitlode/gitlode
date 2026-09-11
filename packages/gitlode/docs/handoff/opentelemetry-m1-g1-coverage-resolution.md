@@ -2,6 +2,11 @@
 
 ## Planning acceptance and next assignment
 
+Current status: the accepted design was implemented at `681a1a5b53bd0aa957dae72d9fd9684da7ff467a`.
+Next is [focused round-2 re-review](opentelemetry-m1-publish-gate-review.md#focused-re-review-after-correction-round-2)
+in the existing gate review conversation. G1/gate acceptance remains pending and G2 remains accepted.
+The implementation instructions below are history; do not repeat the completed correction.
+
 The planning owner accepts the diagnosis and minimal correction design from checkpoint
 `d654a640d2afcc1a716d69b957a28452a9a0457c`. The next assignment is a new implementation conversation
 for correction round 2, using the exact five-file scope and finite regression checklist below.

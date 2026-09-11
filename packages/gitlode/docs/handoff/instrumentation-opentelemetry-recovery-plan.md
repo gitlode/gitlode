@@ -161,11 +161,11 @@ gate acceptance is blocked. Correction round 1 is implemented at
 verification (87 passed / 17 Linux-only skipped). Focused re-review accepted G2 but left G1 open:
 required repository-sidecar schema/signal/diagnostics outcomes are still missing. Bounded diagnosis
 completed at `d654a640d2afcc1a716d69b957a28452a9a0457c`: the gate and positive fixture shared the same
-incomplete inventory. The planning owner accepts its minimal resolution. The immediate next assignment
-is [G1 correction round 2](opentelemetry-m1-g1-coverage-resolution.md#planning-acceptance-and-next-assignment)
-in a new implementation conversation, limited to five files, one per-target report-validity group,
-eight pass-only subchecks and the finite regression checklist. G2 remains accepted. Focused re-review
-follows the implementation checkpoint in the existing gate review conversation.
+incomplete inventory. The accepted minimal resolution was implemented in correction-round-2 commit
+`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`, limited to the five planned files. The implementation
+reports 50 passing focused tests and successful strict typecheck/format/Git checks. The immediate
+next assignment is [focused round-2 re-review](opentelemetry-m1-publish-gate-review.md#focused-re-review-after-correction-round-2)
+in the existing gate review conversation. G1/gate acceptance remains pending; G2 remains accepted.
 No repeated performance run or actual publish is planned. See the
 [implementation outcome](opentelemetry-m1-publish-gate.md#implementation-outcome) for reported checks
 and remaining cumulative Windows/Linux validation.

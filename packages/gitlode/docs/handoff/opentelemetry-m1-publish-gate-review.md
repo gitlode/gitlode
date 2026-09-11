@@ -1,5 +1,11 @@
 # M1 publish gate: independent review packet
 
+Current assignment: diagnosis is complete and its
+[minimal resolution](opentelemetry-m1-g1-coverage-resolution.md#planning-acceptance-and-next-assignment)
+is accepted for correction round 2. Await that fixed implementation checkpoint before focused
+re-review of G1. G2 remains accepted; the gate remains blocked. Earlier diagnosis-routing statements
+below record the preceding phase and do not instruct a repeated diagnosis session.
+
 ## Correction round 1 re-review outcome
 
 At `f7d8a01bd75231b15136707ab40e2b21adf16b1b`, G2 is accepted with no required corrections. G1 is

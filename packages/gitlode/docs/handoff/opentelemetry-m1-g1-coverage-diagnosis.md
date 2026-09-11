@@ -1,5 +1,10 @@
 # G1 coverage diagnosis before correction round 2
 
+Status: completed at `d654a640d2afcc1a716d69b957a28452a9a0457c`; the planning owner accepted the
+[resolution](opentelemetry-m1-g1-coverage-resolution.md#planning-acceptance-and-next-assignment).
+Next is its bounded correction-round-2 implementation in a new conversation. This diagnosis packet
+is historical; do not repeat diagnosis or G2 review.
+
 ## Assignment and exit boundary
 
 Use a fresh bounded diagnosis conversation. Do not implement another patch yet. G2 is accepted at

@@ -1,5 +1,29 @@
 # G1 coverage diagnosis and correction-round-2 boundary
 
+## Planning acceptance and next assignment
+
+The planning owner accepts the diagnosis and minimal correction design from checkpoint
+`d654a640d2afcc1a716d69b957a28452a9a0457c`. The next assignment is a new implementation conversation
+for correction round 2, using the exact five-file scope and finite regression checklist below.
+This section authorizes that bounded implementation and supersedes the diagnosis-only exit boundary
+at the end of this document. G1 is still unaccepted; G2 remains accepted and must not be reopened.
+
+Record actual starting HEAD and preserve worktree changes. Add one target_on
+`repository_profile_report` attestation per repository target with eight exact pass-only subchecks;
+retain existing exception-capable checks. Use an independent literal test oracle to prevent the
+shared-incomplete-inventory failure. Ensure unknown subcheck keys and an exception field on the
+pass-only group are rejected as well as missing/non-pass outcomes.
+
+Do not run formal measurements or the release pipeline; no long empirical workload is planned.
+Run the specified focused checks, preserve the blocked live record, and create a checkpoint commit.
+Record commands/results and actual evidence paths; report the resulting OID in the outcome without
+trying to embed a commit's own hash inside itself. Return for focused re-review in the existing gate
+review conversation; do not declare G1/M1 accepted, merge, publish, or freeze a candidate.
+
+If a concrete contradiction prevents the specified correction, return the predicate and evidence
+rather than silently expanding the schema or reopening accepted work. If the same G1 issue remains
+after round 2, reconcile it through the bounded diagnosis process, not another patch loop.
+
 ## Diagnosis outcome
 
 Diagnosis completed on 2026-09-11 at actual HEAD

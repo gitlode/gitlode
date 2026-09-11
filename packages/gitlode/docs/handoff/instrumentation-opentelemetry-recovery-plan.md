@@ -159,11 +159,13 @@ obligation coverage, and G2, insufficient revision/provenance integrity. Both fi
 gate acceptance is blocked. Correction round 1 is implemented at
 `f7d8a01bd75231b15136707ab40e2b21adf16b1b`; the outcome records the obligation mapping and Windows
 verification (87 passed / 17 Linux-only skipped). Focused re-review accepted G2 but left G1 open:
-required repository-sidecar schema/signal/diagnostics outcomes are still missing. The immediate next
-assignment is [bounded G1 coverage diagnosis](opentelemetry-m1-g1-coverage-diagnosis.md) in a fresh
-conversation before correction round 2. The planning owner chooses this earlier than the mandatory
-two-round escalation threshold because the same mapping omission recurred. No code repair or
-reopening of accepted G2 is assigned during diagnosis.
+required repository-sidecar schema/signal/diagnostics outcomes are still missing. Bounded diagnosis
+completed at `d654a640d2afcc1a716d69b957a28452a9a0457c`: the gate and positive fixture shared the same
+incomplete inventory. The planning owner accepts its minimal resolution. The immediate next assignment
+is [G1 correction round 2](opentelemetry-m1-g1-coverage-resolution.md#planning-acceptance-and-next-assignment)
+in a new implementation conversation, limited to five files, one per-target report-validity group,
+eight pass-only subchecks and the finite regression checklist. G2 remains accepted. Focused re-review
+follows the implementation checkpoint in the existing gate review conversation.
 No repeated performance run or actual publish is planned. See the
 [implementation outcome](opentelemetry-m1-publish-gate.md#implementation-outcome) for reported checks
 and remaining cumulative Windows/Linux validation.

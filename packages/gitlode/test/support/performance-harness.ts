@@ -12,6 +12,7 @@ import {
   performanceDiagnostic,
   performanceStage,
 } from "../../scripts/tooling/performance-progress.js";
+import { requiredTelemetryPerformanceTargets } from "../../scripts/tooling/telemetry-performance-targets.js";
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
 export { resolveSourceRevision } from "../../scripts/tooling/source-revision.js";
 
@@ -45,13 +46,7 @@ export interface CalibrationTarget {
   readonly artifactRef?: string;
   readonly reason?: string;
 }
-export const requiredCalibrationTargets = [
-  "commit_heavy_repository/isomorphic-git",
-  "commit_heavy_repository/git-cli",
-  "file_heavy_repository/isomorphic-git",
-  "file_heavy_repository/git-cli",
-  "plugin_heavy_projection/isomorphic-git",
-] as const;
+export const requiredCalibrationTargets = requiredTelemetryPerformanceTargets;
 export function validateCalibrationMatrix(manifest: FixtureManifest): string[] {
   const actual = Object.keys(manifest.calibrationTargets);
   return [

@@ -55,6 +55,8 @@
     "test:coverage": "npm run build:dev && vitest run --coverage",
     "test:package": "npm run build:release && npm run validate:publint && npm run test:system:package",
     "test:system:package": "tsx ./scripts/test-installed-package.ts",
+    "typecheck:telemetry-release-acceptance": "tsc -p ./tsconfig.telemetry-release-acceptance.json",
+    "validate:telemetry-release-acceptance": "npm run typecheck:telemetry-release-acceptance && tsx ./scripts/check-telemetry-release-acceptance.ts",
     "validate:publint": "publint --strict --pack npm"
   },
   "dependencies": {

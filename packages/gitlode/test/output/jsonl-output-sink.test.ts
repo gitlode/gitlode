@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
 import { JsonlOutputSink } from "../../src/output/jsonl-output-sink.js";
+import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "../../src/output/telemetry/jsonl-file-writer-metric-recorder.js";
 
 function makeRecord(oid: string): ProjectedRecord {
   return {
@@ -37,6 +38,7 @@ describe("JsonlOutputSink", () => {
       tmpDir,
       (seq) => `out-${String(seq).padStart(6, "0")}.jsonl`,
       {},
+      NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
     );
     const sink = new JsonlOutputSink(writer);
     return { writer, sink };

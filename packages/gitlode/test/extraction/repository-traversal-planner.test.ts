@@ -2,7 +2,7 @@ import type { Diagnostic, DiagnosticReporter } from "@gitlode/internal-contracts
 import type { TraversalPlanningRequest } from "@gitlode/internal-contracts/extraction";
 import { type GitAdapter, GitAdapterError } from "@gitlode/internal-contracts/git";
 import type { CommitOid } from "@gitlode/internal-contracts/model";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
+import { trace } from "@opentelemetry/api";
 import { describe, expect, it } from "vitest";
 
 import { RepositoryTraversalPlanner } from "../../src/extraction/repository-traversal-planner.js";
@@ -60,7 +60,7 @@ function makeAdapter(options: {
 }
 
 function makePlanner(adapter: GitAdapter): RepositoryTraversalPlanner {
-  return new RepositoryTraversalPlanner(adapter, noopInstrumentation);
+  return new RepositoryTraversalPlanner(adapter, trace.getTracer("gitlode.extraction"));
 }
 
 function baseRequest(overrides: Partial<TraversalPlanningRequest> = {}): TraversalPlanningRequest {

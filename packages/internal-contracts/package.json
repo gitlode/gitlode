@@ -38,6 +38,10 @@
     "./line-diff": {
       "types": "./dist/line-diff/index.d.ts",
       "default": "./dist/line-diff/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry/index.d.ts",
+      "default": "./dist/telemetry/index.js"
     }
   },
   "scripts": {

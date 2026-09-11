@@ -1,14 +1,12 @@
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, isAbsolute, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
-import { satisfies, validRange } from "semver";
+import { satisfies, valid, validRange } from "semver";
 
 import { packageVersion } from "../package-metadata.js";
 import type { DiagnosticReporter } from "../plugin-api/index.js";
-import type { PluginDeclarations, PluginEntry } from "./types.js";
+import type { PluginEntry, PluginPackageResolution } from "./types.js";
 
 const MAX_WALK_STEPS = 20;
 
@@ -38,16 +36,36 @@ async function findNearestPackageJson(
   return null;
 }
 
-function resolveEntrypointToUrl(entrypoint: string, baseDir: AbsoluteDirectoryPath): string | null {
-  try {
-    if (entrypoint.startsWith(".") || isAbsolute(entrypoint)) {
-      return pathToFileURL(resolve(baseDir, entrypoint)).href;
-    }
-    const requireFromBaseDirectory = createRequire(pathToFileURL(baseDir + "/").href);
-    return pathToFileURL(requireFromBaseDirectory.resolve(entrypoint)).href;
-  } catch {
-    return null;
+function isValidPackageName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 214 &&
+    /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/.test(value)
+  );
+}
+
+function resolveTelemetryScope(entry: PluginEntry, packageData: unknown): PluginPackageResolution {
+  const manifest = packageData as { name?: unknown; version?: unknown } | null;
+  if (!isValidPackageName(manifest?.name)) {
+    return { scope: { name: `gitlode.plugin.${entry.namespace}` }, manifest: packageData };
   }
+  const packageVersion = typeof manifest.version === "string" ? valid(manifest.version) : null;
+  return {
+    scope:
+      packageVersion === null
+        ? { name: manifest.name }
+        : { name: manifest.name, version: packageVersion },
+    manifest: packageData,
+  };
+}
+
+interface PluginCompatibilityResult {
+  readonly resolutions: readonly {
+    readonly entry: PluginEntry;
+    readonly packageResolution: PluginPackageResolution;
+  }[];
+  readonly warningCount: number;
 }
 
 /**
@@ -56,60 +74,65 @@ function resolveEntrypointToUrl(entrypoint: string, baseDir: AbsoluteDirectoryPa
  */
 export async function checkPluginCompatibility(
   entries: readonly PluginEntry[],
-  declarations: PluginDeclarations,
-  baseDir: AbsoluteDirectoryPath,
   reporter: Pick<DiagnosticReporter, "warn">,
-): Promise<void> {
+): Promise<PluginCompatibilityResult> {
+  let warningCount = 0;
+  const warn = (message: string) => {
+    warningCount++;
+    reporter.warn(message);
+  };
+  const resolutions: Array<PluginCompatibilityResult["resolutions"][number]> = [];
+
   for (const entry of entries) {
-    const declaration = declarations[entry.namespace];
-    if (!declaration) continue;
-
-    const entrypointUrl = resolveEntrypointToUrl(declaration.entrypoint, baseDir);
-    if (entrypointUrl === null) {
-      reporter.warn(
-        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${declaration.entrypoint}.`,
-      );
-      continue;
-    }
-
-    const found = await findNearestPackageJson(entrypointUrl);
+    const found = await findNearestPackageJson(entry.resolvedEntrypointUrl);
     if (found === null) {
-      reporter.warn(
-        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${declaration.entrypoint}.`,
+      warn(
+        `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${entry.entrypoint}.`,
       );
+      resolutions.push({
+        entry,
+        packageResolution: { scope: { name: `gitlode.plugin.${entry.namespace}` } },
+      });
       continue;
     }
 
     const { filePath, data: packageData } = found;
+    const packageResolution = {
+      ...resolveTelemetryScope(entry, packageData),
+      manifestPath: filePath,
+    };
+    resolutions.push({ entry, packageResolution });
     let peerRange: string | undefined;
     try {
       const packageManifest = packageData as { peerDependencies?: Record<string, string> };
       peerRange = packageManifest.peerDependencies?.["gitlode"];
     } catch {
-      reporter.warn(
+      warn(
         `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.`,
       );
       continue;
     }
 
     if (peerRange === undefined) {
-      reporter.warn(
+      warn(
         `Plugin "${entry.namespace}" does not declare peerDependencies.gitlode. Compatibility unknown; continuing.`,
       );
       continue;
     }
 
     if (validRange(peerRange) === null) {
-      reporter.warn(
+      warn(
         `Plugin "${entry.namespace}" compatibility check skipped: unable to read package metadata at ${filePath}.`,
       );
       continue;
     }
 
     if (!satisfies(packageVersion, peerRange)) {
-      reporter.warn(
+      warn(
         `Plugin "${entry.namespace}" declares peer gitlode ${peerRange}, but running gitlode is ${packageVersion}. Continuing; behavior may be incompatible.`,
       );
     }
   }
+
+  return { resolutions, warningCount };
 }

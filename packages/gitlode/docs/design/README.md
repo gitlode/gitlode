@@ -9,17 +9,20 @@ behavioral detail is useful.
 
 ## Canonical design documents
 
-| Area                       | Document                                                         | Owns                                                                                              |
-| -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Architecture               | [`architecture.md`](architecture.md)                             | System layering, runtime flow, implementation responsibilities, and major trade-offs.             |
-| Domain design              | [`domain-design.md`](domain-design.md)                           | Domain principles, charters, allowed dependencies, source imports, and enforcement guidance.      |
-| CLI                        | [`cli.md`](cli.md)                                               | Command shape, options, validation, stderr behavior, exit codes, and CLI implementation notes.    |
-| Configuration              | [`configuration.md`](configuration.md)                           | Versioned configuration shape, path resolution, precedence, and validation pipeline.              |
-| Git adapters               | [`git-adapters.md`](git-adapters.md)                             | Git adapter selection, blob-fact boundaries, `git-cli` protocols, lifecycle, and benchmarking.    |
-| Git traversal              | [`git-traversal.md`](git-traversal.md)                           | User-visible traversal behavior, differential extraction, state lifecycle, and deduplication.     |
-| Plugins                    | [`plugins.md`](plugins.md)                                       | Plugin configuration, runtime contract, `extensions` output field, lifecycle, and package policy. |
-| Output schema              | [`schema.md`](schema.md)                                         | JSON Lines format, record fields, file rotation, and file-level output schema.                    |
-| Commit traversal internals | [`commit-traversal-internals.md`](commit-traversal-internals.md) | Internal traversal strategies, certificates, fallback behavior, and strategy tests.               |
+| Area                       | Document                                                         | Owns                                                                                               |
+| -------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Architecture               | [`architecture.md`](architecture.md)                             | System layering, runtime flow, implementation responsibilities, and major trade-offs.              |
+| Domain design              | [`domain-design.md`](domain-design.md)                           | Domain principles, charters, allowed dependencies, source imports, and enforcement guidance.       |
+| Telemetry                  | [`telemetry.md`](telemetry.md)                                   | OpenTelemetry API contracts, signal policy, local collection, lifecycle, and profiling boundaries. |
+| Telemetry verification     | [`telemetry-verification.md`](telemetry-verification.md)         | Migration fixtures, test layers, failure injection, equivalence, and verification evidence.        |
+| Telemetry performance      | [`telemetry-performance.md`](telemetry-performance.md)           | Reproducible overhead, memory, volume, fixture, and acceptance policy for the migration.           |
+| CLI                        | [`cli.md`](cli.md)                                               | Command shape, options, validation, stderr behavior, exit codes, and CLI implementation notes.     |
+| Configuration              | [`configuration.md`](configuration.md)                           | Versioned configuration shape, path resolution, precedence, and validation pipeline.               |
+| Git adapters               | [`git-adapters.md`](git-adapters.md)                             | Git adapter selection, blob-fact boundaries, `git-cli` protocols, lifecycle, and benchmarking.     |
+| Git traversal              | [`git-traversal.md`](git-traversal.md)                           | User-visible traversal behavior, differential extraction, state lifecycle, and deduplication.      |
+| Plugins                    | [`plugins.md`](plugins.md)                                       | Plugin configuration, runtime contract, `extensions` output field, lifecycle, and package policy.  |
+| Output schema              | [`schema.md`](schema.md)                                         | JSON Lines format, record fields, file rotation, and file-level output schema.                     |
+| Commit traversal internals | [`commit-traversal-internals.md`](commit-traversal-internals.md) | Internal traversal strategies, certificates, fallback behavior, and strategy tests.                |
 
 ## Audience policy
 
@@ -29,6 +32,16 @@ maintain changes safely.
 
 Coding agents should treat these documents as the durable design source. Agent-specific entrypoints
 may summarize key guardrails for readability, but they should not become independent specifications.
+
+## Telemetry change routes
+
+For changes to product operations or their domain-owned recorders, start with
+[`telemetry.md`](telemetry.md), then use
+[`telemetry-verification.md`](telemetry-verification.md) for owner and recorder evidence and
+[`domain-design.md`](domain-design.md) when placement or imports change. For worker-side collection
+and lifecycle changes, also follow [`architecture.md`](architecture.md). For presentation changes,
+use [`telemetry.md`](telemetry.md) for signal and report contracts and
+[`../profiling.md`](../profiling.md) for the implemented user-visible interpretation.
 
 ## Relationship to user documentation
 

@@ -1,7 +1,7 @@
 import type { Diagnostic, DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extraction";
 import type { ProgressEvent, ProgressReporter } from "@gitlode/internal-contracts/progress";
-import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
+import type { ProfileReport } from "@gitlode/internal-contracts/telemetry";
 import type {
   AbsoluteDirectoryPath,
   AbsolutePath,
@@ -57,8 +57,8 @@ export interface ExecutionSuccessPayload {
   readonly bytesWritten: number;
   readonly elapsedMs: number;
   readonly refs: readonly string[];
-  readonly profileEntries: readonly ProfileSummaryEntry[];
   readonly skippedDiffs: number;
+  readonly profileReport?: ProfileReport;
 }
 
 interface WorkerRunSuccess {
@@ -75,12 +75,14 @@ interface ExecutionRunSuccess {
 interface ExecutionUserError {
   readonly kind: "user-error";
   readonly message: string;
+  readonly profileReport?: ProfileReport;
 }
 
 interface ExecutionRuntimeError {
   readonly kind: "runtime-error";
   readonly message: string;
   readonly stack?: string;
+  readonly profileReport?: ProfileReport;
 }
 
 export type WorkerRunResult = WorkerRunSuccess | ExecutionUserError | ExecutionRuntimeError;

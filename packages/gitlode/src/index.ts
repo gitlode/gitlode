@@ -67,8 +67,7 @@ function toSuccessReportData(success: ExecutionSuccessPayload): SuccessReportDat
     bytesWritten: success.bytesWritten,
     elapsedMs: success.elapsedMs,
     refs: success.refs,
-    profileEntries: success.profileEntries,
-    skippedDiffs: success.skippedDiffs,
+    profileReport: success.profileReport,
   };
 }
 

@@ -17,6 +17,6 @@ export function renderSuccessReport(options: RenderSuccessReportOptions): void {
   });
 
   if (profile) {
-    presenter.renderProfile(data.profileEntries, data.skippedDiffs);
+    if (data.profileReport) presenter.renderProfile(data.profileReport);
   }
 }

@@ -5,9 +5,20 @@ export type {
   DagFrontierItem,
   DagSuccessor,
   DagTopologyPort,
+  DagTraversalRole,
   WalkDagContext,
   WalkDagStrategyOptions,
 } from "./types.js";
+export type {
+  DagFallbackReason,
+  DagCertificationResult,
+  DagTerminationReason,
+  DagCertifiedClosureResult,
+  DagOperationCompletion,
+  DagOperationObservation,
+  DagOperationObservationHooks,
+  DagStreamCompletion,
+} from "./telemetry/observations.js";
 export {
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,

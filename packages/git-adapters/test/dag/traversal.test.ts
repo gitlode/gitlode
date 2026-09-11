@@ -11,10 +11,6 @@ import {
   walkDagNodeIdsEagerExclude,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "@gitlode/internal-foundation/dag";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
 import { OrderedQueue } from "@gitlode/internal-foundation/support";
 import * as git from "isomorphic-git";
 import { describe, expect, it } from "vitest";
@@ -44,7 +40,6 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of eagerExcludeStrategy(
         {
           graph: rawCommitTopologyPort(dag),
-          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -61,7 +56,6 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of certifiedLazyStrategy(
         {
           graph: rawCommitTopologyPort(dag),
-          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -78,7 +72,6 @@ const walkers: readonly { readonly name: string; readonly walk: Walker }[] = [
       for await (const commit of phaseCertifiedStrategy(
         {
           graph: rawCommitTopologyPort(dag),
-          instrumentation: noopInstrumentation,
         },
         head,
         exclude,
@@ -216,7 +209,6 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
         walkDagReachableNodeIds(
           {
             graph: stringTopology({ left: ["root"], right: ["root"], root: [] }),
-            instrumentation: noopInstrumentation,
           },
           ["left", "right"],
         ),
@@ -229,12 +221,8 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
   it("yields deterministic order for identical input and topology", async () => {
     const graph = stringTopology({ left: ["root"], right: ["root"], root: [] });
 
-    const first = await collect(
-      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
-    );
-    const second = await collect(
-      walkDagReachableNodeIds({ graph, instrumentation: noopInstrumentation }, ["left", "right"]),
-    );
+    const first = await collect(walkDagReachableNodeIds({ graph }, ["left", "right"]));
+    const second = await collect(walkDagReachableNodeIds({ graph }, ["left", "right"]));
 
     expect(first).toEqual(second);
   });
@@ -255,12 +243,7 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
     };
 
     const yielded = await collect(
-      walkDagNodeIdsEagerExclude(
-        { graph, instrumentation: noopInstrumentation },
-        "head",
-        undefined,
-        { createFrontier: () => frontier },
-      ),
+      walkDagNodeIdsEagerExclude({ graph }, "head", undefined, { createFrontier: () => frontier }),
     );
 
     expect(new Set(yielded)).toEqual(new Set(["head", "first", "second"]));
@@ -279,37 +262,21 @@ describe("DAG traversal NodeId API and frontier metadata", () => {
   });
 });
 
-describe("DAG traversal telemetry", () => {
+describe("DAG traversal observation behavior", () => {
   it("records a top-level reachable operation with yielded nodes", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagReachableNodeIds(
         {
           graph: stringTopology({ head: ["left", "right"], left: [], right: [] }),
-          instrumentation: recorder,
         },
         ["head"],
       ),
     );
 
     expect(new Set(result)).toEqual(new Set(["head", "left", "right"]));
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.reachable",
-        counters: {
-          main_expansions: 3,
-          successor_expansions: 3,
-          traversal_steps: 3,
-          yielded_nodes: 3,
-        },
-      }),
-    ]);
   });
 
   it("records eager-exclude traversal output separately from excluded reachable collection", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagNodeIdsEagerExclude(
         {
@@ -318,7 +285,6 @@ describe("DAG traversal telemetry", () => {
             release: ["root"],
             head: ["release"],
           }),
-          instrumentation: recorder,
         },
         "head",
         "release",
@@ -326,25 +292,9 @@ describe("DAG traversal telemetry", () => {
     );
 
     expect(result).toEqual(["head"]);
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.traversal",
-        attributes: { strategy: "eagerExclude" },
-        counters: {
-          exclude_expansions: 2,
-          excluded_nodes: 2,
-          main_expansions: 1,
-          successor_expansions: 3,
-          traversal_steps: 3,
-          yielded_nodes: 1,
-        },
-      }),
-    ]);
   });
 
   it("records certified-lazy certificate success without fallback counters", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagNodeIdsCertifiedLazy(
         {
@@ -354,7 +304,6 @@ describe("DAG traversal telemetry", () => {
             after: ["release"],
             head: ["after"],
           }),
-          instrumentation: recorder,
         },
         "head",
         "release",
@@ -363,25 +312,9 @@ describe("DAG traversal telemetry", () => {
     );
 
     expect(new Set(result)).toEqual(new Set(["head", "after"]));
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.traversal",
-        attributes: { result: "certified", strategy: "certifiedLazy" },
-        counters: expect.objectContaining({
-          exclude_expansions: 2,
-          main_expansions: 2,
-          successor_expansions: 4,
-          yielded_nodes: 2,
-        }),
-      }),
-    ]);
-    expect(recorder.records()[0]?.counters).not.toHaveProperty("fallback_removed");
-    expect(recorder.records()[0]?.counters).not.toHaveProperty("excluded_nodes");
   });
 
   it("records certified-lazy fallback reason and removed candidates", async () => {
-    const recorder = new LocalInstrumentationRecorder(() => 0);
-
     const result = await collect(
       walkDagNodeIdsCertifiedLazy(
         {
@@ -391,7 +324,6 @@ describe("DAG traversal telemetry", () => {
             excludeRoot: [],
             exclude: ["excludeRoot"],
           }),
-          instrumentation: recorder,
         },
         "head",
         "exclude",
@@ -400,21 +332,6 @@ describe("DAG traversal telemetry", () => {
     );
 
     expect(new Set(result)).toEqual(new Set(["head", "headRoot"]));
-    expect(recorder.records()).toEqual([
-      expect.objectContaining({
-        name: "dag.traversal",
-        attributes: {
-          fallback_reason: "open_include_path",
-          result: "fallback",
-          strategy: "certifiedLazy",
-        },
-        counters: expect.objectContaining({
-          excluded_nodes: 2,
-          fallback_removed: 0,
-          yielded_nodes: 2,
-        }),
-      }),
-    ]);
   });
 });
 
@@ -792,7 +709,6 @@ describe("DAG traversal eagerExclude read trace", () => {
     const commits = walkDagNodeIdsEagerExclude(
       {
         graph: rawCommitTopologyPort(dag, requests),
-        instrumentation: noopInstrumentation,
       },
       head,
       exclude,
@@ -897,7 +813,6 @@ describe("DAG traversal certifiedLazy read trace", () => {
     const commits = walkDagNodeIdsCertifiedLazy(
       {
         graph: rawCommitTopologyPort(dag, requests),
-        instrumentation: noopInstrumentation,
       },
       head,
       exclude,

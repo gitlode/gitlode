@@ -1,6 +1,6 @@
 import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
-import type { ProfileSummaryEntry } from "@gitlode/internal-foundation/instrumentation";
+import type { ProfileReport } from "@gitlode/internal-contracts/telemetry";
 
 import type { RunPresenter } from "./presenter.js";
 import type { Clock, Scheduler, TerminalSink, UiMode } from "./progress/types.js";
@@ -33,6 +33,5 @@ export interface SuccessReportData {
   readonly bytesWritten: number;
   readonly elapsedMs: number;
   readonly refs: readonly string[];
-  readonly profileEntries: readonly ProfileSummaryEntry[];
-  readonly skippedDiffs: number;
+  readonly profileReport?: ProfileReport;
 }

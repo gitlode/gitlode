@@ -99,7 +99,13 @@ export async function resolvePluginEntries(
       const resolvedSpecifier = resolvePluginSpecifier(entrypoint, namespace, baseDir);
       const module = await loadPluginModule(entrypoint, namespace, resolvedSpecifier);
       const plugin = await createPlugin(module, entrypoint, namespace, pluginConfig);
-      entries.push({ namespace: namespace as Namespace, plugin, failurePolicy });
+      entries.push({
+        namespace: namespace as Namespace,
+        plugin,
+        failurePolicy,
+        entrypoint,
+        resolvedEntrypointUrl: resolvedSpecifier,
+      });
     }
 
     return { kind: "resolved", entries };

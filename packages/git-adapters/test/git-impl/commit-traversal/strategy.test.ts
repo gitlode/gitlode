@@ -1,6 +1,5 @@
 import type { CommitOid } from "@gitlode/internal-contracts/model";
 import type { DagSuccessor, DagTopologyPort } from "@gitlode/internal-foundation/dag";
-import { noopInstrumentation } from "@gitlode/internal-foundation/instrumentation";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -42,11 +41,7 @@ async function collect(
 ): Promise<Node[]> {
   const strategy = createCommitTraversalStrategy(strategyName);
   const result: Node[] = [];
-  for await (const node of strategy.walk(
-    { graph, instrumentation: noopInstrumentation },
-    oid("M"),
-    excludeNodeId,
-  )) {
+  for await (const node of strategy.walk({ graph }, oid("M"), excludeNodeId)) {
     result.push(node);
   }
   return result;

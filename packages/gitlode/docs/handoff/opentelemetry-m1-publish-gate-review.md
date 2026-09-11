@@ -1,5 +1,23 @@
 # M1 publish gate: independent review packet
 
+## Correction round 1 re-review outcome
+
+At `f7d8a01bd75231b15136707ab40e2b21adf16b1b`, G2 is accepted with no required corrections. G1 is
+not accepted: target_on repository-sidecar report existence/schema validity, complete signal status
+for spans/counters/histograms, and empty diagnostics are not explicit required outcomes in the gate.
+Size and prohibited-span checks alone allow an incomplete positive record. The planning owner
+confirmed this discrepancy between `requiredTelemetryRepositoryChecks`, the performance contract,
+and `evaluateRepositoryProfileReport`; gate acceptance remains blocked.
+
+The reviewer reported actual HEAD `69f0521f0f104dbb0ff2a77646f3887ccaaa5fae`, handoff-only later
+changes, clean worktree, blocked record, passing diff/show checks and strict typecheck, and 39/39
+focused gate tests. The reported 87/17 broader run was not repeated. Planning intake confirmed
+matching HEAD/clean state and inspected the contract/evaluator, without rerunning tests.
+
+Next is [bounded G1 coverage diagnosis](opentelemetry-m1-g1-coverage-diagnosis.md) in a fresh
+conversation before correction round 2. G2 remains accepted. The assignments/outcomes below are
+history; do not repeat the original review or start another correction without this diagnosis.
+
 ## Focused re-review after correction round 1
 
 Resume the existing gate review conversation. Review correction checkpoint

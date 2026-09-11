@@ -1,5 +1,10 @@
 # M1 publish gate: correction round 1
 
+Current disposition: independent re-review accepted G2 and left G1 open for missing repository-sidecar
+report obligations. Gate acceptance remains blocked. The next assignment is
+[G1 coverage diagnosis](opentelemetry-m1-g1-coverage-diagnosis.md), not repetition of this correction.
+The implementation outcome below records what round 1 delivered, not complete G1 acceptance.
+
 ## Correction outcome
 
 Implemented and locally verified on Windows. The checkpoint OID is reported with the implementation

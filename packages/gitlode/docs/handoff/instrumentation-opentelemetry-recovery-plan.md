@@ -158,9 +158,12 @@ record blocked. Independent gate review found two required corrections: G1, inco
 obligation coverage, and G2, insufficient revision/provenance integrity. Both findings are accepted;
 gate acceptance is blocked. Correction round 1 is implemented at
 `f7d8a01bd75231b15136707ab40e2b21adf16b1b`; the outcome records the obligation mapping and Windows
-verification (87 passed / 17 Linux-only skipped). The immediate next assignment is
-[focused re-review](opentelemetry-m1-publish-gate-review.md#focused-re-review-after-correction-round-1)
-in the existing gate review conversation. No new implementation assignment starts before that result.
+verification (87 passed / 17 Linux-only skipped). Focused re-review accepted G2 but left G1 open:
+required repository-sidecar schema/signal/diagnostics outcomes are still missing. The immediate next
+assignment is [bounded G1 coverage diagnosis](opentelemetry-m1-g1-coverage-diagnosis.md) in a fresh
+conversation before correction round 2. The planning owner chooses this earlier than the mandatory
+two-round escalation threshold because the same mapping omission recurred. No code repair or
+reopening of accepted G2 is assigned during diagnosis.
 No repeated performance run or actual publish is planned. See the
 [implementation outcome](opentelemetry-m1-publish-gate.md#implementation-outcome) for reported checks
 and remaining cumulative Windows/Linux validation.

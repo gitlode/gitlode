@@ -23,14 +23,19 @@ handoff. Staged whitespace checks passed and the added relative link target exis
 bundle SHA-256 is `40783a7b3e962e3faeaca2351a01162da54b7831302b53882bc932b8f2d685cd`.
 Functional/package checks were not repeated because implementation and packaging inputs match.
 
-Next is a narrowly scoped review amendment in the existing integration review conversation. Verify
-the actual base `1664798...`, unchanged source `134e475...`, and result tree `619c389...`, then return
-whether a merge commit preserving both histories is accepted. Do not repeat cumulative source review
-or change live refs. After acceptance the executor rechecks authoritative refs, reproduces the exact
-tree and records the actual merge commit; only completed integration closes M1. The prior cumulative
-acceptance remains valid for its scope, but its old-base fast-forward recommendation is superseded.
+The bounded review amendment is accepted. A fresh read-only `ls-remote` independently confirmed
+remote `integration/v0.13.0` at `1664798...` and remote `feature/otel-redesign` at `5a6a810...`; the
+exact T13B query again returned no remote head. The remote base has parent `745d3d5...`, and the merge
+base of `1664798...` and `134e475...` is `745d3d5...`; neither tip is an ancestor of the other.
 
-## Outcome
+The staged tree was independently recomputed as `619c389...`, with no unmerged entries or whitespace
+errors. Its complete difference from source is the one link above, whose target exists in that tree;
+its complete non-handoff difference from validated `681a1a5...` is empty. The existing cumulative
+acceptance and two-platform evidence therefore remain applicable without another source review or
+test run. A merge commit with first parent `1664798...`, second parent `134e475...`, and tree
+`619c389...` is accepted subject to the final ref check below. No shared ref was changed or pushed.
+
+## Original outcome against the superseded local base
 
 The cumulative redesign at proposed source
 `134e475b2de9559007e11fb724298395f832c6cf` is accepted for fast-forward integration from the
@@ -158,7 +163,7 @@ commit, conflict, or synthesized resolution. The result is byte-for-byte the pro
 | Frozen identity/dependencies        | Fixed source/harness `681a1a5...`, lockfile hash, Windows/Linux tarballs, production dependency inventory, and complete sealed Linux runtime are preserved under the M1 archive. Proposed source changes only seven handoff files. Accepted for candidate preservation and reuse.                                                                                                         |
 | Known performance findings          | M0's `commit_heavy_repository/isomorphic-git` target passed calibration, legacy capture, disabled overhead, and profile overhead for older product `a97829b...`/harness `a53a5b8...`. No known performance failure is being hidden, but this is partial evidence for an older candidate and is not M1-candidate or full T13B acceptance. Remaining performance work stays blocked for M2. |
 | Enforceable blocked publishing      | Gate G1/G2 and the full slice were independently accepted at `681a1a5...`; focused tests/typecheck passed on both validation platforms. The committed record remains `blocked`, root supported publish commands converge on the validator, and the release checkout requests full history. Accepted for M1 integration; publishing remains unauthorized.                                  |
-| Actual integration result           | Isolated `--ff-only` rehearsal passed with exact source/result OID and tree. The shared `integration/v0.13.0` ref was not changed, so M1 is not complete.                                                                                                                                                                                                                                 |
+| Actual integration result           | The original isolated `--ff-only` rehearsal passed for the superseded local base. The bounded amendment accepts the authoritative-base staged merge tree `619c389...` with parents `1664798...` and `134e475...`. The shared `integration/v0.13.0` ref was not changed, so M1 is not complete.                                                                                            |
 
 ## Archive checks independently performed
 
@@ -200,18 +205,30 @@ The merge must preserve these explicit blockers; none is waived by this acceptan
   and explicitly approve release authority; and
 - change the migration acceptance record only after all required independent evidence exists.
 
-## Safe merge recommendation
+## Amended safe merge recommendation
 
-The integration owner may fast-forward the shared `integration/v0.13.0` branch to exactly
-`134e475b2de9559007e11fb724298395f832c6cf`, but only after a final authoritative ref and worktree
-check confirms that the integration tip is still exactly
-`745d3d553e7ddbea430993602ddaa36fe816dfc4`, remains an ancestor of the source, and has no local
-changes. Use `--ff-only`; do not merge only the final T13B tail, substitute the later planning tip,
-or resolve a changed base under this review acceptance.
+The old-base fast-forward recommendation is superseded. The integration owner may create one merge
+commit preserving the authoritative remote link commit and the complete reviewed source, with these
+exact identities:
 
-After the action, record the actual HEAD and tree and confirm they are respectively
-`134e475b2de9559007e11fb724298395f832c6cf` and
-`54314b434e83e17af59925d00ba44cdcf0a9495c`. If any ref, ancestry, source, or tree differs, stop and
-return for reconciliation and validation of the actual result. Only the completed reviewed merge
-may close M1; all post-M1 work must then branch from the updated integration branch while the blocked
-publishing record and M2 obligations remain intact.
+- first parent: `1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`;
+- second parent: `134e475b2de9559007e11fb724298395f832c6cf`; and
+- merge tree: `619c389da8a12e36fa8465a611a0c8f28eaad0ea`.
+
+Immediately before acting, use an authoritative read-only remote check and stop unless
+`integration/v0.13.0` is still exactly the first parent. Confirm the source commit and source tree
+remain exactly `134e475...` and `54314b434e83e17af59925d00ba44cdcf0a9495c`, and start from a clean
+checkout of the authoritative base. Reproduce the accepted shape with
+`merge --no-ff --no-commit 134e475...`, then stop unless there are no unmerged entries and
+`git write-tree` is exactly `619c389...`.
+
+Commit that staged result without amending its content. The merge commit OID is intentionally not
+predetermined because commit metadata is not part of the staged tree; verify that the resulting
+commit has the exact two parents above in that order and the exact accepted tree before any push.
+Do not merge only the T13B tail, use the later planning tip as source, discard the remote's added
+link, or resolve any changed ref/tree under this acceptance. Any mismatch returns for reconciliation
+and applicable validation.
+
+Only the completed reviewed shared-branch integration may close M1. All post-M1 work must then branch
+from the updated integration branch while the blocked publishing record and M2 obligations remain
+intact.

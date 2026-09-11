@@ -1,5 +1,19 @@
 # M1 cumulative validation result and preserved candidate
 
+## Planning acceptance
+
+The planning owner accepts cumulative validation and candidate preservation at
+`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`. On receipt, planning HEAD was
+`134e475b2de9559007e11fb724298395f832c6cf` with a clean worktree. The owner independently verified
+`evidence.sha256` as `7454ed104bfeb89ce401ff88156e5a261fd22c64608a21d1dce94119c2e4bb08` and all 40
+indexed archive files, including the runtime archive hash recorded below, and inspected the command
+ledger and result/provenance records. Tests and ext4 runtime extraction were not rerun in planning.
+
+The observed integration ref remains `745d3d553e7ddbea430993602ddaa36fe816dfc4`, an ancestor of
+the proposed source `134e475...`; changes from the validated candidate are seven handoff documents
+only. Next is [cumulative integration review and rehearsal](opentelemetry-m1-integration-review.md).
+M1, full T13B, M2, T13C and publish acceptance remain incomplete.
+
 ## Outcome
 
 Cumulative functional and package validation passed on Windows and Linux for source and harness

@@ -1,5 +1,11 @@
 # M1 cumulative functional validation and candidate preservation
 
+Status: completed and accepted; see the [validation result](opentelemetry-m1-validation-result.md).
+Windows passed 1,184 tests with 17 expected skips, Linux passed all 1,201 with no skips; complete
+packages/runtime and evidence are preserved. Next is
+[integration review and rehearsal](opentelemetry-m1-integration-review.md). The validation assignment
+below is historical; do not repeat it automatically.
+
 ## Assignment and fixed identities
 
 Use a new validation conversation. Placement and the publish-gate slice are independently accepted;

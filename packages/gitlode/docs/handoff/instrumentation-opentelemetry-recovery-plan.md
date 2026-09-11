@@ -38,12 +38,12 @@ without reading the entire telemetry design to understand extraction.
 
 ## Milestones
 
-| Milestone                                  | Status                        | Exit evidence                                                                                                                                |
-| ------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Executable and diagnosable measurement | complete: one target accepted | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
-| M1: Integration-ready                      | in preparation                | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
-| M2: v0.13.0 release-ready                  | pending M1                    | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
-| M3: Future capabilities                    | deferred beyond v0.13.0       | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
+| Milestone                                  | Status                            | Exit evidence                                                                                                                                |
+| ------------------------------------------ | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Executable and diagnosable measurement | complete: one target accepted     | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
+| M1: Integration-ready                      | integrated; CI correction pending | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
+| M2: v0.13.0 release-ready                  | pending M1                        | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
+| M3: Future capabilities                    | deferred beyond v0.13.0           | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
 
 ### M0: Establish the measurement path
 
@@ -155,12 +155,17 @@ The publish gate, including G1 and G2, is independently accepted at
 remains blocked. The human-approved policy stops all supported Changesets publishing, including
 plugin-only releases, until M2 is accepted while leaving ordinary CI and Version PR creation usable.
 
-The immediate next assignment is [cumulative M1 validation](opentelemetry-m1-cumulative-validation.md)
-in a new conversation, using source/harness `681a1a5b53bd0aa957dae72d9fd9684da7ff467a` on Windows and
-Linux, then preserving the prospective immutable migration candidate. Builds, tests and temporary
-consumer installations may take substantial execution time; no formal performance runs are assigned.
-Cumulative integration review and merge-result checks follow; M1 is not yet complete. The current
-conversation owns planning and acceptance. Generic continuation instructions preserve this assignment.
+Cumulative Windows/Linux validation and immutable candidate preservation are accepted for source/harness
+`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`; the
+[result](opentelemetry-m1-validation-result.md) records test coverage, reruns and verified archives.
+The accepted integration was pushed as `506b657b6de9bb6e896846e2e7fc3454833296d8`, with the reviewed
+parents and tree. Its source-test CI exposed ambient Actions environment leakage into gate tests.
+The [integration result](opentelemetry-m1-integration-review-result.md#actual-integration-and-ci-follow-up-2026-09-11)
+records the merge, branch-rule bypass disclosure, diagnosis, and bounded test-only correction.
+M1 remains open until that correction passes CI and is integrated through the normal PR path.
+The immediate assignment is owned by the current planning conversation on
+`fix/otel-release-tests-ci-context`; no formal measurement or production gate change is required.
+Generic continuation instructions preserve this assignment. All subsequent work starts from integration.
 
 Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
 share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { validateTelemetryReleaseAcceptance } from "../../scripts/check-telemetry-release-acceptance.js";
 import {
@@ -302,7 +302,14 @@ async function repositoryFixture(options: { frozenIsFinal?: boolean } = {}) {
   return { repository, revisions };
 }
 
+beforeEach(() => {
+  // Temporary repositories use their own local branch; Actions cases pass explicit environments.
+  vi.stubEnv("GITHUB_ACTIONS", undefined);
+  vi.stubEnv("GITHUB_REF", undefined);
+});
+
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     temporaryDirectories
       .splice(0)

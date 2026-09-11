@@ -2,10 +2,9 @@
 
 ## Status
 
-This document defines the accepted target design for gitlode telemetry. The OpenTelemetry migration
-is not yet implemented, so source code and [`../profiling.md`](../profiling.md) still describe the
-current custom instrumentation in places. Implementation work must converge on this document rather
-than preserve those transitional contracts.
+This document defines the accepted design for gitlode telemetry. The OpenTelemetry runtime migration
+is implemented; integration and the remaining release acceptance are tracked separately.
+[`../profiling.md`](../profiling.md) describes the implemented profile output.
 
 The migration status, branch-sized work plan, and remaining design gates are tracked in
 [`../handoff/instrumentation-opentelemetry-redesign-plan.md`](../handoff/instrumentation-opentelemetry-redesign-plan.md).

@@ -8,12 +8,13 @@ documents.
 
 ## Active OpenTelemetry work
 
-Read the [redesign plan](instrumentation-opentelemetry-redesign-plan.md) for original implementation
-units and reviewed evidence, then the
-[recovery plan](instrumentation-opentelemetry-recovery-plan.md) for the accepted M0–M3 sequence,
-integration/release distinction, current blockers, and next session assignment.
-The [M0 environment handoff](opentelemetry-m0-environment.md) records the prepared Linux/WSL2
-toolchain, release snapshots, probe evidence, and next harness-supervision assignment.
+Start with the [recovery plan](instrumentation-opentelemetry-recovery-plan.md) for the current
+reintegration route, human PR/merge authority, milestones, and next assignment. The
+[redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains unfinished T13B/T13C scope.
+The [M0 result](opentelemetry-m0-result.md) preserves Linux/WSL2 setup and one-target evidence;
+the [M1 evidence note](opentelemetry-m1-validation-result.md) preserves candidate validation,
+package identities, and the CI correction needed for reintegration. Completed session packets
+have been removed; accepted contracts live in the design and contributing documentation.
 
 ## Lifecycle
 

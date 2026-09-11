@@ -1,21 +1,75 @@
 # OpenTelemetry Redesign Recovery Plan
 
-## Authority and objective
+## Authority and current status
 
-The human accepted this recovery direction on 2026-09-09. It sequences unfinished work from
-[`instrumentation-opentelemetry-redesign-plan.md`](instrumentation-opentelemetry-redesign-plan.md)
-without replacing the durable [telemetry](../design/telemetry.md),
-[verification](../design/telemetry-verification.md), or
-[performance](../design/telemetry-performance.md) contracts.
+The human accepted staged convergence on 2026-09-09 and branch-history recovery on 2026-09-11.
+The objective remains safe integration before full v0.13.0 release acceptance. The
+[redesign plan](instrumentation-opentelemetry-redesign-plan.md) tracks unfinished T13B/T13C work;
+canonical telemetry, verification, performance, and publish contracts remain authoritative.
 
-The objective is to restore feature development on `integration/v0.13.0` while completing telemetry
-quality and performance acceptance before v0.13.0 is released. Integration acceptance is distinct
-from release acceptance. Neither an integration merge nor a test-scale measurement completes T13B,
-waives a performance requirement, or constitutes a performance exception.
+M0 is complete. M1 implementation and prior functional validation remain accepted evidence, but
+M1 integration is reopened after the human reset. M2 is paused until the intended integration chain
+is complete. Resetting branch history does not undo the implementation or waive release obligations.
 
-The work also supports practical experience maintaining OTel instrumentation in a product. Code and
-documentation must let a new contributor recognize telemetry concerns and find the relevant guidance
-without reading the entire telemetry design to understand extraction.
+| Milestone                 | Status                    | Remaining exit                                                                                      |
+| ------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------- |
+| M0: Measurement path      | complete, one target only | Preserve the original evidence and attribution                                                      |
+| M1: Integration-ready     | reintegration pending     | Prepare the T13B tip, then human-approved PRs and human-operated merges through the parent branches |
+| M2: v0.13.0 release-ready | paused pending M1         | Full T13B, readable profiles, staged system-test organization, final candidate and T13C             |
+| M3: Future capabilities   | deferred beyond v0.13.0   | Separate future plans                                                                               |
+
+## Branch recovery and next assignment
+
+The local and actual remote integration refs were checked after the human reset and both equal
+`1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`. The reset integration tip is preserved locally and
+remotely at `archive/otel-m1-before-reset-20260911`, OID
+`b4468342c982d09be09e9c46290bb1ed2d842a36`. That branch is an archive, not an active merge source.
+The separate `D:\gitlode_test` evidence archives remain immutable.
+
+The approved integration route is:
+
+1. `feature/otel-redesign_T13B` into `feature/otel-redesign_T13`.
+2. `feature/otel-redesign_T13` into `feature/otel-redesign`.
+3. `feature/otel-redesign` into `integration/v0.13.0`.
+
+Step 4 recovery preparation is owned by the current planning conversation on T13B, starting at
+`50159a615843d8c0294b8cf3d7f95754478e8540`. The test environment isolation from
+`a6a7073f09231df94e1275b237e3bb276b591c03` is reapplied at `7dc4ca7`; completed handoffs are
+consolidated and the [M1 evidence note](opentelemetry-m1-validation-result.md#recovery-step-4-validation)
+records the verified delta and current checks separately from historical validation. The next action
+after the documentation checkpoint is human inspection and explicit permission for the T13B-to-T13
+PR. Do not restore the old M1-complete/M2-next routing or resume M2 before reintegration.
+
+Before each PR, present its exact source tip, base branch, cumulative diff, evidence, and remaining
+obligations for human inspection. Obtain explicit permission stating which branch will merge into
+which branch. The human creates the approval and performs the merge, including any squash choice;
+the agent must not merge or directly push integration. See the
+[durable collaboration rule](../agents/collaborative-work.md#pull-requests-and-branch-integration).
+No PR is authorized merely by completion of this preparation step.
+
+After each human merge, fetch and inspect the actual result before preparing the next PR. Compare
+content rather than assuming ancestry survived squash. Preserve the domain-design link already in
+the integration base's `git-cli-adapter-plan.md`. The earlier direct-integration rehearsal is
+historical evidence only, not authorization or a matching-tree claim for these new merge results.
+
+## Evidence and squash boundaries
+
+- [M0 environment and one-target result](opentelemetry-m0-result.md) retain operational paths,
+  exact product/harness/recipe identities and archive hashes. They are not full T13B evidence.
+- [M1 validation evidence](opentelemetry-m1-validation-result.md) retains the frozen candidate,
+  Windows/Linux verification and immutable package/runtime identities. The CI fix changes only tests;
+  compare production/package inputs explicitly before reusing that verification for a new tip.
+- Squash changes commit identities and can remove ancestor relationships required by the
+  [publish gate](../contributing/build-test-release.md). Keeping an archive ref preserves objects,
+  but does not make an old frozen candidate an ancestor of the new final candidate.
+- After the full branch chain is integrated, freeze a new M2 product candidate on the resulting
+  integration history and run formal M2 acceptance there. Keep old evidence attributed to its actual
+  OIDs; never relabel old measurements as new-candidate results or relax provenance checks here.
+  M2 planning must also settle final release-to-main squash timing before binding the final candidate.
+
+Completed implementation/review/diagnosis packets were removed from the working tree. Their history
+remains in the preserved T13B commits and archive branch. This plan and the two evidence notes carry
+only context needed for reintegration and M2; the original plan carries the remaining unit scope.
 
 ## Accepted decisions and limits
 
@@ -31,48 +85,10 @@ without reading the entire telemetry design to understand extraction.
   workflows incrementally. Do not move every telemetry test or add public APIs to expose internals.
 - Separate implementation, measurement execution, diagnosis, and review sessions using the
   [collaboration guidance](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
-- Do not reset the migration, restore legacy instrumentation, remove observations, relax thresholds,
+- Do not discard the implementation, restore legacy instrumentation, remove observations, relax thresholds,
   or automatically retry for a favorable result. The current calibration recipe remains authoritative.
   Whether to replace minimum-integer calibration with a selection having more timing headroom is an
   unresolved design question, not an approved change.
-
-## Milestones
-
-| Milestone                                  | Status                        | Exit evidence                                                                                                                                |
-| ------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Executable and diagnosable measurement | complete: one target accepted | Usable reference environment, bounded observable execution, and one complete repository measurement path                                     |
-| M1: Integration-ready                      | in preparation                | Functional safety, limited organization, immutable candidate, enforceable release obligations, and reviewed merge into `integration/v0.13.0` |
-| M2: v0.13.0 release-ready                  | pending M1                    | Full T13B acceptance, readable profiles, staged system-test organization, documentation, final candidate validation, and T13C closure        |
-| M3: Future capabilities                    | deferred beyond v0.13.0       | Separately scoped future plans; not blockers for M1 or M2                                                                                    |
-
-### M0: Establish the measurement path
-
-Use separate bounded assignments for environment preparation, harness repair, and execution.
-
-1. Prepare the existing WSL2 distribution. Record Linux Node/npm/Git versions, filesystem and
-   execution paths, available resources, and the preserved legacy release identity. Keep dependency
-   installation separate from timed work. Check the entire legacy bundle/dependency closure, not just
-   `index.js`. Use Linux tools for both baseline and candidate.
-2. Demonstrate external RSS sampling for a child on that environment. Verify the sampling cadence
-   required by the performance catalog and distinguish missing samples from a zero measurement.
-3. Make the harness diagnosable: expose preparation, pilot quantity, warmup/measured iteration,
-   child PID, elapsed time, and completion/failure stage. Keep supervision outside product telemetry
-   and avoid high-frequency logging during timed work. Preserve bounded child diagnostics for failure.
-4. Establish generous, separately defined preparation and execution deadlines with owned-child cleanup.
-   A deadline is a supervision limit, not a performance threshold. Preserve available evidence and
-   return inconclusive on expiry; do not leave descendants running or report a timeout as a measured
-   performance failure. Review durable supervision contracts before implementing them.
-5. Freeze the harness and complete one repository target: calibration, legacy capture,
-   `disabled_overhead`, and `profile_overhead`, including the required sidecar evidence. Save each
-   attempt and comparison in distinct directories to prevent artifact replacement.
-
-M0 requires valid pass/fail comparison evidence; unresolved inconclusive evidence means the path is
-not ready. A valid performance failure can close the measurement-path task, but becomes an explicit
-investigation item for M1/M2. It never authorizes ignoring a material regression. A short smoke run
-can establish mechanics but cannot substitute for formal wall-clock evidence.
-
-Do not start full-matrix runs while environment support or indefinite waiting is unresolved. Do not
-expand this slice into workspace moves, profile UI work, or production telemetry optimization.
 
 ### M1: Integrate without claiming release readiness
 
@@ -91,13 +107,13 @@ Before merging:
 - define and verify how the M2 release blockers prevent accidental publishing. The existing
   `validate:release` command is not evidence of formal telemetry performance acceptance. Keep
   integration CI usable while making release readiness explicit; and
-- review the cumulative result on the integration target, then merge into `integration/v0.13.0`.
+- review the cumulative result and each proposed merge result, then follow the human-approved branch chain above.
 
 Mechanical moves belong before integration to reduce later conflicts. General helper extraction,
 recorder API redesign, and large documentation rewrites are not prerequisites for those moves.
 Partial performance coverage must remain labeled partial.
 
-After the merge, branch all further work from `integration/v0.13.0`. Other feature work can proceed.
+After the final human-operated integration merge, branch all further work from `integration/v0.13.0`. Other feature work can proceed.
 Do not continue accumulating changes on a parallel long-lived redesign branch. Keep T13B and T13C
 open and retain these handoffs until their release obligations are complete.
 
@@ -129,65 +145,15 @@ abstractions, and migration of unrelated system tests belong in separately scope
 Local SDK integration already exists; future work is not described as the first SDK adoption.
 These ideas must not automatically become v0.13.0 blockers.
 
-## Session packets and current next assignment
+## Session boundaries
 
-The planning session owns this milestone table, decisions, and a concise blocker ledger. Each task
-packet names its base revision, allowed files, required reading, commands, exit evidence, and the
-conditions requiring a design decision. Return artifact paths and revisions, not a transcript dump.
-Measurement operators do not repair code or alter fixtures during a formal run. A separate diagnosis
-session handles a concrete failed/inconclusive result. Reviewers inspect the fixed diff and return
-contract-linked required corrections separately from optional improvements.
+The current conversation prepares recovery step 4 and reports a reviewable checkpoint. It does not
+start M2 or create a PR without explicit approval. Generic continuation instructions preserve these
+boundaries. After reintegration, use a separate M2 planning conversation to order presentation,
+system-test organization, candidate freezing, formal measurements, and T13C by their dependencies.
 
-M0 environment preparation is complete. The
-[environment handoff](opentelemetry-m0-environment.md) records toolchain activation, immutable release
-snapshots, successful child RSS and behavioral smoke probes, archive provenance, and limitations.
-
-M0 is complete: environment preparation, harness supervision and R1 review/freeze, and the
-one-target calibration/capture/comparison path are accepted. The
-[M0 result](opentelemetry-m0-result.md) records the exact revisions, passing target results,
-independently verified archive, and observed execution duration. Full T13B/M2 acceptance remains
-open; this evidence covers one target and the preserved candidate only.
-
-M1 placement/navigation is independently accepted at `97235c37a518c829170568f9c32d5ffe2318803b`.
-The publish gate, including G1 and G2, is independently accepted at
-`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`; see the
-[final review outcome](opentelemetry-m1-publish-gate-review.md#final-slice-acceptance). The live record
-remains blocked. The human-approved policy stops all supported Changesets publishing, including
-plugin-only releases, until M2 is accepted while leaving ordinary CI and Version PR creation usable.
-
-Cumulative Windows/Linux validation and immutable candidate preservation are accepted for source/harness
-`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`; the
-[result](opentelemetry-m1-validation-result.md) records test coverage, reruns and verified archives.
-The immediate next assignment is [cumulative integration review and rehearsal](opentelemetry-m1-integration-review.md)
-in a new conversation, with proposed source `134e475b2de9559007e11fb724298395f832c6cf`. This reviews
-the cumulative redesign and rehearses the result in an isolated clone without changing live refs.
-Reuse passed validation if implementation trees match; do not start formal measurements. M1 remains
-open until the reviewed integration actually occurs. Cumulative review accepted the original source,
-but final authoritative-ref verification found remote integration at `1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`,
-one handoff-link commit beyond the reviewed local base. Planning rehearsed a conflict-free merge with
-result tree `619c389da8a12e36fa8465a611a0c8f28eaad0ea`; implementation inputs are unchanged.
-The immediate next action is the [bounded review amendment](opentelemetry-m1-integration-review.md#current-bounded-amendment)
-in the existing integration review conversation. No live refs have been changed. The current
-conversation owns planning and acceptance. Generic continuation instructions preserve this assignment.
-
-Do not reuse a mutable development `dist` as the measurement bundle. Development and release builds
-share that directory. Do not install into or reconfigure Docker Desktop's managed distribution.
-
-## Initial inspection evidence (2026-09-09)
-
-- Source inspected at `3a84de9` on `feature/otel-redesign_T13B`; no source implementation changes
-  are part of this planning update.
-- `Ubuntu` and `docker-desktop` were running as WSL version 2. Ubuntu reports 26.04 LTS,
-  kernel `6.18.33.1-microsoft-standard-WSL2`, and Git `2.53.0`.
-- The inspected Ubuntu login shell could not resolve `node` or `npm`. This is not proof that no
-  alternative installation exists; the next session must establish an explicit Linux toolchain.
-- Ubuntu root is ext4 with roughly 999 million KiB available. `/mnt/d` is a Windows-mounted 9p
-  filesystem. `/proc/self/status` is readable; sampling the actual target child is still unverified.
-- WSL enumeration required elevated tool execution because the sandbox returned access denied.
-  The approved retry was read-only. No WSL settings or installed packages were changed.
-- The D-drive archive contains Windows pilot evidence from 2026-09-03 with unsupported RSS and a
-  checkpoint-comparison failure. It contains no newly accepted Linux calibration evidence.
-
-The initial toolchain and child RSS blockers were resolved by the subsequent
-[environment preparation](opentelemetry-m0-environment.md). M0 is now complete with the accepted
-[one-target result](opentelemetry-m0-result.md); full-matrix and release acceptance remain open.
+Use separate bounded implementation, measurement, diagnosis, and review assignments as described
+in the [collaboration guidance](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
+Measurement operators execute fixed inputs and return evidence; they do not repair code or retry for
+a favorable result. Warn before long external execution. Never reuse a mutable development
+`dist` as the preserved measurement bundle or modify Docker Desktop's managed distribution.

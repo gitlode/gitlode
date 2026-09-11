@@ -201,6 +201,18 @@ A good completion summary includes:
 
 The agent should help close the loop cleanly.
 
+## Pull requests and branch integration
+
+Before creating any pull request, state the exact source and base branches and obtain explicit human
+approval. Complete the authorized implementation, validation, and handoff cleanup first so the human
+can review the proposed content as well as the merge destination. A generic instruction to continue,
+or approval of implementation work, does not authorize PR creation.
+
+The human performs PR approval and merge, including the choice of squash, merge, or rebase. Agents
+must not merge PRs, bypass branch rules, or directly update a shared integration branch as an
+alternative. Confirm the intended branch chain rather than assuming a nested work branch should
+merge directly into integration. Checkpoint commits remain allowed within the authorized work scope.
+
 ## Bounded implementation and measurement sessions
 
 For work combining implementation and empirical acceptance, divide sessions by responsibility:

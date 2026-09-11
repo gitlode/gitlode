@@ -1,50 +1,70 @@
-# M1 cumulative validation result and preserved candidate
+# M1 evidence retained for reintegration and M2
 
-## Planning acceptance
+## Scope and accepted inputs
 
-The planning owner accepts cumulative validation and candidate preservation at
-`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`. On receipt, planning HEAD was
-`134e475b2de9559007e11fb724298395f832c6cf` with a clean worktree. The owner independently verified
-`evidence.sha256` as `7454ed104bfeb89ce401ff88156e5a261fd22c64608a21d1dce94119c2e4bb08` and all 40
-indexed archive files, including the runtime archive hash recorded below, and inspected the command
-ledger and result/provenance records. Tests and ext4 runtime extraction were not rerun in planning.
+M1 integration is reopened after the human reset; see the [recovery plan](instrumentation-opentelemetry-recovery-plan.md).
+This note preserves evidence needed for reintegration and candidate-delta assessment. It does not
+attribute old runs to the new T13B tip or accept T13B/M2/T13C and publishing.
 
-The observed integration ref remains `745d3d553e7ddbea430993602ddaa36fe816dfc4`, an ancestor of
-the proposed source `134e475...`; changes from the validated candidate are seven handoff documents
-only. Next is [cumulative integration review and rehearsal](opentelemetry-m1-integration-review.md).
-M1, full T13B, M2, T13C and publish acceptance remain incomplete.
-
-## Outcome
-
-Cumulative functional and package validation passed on Windows and Linux for source and harness
-`681a1a5b53bd0aa957dae72d9fd9684da7ff467a`. The tested package and a complete production-only Linux
-installation are preserved under `D:\gitlode_test\m1-20260911T052245Z-681a1a5`. This checkpoint
-records validation and candidate preservation only. It does not complete M1 or T13B, accept M2 or
-T13C, authorize publishing, or perform the remaining cumulative review and merge-result checks.
-
-No source code, release-acceptance record, calibration input, candidate/integration ref, or fixture
-was changed. The only repository mutation is this result document and its requested checkpoint,
-which advances `feature/otel-redesign_T13B` from the planning HEAD recorded below. No formal
-performance measurement, merge, Version PR, release, Changesets publish, or npm publish was run.
-
-## Identities and ref relationship
-
-- Planning checkout before validation: branch `feature/otel-redesign_T13B`, HEAD
-  `81fe9025ac8ba425a8d2f11c881949af3f096c6d`, clean worktree.
-- Fixed source and current harness: `681a1a5b53bd0aa957dae72d9fd9684da7ff467a`.
-- Refs recorded before creating the isolated checkouts:
-  - `feature/otel-redesign_T13B`: `81fe9025ac8ba425a8d2f11c881949af3f096c6d`
-  - `feature/otel-redesign`: `5a6a810b8621759fb9723d0617aabdf1fbbac631`
-  - `integration/v0.13.0`: `745d3d553e7ddbea430993602ddaa36fe816dfc4`
-- `integration/v0.13.0` is an ancestor of the fixed candidate. The fixed candidate is not an
-  ancestor of the integration ref, and their merge base is the integration OID itself,
-  `745d3d553e7ddbea430993602ddaa36fe816dfc4`. Thus the candidate remains unmerged as expected.
-- The transfer bundle SHA-256 is
+- Domain-local placement was independently accepted at `97235c37a518c829170568f9c32d5ffe2318803b`:
+  ten exact renames, unchanged recording behavior and exports, and contributor routing.
+- Gate G1/G2 and cumulative Windows/Linux validation were accepted at source/harness
+  `681a1a5b53bd0aa957dae72d9fd9684da7ff467a`. Obligations and provenance remain canonical in
+  [build/test/release guidance](../contributing/build-test-release.md); the live record stays blocked.
+- Archive: `D:\gitlode_test\m1-20260911T052245Z-681a1a5`. Planning independently verified all
+  40 `evidence.sha256` entries and manifest SHA-256
+  `7454ed104bfeb89ce401ff88156e5a261fd22c64608a21d1dce94119c2e4bb08` at the original acceptance.
+- Candidate transfer bundle SHA-256:
   `0ac433cd98f3f3a3a44c81fa8dc444474d07866b93150d9476dff0e4de1fab73`.
-- The committed `package-lock.json` SHA-256 is
+- Candidate source lockfile SHA-256:
   `f8808ceec4f64f5e6b7ba46d88804929d54e1ae0e8576e5da77237a0f3647ba7`.
 
-## Environments
+## Reversed integration and retained CI correction
+
+The old reviewed integration source was `134e475b2de9559007e11fb724298395f832c6cf`, a fixed
+validation checkpoint. Its difference from the later T13B tip `50159a6...` was five handoff files,
+with no implementation/package delta. Review accepted cumulative behavior and the rehearsal tree
+`619c389da8a12e36fa8465a611a0c8f28eaad0ea` against base `1664798...`. The old merge
+`506b657...` used that tree, but directly pushing it bypassed the PR and required-check rules.
+That deviation was disclosed; the human subsequently reset integration and now owns every merge.
+The old rehearsal does not replace review of the new multistage merge results.
+
+[Initial integration CI](https://github.com/gitlode/gitlode/actions/runs/34570108403) failed because
+gate tests inherited `GITHUB_ACTIONS` and `GITHUB_REF` from the runner, rejecting temporary Git
+repositories before their intended assertions. Commit `a6a7073f09231df94e1275b237e3bb276b591c03`
+isolated these variables with Vitest lifecycle hooks and retained explicit Actions-context tests.
+Production gate conditions and publishing wiring were unchanged. Historical verification includes
+50/50 focused tests under both integration and PR environments and
+[PR CI](https://github.com/gitlode/gitlode/actions/runs/34570822554) with 91 files / 1,201 tests,
+release build, publint and installed-package validation passing. These are historical run results.
+
+Recovery reapplies only that test-file change on `50159a6...`, not the old commit's integration
+closure documents. All post-reset validation belongs to the new checkpoint; old M0/M1 archives
+must not be overwritten. The archived pre-reset tip is `b446834...`, named by the recovery plan.
+
+## Recovery step 4 validation
+
+The test correction is checkpointed on T13B at `7dc4ca7`, based on `50159a6`. Its test file is
+byte-for-byte identical in Git content to the previously CI-validated `a6a7073` file. In this recovery
+session, all 50 focused gate tests passed with inherited `GITHUB_ACTIONS=true` under each of
+`refs/heads/feature/otel-redesign_T13B` and `refs/pull/999/merge`. Explicit Actions-main/non-main
+cases remain in the suite. Strict validator typecheck and root/workspace lint passed.
+
+The complete difference from accepted `681a1a5`, excluding documentation and that one test, is empty.
+Thus production, packaging, dependencies, workflows, harness implementation and acceptance record
+retain the previously validated inputs. Full Windows/Linux suites and installed-package checks were
+not rerun here; the prior two-platform evidence and historical fixed-file CI run above are reused
+with this explicit delta. No formal measurements, archive rewrites, PR creation or merge occurred.
+
+Completed handoff packets were consolidated into four telemetry continuation documents. Removed-file
+references and local Markdown links were checked repository-wide with no remaining broken links.
+Root format write/check and diff whitespace checks are required before the documentation checkpoint.
+The first PR base was read directly from the remote as `feature/otel-redesign_T13` at
+`06136491676e71298c7d5488d3df8ed6a4e5b6bd`, which is an ancestor of the prepared T13B tip. Recheck
+it before creating the human-authorized PR. The cumulative PR includes earlier M0/M1 work as well
+as this recovery delta; this paragraph is not a claim of a new independent cumulative review.
+
+## Environments of the original validation
 
 | Platform | Environment                                                                | Toolchain                                             | Filesystem and isolation                                                                                                                                                  |
 | -------- | -------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -141,15 +161,9 @@ The fixed candidate's unchanged, uncalibrated repository manifest is separately 
 calibration evidence. M2 must perform its required candidate-delta assessment and remaining matrix
 under the accepted reuse rules.
 
-## Evidence and remaining obligations
+## Remaining acceptance
 
-The archive contains the candidate Git bundle, Windows and Linux command logs, the failed Windows
-attempt and successful complete rerun, package manifests and tarballs, production dependency
-inventory, installed-tree hashes/modes, M0/M1 manifest provenance, and a repository-wide SHA-256
-index with a verification log. Both fixed validation source checkouts were clean after all checks.
-
-Outstanding work remains intentionally unchanged: independent cumulative review against the
-then-current integration target, merge-result verification and reviewed merge into
-`integration/v0.13.0`, full T13B/M2 performance and readability/system-test/documentation/final
-candidate obligations, T13C closure, acceptance-record review, and explicit release authority. None
-of those obligations is satisfied or waived by this functional-validation checkpoint.
+Confirm the prepared T13B diff, then obtain explicit permission before creating the T13B-to-T13 PR.
+The human merges each stage. Verify each actual result, preserving the integration base's existing
+link change. Only final integration closes M1 again. Full T13B, M2 presentation/system-test work,
+final candidate validation, T13C and release-authority acceptance remain outstanding.

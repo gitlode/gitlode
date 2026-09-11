@@ -2,7 +2,8 @@
 
 ## Implementation outcome
 
-Implemented in checkpoint `97235c37a518c829170568f9c32d5ffe2318803b`; independent review is pending.
+Implemented in checkpoint `97235c37a518c829170568f9c32d5ffe2318803b`; independent review is accepted
+with no required corrections. See the [review outcome](opentelemetry-m1-placement-review.md#accepted-outcome).
 The planning owner confirmed matching HEAD and a clean worktree on receipt, all ten renames at
 100% similarity, and that the `.rev-dep.config.json` diff only updates five explicit entrypoint paths
 to their new locations. No dependency allowlist or domain rule was relaxed. The checkpoint's
@@ -12,7 +13,7 @@ The implementation owner reported 21 focused test files / 321 passing tests, arc
 lint, format write/check, diff check, no stale paths, and no nested telemetry barrels. These checks
 were not repeated by the planning owner. Full Windows/Linux installed-package and cumulative
 integration validation remain later M1 obligations. No publish gate, measurement, merge, or new
-candidate freeze was performed. Next: [fixed-checkpoint review](opentelemetry-m1-placement-review.md).
+candidate freeze was performed. Next: [publish-gate implementation](opentelemetry-m1-publish-gate.md).
 
 The original implementation instructions below are historical; do not repeat the moves.
 

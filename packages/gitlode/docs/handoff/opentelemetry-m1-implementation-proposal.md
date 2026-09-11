@@ -2,10 +2,11 @@
 
 ## Planning disposition
 
-The planning owner accepts the ten-file placement map and minimal contributor navigation changes
-within the already approved M1 direction. The next bounded assignment is
-[placement and navigation](opentelemetry-m1-placement.md). It does not include the gate-related
-build/test/release documentation until that gate is implemented.
+Placement and navigation are implemented and independently accepted at
+`97235c37a518c829170568f9c32d5ffe2318803b`. The next bounded assignment is
+[publish-gate implementation](opentelemetry-m1-publish-gate.md). That packet resolves and supersedes
+the tentative gate details below: committed review attestations, final validation after Changesets
+versioning, record-only post-candidate differences, and reviewed retirement after v0.13.0 publication.
 
 Session allocation below is superseded: placement/navigation and the publish gate have no direct
 implementation dependency and use separate implementation sessions. Each supplies a checkpoint for

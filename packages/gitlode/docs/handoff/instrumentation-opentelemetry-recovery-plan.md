@@ -151,10 +151,11 @@ open; this evidence covers one target and the preserved candidate only.
 M1 preparation is complete in proposal commit `571a65c14e9e001c142884b4289660e84d68970a`. The planning
 owner accepted its ten-file placement map and minimal contributor routes. Placement/navigation is
 implemented at `97235c37a518c829170568f9c32d5ffe2318803b`; the [outcome](opentelemetry-m1-placement.md)
-records intake checks and reported verification. The immediate next assignment is
-[independent fixed-checkpoint review](opentelemetry-m1-placement-review.md) in a new conversation.
-No repeated performance run is planned. The publish gate uses a separate
-implementation session. The human accepted blocking the entire supported Changesets publish operation,
+records intake checks and reported verification. Independent review accepted the slice with no
+required corrections; see the [review outcome](opentelemetry-m1-placement-review.md#accepted-outcome).
+The immediate next assignment is [publish-gate implementation](opentelemetry-m1-publish-gate.md)
+in a new implementation conversation. No repeated performance run is planned.
+The human accepted blocking the entire supported Changesets publish operation,
 including independent plugin-only releases, until M2 is accepted; ordinary CI and integration work
 remain usable. See the [proposal disposition](opentelemetry-m1-implementation-proposal.md#planning-disposition)
 for remaining gate details. Gate implementation does not block mechanical placement work. The current

@@ -5,23 +5,23 @@ import { describe, expect, test } from "vitest";
 import {
   createBuiltInFactProjectorMetricRecorder,
   NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
-} from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
+} from "../../src/extraction/telemetry/built-in-fact-projector-metric-recorder.js";
 import {
   createExtractionPipelineMetricRecorder,
   NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
-} from "../../src/extraction/extraction-pipeline-metric-recorder.js";
+} from "../../src/extraction/telemetry/extraction-pipeline-metric-recorder.js";
 import {
   createFileChangeFactExpanderMetricRecorder,
   NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
-} from "../../src/extraction/file-change-fact-expander-metric-recorder.js";
+} from "../../src/extraction/telemetry/file-change-fact-expander-metric-recorder.js";
 import {
   createJsonlFileWriterMetricRecorder,
   NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
-} from "../../src/output/jsonl-file-writer-metric-recorder.js";
+} from "../../src/output/telemetry/jsonl-file-writer-metric-recorder.js";
 import {
   createPluginProjectionMetricRecorder,
   NOOP_PLUGIN_PROJECTION_METRIC_RECORDER,
-} from "../../src/plugin-runtime/plugin-projection-metric-recorder.js";
+} from "../../src/plugin-runtime/telemetry/plugin-projection-metric-recorder.js";
 
 type Call = { name: string; value: number; attributes?: unknown };
 class FakeMeter {

@@ -41,8 +41,8 @@ import {
   type CliFileBlobChangeDescriptor,
   type CliFileBlobSnapshotDescriptor,
 } from "./git-cli-raw-diff.js";
-import type { GitMetricRecorder } from "./git-metric-recorder.js";
-import { attributeKey, setGitProcessError, withGitAsyncSpan } from "./git-telemetry.js";
+import type { GitMetricRecorder } from "./telemetry/git-metric-recorder.js";
+import { attributeKey, setGitProcessError, withGitAsyncSpan } from "./telemetry/git-telemetry.js";
 
 export { parseBatchObjectStream } from "./git-cli-cat-file-batch.js";
 export { parseRawDiffTreeOutput } from "./git-cli-raw-diff.js";

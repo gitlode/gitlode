@@ -29,8 +29,16 @@ function normalizeCheckpoint(
 ): unknown {
   if (!checkpoint || typeof checkpoint !== "object") return checkpoint;
   const value = checkpoint as Record<string, unknown>;
+  const refs = Array.isArray(value.refs)
+    ? value.refs.map((ref) => {
+        if (!ref || typeof ref !== "object") return ref;
+        const entry = ref as Record<string, unknown>;
+        return typeof entry.updatedAt === "string" ? { ...entry, updatedAt: "<session>" } : ref;
+      })
+    : value.refs;
   return {
     ...value,
+    ...(refs === undefined ? {} : { refs }),
     ...(value.repositoryPath === repositoryPath ? { repositoryPath: "<repository>" } : {}),
     ...(value.generatedAt === generatedAt ? { generatedAt: "<session>" } : {}),
   };

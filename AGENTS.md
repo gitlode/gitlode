@@ -86,10 +86,16 @@ Read:
 
 1. `packages/gitlode/docs/design/telemetry.md` for instrumentation, collection, and profile-report
    contracts
-2. `packages/gitlode/docs/profiling.md` for the currently implemented profile output
+2. `packages/gitlode/docs/design/telemetry-verification.md` for recorder, operation-owner, collector,
+   and equivalence verification
 3. `packages/gitlode/docs/design/architecture.md` and `packages/gitlode/docs/design/domain-design.md`
    when instrumentation boundaries are affected
-4. Relevant notes in `packages/gitlode/docs/handoff/` only when continuing unfinished work
+4. `packages/gitlode/docs/design/telemetry-performance.md` and
+   `packages/gitlode/docs/contributing/telemetry-performance-harness.md` only for empirical
+   performance work
+5. `packages/gitlode/docs/profiling.md` for user-visible profile-report interpretation
+6. `packages/gitlode/docs/contributing/build-test-release.md` when publish policy is affected
+7. Relevant notes in `packages/gitlode/docs/handoff/` only when continuing unfinished work
 
 ## Guardrails
 

@@ -14,7 +14,7 @@ import {
 import { assertNever, formatUnixTimestampWithOffset } from "@gitlode/internal-foundation/support";
 import type { Context, Tracer } from "@opentelemetry/api";
 
-import type { BuiltInFactProjectorMetricRecorder } from "./built-in-fact-projector-metric-recorder.js";
+import type { BuiltInFactProjectorMetricRecorder } from "./telemetry/built-in-fact-projector-metric-recorder.js";
 
 export function projectCommit(
   fact: CommitFact,

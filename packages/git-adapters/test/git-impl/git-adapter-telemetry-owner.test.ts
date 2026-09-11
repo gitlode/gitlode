@@ -20,13 +20,13 @@ import type { FsClient } from "isomorphic-git";
 import { Volume, createFsFromVolume } from "memfs";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createDagTelemetryBinding } from "../../src/git-impl/dag-metric-recorder.js";
 import { GitCliAdapter } from "../../src/git-impl/git-cli-adapter.js";
+import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+import { createDagTelemetryBinding } from "../../src/git-impl/telemetry/dag-metric-recorder.js";
 import {
   createGitMetricRecorder,
   type GitMetricRecorder,
-} from "../../src/git-impl/git-metric-recorder.js";
-import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
+} from "../../src/git-impl/telemetry/git-metric-recorder.js";
 
 class RecordingSpan {
   readonly attributes: Record<string, string | boolean | number> = {};

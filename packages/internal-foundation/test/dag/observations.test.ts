@@ -11,7 +11,7 @@ import type {
   DagOperationCompletion,
   DagOperationObservation,
   DagTerminationReason,
-} from "../../src/dag/observations.js";
+} from "../../src/dag/telemetry/observations.js";
 import type { DagTopologyPort, WalkDagContext } from "../../src/dag/types.js";
 
 class RecordingDagOperationObservation implements DagOperationObservation {

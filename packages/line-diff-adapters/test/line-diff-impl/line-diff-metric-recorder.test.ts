@@ -5,7 +5,7 @@ import { describe, expect, test } from "vitest";
 import {
   createLineDiffMetricRecorder,
   NOOP_LINE_DIFF_METRIC_RECORDER,
-} from "../../src/line-diff-impl/line-diff-metric-recorder.js";
+} from "../../src/line-diff-impl/telemetry/line-diff-metric-recorder.js";
 type Call = { name: string; value: number; attributes: unknown };
 class FakeMeter {
   creations: { kind: string; name: string; options: unknown }[] = [];

@@ -1,7 +1,7 @@
 import { context, metrics, trace } from "@opentelemetry/api";
 
-import { createDagTelemetryBinding } from "../../src/git-impl/dag-metric-recorder.js";
-import { createGitMetricRecorder } from "../../src/git-impl/git-metric-recorder.js";
+import { createDagTelemetryBinding } from "../../src/git-impl/telemetry/dag-metric-recorder.js";
+import { createGitMetricRecorder } from "../../src/git-impl/telemetry/git-metric-recorder.js";
 
 export function adapterTelemetry(adapter: "isomorphic-git" | "git-cli") {
   const gitTracer = trace.getTracer("gitlode.git");

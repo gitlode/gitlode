@@ -15,3 +15,11 @@ and coding agents need while changing the codebase.
   LLM autonomy boundaries, severity, and review cadence.
 - [`telemetry-performance-harness.md`](telemetry-performance-harness.md): reference calibration,
   legacy baseline capture, and migration comparison workflow.
+
+For normal telemetry verification, start with
+[`../design/telemetry-verification.md`](../design/telemetry-verification.md) and run the applicable
+repository checks described in [`build-test-release.md`](build-test-release.md). Formal performance
+work additionally follows [`../design/telemetry-performance.md`](../design/telemetry-performance.md)
+and [`telemetry-performance-harness.md`](telemetry-performance-harness.md). Changes to publish policy
+start with [`build-test-release.md`](build-test-release.md); migration acceptance and empirical
+evidence are separate from the functional and package validation performed by `validate:release`.

@@ -12,7 +12,7 @@ import { withAsyncSpan } from "@gitlode/internal-foundation/otel-support";
 import { atOrThrow } from "@gitlode/internal-foundation/support";
 import { context, trace, type Context } from "@opentelemetry/api";
 
-import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "./extraction-pipeline-metric-recorder.js";
+import { NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER } from "./telemetry/extraction-pipeline-metric-recorder.js";
 import type { CoordinatorDependencies } from "./types.js";
 
 async function* deduplicateCommits(

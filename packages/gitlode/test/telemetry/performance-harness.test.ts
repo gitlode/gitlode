@@ -17,17 +17,24 @@ import {
 } from "../support/performance-fixtures.js";
 import {
   canonicalManifest,
+  composeFormalStatus,
+  composeSidecarEvaluationStatus,
   environmentCompatibility,
   evaluateComparison,
+  evaluateRepositoryProfileReport,
   evaluateVolume,
+  extractProfileReportMeasurements,
   launchMeasuredChild,
   mad,
   manifestHash,
   median,
-  nextCalibrationQuantity,
+  classifyCalibrationMedian,
+  planCalibration,
   pairPlan,
   sampleChildRss,
   unavailableTargetTelemetry,
+  volumeObservationFromProfileReport,
+  validateSidecarMatrix,
   type EnvironmentFingerprint,
   type FixtureManifest,
   type RawRun,
@@ -42,7 +49,7 @@ const manifest: FixtureManifest = {
   recipeRevision: "performance-v1",
   aggregationScale: {
     status: "fixed-recipe",
-    integration: "pending-target-collector",
+    integration: "implemented-target-collector",
     quantities: { scale: 4 },
   },
   calibrationTargets: {
@@ -99,6 +106,67 @@ const run = (elapsedMs: number, rss = 100 * 1024 ** 2, code = 0, pairIndex = 0):
 });
 
 describe("performance harness contracts", () => {
+  it("composes formal status with fail precedence and deterministic deduplication", () => {
+    expect(composeFormalStatus(["pass", "pass", "pass"], ["z", "a", "z"])).toEqual({
+      status: "pass",
+      reasons: ["a", "z"],
+    });
+    expect(composeFormalStatus(["fail", "inconclusive", "pass"]).status).toBe("fail");
+    expect(composeFormalStatus(["inconclusive", "fail", "pass"]).status).toBe("fail");
+    expect(composeFormalStatus(["inconclusive", "pass", "pass"]).status).toBe("inconclusive");
+  });
+  it.each([
+    [["fail"], ["missing sidecar"], "fail"],
+    [["inconclusive"], ["missing sidecar"], "inconclusive"],
+    [["fail", "inconclusive"], [], "fail"],
+    [["pass"], [], "pass"],
+  ])(
+    "composes sidecar status for reports=%j completeness=%j => %s",
+    (reports, errors, expected) => {
+      expect(composeSidecarEvaluationStatus(reports, errors).status).toBe(expected);
+    },
+  );
+  it("validates every target_on sidecar completeness branch", () => {
+    const targetOn = { runId: "on", state: "target_on" as const };
+    expect(validateSidecarMatrix([targetOn], [])).toContain("missing sidecar for runId on");
+    expect(
+      validateSidecarMatrix(
+        [targetOn],
+        [{ ...targetOn, status: "not-applicable", provenanceRunId: "on" }],
+      ),
+    ).toContain("target_on sidecar is not-applicable for on");
+    expect(
+      validateSidecarMatrix(
+        [targetOn],
+        [{ ...targetOn, status: "inconclusive", provenanceRunId: "on" }],
+      ),
+    ).toContain("target_on sidecar is inconclusive for on");
+    expect(
+      validateSidecarMatrix(
+        [targetOn],
+        [{ ...targetOn, status: "available", provenanceRunId: "on" }],
+      ),
+    ).toContain("target_on sidecar report is missing for on");
+    expect(
+      validateSidecarMatrix(
+        [
+          { runId: "off", state: "target_off" },
+          { runId: "legacy", state: "legacy_off" },
+        ],
+        [
+          { runId: "off", status: "available", provenanceRunId: "off", report: {} },
+          { runId: "legacy", status: "not-applicable", provenanceRunId: "wrong" },
+          { runId: "extra", status: "not-applicable", provenanceRunId: "extra" },
+          { runId: "extra", status: "not-applicable", provenanceRunId: "extra" },
+        ],
+      ),
+    ).toEqual([
+      "duplicate sidecar for runId extra",
+      "sidecar runId mismatch for legacy",
+      "target_off sidecar must be not-applicable for off",
+      "unexpected sidecar for runId extra",
+    ]);
+  });
   it("separates two warmups from seven alternating measured pairs", () => {
     const plan = pairPlan();
     expect(plan.slice(0, 2).every((p) => p.phase === "warmup")).toBe(true);
@@ -214,11 +282,104 @@ describe("performance harness contracts", () => {
     expect(await readFile(path, "utf8")).toBe(before);
     expect(JSON.parse(before)).toEqual(manifest);
   });
-  it("doubles calibration candidates and stops only in the window", () => {
-    expect(nextCalibrationQuantity(8, 9_999)).toEqual({ quantity: 16, complete: false });
-    expect(nextCalibrationQuantity(16, 10_000)).toEqual({ quantity: 16, complete: true });
-    expect(nextCalibrationQuantity(16, 30_000)).toEqual({ quantity: 16, complete: true });
-    expect(() => nextCalibrationQuantity(16, 30_001)).toThrow();
+  it("plans calibration boundaries, direct selection, and exponential expansion", () => {
+    const attempt = (quantity: number, medianMs: number, options = {}) => ({
+      quantity,
+      medianMs,
+      madRatio: 0.05,
+      childValid: true,
+      behaviorValid: true,
+      ...options,
+    });
+    expect(planCalibration(8, [])).toEqual({ kind: "run-initial", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 10_000)])).toEqual({ kind: "complete", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 30_000)])).toEqual({ kind: "complete", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 20_000)])).toEqual({ kind: "complete", quantity: 8 });
+    expect(planCalibration(8, [attempt(8, 30_001)])).toMatchObject({
+      kind: "fail-no-acceptable-quantity",
+      code: "initial-above-window",
+    });
+    expect(planCalibration(8, [attempt(8, 9_999)])).toEqual({ kind: "expand-upper", quantity: 16 });
+  });
+  it("refines overshoots to the smallest accepted integer without repeats", () => {
+    const attempt = (quantity: number, medianMs: number) => ({
+      quantity,
+      medianMs,
+      madRatio: 0,
+      childValid: true,
+      behaviorValid: true,
+    });
+    expect(planCalibration(8, [attempt(8, 9_000), attempt(16, 31_000)])).toEqual({
+      kind: "refine-bracket",
+      quantity: 12,
+      lower: 8,
+      upper: 16,
+    });
+    expect(
+      planCalibration(8, [attempt(8, 9_000), attempt(16, 31_000), attempt(12, 9_500)]),
+    ).toEqual({ kind: "refine-bracket", quantity: 14, lower: 12, upper: 16 });
+    expect(
+      planCalibration(8, [
+        attempt(8, 9_000),
+        attempt(16, 31_000),
+        attempt(12, 9_500),
+        attempt(14, 10_000),
+      ]),
+    ).toEqual({ kind: "refine-bracket", quantity: 13, lower: 12, upper: 14 });
+    expect(
+      planCalibration(8, [
+        attempt(8, 9_000),
+        attempt(16, 31_000),
+        attempt(12, 9_500),
+        attempt(14, 10_000),
+        attempt(13, 9_999),
+      ]),
+    ).toEqual({ kind: "complete", quantity: 14 });
+    expect(planCalibration(8, [attempt(8, 9_000), attempt(9, 30_001)])).toMatchObject({
+      kind: "fail-no-acceptable-quantity",
+      code: "adjacent-integers-skip-window",
+    });
+  });
+  it("makes unstable, invalid, inverted, and unsafe calibration evidence terminal", () => {
+    const valid = (quantity: number, medianMs: number) => ({
+      quantity,
+      medianMs,
+      madRatio: 0,
+      childValid: true,
+      behaviorValid: true,
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), madRatio: 0.05 }])).toMatchObject({
+      kind: "complete",
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), madRatio: 0.050001 }])).toMatchObject({
+      kind: "inconclusive-unstable",
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), childValid: false }])).toMatchObject({
+      kind: "inconclusive-evidence",
+      code: "child-validation-failed",
+    });
+    expect(planCalibration(8, [{ ...valid(8, 10_000), behaviorValid: false }])).toMatchObject({
+      kind: "inconclusive-evidence",
+      code: "behavior-validation-failed",
+    });
+    expect(planCalibration(8, [valid(8, 10_000), valid(16, 9_999)])).toEqual({
+      kind: "inconclusive-non-monotonic",
+      code: "lower-threshold-classification-inversion",
+    });
+    expect(
+      planCalibration(Number.MAX_SAFE_INTEGER, [valid(Number.MAX_SAFE_INTEGER, 9_999)]),
+    ).toMatchObject({ kind: "fail-safe-integer-expansion" });
+    expect(classifyCalibrationMedian(9_999)).toBe("lower");
+    expect(classifyCalibrationMedian(10_000)).toBe("accepted");
+    expect(classifyCalibrationMedian(30_001)).toBe("upper");
+    expect(() => classifyCalibrationMedian(Number.NaN)).toThrow(/finite/);
+    expect(() => planCalibration(0, [])).toThrow(/positive safe integer/);
+    expect(() => planCalibration(8, [{ ...valid(8, Number.POSITIVE_INFINITY) }])).toThrow(/median/);
+    expect(() => planCalibration(8, [{ ...valid(8, -1) }])).toThrow(/median/);
+    expect(() => planCalibration(8, [{ ...valid(8, 10_000), madRatio: Number.NaN }])).toThrow(
+      /MAD/,
+    );
+    expect(() => planCalibration(8, [{ ...valid(8, 10_000), madRatio: -1 }])).toThrow(/MAD/);
   });
   it("samples only injected child RSS and cleans up after exit", async () => {
     const child = new EventEmitter() as EventEmitter & { pid: number };
@@ -253,6 +414,77 @@ describe("performance harness contracts", () => {
     expect(roundTrip.value).toBe(1.23456789);
     expect(artifact.runs[0].telemetry.reportJsonBytes.status).toBe("not-applicable");
     expect(unavailableTargetTelemetry("target_on").reportJsonBytes.status).toBe("unavailable");
+  });
+  it("extracts ProfileReport measurements without inventing unavailable values", () => {
+    const measurements = extractProfileReportMeasurements({
+      schemaVersion: 1,
+      spans: [{ callCount: 3 }],
+      counters: [{}],
+      histograms: [{ count: 2, bucketCounts: [1, 1] }],
+      diagnostics: [{ code: "x" }],
+    });
+    expect(measurements).toMatchObject({
+      reportJsonBytes: { status: "available" },
+      spanAggregateGroupCount: { value: 1 },
+      totalEndedSpanCount: { value: 3 },
+      counterDatapointCount: { value: 1 },
+      histogramDatapointCount: { value: 1 },
+      diagnosticCount: { value: 1 },
+    });
+    expect(unavailableTargetTelemetry("target_off").reportJsonBytes.status).toBe("unavailable");
+    expect(() => extractProfileReportMeasurements({ spans: [] })).toThrow(/missing/);
+  });
+  it("formally evaluates repository reports without leaking malformed input", () => {
+    const report = (overrides: Record<string, unknown> = {}) => ({
+      schemaVersion: 1,
+      spans: [],
+      counters: [],
+      histograms: [],
+      diagnostics: [],
+      signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
+      ...overrides,
+    });
+    expect(evaluateRepositoryProfileReport(report()).status).toBe("pass");
+    expect(
+      evaluateRepositoryProfileReport({ schemaVersion: 1, spans: [{ callCount: "bad" }] }).status,
+    ).toBe("inconclusive");
+    expect(evaluateRepositoryProfileReport(report({ spans: null })).status).toBe("inconclusive");
+    expect(evaluateRepositoryProfileReport(report({ counters: null })).status).toBe("inconclusive");
+    expect(evaluateRepositoryProfileReport(report({ histograms: null })).status).toBe(
+      "inconclusive",
+    );
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          signalStatus: { spans: "unavailable", counters: "complete", histograms: "complete" },
+        }),
+      ).status,
+    ).toBe("inconclusive");
+    expect(
+      evaluateRepositoryProfileReport(report({ diagnostics: [{ code: "overflow" }] })).status,
+    ).toBe("fail");
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          spans: Array.from({ length: 30_000 }, () => ({
+            scope: { name: "plugin.valid" },
+            name: "plugin.operation",
+            callCount: 0,
+          })),
+        }),
+      ).status,
+    ).toBe("fail");
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          spans: [{ scope: { name: "gitlode.git" }, name: "gitlode.unknown", callCount: 1 }],
+        }),
+      ).status,
+    ).toBe("fail");
+    expect(evaluateRepositoryProfileReport({ nope: true })).toMatchObject({
+      status: "inconclusive",
+      reasons: ["collector output is missing ProfileReport arrays"],
+    });
   });
   it("marks unsupported platforms and empty RSS readers inconclusive", async () => {
     const child = new EventEmitter() as EventEmitter & { pid: number };
@@ -297,13 +529,23 @@ describe("performance harness contracts", () => {
       }).reasons,
     ).toContain("candidate measured pair indexes are missing or duplicated");
   });
-  it("normalizes only filename session timestamps and exact checkpoint timestamps", () => {
+  it("normalizes only session timestamps in filenames and checkpoints", () => {
     expect(normalizePerformanceFilename("prefix-20240101T010203Z-000001.jsonl")).toBe(
       "prefix-<session>-000001.jsonl",
     );
-    const artifact = (name: string, bytes = "same", generatedAt = "2024-01-01T01:02:03.000Z") => ({
+    const artifact = (
+      name: string,
+      bytes = "same",
+      generatedAt = "2024-01-01T01:02:03.000Z",
+      refUpdatedAt = generatedAt,
+      tipOid = "fixed-tip",
+    ) => ({
       exit: { code: 0, signal: null },
-      checkpoint: { repositoryPath: "/repo", generatedAt },
+      checkpoint: {
+        repositoryPath: "/repo",
+        generatedAt,
+        refs: [{ ref: "main", refType: "branch", tipOid, updatedAt: refUpdatedAt }],
+      },
       jsonl: [{ name, bytes: Buffer.from(bytes) }],
       derived: { records: 1, commits: 1, skippedDiffs: 0, files: 1, bytes: 4 },
       captureErrors: [],
@@ -317,10 +559,28 @@ describe("performance harness contracts", () => {
     expect(
       comparePerformanceBehavior(
         left,
-        artifact("prefix-20240201T010203Z-000001.jsonl", "same", input.candidateGeneratedAt),
+        artifact(
+          "prefix-20240201T010203Z-000001.jsonl",
+          "same",
+          input.candidateGeneratedAt,
+          "2024-02-01T02:03:04.000Z",
+        ),
         input,
       ),
     ).toEqual([]);
+    expect(
+      comparePerformanceBehavior(
+        left,
+        artifact(
+          "prefix-20240201T010203Z-000001.jsonl",
+          "same",
+          input.candidateGeneratedAt,
+          input.candidateGeneratedAt,
+          "changed-tip",
+        ),
+        input,
+      ),
+    ).toContain("checkpoint differs");
     expect(
       comparePerformanceBehavior(
         left,
@@ -372,6 +632,32 @@ describe("performance harness contracts", () => {
         "Git command span/start mismatch",
       ]),
     );
+  });
+  it("classifies report spans by exact metadata pairs and fixture-owned scopes", () => {
+    const report = {
+      schemaVersion: 1,
+      spans: [
+        { scope: { name: "gitlode.git" }, name: "gitlode.git.cli.rev_list", callCount: 3 },
+        { scope: { name: "gitlode.execution" }, name: "gitlode.git.cli.rev_list", callCount: 2 },
+        { scope: { name: "gitlode.git" }, name: "gitlode.unknown", callCount: 4 },
+        { scope: { name: "plugin.scoped" }, name: "gitlode.git.cli.rev_list", callCount: 5 },
+        { scope: { name: "plugin.unscoped" }, name: "plugin.project", callCount: 7 },
+        { scope: { name: "plugin.fallback" }, name: "plugin.fallback", callCount: 11 },
+        { scope: { name: "fixture.synthetic" }, name: "synthetic.operation", callCount: 13 },
+      ],
+      counters: [],
+      histograms: [],
+      diagnostics: [],
+    };
+    const observation = volumeObservationFromProfileReport(report, {
+      scale: 1,
+      profileRssDeltaBytes: 0,
+      gitCommandStarts: 3,
+      fixtureOwnedScopes: ["fixture.synthetic"],
+    });
+    expect(observation.gitCommandSpans).toBe(3);
+    expect(observation.pluginSpans).toBe(23);
+    expect(observation.prohibitedScalingSpanCount).toBe(6);
   });
   it("generates deterministic Git-independent aggregation and plugin inputs", async () => {
     expect(createAggregationFixture(4)).toEqual(createAggregationFixture(4));

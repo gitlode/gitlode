@@ -9,7 +9,7 @@ export {
   type ExtractionPipelineMetricRecorder,
   type ExtractionGranularity,
   type OutputWriteOutcome,
-} from "./extraction-pipeline-metric-recorder.js";
+} from "./telemetry/extraction-pipeline-metric-recorder.js";
 export {
   createFileChangeFactExpanderMetricRecorder,
   NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
@@ -17,11 +17,11 @@ export {
   type FileChangeType,
   type FileChangeExpansionOutcome,
   type DiffSkipReason,
-} from "./file-change-fact-expander-metric-recorder.js";
+} from "./telemetry/file-change-fact-expander-metric-recorder.js";
 export {
   createBuiltInFactProjectorMetricRecorder,
   NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
   type BuiltInFactProjectorMetricRecorder,
   type ProjectionFactType,
   type ProjectionOutcome,
-} from "./built-in-fact-projector-metric-recorder.js";
+} from "./telemetry/built-in-fact-projector-metric-recorder.js";

@@ -56,10 +56,10 @@
       "status": "incomplete"
     }
   },
-  "recipeRevision": "performance-v2-final-total-commits",
+  "recipeRevision": "performance-v3-bracketed-calibration",
   "schemaVersion": 2,
   "aggregationScale": {
-    "integration": "pending-target-collector",
+    "integration": "implemented-target-collector",
     "status": "fixed-recipe",
     "quantities": { "scale": 1024 }
   }

@@ -10,8 +10,8 @@ import {
   resolveDagCertifiedClosurePhase,
   walkDagNodeIdsPhaseCertifiedDifference,
 } from "../../src/dag/index.js";
-import type { DagOperationObservation } from "../../src/dag/observations.js";
 import { PhaseCertifiedDifferenceState } from "../../src/dag/phase-certified-difference-state.js";
+import type { DagOperationObservation } from "../../src/dag/telemetry/observations.js";
 import { OrderedQueue, PriorityQueue } from "../../src/support/index.js";
 
 describe("resolveDagCertifiedClosurePhase", () => {

@@ -10,6 +10,7 @@ type CheckTask = {
 
 const __dirname = nodePath.dirname(fileURLToPath(import.meta.url));
 const packageRoot = nodePath.resolve(__dirname, "..");
+const repositoryRoot = nodePath.resolve(packageRoot, "..", "..");
 
 const tasks: CheckTask[] = [
   {
@@ -67,7 +68,20 @@ async function runGenerateScript(scriptName: string): Promise<void> {
 }
 
 async function getGitStatus(targets: string[]): Promise<string> {
-  const status = await runCommand("git", ["status", "--porcelain", "--", ...targets], packageRoot);
+  const status = await runCommand(
+    "git",
+    [
+      "-c",
+      `safe.directory=${repositoryRoot.replaceAll("\\", "/")}`,
+      "-C",
+      repositoryRoot,
+      "status",
+      "--porcelain",
+      "--",
+      ...targets.map((target) => nodePath.join("packages/gitlode", target)),
+    ],
+    packageRoot,
+  );
 
   return status.trim();
 }

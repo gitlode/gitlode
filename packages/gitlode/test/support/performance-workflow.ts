@@ -100,7 +100,8 @@ export function validateFixtureManifest(value: unknown): string[] {
   const aggregation = manifest.aggregationScale;
   if (
     aggregation?.status !== "fixed-recipe" ||
-    aggregation.integration !== "pending-target-collector" ||
+    (aggregation.integration !== "pending-target-collector" &&
+      aggregation.integration !== "implemented-target-collector") ||
     Object.keys(aggregation?.quantities ?? {}).some((key) => key !== "scale") ||
     !Number.isSafeInteger(aggregation.quantities?.scale) ||
     (aggregation.quantities?.scale ?? 0) <= 0

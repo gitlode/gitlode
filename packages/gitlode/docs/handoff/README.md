@@ -6,6 +6,16 @@ investigations that may be resumed by human developers or coding agents.
 Handoff documents are useful working context, but they are not durable source-of-truth design
 documents.
 
+## Active OpenTelemetry work
+
+Start with the [recovery plan](instrumentation-opentelemetry-recovery-plan.md) for the current
+reintegration route, human PR/merge authority, milestones, and next assignment. The
+[redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains unfinished T13B/T13C scope.
+The [M0 result](opentelemetry-m0-result.md) preserves Linux/WSL2 setup and one-target evidence;
+the [M1 evidence note](opentelemetry-m1-validation-result.md) preserves candidate validation,
+package identities, and the CI correction needed for reintegration. Completed session packets
+have been removed; accepted contracts live in the design and contributing documentation.
+
 ## Lifecycle
 
 Use handoff documents for:

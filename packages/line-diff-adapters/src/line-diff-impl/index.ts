@@ -5,4 +5,4 @@ export {
   NOOP_LINE_DIFF_METRIC_RECORDER,
   type LineDiffMetricRecorder,
   type LineDiffComputeOutcome,
-} from "./line-diff-metric-recorder.js";
+} from "./telemetry/line-diff-metric-recorder.js";

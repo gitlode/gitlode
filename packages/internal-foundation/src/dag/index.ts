@@ -18,7 +18,7 @@ export type {
   DagOperationObservation,
   DagOperationObservationHooks,
   DagStreamCompletion,
-} from "./observations.js";
+} from "./telemetry/observations.js";
 export {
   walkDagNodeIdsCertifiedLazy,
   walkDagNodeIdsEagerExclude,

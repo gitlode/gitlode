@@ -49,6 +49,11 @@ Collector and report tests cover bounded span aggregation, metric conversion, re
 canonical sorting, signal status, structured cloning, and invalid aggregation. Completed span
 objects and raw histogram samples must not be retained.
 
+Repository performance workflow tests use the same development-only sidecar orchestration as the
+formal workflow. They require a `target_on` report, classify missing or malformed reports as
+inconclusive, propagate report-size, prohibited-span, diagnostic, and signal-status outcomes to the
+top-level evaluation, and keep timed CLI output/checkpoints separate from sidecar artifacts.
+
 ## Bounded collection
 
 Every collection limit is tested immediately below, at, and above its boundary. Bounded streaming

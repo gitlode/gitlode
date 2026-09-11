@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -40,7 +40,7 @@ const manifest = (status: "complete" | "incomplete"): FixtureManifest => ({
   recipeRevision: "test",
   aggregationScale: {
     status: "fixed-recipe",
-    integration: "pending-target-collector",
+    integration: "implemented-target-collector",
     quantities: { scale: 4 },
   },
   calibrationTargets: Object.fromEntries(
@@ -55,6 +55,95 @@ const manifest = (status: "complete" | "incomplete"): FixtureManifest => ({
       },
     ]),
   ) as FixtureManifest["calibrationTargets"],
+});
+describe.skipIf(process.platform !== "linux")("supervised workflow integration", () => {
+  it("reports entrypoint setup failures as bounded supervision failures", async () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../../../..");
+    const root = await mkdtemp(join(tmpdir(), "gitlode-supervision-entrypoint-"));
+    temporary.push(root);
+    const artifactFile = join(root, "not-a-directory");
+    await writeFile(artifactFile, "occupied");
+    const execution = promisify(execFile)(
+      process.execPath,
+      [
+        resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+        resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance-supervised.ts"),
+        "capture-legacy",
+        "--artifacts",
+        artifactFile,
+      ],
+      { cwd: repositoryRoot, timeout: 10_000 },
+    );
+    await expect(execution).rejects.toMatchObject({
+      code: 2,
+      stderr: expect.stringMatching(/supervision failed before terminal evidence/),
+    });
+    try {
+      await execution;
+    } catch (error) {
+      expect(String((error as { stderr?: string }).stderr).length).toBeLessThan(500);
+    }
+  }, 10_000);
+  it.each([false, true])(
+    "preserves completed runs when a later child stalls: %s",
+    async (stall) => {
+      const root = await mkdtemp(join(tmpdir(), "gitlode-supervised-workflow-"));
+      temporary.push(root);
+      const artifacts = join(root, "artifacts");
+      const manifestPath = join(root, "manifest.json");
+      const cli = join(root, "cli.cjs");
+      await writeFile(manifestPath, JSON.stringify(manifest("complete")));
+      await writeFile(
+        cli,
+        `const fs=require('node:fs'),a=process.argv.slice(2),value=n=>a[a.indexOf(n)+1];
+const counter=${JSON.stringify(join(root, "counter"))};
+const count=fs.existsSync(counter)?Number(fs.readFileSync(counter,'utf8'))+1:1;fs.writeFileSync(counter,String(count));
+if(${stall} && count===2){setInterval(()=>{},1000)}else{
+fs.writeFileSync(value('--output-dir')+'/performance-20240101T000000Z-000001.jsonl',Array.from({length:5},(_,i)=>JSON.stringify({oid:String(i)})).join('\\n')+'\\n');
+fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedAt:'2024-01-01T00:00:00.000Z',refs:[]}));}`,
+      );
+      const repositoryRoot = resolve(import.meta.dirname, "../../../..");
+      const execution = promisify(execFile)(
+        process.execPath,
+        [
+          resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+          resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance-supervised.ts"),
+          "capture-legacy",
+          "--manifest",
+          manifestPath,
+          "--fixture",
+          "commit_heavy_repository",
+          "--adapter",
+          "isomorphic-git",
+          "--baseline-cli",
+          cli,
+          "--legacy-revision",
+          "legacy-test",
+          "--artifacts",
+          artifacts,
+          "--execution-timeout-ms",
+          "1000",
+        ],
+        { cwd: repositoryRoot, timeout: 25_000 },
+      );
+      if (stall) await expect(execution).rejects.toMatchObject({ code: 2 });
+      else await execution;
+      const evidence = await Promise.all(
+        (await readdir(artifacts))
+          .filter((name) => name.endsWith(".json"))
+          .map(async (name) => JSON.parse(await readFile(join(artifacts, name), "utf8"))),
+      );
+      const supervision = evidence.find((value) => value.kind === "performance-supervision");
+      expect(supervision.status).toBe(stall ? "inconclusive" : "completed");
+      expect(supervision.failure).toBe(stall ? "execution-deadline-exceeded" : undefined);
+      expect(evidence.filter((value) => value.kind === "completed-performance-run")).toHaveLength(
+        stall ? 1 : 9,
+      );
+      expect(supervision.cleanupErrors).toEqual([]);
+      expect(JSON.parse(await readFile(manifestPath, "utf8"))).toEqual(manifest("complete"));
+    },
+    30_000,
+  );
 });
 describe("performance workflow routing", () => {
   it("validates fixture, adapter, state and preserves aggregation identity", () => {
@@ -165,7 +254,6 @@ describe("performance workflow routing", () => {
     expect(
       artifact.behaviorEvidence.baseline[0].files.map((file: { name: string }) => file.name),
     ).toEqual(["performance-<session>-000001.jsonl", "performance-<session>-000002.jsonl"]);
-    expect(artifactText).not.toContain("gitlode-performance-");
   }, 30_000);
   it("saves malformed legacy failure evidence before returning nonzero", async () => {
     const root = await mkdtemp(join(tmpdir(), "performance-empty-"));
@@ -525,5 +613,26 @@ describe("performance workflow routing", () => {
     expect(flags.filter((flag) => flag === "on")).toHaveLength(9);
     expect(profile.behaviorEvidence.baseline).toHaveLength(7);
     expect(profile.behaviorEvidence.candidate).toHaveLength(7);
+    expect(profile.formalEvaluation.behavior.reasons).toEqual([]);
+    expect(profile.formalEvaluation.sidecar.status).toBe("inconclusive");
+    expect(profile.sidecarEvaluation.status).toBe("inconclusive");
+    expect(profile.formalEvaluation.status).toBe(profile.sidecarEvaluation.status);
+    expect(profile.sidecars.candidate).toHaveLength(9);
+    expect(
+      profile.sidecars.candidate.every(
+        (sidecar: { provenance: { runId: string } }, index: number) =>
+          sidecar.provenance.runId === profile.runs.candidate[index].runId,
+      ),
+    ).toBe(true);
+    expect(
+      profile.sidecars.candidate.every(
+        (sidecar: { isolationEvidence: Record<string, boolean> }) =>
+          sidecar.isolationEvidence.outputPathsDiffer &&
+          sidecar.isolationEvidence.checkpointPathsDiffer &&
+          sidecar.isolationEvidence.crossPathsDiffer,
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(profile)).not.toContain("gitlode-performance-");
+    expect(JSON.stringify(profile)).not.toContain("gitlode-profile-sidecar-");
   }, 30_000);
 });

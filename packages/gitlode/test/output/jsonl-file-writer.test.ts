@@ -6,8 +6,8 @@ import { join } from "node:path";
 import type { ProjectedCommit, ProjectedFileChange } from "@gitlode/internal-contracts/extraction";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "../../src/output/jsonl-file-writer-metric-recorder.js";
 import { JsonlFileWriter } from "../../src/output/jsonl-file-writer.js";
+import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "../../src/output/telemetry/jsonl-file-writer-metric-recorder.js";
 
 function makeCommit(oid: string): ProjectedCommit {
   return {

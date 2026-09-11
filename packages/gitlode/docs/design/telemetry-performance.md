@@ -32,13 +32,68 @@ High variation, environment mismatch, failed child execution, or failed output e
 measurement inconclusive rather than passing or failing. Inconclusive measurements are rerun under
 controlled conditions.
 
+## Execution supervision
+
+The supported reference commands run the workflow in an owned Linux process group under a separate
+supervisor. WSL2 with Linux-native tools and storage is supported. The supervisor observes preparation,
+child execution, and processing stages without depending on the workflow's event loop. The exact
+limits, retained diagnostics, and termination policy are in the performance catalog. These deadlines
+are operational safeguards, not the wall-clock performance thresholds.
+
+Stage changes identify the fixture, adapter, quantity, warmup/measured iteration, and profile state;
+child PID updates and periodic elapsed-time messages expose progress without extending deadlines.
+Deadline expiry, operator SIGINT/SIGTERM, unexpected workflow termination, or supervision failure
+makes the attempt inconclusive and nonzero. Cleanup targets only the supervisor-owned process group,
+including descendants after the workflow exits. A grace period precedes forced termination.
+
+Each invocation writes uniquely named atomic supervision snapshots. Completed raw runs and normalized
+behavior are saved between children, alongside the existing complete-pilot artifacts. The supervisor
+does not invent a pilot result when a child or repository preparation has not completed. Partial
+evidence is diagnostic and cannot be resumed into a later formal attempt. Supervision completion
+does not imply performance acceptance; both supervision and formal artifacts must be inspected.
+
+Structured supervision evidence contains identifiers rather than temporary paths or raw arguments.
+Bounded raw child diagnostics are kept in a separate local log that may contain paths. They are not
+embedded in, or treated as, formal calibration/comparison evidence. Abrupt supervisor SIGKILL, host
+shutdown, or uninterruptible kernel I/O cannot promise orderly cleanup; remaining progress is only
+diagnostic evidence in those cases.
+
+A final raw-diagnostic or supervision-snapshot write failure is itself an inconclusive supervision
+result with exit code 2. The two destinations remain independent: losing the raw log does not prevent
+the supervisor from recording a structured terminal failure when snapshot storage is still writable.
+After cleanup, a failed terminal snapshot receives one bounded recovery write as inconclusive
+evidence; the measured workflow is never repeated to repair evidence. If persistent storage failure
+also prevents that recovery, the operator receives bounded stderr diagnostics and no claim that the
+last on-disk `running` snapshot is terminal. No software path can guarantee replacement of that
+snapshot while its storage remains unwritable.
+
 ## Fixtures
 
 The suite contains commit-heavy and file-heavy deterministic repositories for both Git adapters, a
 deterministic plugin-heavy projection case, and a Git-independent aggregation scale case. Phase 0
-calibrates repository sizes by doubling candidate workloads until the legacy disabled median reaches
-10–30 seconds on the reference environment, then freezes those quantities in a manifest for the
-entire migration.
+calibrates repository sizes with a two-stage search on the reference environment. It doubles the
+candidate workload to bracket the ten-second lower threshold, then uses deterministic integer binary
+search to select the smallest permitted quantity whose observed legacy-disabled median is at least
+ten seconds. The selected median must not exceed thirty seconds. This refinement is required even
+when a doubling step jumps directly from below ten seconds to above thirty seconds.
+
+Every calibration pilot uses the cataloged warmup and measured-run counts. Its child and behavioral
+evidence must pass before its median participates in the search. A pilot whose median absolute
+deviation exceeds five percent makes the attempt inconclusive. The same applies if completed pilots
+classify a smaller quantity at or above ten seconds while classifying a larger quantity below ten
+seconds; individual median values need not otherwise be strictly increasing. The harness must not
+automatically retry or select a favorable sample. The initial manifest quantity is the minimum
+permitted quantity. If it already exceeds thirty seconds, or adjacent permitted integer quantities
+leave no value inside the window, calibration fails with preserved evidence rather than weakening
+the accepted window.
+
+The harness atomically persists artifact-safe progress after every completed pilot, including the
+quantity, unrounded median and median absolute deviation, raw warmup and measured outcomes,
+validation results, normalized behavior, revisions, and target recipe hash. A terminal failure after
+workflow preparation begins must preserve all completed pilots. Temporary output and checkpoint
+paths are excluded. An interrupted attempt may inform diagnosis but its measurements are not resumed
+or combined with a later formal attempt. Successful quantities are then frozen in the manifest for
+the entire migration.
 
 The plugin fixture deliberately excludes network, IPC, and arbitrary script work. Such costs belong
 to the injected workload and are not evidence of host telemetry overhead.
@@ -54,7 +109,15 @@ Trace-volume checks reject the return of per-record, per-write, per-blob, per-di
 file-expansion spans. Git CLI command spans may scale only with actual command invocations and must
 not cause additional commands. Plugin-created spans are reported separately from host volume.
 
-For each fixed performance fixture, the JSON UTF-8 representation of `ProfileReport` must remain at
+Repository sidecar acceptance is a separate formal workflow. For `target_on`, the sidecar and a
+valid `ProfileReport` are required; `legacy_off` and `target_off` are not-applicable. The repository
+checks report schema, signal status, diagnostics, the 1 MiB report limit, and prohibited host
+spans, and propagates fail or inconclusive to the top-level evaluation after saving the artifact.
+It does not reuse aggregation N/4N/RSS evaluation. Git CLI command-start counts are not inferred
+from runtime spans; any T09 command-parity result is explicitly contract evidence unless an
+independent development-only command-start measurement is available.
+
+For each fixed performance fixture, the development-only collector's JSON UTF-8 representation of `ProfileReport` must remain at
 or below 1 MiB. This is a fixture acceptance limit, not a claim that an unbounded number of configured
 plugin scopes consumes constant space.
 

@@ -7,8 +7,8 @@ import type { Meter } from "@opentelemetry/api";
 import type { diffLines as DiffLines } from "diff";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER } from "../../src/extraction/file-change-fact-expander-metric-recorder.js";
 import { FileChangeFactExpander } from "../../src/extraction/file-change-fact-expander.js";
+import { NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER } from "../../src/extraction/telemetry/file-change-fact-expander-metric-recorder.js";
 
 const diffModule = vi.hoisted(() => ({
   defaultImplementation: undefined as unknown as typeof DiffLines,

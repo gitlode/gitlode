@@ -16,11 +16,11 @@ import {
   createGitCliAdapterForTesting,
 } from "../../src/git-impl/git-cli-adapter.js";
 import type { GitCliProcess } from "../../src/git-impl/git-cli-cat-file-batch.js";
-import { createGitMetricRecorder } from "../../src/git-impl/git-metric-recorder.js";
 import {
   createIsomorphicGitAdapterForTesting,
   IsomorphicGitAdapter,
 } from "../../src/git-impl/isomorphic-git-adapter.js";
+import { createGitMetricRecorder } from "../../src/git-impl/telemetry/git-metric-recorder.js";
 
 type Call = { name: string; value: number; attributes: Record<string, unknown> };
 class RecordingMeter {

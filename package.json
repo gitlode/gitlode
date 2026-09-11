@@ -22,7 +22,7 @@
     "build:release": "npm run build:dev && npm run bundle:release -w gitlode",
     "build:watch": "tsc -b -w",
     "changeset": "changeset",
-    "changeset:publish": "changeset publish",
+    "changeset:publish": "npm run validate:telemetry-release-acceptance -w gitlode && changeset publish",
     "changeset:status": "changeset status",
     "changeset:version": "changeset version",
     "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",

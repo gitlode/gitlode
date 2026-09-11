@@ -3,13 +3,13 @@ import { createMonotonicTiming } from "@gitlode/internal-contracts/telemetry";
 import { ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
 
-import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
-import type { BuiltInFactProjectorMetricRecorder } from "../../src/extraction/built-in-fact-projector-metric-recorder.js";
 import {
   BuiltInFactProjector,
   projectCommit,
   projectFileChange,
 } from "../../src/extraction/built-in-fact-projector.js";
+import { NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER } from "../../src/extraction/telemetry/built-in-fact-projector-metric-recorder.js";
+import type { BuiltInFactProjectorMetricRecorder } from "../../src/extraction/telemetry/built-in-fact-projector-metric-recorder.js";
 import { makeTracer } from "../support/otel-fakes.js";
 
 async function* toAsyncIter<T>(items: T[]): AsyncIterable<T> {

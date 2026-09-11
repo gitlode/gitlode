@@ -153,8 +153,12 @@ owner accepted its ten-file placement map and minimal contributor routes. Placem
 implemented at `97235c37a518c829170568f9c32d5ffe2318803b`; the [outcome](opentelemetry-m1-placement.md)
 records intake checks and reported verification. Independent review accepted the slice with no
 required corrections; see the [review outcome](opentelemetry-m1-placement-review.md#accepted-outcome).
-The immediate next assignment is [publish-gate implementation](opentelemetry-m1-publish-gate.md)
-in a new implementation conversation. No repeated performance run is planned.
+The publish gate is implemented at `21a6c4d8f602eececcf189e756c4c4e5e093359f` with the acceptance
+record blocked. The immediate next assignment is
+[independent gate review](opentelemetry-m1-publish-gate-review.md) in a new conversation.
+No repeated performance run or actual publish is planned. See the
+[implementation outcome](opentelemetry-m1-publish-gate.md#implementation-outcome) for reported checks
+and remaining cumulative Windows/Linux validation.
 The human accepted blocking the entire supported Changesets publish operation,
 including independent plugin-only releases, until M2 is accepted; ordinary CI and integration work
 remain usable. See the [proposal disposition](opentelemetry-m1-implementation-proposal.md#planning-disposition)

@@ -1,5 +1,26 @@
 # M1 publish gate implementation packet
 
+## Implementation outcome
+
+Implemented at `21a6c4d8f602eececcf189e756c4c4e5e093359f`, parent
+`651f0a53001405b752beef52b31ac21b50c311ac`. The planning owner confirmed matching HEAD and a clean
+worktree on receipt. The live acceptance record is `blocked`; the root publish command invokes
+the validator before Changesets, and the release checkout now fetches full history. This is intake
+verification, not independent acceptance. Next: [fixed-checkpoint gate review](opentelemetry-m1-publish-gate-review.md).
+
+The implementation owner reports strict validator typechecking; focused checks 32 passed / 3 skipped;
+full suite 1,153 passed / 17 skipped; lint, formatting, architecture, schema, release build and
+diff checks passed. Initial publint failed because sandbox cache/temp writes returned EPERM; an
+unsandboxed rerun of publint and installed-package tests passed. These are reported results, not
+checks rerun by the planning owner. Review should identify the selected suites and skipped cases;
+the totals alone do not identify gate-test coverage or Linux validation. Cumulative Windows/Linux
+validation of the actual M1 candidate remains outstanding.
+
+Required target constants were extracted to a side-effect-free tooling module and imported by the
+existing performance harness; review this dependency change without changing the frozen M0 harness.
+No actual publish, Version PR, formal measurement, merge, or M1/M2/T13B/T13C closure was performed.
+The implementation assignment below is completed history; do not reimplement it.
+
 ## Assignment and authority
 
 Use a new implementation conversation for the gate only. Placement/navigation at

@@ -44,6 +44,14 @@ T13B/T13C exit criteria. Canonical design, verification, performance and publish
 - Preserve immutable evidence under `D:\gitlode_test`; do not overwrite archives or use them as
   mutable build directories. Old packets remain in recorded commits and bundles, not active instructions.
 
+## Current session assignment
+
+The next human-started conversation is the [interactive profile design session](opentelemetry-m2-profile-design.md).
+It compares legacy/current output, explores alternatives with the human, then converges on detailed
+M2 scope and separately recorded future ideas. It is not an autonomous implementation session.
+No display option is selected by this assignment. Trunk resumes dependency planning when the human
+returns the design outcome; implementation packets follow the agreed design.
+
 ## Decisions before M2 implementation
 
 The following order is a planning proposal for human discussion, not an implementation assignment:

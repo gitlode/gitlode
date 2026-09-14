@@ -35,13 +35,9 @@
           ]
         },
         {
-          "name": "instrumentation",
-          "pattern": "packages/internal-foundation/src/instrumentation/**",
-          "allow": [
-            "packages/internal-foundation/src/instrumentation/**",
-            "packages/internal-foundation/src/type-utils/index.ts",
-            "packages/internal-foundation/dist/type-utils/index.js"
-          ]
+          "name": "otel-support",
+          "pattern": "packages/internal-foundation/src/otel-support/**",
+          "allow": ["packages/internal-foundation/src/otel-support/**"]
         },
         {
           "name": "dag",
@@ -52,8 +48,8 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js"
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
           ]
         },
         {
@@ -91,7 +87,9 @@
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/model/index.ts",
-            "packages/internal-contracts/dist/model/index.js"
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -115,6 +113,15 @@
           ]
         },
         {
+          "name": "telemetry",
+          "pattern": "packages/internal-contracts/src/telemetry/**",
+          "allow": [
+            "packages/internal-contracts/src/telemetry/**",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
+          ]
+        },
+        {
           "name": "git-impl",
           "pattern": "packages/git-adapters/src/git-impl/**",
           "allow": [
@@ -123,14 +130,16 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/dag/index.ts",
             "packages/internal-foundation/dist/dag/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/src/git/index.ts",
             "packages/internal-contracts/dist/git/index.js",
             "packages/internal-contracts/src/model/index.ts",
-            "packages/internal-contracts/dist/model/index.js"
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -140,10 +149,9 @@
             "packages/line-diff-adapters/src/line-diff-impl/**",
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/line-diff/index.ts",
-            "packages/internal-contracts/dist/line-diff/index.js"
+            "packages/internal-contracts/dist/line-diff/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -175,8 +183,6 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
@@ -188,7 +194,10 @@
             "packages/internal-contracts/src/model/index.ts",
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/src/progress/index.ts",
-            "packages/internal-contracts/dist/progress/index.js"
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
           ]
         },
         {
@@ -198,10 +207,9 @@
             "packages/gitlode/src/plugin-api/**",
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -215,12 +223,13 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js",
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -231,7 +240,8 @@
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
-            "packages/internal-contracts/dist/extraction-api/index.js"
+            "packages/internal-contracts/dist/extraction-api/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -268,12 +278,12 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/progress/index.ts",
-            "packages/internal-contracts/dist/progress/index.js"
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -290,8 +300,6 @@
             "packages/internal-foundation/dist/type-utils/index.js",
             "packages/internal-foundation/src/support/index.ts",
             "packages/internal-foundation/dist/support/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/diagnostics/index.ts",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
@@ -302,12 +310,16 @@
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/src/progress/index.ts",
             "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js",
             "packages/git-adapters/src/git-impl/index.ts",
             "packages/git-adapters/dist/git-impl/index.js",
             "packages/git-adapters/src/git-impl/commit-traversal/index.ts",
             "packages/git-adapters/dist/git-impl/commit-traversal/index.js",
             "packages/line-diff-adapters/src/line-diff-impl/index.ts",
-            "packages/line-diff-adapters/dist/line-diff-impl/index.js"
+            "packages/line-diff-adapters/dist/line-diff-impl/index.js",
+            "packages/internal-foundation/src/otel-support/index.ts",
+            "packages/internal-foundation/dist/otel-support/index.js"
           ]
         },
         {
@@ -328,8 +340,6 @@
             "packages/gitlode/src/plugin-api/index.ts",
             "packages/internal-foundation/src/type-utils/index.ts",
             "packages/internal-foundation/dist/type-utils/index.js",
-            "packages/internal-foundation/src/instrumentation/index.ts",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-contracts/src/model/index.ts",
             "packages/internal-contracts/dist/model/index.js",
             "packages/internal-contracts/src/extraction-api/index.ts",
@@ -344,7 +354,11 @@
         {
           "name": "internal-contracts-tests",
           "pattern": "packages/internal-contracts/test/**",
-          "allow": ["packages/internal-contracts/src/**", "packages/internal-contracts/test/**"]
+          "allow": [
+            "packages/internal-contracts/src/**",
+            "packages/internal-contracts/test/**",
+            "packages/internal-foundation/dist/otel-support/index.js"
+          ]
         },
         {
           "name": "git-adapters-tests",
@@ -353,10 +367,11 @@
             "packages/git-adapters/src/**",
             "packages/git-adapters/test/**",
             "packages/internal-foundation/dist/dag/index.js",
-            "packages/internal-foundation/dist/instrumentation/index.js",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/dist/git/index.js",
-            "packages/internal-contracts/dist/model/index.js"
+            "packages/internal-contracts/dist/model/index.js",
+            "packages/internal-contracts/src/telemetry/index.ts",
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -365,7 +380,7 @@
           "allow": [
             "packages/line-diff-adapters/src/**",
             "packages/line-diff-adapters/test/**",
-            "packages/internal-foundation/dist/instrumentation/index.js"
+            "packages/internal-contracts/dist/telemetry/index.js"
           ]
         },
         {
@@ -374,14 +389,17 @@
           "allow": [
             "packages/gitlode/src/**",
             "packages/gitlode/test/**",
-            "packages/internal-foundation/dist/instrumentation/index.js",
+            "packages/gitlode/scripts/**",
             "packages/internal-foundation/dist/support/index.js",
             "packages/internal-contracts/dist/diagnostics/index.js",
             "packages/internal-contracts/dist/extraction-api/index.js",
             "packages/internal-contracts/dist/git/index.js",
             "packages/internal-contracts/dist/line-diff/index.js",
             "packages/internal-contracts/dist/model/index.js",
-            "packages/internal-contracts/dist/progress/index.js"
+            "packages/internal-contracts/dist/progress/index.js",
+            "packages/internal-contracts/dist/telemetry/index.js",
+            "packages/git-adapters/dist/git-impl/index.js",
+            "packages/line-diff-adapters/dist/line-diff-impl/index.js"
           ]
         },
         {
@@ -505,7 +523,7 @@
       "prodEntryPoints": [
         "src/type-utils/index.ts",
         "src/support/index.ts",
-        "src/instrumentation/index.ts",
+        "src/otel-support/index.ts",
         "src/dag/index.ts"
       ],
       "devEntryPoints": ["test/**", "vitest.config.ts"]
@@ -526,7 +544,10 @@
         "excludeModules": ["@types/*", "@vitest/coverage-v8", "@gitlode/internal-foundation"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
-      "missingNodeModulesDetection": true,
+      "missingNodeModulesDetection": {
+        "enabled": true,
+        "excludeModules": ["@opentelemetry/api"]
+      },
       "devDepsUsageOnProdDetection": {
         "ignoreTypeImports": true
       },
@@ -537,7 +558,8 @@
         "src/progress/index.ts",
         "src/extraction-api/index.ts",
         "src/git/index.ts",
-        "src/line-diff/index.ts"
+        "src/line-diff/index.ts",
+        "src/telemetry/index.ts"
       ],
       "devEntryPoints": ["test/**", "vitest.config.ts"]
     },
@@ -556,12 +578,7 @@
         "graphExclude": ["../../**/dist/**"]
       },
       "unusedNodeModulesDetection": {
-        "excludeModules": [
-          "@types/*",
-          "@vitest/coverage-v8",
-          "@gitlode/internal-contracts",
-          "@gitlode/internal-foundation"
-        ],
+        "excludeModules": ["@types/*", "@vitest/coverage-v8", "@gitlode/internal-contracts"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       },
       "missingNodeModulesDetection": true,
@@ -602,7 +619,20 @@
     {
       "path": "packages/gitlode",
       "followMonorepoPackages": true,
-      "prodEntryPoints": ["src/index.ts", "src/plugin-api.ts", "src/execution/worker-entry.ts"],
+      "prodEntryPoints": [
+        "src/index.ts",
+        "src/plugin-api.ts",
+        "src/execution/worker-entry.ts",
+        "src/execution/telemetry/index.ts",
+        "src/extraction/telemetry/extraction-pipeline-metric-recorder.ts",
+        "src/extraction/telemetry/file-change-fact-expander-metric-recorder.ts",
+        "src/extraction/telemetry/built-in-fact-projector-metric-recorder.ts",
+        "src/output/telemetry/jsonl-file-writer-metric-recorder.ts",
+        "src/plugin-runtime/telemetry/plugin-projection-metric-recorder.ts",
+        "src/extraction/index.ts",
+        "src/output/index.ts",
+        "src/plugin-runtime/index.ts"
+      ],
       "devEntryPoints": ["test/**", "scripts/**", "tsdown.config.ts", "vitest.config.ts"],
       "circularImportsDetection": {
         "ignoreTypeImports": false
@@ -634,7 +664,7 @@
     },
     {
       "path": "packages/plugin-assay-metrics",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -658,7 +688,7 @@
     },
     {
       "path": "packages/plugin-conventional-commits",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -682,7 +712,7 @@
     },
     {
       "path": "packages/plugin-custom-field",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -706,7 +736,7 @@
     },
     {
       "path": "packages/plugin-file-type",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {
@@ -730,7 +760,7 @@
     },
     {
       "path": "packages/plugin-identity-profile",
-      "followMonorepoPackages": true,
+      "followMonorepoPackages": false,
       "prodEntryPoints": ["src/index.ts"],
       "devEntryPoints": ["test/**", "vitest.config.ts"],
       "circularImportsDetection": {

@@ -226,10 +226,12 @@ Traversal instrumentation is designed to compare the efficiency of strategies th
 result-set problem, not to define a stable user-facing contract. The main diagnostic question is how
 much graph and commit-object work was needed to produce the final yielded commit set.
 
-The instrumentation boundary follows the implementation boundary:
+The instrumentation boundary preserves the generic DAG / Git implementation split:
 
-- the DAG traversal core records topology and strategy work;
-- the Git adapter records commit-object reads, commit cache hits, and yielded commit objects.
+- the DAG traversal core reports topology and strategy work through algorithm-neutral observation
+  hooks that contain no OpenTelemetry types or `gitlode.*` names;
+- the Git implementation binds those hooks to the cataloged `gitlode.dag` observations; and
+- the Git adapter also records commit-object reads, commit cache hits, and yielded commit objects.
 
 This means the DAG core uses graph vocabulary such as successor expansion instead of Git-specific
 vocabulary such as commit read. For Git repositories, a successor expansion usually causes the
@@ -248,11 +250,13 @@ exclude-collection phase for `dag.traversal`, it is implemented through the reus
 the public facade. In that context, internal reachable yields are not counted as parent
 `yielded_nodes`; the caller records the collection size as `excluded_nodes` instead.
 
-DAG traversal functions exported as public operations should keep operation-level telemetry
-semantics. Reusable traversal implementations may accept a context-specific telemetry observer so
-callers can report the same graph work in the vocabulary of the enclosing operation. Whether a
-helper is technically exported for another in-repository strategy module is less important than
-whether it represents a public traversal-domain operation.
+DAG traversal functions exported as public operations should keep operation-level observation
+semantics. Reusable traversal implementations may accept a context-specific, algorithm-neutral
+observer so callers can report the same graph work in the vocabulary of the enclosing operation.
+The observer reports facts and lifecycle transitions; it does not select OpenTelemetry names,
+instruments, attributes, or status. Whether a helper is technically exported for another
+in-repository strategy module is less important than whether it represents a public
+traversal-domain operation.
 
 The adapter-level `git.walk_commits` span records `commits_yielded`, total backend
 `commit_reads`, and read/cache counters split by purpose. `topology_commit_reads` and

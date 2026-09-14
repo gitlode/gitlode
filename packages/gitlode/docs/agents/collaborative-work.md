@@ -200,3 +200,71 @@ A good completion summary includes:
 - Whether any remaining issues are blockers or future considerations
 
 The agent should help close the loop cleanly.
+
+## Pull requests and branch integration
+
+Before creating any pull request, state the exact source and base branches and obtain explicit human
+approval. Complete the authorized implementation, validation, and handoff cleanup first so the human
+can review the proposed content as well as the merge destination. A generic instruction to continue,
+or approval of implementation work, does not authorize PR creation.
+
+The human performs PR approval and merge, including the choice of squash, merge, or rebase. Agents
+must not merge PRs, bypass branch rules, or directly update a shared integration branch as an
+alternative. Confirm the intended branch chain rather than assuming a nested work branch should
+merge directly into integration. Checkpoint commits remain allowed within the authorized work scope.
+
+## Bounded implementation and measurement sessions
+
+For work combining implementation and empirical acceptance, divide sessions by responsibility:
+
+- planning owns decisions, milestone status, blockers, and the next bounded task packet;
+- implementation changes a named code slice and supplies verification evidence;
+- measurement executes an immutable candidate and harness and returns artifacts and classifications;
+- diagnosis explains a specific failed or inconclusive result before proposing a correction; and
+- review checks a fixed revision/diff against its accepted contracts.
+
+These are responsibility boundaries, not a requirement to launch concurrent agents. Avoid concurrent
+work on dependent implementations or rebuilding a bundle that a measurement session is using.
+
+When the human delegates session planning, the agent owns these assignments within the agreed scope.
+A generic instruction such as "continue" or "next step" preserves the current session plan unless
+the human explicitly changes it. State any agent-selected reassignment and its reason before doing
+the affected work. Do not retroactively redo completed work solely to match a session boundary.
+
+Distinguish a planned handoff from an actually started session. A new turn, context compaction, or
+a separate shell process does not establish a new agent conversation. Identify whether a handoff
+uses a separate user conversation or an available delegated agent with a bounded input. If the
+required session cannot be started with available tools and authorization, prepare its complete
+task packet and explain the one launch action needed from the human; do not silently execute the
+assigned work in the current session instead.
+
+Each task packet identifies the base revision, scope, exclusions, required reading, commands, exit
+evidence, and decisions outside the session's authority. Handoffs carry concise findings, exact
+revisions, artifact paths, and remaining blockers rather than complete conversation histories.
+
+Before starting or handing off work with potentially long external execution (for example repeated
+calibration, measurements, large builds, or transfers), tell the human that the work itself may take
+substantial time independently of model reasoning. Include that notice in the task packet. Numeric
+duration estimates are optional; do not spend extra effort estimating them unless useful or requested.
+Continue stage/progress reporting during execution and distinguish a known long operation from a stall.
+
+A formal measurement session does not edit code, change thresholds, resize frozen fixtures, or retry
+until a favorable result appears. It saves evidence and returns a repair or diagnosis request when
+needed. Distinguish preparation deadlines and execution failures from measured performance failures.
+Do not wait indefinitely without checking the owned process and current stage.
+
+Review required corrections in one batch where possible. Link each blocker to an accepted contract
+and explain which behavior or evidence it invalidates; list optional improvements separately.
+Follow-up review focuses on corrections and their affected dependencies without ignoring newly found
+material defects. After two correction rounds involving the same underlying issue, use a fresh,
+bounded diagnosis session to reconcile ownership or contract interpretation before repeating local
+patches. This is a convergence check, not permission to accept unresolved defects.
+
+Track integration acceptance separately from release acceptance when a human-approved plan permits
+staged integration. Never turn deferred evidence into an implicit pass or exception. Carry release
+blockers across session and branch boundaries until their explicit exit evidence is accepted.
+
+When checkpoint commits are authorized, preserve meaningful intermediate states without waiting for
+a plan unit to finish. Record outstanding review or acceptance blockers in the checkpoint handoff;
+a commit alone does not imply review acceptance, measurement freeze, integration, or release.
+Later squashing may organize history, but should not delay preserving current work.

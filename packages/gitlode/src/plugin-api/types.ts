@@ -4,8 +4,8 @@ import type {
   ProjectedExtensionValue,
   ProjectedRecordFor,
 } from "@gitlode/internal-contracts/extraction";
-import type { Instrumentation } from "@gitlode/internal-foundation/instrumentation";
 import type { Brand } from "@gitlode/internal-foundation/type-utils";
+import type { Meter, Tracer } from "@opentelemetry/api";
 
 export interface DiagnosticReporter {
   warn(message: string): void;
@@ -42,7 +42,8 @@ export type ProjectionContext = {
 }[FactType];
 
 export interface PluginRuntimeContext extends DiagnosticReporter {
-  readonly instrumentation: Instrumentation;
+  readonly tracer: Tracer;
+  readonly meter: Meter;
 }
 
 /** Contract implemented by every projector plugin. */

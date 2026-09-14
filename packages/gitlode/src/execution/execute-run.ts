@@ -1,18 +1,36 @@
 import { performance } from "node:perf_hooks";
 
+import {
+  createDagTelemetryBinding,
+  createGitMetricRecorder,
+  NOOP_DAG_TELEMETRY_BINDING,
+  NOOP_GIT_METRIC_RECORDER,
+  type DagTelemetryBinding,
+  type GitMetricRecorder,
+} from "@gitlode/git-adapters";
 import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type { FactProjector } from "@gitlode/internal-contracts/extraction";
+import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
-import {
-  LocalInstrumentationRecorder,
-  noopInstrumentation,
-  type Instrumentation,
-} from "@gitlode/internal-foundation/instrumentation";
+import { createMonotonicTiming, type MonotonicTiming } from "@gitlode/internal-contracts/telemetry";
+import { recordSpanError } from "@gitlode/internal-foundation/otel-support";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import {
+  createLineDiffMetricRecorder,
   JsLineDiffCalculator,
+  NOOP_LINE_DIFF_METRIC_RECORDER,
   type JsLineDiffCalculatorDependencies,
 } from "@gitlode/line-diff-adapters";
+import {
+  ROOT_CONTEXT,
+  context,
+  SpanStatusCode,
+  trace,
+  type Context,
+  type Meter,
+  type Span,
+  type Tracer,
+} from "@opentelemetry/api";
 
 import {
   CommitFactExtractor,
@@ -20,8 +38,20 @@ import {
   BuiltInFactProjector,
   FileChangeFactExpander,
   RepositoryTraversalPlanner,
+  createExtractionPipelineMetricRecorder,
+  createFileChangeFactExpanderMetricRecorder,
+  createBuiltInFactProjectorMetricRecorder,
+  NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+  NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+  NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
 } from "../extraction/index.js";
-import { formatSessionTimestamp, JsonlFileWriter, JsonlOutputSink } from "../output/index.js";
+import {
+  formatSessionTimestamp,
+  JsonlFileWriter,
+  JsonlOutputSink,
+  createJsonlFileWriterMetricRecorder,
+  NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+} from "../output/index.js";
 import {
   createEmptyCheckpoint,
   loadStateFile,
@@ -39,6 +69,7 @@ import {
   resolveRepositoryBasics,
   validateRepositoryAccess,
 } from "./repository-context.js";
+import { WorkerTelemetrySession } from "./telemetry/worker-telemetry-session.js";
 import type {
   ExecutionRunReporters,
   ExecutionRunInput,
@@ -54,152 +85,381 @@ interface WorkerExecutionReporters {
   readonly diagnosticReporter: DiagnosticReporter;
 }
 
-async function finishUserError(
-  runSpan: ReturnType<Instrumentation["startSpan"]>,
-  message: string,
-): Promise<WorkerRunResult> {
-  runSpan.setAttribute("gitlode.result", "user-error");
-  runSpan.end();
+async function finishUserError(runSpan: Span, message: string): Promise<WorkerRunResult> {
+  runSpan.setAttribute("gitlode.run.result", "user_error");
+  runSpan.setStatus({ code: SpanStatusCode.ERROR });
   return {
     kind: "user-error",
     message,
   };
 }
 
+interface WorkerExecutionTelemetry {
+  readonly rootSpan?: Span;
+  readonly executionTracer: Tracer;
+  readonly extractionTracer: Tracer;
+  readonly extractionMeter: Meter;
+  readonly lineDiffMeter: Meter;
+  readonly rootContext: Context;
+  readonly gitTracer: Tracer;
+  readonly gitMetricRecorder: GitMetricRecorder;
+  readonly dagTelemetryBinding: DagTelemetryBinding;
+  readonly pluginRuntimeTracer: Tracer;
+  readonly getPluginTracer: (name: string, version?: string) => Tracer;
+  readonly getPluginMeter: (name: string, version?: string) => Meter;
+  readonly metricRecordingEnabled?: boolean;
+  readonly metricTiming?: MonotonicTiming;
+}
+
+export type TelemetryCompositionSlot =
+  | "git"
+  | "dag"
+  | "extraction-pipeline"
+  | "file-change-expansion"
+  | "built-in-projection"
+  | "plugin-base-projection"
+  | "line-diff"
+  | "jsonl-output"
+  | "plugin-projection";
+
+type TelemetryCompositionObserver = (slot: TelemetryCompositionSlot, component: object) => void;
+
+function createDefaultWorkerExecutionTelemetry(
+  adapter: ExecutionRunInput["gitAdapter"],
+  session: WorkerTelemetrySession,
+  telemetryClock?: () => number,
+  observeComposition?: TelemetryCompositionObserver,
+): WorkerExecutionTelemetry {
+  const gitTracer = session.getTracer("gitlode.git");
+  const metricRecordingEnabled = session.recordingEnabled;
+  const metricTiming = createMonotonicTiming(telemetryClock);
+  const gitMetricRecorder = metricRecordingEnabled
+    ? createGitMetricRecorder(session.getMeter("gitlode.git"), adapter, metricTiming)
+    : NOOP_GIT_METRIC_RECORDER;
+  const dagTelemetryBinding = metricRecordingEnabled
+    ? createDagTelemetryBinding(session.getTracer("gitlode.dag"), session.getMeter("gitlode.dag"))
+    : NOOP_DAG_TELEMETRY_BINDING;
+  observeComposition?.("git", gitMetricRecorder);
+  observeComposition?.("dag", dagTelemetryBinding);
+  return {
+    rootSpan: session.rootSpan,
+    executionTracer: session.getTracer("gitlode.execution"),
+    extractionTracer: session.getTracer("gitlode.extraction"),
+    extractionMeter: session.getMeter("gitlode.extraction"),
+    lineDiffMeter: session.getMeter("gitlode.line_diff"),
+    rootContext: session.rootContext,
+    gitTracer,
+    gitMetricRecorder,
+    dagTelemetryBinding,
+    pluginRuntimeTracer: session.getTracer("gitlode.plugin_runtime"),
+    getPluginTracer: (name, version) => session.getTracer(name, version),
+    getPluginMeter: (name, version) => session.getMeter(name, version),
+    metricRecordingEnabled,
+    metricTiming,
+  };
+}
+
+interface WorkerExecutionDependencies extends GitAdapterFactoryDependencies {
+  readonly createTelemetrySession?: (enabled: boolean) => Promise<WorkerTelemetrySession>;
+  readonly telemetryClock?: () => number;
+  readonly observeTelemetryComposition?: TelemetryCompositionObserver;
+}
+
+async function withSetupAsyncSpan<T>(
+  tracer: Tracer,
+  name: string,
+  callback: (span: Span) => Promise<T>,
+  parentContext: Context,
+): Promise<T> {
+  const span = tracer.startSpan(name, undefined, parentContext);
+  try {
+    return await context.with(trace.setSpan(parentContext, span), () => callback(span));
+  } catch (error) {
+    if (error instanceof GitAdapterError) {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    } else {
+      recordSpanError(span, error);
+    }
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
+function withSetupSpan<T>(
+  tracer: Tracer,
+  name: string,
+  parentContext: Context,
+  callback: (span: Span) => T,
+): T {
+  const span = tracer.startSpan(name, undefined, parentContext);
+  try {
+    return context.with(trace.setSpan(parentContext, span), () => callback(span));
+  } catch (error) {
+    if (error instanceof GitAdapterError) {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    } else {
+      recordSpanError(span, error);
+    }
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+
 export async function executeWorkerRunRequest(
   request: WorkerRunRequest,
   reporters: WorkerExecutionReporters,
-  dependencies: GitAdapterFactoryDependencies = { environment: process.env },
+  dependencies: WorkerExecutionDependencies = { environment: process.env },
+  telemetry?: WorkerExecutionTelemetry,
 ): Promise<WorkerRunResult> {
   const { input, priorCheckpoint } = request;
-  const recorder = input.profile
-    ? new LocalInstrumentationRecorder(() => performance.now())
-    : undefined;
-  const instrumentation = recorder ?? noopInstrumentation;
+  const session = telemetry
+    ? undefined
+    : await (dependencies.createTelemetrySession ?? WorkerTelemetrySession.create)(input.profile);
+  const activeTelemetry =
+    telemetry ??
+    createDefaultWorkerExecutionTelemetry(
+      input.gitAdapter,
+      session ??
+        (() => {
+          throw new Error("Telemetry session was not created.");
+        })(),
+      dependencies.telemetryClock,
+      dependencies.observeTelemetryComposition,
+    );
+  const { executionTracer, extractionTracer, extractionMeter } = activeTelemetry;
 
   const sessionTimestamp = new Date();
   const startMs = performance.now();
   const resolvedRepoPath: AbsolutePath = input.repositoryPath;
-  const runSpan = instrumentation.startSpan("gitlode.run", {
-    attributes: {
-      "gitlode.granularity": input.granularity,
-      "gitlode.profile": input.profile,
-      "git.adapter": input.gitAdapter,
-    },
+  const runSpan =
+    activeTelemetry.rootSpan ??
+    activeTelemetry.executionTracer.startSpan("gitlode.run", { root: true }, ROOT_CONTEXT);
+  const rootContext = trace.setSpan(activeTelemetry.rootContext, runSpan);
+  runSpan.setAttributes({
+    "gitlode.extraction.granularity": input.granularity,
+    "gitlode.git.adapter": input.gitAdapter,
+    "gitlode.extraction.range.kind": input.range?.type ?? "none",
   });
 
-  try {
-    const gitAdapterResult = await buildGitAdapter(input.gitAdapter, instrumentation, dependencies);
-    if (gitAdapterResult.kind === "user-error") {
-      return await finishUserError(runSpan, gitAdapterResult.message);
-    }
-    if (gitAdapterResult.gitVersion !== undefined) {
-      runSpan.setAttribute("git.cli.version", gitAdapterResult.gitVersion);
-    }
-    await using gitAdapter = gitAdapterResult.adapter;
-
-    await instrumentation.runAsync(
-      "gitlode.validate_repository_access",
-      async () => await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter),
-    );
-
-    const repositoryObjectFormat = await instrumentation.runAsync(
-      "gitlode.resolve_object_format",
-      async (span) => {
-        const objectFormat = await resolveRepositoryObjectFormat(resolvedRepoPath, gitAdapter);
-        span.setAttribute("git.object_format", objectFormat);
-        return objectFormat;
-      },
-    );
-
-    instrumentation.run("gitlode.state.validate", () => {
-      validatePriorCheckpoint(priorCheckpoint, resolvedRepoPath, repositoryObjectFormat);
-    });
-
-    const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await instrumentation.runAsync(
-      "gitlode.repository_basics",
-      async () =>
-        await resolveRepositoryBasics(resolvedRepoPath, gitAdapter, input.repoName, input.repoUrl),
-    );
-
-    const resolvedRange = await instrumentation.runAsync(
-      "gitlode.resolve_extraction_range",
-      async (span) => {
-        span.setAttribute("gitlode.range.kind", input.range?.type ?? "none");
-        return await resolveExtractionRange(input.range, resolvedRepoPath, gitAdapter);
-      },
-    );
-
-    const resolvedOutputPrefix = resolveOutputPrefix(
-      input.outputPrefix,
-      resolvedRepoUrl,
-      resolvedRepoPath,
-    );
-    const extractionSettings = {
-      refs: input.refs,
-      outputDir: input.outputDir,
-      outputPrefix: resolvedOutputPrefix,
-      rotation: input.rotation,
-      range: resolvedRange,
-      granularity: input.granularity,
-      maxDiffSize: input.maxDiffSize,
-    };
-
-    const traversalPlanner = new RepositoryTraversalPlanner(gitAdapter, instrumentation);
-    const traversalExtractor = new CommitFactExtractor(gitAdapter, instrumentation);
-    const fileChangeExpander = new FileChangeFactExpander(
-      gitAdapter,
-      new JsLineDiffCalculator({ instrumentation } satisfies JsLineDiffCalculatorDependencies),
-      instrumentation,
-      extractionSettings.maxDiffSize,
-    );
-
-    let projector: FactProjector;
-    const { pluginBaseDirectory, pluginDeclarations } = input;
-    if (!pluginBaseDirectory || !hasEffectivePluginDeclarations(pluginDeclarations)) {
-      projector = new BuiltInFactProjector(resolvedRepoName, resolvedRepoUrl, instrumentation);
-    } else {
-      const baseProjector = new BuiltInFactProjector(
-        resolvedRepoName,
-        resolvedRepoUrl,
-        instrumentation,
+  const applicationWork = async (): Promise<WorkerRunResult> => {
+    try {
+      const gitAdapterResult = await buildGitAdapter(
+        input.gitAdapter,
+        {
+          gitTracer: activeTelemetry.gitTracer,
+          gitMetricRecorder: activeTelemetry.gitMetricRecorder,
+          dagTelemetryBinding: activeTelemetry.dagTelemetryBinding,
+          rootContext,
+        },
+        dependencies,
       );
-      const projectorResult = await buildPluginProjector(
-        pluginDeclarations,
-        pluginBaseDirectory,
-        baseProjector,
-        reporters,
-        instrumentation,
-      );
-      if (projectorResult.kind === "termination") {
-        return await finishUserError(runSpan, projectorResult.message);
+      if (gitAdapterResult.kind === "user-error") {
+        return await finishUserError(runSpan, gitAdapterResult.message);
       }
-      projector = projectorResult.projector;
-    }
+      if (gitAdapterResult.gitVersion !== undefined) {
+        runSpan.setAttribute("gitlode.git.cli.version", gitAdapterResult.gitVersion);
+      }
+      await using gitAdapter = gitAdapterResult.adapter;
 
-    const sink = new JsonlOutputSink(
-      new JsonlFileWriter(
-        extractionSettings.outputDir,
-        (seq) =>
-          `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
-        extractionSettings.rotation,
-      ),
-    );
+      await withSetupAsyncSpan(
+        executionTracer,
+        "gitlode.repository.access.validate",
+        async () => await validateRepositoryAccess(input, resolvedRepoPath, gitAdapter),
+        rootContext,
+      );
 
-    const coordinator = new ExtractionPipeline({
-      traversalPlanner,
-      traversalExtractor,
-      fileChangeExpander,
-      projector,
-      sink,
-      progressReporter: reporters.progressReporter,
-      diagnosticReporter: reporters.diagnosticReporter,
-      instrumentation,
-    });
+      const repositoryObjectFormat = await withSetupAsyncSpan(
+        executionTracer,
+        "gitlode.repository.object_format.resolve",
+        async (span) => {
+          const objectFormat = await resolveRepositoryObjectFormat(resolvedRepoPath, gitAdapter);
+          span.setAttribute("gitlode.git.object_format", objectFormat);
+          runSpan.setAttribute("gitlode.git.object_format", objectFormat);
+          return objectFormat;
+        },
+        rootContext,
+      );
 
-    const result = await instrumentation.runAsync("gitlode.extract", async (span) => {
-      span.incrementCounter("refs", extractionSettings.refs.length);
-      const coordinatorResult = await coordinator.run({
+      withSetupSpan(executionTracer, "gitlode.state.validate", rootContext, (span) => {
+        span.setAttribute("gitlode.ref.prior.count", priorCheckpoint.refs.length);
+        validatePriorCheckpoint(priorCheckpoint, resolvedRepoPath, repositoryObjectFormat);
+      });
+
+      const { repoName: resolvedRepoName, repoUrl: resolvedRepoUrl } = await withSetupAsyncSpan(
+        executionTracer,
+        "gitlode.repository.metadata.resolve",
+        async (span) => {
+          const basics = await resolveRepositoryBasics(
+            resolvedRepoPath,
+            gitAdapter,
+            input.repoName,
+            input.repoUrl,
+          );
+          span.setAttribute(
+            "gitlode.repository.name.source",
+            input.repoName !== undefined ? "explicit" : basics.repoUrl ? "remote_url" : "path",
+          );
+          span.setAttribute(
+            "gitlode.repository.url.source",
+            input.repoUrl !== undefined ? "explicit" : basics.repoUrl ? "remote" : "missing",
+          );
+          return basics;
+        },
+        rootContext,
+      );
+
+      const resolvedRange = await withSetupAsyncSpan(
+        executionTracer,
+        "gitlode.extraction.range.resolve",
+        async (span) => {
+          span.setAttribute("gitlode.extraction.range.kind", input.range?.type ?? "none");
+          return await resolveExtractionRange(input.range, resolvedRepoPath, gitAdapter);
+        },
+        rootContext,
+      );
+
+      const resolvedOutputPrefix = resolveOutputPrefix(
+        input.outputPrefix,
+        resolvedRepoUrl,
+        resolvedRepoPath,
+      );
+      const extractionSettings = {
+        refs: input.refs,
+        outputDir: input.outputDir,
+        outputPrefix: resolvedOutputPrefix,
+        rotation: input.rotation,
+        range: resolvedRange,
+        granularity: input.granularity,
+        maxDiffSize: input.maxDiffSize,
+      };
+
+      const traversalPlanner = new RepositoryTraversalPlanner(gitAdapter, extractionTracer);
+      const traversalExtractor = new CommitFactExtractor(gitAdapter, extractionTracer);
+      const lineDiffMetricRecorder =
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_LINE_DIFF_METRIC_RECORDER
+          : createLineDiffMetricRecorder(
+              activeTelemetry.lineDiffMeter,
+              activeTelemetry.metricTiming,
+            );
+      dependencies.observeTelemetryComposition?.("line-diff", lineDiffMetricRecorder);
+      const fileChangeExpanderMetricRecorder =
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER
+          : createFileChangeFactExpanderMetricRecorder(
+              extractionMeter,
+              activeTelemetry.metricTiming,
+            );
+      dependencies.observeTelemetryComposition?.(
+        "file-change-expansion",
+        fileChangeExpanderMetricRecorder,
+      );
+      const fileChangeExpander = new FileChangeFactExpander(
+        gitAdapter,
+        new JsLineDiffCalculator({
+          metricRecorder: lineDiffMetricRecorder,
+        } satisfies JsLineDiffCalculatorDependencies),
+        fileChangeExpanderMetricRecorder,
+        extractionSettings.maxDiffSize,
+      );
+
+      let projector: FactProjector;
+      const { pluginBaseDirectory, pluginDeclarations } = input;
+      if (!pluginBaseDirectory || !hasEffectivePluginDeclarations(pluginDeclarations)) {
+        const projectionMetricRecorder =
+          activeTelemetry.metricRecordingEnabled === false
+            ? NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER
+            : createBuiltInFactProjectorMetricRecorder(
+                extractionMeter,
+                activeTelemetry.metricTiming,
+              );
+        dependencies.observeTelemetryComposition?.("built-in-projection", projectionMetricRecorder);
+        projector = new BuiltInFactProjector(
+          resolvedRepoName,
+          resolvedRepoUrl,
+          extractionTracer,
+          projectionMetricRecorder,
+        );
+      } else {
+        const projectionMetricRecorder =
+          activeTelemetry.metricRecordingEnabled === false
+            ? NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER
+            : createBuiltInFactProjectorMetricRecorder(
+                extractionMeter,
+                activeTelemetry.metricTiming,
+              );
+        dependencies.observeTelemetryComposition?.(
+          "plugin-base-projection",
+          projectionMetricRecorder,
+        );
+        const baseProjector = new BuiltInFactProjector(
+          resolvedRepoName,
+          resolvedRepoUrl,
+          extractionTracer,
+          projectionMetricRecorder,
+          false,
+        );
+        const projectorResult = await buildPluginProjector(
+          pluginDeclarations,
+          pluginBaseDirectory,
+          baseProjector,
+          reporters,
+          {
+            pluginRuntimeTracer: activeTelemetry.pluginRuntimeTracer,
+            projectionTracer: extractionTracer,
+            rootContext,
+            getPluginTracer: activeTelemetry.getPluginTracer,
+            getPluginMeter: activeTelemetry.getPluginMeter,
+            metricRecordingEnabled: activeTelemetry.metricRecordingEnabled,
+            metricTiming: activeTelemetry.metricTiming,
+            observeProjectionMetricRecorder: (component) =>
+              dependencies.observeTelemetryComposition?.("plugin-projection", component),
+          },
+        );
+        if (projectorResult.kind === "termination") {
+          return await finishUserError(runSpan, projectorResult.message);
+        }
+        projector = projectorResult.projector;
+      }
+
+      const outputMetricRecorder =
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_JSONL_FILE_WRITER_METRIC_RECORDER
+          : createJsonlFileWriterMetricRecorder(extractionMeter);
+      dependencies.observeTelemetryComposition?.("jsonl-output", outputMetricRecorder);
+      const sink = new JsonlOutputSink(
+        new JsonlFileWriter(
+          extractionSettings.outputDir,
+          (seq) =>
+            `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
+          extractionSettings.rotation,
+          outputMetricRecorder,
+        ),
+      );
+
+      const extractionPipelineMetricRecorder =
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER
+          : createExtractionPipelineMetricRecorder(extractionMeter, activeTelemetry.metricTiming);
+      dependencies.observeTelemetryComposition?.(
+        "extraction-pipeline",
+        extractionPipelineMetricRecorder,
+      );
+      const coordinator = new ExtractionPipeline({
+        traversalPlanner,
+        traversalExtractor,
+        fileChangeExpander,
+        projector,
+        sink,
+        progressReporter: reporters.progressReporter,
+        diagnosticReporter: reporters.diagnosticReporter,
+        tracer: extractionTracer,
+        metricRecorder: extractionPipelineMetricRecorder,
+      });
+
+      const result = await coordinator.run({
         repositoryPath: resolvedRepoPath,
         repoName: resolvedRepoName,
         repoUrl: resolvedRepoUrl,
@@ -209,41 +469,71 @@ export async function executeWorkerRunRequest(
         priorCheckpoint,
         sessionTimestamp,
       });
-      span.incrementCounter("records", coordinatorResult.recordsWritten);
-      span.incrementCounter("commits", coordinatorResult.commitsTraversed);
-      span.incrementCounter("skipped_diffs", coordinatorResult.skippedDiffs);
-      return coordinatorResult;
+
+      const success: ExecutionSuccessPayload = {
+        recordsWritten: result.recordsWritten,
+        commitsTraversed: result.commitsTraversed,
+        filesCreated: sink.filesCreated,
+        bytesWritten: sink.bytesWritten,
+        elapsedMs: performance.now() - startMs,
+        refs: result.refs,
+        skippedDiffs: result.skippedDiffs,
+      };
+
+      return {
+        kind: "success",
+        success,
+        checkpoint: result.checkpoint,
+      };
+    } catch (error) {
+      if (error instanceof GitAdapterError) {
+        return await finishUserError(runSpan, error.message);
+      }
+      runSpan.setAttribute("gitlode.run.result", "runtime_error");
+      recordSpanError(runSpan, error);
+      if (telemetry) {
+        runSpan.end();
+        throw error;
+      }
+      return {
+        kind: "runtime-error",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      };
+    }
+  };
+  const applicationResult = await (session
+    ? session.runInRootContext(applicationWork)
+    : context.with(rootContext, applicationWork));
+
+  if (applicationResult.kind === "success") {
+    runSpan.setAttributes({
+      "gitlode.run.result": "success",
+      "gitlode.commit.unique.count": applicationResult.success.commitsTraversed,
+      "gitlode.output.record.count": applicationResult.success.recordsWritten,
+      "gitlode.output.file.count": applicationResult.success.filesCreated,
+      "gitlode.output.size": applicationResult.success.bytesWritten,
     });
-
-    // End run-scoped Git processes before taking the profiling snapshot. The
-    // await-using declaration still guarantees cleanup on every earlier exit.
-    await gitAdapter[Symbol.asyncDispose]();
-
-    runSpan.incrementCounter("records", result.recordsWritten);
-    runSpan.incrementCounter("commits", result.commitsTraversed);
-    runSpan.setAttribute("gitlode.result", "success");
-    runSpan.end();
-
-    const success: ExecutionSuccessPayload = {
-      recordsWritten: result.recordsWritten,
-      commitsTraversed: result.commitsTraversed,
-      filesCreated: sink.filesCreated,
-      bytesWritten: sink.bytesWritten,
-      elapsedMs: performance.now() - startMs,
-      refs: result.refs,
-      profileEntries: recorder?.summary() ?? [],
-      skippedDiffs: result.skippedDiffs,
-    };
-
-    return {
-      kind: "success",
-      success,
-      checkpoint: result.checkpoint,
-    };
-  } catch (error) {
-    runSpan.end(error);
-    throw error;
   }
+  if (!session) {
+    runSpan.end();
+    return applicationResult;
+  }
+  const finalized = await session.finalize(applicationResult);
+  if (finalized.initializationWarning) {
+    reporters.diagnosticReporter.report({
+      severity: "warn",
+      message: "Telemetry initialization degraded; profile data is unavailable.",
+    });
+  }
+  if (!finalized.profileReport) return finalized.applicationResult;
+  if (finalized.applicationResult.kind === "success") {
+    return {
+      ...finalized.applicationResult,
+      success: { ...finalized.applicationResult.success, profileReport: finalized.profileReport },
+    };
+  }
+  return { ...finalized.applicationResult, profileReport: finalized.profileReport };
 }
 
 export interface ExecuteRunDependencies {

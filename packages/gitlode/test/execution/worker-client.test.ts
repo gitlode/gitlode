@@ -56,7 +56,7 @@ function successResult(): WorkerRunResult {
       bytesWritten: 100,
       elapsedMs: 10,
       refs: ["main"],
-      profileEntries: [],
+      profileReport: undefined,
       skippedDiffs: 0,
     },
     checkpoint: {

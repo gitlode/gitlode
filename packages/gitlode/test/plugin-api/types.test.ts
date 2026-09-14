@@ -1,7 +1,12 @@
 import type { ProjectedExtensionValue } from "@gitlode/internal-contracts/extraction";
+import type { Meter, Tracer } from "@opentelemetry/api";
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { PluginProjectionResult, PluginProjectionValue } from "../../src/plugin-api/index.js";
+import type {
+  PluginProjectionResult,
+  PluginProjectionValue,
+  PluginRuntimeContext,
+} from "../../src/plugin-api/index.js";
 
 // ---------------------------------------------------------------------------
 // Plugin contract type assertions
@@ -38,5 +43,17 @@ describe("ProjectedExtensionValue type contract", () => {
     expectTypeOf<boolean>().toMatchTypeOf<ProjectedExtensionValue>();
     expectTypeOf<Record<string, unknown>>().toMatchTypeOf<ProjectedExtensionValue>();
     expectTypeOf<null>().toMatchTypeOf<ProjectedExtensionValue>();
+  });
+});
+
+describe("PluginRuntimeContext telemetry contract", () => {
+  it("exposes OpenTelemetry API tracer and meter types", () => {
+    expectTypeOf<PluginRuntimeContext["tracer"]>().toEqualTypeOf<Tracer>();
+    expectTypeOf<PluginRuntimeContext["meter"]>().toEqualTypeOf<Meter>();
+  });
+
+  it("does not expose the legacy instrumentation property", () => {
+    type HasInstrumentation = "instrumentation" extends keyof PluginRuntimeContext ? true : false;
+    expectTypeOf<HasInstrumentation>().toEqualTypeOf<false>();
   });
 });

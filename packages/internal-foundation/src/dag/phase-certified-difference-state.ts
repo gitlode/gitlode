@@ -1,4 +1,3 @@
-import { noopInstrumentation } from "../instrumentation/index.js";
 import { collectAsyncIterableToSet } from "../support/index.js";
 import type {
   CertifiedClosurePhaseResult,
@@ -69,10 +68,8 @@ interface ReadonlyCertifiedExcludeState<NodeId extends PropertyKey> {
 export class PhaseCertifiedDifferenceState<NodeId extends PropertyKey, DomainHint = undefined> {
   private readonly includeGraph: IncludeGraphState<NodeId, DomainHint>;
   private readonly certifiedExclude = new CertifiedExcludeState<NodeId>();
-  private readonly telemetry?: DagPhaseCertifiedTelemetry;
 
   constructor(graph: DagTopologyPort<NodeId, DomainHint>, telemetry?: DagPhaseCertifiedTelemetry) {
-    this.telemetry = telemetry;
     this.includeGraph = new IncludeGraphState(graph, telemetry);
   }
 
@@ -115,16 +112,15 @@ export class PhaseCertifiedDifferenceState<NodeId extends PropertyKey, DomainHin
   async *applyClosureAndResolveIncludeHits(
     closure: CertifiedClosurePhaseResult<NodeId>,
   ): AsyncIterable<NodeId> {
-    const { includeHits, newlyCertifiedCount } = this.certifiedExclude.absorbClosureCertification(
+    const { includeHits } = this.certifiedExclude.absorbClosureCertification(
       closure,
       this.includeGraph,
     );
-    this.telemetry?.span.incrementCounter("certified_nodes", newlyCertifiedCount);
     yield* this.resolveIncludeHits(includeHits);
   }
 
   async *resolveIncludeHits(hits: ReadonlySet<NodeId>): AsyncIterable<NodeId> {
-    yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits, this.telemetry);
+    yield* resolveCertifiedHits(this.includeGraph, this.certifiedExclude, hits);
   }
 
   // The facade decides when to drain; observed local graph deletion belongs to include-side state.
@@ -162,22 +158,16 @@ async function* resolveCertifiedHits<NodeId extends PropertyKey>(
   includeGraph: MutableIncludeGraphState<NodeId>,
   certifiedExclude: ReadonlyCertifiedExcludeState<NodeId>,
   hits: ReadonlySet<NodeId>,
-  telemetry?: DagPhaseCertifiedTelemetry,
 ): AsyncIterable<NodeId> {
   if (hits.size === 0) return;
-  telemetry?.span.incrementCounter("certified_hits", hits.size);
 
   const classification = await classifyCertifiedHits(includeGraph, hits);
-  telemetry?.span.incrementCounter("classification_runs");
-  telemetry?.span.incrementCounter("classification_newer_nodes", classification.newerSideSize);
-  telemetry?.span.incrementCounter("classification_older_nodes", classification.olderSideSize);
 
   let excludedNodes = 0;
   for (const nodeId of classification.excluded) {
     if (includeGraph.get(nodeId) !== undefined) excludedNodes++;
     includeGraph.detachAndRemoveNode(nodeId);
   }
-  telemetry?.span.incrementCounter("classification_excluded_nodes", excludedNodes);
 
   for (const nodeId of classification.yieldable) {
     if (classification.excluded.has(nodeId)) continue;
@@ -196,7 +186,6 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
     walkDagReachableNodeIds(
       {
         graph: includeGraph.createPredecessorTopology(),
-        instrumentation: noopInstrumentation,
       },
       hits,
     ),
@@ -205,7 +194,6 @@ async function classifyCertifiedHits<NodeId extends PropertyKey>(
     walkDagReachableNodeIds(
       {
         graph: includeGraph.createSuccessorTopology(),
-        instrumentation: noopInstrumentation,
       },
       hits,
     ),
@@ -292,8 +280,7 @@ class IncludeGraphState<
   async expand(nodeId: NodeId): Promise<readonly DagSuccessor<NodeId, DomainHint>[]> {
     this.ensureNodeState(nodeId);
 
-    this.telemetry?.span.incrementCounter("successor_expansions");
-    this.telemetry?.span.incrementCounter("main_expansions");
+    this.telemetry?.observation?.recordSuccessorExpansion("main");
     const successors = await this.graph.getSuccessors(nodeId);
     const successorIds = successors.map((successor) => successor.nodeId);
     this.markNodeExpanded(nodeId);

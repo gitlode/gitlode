@@ -1,0 +1,268 @@
+# OpenTelemetry Redesign Recovery Plan
+
+## Authority and current status
+
+The human accepted staged convergence on 2026-09-09, branch-history recovery on 2026-09-11,
+and the pre-merge review disposition below on 2026-09-14.
+The objective remains safe integration before full v0.13.0 release acceptance. The
+[redesign plan](instrumentation-opentelemetry-redesign-plan.md) tracks unfinished T13B/T13C work;
+canonical telemetry, verification, performance, and publish contracts remain authoritative.
+
+M0 is complete. R1 disabled-recorder selection and R2 bounded metric collection are independently
+accepted, including corrected R1 composition-regression evidence. Prior full validation retains its
+historical scope; corrected candidate `6fd46d3` now has accepted cumulative Windows/Linux verification.
+The human has merged the T13B-to-T13 and T13-to-redesign PRs. The final integration PR waits for
+final integration preparation and explicit human PR permission. M2 remains paused.
+
+| Milestone                 | Status                                   | Remaining exit                                                                          |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
+| M0: Measurement path      | complete, one target only                | Preserve the original evidence and attribution                                          |
+| M1: Integration-ready     | R1/R2 and cumulative validation accepted | Prepare integration and obtain human permission for the final integration PR            |
+| M2: v0.13.0 release-ready | paused pending M1                        | Full T13B, readable profiles, staged system-test organization, final candidate and T13C |
+| M3: Future capabilities   | deferred beyond v0.13.0                  | Separate future plans                                                                   |
+
+## Branch recovery and next assignment
+
+The local and actual remote integration refs were checked after the human reset and both equal
+`1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`. The reset integration tip is preserved locally and
+remotely at `archive/otel-m1-before-reset-20260911`, OID
+`b4468342c982d09be09e9c46290bb1ed2d842a36`. That branch is an archive, not an active merge source.
+The separate `D:\gitlode_test` evidence archives remain immutable.
+
+The approved integration route is:
+
+1. `feature/otel-redesign_T13B` into `feature/otel-redesign_T13`.
+2. `feature/otel-redesign_T13` into `feature/otel-redesign`.
+3. `feature/otel-redesign` into `integration/v0.13.0`.
+
+Recovery step 4 completed at `08661cebbdd5538fe0e3a1e8836890127bbd2bf5`, including the test
+environment correction at `7dc4ca7` and completed-handoff cleanup. The human squash-merged
+[PR #109](https://github.com/gitlode/gitlode/pull/109) into T13 at
+`ec0b0863c59129bed770228f2038b2cba2d07113`, then merged
+[PR #110](https://github.com/gitlode/gitlode/pull/110) into redesign, whose reviewed implementation
+is `8c0b200f7e0ac8f175199b76201297364dccd1a1`. Preserve the child branches until recovery is complete.
+
+R1 and R2 implementation returned at `f755cc775f7ecb8e299a0eb3f36cea0f40bd7eda` and
+`0354bab6bcf8e2f78bb6dcb0d23843576504e869`; the outcome is checkpointed at
+`93f881784c6c9c47e51fdaaf9b42a852c8afa068`. Independent review at
+`d25d65ddec78b7d6dad38bc2a23628f9967b96f7` accepted R2 but found R1 test evidence insufficient:
+inactive composition disconnects the observed clock, and output/DAG selection is not observed.
+Trunk confirmed the finding; no concrete production-result defect was identified. The evidence
+correction returned at `c3e74a292cd459c1fe455803bbe66f6553a192ad`, with outcome checkpoint
+`219207f6c7fdaad15c5591cbd91a19f2fda084dd`. Independent re-review recorded at
+`6fd46d340c57dd706a8483bb131693b47d9efe08` accepted R1 and maintained R2 acceptance; trunk adopts
+that result. Cumulative validation returned at `dd4cba745e3e5c93d5a49965947835ebb450579d`:
+Windows 91 files / 1,190 passed / 17 Linux-only skips; Linux 91 files / 1,207 passed / zero skips.
+Trunk verified all 62 archive entries and accepts the [retained evidence](opentelemetry-m1-validation-result.md).
+The remaining work is final integration preparation and human PR authorization. Do not continue
+implementation on already-squashed T13B or replay its commits. M1 remains pending actual integration;
+M2 remains paused and the live publish gate remains blocked.
+
+Before each PR, present its exact source tip, base branch, cumulative diff, evidence, and remaining
+obligations for human inspection. Obtain explicit permission stating which branch will merge into
+which branch. The human creates the approval and performs the merge, including any squash choice;
+the agent must not merge or directly push integration. See the
+[durable collaboration rule](../agents/collaborative-work.md#pull-requests-and-branch-integration).
+No PR is authorized merely by completion of this preparation step.
+
+After each human merge, fetch and inspect the actual result before preparing the next PR. Compare
+content rather than assuming ancestry survived squash. Preserve the domain-design link already in
+the integration base's `git-cli-adapter-plan.md`. The earlier direct-integration rehearsal is
+historical evidence only, not authorization or a matching-tree claim for these new merge results.
+
+## Evidence and squash boundaries
+
+- [M0 environment and one-target result](opentelemetry-m0-result.md) retain operational paths,
+  exact product/harness/recipe identities and archive hashes. They are not full T13B evidence.
+- [M1 validation evidence](opentelemetry-m1-validation-result.md) retains the frozen candidate,
+  Windows/Linux verification and immutable package/runtime identities. The earlier CI fix changed
+  only tests; the new R1/R2 production delta has its own cumulative evidence at `6fd46d3`.
+  The old test/document-only delta justification is historical, not reused for those corrections.
+- Squash changes commit identities and can remove ancestor relationships required by the
+  [publish gate](../contributing/build-test-release.md). Keeping an archive ref preserves objects,
+  but does not make an old frozen candidate an ancestor of the new final candidate.
+- After the full branch chain is integrated, freeze a new M2 product candidate on the resulting
+  integration history and run formal M2 acceptance there. Keep old evidence attributed to its actual
+  OIDs; never relabel old measurements as new-candidate results or relax provenance checks here.
+  M2 planning must also settle final release-to-main squash timing before binding the final candidate.
+
+Completed implementation/review/diagnosis packets were removed from the working tree. Their history
+remains in the preserved T13B commits and archive branch. This plan and the two evidence notes carry
+only context needed for reintegration and M2; the original plan carries the remaining unit scope.
+
+## Accepted decisions and limits
+
+- Use Linux/WSL2 for reference measurements. Prepare a Linux-native toolchain and filesystem for
+  execution; retain `D:\gitlode_test` as the Windows-accessible artifact archive. Do not use Windows
+  baseline timings as Linux comparison evidence. Windows functional validation remains required.
+- Integrate at M1; complete all pre-release obligations at M2. Future capabilities belong to M3.
+- Before M1, limit production reorganization to recognizable domain-local `telemetry/` placement,
+  naming, import adjustments, and documentation entrypoints. Keep operation ownership and semantics.
+  These subdirectories are not new code domains. Do not combine this with recorder API redesign.
+- The 2026-09-14 amendment additionally requires the narrowly scoped R1/R2 safety corrections before
+  M1. It does not authorize general recorder, metadata, lifecycle-helper, or collector refactoring.
+- Improve profile readability before release, using representative output for human review.
+- Adopt a private `tests/system` workspace in a separate post-M1 slice, moving release-CLI system
+  workflows incrementally. Do not move every telemetry test or add public APIs to expose internals.
+- Separate implementation, measurement execution, diagnosis, and review sessions using the
+  [collaboration guidance](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
+- Do not discard the implementation, restore legacy instrumentation, remove observations, relax thresholds,
+  or automatically retry for a favorable result. The current calibration recipe remains authoritative.
+  Whether to replace minimum-integer calibration with a selection having more timing headroom is an
+  unresolved design question, not an approved change.
+
+## Accepted pre-merge review disposition (2026-09-14)
+
+### Provenance and interpretation
+
+The independent LLM review compared integration `1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`
+with redesign `8c0b200f7e0ac8f175199b76201297364dccd1a1`. The unmodified report and its README
+route were preserved at checkpoint `6b99b4d8e8b5c846371bcb7174e3337152684491` before disposition;
+the report is removed from the active tree. This section is the accepted continuation authority,
+not the original report's recommendations. In particular, the human accepted moving R2 from the
+report's proposed M2 timing to a required pre-M1 correction.
+R1/R2 in this section identify the 2026-09-14 pre-merge findings, not the previously completed
+M0 supervision R1 final-evidence-write correction.
+
+Planning independently inspected the R1 composition path and R2 collection/installed-SDK code at
+the reviewed head, and reproduced R2 using the actual source `WorkerTelemetrySession`. R1's reported
+108 timing-clock reads were not independently recounted. The original review reported a successful
+development build and 14 focused test files / 231 passing tests; planning did not rerun those suites.
+Neither review performed full release validation, formal measurement, or external archive verification.
+
+The report counted 209 changed files with 33,893 net added lines, about 80% in tests, documentation
+and validation tooling; these are report-derived ownership counts, not complexity or performance
+measurements. The migration includes observation redesign, local report collection, verification
+catalogs and evidence/release tooling beyond OTel API adoption alone. Domain-local recorder placement
+is not itself a demonstrated defect. Preserve semantic operation ownership and recorder APIs:
+partial work, plugin callback versus result application, output success versus written bytes, and
+DAG work have distinct owners. Do not use line counts to justify wholesale deletion or new release gates.
+
+### R1: Disabled and degraded composition ? accepted
+
+The original composition created active domain recorders despite a no-op recording destination.
+Correction `f755cc775f7ecb8e299a0eb3f36cea0f40bd7eda` selects no-op recorder families and Git-owned
+no-op DAG binding from effective session state. Correction `c3e74a292cd459c1fe455803bbe66f6553a192ad`
+closed the test blind spot by retaining an observable timing clock and observing the exact objects
+passed to their owners. All nine selections were mutation-checked in implementation; independent
+review repeated timing and non-timing mutations and traced all nine owners. Actual disabled/degraded
+composition, both Git adapters and representative file/plugin paths are covered. No formal overhead
+threshold or zero overall overhead follows from this functional evidence.
+
+Review checkpoint `6fd46d340c57dd706a8483bb131693b47d9efe08` accepted R1 and retained R2 acceptance,
+with 9 files / 179 affected tests passing. Existing recorder semantics and public APIs are preserved.
+The [local profile and failure-isolation contract](../design/telemetry.md) remains authoritative.
+
+### R2: Asynchronous metric collection ? accepted
+
+Without a finite SDK collection timeout, a plugin's unresolved observable callback could prevent
+finalization even when its metric was excluded from the report. Correction
+`0354bab6bcf8e2f78bb6dcb0d23843576504e869` uses the SDK collection timeout with a default of
+1,000 ms, validated as a positive safe integer. Review checkpoint `d25d65d` accepted real SDK callback
+coverage for normal completion, rejection, non-settlement and late settlement, including partial
+signals, sanitized diagnostics, original result identity, cleanup and idempotent finalization.
+
+The timeout bounds asynchronous collection waiting; it neither cancels arbitrary callbacks nor
+preempts synchronous event-loop blocking. This is not a plugin sandbox or process-supervision claim.
+The default and limitations are documented in the canonical telemetry contract. Both fixes are
+included in the fresh cumulative validation retained in the M1 evidence note.
+
+### C1-C6: Required portions and optional follow-up
+
+These proposals are not blanket M2 acceptance conditions. Preserve operation-owner call sites;
+take optional refactoring only through a separately justified, bounded decision.
+
+| ID  | Observation and accepted disposition                                                                                                                                                                                                                                                                                                                                                                              |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | YAML catalogs, runtime metadata and profile-view metadata require coordinated edits. M3 candidate: generate only needed runtime metadata from canonical YAML at development/build time, with no production YAML parser. Reduce independently maintained definitions, not just visible line counts; do not change catalog policy at M1/M2 by implication.                                                          |
+| C2  | Instrument descriptions, units and histogram buckets repeat across factories. M3 candidate: small shared construction helpers, preserving semantic recorder methods. A local improvement required by existing M2 work is possible; an across-the-board rewrite is not scheduled.                                                                                                                                  |
+| C3  | Span start/context/catch/end logic repeats, partly because GitAdapterError has different policy. M3 candidate: separate lifecycle mechanism from error policy while preserving context, error classification and exactly-once ending. Not a prerequisite for M1.                                                                                                                                                  |
+| C4  | SDK histogram/attribute validation and report validation overlap but guard different boundaries. M2 related work may clarify ownership and document responsibility; broad consolidation is an M3 candidate. Do not remove defensive validation merely because checks resemble one another.                                                                                                                        |
+| C5  | Direct no-op tests missed production selection; injected lifecycle failures missed a real async callback stall. Actual-path regression tests for R1/R2 are mandatory at M1. Wholesale removal/replacement of production test hooks is an M3 candidate, not a new release condition.                                                                                                                               |
+| C6  | Migration acceptance/provenance tooling differs from lasting performance regression tooling. Incorporate ownership and retirement criteria into existing M2 system-test organization and T13C work. Preserve evidence and required checks; do not remove the gate before M2 acceptance. Record the separately reviewed gate-retirement timing after the initial release, as required by current publish guidance. |
+
+### Final integration preparation
+
+Implementation, independent review, correction and cumulative validation are complete. Their
+checkpoint identities and evidence remain above and in the M1 evidence note; completed session
+packets are no longer active instructions. Assess the current source and actual remote base,
+preserve the base's existing domain-design link, and request explicit human permission to create
+`feature/otel-redesign` into `integration/v0.13.0`. The human chooses and performs the merge.
+Formal performance work remains M2, using a new post-integration candidate.
+
+### M1: Integrate without claiming release readiness
+
+Before merging:
+
+- close the accepted R1/R2 blockers above with actual-path tests, independent review and updated
+  cumulative functional/package evidence for the corrected candidate;
+- verify result/JSONL/checkpoint equivalence, operation ownership, and telemetry failure isolation
+  against the canonical verification matrix;
+- pass the applicable complete repository and installed-package checks from
+  [build/test/release guidance](../contributing/build-test-release.md);
+- review M0 results and explicitly triage every known performance failure; do not integrate an
+  unaddressed material regression as though it were merely missing evidence;
+- complete the limited domain-local placement and contributor reading routes, preserving recording
+  points, attributes, no-op behavior, and extraction control flow;
+- preserve an immutable migration candidate with revision, complete release bundle and dependencies,
+  content hashes, harness revision, environment, and fixture identity;
+- define and verify how the M2 release blockers prevent accidental publishing. The existing
+  `validate:release` command is not evidence of formal telemetry performance acceptance. Keep
+  integration CI usable while making release readiness explicit; and
+- review the cumulative result and each proposed merge result, then follow the human-approved branch chain above.
+
+Mechanical moves belong before integration to reduce later conflicts. General helper extraction,
+recorder API redesign, and large documentation rewrites are not prerequisites for those moves.
+Partial performance coverage must remain labeled partial.
+
+After the final human-operated integration merge, branch all further work from `integration/v0.13.0`. Other feature work can proceed.
+Do not continue accumulating changes on a parallel long-lived redesign branch. Keep T13B and T13C
+open and retain these handoffs until their release obligations are complete.
+
+### M2: Close the v0.13.0 release obligations
+
+| Obligation                      | Required evidence                                                                                                                                                                                                    |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Original performance acceptance | All repository calibration targets, legacy captures, both comparison matrices, aggregation scale, and other cataloged volume/memory/behavior checks; any exception has the required evidence and explicit acceptance |
+| Profile readability             | Representative commit, file, and plugin output plus partial/unavailable cases reviewed by the human; formatter tests alone do not establish usability                                                                |
+| System-test organization        | A private `tests/system` workspace with the first release-CLI workflow migration, explicit commands, dependency boundaries, and checked TypeScript for its owned tooling                                             |
+| Contributor navigation          | Clear product-versus-telemetry reading routes, instrumentation placement guidance, and separate guidance for recorder changes and collection infrastructure                                                          |
+| Final candidate                 | Functional/package checks and applicable formal performance acceptance on the actual release candidate; changes since the frozen migration candidate are assessed explicitly                                         |
+| Closure                         | T13B accepted, T13C completed, release blockers closed, stable facts moved to durable docs, and temporary handoffs removed                                                                                           |
+
+Stage system-test migration after the measurement path works. Pure planner/statistics tests remain
+unit tests of the harness; collector tests that need internal implementation access stay with their
+owning package. Do not make every existing test type error or every test-directory move a release
+prerequisite. Keep the existing required checks running while their owners/commands are migrated.
+Include C6's migration-only versus lasting-check ownership and gate-retirement criteria in these
+existing M2/T13C tasks. C4 responsibility clarification belongs only where related work touches it;
+C1-C5 general simplifications are not additional M2 release gates.
+
+Freeze the migration candidate for attribution, and separately verify the final release candidate
+for shipment. Later feature costs must not be silently attributed to telemetry or accepted by
+reusing older passing results. Diagnose changed behavior against the frozen candidate; apply the
+existing explicit exception process where necessary. Do not silently recalibrate a frozen fixture.
+
+### M3: Future work
+
+External export, collector/backend integration, analysis platforms, broader reusable instrumentation
+abstractions, and migration of unrelated system tests belong in separately scoped future work.
+Local SDK integration already exists; future work is not described as the first SDK adoption.
+These ideas must not automatically become v0.13.0 blockers.
+The C1-C5 follow-up candidates above also belong here except for the explicitly required R1/R2
+tests and limited M2 responsibility clarification. None is an automatic implementation commitment.
+
+## Session boundaries
+
+The current conversation owns trunk acceptance and has accepted R1/R2 after independent review.
+Cumulative validation is accepted. Trunk prepares the final integration step and requests explicit
+human permission for PR creation; no PR is authorized yet.
+Generic continuation instructions preserve
+these boundaries. After reintegration, use a separate M2 planning conversation to order presentation,
+system-test organization, candidate freezing, formal measurements, and T13C by their dependencies.
+
+Use separate bounded implementation, measurement, diagnosis, and review assignments as described
+in the [collaboration guidance](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
+Measurement operators execute fixed inputs and return evidence; they do not repair code or retry for
+a favorable result. Warn before long external execution. Never reuse a mutable development
+`dist` as the preserved measurement bundle or modify Docker Desktop's managed distribution.

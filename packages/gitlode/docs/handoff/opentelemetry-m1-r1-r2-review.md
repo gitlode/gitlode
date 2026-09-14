@@ -89,4 +89,78 @@ functional and installed-package validation; this review alone does not complete
 
 ## Review outcome
 
-Pending independent review. R1/R2 remain implemented but unaccepted.
+Reviewed fixed implementation target:
+`0354bab6bcf8e2f78bb6dcb0d23843576504e869` (base
+`3ed3cf47a9efcddffbbf4a45144325c7cfa807ad`, R1
+`f755cc775f7ecb8e299a0eb3f36cea0f40bd7eda`). The review started from documentation-only HEAD
+`75588089bfe1d63c3a6c8120743b5323665db05d`; the worktree was clean. All four named commits exist,
+the base/R1/R2/outcome ancestry chain is intact, the fixed diff contains the reported 13 unique
+source/test/durable-document files, and changes after the target were limited to the three handoff
+documents, including this packet. Both the fixed diff and the pre-review post-target diff passed
+`git diff --check`.
+
+### Judgments
+
+- **R1: changes required.** Static inspection found the intended production selections in normal
+  default composition: inactive sessions choose the no-op Git, extraction, built-in projection,
+  line-diff, output and plugin recorders and the Git-owned no-op DAG binding; active sessions retain
+  the active factories. The DAG no-op binding delegates difference directly to the supplied walk,
+  and forwards graph, input and options unchanged to the reachable and certified-closure algorithms,
+  so it adds no lifecycle wrapper or mutable observation state and preserves partial iteration and
+  thrown values. The real-repository test also covers disabled isomorphic-git, degraded Git CLI and
+  enabled isomorphic-git results, JSONL, checkpoint, plugin and warning/report outcomes.
+
+  The mandatory actual-path selection evidence nevertheless has a false-negative path. In
+  `createDefaultWorkerExecutionTelemetry()`, `metricTiming` is set to `undefined` whenever
+  `recordingEnabled` is false. If any disabled/degraded composition branch accidentally selects an
+  active timing recorder, that recorder constructs its own default `performance.now` timing and the
+  injected `telemetryClock` still reports zero reads. The active output recorder and active DAG
+  binding likewise have no injected-clock observation. Consequently the passing zero-read assertion,
+  together with the direct no-op DAG object test, does not prove that production composition selected
+  every required no-op object; this is the exact evidence weakness the review contract excludes.
+
+  Required correction: make the disabled and initialization-degraded production-path regression
+  fail if any required recorder family or DAG binding is composed as active, while retaining the
+  existing result/JSONL/checkpoint/plugin/warning assertions. The clock assertion must remain wired
+  so an accidentally active timing recorder uses the observed test clock. Cover the non-timing output
+  recorder and DAG binding through an actual composition-visible observation rather than only direct
+  no-op object tests. This correction is required evidence for the accepted no-op composition and
+  failure-isolation contract; no production result defect was observed in the fixed implementation.
+
+- **R2: accepted.** `LocalMetricReader` validates a positive safe-integer timeout and passes it to
+  SDK collection. The ordinary `WorkerTelemetrySession.create()` path reaches the constructor with
+  no override and therefore uses the 1,000 ms production default; test overrides construct the same
+  reader and exercise the same `collect({ timeoutMillis })` mechanism. Inspection of installed
+  `@opentelemetry/sdk-metrics` 2.10.0 confirmed that callback rejection and timeout are aggregated in
+  `CollectionResult.errors` while collection resolves, whereas collection-level rejection follows
+  the reader's unavailable-signal catch path. The session tests use real unlisted plugin observable
+  gauges and cover normal settlement, rejection and non-settlement. They prove partial counter and
+  histogram status for callback errors, bounded diagnostics without callback error text, original
+  success/failure result identity, subsequent provider/context cleanup, memoized finalization and
+  stable late settlement. The durable design correctly limits the guarantee to asynchronous
+  collection waiting and disclaims callback cancellation and synchronous event-loop preemption.
+
+- **Combined: changes required because R1 is not accepted.** R2 can remain accepted while the single
+  grouped R1 evidence correction is made and independently re-reviewed. No optional improvement was
+  identified, and this review does not broaden into C1-C6, release validation or performance work.
+
+### Checks and evidence accounting
+
+Newly run from repository root against HEAD whose implementation/test tree matched the fixed target:
+
+- `npm run build:dev`: passed (`tsc -b`); the referenced production composite projects typecheck,
+  while the documented tooling/test `noCheck` boundary remains distinct.
+- The packet's exact combined Vitest command: 9 files, 179 tests passed, 0 failed, 0 skipped.
+- `npm run format:write` and `npm run format:check`: passed; formatting changed only this review
+  outcome.
+- `git diff --check 3ed3cf47..0354bab`: passed.
+- `git diff --check 0354bab..7558808`: passed before recording this outcome.
+
+The implementation packet's separate R1 7-file/126-test and R2 2-file/73-test runs, architecture
+check, lint and original diff checks remain reported evidence; they were not independently rerun
+before recording this outcome. Full Windows/Linux release and installed-package validation, formal
+calibration and formal performance measurements were intentionally not run.
+
+Concrete residual paths are the R1 regression false negatives described above and the documented R2
+limit that a synchronous callback can still block the event loop. The latter is an accepted boundary,
+not a correction request. M1 remains incomplete, and this review does not permit a PR or integration.

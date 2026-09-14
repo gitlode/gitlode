@@ -10,16 +10,16 @@ canonical telemetry, verification, performance, and publish contracts remain aut
 
 M0 is complete. R1 disabled-recorder selection and R2 bounded metric collection are independently
 accepted, including corrected R1 composition-regression evidence. Prior full validation retains its
-historical scope; the corrected candidate still requires cumulative Windows/Linux verification.
+historical scope; corrected candidate `6fd46d3` now has accepted cumulative Windows/Linux verification.
 The human has merged the T13B-to-T13 and T13-to-redesign PRs. The final integration PR waits for
-updated cumulative validation and integration preparation. M2 remains paused.
+final integration preparation and explicit human PR permission. M2 remains paused.
 
-| Milestone                 | Status                                        | Remaining exit                                                                                                   |
-| ------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| M0: Measurement path      | complete, one target only                     | Preserve the original evidence and attribution                                                                   |
-| M1: Integration-ready     | R1/R2 accepted; cumulative validation pending | Validate the corrected candidate, prepare integration, then obtain human permission for the final integration PR |
-| M2: v0.13.0 release-ready | paused pending M1                             | Full T13B, readable profiles, staged system-test organization, final candidate and T13C                          |
-| M3: Future capabilities   | deferred beyond v0.13.0                       | Separate future plans                                                                                            |
+| Milestone                 | Status                                   | Remaining exit                                                                          |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
+| M0: Measurement path      | complete, one target only                | Preserve the original evidence and attribution                                          |
+| M1: Integration-ready     | R1/R2 and cumulative validation accepted | Prepare integration and obtain human permission for the final integration PR            |
+| M2: v0.13.0 release-ready | paused pending M1                        | Full T13B, readable profiles, staged system-test organization, final candidate and T13C |
+| M3: Future capabilities   | deferred beyond v0.13.0                  | Separate future plans                                                                   |
 
 ## Branch recovery and next assignment
 
@@ -51,12 +51,12 @@ Trunk confirmed the finding; no concrete production-result defect was identified
 correction returned at `c3e74a292cd459c1fe455803bbe66f6553a192ad`, with outcome checkpoint
 `219207f6c7fdaad15c5591cbd91a19f2fda084dd`. Independent re-review recorded at
 `6fd46d340c57dd706a8483bb131693b47d9efe08` accepted R1 and maintained R2 acceptance; trunk adopts
-that result. The next assignment is [corrected-candidate cumulative validation](opentelemetry-m1-corrected-validation.md)
-in a separate human-started validation conversation, fixed to source/harness `6fd46d3...`.
-Its delta from accepted `c3e74a2...` is three handoff documents only. Return fresh Windows/Linux
-evidence to trunk before integration preparation. Do not continue implementation on the already-squashed T13B
-branch or replay its commits. This planning update authorizes no PR or merge. Do not restore the
-old M1-complete/M2-next routing or resume M2 before reintegration.
+that result. Cumulative validation returned at `dd4cba745e3e5c93d5a49965947835ebb450579d`:
+Windows 91 files / 1,190 passed / 17 Linux-only skips; Linux 91 files / 1,207 passed / zero skips.
+Trunk verified all 62 archive entries and accepts the [retained evidence](opentelemetry-m1-validation-result.md).
+The remaining work is final integration preparation and human PR authorization. Do not continue
+implementation on already-squashed T13B or replay its commits. M1 remains pending actual integration;
+M2 remains paused and the live publish gate remains blocked.
 
 Before each PR, present its exact source tip, base branch, cumulative diff, evidence, and remaining
 obligations for human inspection. Obtain explicit permission stating which branch will merge into
@@ -76,8 +76,8 @@ historical evidence only, not authorization or a matching-tree claim for these n
   exact product/harness/recipe identities and archive hashes. They are not full T13B evidence.
 - [M1 validation evidence](opentelemetry-m1-validation-result.md) retains the frozen candidate,
   Windows/Linux verification and immutable package/runtime identities. The earlier CI fix changed
-  only tests, but R1/R2 will change production. Its old test/document-only delta justification cannot
-  validate the corrected candidate; update cumulative evidence after the corrections.
+  only tests; the new R1/R2 production delta has its own cumulative evidence at `6fd46d3`.
+  The old test/document-only delta justification is historical, not reused for those corrections.
 - Squash changes commit identities and can remove ancestor relationships required by the
   [publish gate](../contributing/build-test-release.md). Keeping an archive ref preserves objects,
   but does not make an old frozen candidate an ancestor of the new final candidate.
@@ -138,75 +138,34 @@ is not itself a demonstrated defect. Preserve semantic operation ownership and r
 partial work, plugin callback versus result application, output success versus written bytes, and
 DAG work have distinct owners. Do not use line counts to justify wholesale deletion or new release gates.
 
-### R1: Select no-op recorders in disabled and degraded composition
+### R1: Disabled and degraded composition ? accepted
 
-Status: accepted at `c3e74a2` by independent re-review checkpoint `6fd46d3`; trunk acceptance recorded.
-The previous regression blind spot is closed by actual-object identity and connected clock
-observation. Re-review independently repeated timing and non-timing mutations, checked all nine
-selections against owners, and passed 9 files / 179 tests. The following records the original defect
-and accepted correction criteria; it is not an instruction to reimplement the completed fix.
+The original composition created active domain recorders despite a no-op recording destination.
+Correction `f755cc775f7ecb8e299a0eb3f36cea0f40bd7eda` selects no-op recorder families and Git-owned
+no-op DAG binding from effective session state. Correction `c3e74a292cd459c1fe455803bbe66f6553a192ad`
+closed the test blind spot by retaining an observable timing clock and observing the exact objects
+passed to their owners. All nine selections were mutation-checked in implementation; independent
+review repeated timing and non-timing mutations and traced all nine owners. Actual disabled/degraded
+composition, both Git adapters and representative file/plugin paths are covered. No formal overhead
+threshold or zero overall overhead follows from this functional evidence.
 
-`createDefaultWorkerExecutionTelemetry()` in
-[`execute-run.ts`](../../src/execution/execute-run.ts) and
-[`plugin-bootstrap.ts`](../../src/execution/plugin-bootstrap.ts) construct active recorders even
-when profiling is disabled or initialization has degraded. A no-op OTel recording destination does
-not suppress clock reads, timing tokens, attributes or DAG accumulation performed beforehand.
-The [local profile contract](../design/telemetry.md#local-profile-mode) requires no-op domain
-recorders; [failure isolation](../design/telemetry.md#failure-isolation) also covers initialization
-degradation. Existing no-op recorder families are already available.
+Review checkpoint `6fd46d340c57dd706a8483bb131693b47d9efe08` accepted R1 and retained R2 acceptance,
+with 9 files / 179 affected tests passing. Existing recorder semantics and public APIs are preserved.
+The [local profile and failure-isolation contract](../design/telemetry.md) remains authoritative.
 
-The original review exercised the actual worker composition with the deterministic repository,
-isomorphic-git, file granularity and `profile: false`: success, 12 records, no profile report, and
-108 telemetry timing reads. This supports unnecessary disabled-path work, not a measured violation
-of a formal overhead threshold. Planning confirmed the cause by following active recorder creation
-to `timing.start(true)` in the projection recorder and shared timing implementation.
+### R2: Asynchronous metric collection ? accepted
 
-Correction boundary: expose/use the session's effective recording state and select existing no-op
-recorder families and DAG bindings at composition. Cover Git, extraction, built-in projection,
-line diff, output and plugin projection. Do not infer success from the requested profile flag alone,
-spread profile conditionals through product operations, or change recorder semantics/public APIs.
+Without a finite SDK collection timeout, a plugin's unresolved observable callback could prevent
+finalization even when its metric was excluded from the report. Correction
+`0354bab6bcf8e2f78bb6dcb0d23843576504e869` uses the SDK collection timeout with a default of
+1,000 ms, validated as a positive safe integer. Review checkpoint `d25d65d` accepted real SDK callback
+coverage for normal completion, rejection, non-settlement and late settlement, including partial
+signals, sanitized diagnostics, original result identity, cleanup and idempotent finalization.
 
-Exit evidence: actual disabled and initialization-degraded worker composition selects no-op behavior
-without telemetry timing/accumulation work; normal enabled composition still records correctly.
-Exercise both Git adapters and representative file/plugin paths, preserve application results,
-JSONL/checkpoints and initialization warnings, and retain owner/recorder regressions. Count telemetry
-clock activity rather than forbidding unrelated application clock reads. Direct no-op object tests
-alone are insufficient. No formal timing threshold or zero overall overhead is inferred from this fix.
-
-### R2: Bound asynchronous metric collection during finalization
-
-Status: implemented at `0354bab`; independently accepted in review checkpoint `d25d65d`.
-Trunk retains that acceptance while R1 evidence is corrected. Existing R2 tests remain affected-suite
-regression coverage; only a new concrete defect or an R2 implementation change reopens its review.
-
-[`LocalMetricReader.collectSnapshot()`](../../src/execution/telemetry/local-metric-reader.ts)
-calls `collect()` without a timeout. Plugins receive standard Meter objects and can register async
-observable callbacks. Report filtering occurs after SDK collection, so an unlisted metric callback
-can still delay finalization. The installed SDK awaits callback settlement when no timeout is given.
-
-Both review and planning used an enabled real `WorkerTelemetrySession`, a plugin-scoped observable
-gauge, and a manually unresolved Promise. The callback ran and finalization was pending after a
-100 ms observation; resolving the Promise allowed completion with the original application result.
-This is a functional liveness reproduction, not a benchmark or a proposed timeout value.
-Deferring it because collection changes are unlikely to conflict would leave a known violation of
-M1 failure isolation: completed product work cannot return its result while telemetry waits.
-
-Correction boundary: use the SDK's supported finite metric-collection timeout; preserve diagnostics,
-partial/unavailable signal status, later shutdown and the original application result. Specify the
-finite default and its rationale with the implementation; do not reuse the observation's 100 ms
-as a requirement or add a new CLI option without a separate design decision. Keep the change within
-collection/session infrastructure and its canonical failure-isolation documentation.
-
-Exit evidence: real asynchronous observable callbacks, including an unlisted plugin metric, exercise
-normal completion, rejection and non-settlement. Non-settlement must yield a bounded finalization
-result with diagnostic evidence and continued resource cleanup; application success and failure
-classification are preserved. Verify finalization idempotence and behavior after a delayed callback
-settles, without an injected failure flag being the sole evidence. Tests need their own finite
-cleanup/deadline and must not leave the runner waiting indefinitely.
-
-A timeout bounds waiting; it does not cancel arbitrary plugin activity or preempt synchronous code
-blocking the event loop. Do not expand this correction into a plugin sandbox or process supervisor,
-or promise forced termination of such code. Update durable documentation to describe the actual bound.
+The timeout bounds asynchronous collection waiting; it neither cancels arbitrary callbacks nor
+preempts synchronous event-loop blocking. This is not a plugin sandbox or process-supervision claim.
+The default and limitations are documented in the canonical telemetry contract. Both fixes are
+included in the fresh cumulative validation retained in the M1 evidence note.
 
 ### C1-C6: Required portions and optional follow-up
 
@@ -222,28 +181,14 @@ take optional refactoring only through a separately justified, bounded decision.
 | C5  | Direct no-op tests missed production selection; injected lifecycle failures missed a real async callback stall. Actual-path regression tests for R1/R2 are mandatory at M1. Wholesale removal/replacement of production test hooks is an M3 candidate, not a new release condition.                                                                                                                               |
 | C6  | Migration acceptance/provenance tooling differs from lasting performance regression tooling. Incorporate ownership and retirement criteria into existing M2 system-test organization and T13C work. Preserve evidence and required checks; do not remove the gate before M2 acceptance. Record the separately reviewed gate-retirement timing after the initial release, as required by current publish guidance. |
 
-### Implementation, review and validation sequence
+### Final integration preparation
 
-The separate implementation conversation completed both repairs as distinct checkpoints, with
-limited verification recorded in the [implementation outcome](opentelemetry-m1-r1-r2-implementation.md#implementation-outcome).
-The sequence below retains the responsibility boundaries for review and any required correction.
-Read this section, canonical telemetry/verification and contributor build/test
-guidance, then inspect the exact named composition, recorder, collection and session paths. Allowed
-changes are the R1/R2 implementation, their real-path regression tests and directly affected durable
-docs. Exclude C1-C6 general refactors, presentation, workspace moves, dependency upgrades, thresholds,
-formal measurements and publish-gate changes. Return exact commits, commands/results and residual risks.
-
-Follow with a separate independent review of the fixed correction diff and its affected dependencies.
-Then update cumulative Windows/Linux functional and installed-package validation for the corrected
-candidate using the canonical commands. Preserve fresh source/bundle identities and explicitly assess
-the production delta; previous 681a1a5 or 08661ce evidence is historical, not a pass for modified code.
-These builds and validation commands may take substantial external execution time; warn before starting.
-Formal performance measurement stays in M2, with a new post-integration candidate as described above.
-
-Stop correction scope growth at the R1/R2 exit criteria. New concrete failures return to planning;
-do not fold optional cleanup into a repair loop. After acceptance, update M1 evidence/current status,
-confirm the actual integration base and proposed merge result, and request explicit human permission
-to create `feature/otel-redesign` into `integration/v0.13.0`. The human chooses and performs the merge.
+Implementation, independent review, correction and cumulative validation are complete. Their
+checkpoint identities and evidence remain above and in the M1 evidence note; completed session
+packets are no longer active instructions. Assess the current source and actual remote base,
+preserve the base's existing domain-design link, and request explicit human permission to create
+`feature/otel-redesign` into `integration/v0.13.0`. The human chooses and performs the merge.
+Formal performance work remains M2, using a new post-integration candidate.
 
 ### M1: Integrate without claiming release readiness
 
@@ -310,8 +255,8 @@ tests and limited M2 responsibility clarification. None is an automatic implemen
 ## Session boundaries
 
 The current conversation owns trunk acceptance and has accepted R1/R2 after independent review.
-The human starts the assigned cumulative validation conversation and returns its outcome. Trunk
-then assesses the evidence and prepares the final integration step; no PR is authorized yet.
+Cumulative validation is accepted. Trunk prepares the final integration step and requests explicit
+human permission for PR creation; no PR is authorized yet.
 Generic continuation instructions preserve
 these boundaries. After reintegration, use a separate M2 planning conversation to order presentation,
 system-test organization, candidate freezing, formal measurements, and T13C by their dependencies.

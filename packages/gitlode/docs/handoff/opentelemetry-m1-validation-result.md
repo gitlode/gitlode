@@ -1,15 +1,130 @@
 # M1 evidence retained for reintegration and M2
 
-## Current evidence boundary after the 2026-09-14 review
+## Current accepted validation (2026-09-14)
 
-The [accepted disposition](instrumentation-opentelemetry-recovery-plan.md#accepted-pre-merge-review-disposition-2026-09-14)
-requires R1 disabled/degraded no-op selection and R2 bounded metric collection before M1. The tests,
-packages and earlier test/document-only delta below remain evidence for their recorded revisions;
-they do not establish acceptance of those two defects or of their future production corrections.
-After correction and independent review, update Windows/Linux cumulative functional and installed-
-package evidence for the new candidate. Do not relabel the immutable archives or repeat formal
-performance work in this planning step. The original review was preserved at `6b99b4d` and its
-accepted findings/verification requirements were transferred to the recovery plan before removal.
+Trunk accepts the corrected candidate's cumulative functional/package evidence at
+`6fd46d340c57dd706a8483bb131693b47d9efe08`. R1 was independently accepted at this review checkpoint;
+R2 acceptance at `d25d65ddec78b7d6dad38bc2a23628f9967b96f7` remains valid.
+The validation session's complete outcome is preserved at documentation checkpoint
+`dd4cba745e3e5c93d5a49965947835ebb450579d`. Its result is retained below; the completed
+implementation, review and validation assignment packets are removed from the active tree.
+
+Trunk independently verified the manifest's recorded SHA-256 and all 62 entries, and inspected the
+command ledger and result summary. From the fixed candidate through that documentation checkpoint,
+only two handoff documents changed. No functional suite was rerun by trunk without a new code delta.
+The remote integration base was rechecked as `1664798a9f586b1ac4e632d02d3a37cb0c6ebf0d`.
+Final PR creation still needs explicit human permission, and the human alone performs the merge.
+
+### Result and provenance
+
+The cumulative corrected-candidate validation passed on Windows and Linux at fixed source and
+harness `6fd46d340c57dd706a8483bb131693b47d9efe08`. This is functional and package evidence only. No
+code correction, acceptance-record change, calibration, formal performance measurement, PR, merge,
+push or publisher-capable command was performed. The live telemetry migration acceptance record
+remains `blocked`, and M1 integration remains pending.
+
+The planning worktree entered this run clean on `feature/otel-redesign` at
+`e2ec15ea61e323a777430b270404623d4cc323e5`, 12 local commits ahead of the then-recorded remote.
+The fixed candidate resolved to tree `de87935d9ceedc24e9f169bf12ce44d6979f04d7`. Its delta from
+accepted R1 correction `c3e74a292cd459c1fe455803bbe66f6553a192ad` was exactly the three
+expected handoff documents. Both platform runs used fresh detached bundle clones and ended with
+clean source checkouts. The planning branch, T13B, T13, integration and pre-reset archive refs were
+not updated by validation.
+
+The new immutable evidence archive is
+`D:\gitlode_test\m1-corrected-20260914T061714Z-6fd46d3`. Its 62-entry
+`evidence.sha256` was verified after Linux-to-Windows transfer; the manifest's own SHA-256 is
+`dd17838aa8c3d21f605606c5dcd259b08d60c91892447d10990e51d80bd60472`. The fresh source/harness
+bundle SHA-256 is `d29416c14e2f650cd1db51423f7cceaad435562bc63653d498f7d6fb3320ccc0`.
+
+### Environments and command results
+
+| Platform | Environment                                                                             | Toolchain                                       | Isolation                                                                                                 |
+| -------- | --------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Windows  | Windows 11 Pro 10.0.26200, x64, NTFS                                                    | Node 22.23.1, npm 11.11.0, Git 2.45.1.windows.1 | `D:\gitlode_work\m1-corrected-20260914T061714Z-6fd46d3-windows`; sibling temp/cache outside the checkout  |
+| Linux    | Ubuntu 26.04 LTS on WSL2, kernel 6.18.33.1-microsoft-standard-WSL2, x86_64, native ext4 | private Node 22.23.1, npm 10.9.8, Git 2.53.0    | `/home/t-wakabayashi/gitlode-performance/m1-corrected-20260914T061714Z-6fd46d3`; separate ext4 temp/cache |
+
+The fixed revision's actual `validate:release` definition matched the documented complete pipeline.
+Both `npm ci` runs passed: Windows installed 323 packages and Linux installed 324. Each reported
+seven audit findings (one low, three moderate and three high); no dependency mutation or audit fix
+was performed.
+
+| Required command                                            | Windows           | Linux                    |
+| ----------------------------------------------------------- | ----------------- | ------------------------ |
+| `npm ci`                                                    | exit 0; 21.613 s  | exit 0; 14.98 s          |
+| `npm run validate:release`                                  | exit 0; 104.386 s | exit 0; 40.32 s          |
+| `npm run typecheck:telemetry-release-acceptance -w gitlode` | exit 0; 0.600 s   | exit 0; 0.27 s           |
+| `git diff --check`                                          | exit 0; 0.038 s   | exit 0; less than 0.01 s |
+
+Production checked typing therefore passed separately on both platforms. The pre-existing
+test/tooling `noCheck` boundary described in the build guidance was not treated as production typing.
+
+### Source tests and installed-package coverage
+
+Windows passed all 91 test files with 1,190 passed and 17 skipped of 1,207 tests. The skips were the
+14 cases inside the explicitly Linux-only process-supervision definition and the three cases inside
+the explicitly Linux-only supervised-workflow definition. Linux passed all 91 files and all 1,207
+tests with no skips, including all 22 tests in `performance-supervisor.test.ts` and all 16 tests in
+`performance-workflow.test.ts`.
+
+The cumulative suites included the corrected production-path evidence:
+
+- R1 real composition ran in `execute-run.test.ts` (23 tests), including the case that observes
+  actual disabled and initialization-degraded object selection, connected telemetry clock activity,
+  all recorder/DAG bindings, both Git adapters and representative file/plugin paths.
+- R2 ran in `local-collection.test.ts` (38 tests) and `worker-telemetry-session.test.ts` (35 tests).
+  These include the documented finite default timeout and real SDK asynchronous observable callbacks
+  for normal completion, rejection and non-settlement of an unlisted plugin metric, with bounded
+  finalization, partial diagnostics, continued cleanup, idempotence and safe late settlement.
+
+On both platforms, the canonical pipeline and the preservation binding run passed publint and the
+complete installed-package system test. Package version 0.12.0 started through the installed CLI and
+worker; isomorphic-git and Git CLI each produced two records; line diff, dynamic plugin, schema and
+the NodeNext TypeScript consumer passed.
+
+Every required product command passed on its first execution, so no validation rerun was made. Two
+pre-execution Linux environment-snapshot attempts exited 2 and 1 because PowerShell-to-bash quoting
+lost the intended group and then a task-local path variable. Their logs and diagnoses are retained.
+No candidate command had started, and the successful retry changed only the operator command to use
+literal absolute paths.
+
+### Preserved package and runtime identities
+
+No development build occurred after either successful canonical release pipeline. On each platform,
+the current release output was packed, checked again with strict publint and the installed-package
+test for preservation binding, then packed again. Pre/post package bytes matched exactly.
+
+| Artifact                     | SHA-256                                                            | Binding                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Windows `gitlode-0.12.0.tgz` | `63beec97129799f0963be8fa5c8160673bdf094959763ff528a3be7f116d2da7` | pre/post pack matched; installed-package checks passed against the intervening release output     |
+| Linux `gitlode-0.12.0.tgz`   | `87a74532f3f53ac87f64a3ed830f841a98cc8b1c4466d44b20115955c078fb8f` | pre/post pack matched; transferred copy hash matched                                              |
+| Linux production runtime     | `c91e77aebfe06a29ba6899d99541957bf6ff9a92d8340ffca471abcb626a9b54` | installed only from the preserved Linux package; includes lockfile and 69-package runtime closure |
+
+The installed runtime lockfile SHA-256 is
+`fb1cbd6c1d5e1ab71d1da217f2e3b1570a57057824eb53e349c481ef36a25c79`. All non-symlink runtime
+entries were made non-writable before archiving. A fresh ext4 extraction verified all 4,085 file
+hashes and all 4,469 mode/type/link inventory entries, including five npm `.bin` symlinks, and the
+extracted CLI reported version 0.12.0.
+
+### Delta and remaining limits
+
+Relative to historical M1 candidate `681a1a5b53bd0aa957dae72d9fd9684da7ff467a`, the corrected
+candidate changes six production files by 166 insertions and 17 deletions. R1 accounts for effective
+recording-state composition and no-op Git, extraction, projection, line-diff, output, plugin and DAG
+selection. R2 accounts for the finite local metric-collection timeout and session finalization
+handling. The archive records the exact file-level delta; documentation/test/handoff consolidation
+is not represented as production change.
+
+This run adds cumulative functional, typing, package and runtime-preservation evidence for R1/R2. It
+does not relabel historical M0/M1 evidence, validate a future squash or integration tree, establish
+formal performance acceptance, close the live release gate or mark M1 complete. Trunk must still
+inspect this evidence and the eventual integration-base delta before the human authorizes or performs
+any final integration PR or merge.
+
+## Historical validation boundary
+
+The remaining sections describe earlier revisions only. The new validation above covers R1/R2;
+older measurements and packages retain their original identities and scope.
 
 ## Scope and accepted inputs
 
@@ -174,8 +289,8 @@ under the accepted reuse rules.
 
 ## Remaining acceptance
 
-The human has merged PRs #109 and #110. Close the recovery plan's pre-merge R1/R2 blockers and
-update corrected-candidate validation before requesting the final redesign-to-integration PR.
+The human has merged PRs #109 and #110. R1/R2 and corrected-candidate cumulative validation are
+accepted. Prepare the final redesign-to-integration PR for explicit human authorization.
 The human performs the merge; preserve the integration base's existing link change and verify the
 actual result. Only final integration closes M1 again. Full T13B, M2 presentation/system-test work,
 final candidate validation, T13C and release-authority acceptance remain outstanding.

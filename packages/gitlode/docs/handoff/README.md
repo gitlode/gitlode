@@ -18,9 +18,9 @@ have been removed; accepted contracts live in the design and contributing docume
 
 Before the redesign-to-integration merge, read the recovery plan's
 [accepted pre-merge disposition](instrumentation-opentelemetry-recovery-plan.md#accepted-pre-merge-review-disposition-2026-09-14).
-R1 no-op selection and R2 bounded asynchronous collection are required before M1. That section
-also defines evidence limits, optional C1-C6 follow-up, and the separate implementation/review/
-validation sequence. The original review is preserved in Git history, not as an active instruction.
+R1 no-op selection, R2 bounded asynchronous collection and corrected-candidate cumulative validation
+are accepted. That section also defines evidence limits, optional C1-C6 follow-up and final integration
+preparation. The original review is preserved in Git history, not as an active instruction.
 
 ## Lifecycle
 

@@ -16,6 +16,11 @@ the [M1 evidence note](opentelemetry-m1-validation-result.md) preserves candidat
 package identities, and the CI correction needed for reintegration. Completed session packets
 have been removed; accepted contracts live in the design and contributing documentation.
 
+Before the redesign-to-integration merge, read the
+[pre-merge review handoff](opentelemetry-pre-merge-review.md). It preserves the independent review of
+`1664798` to `8c0b200`, including confirmed findings, change-volume analysis, M1/M2 recommendations,
+and the limits of the review evidence.
+
 ## Lifecycle
 
 Use handoff documents for:

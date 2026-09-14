@@ -14,12 +14,12 @@ collection. The human has merged the T13B-to-T13 and T13-to-redesign PRs. The fi
 integration PR waits for these corrections, independent review, and updated cumulative validation.
 M2 remains paused. Neither branch-history recovery nor old passing tests waive these new blockers.
 
-| Milestone                 | Status                    | Remaining exit                                                                                                                  |
-| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Measurement path      | complete, one target only | Preserve the original evidence and attribution                                                                                  |
-| M1: Integration-ready     | R1/R2 corrections pending | Correct and independently review R1/R2, update cumulative validation, then obtain human permission for the final integration PR |
-| M2: v0.13.0 release-ready | paused pending M1         | Full T13B, readable profiles, staged system-test organization, final candidate and T13C                                         |
-| M3: Future capabilities   | deferred beyond v0.13.0   | Separate future plans                                                                                                           |
+| Milestone                 | Status                           | Remaining exit                                                                                                              |
+| ------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| M0: Measurement path      | complete, one target only        | Preserve the original evidence and attribution                                                                              |
+| M1: Integration-ready     | R1/R2 independent review pending | Review the implemented corrections, update cumulative validation, then obtain human permission for the final integration PR |
+| M2: v0.13.0 release-ready | paused pending M1                | Full T13B, readable profiles, staged system-test organization, final candidate and T13C                                     |
+| M3: Future capabilities   | deferred beyond v0.13.0          | Separate future plans                                                                                                       |
 
 ## Branch recovery and next assignment
 
@@ -42,10 +42,13 @@ environment correction at `7dc4ca7` and completed-handoff cleanup. The human squ
 [PR #110](https://github.com/gitlode/gitlode/pull/110) into redesign, whose reviewed implementation
 is `8c0b200f7e0ac8f175199b76201297364dccd1a1`. Preserve the child branches until recovery is complete.
 
-The next assignment is the [bounded R1/R2 implementation](opentelemetry-m1-r1-r2-implementation.md)
-in a separate human-started branch conversation, based on the checkpoint adding that packet to
-`feature/otel-redesign`. The current conversation remains trunk; the human returns the implementation
-outcome here for independent-review assignment. Do not continue implementation on the already-squashed T13B
+R1 and R2 implementation returned at `f755cc775f7ecb8e299a0eb3f36cea0f40bd7eda` and
+`0354bab6bcf8e2f78bb6dcb0d23843576504e869`; the outcome is checkpointed at
+`93f881784c6c9c47e51fdaaf9b42a852c8afa068`. The next assignment is the
+[independent correction review](opentelemetry-m1-r1-r2-review.md) in a new human-started conversation.
+Implementation and limited checks are complete, but R1/R2 are not yet accepted. The current
+conversation remains trunk; the human returns the review outcome here before cumulative validation
+is assigned. Do not continue implementation on the already-squashed T13B
 branch or replay its commits. This planning update authorizes no PR or merge. Do not restore the
 old M1-complete/M2-next routing or resume M2 before reintegration.
 
@@ -131,7 +134,7 @@ DAG work have distinct owners. Do not use line counts to justify wholesale delet
 
 ### R1: Select no-op recorders in disabled and degraded composition
 
-Status: confirmed; mandatory before M1; not implemented by this planning update.
+Status: implemented at `f755cc7`; mandatory before M1; independent review pending.
 
 `createDefaultWorkerExecutionTelemetry()` in
 [`execute-run.ts`](../../src/execution/execute-run.ts) and
@@ -162,7 +165,7 @@ alone are insufficient. No formal timing threshold or zero overall overhead is i
 
 ### R2: Bound asynchronous metric collection during finalization
 
-Status: confirmed; mandatory before M1; not implemented by this planning update.
+Status: implemented at `0354bab`; mandatory before M1; independent review pending.
 
 [`LocalMetricReader.collectSnapshot()`](../../src/execution/telemetry/local-metric-reader.ts)
 calls `collect()` without a timeout. Plugins receive standard Meter objects and can register async
@@ -209,9 +212,10 @@ take optional refactoring only through a separately justified, bounded decision.
 
 ### Implementation, review and validation sequence
 
-The current conversation only updates documents and saves checkpoints. Next use a separate bounded
-implementation conversation on the current redesign planning checkpoint, with R1 and R2 saved as
-separate commits. Read this section, canonical telemetry/verification and contributor build/test
+The separate implementation conversation completed both repairs as distinct checkpoints, with
+limited verification recorded in the [implementation outcome](opentelemetry-m1-r1-r2-implementation.md#implementation-outcome).
+The sequence below retains the responsibility boundaries for review and any required correction.
+Read this section, canonical telemetry/verification and contributor build/test
 guidance, then inspect the exact named composition, recorder, collection and session paths. Allowed
 changes are the R1/R2 implementation, their real-path regression tests and directly affected durable
 docs. Exclude C1-C6 general refactors, presentation, workspace moves, dependency upgrades, thresholds,
@@ -293,9 +297,9 @@ tests and limited M2 responsibility clarification. None is an automatic implemen
 
 ## Session boundaries
 
-The current conversation preserves the original review, incorporates the human-approved disposition,
-removes the review report, and checkpoints documentation only. The next implementation/review/
-validation conversations follow the R1/R2 sequence above. Generic continuation instructions preserve
+The current conversation owns trunk acceptance and has assigned independent review of the returned
+R1/R2 implementation. The human starts that conversation and returns its outcome. Cumulative
+validation is assigned after review acceptance. Generic continuation instructions preserve
 these boundaries. After reintegration, use a separate M2 planning conversation to order presentation,
 system-test organization, candidate freezing, formal measurements, and T13C by their dependencies.
 

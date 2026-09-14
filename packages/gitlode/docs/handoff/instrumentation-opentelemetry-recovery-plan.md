@@ -14,12 +14,12 @@ functional validation retains its historical scope. The human has merged the T13
 T13-to-redesign PRs. The final integration PR waits for R1 evidence correction/re-review and updated
 cumulative validation. M2 remains paused; old passing tests do not waive these remaining gates.
 
-| Milestone                 | Status                                      | Remaining exit                                                                                                                        |
-| ------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| M0: Measurement path      | complete, one target only                   | Preserve the original evidence and attribution                                                                                        |
-| M1: Integration-ready     | R1 evidence correction pending; R2 accepted | Correct and re-review R1 regression evidence, update cumulative validation, then obtain human permission for the final integration PR |
-| M2: v0.13.0 release-ready | paused pending M1                           | Full T13B, readable profiles, staged system-test organization, final candidate and T13C                                               |
-| M3: Future capabilities   | deferred beyond v0.13.0                     | Separate future plans                                                                                                                 |
+| Milestone                 | Status                                    | Remaining exit                                                                                                                   |
+| ------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Measurement path      | complete, one target only                 | Preserve the original evidence and attribution                                                                                   |
+| M1: Integration-ready     | R1 focused re-review pending; R2 accepted | Accept corrected R1 regression evidence, update cumulative validation, then obtain human permission for the final integration PR |
+| M2: v0.13.0 release-ready | paused pending M1                         | Full T13B, readable profiles, staged system-test organization, final candidate and T13C                                          |
+| M3: Future capabilities   | deferred beyond v0.13.0                   | Separate future plans                                                                                                            |
 
 ## Branch recovery and next assignment
 
@@ -47,10 +47,12 @@ R1 and R2 implementation returned at `f755cc775f7ecb8e299a0eb3f36cea0f40bd7eda` 
 `93f881784c6c9c47e51fdaaf9b42a852c8afa068`. Independent review at
 `d25d65ddec78b7d6dad38bc2a23628f9967b96f7` accepted R2 but found R1 test evidence insufficient:
 inactive composition disconnects the observed clock, and output/DAG selection is not observed.
-Trunk confirms the finding; no concrete production-result defect was identified. The next assignment
-is [R1 evidence correction, round 1](opentelemetry-m1-r1-r2-implementation.md#current-assignment-r1-evidence-correction-round-1)
-in the human-started implementation conversation. Keep R2 accepted; return the correction to trunk
-for focused independent re-review before cumulative validation. Do not continue implementation on the already-squashed T13B
+Trunk confirmed the finding; no concrete production-result defect was identified. The evidence
+correction returned at `c3e74a292cd459c1fe455803bbe66f6553a192ad`, with outcome checkpoint
+`219207f6c7fdaad15c5591cbd91a19f2fda084dd`. The next assignment is
+[focused R1 re-review](opentelemetry-m1-r1-r2-review.md#current-assignment-focused-r1-re-review)
+in the human-started independent reviewer conversation. Keep R2 accepted; return the review outcome
+to trunk before cumulative validation. Do not continue implementation on the already-squashed T13B
 branch or replay its commits. This planning update authorizes no PR or merge. Do not restore the
 old M1-complete/M2-next routing or resume M2 before reintegration.
 
@@ -136,7 +138,7 @@ DAG work have distinct owners. Do not use line counts to justify wholesale delet
 
 ### R1: Select no-op recorders in disabled and degraded composition
 
-Status: implementation inspected at `f755cc7`; mandatory before M1; evidence correction required.
+Status: implementation inspected at `f755cc7`; evidence corrected at `c3e74a2`; focused re-review pending.
 The independent review found no-op choices present, but the regression could pass if individual
 choices reverted to active recorders. The current correction packet defines a finite selection-
 sensitivity checklist. R1 stays unaccepted until corrected evidence passes focused re-review.
@@ -304,9 +306,9 @@ tests and limited M2 responsibility clarification. None is an automatic implemen
 
 ## Session boundaries
 
-The current conversation owns trunk acceptance and has assigned the bounded R1 evidence correction
-after independent review. The human starts/resumes implementation and returns its outcome; trunk
-then assigns focused re-review. R2 remains accepted. Cumulative validation follows R1 acceptance.
+The current conversation owns trunk acceptance and has assigned focused R1 re-review of the returned
+evidence correction. The human starts/resumes the independent reviewer and returns its outcome.
+R2 remains accepted. Cumulative validation follows R1 acceptance.
 Generic continuation instructions preserve
 these boundaries. After reintegration, use a separate M2 planning conversation to order presentation,
 system-test organization, candidate freezing, formal measurements, and T13C by their dependencies.

@@ -1,5 +1,55 @@
 # Independent review of M1 pre-merge R1/R2 corrections
 
+## Current assignment: focused R1 re-review
+
+Resume the independent review conversation; if unavailable, start a new reviewer conversation with
+this section. The original review below remains historical. The human returns the result to trunk.
+
+- Correction base: `9efddecf80a48bdd66270dd9b2b41cb53c33494a`.
+- Fixed correction target: `c3e74a292cd459c1fe455803bbe66f6553a192ad`.
+- Outcome checkpoint: `219207f6c7fdaad15c5591cbd91a19f2fda084dd`.
+- R2 acceptance remains at `0354bab6bcf8e2f78bb6dcb0d23843576504e869`, reviewed in `d25d65d`.
+
+Review the three changed implementation/test files (`execute-run.ts`, `plugin-bootstrap.ts`,
+`execute-run.test.ts`) and the [correction outcome](opentelemetry-m1-r1-r2-implementation.md#r1-correction-outcome).
+Verify actual HEAD/worktree, ancestry, inventory and post-target documentation-only changes.
+Trunk confirmed the returned OIDs/scope and diff whitespace, but did not rerun tests or mutations.
+
+The sole prior blocker was that passing tests could miss active recorders in inactive composition.
+Check that inactive timing now reaches the observed clock if an active timing recorder is selected,
+and that component identity observations refer to the exact objects passed into real owners, not
+a shadow selection. Inspect the observer's optional production path and plugin forwarding: no
+wrapping/replacement, changed control flow, public API or per-operation instrumentation is intended.
+Distinguish bounded composition-time allocation from recurring operation work.
+
+Validate coverage of all nine selections in the implementation's sensitivity table, including both
+built-in projector sites, non-timing JSONL output and DAG binding, disabled/degraded paths and
+enabled behavior. Inspect assertion structure: one failed test must not be overreported as proof
+that every scenario/assertion was reached. Preserve result/JSONL/checkpoint/plugin/warning checks.
+Verify temporary active-selection mutations were restored in the fixed target.
+
+Run the actual composition regression and relevant affected tests against the fixed content. Inspect
+the reported nine mutation results; independently demonstrate sensitivity for representative timing
+and non-timing selections if needed to resolve doubt. Any temporary deliberate fault must be isolated
+and restored, never checkpointed. Do not require a new mutation framework, exhaustive repeat of all
+reported runs, or new combinatorial cases absent a specific evidence gap. The implementation reports
+R1 7 files / 106 passes and combined 9 files / 179 passes; attribute reported and new runs separately.
+
+R2 tests may run as regression coverage; do not reopen accepted R2 design without a concrete new
+defect or an affecting implementation change. Do not broaden into C1-C6 cleanup, full Windows/Linux
+release validation, installed-package validation, archive revalidation or formal measurements.
+Check applicable production typing and diff whitespace; preserve the existing test noCheck distinction.
+
+Append a concise result below with fixed OID, R1 judgment, R2 acceptance maintained (or a concrete
+reason to reopen), exact new checks, any residual failure path and final HEAD/worktree. Save only
+the review documentation after format write/check. No implementation changes, push, PR, merge or
+publish. If accepted, return to trunk for cumulative validation assignment. If another correction is
+required, return the concrete failing selection/observation; avoid broadening the original criterion.
+
+### Focused re-review outcome
+
+Pending. R1 correction is implemented but not yet accepted; R2 remains accepted.
+
 ## Assignment and fixed inputs
 
 Use a new human-started review conversation, independent of implementation. Review only the accepted

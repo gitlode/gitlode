@@ -42,8 +42,10 @@ environment correction at `7dc4ca7` and completed-handoff cleanup. The human squ
 [PR #110](https://github.com/gitlode/gitlode/pull/110) into redesign, whose reviewed implementation
 is `8c0b200f7e0ac8f175199b76201297364dccd1a1`. Preserve the child branches until recovery is complete.
 
-The next assignment is the bounded R1/R2 implementation described below, based on the final planning
-checkpoint on `feature/otel-redesign`. Do not continue implementation on the already-squashed T13B
+The next assignment is the [bounded R1/R2 implementation](opentelemetry-m1-r1-r2-implementation.md)
+in a separate human-started branch conversation, based on the checkpoint adding that packet to
+`feature/otel-redesign`. The current conversation remains trunk; the human returns the implementation
+outcome here for independent-review assignment. Do not continue implementation on the already-squashed T13B
 branch or replay its commits. This planning update authorizes no PR or merge. Do not restore the
 old M1-complete/M2-next routing or resume M2 before reintegration.
 

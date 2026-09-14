@@ -21,7 +21,10 @@ import { describe, expect, it } from "vitest";
 
 import { createCommitTraversalStrategy } from "../../src/git-impl/commit-traversal/index.js";
 import { IsomorphicGitAdapter } from "../../src/git-impl/isomorphic-git-adapter.js";
-import { createDagTelemetryBinding } from "../../src/git-impl/telemetry/dag-metric-recorder.js";
+import {
+  createDagTelemetryBinding,
+  NOOP_DAG_TELEMETRY_BINDING,
+} from "../../src/git-impl/telemetry/dag-metric-recorder.js";
 import { createGitMetricRecorder } from "../../src/git-impl/telemetry/git-metric-recorder.js";
 import { adapterTelemetry } from "../support/adapter-telemetry.js";
 
@@ -599,6 +602,29 @@ describe("Git-owned DAG telemetry binding", () => {
     await binding.instrumentCertifiedClosure({ getSuccessors: async () => [] }, "root");
     await drain(binding.instrumentReachable({ getSuccessors: async () => [] }, ["root"]));
     expect(meter.creations).toHaveLength(8);
+  });
+
+  it("runs all DAG operations through the no-op binding without telemetry resources", async () => {
+    const graph = {
+      getSuccessors: async (nodeId: string) => (nodeId === "root" ? [{ nodeId: "parent" }] : []),
+    };
+    const difference = await drain(
+      NOOP_DAG_TELEMETRY_BINDING.instrumentDifference(
+        "eager-exclude",
+        false,
+        async function* (observation) {
+          observation.recordStepProcessed();
+          observation.complete("exhausted");
+          yield "root";
+        },
+      ),
+    );
+    const reachable = await drain(NOOP_DAG_TELEMETRY_BINDING.instrumentReachable(graph, ["root"]));
+    const closure = await NOOP_DAG_TELEMETRY_BINDING.instrumentCertifiedClosure(graph, "root");
+
+    expect(difference).toEqual(["root"]);
+    expect(reachable).toEqual(["root", "parent"]);
+    expect(closure).toBeDefined();
   });
 });
 

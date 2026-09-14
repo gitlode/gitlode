@@ -16,6 +16,7 @@ import {
   executeWorkerRunRequest,
   type ExecuteRunDependencies,
 } from "../../src/execution/execute-run.js";
+import { createWorkerTelemetrySessionForTest } from "../../src/execution/telemetry/index.js";
 import type { ExecutionRunInput, WorkerRunRequest } from "../../src/execution/types.js";
 import type { StateStore } from "../../src/state/index.js";
 import { makeTracer } from "../support/otel-fakes.js";
@@ -279,6 +280,135 @@ describe("executeRun state orchestration", () => {
 });
 
 describe("executeWorkerRunRequest profiling", () => {
+  it("selects no-op recorders from disabled and degraded session state", async () => {
+    const repoDir = await makeTempDir("gitlode-noop-telemetry-repo-");
+    const pluginRoot = await makeTempDir("gitlode-noop-telemetry-plugin-");
+    await git.init({ fs: nodeFs, dir: repoDir, defaultBranch: "main" });
+    await git.setConfig({ fs: nodeFs, dir: repoDir, path: "user.name", value: "Tester" });
+    await git.setConfig({
+      fs: nodeFs,
+      dir: repoDir,
+      path: "user.email",
+      value: "test@example.com",
+    });
+    await writeFile(join(repoDir, "file.txt"), "hello\n");
+    await git.add({ fs: nodeFs, dir: repoDir, filepath: "file.txt" });
+    await git.commit({
+      fs: nodeFs,
+      dir: repoDir,
+      message: "initial",
+      author: { name: "Tester", email: "test@example.com", timestamp: 1_000, timezoneOffset: 0 },
+    });
+    await writeFile(
+      join(pluginRoot, "plugin.mjs"),
+      `export default function factory(config) {
+        return {
+          async init() { return { type: "ready" }; },
+          async project() { return { type: "success", data: { configured: config } }; }
+        };
+      }`,
+    );
+
+    const run = async (
+      profile: boolean,
+      gitAdapter: "isomorphic-git" | "git-cli",
+      degraded: boolean,
+    ) => {
+      const outputDir = await makeTempDir("gitlode-noop-telemetry-output-");
+      let telemetryClockReads = 0;
+      const diagnostics: Array<{ readonly severity: string; readonly message: string }> = [];
+      const result = await executeWorkerRunRequest(
+        {
+          input: {
+            repositoryPath: repoDir as AbsolutePath,
+            refs: ["main"],
+            outputDir: outputDir as AbsolutePath,
+            rotation: {},
+            granularity: "file",
+            profile,
+            gitAdapter,
+            pluginBaseDirectory: pluginRoot as AbsolutePath,
+            pluginDeclarations: {
+              sample: { entrypoint: "./plugin.mjs", config: "worker", failurePolicy: "skip-fact" },
+            },
+          },
+          priorCheckpoint: {
+            generatedAt: "2026-01-01T00:00:00.000Z",
+            repositoryPath: repoDir as AbsolutePath,
+            refs: [],
+          },
+        },
+        {
+          progressReporter: { emit() {} },
+          diagnosticReporter: { report: (diagnostic) => diagnostics.push(diagnostic) },
+        },
+        {
+          environment: {},
+          telemetryClock: () => ++telemetryClockReads,
+          ...(degraded
+            ? {
+                createTelemetrySession: async () =>
+                  await createWorkerTelemetrySessionForTest({
+                    failures: { meter_provider_construction: new Error("degrade") },
+                  }),
+              }
+            : {}),
+        },
+      );
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") throw new Error(result.message);
+      const [outputFile] = await readdir(outputDir);
+      return {
+        result,
+        diagnostics,
+        telemetryClockReads,
+        records: (await readFile(join(outputDir, outputFile!), "utf8"))
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line) as unknown),
+      };
+    };
+
+    const disabled = await run(false, "isomorphic-git", false);
+    const degraded = await run(true, "git-cli", true);
+    const enabled = await run(true, "isomorphic-git", false);
+
+    expect(disabled.telemetryClockReads).toBe(0);
+    expect(degraded.telemetryClockReads).toBe(0);
+    expect(enabled.telemetryClockReads).toBeGreaterThan(0);
+    expect(disabled.result.success.profileReport).toBeUndefined();
+    expect(degraded.result.success.profileReport).toBeUndefined();
+    expect(enabled.result.success.profileReport).toBeDefined();
+    const compatibilityWarning = {
+      severity: "warn",
+      message:
+        'Plugin "sample" compatibility check skipped: unable to read package metadata at ./plugin.mjs.',
+    };
+    expect(disabled.diagnostics).toEqual([compatibilityWarning]);
+    expect(enabled.diagnostics).toEqual([compatibilityWarning]);
+    expect(degraded.diagnostics).toEqual([
+      compatibilityWarning,
+      {
+        severity: "warn",
+        message: "Telemetry initialization degraded; profile data is unavailable.",
+      },
+    ]);
+    for (const outcome of [disabled, degraded, enabled]) {
+      expect(outcome.result.success).toMatchObject({
+        recordsWritten: 1,
+        commitsTraversed: 1,
+        filesCreated: 1,
+        skippedDiffs: 0,
+      });
+      expect(outcome.result.checkpoint.refs).toHaveLength(1);
+      expect(outcome.records).toHaveLength(1);
+      expect(outcome.records[0]).toMatchObject({
+        file: { path: "file.txt", status: "added", additions: 1, deletions: 0 },
+      });
+      expect(JSON.stringify(outcome.records[0])).toContain('"sample":{"configured":"worker"}');
+    }
+  });
+
   it("includes git adapter walkCommits instrumentation in profile entries", async () => {
     const repoDir = await makeTempDir("gitlode-execution-repo-");
     const outputDir = await makeTempDir("gitlode-execution-output-");

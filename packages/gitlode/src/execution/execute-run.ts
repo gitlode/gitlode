@@ -3,6 +3,8 @@ import { performance } from "node:perf_hooks";
 import {
   createDagTelemetryBinding,
   createGitMetricRecorder,
+  NOOP_DAG_TELEMETRY_BINDING,
+  NOOP_GIT_METRIC_RECORDER,
   type DagTelemetryBinding,
   type GitMetricRecorder,
 } from "@gitlode/git-adapters";
@@ -10,11 +12,13 @@ import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics
 import type { FactProjector } from "@gitlode/internal-contracts/extraction";
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
+import { createMonotonicTiming, type MonotonicTiming } from "@gitlode/internal-contracts/telemetry";
 import { recordSpanError } from "@gitlode/internal-foundation/otel-support";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import {
   createLineDiffMetricRecorder,
   JsLineDiffCalculator,
+  NOOP_LINE_DIFF_METRIC_RECORDER,
   type JsLineDiffCalculatorDependencies,
 } from "@gitlode/line-diff-adapters";
 import {
@@ -37,12 +41,16 @@ import {
   createExtractionPipelineMetricRecorder,
   createFileChangeFactExpanderMetricRecorder,
   createBuiltInFactProjectorMetricRecorder,
+  NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+  NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+  NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
 } from "../extraction/index.js";
 import {
   formatSessionTimestamp,
   JsonlFileWriter,
   JsonlOutputSink,
   createJsonlFileWriterMetricRecorder,
+  NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
 } from "../output/index.js";
 import {
   createEmptyCheckpoint,
@@ -99,13 +107,18 @@ interface WorkerExecutionTelemetry {
   readonly pluginRuntimeTracer: Tracer;
   readonly getPluginTracer: (name: string, version?: string) => Tracer;
   readonly getPluginMeter: (name: string, version?: string) => Meter;
+  readonly metricRecordingEnabled?: boolean;
+  readonly metricTiming?: MonotonicTiming;
 }
 
 function createDefaultWorkerExecutionTelemetry(
   adapter: ExecutionRunInput["gitAdapter"],
   session: WorkerTelemetrySession,
+  telemetryClock?: () => number,
 ): WorkerExecutionTelemetry {
   const gitTracer = session.getTracer("gitlode.git");
+  const metricRecordingEnabled = session.recordingEnabled;
+  const metricTiming = metricRecordingEnabled ? createMonotonicTiming(telemetryClock) : undefined;
   return {
     rootSpan: session.rootSpan,
     executionTracer: session.getTracer("gitlode.execution"),
@@ -114,15 +127,23 @@ function createDefaultWorkerExecutionTelemetry(
     lineDiffMeter: session.getMeter("gitlode.line_diff"),
     rootContext: session.rootContext,
     gitTracer,
-    gitMetricRecorder: createGitMetricRecorder(session.getMeter("gitlode.git"), adapter),
-    dagTelemetryBinding: createDagTelemetryBinding(
-      session.getTracer("gitlode.dag"),
-      session.getMeter("gitlode.dag"),
-    ),
+    gitMetricRecorder: metricRecordingEnabled
+      ? createGitMetricRecorder(session.getMeter("gitlode.git"), adapter, metricTiming)
+      : NOOP_GIT_METRIC_RECORDER,
+    dagTelemetryBinding: metricRecordingEnabled
+      ? createDagTelemetryBinding(session.getTracer("gitlode.dag"), session.getMeter("gitlode.dag"))
+      : NOOP_DAG_TELEMETRY_BINDING,
     pluginRuntimeTracer: session.getTracer("gitlode.plugin_runtime"),
     getPluginTracer: (name, version) => session.getTracer(name, version),
     getPluginMeter: (name, version) => session.getMeter(name, version),
+    metricRecordingEnabled,
+    metricTiming,
   };
+}
+
+interface WorkerExecutionDependencies extends GitAdapterFactoryDependencies {
+  readonly createTelemetrySession?: (enabled: boolean) => Promise<WorkerTelemetrySession>;
+  readonly telemetryClock?: () => number;
 }
 
 async function withSetupAsyncSpan<T>(
@@ -170,11 +191,13 @@ function withSetupSpan<T>(
 export async function executeWorkerRunRequest(
   request: WorkerRunRequest,
   reporters: WorkerExecutionReporters,
-  dependencies: GitAdapterFactoryDependencies = { environment: process.env },
+  dependencies: WorkerExecutionDependencies = { environment: process.env },
   telemetry?: WorkerExecutionTelemetry,
 ): Promise<WorkerRunResult> {
   const { input, priorCheckpoint } = request;
-  const session = telemetry ? undefined : await WorkerTelemetrySession.create(input.profile);
+  const session = telemetry
+    ? undefined
+    : await (dependencies.createTelemetrySession ?? WorkerTelemetrySession.create)(input.profile);
   const activeTelemetry =
     telemetry ??
     createDefaultWorkerExecutionTelemetry(
@@ -183,6 +206,7 @@ export async function executeWorkerRunRequest(
         (() => {
           throw new Error("Telemetry session was not created.");
         })(),
+      dependencies.telemetryClock,
     );
   const { executionTracer, extractionTracer, extractionMeter } = activeTelemetry;
 
@@ -296,9 +320,20 @@ export async function executeWorkerRunRequest(
       const fileChangeExpander = new FileChangeFactExpander(
         gitAdapter,
         new JsLineDiffCalculator({
-          metricRecorder: createLineDiffMetricRecorder(activeTelemetry.lineDiffMeter),
+          metricRecorder:
+            activeTelemetry.metricRecordingEnabled === false
+              ? NOOP_LINE_DIFF_METRIC_RECORDER
+              : createLineDiffMetricRecorder(
+                  activeTelemetry.lineDiffMeter,
+                  activeTelemetry.metricTiming,
+                ),
         } satisfies JsLineDiffCalculatorDependencies),
-        createFileChangeFactExpanderMetricRecorder(extractionMeter),
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER
+          : createFileChangeFactExpanderMetricRecorder(
+              extractionMeter,
+              activeTelemetry.metricTiming,
+            ),
         extractionSettings.maxDiffSize,
       );
 
@@ -309,14 +344,24 @@ export async function executeWorkerRunRequest(
           resolvedRepoName,
           resolvedRepoUrl,
           extractionTracer,
-          createBuiltInFactProjectorMetricRecorder(extractionMeter),
+          activeTelemetry.metricRecordingEnabled === false
+            ? NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER
+            : createBuiltInFactProjectorMetricRecorder(
+                extractionMeter,
+                activeTelemetry.metricTiming,
+              ),
         );
       } else {
         const baseProjector = new BuiltInFactProjector(
           resolvedRepoName,
           resolvedRepoUrl,
           extractionTracer,
-          createBuiltInFactProjectorMetricRecorder(extractionMeter),
+          activeTelemetry.metricRecordingEnabled === false
+            ? NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER
+            : createBuiltInFactProjectorMetricRecorder(
+                extractionMeter,
+                activeTelemetry.metricTiming,
+              ),
           false,
         );
         const projectorResult = await buildPluginProjector(
@@ -330,6 +375,8 @@ export async function executeWorkerRunRequest(
             rootContext,
             getPluginTracer: activeTelemetry.getPluginTracer,
             getPluginMeter: activeTelemetry.getPluginMeter,
+            metricRecordingEnabled: activeTelemetry.metricRecordingEnabled,
+            metricTiming: activeTelemetry.metricTiming,
           },
         );
         if (projectorResult.kind === "termination") {
@@ -344,7 +391,9 @@ export async function executeWorkerRunRequest(
           (seq) =>
             `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
           extractionSettings.rotation,
-          createJsonlFileWriterMetricRecorder(extractionMeter),
+          activeTelemetry.metricRecordingEnabled === false
+            ? NOOP_JSONL_FILE_WRITER_METRIC_RECORDER
+            : createJsonlFileWriterMetricRecorder(extractionMeter),
         ),
       );
 
@@ -357,7 +406,10 @@ export async function executeWorkerRunRequest(
         progressReporter: reporters.progressReporter,
         diagnosticReporter: reporters.diagnosticReporter,
         tracer: extractionTracer,
-        metricRecorder: createExtractionPipelineMetricRecorder(extractionMeter),
+        metricRecorder:
+          activeTelemetry.metricRecordingEnabled === false
+            ? NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER
+            : createExtractionPipelineMetricRecorder(extractionMeter, activeTelemetry.metricTiming),
       });
 
       const result = await coordinator.run({

@@ -1,7 +1,10 @@
 import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import type { FactProjector } from "@gitlode/internal-contracts/extraction";
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
-import { getTelemetryAttributeMetadata } from "@gitlode/internal-contracts/telemetry";
+import {
+  getTelemetryAttributeMetadata,
+  type MonotonicTiming,
+} from "@gitlode/internal-contracts/telemetry";
 import { recordSpanError } from "@gitlode/internal-foundation/otel-support";
 import type { AbsoluteDirectoryPath } from "@gitlode/internal-foundation/support";
 import {
@@ -22,6 +25,7 @@ import {
   type PluginInitializationFailure,
   type PluginRuntimeEntry,
   resolvePluginEntries,
+  NOOP_PLUGIN_PROJECTION_METRIC_RECORDER,
 } from "../plugin-runtime/index.js";
 
 interface PluginBootstrapReporters {
@@ -35,6 +39,8 @@ interface PluginBootstrapTelemetry {
   readonly rootContext: Context;
   readonly getPluginTracer: (name: string, version?: string) => Tracer;
   readonly getPluginMeter: (name: string, version?: string) => Meter;
+  readonly metricRecordingEnabled?: boolean;
+  readonly metricTiming?: MonotonicTiming;
 }
 
 type BuildPluginProjectorResult =
@@ -143,7 +149,10 @@ export async function buildPluginProjector(
           binding = {
             tracer,
             meter,
-            projectionMetricRecorder: createPluginProjectionMetricRecorder(meter),
+            projectionMetricRecorder:
+              telemetry.metricRecordingEnabled === false
+                ? NOOP_PLUGIN_PROJECTION_METRIC_RECORDER
+                : createPluginProjectionMetricRecorder(meter, telemetry.metricTiming),
           };
           scopeBindings.set(identity, binding);
         }

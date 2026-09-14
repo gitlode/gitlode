@@ -178,6 +178,10 @@ export class WorkerTelemetrySession {
     return this.#rootContext;
   }
 
+  get recordingEnabled(): boolean {
+    return this.#active !== undefined;
+  }
+
   runInRootContext<Value>(callback: () => Value): Value {
     return context.with(this.#rootContext, callback);
   }

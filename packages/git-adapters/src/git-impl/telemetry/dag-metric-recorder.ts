@@ -162,6 +162,27 @@ export interface DagTelemetryBinding {
   ): Promise<CertifiedClosurePhaseResult<NodeId>>;
 }
 
+const noopObservation = Object.freeze<DagOperationObservation>({
+  ...noopHooks,
+  complete() {},
+});
+
+export const NOOP_DAG_TELEMETRY_BINDING = Object.freeze<DagTelemetryBinding>({
+  instrumentDifference(_strategy, _hasExclusion, walk) {
+    return walk(noopObservation);
+  },
+  instrumentReachable(graph, nodeIds, options = {}) {
+    return walkDagReachableNodeIds({ graph, observation: noopObservation }, nodeIds, options);
+  },
+  instrumentCertifiedClosure(graph, nodeId, options = {}) {
+    return resolveDagCertifiedClosurePhase(
+      { graph, observation: noopObservation },
+      nodeId,
+      options,
+    );
+  },
+});
+
 export function createDagTelemetryBinding(tracer: Tracer, meter: Meter): DagTelemetryBinding {
   const recorder = createDagMetricRecorder(meter);
   const observations = new WeakMap<Span, DagOperationObservation>();

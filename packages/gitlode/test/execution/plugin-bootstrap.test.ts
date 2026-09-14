@@ -19,6 +19,10 @@ vi.mock("../../src/plugin-runtime/index.js", () => ({
     startProjection: () => ({}),
     completeProjection() {},
   }),
+  NOOP_PLUGIN_PROJECTION_METRIC_RECORDER: {
+    startProjection: () => ({}),
+    completeProjection() {},
+  },
   EnrichingFactProjector: class EnrichingFactProjector {},
 }));
 

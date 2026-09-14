@@ -86,6 +86,7 @@ describe("WorkerTelemetrySession normal lifecycle", () => {
     expect(awaitedActive).toBe(session.rootSpan);
     expect(session.rootSpan.spanContext().traceId).not.toBe(ambient.spanContext().traceId);
     expect(session.rootSpan.isRecording()).toBe(true);
+    expect(session.recordingEnabled).toBe(true);
 
     const end = vi.spyOn(session.rootSpan, "end");
     expect(session.rootSpan.isRecording()).toBe(true);
@@ -226,6 +227,7 @@ describe("WorkerTelemetrySession initialization degradation", () => {
       expect(ran).toBe(true);
       expect(finalized.applicationResult).toBe(applicationResult);
       expect(finalized.profileReport).toBeUndefined();
+      expect(session.recordingEnabled).toBe(false);
       expect(finalized.initializationWarning).toEqual({
         code: "telemetry_initialization_failed",
         message: null,

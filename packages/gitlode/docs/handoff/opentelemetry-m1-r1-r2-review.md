@@ -48,7 +48,57 @@ required, return the concrete failing selection/observation; avoid broadening th
 
 ### Focused re-review outcome
 
-Pending. R1 correction is implemented but not yet accepted; R2 remains accepted.
+Reviewed fixed correction target `c3e74a292cd459c1fe455803bbe66f6553a192ad` from correction
+base `9efddecf80a48bdd66270dd9b2b41cb53c33494a`. **R1 is accepted. R2 acceptance is
+maintained** at `0354bab6bcf8e2f78bb6dcb0d23843576504e869`; the correction does not change the
+R2 implementation or its collection contract. The review started from documentation-only HEAD
+`e33de29a00c30f0a60157bb0a4bac02a42ff83e8` on `feature/otel-redesign` with a clean worktree.
+The base, target and outcome checkpoint `219207f6c7fdaad15c5591cbd91a19f2fda084dd` exist and have
+the required ancestry. The correction changes exactly `execute-run.ts`, `plugin-bootstrap.ts` and
+`execute-run.test.ts`; all post-target changes before this outcome are limited to the three handoff
+documents. The fixed and post-target diffs pass `git diff --check`.
+
+Static inspection confirmed all nine selections in the reported sensitivity table. The injected
+timing is now constructed independently of effective recording state, so any accidentally active
+timing recorder in disabled or initialization-degraded composition reaches the observed clock.
+Construction itself allocates only the timing closure and does not read the clock; the selected
+no-op recorders therefore add no recurring operation work. The optional composition observer has no
+selection branch and is absent from normal composition. At each site it observes the same local
+object reference subsequently passed to the real adapter, DAG binding owner, line-diff calculator,
+file expander, either built-in projector site, plugin runtime entry, JSONL writer or extraction
+pipeline. It does not wrap or replace components, change control flow, or add a package export.
+
+The real-repository regression checks exact no-op identity for disabled isomorphic-git and degraded
+Git CLI composition, both with plugin projection and without it. It therefore covers the two
+built-in projector construction sites, plugin forwarding, non-timing JSONL output and the DAG
+binding, as well as Git, line-diff, file-expansion and extraction-pipeline recorders. The enabled
+isomorphic-git/plugin case observes active components, reads the injected clock and produces a
+profile. All five runs preserve result counts, JSONL facts, checkpoint state and plugin values;
+disabled/degraded report omission and the single degraded warning are retained. The soft assertions
+continue after an earlier failure, but the recorded one failed test is not treated as proof of every
+assertion: source-to-owner inspection and per-slot assertion labels establish the complete inventory.
+
+New checks run in this review against a tree whose three implementation/test files exactly matched
+the target:
+
+- `npm run build:dev`: passed; the production composite remains checked while the existing test and
+  tooling `noCheck` boundary is unchanged.
+- The exact nine-file affected Vitest command: 9 files, 179 tests passed, 0 failed, 0 skipped. This
+  includes the accepted R2 suites as regression coverage.
+- The focused composition test after restoration: 1 passed, 22 skipped.
+- An independent timing sensitivity mutation selected the active line-diff recorder in all four
+  inactive scenarios. The focused command failed as required with 8 soft assertion failures: four
+  clock-read failures and four `line-diff` identity failures.
+- An independent non-timing sensitivity mutation selected the active JSONL recorder in all four
+  inactive scenarios. The focused command failed as required with four `jsonl-output` identity
+  failures. Both temporary mutations were restored; the target files again match the fixed OID.
+
+The implementation packet's other seven per-selection mutation runs and R1 7-file/106-test run
+remain reported evidence rather than newly rerun evidence. Their stated failing slot assertions are
+consistent with the inspected branches and common four-scenario assertion loop. There is no concrete
+remaining R1 failure path within the assigned scope. The documented R2 limit on synchronous
+event-loop blocking remains an accepted boundary, not a reopened defect. This focused acceptance
+returns to trunk for cumulative validation; it does not complete M1 or authorize integration.
 
 ## Assignment and fixed inputs
 

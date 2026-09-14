@@ -1,5 +1,16 @@
 # M1 evidence retained for reintegration and M2
 
+## Current evidence boundary after the 2026-09-14 review
+
+The [accepted disposition](instrumentation-opentelemetry-recovery-plan.md#accepted-pre-merge-review-disposition-2026-09-14)
+requires R1 disabled/degraded no-op selection and R2 bounded metric collection before M1. The tests,
+packages and earlier test/document-only delta below remain evidence for their recorded revisions;
+they do not establish acceptance of those two defects or of their future production corrections.
+After correction and independent review, update Windows/Linux cumulative functional and installed-
+package evidence for the new candidate. Do not relabel the immutable archives or repeat formal
+performance work in this planning step. The original review was preserved at `6b99b4d` and its
+accepted findings/verification requirements were transferred to the recovery plan before removal.
+
 ## Scope and accepted inputs
 
 M1 integration is reopened after the human reset; see the [recovery plan](instrumentation-opentelemetry-recovery-plan.md).
@@ -60,8 +71,8 @@ Completed handoff packets were consolidated into four telemetry continuation doc
 references and local Markdown links were checked repository-wide with no remaining broken links.
 Root format write/check and diff whitespace checks are required before the documentation checkpoint.
 The first PR base was read directly from the remote as `feature/otel-redesign_T13` at
-`06136491676e71298c7d5488d3df8ed6a4e5b6bd`, which is an ancestor of the prepared T13B tip. Recheck
-it before creating the human-authorized PR. The cumulative PR includes earlier M0/M1 work as well
+`06136491676e71298c7d5488d3df8ed6a4e5b6bd`, an ancestor of the prepared T13B tip and the base of
+the subsequently human-merged PR #109. That cumulative PR included earlier M0/M1 work as well
 as this recovery delta; this paragraph is not a claim of a new independent cumulative review.
 
 ## Environments of the original validation
@@ -163,7 +174,8 @@ under the accepted reuse rules.
 
 ## Remaining acceptance
 
-Confirm the prepared T13B diff, then obtain explicit permission before creating the T13B-to-T13 PR.
-The human merges each stage. Verify each actual result, preserving the integration base's existing
-link change. Only final integration closes M1 again. Full T13B, M2 presentation/system-test work,
+The human has merged PRs #109 and #110. Close the recovery plan's pre-merge R1/R2 blockers and
+update corrected-candidate validation before requesting the final redesign-to-integration PR.
+The human performs the merge; preserve the integration base's existing link change and verify the
+actual result. Only final integration closes M1 again. Full T13B, M2 presentation/system-test work,
 final candidate validation, T13C and release-authority acceptance remain outstanding.

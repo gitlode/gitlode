@@ -16,10 +16,11 @@ the [M1 evidence note](opentelemetry-m1-validation-result.md) preserves candidat
 package identities, and the CI correction needed for reintegration. Completed session packets
 have been removed; accepted contracts live in the design and contributing documentation.
 
-Before the redesign-to-integration merge, read the
-[pre-merge review handoff](opentelemetry-pre-merge-review.md). It preserves the independent review of
-`1664798` to `8c0b200`, including confirmed findings, change-volume analysis, M1/M2 recommendations,
-and the limits of the review evidence.
+Before the redesign-to-integration merge, read the recovery plan's
+[accepted pre-merge disposition](instrumentation-opentelemetry-recovery-plan.md#accepted-pre-merge-review-disposition-2026-09-14).
+R1 no-op selection and R2 bounded asynchronous collection are required before M1. That section
+also defines evidence limits, optional C1-C6 follow-up, and the separate implementation/review/
+validation sequence. The original review is preserved in Git history, not as an active instruction.
 
 ## Lifecycle
 

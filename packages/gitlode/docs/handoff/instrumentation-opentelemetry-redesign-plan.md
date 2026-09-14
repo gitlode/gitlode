@@ -9,7 +9,10 @@ were removed; their history remains in the pre-recovery commits.
 
 The [recovery plan](instrumentation-opentelemetry-recovery-plan.md) owns current sequencing,
 branch integration and the M0/M1/M2 distinction. M0 is complete; M1 is awaiting reintegration through
-T13B, T13 and the redesign parent branch. Integration does not accept formal performance or publishing.
+T13B, T13 and the redesign parent branch. The first two PRs have been merged by the human; the
+final integration now additionally requires the recovery plan's accepted R1/R2 corrections,
+independent review and renewed cumulative validation. Integration does not accept formal performance
+or publishing. C1-C6 general cleanup proposals do not expand this unit's release gates.
 
 | Unit     | Status   | Continuation evidence                                                                                                                                  |
 | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |

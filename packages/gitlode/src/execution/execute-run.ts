@@ -111,14 +111,36 @@ interface WorkerExecutionTelemetry {
   readonly metricTiming?: MonotonicTiming;
 }
 
+export type TelemetryCompositionSlot =
+  | "git"
+  | "dag"
+  | "extraction-pipeline"
+  | "file-change-expansion"
+  | "built-in-projection"
+  | "plugin-base-projection"
+  | "line-diff"
+  | "jsonl-output"
+  | "plugin-projection";
+
+type TelemetryCompositionObserver = (slot: TelemetryCompositionSlot, component: object) => void;
+
 function createDefaultWorkerExecutionTelemetry(
   adapter: ExecutionRunInput["gitAdapter"],
   session: WorkerTelemetrySession,
   telemetryClock?: () => number,
+  observeComposition?: TelemetryCompositionObserver,
 ): WorkerExecutionTelemetry {
   const gitTracer = session.getTracer("gitlode.git");
   const metricRecordingEnabled = session.recordingEnabled;
-  const metricTiming = metricRecordingEnabled ? createMonotonicTiming(telemetryClock) : undefined;
+  const metricTiming = createMonotonicTiming(telemetryClock);
+  const gitMetricRecorder = metricRecordingEnabled
+    ? createGitMetricRecorder(session.getMeter("gitlode.git"), adapter, metricTiming)
+    : NOOP_GIT_METRIC_RECORDER;
+  const dagTelemetryBinding = metricRecordingEnabled
+    ? createDagTelemetryBinding(session.getTracer("gitlode.dag"), session.getMeter("gitlode.dag"))
+    : NOOP_DAG_TELEMETRY_BINDING;
+  observeComposition?.("git", gitMetricRecorder);
+  observeComposition?.("dag", dagTelemetryBinding);
   return {
     rootSpan: session.rootSpan,
     executionTracer: session.getTracer("gitlode.execution"),
@@ -127,12 +149,8 @@ function createDefaultWorkerExecutionTelemetry(
     lineDiffMeter: session.getMeter("gitlode.line_diff"),
     rootContext: session.rootContext,
     gitTracer,
-    gitMetricRecorder: metricRecordingEnabled
-      ? createGitMetricRecorder(session.getMeter("gitlode.git"), adapter, metricTiming)
-      : NOOP_GIT_METRIC_RECORDER,
-    dagTelemetryBinding: metricRecordingEnabled
-      ? createDagTelemetryBinding(session.getTracer("gitlode.dag"), session.getMeter("gitlode.dag"))
-      : NOOP_DAG_TELEMETRY_BINDING,
+    gitMetricRecorder,
+    dagTelemetryBinding,
     pluginRuntimeTracer: session.getTracer("gitlode.plugin_runtime"),
     getPluginTracer: (name, version) => session.getTracer(name, version),
     getPluginMeter: (name, version) => session.getMeter(name, version),
@@ -144,6 +162,7 @@ function createDefaultWorkerExecutionTelemetry(
 interface WorkerExecutionDependencies extends GitAdapterFactoryDependencies {
   readonly createTelemetrySession?: (enabled: boolean) => Promise<WorkerTelemetrySession>;
   readonly telemetryClock?: () => number;
+  readonly observeTelemetryComposition?: TelemetryCompositionObserver;
 }
 
 async function withSetupAsyncSpan<T>(
@@ -207,6 +226,7 @@ export async function executeWorkerRunRequest(
           throw new Error("Telemetry session was not created.");
         })(),
       dependencies.telemetryClock,
+      dependencies.observeTelemetryComposition,
     );
   const { executionTracer, extractionTracer, extractionMeter } = activeTelemetry;
 
@@ -317,51 +337,68 @@ export async function executeWorkerRunRequest(
 
       const traversalPlanner = new RepositoryTraversalPlanner(gitAdapter, extractionTracer);
       const traversalExtractor = new CommitFactExtractor(gitAdapter, extractionTracer);
-      const fileChangeExpander = new FileChangeFactExpander(
-        gitAdapter,
-        new JsLineDiffCalculator({
-          metricRecorder:
-            activeTelemetry.metricRecordingEnabled === false
-              ? NOOP_LINE_DIFF_METRIC_RECORDER
-              : createLineDiffMetricRecorder(
-                  activeTelemetry.lineDiffMeter,
-                  activeTelemetry.metricTiming,
-                ),
-        } satisfies JsLineDiffCalculatorDependencies),
+      const lineDiffMetricRecorder =
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_LINE_DIFF_METRIC_RECORDER
+          : createLineDiffMetricRecorder(
+              activeTelemetry.lineDiffMeter,
+              activeTelemetry.metricTiming,
+            );
+      dependencies.observeTelemetryComposition?.("line-diff", lineDiffMetricRecorder);
+      const fileChangeExpanderMetricRecorder =
         activeTelemetry.metricRecordingEnabled === false
           ? NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER
           : createFileChangeFactExpanderMetricRecorder(
               extractionMeter,
               activeTelemetry.metricTiming,
-            ),
+            );
+      dependencies.observeTelemetryComposition?.(
+        "file-change-expansion",
+        fileChangeExpanderMetricRecorder,
+      );
+      const fileChangeExpander = new FileChangeFactExpander(
+        gitAdapter,
+        new JsLineDiffCalculator({
+          metricRecorder: lineDiffMetricRecorder,
+        } satisfies JsLineDiffCalculatorDependencies),
+        fileChangeExpanderMetricRecorder,
         extractionSettings.maxDiffSize,
       );
 
       let projector: FactProjector;
       const { pluginBaseDirectory, pluginDeclarations } = input;
       if (!pluginBaseDirectory || !hasEffectivePluginDeclarations(pluginDeclarations)) {
+        const projectionMetricRecorder =
+          activeTelemetry.metricRecordingEnabled === false
+            ? NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER
+            : createBuiltInFactProjectorMetricRecorder(
+                extractionMeter,
+                activeTelemetry.metricTiming,
+              );
+        dependencies.observeTelemetryComposition?.("built-in-projection", projectionMetricRecorder);
         projector = new BuiltInFactProjector(
           resolvedRepoName,
           resolvedRepoUrl,
           extractionTracer,
+          projectionMetricRecorder,
+        );
+      } else {
+        const projectionMetricRecorder =
           activeTelemetry.metricRecordingEnabled === false
             ? NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER
             : createBuiltInFactProjectorMetricRecorder(
                 extractionMeter,
                 activeTelemetry.metricTiming,
-              ),
+              );
+        dependencies.observeTelemetryComposition?.(
+          "plugin-base-projection",
+          projectionMetricRecorder,
         );
-      } else {
         const baseProjector = new BuiltInFactProjector(
           resolvedRepoName,
           resolvedRepoUrl,
           extractionTracer,
-          activeTelemetry.metricRecordingEnabled === false
-            ? NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER
-            : createBuiltInFactProjectorMetricRecorder(
-                extractionMeter,
-                activeTelemetry.metricTiming,
-              ),
+          projectionMetricRecorder,
           false,
         );
         const projectorResult = await buildPluginProjector(
@@ -377,6 +414,8 @@ export async function executeWorkerRunRequest(
             getPluginMeter: activeTelemetry.getPluginMeter,
             metricRecordingEnabled: activeTelemetry.metricRecordingEnabled,
             metricTiming: activeTelemetry.metricTiming,
+            observeProjectionMetricRecorder: (component) =>
+              dependencies.observeTelemetryComposition?.("plugin-projection", component),
           },
         );
         if (projectorResult.kind === "termination") {
@@ -385,18 +424,29 @@ export async function executeWorkerRunRequest(
         projector = projectorResult.projector;
       }
 
+      const outputMetricRecorder =
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_JSONL_FILE_WRITER_METRIC_RECORDER
+          : createJsonlFileWriterMetricRecorder(extractionMeter);
+      dependencies.observeTelemetryComposition?.("jsonl-output", outputMetricRecorder);
       const sink = new JsonlOutputSink(
         new JsonlFileWriter(
           extractionSettings.outputDir,
           (seq) =>
             `${extractionSettings.outputPrefix}-${formatSessionTimestamp(sessionTimestamp)}-${String(seq).padStart(6, "0")}.jsonl`,
           extractionSettings.rotation,
-          activeTelemetry.metricRecordingEnabled === false
-            ? NOOP_JSONL_FILE_WRITER_METRIC_RECORDER
-            : createJsonlFileWriterMetricRecorder(extractionMeter),
+          outputMetricRecorder,
         ),
       );
 
+      const extractionPipelineMetricRecorder =
+        activeTelemetry.metricRecordingEnabled === false
+          ? NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER
+          : createExtractionPipelineMetricRecorder(extractionMeter, activeTelemetry.metricTiming);
+      dependencies.observeTelemetryComposition?.(
+        "extraction-pipeline",
+        extractionPipelineMetricRecorder,
+      );
       const coordinator = new ExtractionPipeline({
         traversalPlanner,
         traversalExtractor,
@@ -406,10 +456,7 @@ export async function executeWorkerRunRequest(
         progressReporter: reporters.progressReporter,
         diagnosticReporter: reporters.diagnosticReporter,
         tracer: extractionTracer,
-        metricRecorder:
-          activeTelemetry.metricRecordingEnabled === false
-            ? NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER
-            : createExtractionPipelineMetricRecorder(extractionMeter, activeTelemetry.metricTiming),
+        metricRecorder: extractionPipelineMetricRecorder,
       });
 
       const result = await coordinator.run({

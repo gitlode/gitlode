@@ -3,9 +3,14 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createDagTelemetryBinding } from "@gitlode/git-adapters";
+import {
+  createDagTelemetryBinding,
+  NOOP_DAG_TELEMETRY_BINDING,
+  NOOP_GIT_METRIC_RECORDER,
+} from "@gitlode/git-adapters";
 import type { ProgressEvent } from "@gitlode/internal-contracts/progress";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
+import { NOOP_LINE_DIFF_METRIC_RECORDER } from "@gitlode/line-diff-adapters";
 import { ROOT_CONTEXT, context, metrics, trace, type Meter } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import * as git from "isomorphic-git";
@@ -15,9 +20,17 @@ import {
   executeRun,
   executeWorkerRunRequest,
   type ExecuteRunDependencies,
+  type TelemetryCompositionSlot,
 } from "../../src/execution/execute-run.js";
 import { createWorkerTelemetrySessionForTest } from "../../src/execution/telemetry/index.js";
 import type { ExecutionRunInput, WorkerRunRequest } from "../../src/execution/types.js";
+import {
+  NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+  NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+  NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+} from "../../src/extraction/index.js";
+import { NOOP_JSONL_FILE_WRITER_METRIC_RECORDER } from "../../src/output/index.js";
+import { NOOP_PLUGIN_PROJECTION_METRIC_RECORDER } from "../../src/plugin-runtime/index.js";
 import type { StateStore } from "../../src/state/index.js";
 import { makeTracer } from "../support/otel-fakes.js";
 
@@ -313,10 +326,12 @@ describe("executeWorkerRunRequest profiling", () => {
       profile: boolean,
       gitAdapter: "isomorphic-git" | "git-cli",
       degraded: boolean,
+      withPlugin: boolean,
     ) => {
       const outputDir = await makeTempDir("gitlode-noop-telemetry-output-");
       let telemetryClockReads = 0;
       const diagnostics: Array<{ readonly severity: string; readonly message: string }> = [];
+      const composition: Array<readonly [TelemetryCompositionSlot, object]> = [];
       const result = await executeWorkerRunRequest(
         {
           input: {
@@ -327,10 +342,18 @@ describe("executeWorkerRunRequest profiling", () => {
             granularity: "file",
             profile,
             gitAdapter,
-            pluginBaseDirectory: pluginRoot as AbsolutePath,
-            pluginDeclarations: {
-              sample: { entrypoint: "./plugin.mjs", config: "worker", failurePolicy: "skip-fact" },
-            },
+            ...(withPlugin
+              ? {
+                  pluginBaseDirectory: pluginRoot as AbsolutePath,
+                  pluginDeclarations: {
+                    sample: {
+                      entrypoint: "./plugin.mjs",
+                      config: "worker",
+                      failurePolicy: "skip-fact" as const,
+                    },
+                  },
+                }
+              : {}),
           },
           priorCheckpoint: {
             generatedAt: "2026-01-01T00:00:00.000Z",
@@ -345,6 +368,7 @@ describe("executeWorkerRunRequest profiling", () => {
         {
           environment: {},
           telemetryClock: () => ++telemetryClockReads,
+          observeTelemetryComposition: (slot, component) => composition.push([slot, component]),
           ...(degraded
             ? {
                 createTelemetrySession: async () =>
@@ -362,6 +386,7 @@ describe("executeWorkerRunRequest profiling", () => {
         result,
         diagnostics,
         telemetryClockReads,
+        composition,
         records: (await readFile(join(outputDir, outputFile!), "utf8"))
           .trim()
           .split("\n")
@@ -369,13 +394,64 @@ describe("executeWorkerRunRequest profiling", () => {
       };
     };
 
-    const disabled = await run(false, "isomorphic-git", false);
-    const degraded = await run(true, "git-cli", true);
-    const enabled = await run(true, "isomorphic-git", false);
+    const disabled = await run(false, "isomorphic-git", false, true);
+    const disabledBuiltIn = await run(false, "isomorphic-git", false, false);
+    const degraded = await run(true, "git-cli", true, true);
+    const degradedBuiltIn = await run(true, "git-cli", true, false);
+    const enabled = await run(true, "isomorphic-git", false, true);
 
-    expect(disabled.telemetryClockReads).toBe(0);
-    expect(degraded.telemetryClockReads).toBe(0);
+    const commonNoopComposition = [
+      ["git", NOOP_GIT_METRIC_RECORDER],
+      ["dag", NOOP_DAG_TELEMETRY_BINDING],
+      ["line-diff", NOOP_LINE_DIFF_METRIC_RECORDER],
+      ["file-change-expansion", NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER],
+    ] as const;
+    const trailingNoopComposition = [
+      ["jsonl-output", NOOP_JSONL_FILE_WRITER_METRIC_RECORDER],
+      ["extraction-pipeline", NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER],
+    ] as const;
+    const expectNoopComposition = (
+      outcome: Awaited<ReturnType<typeof run>>,
+      projectionSlot: "built-in-projection" | "plugin-base-projection",
+    ) => {
+      const expected = [
+        ...commonNoopComposition,
+        [projectionSlot, NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER],
+        ...(projectionSlot === "plugin-base-projection"
+          ? ([["plugin-projection", NOOP_PLUGIN_PROJECTION_METRIC_RECORDER]] as const)
+          : []),
+        ...trailingNoopComposition,
+      ] as const;
+      expect
+        .soft(outcome.composition.map(([slot]) => slot))
+        .toEqual(expected.map(([slot]) => slot));
+      for (const [index, [slot, component]] of expected.entries()) {
+        expect.soft(outcome.composition[index]?.[1], slot).toBe(component);
+      }
+    };
+
+    expect.soft(disabled.telemetryClockReads).toBe(0);
+    expect.soft(disabledBuiltIn.telemetryClockReads).toBe(0);
+    expect.soft(degraded.telemetryClockReads).toBe(0);
+    expect.soft(degradedBuiltIn.telemetryClockReads).toBe(0);
     expect(enabled.telemetryClockReads).toBeGreaterThan(0);
+    expectNoopComposition(disabled, "plugin-base-projection");
+    expectNoopComposition(disabledBuiltIn, "built-in-projection");
+    expectNoopComposition(degraded, "plugin-base-projection");
+    expectNoopComposition(degradedBuiltIn, "built-in-projection");
+    for (const [slot, component] of enabled.composition) {
+      const noopsBySlot: Partial<Record<TelemetryCompositionSlot, object>> = {
+        git: NOOP_GIT_METRIC_RECORDER,
+        dag: NOOP_DAG_TELEMETRY_BINDING,
+        "line-diff": NOOP_LINE_DIFF_METRIC_RECORDER,
+        "file-change-expansion": NOOP_FILE_CHANGE_FACT_EXPANDER_METRIC_RECORDER,
+        "plugin-base-projection": NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
+        "plugin-projection": NOOP_PLUGIN_PROJECTION_METRIC_RECORDER,
+        "jsonl-output": NOOP_JSONL_FILE_WRITER_METRIC_RECORDER,
+        "extraction-pipeline": NOOP_EXTRACTION_PIPELINE_METRIC_RECORDER,
+      };
+      expect(component, slot).not.toBe(noopsBySlot[slot]);
+    }
     expect(disabled.result.success.profileReport).toBeUndefined();
     expect(degraded.result.success.profileReport).toBeUndefined();
     expect(enabled.result.success.profileReport).toBeDefined();
@@ -393,7 +469,7 @@ describe("executeWorkerRunRequest profiling", () => {
         message: "Telemetry initialization degraded; profile data is unavailable.",
       },
     ]);
-    for (const outcome of [disabled, degraded, enabled]) {
+    for (const outcome of [disabled, disabledBuiltIn, degraded, degradedBuiltIn, enabled]) {
       expect(outcome.result.success).toMatchObject({
         recordsWritten: 1,
         commitsTraversed: 1,
@@ -405,7 +481,11 @@ describe("executeWorkerRunRequest profiling", () => {
       expect(outcome.records[0]).toMatchObject({
         file: { path: "file.txt", status: "added", additions: 1, deletions: 0 },
       });
-      expect(JSON.stringify(outcome.records[0])).toContain('"sample":{"configured":"worker"}');
+      if (outcome === disabledBuiltIn || outcome === degradedBuiltIn) {
+        expect(JSON.stringify(outcome.records[0])).not.toContain('"sample"');
+      } else {
+        expect(JSON.stringify(outcome.records[0])).toContain('"sample":{"configured":"worker"}');
+      }
     }
   });
 

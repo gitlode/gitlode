@@ -41,6 +41,7 @@ interface PluginBootstrapTelemetry {
   readonly getPluginMeter: (name: string, version?: string) => Meter;
   readonly metricRecordingEnabled?: boolean;
   readonly metricTiming?: MonotonicTiming;
+  readonly observeProjectionMetricRecorder?: (component: object) => void;
 }
 
 type BuildPluginProjectorResult =
@@ -146,13 +147,15 @@ export async function buildPluginProjector(
         if (binding === undefined) {
           const tracer = telemetry.getPluginTracer(name, version);
           const meter = telemetry.getPluginMeter(name, version);
+          const projectionMetricRecorder =
+            telemetry.metricRecordingEnabled === false
+              ? NOOP_PLUGIN_PROJECTION_METRIC_RECORDER
+              : createPluginProjectionMetricRecorder(meter, telemetry.metricTiming);
+          telemetry.observeProjectionMetricRecorder?.(projectionMetricRecorder);
           binding = {
             tracer,
             meter,
-            projectionMetricRecorder:
-              telemetry.metricRecordingEnabled === false
-                ? NOOP_PLUGIN_PROJECTION_METRIC_RECORDER
-                : createPluginProjectionMetricRecorder(meter, telemetry.metricTiming),
+            projectionMetricRecorder,
           };
           scopeBindings.set(identity, binding);
         }

@@ -24,6 +24,7 @@ import {
   BoundedDiagnosticAccumulator,
   convertLocalMetrics,
   createLocalMetricViews,
+  DEFAULT_LOCAL_METRIC_COLLECTION_TIMEOUT_MILLIS,
   LocalMetricReader,
   LocalSpanProcessor,
   ProfileReportBuilder,
@@ -464,6 +465,10 @@ describe("local span processor", () => {
 });
 
 describe("local metrics", () => {
+  test("uses the documented finite collection timeout by default", () => {
+    expect(DEFAULT_LOCAL_METRIC_COLLECTION_TIMEOUT_MILLIS).toBe(1_000);
+  });
+
   test("derives exact histogram views from catalog metadata", () => {
     const views = createLocalMetricViews();
     const histograms = TELEMETRY_METRICS.filter((metric) => metric.instrument === "histogram");

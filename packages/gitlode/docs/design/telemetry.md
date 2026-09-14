@@ -537,7 +537,9 @@ Attribute reducers are selected by collection policy:
 Metrics use a local manual reader and are collected once during finalization. Counter and histogram
 datapoints retain their bounded attribute sets. Histograms retain count, sum, optional minimum and
 maximum, and explicit bucket counts, not raw samples. Approximate percentile display is not part of
-the initial profile.
+the initial profile. Collection passes a 1,000 ms timeout to the OpenTelemetry SDK. This default is
+long enough for ordinary asynchronous observations while bounding how long a completed run waits on
+a faulty callback; it is an internal lifecycle policy, not a CLI option.
 
 Collection limits per run are:
 
@@ -640,6 +642,11 @@ Finalization stages are best-effort and independently guarded. Failure of one st
 later collection or shutdown attempts. A report may contain only the successfully collected signal
 sections and a bounded diagnostic describing missing data. Shutdown failure does not invalidate an
 already-built report.
+
+The SDK collection timeout makes counters and histograms partial when an asynchronous observable
+callback rejects or does not settle within the bound, records lifecycle diagnostics, and allows
+later finalization cleanup to continue. The timeout bounds waiting only. It does not cancel the
+callback, prevent late settlement, or preempt synchronous plugin code that blocks the event loop.
 
 Lifecycle diagnostics identify the failed stage and contain a safely normalized message, not raw
 telemetry data or an unbounded stack. Repeated failures are deduplicated.

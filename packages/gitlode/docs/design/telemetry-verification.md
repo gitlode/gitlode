@@ -74,7 +74,10 @@ abstractions.
 Tests prove idempotent non-rejecting finalization, exactly-once shutdown, later-stage attempts after
 an earlier failure, no-op degradation after initialization failure, preservation of available
 signals and already-built reports, and bounded deduplicated lifecycle diagnostics. Application
-result classification and output remain unchanged in every case.
+result classification and output remain unchanged in every case. Real SDK asynchronous observable
+callbacks cover normal completion, rejection, and non-settlement (including an unlisted plugin
+metric); the non-settlement case uses a finite outer test deadline and proves bounded collection,
+partial metric signals, continued cleanup, idempotence, and safe late settlement.
 
 ## Operation-owner integration
 

@@ -62,6 +62,7 @@ export type WorkerTelemetryTestAttempt =
 export interface WorkerTelemetryTestHooks {
   readonly failures?: Partial<Record<WorkerTelemetryTestAttempt, unknown>>;
   readonly onAttempt?: (attempt: WorkerTelemetryTestAttempt) => void;
+  readonly metricCollectionTimeoutMillis?: number;
 }
 
 interface ActiveSessionResources {
@@ -377,7 +378,7 @@ async function createSession(
     attempt(hooks, "provider_initialization");
     const diagnostics = new BoundedDiagnosticAccumulator();
     spanProcessor = new LocalSpanProcessor(diagnostics);
-    metricReader = new LocalMetricReader();
+    metricReader = new LocalMetricReader(hooks?.metricCollectionTimeoutMillis);
     const reportBuilder = new ProfileReportBuilder(diagnostics);
     attempt(hooks, "trace_provider_construction");
     tracerProvider = new BasicTracerProvider({ spanProcessors: [spanProcessor] });

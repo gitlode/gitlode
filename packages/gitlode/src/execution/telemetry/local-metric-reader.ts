@@ -39,6 +39,8 @@ export interface LocalMetricSnapshot {
   readonly histograms: readonly ProfileHistogramPoint[];
 }
 
+export const DEFAULT_LOCAL_METRIC_COLLECTION_TIMEOUT_MILLIS = 1_000;
+
 export function createLocalMetricViews(): ViewOptions[] {
   return TELEMETRY_METRICS.filter(
     (
@@ -297,10 +299,19 @@ export function convertLocalMetrics(
 }
 
 export class LocalMetricReader extends MetricReader {
+  readonly #collectionTimeoutMillis: number;
+
+  constructor(collectionTimeoutMillis = DEFAULT_LOCAL_METRIC_COLLECTION_TIMEOUT_MILLIS) {
+    super();
+    if (!Number.isSafeInteger(collectionTimeoutMillis) || collectionTimeoutMillis <= 0)
+      throw new Error("Metric collection timeout must be a positive integer.");
+    this.#collectionTimeoutMillis = collectionTimeoutMillis;
+  }
+
   async collectSnapshot(diagnostics: BoundedDiagnosticAccumulator): Promise<LocalMetricSnapshot> {
     let result: CollectionResult;
     try {
-      result = await this.collect();
+      result = await this.collect({ timeoutMillis: this.#collectionTimeoutMillis });
     } catch {
       diagnostics.add({
         code: "lifecycle_failure",

@@ -5,6 +5,7 @@ export {
 export {
   convertLocalMetrics,
   createLocalMetricViews,
+  DEFAULT_LOCAL_METRIC_COLLECTION_TIMEOUT_MILLIS,
   LocalMetricReader,
   type LocalMetricSnapshot,
 } from "./local-metric-reader.js";

@@ -50,6 +50,20 @@ function expectPlainCloneValues(value: unknown): void {
     expectPlainCloneValues(entry);
 }
 
+async function withDeadline<T>(promise: Promise<T>, timeoutMillis = 2_000): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error("Test deadline exceeded.")), timeoutMillis);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 beforeEach(() => context.disable());
 afterEach(() => context.disable());
 
@@ -273,6 +287,138 @@ describe("WorkerTelemetrySession initialization degradation", () => {
 });
 
 describe("WorkerTelemetrySession best-effort finalization", () => {
+  test("collects a normally completing unlisted plugin observable", async () => {
+    const { hooks: testHooks, attempts } = hooks();
+    const session = await createWorkerTelemetrySessionForTest({
+      ...testHooks,
+      metricCollectionTimeoutMillis: 200,
+    });
+    let callbackCount = 0;
+    session
+      .getMeter("example.plugin", "1.0.0")
+      .createObservableGauge("example.plugin.unlisted")
+      .addCallback(async (result) => {
+        await Promise.resolve();
+        callbackCount += 1;
+        result.observe(1);
+      });
+    const applicationResult = { kind: "success" as const };
+
+    const finalized = await withDeadline(session.finalize(applicationResult));
+
+    expect(finalized.applicationResult).toBe(applicationResult);
+    expect(finalized.profileReport?.signalStatus).toEqual({
+      spans: "complete",
+      counters: "complete",
+      histograms: "complete",
+    });
+    expect(finalized.profileReport?.counters).toEqual([]);
+    expect(finalized.profileReport?.histograms).toEqual([]);
+    expect(callbackCount).toBe(1);
+    for (const resource of [
+      "trace_provider_shutdown",
+      "meter_provider_shutdown",
+      "context_manager_cleanup",
+    ] as const)
+      expect(attempts.filter((attempt) => attempt === resource)).toHaveLength(1);
+  });
+
+  test("isolates rejection from a real asynchronous observable and preserves failure identity", async () => {
+    const { hooks: testHooks, attempts } = hooks();
+    const session = await createWorkerTelemetrySessionForTest({
+      ...testHooks,
+      metricCollectionTimeoutMillis: 200,
+    });
+    const callbackFailure = new Error("plugin observable rejected");
+    session
+      .getMeter("example.plugin")
+      .createObservableGauge("example.plugin.unlisted")
+      .addCallback(async () => {
+        await Promise.resolve();
+        throw callbackFailure;
+      });
+    const applicationResult = { kind: "user-error" as const, message: "application failure" };
+
+    const finalization = session.finalize(applicationResult);
+    const finalized = await withDeadline(finalization);
+
+    expect(finalized.applicationResult).toBe(applicationResult);
+    expect(finalized.profileReport?.signalStatus.counters).toBe("partial");
+    expect(finalized.profileReport?.signalStatus.histograms).toBe("partial");
+    expect(lifecycle(finalized.profileReport!)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "metric_collection", signal: "counters" }),
+        expect.objectContaining({ stage: "metric_collection", signal: "histograms" }),
+      ]),
+    );
+    expect(JSON.stringify(finalized.profileReport)).not.toContain(callbackFailure.message);
+    expect(session.finalize({ kind: "later" })).toBe(finalization);
+    for (const resource of [
+      "trace_provider_shutdown",
+      "meter_provider_shutdown",
+      "context_manager_cleanup",
+    ] as const)
+      expect(attempts.filter((attempt) => attempt === resource)).toHaveLength(1);
+  });
+
+  test("bounds a non-settling observable and remains stable after its late settlement", async () => {
+    const { hooks: testHooks, attempts } = hooks();
+    const session = await createWorkerTelemetrySessionForTest({
+      ...testHooks,
+      metricCollectionTimeoutMillis: 25,
+    });
+    let releaseCallback!: () => void;
+    const callbackGate = new Promise<void>((resolve) => {
+      releaseCallback = resolve;
+    });
+    let markCallbackStarted!: () => void;
+    const callbackStarted = new Promise<void>((resolve) => {
+      markCallbackStarted = resolve;
+    });
+    let markCallbackFinished!: () => void;
+    const callbackFinished = new Promise<void>((resolve) => {
+      markCallbackFinished = resolve;
+    });
+    session
+      .getMeter("example.plugin")
+      .createObservableGauge("example.plugin.unlisted")
+      .addCallback(async () => {
+        markCallbackStarted();
+        await callbackGate;
+        markCallbackFinished();
+      });
+    const applicationResult = { kind: "success" as const };
+    const finalization = session.finalize(applicationResult);
+
+    try {
+      await withDeadline(callbackStarted);
+      const finalized = await withDeadline(finalization);
+      expect(finalized.applicationResult).toBe(applicationResult);
+      expect(finalized.profileReport?.signalStatus.counters).toBe("partial");
+      expect(finalized.profileReport?.signalStatus.histograms).toBe("partial");
+      expect(lifecycle(finalized.profileReport!)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ stage: "metric_collection", signal: "counters" }),
+          expect.objectContaining({ stage: "metric_collection", signal: "histograms" }),
+        ]),
+      );
+      expect(session.finalize({ kind: "later" })).toBe(finalization);
+      for (const resource of [
+        "trace_provider_shutdown",
+        "meter_provider_shutdown",
+        "context_manager_cleanup",
+      ] as const)
+        expect(attempts.filter((attempt) => attempt === resource)).toHaveLength(1);
+
+      releaseCallback();
+      await withDeadline(callbackFinished);
+      expect(await finalization).toBe(finalized);
+      expect(attempts.filter((attempt) => attempt === "metric_collect")).toHaveLength(1);
+    } finally {
+      releaseCallback();
+    }
+  });
+
   test("guards an actual root span end exception and does not retry it", async () => {
     const { hooks: testHooks, attempts } = hooks();
     const session = await createWorkerTelemetrySessionForTest(testHooks);

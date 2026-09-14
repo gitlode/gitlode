@@ -112,4 +112,61 @@ preserve the partial checkpoint and return the specific decision; do not expand 
 
 ## Implementation outcome
 
-Pending. This packet is an assignment, not evidence of implementation or acceptance.
+Implemented from checkpoint `3ed3cf47a9efcddffbbf4a45144325c7cfa807ad` on
+`feature/otel-redesign`:
+
+- R1 checkpoint: `f755cc775f7ecb8e299a0eb3f36cea0f40bd7eda`
+  (`fix(telemetry): select no-op recorders when inactive`). The worker session now exposes its
+  effective recording state. Default composition selects the existing no-op Git, extraction,
+  line-diff, output and plugin projection recorders when disabled or initialization-degraded, and
+  selects a Git-owned no-op DAG binding that runs the underlying algorithms without span wrapping
+  or observation accumulation. Enabled composition retains the active recorders.
+- R2 checkpoint: `0354bab6bcf8e2f78bb6dcb0d23843576504e869`
+  (`fix(telemetry): bound asynchronous metric collection`). `LocalMetricReader` passes the SDK a
+  finite 1,000 ms collection timeout. The default leaves practical headroom for ordinary
+  asynchronous observations while bounding finalization delay; it is internal rather than a CLI
+  setting. The timeout bounds waiting but does not cancel callbacks or preempt synchronous code.
+
+R1 production-path coverage runs disabled isomorphic-git, initialization-degraded Git CLI and
+enabled isomorphic-git composition over real one-commit repositories, file projection, line diff,
+JSONL output and an actual plugin. The injected telemetry-only clock records zero reads in disabled
+and degraded composition and records reads when enabled. All paths preserve successful records and
+checkpoints; disabled and degraded paths omit the report, degraded initialization retains its one
+warning, and enabled composition produces a report. The Git-owned no-op binding also exercises
+difference, reachable and certified-closure operations without telemetry resources.
+
+R2 production-path coverage registers a real SDK asynchronous observable gauge under an unlisted
+plugin metric. It covers normal completion, callback rejection and non-settlement. The latter uses
+a 25 ms test-only collection timeout plus a 2,000 ms outer deadline, returns the original
+application result with partial counter/histogram status and bounded lifecycle diagnostics,
+continues provider/context cleanup, memoizes finalization, and remains stable after the callback is
+released and settles late. The rejection case preserves a typed application-failure object by
+identity; callback failure content is not exposed.
+
+Final verification from the repository root:
+
+- `npm run build:dev`: passed. Production composite projects were checked. The existing
+  `tsconfig.tooling.json` `noCheck` boundary for tests remains unchanged.
+- R1 focused Vitest invocation from this packet, excluding the two R2/local-collection files:
+  7 files and 126 tests passed.
+- R2 focused invocation of `worker-telemetry-session.test.ts` and `local-collection.test.ts`:
+  2 files and 73 tests passed.
+- Combined affected-suite invocation exactly as listed in this packet: 9 files and 179 tests passed.
+- `npm run architecture:check`: passed for all workspaces. Rev-dep reported zero config errors and
+  one unrelated compactness warning for an existing detector declaration.
+- `npm run lint`: passed.
+- `npm run format:write` followed by `npm run format:check`: passed.
+- `git diff --check`: passed.
+
+During development, new tests first exposed two fixture-expectation mistakes (the existing plugin
+compatibility warning and the DAG successor object shape); after correcting the tests, R1 passed.
+The first R2 build rejected a parameter property under the existing `erasableSyntaxOnly` policy;
+the implementation was changed to a private field and the build and focused tests then passed.
+No failing production behavior remains from those iterations.
+
+The implementation changes 13 unique source, test and durable-design files across gitlode and the
+Git adapter, plus this outcome update. It does not change recorder APIs, instrument catalogs, CLI
+configuration, dependencies, thresholds, fixtures, presentation, acceptance records or archive
+refs. No PR, push, merge, publish, release/package validation, cross-platform cumulative validation
+or formal performance measurement was performed. These commits are implementation evidence only;
+independent review and milestone acceptance remain with trunk.

@@ -1,5 +1,61 @@
 # M1 pre-merge R1/R2 implementation assignment
 
+## Current assignment: R1 evidence correction, round 1
+
+Resume the implementation conversation for this bounded correction; if unavailable, start a new
+implementation conversation using this section. The human starts the conversation and returns its
+outcome to trunk. The original implementation assignment and outcome below are historical context.
+R2 is independently accepted at `0354bab6bcf8e2f78bb6dcb0d23843576504e869`; do not reopen it.
+
+Start from the documentation checkpoint adding this assignment on `feature/otel-redesign`.
+Review outcome base: `d25d65ddec78b7d6dad38bc2a23628f9967b96f7`; production must still match
+`0354bab...`. Record HEAD and worktree; preserve unrelated changes and return unexpected production
+delta to trunk. Read the [independent review outcome](opentelemetry-m1-r1-r2-review.md#review-outcome)
+and the recovery plan's R1 criterion. This corrects test evidence, not a newly demonstrated defect
+in the current no-op selection implementation.
+
+The injected clock is presently disconnected when recording is inactive: `metricTiming` becomes
+undefined, so an accidentally active recorder falls back to its own clock and the test still sees
+zero reads. Output recording and DAG accumulation also cannot be detected by that clock assertion.
+Retain the real default worker composition, disabled/degraded/enabled paths, plugin execution and
+application-result/JSONL/checkpoint/warning assertions while closing these blind spots.
+
+Allowed scope is the execution composition regression tests and their minimal observation seams
+in `execute-run.ts` or `plugin-bootstrap.ts`, plus directly needed test support and this outcome.
+Keep production no-op choices and recorder semantics unchanged. If retaining the clock assertion,
+ensure an accidentally active timing recorder actually uses the observed clock; alternatively
+replace it with demonstrably stronger actual-composition evidence and explain the replacement.
+Explicitly observe output-recorder and DAG-binding selection. Do not substitute manually assembled
+telemetry for the default composition under test or add a shadow selector that can disagree with it.
+Prefer test-side observation; any production seam must stay internal and avoid new per-operation
+work when profiling is disabled. No new public API or generic test framework is required.
+
+Use a finite sensitivity checklist covering Git recorder, extraction pipeline, file expansion,
+built-in projection, line diff, JSONL output, plugin projection and DAG binding in disabled and
+initialization-degraded composition. Include both built-in projector construction sites when the
+existing fixture only exercises one. For each selection, demonstrate that replacing that no-op
+choice with its active counterpart causes the corresponding regression to fail. This may use small
+temporary local mutations or an equivalent direct proof; no mutation-testing framework is required.
+Record selection, scenario and failing assertion, then restore each temporary change. Verify the
+final diff contains no deliberate faults. A single global enabled/disabled toggle is not sufficient
+to establish sensitivity to an individual recorder-selection regression.
+
+Run the R1 focused execution/plugin/recorder/DAG tests from the original packet, then its combined
+affected suite once after final changes. Keep R2 tests as regression coverage without reopening its
+accepted design. Run build, applicable checked production typing, architecture, lint, format write/
+check and diff checks for the final correction. Preserve pass/fail/skip accounting. Do not repeat
+full cross-platform release validation, formal performance runs or archived evidence checks here.
+
+Save the correction and its outcome in checkpoints. Return exact OIDs, changed scope, sensitivity
+checklist/results, actual commands and remaining limits. Do not mark R1 accepted or M1 complete.
+No push, PR, merge, publish or acceptance-record changes. After the outcome returns, trunk assigns
+focused independent re-review of this evidence correction, with R2 acceptance maintained. If the
+same evidence issue survives a second correction round, use bounded diagnosis before another loop.
+
+### R1 correction outcome
+
+Pending implementation. R1 remains unaccepted; R2 remains accepted.
+
 ## Owner, inputs and authority
 
 Use a separate human-started branch conversation for implementation. The existing trunk conversation

@@ -34,16 +34,13 @@ T13B/T13C exit criteria. Canonical design, verification, performance and publish
   target and immutable archive paths. Its one-target measurements are not new-candidate evidence.
 - [M1 evidence](opentelemetry-m1-validation-result.md) retains accepted R1/R2, corrected Windows/Linux
   verification, package/runtime identities and the old-versus-new revision boundary.
-- The human alone deletes branches. M1 branches have no remaining implementation assignment.
-  Keep `archive/otel-m1-before-reset-20260911` at `b4468342c982d09be09e9c46290bb1ed2d842a36`.
-  It contains `fix/otel-release-tests-ci-context` and `docs/otel-m1-closure`, but does not contain
-  the final redesign, T13 or T13B tips.
-- The corrected validation archive's `inputs/candidate.bundle` contains T13 `ec0b086`, T13B
-  `08661ce` and redesign history through `e2ec15e`, including accepted `6fd46d3`. It does not
-  contain final PR source `acad3ed`. Before deleting `feature/otel-redesign`, retain that exact
-  tip under a clearly named archive ref/tag or a verified complete bundle. Prefer retaining the
-  other squash-stage tips as archive refs too if convenient Git-history inspection is desired.
-  These are retention recommendations, not authorization for agent deletion or ref changes.
+- The human completed old work-branch deletion and preserved final PR source `acad3ed` as
+  `archive/otel-redesign`. The local archive and remote-tracking ref both resolve to
+  `acad3ed56e134b1a066332cd3d42eb9c01d931b7`; the separate pre-reset archive remains at
+  `b4468342c982d09be09e9c46290bb1ed2d842a36`. Preserve both archive refs.
+- The corrected validation archive's `inputs/candidate.bundle` retains T13 `ec0b086`, T13B
+  `08661ce` and redesign history through `e2ec15e`, including accepted `6fd46d3`. The archives
+  preserve evidence history without restoring completed implementation branches.
 - Preserve immutable evidence under `D:\gitlode_test`; do not overwrite archives or use them as
   mutable build directories. Old packets remain in recorded commits and bundles, not active instructions.
 
@@ -51,8 +48,8 @@ T13B/T13C exit criteria. Canonical design, verification, performance and publish
 
 The following order is a planning proposal for human discussion, not an implementation assignment:
 
-1. Agree the product/harness candidate boundaries and future squash strategy. Keep `7e0055a` as the
-   post-M1 source attribution anchor; no new formal measurement candidate or runtime is frozen here.
+1. Apply the history policy below, then specify exact product/harness inputs before formal measurement.
+   Keep `7e0055a` as the post-M1 source attribution anchor; no formal candidate or runtime is frozen here.
 2. Design readable profile output from representative commit/file/plugin and partial/unavailable
    reports. Agree the reading order and information density before editing the formatter. Preserve
    report semantics and current success-only / quiet behavior unless separately approved.
@@ -77,10 +74,43 @@ publish gate requires legacy <= frozen product <= evidence source <= final candi
 for redesigned evidence, with explicit reviewed reuse bindings. Harness revisions need existence,
 not product ancestry. The publish tree may differ from the final candidate only at the acceptance record.
 
-Before expensive measurement, agree how M2-to-integration and integration-to-main squash will interact
-with these rules: preserve accepted candidate ancestry, or finalize squash history before binding the
-candidate and its formal evidence. Do not relax the gate or treat equal trees as an ancestry proof.
-Version/lockfile changes and T13C cleanup must be accounted for before final candidate acceptance.
+### Working history and accepted measurement history
+
+The human clarified that `integration/v0.13.0` enters `main` through a normal, non-squash merge
+under the project's GitHub rules. Commits admitted to integration will therefore remain in main.
+M2 and its child branches may use any appropriate strategy, subject to human PR/merge approval.
+
+The planning owner's default is:
+
+1. Keep `feature/otel-redesign_M2` as the coordination and cumulative implementation branch.
+   Use child branches for bounded slices such as presentation, system-test organization and repairs.
+   Checkpoint unfinished work freely on those branches; avoid mixing independent slices.
+2. After each slice passes its scoped implementation/review checks, prepare a self-contained commit
+   (or a small coherent series) for M2, normally using a human-operated squash merge. Keep temporary
+   retries and review corrections on the child history. A completed planning/documentation change
+   may also be a coherent commit; commits need not correspond one-for-one with plan units.
+3. Before freezing redesigned-product evidence for formal acceptance, inspect the complete history
+   that would become reachable from integration. Consolidate any remaining provisional M2 checkpoints,
+   remove completed handoff instructions, verify the resulting source and preserve product/runtime
+   and harness identities. This is the boundary after which accepted candidate ancestry is retained.
+4. Merge the reviewed M2 branch into `integration/v0.13.0` using a normal merge by default, preserving
+   the measured source OIDs. This does not mean integration must wait for every release attestation:
+   complete implementation slices can be integrated with the gate blocked, while final acceptance
+   still covers the eventual combined release candidate. Every such PR requires human permission.
+5. Preserve that ancestry through the normal integration-to-main merge. Changesets version/lockfile
+   changes, T13C cleanup and any other source changes must be included in the final candidate or
+   explicitly assessed before its acceptance record is finalized.
+
+No branch is created, rewritten, pushed or merged by this planning decision. If squash is preferred
+for the final M2 PR, choose that before formal candidate binding: integrate the complete reviewed
+implementation with publishing still blocked, then bind measurement inputs on the resulting history.
+Do not squash away evidence-source commits and later claim tree equality satisfies ancestry.
+
+A failed measurement does not force acceptance of a defective candidate. Preserve the attempt,
+implement/review a bounded repair, and create a new descendant candidate. Repeat only affected checks
+when the contract and reviewed delta justify reuse; neither favorable automatic retries nor silent
+reuse is permitted. Complete repair commits may remain in final history when their reason and
+behavior are clear. Harness-only revisions remain separately attributable.
 
 This session does not implement unrelated features. At planned integration/release boundaries, it must
 still inspect their actual combined delta and validate the resulting candidate. A passing isolated M2

@@ -101,5 +101,5 @@ assessment and a new product/harness attribution boundary on the post-squash his
 
 The integration tree equivalence above supports functional reuse; it does not make pre-squash OIDs
 ancestors of the release candidate or establish formal overhead acceptance. Preserve Git objects and
-immutable packages, agree future squash timing, and validate the final combined candidate according
+immutable packages, follow the accepted history policy, and validate the final combined candidate according
 to the [M2 plan](instrumentation-opentelemetry-recovery-plan.md) and canonical publish guidance.

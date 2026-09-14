@@ -54,7 +54,75 @@ same evidence issue survives a second correction round, use bounded diagnosis be
 
 ### R1 correction outcome
 
-Pending implementation. R1 remains unaccepted; R2 remains accepted.
+Implemented from assignment checkpoint `9efddecf80a48bdd66270dd9b2b41cb53c33494a` on
+`feature/otel-redesign` and saved the correction at
+`c3e74a292cd459c1fe455803bbe66f6553a192ad`
+(`test(telemetry): prove inactive composition selections`). R1 remains unaccepted pending focused
+independent re-review; R2 remains accepted at `0354bab6bcf8e2f78bb6dcb0d23843576504e869` and was not
+reopened.
+
+The correction changes only `execute-run.ts`, `plugin-bootstrap.ts`, and
+`execute-run.test.ts`. Default worker composition now constructs the injected `MonotonicTiming`
+independently of effective recording state, while the inactive recorder choices continue to receive
+the existing no-op objects and therefore perform no per-operation clock work. If a timing recorder
+is accidentally selected as active in disabled or initialization-degraded composition, it uses the
+observed test clock instead of silently falling back to `performance.now`. A narrow internal
+composition observer reports the exact objects selected at the existing production construction
+points. It does not select, wrap, or replace a component and is unused by normal composition.
+
+The real-repository regression now runs four inactive cases: disabled isomorphic-git and degraded
+Git CLI, each with and without the actual plugin. This covers both built-in projector construction
+sites while retaining plugin execution, file-level line diff, JSONL, application result, checkpoint,
+warning and report assertions. The enabled isomorphic-git/plugin case still proves active component
+selection and produces a report. The four inactive cases select the exact existing no-op Git,
+extraction-pipeline, file-expansion, built-in projection, line-diff, JSONL-output and plugin
+projection recorders and the Git-owned no-op DAG binding, with zero injected-clock reads.
+
+Sensitivity was checked by temporarily replacing one inactive choice at a time with its active
+factory, running the same actual-composition test, and restoring the change before proceeding. Every
+mutation ran:
+
+```text
+npx vitest run packages/gitlode/test/execution/execute-run.test.ts -t "selects no-op recorders"
+```
+
+All nine commands failed as required (1 failed test, 22 skipped tests each):
+
+| Selection temporarily made active    | Inactive scenarios exercised       | Failing assertions                                |
+| ------------------------------------ | ---------------------------------- | ------------------------------------------------- |
+| Git recorder                         | disabled/degraded, plugin/built-in | clock reads and `git` component identity          |
+| DAG binding                          | disabled/degraded, plugin/built-in | `dag` component identity                          |
+| line diff recorder                   | disabled/degraded, plugin/built-in | clock reads and `line-diff` identity              |
+| file-expansion recorder              | disabled/degraded, plugin/built-in | clock reads and `file-change-expansion` identity  |
+| built-in projector, no-plugin site   | disabled/degraded built-in         | clock reads and `built-in-projection` identity    |
+| built-in projector, plugin-base site | disabled/degraded plugin           | clock reads and `plugin-base-projection` identity |
+| plugin projection recorder           | disabled/degraded plugin           | clock reads and `plugin-projection` identity      |
+| JSONL output recorder                | disabled/degraded, plugin/built-in | `jsonl-output` component identity                 |
+| extraction-pipeline recorder         | disabled/degraded, plugin/built-in | clock reads and `extraction-pipeline` identity    |
+
+After restoring all mutations, the focused actual-composition test passed (1 selected test passed,
+22 skipped), and `git status` plus `git diff --check` showed no residual deliberate fault.
+
+Final verification from the repository root against the correction tree:
+
+- `npm run build:dev`: passed; production composite projects were checked, while the existing
+  tooling/test `noCheck` boundary remains unchanged.
+- R1 focused invocation of the seven execution/plugin/recorder/DAG files from this packet: 7 files,
+  106 tests passed, 0 failed, 0 skipped.
+- The packet's exact combined affected-suite invocation, including the two accepted R2 suites: 9
+  files, 179 tests passed, 0 failed, 0 skipped.
+- `npm run architecture:check`: passed for all workspaces; Rev-dep reported 0 configuration errors
+  and the existing 1 configuration warning.
+- `npm run lint`: passed.
+- `npm run format:write` followed by `npm run format:check`: passed.
+- `git diff --check`: passed.
+
+This correction makes no recorder-semantic, catalog, public API, CLI, dependency, threshold,
+fixture, acceptance-record, R2 implementation, or archive-ref change. It is test evidence for the
+already implemented R1 no-op selections, not a claim of formal overhead acceptance. No PR, push,
+merge, publish, release/package validation, cross-platform cumulative validation, archived-evidence
+check, or formal performance measurement was performed. R1 requires the assigned focused
+independent re-review before trunk may update milestone acceptance.
 
 ## Owner, inputs and authority
 

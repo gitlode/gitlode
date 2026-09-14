@@ -230,7 +230,7 @@ of this design. See [`telemetry.md`](telemetry.md).
 The pre-migration `internal-foundation/instrumentation` source was a transitional custom API, not the
 target domain described here. Production owners now use explicit OpenTelemetry composition and the
 source/export has been removed.
-removed. `otel-support` is distinct from that legacy domain and must not acquire gitlode-specific
+`otel-support` is distinct from that legacy domain and must not acquire gitlode-specific
 observation names.
 
 ### 2.5 `dag`

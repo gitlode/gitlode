@@ -43,7 +43,12 @@ size, including zero, for success and no size for failure. Invalid numeric input
 signal so that an invalid value cannot enter an instrument or suppress valid sibling observations.
 
 Every no-op recorder family is exercised directly. These tests prove that disabled telemetry creates
-no instruments, reads no clock, and needs no per-operation timing-token allocation.
+no instruments, reads no clock, and needs no per-operation timing-token allocation. Direct recorder
+tests do not prove correct production composition: actual disabled and initialization-degraded worker
+paths must also verify the selected recorder/DAG objects and connected timing behavior. The evidence
+must detect an active selection even for non-timing output/DAG bindings and both built-in projector
+construction paths. Preserve enabled recording, application results, JSONL, checkpoints, plugin
+behavior and initialization warnings while testing these paths.
 
 Collector and report tests cover bounded span aggregation, metric conversion, reducer behavior,
 canonical sorting, signal status, structured cloning, and invalid aggregation. Completed span

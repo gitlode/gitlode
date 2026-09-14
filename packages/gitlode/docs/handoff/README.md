@@ -8,19 +8,16 @@ documents.
 
 ## Active OpenTelemetry work
 
-Start with the [recovery plan](instrumentation-opentelemetry-recovery-plan.md) for the current
-reintegration route, human PR/merge authority, milestones, and next assignment. The
-[redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains unfinished T13B/T13C scope.
-The [M0 result](opentelemetry-m0-result.md) preserves Linux/WSL2 setup and one-target evidence;
-the [M1 evidence note](opentelemetry-m1-validation-result.md) preserves candidate validation,
-package identities, and the CI correction needed for reintegration. Completed session packets
-have been removed; accepted contracts live in the design and contributing documentation.
+Start with the [M2 continuation plan](instrumentation-opentelemetry-recovery-plan.md) for milestones,
+remaining decisions, branch/evidence preservation and session routing. M1 is integrated; M2 proceeds
+on `feature/otel-redesign_M2`. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md)
+retains T13B/T13C exit criteria. The [M0 result](opentelemetry-m0-result.md) supplies reusable environment
+setup and one-target provenance; the [M1 evidence note](opentelemetry-m1-validation-result.md) supplies
+corrected functional/package validation and squash attribution. These four notes retain unfinished
+work context, not active instructions to repeat M1. Stable contracts live in design/contributing docs.
 
-Before the redesign-to-integration merge, read the recovery plan's
-[accepted pre-merge disposition](instrumentation-opentelemetry-recovery-plan.md#accepted-pre-merge-review-disposition-2026-09-14).
-R1 no-op selection, R2 bounded asynchronous collection and corrected-candidate cumulative validation
-are accepted. That section also defines evidence limits, optional C1-C6 follow-up and final integration
-preparation. The original review is preserved in Git history, not as an active instruction.
+The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are
+not automatically additional M2 obligations.
 
 ## Lifecycle
 

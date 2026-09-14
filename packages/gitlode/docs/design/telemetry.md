@@ -3,7 +3,7 @@
 ## Status
 
 This document defines the accepted design for gitlode telemetry. The OpenTelemetry runtime migration
-is implemented; integration and the remaining release acceptance are tracked separately.
+is implemented and integrated; remaining release acceptance is tracked separately.
 [`../profiling.md`](../profiling.md) describes the implemented profile output.
 
 The migration status, branch-sized work plan, and remaining design gates are tracked in
@@ -677,10 +677,9 @@ from the catalogs also belong to `@gitlode/internal-contracts/telemetry`. Catalo
 immutable; an owner that passes histogram boundaries to an OpenTelemetry API accepting a mutable
 array supplies a detached copy rather than weakening the metadata type.
 
-The legacy `@gitlode/internal-foundation/instrumentation` export is transitional custom
-instrumentation and is removed when the migration completes. It remains separate from
-`@gitlode/internal-foundation/otel-support`; new helpers must not be re-exported from the legacy
-barrel.
+The legacy `@gitlode/internal-foundation/instrumentation` source and export have been removed.
+Generic OTel helpers belong to `@gitlode/internal-foundation/otel-support`; do not restore the custom
+instrumentation contract or its barrel.
 
 Operation-specific recorder factories live with their owning domains, for example extraction, Git
 implementation, line-diff implementation, output, and plugin runtime. They pre-create instruments

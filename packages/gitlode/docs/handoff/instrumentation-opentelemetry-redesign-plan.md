@@ -8,17 +8,16 @@ contract lives in [telemetry design](../design/telemetry.md), observation catalo
 were removed; their history remains in the pre-recovery commits.
 
 The [recovery plan](instrumentation-opentelemetry-recovery-plan.md) owns current sequencing,
-branch integration and the M0/M1/M2 distinction. M0 is complete; M1 is awaiting reintegration through
-T13B, T13 and the redesign parent branch. The first two PRs have been merged by the human; the
-R1/R2 corrections, independent review and renewed cumulative validation are now accepted.
-Final integration awaits human PR authorization and merge. Integration does not accept formal performance
-or publishing. C1-C6 general cleanup proposals do not expand this unit's release gates.
+branch integration and the M0/M1/M2 distinction. M0 and M1 are complete. PR #111 integrated the
+migration at `7e0055a3f66e38d2f2a8f3554d30c41c2fefb1c0`; R1/R2 and corrected cumulative validation
+are accepted. M2 preparation continues on `feature/otel-redesign_M2`. Integration does not accept
+formal performance or publishing. C1-C6 general cleanup proposals do not expand the release gates.
 
 | Unit     | Status   | Continuation evidence                                                                                                                                  |
 | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | T00A–T12 | complete | API migration, recorders, SDK collection, operation owners, plugins and runtime presentation reviewed; see canonical design and verification contracts |
 | T13A     | complete | Sidecar, aggregation and clean package/readiness verification reviewed                                                                                 |
-| T13B     | pending  | M0 one-target path accepted; M1 placement, gate and two-platform validation accepted; reintegration and full M2 performance acceptance remain          |
+| T13B     | pending  | M0 one-target path accepted; M1 placement, gate and two-platform validation accepted; full M2 performance acceptance remains                           |
 | T13C     | pending  | Consolidation follows full T13B and M2 acceptance                                                                                                      |
 
 No original design gate remains unresolved. New contract changes require planning-owner resolution;

@@ -1,8 +1,8 @@
 # M0 completion and one-target evidence
 
 The planning owner accepts M0 as complete after inspecting the returned artifacts. This establishes
-an executable and diagnosable measurement path with one complete repository target. M1 integration,
-full T13B acceptance, and M2 release readiness remain open. Current work follows the
+an executable and diagnosable measurement path with one complete repository target. M1 integration is complete;
+full T13B acceptance and M2 release readiness remain open. Current work follows the
 [recovery plan](instrumentation-opentelemetry-recovery-plan.md).
 
 ## Identity and results

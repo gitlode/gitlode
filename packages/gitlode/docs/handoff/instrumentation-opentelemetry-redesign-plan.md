@@ -10,7 +10,8 @@ were removed; their history remains in the pre-recovery commits.
 The [recovery plan](instrumentation-opentelemetry-recovery-plan.md) owns current sequencing,
 branch integration and the M0/M1/M2 distinction. M0 and M1 are complete. PR #111 integrated the
 migration at `7e0055a3f66e38d2f2a8f3554d30c41c2fefb1c0`; R1/R2 and corrected cumulative validation
-are accepted. M2 preparation continues on `feature/otel-redesign_M2`. Integration does not accept
+are accepted. M2 profile design, including report schema v2 and fallback, is accepted at `d87bfd6`;
+implementation sessions and history boundaries are assigned by the recovery plan. Integration does not accept
 formal performance or publishing. C1-C6 general cleanup proposals do not expand the release gates.
 
 | Unit     | Status   | Continuation evidence                                                                                                                                  |

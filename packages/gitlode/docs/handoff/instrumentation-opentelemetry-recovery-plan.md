@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                               | Remaining scope                                                            |
-| --------- | ------------------------------------ | -------------------------------------------------------------------------- |
-| M0        | complete, one target only            | Preserve historical evidence and environment                               |
-| M1        | complete                             | Preserve corrected validation and squash attribution                       |
-| M2        | preparation and interactive planning | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates            | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                          | Remaining scope                                                            |
+| --------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only                       | Preserve historical evidence and environment                               |
+| M1        | complete                                        | Preserve corrected validation and squash attribution                       |
+| M2        | profile design accepted; implementation pending | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates                       | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -44,35 +44,64 @@ T13B/T13C exit criteria. Canonical design, verification, performance and publish
 - Preserve immutable evidence under `D:\gitlode_test`; do not overwrite archives or use them as
   mutable build directories. Old packets remain in recorded commits and bundles, not active instructions.
 
-## Current session assignment
+## Accepted profile design and next assignment
 
-The next human-started conversation is the [interactive profile design session](opentelemetry-m2-profile-design.md).
-It compares legacy/current output, explores alternatives with the human, then converges on detailed
-M2 scope and separately recorded future ideas. It is not an autonomous implementation session.
-No display option is selected by this assignment. Trunk resumes dependency planning when the human
-returns the design outcome; implementation packets follow the agreed design.
+The human-approved [profile design](opentelemetry-m2-profile-design.md), including diagnostic identity
+and whole-report fallback corrections, was accepted by trunk at
+`d87bfd6fb8d4e874bb78424111f21f78fd6c9a6d`. Local and actual remote M2 both contained this checkpoint
+when this plan was prepared. The design conversation is complete. Its examples do not replace
+implemented-output review, functional/package checks or performance acceptance.
 
-## Decisions before M2 implementation
+This is a profile **and report-quality** change: schema v2, bounded structured diagnostics,
+measurement availability masks, collector/report propagation, worker fallback, generic presentation
+and shared styling are in scope. Observation admission, recorder ownership and Span aggregation
+identity remain unchanged. The collector changes cannot be attributed to presentation alone.
 
-The following order is a planning proposal for human discussion, not an implementation assignment:
+The next human-started implementation conversation is
+[P1: v2 contracts and bounded issue primitives](opentelemetry-m2-profile-implementation.md).
+Trunk has not started it. Human launches and returns each session; no automatic sub-agent work.
 
-1. Apply the history policy below, then specify exact product/harness inputs before formal measurement.
-   Keep `7e0055a` as the post-M1 source attribution anchor; no formal candidate or runtime is frozen here.
-2. Design readable profile output from representative commit/file/plugin and partial/unavailable
-   reports. Agree the reading order and information density before editing the formatter. Preserve
-   report semantics and current success-only / quiet behavior unless separately approved.
-3. Define the first private `tests/system` slice and implement it separately from presentation.
-   Identify lasting system checks versus migration-only tools; retain unit tests with their owners,
-   explicit checked TypeScript and the current required command coverage. Do not move all tests at once.
-4. After relevant product/harness changes stabilize, preserve a reviewed candidate and harness,
-   then execute bounded formal T13B tasks on Linux. Decide baseline calibration reuse explicitly;
-   do not silently recalibrate the accepted M0 target or relabel its candidate comparisons.
-5. Assess the eventual integrated release candidate, complete required validation and delta review,
-   then close T13C and obtain release-authority acceptance through the existing publish gate.
+## Session sequence and dependencies
 
-Full formal measurement can take substantial external execution time. Order implementation before
-expensive measurements where this avoids invalidating evidence. Pure presentation work must still
-be assessed for package/finalization effects rather than assumed irrelevant to performance.
+These are scheduling labels, not replacements for T13B/T13C. Each implementation outcome returns to
+trunk before the next session. Reviews target exact checkpoint OIDs and affected dependencies;
+accepting a preparatory slice does not accept the entire profile feature or publish gate.
+
+| Stage                 | Session responsibility                                                                                                               | Depends on / exit                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| P1                    | V2 types, safe validation, diagnostic identity/retention, status derivation and fixed fallback primitives with focused tests         | Accepted design; current runtime remains v1 until P2; return explicit wiring/migration inventory                                   |
+| P1-R                  | Independent contract/primitive review                                                                                                | P1 fixed OID; resolve concrete issues before lifecycle wiring                                                                      |
+| P2                    | Collector/report-builder propagation, worker lifecycle/fallback, atomic runtime v2 switch and all report consumers                   | P1 accepted; no mixed-version producer/consumer path; masks never rendered or counted as observed zero                             |
+| P2-R                  | Independent data-integrity/failure-isolation review                                                                                  | Existing detection matrix, actual builder failure, diagnostic failure, overflow and shutdown combinations                          |
+| P3                    | Generic Scope/name display, precision/escaping, shared style and removal of old per-name view policy                                 | P2 accepted; migrate canonical display/catalog contracts together; no transitional v1 support remains                              |
+| P3-R/V                | Independent cumulative review, real commit/file/plugin output and human terminal review, Windows/Linux functional/package validation | Complete profile child branch; runtime output approval and evidence before its integration into M2                                 |
+| S-D/I/R               | Separate private tests/system boundary design, bounded migration and review                                                          | Profile schema/tooling stable; preserve commands and checked TypeScript for moved tooling; do not combine file moves with P2       |
+| F                     | Trunk history review, candidate/package/harness preservation and measurement-readiness checks                                        | Profile/system slices accepted; no pending source changes affecting timed inputs; exact remotely preserved OIDs and archive hashes |
+| T13B execution/review | Bounded Linux operator sessions, then independent evidence review                                                                    | F; calibration/reuse decision, legacy capture, comparisons and aggregation/volume matrix from canonical contracts                  |
+| Final/T13C            | Combined release-candidate delta, final Windows/Linux/package evidence, durable documentation and acceptance record                  | Full obligations; account for unrelated integration changes and version/lockfile changes before final acceptance                   |
+
+P1-P3 share `feature/otel-redesign_M2_profile`, created from the remote-backed M2 checkpoint containing
+this plan. Use sequential conversations on that branch, not a fresh branch per correction. This keeps
+coupled schema/collector/view work off M2 until coherent. P1 may temporarily stage v2-only primitives
+beside the active v1 contract; that is not permission for a shipped dual-version protocol. P2 completes
+the producer/consumer switch; P3 removes transitional code. Never merge a preparatory checkpoint by
+itself into M2 or integration. Meaningful intermediate commits remain allowed and remotely preserved.
+
+Prepare the S-D/I/R packet only after the profile work returns; intended branch is
+`feature/otel-redesign_M2_system` from the then-accepted M2 tip. Do not pre-authorize a broad test move.
+F and later operator packets must name concrete OIDs, commands, limits, archive roots and failure
+return rules before execution. Independent measurement sessions do not repair the candidate.
+
+Canonical updates accompany their actual implementation: P2 owns telemetry/report/collection and
+verification contracts (including profile-report.yaml); P3 owns profiling and generic view policy
+(including profile-view.yaml and coverage tests). Performance sidecar/aggregation readers and tests
+switch with P2; a ProfileReport version bump does not automatically bump unrelated artifact schemas.
+Preserve the existing formal requirements for valid reports, complete signals and empty diagnostics.
+
+Do not rerun successful full suites at every checkpoint. P1/P2/P3 use meaningful affected tests;
+cumulative Windows/Linux and installed-package validation apply to the complete candidate and relevant
+later deltas. Warn before long builds, environment preparation or measurements. Formal T13B can take
+substantial external execution time; no automatic retries or threshold relaxation.
 
 ### History and parallel development boundary
 
@@ -88,31 +117,50 @@ The human clarified that `integration/v0.13.0` enters `main` through a normal, n
 under the project's GitHub rules. Commits admitted to integration will therefore remain in main.
 M2 and its child branches may use any appropriate strategy, subject to human PR/merge approval.
 
-The planning owner's default is:
+### Branch, checkpoint and remote preservation rules
 
-1. Keep `feature/otel-redesign_M2` as the coordination and cumulative implementation branch.
-   Use child branches for bounded slices such as presentation, system-test organization and repairs.
-   Checkpoint unfinished work freely on those branches; avoid mixing independent slices.
-2. After each slice passes its scoped implementation/review checks, prepare a self-contained commit
-   (or a small coherent series) for M2, normally using a human-operated squash merge. Keep temporary
-   retries and review corrections on the child history. A completed planning/documentation change
-   may also be a coherent commit; commits need not correspond one-for-one with plan units.
-3. Before freezing redesigned-product evidence for formal acceptance, inspect the complete history
-   that would become reachable from integration. Consolidate any remaining provisional M2 checkpoints,
-   remove completed handoff instructions, verify the resulting source and preserve product/runtime
-   and harness identities. This is the boundary after which accepted candidate ancestry is retained.
-4. Merge the reviewed M2 branch into `integration/v0.13.0` using a normal merge by default, preserving
-   the measured source OIDs. This does not mean integration must wait for every release attestation:
-   complete implementation slices can be integrated with the gate blocked, while final acceptance
-   still covers the eventual combined release candidate. Every such PR requires human permission.
-5. Preserve that ancestry through the normal integration-to-main merge. Changesets version/lockfile
-   changes, T13C cleanup and any other source changes must be included in the final candidate or
-   explicitly assessed before its acceptance record is finalized.
+| Ref / boundary                            | Purpose and preservation                                                     | Merge method                                                             |
+| ----------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `feature/otel-redesign_M2`                | Trunk planning plus accepted cumulative changes; push meaningful checkpoints | Into integration: normal merge after history review and candidate freeze |
+| `feature/otel-redesign_M2_profile`        | P1-P3 and review corrections; commit/push even explicitly unfinished stages  | Into M2: human squash after cumulative acceptance                        |
+| `feature/otel-redesign_M2_system`         | First system workspace slice and corrections; commit/push independently      | Into M2: human squash after its acceptance                               |
+| `archive/otel-m2-profile-design-20260918` | Immutable accepted design at `d87bfd6fb8d4e874bb78424111f21f78fd6c9a6d`      | Never merge as a work branch                                             |
+| `archive/otel-m2-product-<oid12>`         | F records exact product OID and immutable runtime/package identities         | Never move; product OID must remain an ancestor of final/publish source  |
+| `archive/otel-m2-harness-<oid12>`         | Exact harness OID; may equal product OID                                     | Never move; keep its Git object available to verification                |
+| `integration/v0.13.0` -> `main`           | Approved release history                                                     | Normal non-squash merge, as the human specified                          |
 
-No branch is created, rewritten, pushed or merged by this planning decision. If squash is preferred
-for the final M2 PR, choose that before formal candidate binding: integrate the complete reviewed
-implementation with publishing still blocked, then bind measurement inputs on the resulting history.
-Do not squash away evidence-source commits and later claim tree equality satisfies ancestry.
+Commit at meaningful boundaries and before handing off a session, including unfinished states with
+clear residual work and failing/unrun checks. Push those checkpoints to the same named work branch
+without force, then verify actual remote OID equality. The human explicitly requested remote
+preservation; ordinary work-branch checkpoint pushes are authorized within assigned scope, not just
+local commits. Avoid per-edit commits/pushes. If network/permission prevents backup, preserve locally,
+report the unbacked OIDs and blocker, and do not describe the checkpoint as remotely protected.
+Do not push secrets, raw operator logs or large runtime archives into Git as a substitute for artifact
+preservation. Record archive paths/hashes in the outcome; external artifact backup remains distinct.
+
+PR creation always needs explicit human approval naming source/base. Only the human approves/merges
+and deletes branches. Work-branch pushes do not authorize integration/main updates. No force push,
+shared-history rewrite or branch deletion is implicit in this plan. Preserve source checkpoints and
+review attribution until the human confirms safe deletion after squash.
+
+Before F, inspect commits that will become reachable from integration/main. Finished implementation,
+reviewed repairs and concise planning/documentation commits may remain; avoid retaining every trial
+and correction checkpoint where squash gives a clearer history. This is a SHOULD, not a reason to
+lose evidence or redo valid work. Child squashes provide the normal cleanup boundary. If M2 itself
+still needs rewriting, propose the exact operation after remote archival and obtain specific approval;
+finish it before freezing any redesigned-product evidence. No rewrite is performed by this plan.
+
+At F, create and push the product/harness archive refs before measurement and verify both remote OIDs.
+Also preserve immutable runtime, dependencies, fixture identities and manifests. A Git archive ref
+alone is neither the tested binary nor performance acceptance. Retain these refs and external archives
+through final acceptance; branch deletion must not leave a referenced revision dependent on reflogs.
+Measurement sessions use detached fixed inputs. Repairs create descendants, not replacement commits.
+
+After F, default to normal M2-to-integration merge, then normal integration-to-main merge, keeping
+measured ancestors. If a final M2 squash is preferred, settle it before F: integrate the coherent
+implementation with publishing blocked, then freeze on that resulting history. Equal source trees
+do not replace the gate's ancestry requirement. Version/lockfile changes and T13C cleanup must precede
+final candidate acceptance; thereafter only the acceptance-record path may differ at publish time.
 
 A failed measurement does not force acceptance of a defective candidate. Preserve the attempt,
 implement/review a bounded repair, and create a new descendant candidate. Repeat only affected checks
@@ -154,7 +202,7 @@ take optional refactoring only through a separately justified, bounded decision.
 | Obligation                      | Required evidence                                                                                                                                                                                                    |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Original performance acceptance | All repository calibration targets, legacy captures, both comparison matrices, aggregation scale, and other cataloged volume/memory/behavior checks; any exception has the required evidence and explicit acceptance |
-| Profile readability             | Representative commit, file, and plugin output plus partial/unavailable cases reviewed by the human; formatter tests alone do not establish usability                                                                |
+| Profile readability             | Accepted generic display and schema v2 quality reporting implemented; real commit/file/plugin, partial/unavailable and styled/plain output reviewed by the human                                                     |
 | System-test organization        | A private `tests/system` workspace with the first release-CLI workflow migration, explicit commands, dependency boundaries, and checked TypeScript for its owned tooling                                             |
 | Contributor navigation          | Clear product-versus-telemetry reading routes, instrumentation placement guidance, and separate guidance for recorder changes and collection infrastructure                                                          |
 | Final candidate                 | Functional/package checks and applicable formal performance acceptance on the actual release candidate; changes since the frozen migration candidate are assessed explicitly                                         |
@@ -172,6 +220,14 @@ Freeze the migration candidate for attribution, and separately verify the final 
 for shipment. Later feature costs must not be silently attributed to telemetry or accepted by
 reusing older passing results. Diagnose changed behavior against the frozen candidate; apply the
 existing explicit exception process where necessary. Do not silently recalibrate a frozen fixture.
+
+### Early follow-up outside v0.13.0
+
+The accepted profile design identifies Span aggregation/information retention as a concrete early
+priority, not merely optional cosmetic cleanup. Preserve its rationale and investigation questions
+from design section 9 in a future-work home before closing T13C. No target release is assigned and
+it is not a v0.13.0 gate. Expanding currently undetected loss and domain-specific attribute pivots
+remain deferred. Do not silently fold these into P1-P3.
 
 ### M3: Future work
 
@@ -191,5 +247,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. No PR or implementation
-assignment is authorized merely by this preparation note.
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1 packet
+is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

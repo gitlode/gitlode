@@ -16,8 +16,9 @@ setup and one-target provenance; the [M1 evidence note](opentelemetry-m1-validat
 corrected functional/package validation and squash attribution. These four notes retain unfinished
 work context, not active instructions to repeat M1. Stable contracts live in design/contributing docs.
 
-The active next assignment is [interactive profile presentation design](opentelemetry-m2-profile-design.md),
-a human dialogue that produces detailed design before a separate implementation session.
+The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`. The active next
+assignment is [P1 profile implementation preparation](opentelemetry-m2-profile-implementation.md):
+v2 contracts and bounded issue primitives, followed by independent review and staged runtime wiring.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are
 not automatically additional M2 obligations.

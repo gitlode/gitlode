@@ -98,12 +98,12 @@ describe("v2 diagnostic accumulation", () => {
     const quantity = {
       descriptor: "metric_points" as const,
       unit: "points",
-      value: 2,
+      value: Number.MAX_SAFE_INTEGER,
       relationship: "disjoint" as const,
     };
     accumulator.add(issue("known", { lossQuantity: quantity, count: Number.MAX_SAFE_INTEGER }));
-    accumulator.add(issue("known", { lossQuantity: quantity }));
-    accumulator.add(issue("unknown", { lossQuantity: quantity }));
+    accumulator.add(issue("known", { lossQuantity: { ...quantity, value: 2 } }));
+    accumulator.add(issue("unknown", { lossQuantity: { ...quantity, value: 2 } }));
     accumulator.add(
       issue("unknown", {
         lossQuantity: { ...quantity, value: 3, relationship: "overlapping_or_unknown" },
@@ -127,7 +127,7 @@ describe("v2 diagnostic accumulation", () => {
     ).toMatchObject({
       count: Number.MAX_SAFE_INTEGER,
       countSaturated: true,
-      lossQuantity: { value: 4 },
+      lossQuantity: { value: Number.MAX_SAFE_INTEGER, saturated: true },
     });
     expect(
       diagnostics.find(
@@ -135,6 +135,65 @@ describe("v2 diagnostic accumulation", () => {
       )?.lossQuantity?.value,
     ).toBeNull();
     expect(diagnostics).toHaveLength(3);
+
+    const descriptors = new BoundedProfileDiagnosticAccumulatorV2();
+    descriptors.add(issue("same", { lossQuantity: { ...quantity, value: 1 } }));
+    descriptors.add(
+      issue("same", {
+        lossQuantity: {
+          descriptor: "span_attribute_values",
+          unit: "values",
+          value: 1,
+          relationship: "disjoint",
+        },
+      }),
+    );
+    expect(descriptors.snapshot().diagnostics).toHaveLength(2);
+  });
+
+  it("accounts for escaping within the 4096-code-unit structured detail budget", () => {
+    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    accumulator.add(issue("plain", { attributeKey: { type: "exact", key: "x".repeat(3500) } }));
+    accumulator.add(issue("escaped", { attributeKey: { type: "exact", key: "\\".repeat(3500) } }));
+    const [plain, escaped] = accumulator.snapshot().diagnostics;
+    expect(plain?.attributeKey.type).toBe("exact");
+    expect(escaped?.attributeKey).toEqual({ type: "discarded" });
+    expect(escaped?.detailLoss.attributeKey).toBe(true);
+    for (const diagnostic of [plain, escaped]) {
+      expect(
+        JSON.stringify({
+          target: diagnostic?.target,
+          signalCoverage: diagnostic?.signalCoverage,
+          effects: diagnostic?.effects,
+          extent: diagnostic?.extent,
+          attributeKey: diagnostic?.attributeKey,
+          affectedFields: diagnostic?.affectedFields,
+          detailLoss: diagnostic?.detailLoss,
+          lossQuantity: diagnostic?.lossQuantity,
+        }).length,
+      ).toBeLessThanOrEqual(4096);
+    }
+  });
+
+  it("summarizes a record whose retained fixed distinctions cannot fit the detail budget", () => {
+    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    accumulator.add(
+      issue("quantity", {
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "u".repeat(3900),
+          value: 1,
+          relationship: "disjoint",
+        },
+      }),
+    );
+    const snapshot = accumulator.snapshot();
+    expect(snapshot.diagnostics).toEqual([]);
+    expect(snapshot.summary).toMatchObject({
+      omittedOccurrences: 1,
+      maximumSeverity: "warning",
+      signalCoverage: ["span"],
+    });
   });
 
   it("retains 15 details and uses one fixed summary above capacity", () => {
@@ -278,6 +337,27 @@ describe("v2 availability and fallback primitives", () => {
     ).toEqual({ spans: "partial", counters: "complete", histograms: "unavailable" });
   });
 
+  it("preserves whole-result unavailability through overflow compaction", () => {
+    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    for (let index = 0; index < 15; index += 1) accumulator.add(issue(`retained-${index}`));
+    accumulator.add(
+      issue("unavailable", {
+        code: "lifecycle_failure",
+        stage: "metric_collection",
+        signalCoverage: ["histogram"],
+        effects: ["unknown_collection_coverage"],
+        wholeResultUnavailable: true,
+      }),
+    );
+    expect(
+      deriveProfileSignalStatusV2(
+        { spans: "complete", counters: "complete", histograms: "partial" },
+        { spans: 1, counters: 1, histograms: 0 },
+        accumulator.snapshot(),
+      ).histograms,
+    ).toBe("unavailable");
+  });
+
   it("constructs a clone-safe minimum fallback without reading unsafe values", () => {
     let reads = 0;
     const unsafe = Object.defineProperty({}, "diagnostics", {
@@ -325,6 +405,17 @@ describe("v2 availability and fallback primitives", () => {
       priorIssueDetail: "retained",
       omittedOccurrences: 1,
       maximumSeverity: "warning",
+    });
+  });
+
+  it("distinguishes a trusted empty diagnostic snapshot from no snapshot", () => {
+    const snapshot = new BoundedProfileDiagnosticAccumulatorV2().snapshot();
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.diagnostics)).toBe(true);
+    const report = createFixedProfileReportFallbackV2(snapshot);
+    expect(report.diagnostics).toHaveLength(1);
+    expect(report.diagnostics[0]).toMatchObject({
+      reportDelivery: { priorIssueDetail: "retained", measurementResults: "none" },
     });
   });
 });

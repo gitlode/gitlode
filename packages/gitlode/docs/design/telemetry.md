@@ -567,6 +567,22 @@ interface ProfileReport {
 }
 ```
 
+This schema-version-1 shape remains the active worker and presentation contract. A schema-version-2
+candidate is staged in `internal-contracts/telemetry` under explicit `V2` names. It adds typed issue
+targets, signal coverage, effects, extent, attribute selectors, per-kind numeric-field masks,
+detail-loss masks, loss quantities, fixed overflow evidence, report-delivery provenance, and
+measurement `unavailableFields`. Its execution-owned candidate primitives provide bounded 15+1
+diagnostic retention, status/numeric-availability derivation, and a fixed empty-measurement fallback
+that does not call the normal report builder. The candidate is not emitted or rendered yet; P2 must
+replace the active v1 producer and every consumer atomically before changing
+`PROFILE_REPORT_SCHEMA_VERSION` or the catalog's active `schema_version`.
+
+The staged fallback accepts prior issue details only through an accumulator-issued, detached,
+runtime-frozen snapshot. Without that explicit completion boundary it returns empty measurement
+arrays, unavailable signal statuses, a mandatory report-delivery diagnostic, and fixed evidence that
+prior issue detail is unavailable. It does not inspect arbitrary collector/builder payloads or add a
+second collection traversal.
+
 The report keeps spans, counters, and histograms as separate signals. Metrics are not attached back
 to a span-shaped `details` field. Individual trace IDs, span IDs, parent relationships, exceptions,
 messages, and stacks are not retained.

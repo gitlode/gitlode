@@ -395,3 +395,105 @@ availability:
   finalization_partial_failure: report present with signal status and diagnostics
   telemetry_shutdown_failure: preserve already-built signal data and add a bounded diagnostic when possible
   application_failure: finalize telemetry but retain the current success-only rendering policy
+
+# P1 implementation staging only. The active schema_version and runtime producer above remain v1
+# until P2 atomically migrates the worker, presentation, tooling, and tests.
+staged_v2_candidate:
+  schema_version: 2
+  source:
+    contract: packages/internal-contracts/src/telemetry/profile-report-v2.ts
+    normalization: packages/internal-contracts/src/telemetry/normalization-v2.ts
+    diagnostics: packages/gitlode/src/execution/telemetry/profile-diagnostic-v2-accumulator.ts
+    derivation_and_fallback: packages/gitlode/src/execution/telemetry/profile-report-v2-primitives.ts
+  report:
+    fields:
+      schemaVersion: 2
+      signalStatus: ProfileSignalStatusSetV2
+      spans: ProfileSpanAggregateV2[]
+      counters: ProfileCounterPointV2[]
+      histograms: ProfileHistogramPointV2[]
+      diagnostics: (ProfileDiagnosticV2 | ProfileDiagnosticSummaryV2)[]
+    active_runtime_producer: false
+    structured_clone_safe: true
+  measurement_extensions:
+    span:
+      unavailable_fields: [calls, total, avg, max, errors]
+      quality_evidence: durationContributionCount
+    counter:
+      unavailable_fields: [value]
+    histogram:
+      unavailable_fields: [samples, total, avg, min, max]
+    numeric_values:
+      requirement: finite
+      unavailable_zero_semantics: numeric slots remain finite but masks prevent treating defaults as observations
+  diagnostic:
+    detailed_capacity: 15
+    reserved_summary_capacity: 1
+    identity:
+      - code
+      - stage
+      - canonical target
+      - signal coverage
+      - effects
+      - extent
+      - attribute-key selector
+      - affected fields
+      - detail-loss mask
+      - loss-quantity descriptor and unit
+    target_variants:
+      - report
+      - scope
+      - observation
+      - metric point
+    attribute_key_selectors:
+      - not_applicable
+      - exact
+      - discarded
+    effects:
+      - missing_observations
+      - incomplete_measurement_fields
+      - missing_attribute_detail
+      - unknown_collection_coverage
+      - lost_issue_detail
+      - report_delivery_failure
+      - lifecycle_notice
+    extents:
+      - entire_target
+      - unidentified_subset
+    detail_loss_mask:
+      - pointAttributes
+      - observationIdentity
+      - scopeIdentity
+      - attributeKey
+      - affectedFields
+    structured_detail_maximum_utf16_code_units: 4096
+    message_maximum_utf16_code_units: 512
+    overflow_summary:
+      preserves:
+        - maximum original severity
+        - per-kind effect associations
+        - confirmed whole-result-unavailable evidence
+        - fixed detail-loss mask
+        - safely saturated omitted occurrence count when known
+      prohibits:
+        - lost-target lists
+        - lost-key lists
+    quantity_merge:
+      known_disjoint: saturating sum
+      unknown_or_overlapping: unknown total
+      diagnostic_occurrences_are_loss_amounts: false
+  fixed_fallback:
+    normal_builder_calls: 0
+    measurements_without_trusted_snapshot: none
+    signal_status_without_trusted_snapshot: unavailable
+    mandatory_diagnostic:
+      code: lifecycle_failure
+      stage: report_build
+      severity: warning
+      target: report
+      extent: entire_target
+      effect: report_delivery_failure
+      count: 1
+    prior_detail_input: accumulator-issued detached frozen snapshot only
+    arbitrary_payload_reads: prohibited
+    active_worker_wiring: false

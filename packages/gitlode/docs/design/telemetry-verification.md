@@ -54,6 +54,15 @@ Collector and report tests cover bounded span aggregation, metric conversion, re
 canonical sorting, signal status, structured cloning, and invalid aggregation. Completed span
 objects and raw histogram samples must not be retained.
 
+The staged schema-v2 P1 primitives additionally use literal contract cases for typed target
+canonicalization, independently validated identity components, exact/discarded/not-applicable
+attribute selectors, per-kind fields/effects/coverage, quantity merge uncertainty, safe saturation,
+15+1 issue retention, escaped 4096-code-unit detail broadening, numeric availability, and the fixed
+fallback. These tests do not establish runtime fallback delivery: P2 must inject a real normal
+builder-body failure after invocation, verify worker transport and presentation, preserve
+cleanup/finalization idempotence under simultaneous failures, and migrate status/tooling consumers
+in the same atomic switch.
+
 Repository performance workflow tests use the same development-only sidecar orchestration as the
 formal workflow. They require a `target_on` report, classify missing or malformed reports as
 inconclusive, propagate report-size, prohibited-span, diagnostic, and signal-status outcomes to the

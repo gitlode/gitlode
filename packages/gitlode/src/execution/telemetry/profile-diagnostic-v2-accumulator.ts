@@ -388,6 +388,14 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         message: normalizeMessage(input.message),
         reportDelivery: null,
       };
+      if (JSON.stringify(bounded).length > PROFILE_DIAGNOSTIC_DETAIL_UTF16_LIMIT_V2) {
+        this.#summary = mergeIntoSummary(
+          this.#summary ?? createEmptySummary("retained"),
+          diagnostic,
+          input.wholeResultUnavailable === true,
+        );
+        return;
+      }
       const key = diagnosticIdentity(diagnostic);
       const current = this.#entries.get(key);
       if (current) {

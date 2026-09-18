@@ -34,11 +34,11 @@ describe("staged ProfileReport v2 contracts", () => {
     expect(
       normalizeAffectedFieldsV2([
         { kind: "histogram", fields: ["max", "avg", "total", "avg"] },
-        { kind: "span", fields: ["errors", "calls"] },
+        { kind: "span", fields: ["errors", "max", "avg", "total", "calls"] },
       ]),
     ).toEqual([
       { kind: "histogram", fields: ["total", "avg", "max"] },
-      { kind: "span", fields: ["calls", "errors"] },
+      { kind: "span", fields: ["calls", "total", "avg", "max", "errors"] },
     ]);
     expect(normalizeAffectedFieldsV2([{ kind: "counter", fields: ["avg"] }])).toBeNull();
     expect(normalizeAffectedFieldsV2([{ kind: "span", fields: [] }])).toBeNull();

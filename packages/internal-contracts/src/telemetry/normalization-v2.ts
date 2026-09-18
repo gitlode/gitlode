@@ -36,15 +36,17 @@ export const EMPTY_PROFILE_DETAIL_LOSS_MASK_V2: ProfileDetailLossMaskV2 = Object
   affectedFields: false,
 });
 
-const FIELD_ORDER = new Map<string, number>(
-  [...PROFILE_SPAN_FIELDS_V2, ...PROFILE_COUNTER_FIELDS_V2, ...PROFILE_HISTOGRAM_FIELDS_V2].map(
-    (field, index) => [field, index],
-  ),
-);
 const allowedFields = {
   span: new Set<string>(PROFILE_SPAN_FIELDS_V2),
   counter: new Set<string>(PROFILE_COUNTER_FIELDS_V2),
   histogram: new Set<string>(PROFILE_HISTOGRAM_FIELDS_V2),
+} as const;
+const fieldOrder = {
+  span: new Map<string, number>(PROFILE_SPAN_FIELDS_V2.map((field, index) => [field, index])),
+  counter: new Map<string, number>(PROFILE_COUNTER_FIELDS_V2.map((field, index) => [field, index])),
+  histogram: new Map<string, number>(
+    PROFILE_HISTOGRAM_FIELDS_V2.map((field, index) => [field, index]),
+  ),
 } as const;
 
 function uniqueSorted<Value extends string>(
@@ -87,8 +89,11 @@ export function normalizeAffectedFieldsV2(input: unknown): ProfileAffectedFields
     );
     if (!fields || fields.length === 0 || byKind.has(value.kind as ProfileObservationKindV2))
       return null;
-    fields.sort((left, right) => (FIELD_ORDER.get(left) ?? 0) - (FIELD_ORDER.get(right) ?? 0));
-    byKind.set(value.kind as ProfileObservationKindV2, fields);
+    const kind = value.kind as ProfileObservationKindV2;
+    fields.sort(
+      (left, right) => (fieldOrder[kind].get(left) ?? 0) - (fieldOrder[kind].get(right) ?? 0),
+    );
+    byKind.set(kind, fields);
   }
   return [...byKind.entries()]
     .sort(([left], [right]) => compareCodeUnits(left, right))

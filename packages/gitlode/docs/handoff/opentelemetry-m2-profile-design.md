@@ -12,6 +12,11 @@ The human has also accepted the shared cosmetic-style mapping in section 11, inc
 shared roles. Functional and cosmetic design are complete; terminal verification remains an
 implementation acceptance requirement.
 
+Trunk's limited-review corrections for diagnostic identity and delivery when the normal report
+builder throws are incorporated below. The human accepted the fixed fallback with reuse restricted
+to independently completed, validated snapshots. No design choice remains pending for these two
+corrections; trunk's limited re-review and implementation acceptance remain separate.
+
 Current implemented contracts remain in [telemetry.md](../design/telemetry.md),
 [verification](../design/telemetry-verification.md) and [profiling.md](../profiling.md).
 This handoff describes their intended M2 delta. During implementation migrate normative content
@@ -251,15 +256,15 @@ atomically; do not add a new public persistence/import compatibility promise.
 
 Each diagnostic carries the existing code, stage, severity and occurrence count, plus:
 
-| Concept          | Representation and invariant                                                                                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Target           | Report-wide, Scope, observation, or metric point; observation includes Scope/version/name/internal kind; point adds a validated canonical attribute set                              |
-| Signal coverage  | Bounded subset of Span/Counter/Histogram kinds, independent of display hierarchy                                                                                                     |
-| Effect           | Missing observations/points; incomplete measurement fields; missing attribute detail; unknown collection coverage; lost issue detail; lifecycle notice without established data loss |
-| Extent           | Entire identified target or unidentified subset; do not infer entire from one discarded point                                                                                        |
-| Attribute/fields | Optional validated attribute key or bounded set of affected numeric fields                                                                                                           |
-| Cause            | Existing diagnostic code and lifecycle stage; no presentation strings in semantic metadata                                                                                           |
-| Loss amount      | Optional quantity plus explicit unit; absent if unknown; separate from diagnostic occurrences                                                                                        |
+| Concept          | Representation and invariant                                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Target           | Report-wide, Scope, observation, or metric point; observation includes Scope/version/name/internal kind; point adds a validated canonical attribute set                                                       |
+| Signal coverage  | Bounded subset of Span/Counter/Histogram kinds, independent of display hierarchy                                                                                                                              |
+| Effect           | Missing observations/points; incomplete measurement fields; missing attribute detail; unknown collection coverage; lost issue detail; report delivery failure; lifecycle notice without established data loss |
+| Extent           | Entire identified target or unidentified subset; do not infer entire from one discarded point                                                                                                                 |
+| Attribute/fields | Optional validated attribute key or bounded set of affected numeric fields                                                                                                                                    |
+| Cause            | Existing diagnostic code and lifecycle stage; no presentation strings in semantic metadata                                                                                                                    |
+| Loss amount      | Optional quantity plus explicit unit; absent if unknown; separate from diagnostic occurrences                                                                                                                 |
 
 A notice may have several effects only where separately evidenced. Use structured target identity,
 not an index into retained measurement arrays. This supports observations with no surviving value.
@@ -268,7 +273,8 @@ components independently; if point identity is invalid, retain a valid observati
 
 Keep `signalStatus` as a conservative, derived compatibility summary for internal checks; do not use
 it to place CLI notifications. Derive partial only from data-impact effects and unavailable only
-from confirmed failure to obtain the entire signal result. A broader issue of unknown extent must
+from confirmed failure to obtain or safely supply the entire signal result, distinguishing report
+delivery from collection failure as specified below. A broader issue of unknown extent must
 not assert every row is incomplete. Source evidence is retained in diagnostics; per-node status flags
 are not additional independently mutable state.
 
@@ -282,9 +288,49 @@ wholly unavailable; conflicting evidence is a report-validation issue, not a rea
 
 Preserve measurement limits: 128 Span groups, 16 distinct values per Span attribute, 128 metric points
 per instrument. Keep diagnostics capacity at 16 (15 detailed records plus one reserved summary).
-Expand deduplication identity to include target, effect, extent, fields, code and stage. Repetition
-increments occurrence count; add loss quantities only when disjoint losses with the same unit are
-known. Do not combine lifecycle occurrence counts into lost-sample counts.
+Deduplicate by the complete canonical identity defined below. Repetition increments diagnostic
+occurrence count; this is never implicitly a lost-measurement count.
+
+### Diagnostic identity and merging
+
+Identity consists of code, stage, canonical target, signal-coverage set, effect set, extent,
+attribute-key selector, affected-field set, detail-loss mask, and loss-quantity descriptor. Sets
+are sorted and deduplicated; target includes its discriminant and all retained identity components,
+including Scope/version, observation kind/name and typed point attributes where applicable.
+The attribute-key selector has three distinct states: not applicable, a retained exact key, and
+unknown because detail was discarded. Empty field/effect sets never stand for unknown sets.
+The fixed detail-loss mask records whether point attributes, observation identity, Scope identity,
+attribute key or affected-field detail was discarded. Retained fields remain exact evidence.
+
+Include signal coverage in detailed-record identity, rather than unioning records that differ only
+in coverage. Union coverage/effects only in the reserved broad summary, preserving per-kind effect
+associations; a Counter effect must not be attributed to Spans merely because both appear there.
+Severity follows the diagnostic code; the fallback additionally retains maximum original severity.
+Free-form messages and amounts are not identity. Use cataloged cause text for these structured
+issues and do not retain differing arbitrary messages as an unbounded secondary list.
+
+The loss-quantity descriptor is absent or identifies the semantic quantity and unit, for example
+discarded metric points versus omitted duration contributions. Equal units alone are insufficient.
+Merge numeric loss amounts only when the producer guarantees distinct, non-overlapping losses of
+that descriptor. If any contribution has unknown amount or overlaps another, the merged amount is
+unknown; do not present a partial sum as the total. Occurrence count still sums incoming diagnostic
+occurrences, with existing saturation rules. A single issue with multiple effects is one occurrence;
+counts across different diagnostic records are not a count of distinct root failures.
+
+Apply bounded copying and target broadening before computing retained identity. Downgrade extent
+to unidentified subset when the newly enclosing target is not proven wholly affected. Preserve the
+attribute key and all other valid distinctions that still fit. Records may merge after details are
+lost only when their retained identities, including the loss mask, match. Such a merge represents
+multiple occurrences in a known broader range, not proof of identical original targets. Unknown
+detail and known absence are distinct. The reserved summary keeps fixed masks, not lost-key lists.
+
+Example: two `attribute_reducer_conflict` issues at `span_aggregation`, both targeting the same Span
+aggregate, affect `example.operation.mode` and `example.operation.result` respectively. Retain two
+records, each with its own attribute-key selector and occurrence count 1, and show each explanation
+beside its attribute. A second mode conflict changes only the mode record's occurrence count to 2;
+the result record remains 1. No lost-Span amount is inferred. If both keys must later be discarded,
+the records can become one broader attribute-detail issue with count 3 and explicit unknown keys.
+If either key remains retainable, do not erase it merely to combine the two records.
 
 Structured detail bound: at most 4096 UTF-16 code units of serialized structured target/effect detail per
 record; retain existing sanitized-message limit of 512. This is an explicit detail bound, not a
@@ -322,6 +368,112 @@ not a claim that bounded retention is order-independent. Limits should be verifi
 This mapping covers existing detections only. Existing collector admission exclusions are not
 new missing-data failures. Review finalization to ensure shutdown notices reach the final immutable
 snapshot without changing application-result handling or running cleanup twice.
+
+### Whole-report construction failure
+
+Rejecting an individual observation during validation remains a normal builder result: retain
+other valid observations and a targeted diagnostic. A throw from the normal `build()` call is a
+different failure. The current worker catches it and adds a diagnostic but returns no ProfileReport;
+therefore neither that diagnostic nor subsequent shutdown diagnostics reach presentation. The
+existing entry failure hook alone does not reproduce this path: it still calls the normal builder.
+
+The session owner must catch failure of the normal builder and use a separate fixed-structure
+fallback factory once. Never call the normal builder again and never validate/recover arbitrary
+intermediate data on the fallback path. This factory belongs to execution/telemetry and returns the
+same schema v2 report contract; presentation uses the ordinary report path. Do not add an application
+warning, alternate stderr writer or special rendering bypass.
+
+Reuse measurement arrays only from a completely validated, detached, read-only measurement snapshot
+explicitly completed before the failure, with valid field masks and fixed per-kind coverage evidence.
+A raw collector snapshot, a partial builder array or the failed return object does not qualify.
+The current implementation provides no such published intermediate guarantee: absent an explicit
+safe snapshot contract, use empty arrays. This design does not require a new recovery buffer or
+second traversal just to salvage values. If the safe snapshot exists, preserve its values and field
+masks unchanged; otherwise all measurement arrays are empty. An empty but validated complete snapshot
+must remain distinguishable from absence of a safe snapshot.
+
+Always create a mandatory fixed diagnostic: code `lifecycle_failure`, stage `report_build`,
+warning severity, occurrence count 1, report target, effect `report_delivery_failure`. This effect
+means the normal report could not be produced, not that instrumentation or SDK collection failed.
+Give it whole-target extent for normal report delivery; retain a separate fixed coverage indicator
+of whether all measurement kinds are supplied from the safe snapshot or none can be supplied.
+Do not transform this into confirmed whole-signal _collection_ loss or enumerate missing names.
+
+For fallback reports, define `signalStatus` as availability/completeness of results supplied by the
+report, not a conclusion about instrumentation success. With a safe snapshot, derive each status
+from its trusted coverage/validity evidence and retained issue summaries; builder failure alone
+does not turn valid values partial. Without one, all three statuses are `unavailable` because no
+measurement result can safely be supplied. This report-delivery provenance must survive in the
+mandatory diagnostic and must be honored by CLI wording and status-consuming tooling. The general
+status rule above is extended by this explicit report-delivery case, not by guessed collection loss.
+
+The fixed factory must not depend on the failed builder, its diagnostic serialization, getters on
+rejected input, or the normal accumulator's snapshot succeeding. Do not include thrown messages,
+stacks or raw payloads. Minimum output requires only schema constants, empty arrays, fixed statuses
+and the mandatory diagnostic. Optionally reuse only an independently validated diagnostic snapshot
+and fixed coverage summary; if absent, disclose unavailable collection-detail provenance without
+claiming that earlier collection issues did or did not exist.
+
+Keep the total capacity at 16: the mandatory build-failure record occupies one of 15 detailed slots,
+leaving at most 14 for safely retained prior/shutdown details, plus the reserved summary. The
+mandatory record cannot be evicted. Preserve omitted issue severity and per-kind effects in the
+fixed summary when known. If no safe earlier summary exists, explicitly mark earlier issue detail
+unknown; do not invent occurrence counts for it. Existing detail/message bounds still apply.
+
+Keep the current cleanup order and exactly-once ownership. After normal shutdown/context cleanup,
+seal the fallback with fixed shutdown-failure counts/notices (or their bounded summary) without
+re-running the normal builder or unsafe diagnostic path. Finalization retains one cached promise:
+repeated/concurrent calls return the same final outcome and do not count the failure or clean up
+twice. Application result and success-only/quiet visibility remain unchanged. Disabled profiling
+and initialization-degraded sessions still return no profile; this fallback only applies to an
+active profiling session's report-build failure.
+
+Example without safe measurements:
+
+```text
+Profile
+  ! Profile report construction failed; measurement results could not be provided.
+```
+
+If earlier diagnostic provenance cannot be retained, add a plain explanation that earlier
+collection issue details are unavailable. With safe measurements, use:
+
+```text
+Profile
+  ! Profile report construction failed; validated measurement results are shown below.
+```
+
+Then render the preserved measurements normally and separately explain any trusted pre-existing
+loss or shutdown issue. Use the existing warning marker role, not domain-dependent coloring. The
+mandatory explanation replaces the generic headline when it suffices; do not state that collection
+failed merely because report construction failed.
+
+### Limited-review verification requirements
+
+- Same observation, different attribute keys, same conflict code/stage: two detailed records and
+  two correctly located explanations; repeating one changes only that record's occurrence count.
+- Key not applicable versus key discarded; field/effect/type distinctions; differing coverage sets;
+  canonical set order; different quantity descriptors and unknown/overlapping amounts do not merge
+  into false exact totals. Broadening preserves retained selectors and marks lost distinctions.
+- Real throw from `reportBuilder.build()` after invocation, including an internal failure after
+  some validation work: fixed fallback reaches worker result and normal successful presentation.
+  Test the builder dependency/body itself; the entry `report_build` hook is not a substitute.
+- Individual validation rejection still retains valid siblings through the normal builder and does
+  not activate whole-report fallback. Normal builder is called once even when it fails.
+- No safe snapshot yields empty arrays/unavailable statuses with report-delivery explanation;
+  an independently complete safe snapshot preserves values/masks and corresponding coverage.
+  Partial builder buffers must never leak; a valid empty snapshot is not treated as failure.
+- A broken normal diagnostic snapshot does not prevent the minimum fixed fallback. Unsafe thrown
+  payloads never reach it. Prior detail loss and simultaneous shutdown failure fit within bounds,
+  retain the mandatory record, and do not become invented collection loss.
+- Concurrent/repeated finalize returns one result with one cleanup sequence; application result,
+  failed-run profile suppression, quiet and initialization-degraded behavior remain unchanged.
+
+This supplements implementation slice 1 (report contracts, worker fallback, trusted snapshot
+boundary and tooling interpretation) and slice 2 (diagnostic producers/identity), followed by normal
+presentation. No new recorder or observation dependencies are introduced. Canonical update targets
+remain telemetry.md, telemetry-verification.md and its verification catalog, the report catalog,
+profiling.md and relevant CLI interpretation; do not change their current contracts in this session.
 
 ## 7. Diagnostic wording
 

@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                                          | Remaining scope                                                            |
-| --------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only                       | Preserve historical evidence and environment                               |
-| M1        | complete                                        | Preserve corrected validation and squash attribution                       |
-| M2        | profile design accepted; implementation pending | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates                       | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                  | Remaining scope                                                            |
+| --------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only               | Preserve historical evidence and environment                               |
+| M1        | complete                                | Preserve corrected validation and squash attribution                       |
+| M2        | P1 returned; independent review pending | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates               | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -57,9 +57,11 @@ measurement availability masks, collector/report propagation, worker fallback, g
 and shared styling are in scope. Observation admission, recorder ownership and Span aggregation
 identity remain unchanged. The collector changes cannot be attributed to presentation alone.
 
-The next human-started implementation conversation is
-[P1: v2 contracts and bounded issue primitives](opentelemetry-m2-profile-implementation.md).
-Trunk has not started it. Human launches and returns each session; no automatic sub-agent work.
+P1 returned on `feature/otel-redesign_M2_profile` at
+`a9a48137cdcd222ba63cd0cf0459f867fa386718`; trunk confirmed local/actual remote equality and clean
+worktree. P1 is not yet independently accepted. The next human-started conversation is
+[P1-R: independent primitive review](opentelemetry-m2-profile-p1-review.md), fixed to that full target,
+not only its first implementation checkpoint. P2 remains unassigned until that review is resolved.
 
 ## Session sequence and dependencies
 
@@ -247,5 +249,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1 packet
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1-R review
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

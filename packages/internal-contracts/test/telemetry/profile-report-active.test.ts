@@ -1,38 +1,36 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  normalizeAffectedFieldsV2,
-  normalizeAttributeKeySelectorV2,
-  normalizeProfileCounterPointV2,
-  normalizeProfileHistogramPointV2,
-  normalizeProfileSpanAggregateV2,
-  normalizeProfileTargetV2,
+  normalizeAffectedFields,
+  normalizeAttributeKeySelector,
+  normalizeProfileCounterPoint,
+  normalizeProfileHistogramPoint,
+  normalizeProfileSpanAggregate,
+  normalizeProfileTarget,
   PROFILE_REPORT_SCHEMA_VERSION,
-  PROFILE_REPORT_V2_SCHEMA_VERSION,
 } from "../../src/telemetry/index.js";
 
-describe("staged ProfileReport v2 contracts", () => {
-  it("keeps v1 active while exposing the v2 candidate literal", () => {
-    expect(PROFILE_REPORT_SCHEMA_VERSION).toBe(1);
-    expect(PROFILE_REPORT_V2_SCHEMA_VERSION).toBe(2);
+describe("active ProfileReport contracts", () => {
+  it("activates schema version 2", () => {
+    expect(PROFILE_REPORT_SCHEMA_VERSION).toBe(2);
   });
 
   it("keeps all attribute selector states distinct", () => {
-    expect(normalizeAttributeKeySelectorV2({ type: "not_applicable" })).toEqual({
+    expect(normalizeAttributeKeySelector({ type: "not_applicable" })).toEqual({
       type: "not_applicable",
     });
-    expect(normalizeAttributeKeySelectorV2({ type: "exact", key: "a" })).toEqual({
+    expect(normalizeAttributeKeySelector({ type: "exact", key: "a" })).toEqual({
       type: "exact",
       key: "a",
     });
-    expect(normalizeAttributeKeySelectorV2({ type: "discarded" })).toEqual({
+    expect(normalizeAttributeKeySelector({ type: "discarded" })).toEqual({
       type: "discarded",
     });
   });
 
   it("validates fields per kind and canonicalizes their order", () => {
     expect(
-      normalizeAffectedFieldsV2([
+      normalizeAffectedFields([
         { kind: "histogram", fields: ["max", "avg", "total", "avg"] },
         { kind: "span", fields: ["errors", "max", "avg", "total", "calls"] },
       ]),
@@ -40,13 +38,13 @@ describe("staged ProfileReport v2 contracts", () => {
       { kind: "histogram", fields: ["total", "avg", "max"] },
       { kind: "span", fields: ["calls", "total", "avg", "max", "errors"] },
     ]);
-    expect(normalizeAffectedFieldsV2([{ kind: "counter", fields: ["avg"] }])).toBeNull();
-    expect(normalizeAffectedFieldsV2([{ kind: "span", fields: [] }])).toBeNull();
+    expect(normalizeAffectedFields([{ kind: "counter", fields: ["avg"] }])).toBeNull();
+    expect(normalizeAffectedFields([{ kind: "span", fields: [] }])).toBeNull();
   });
 
   it("canonicalizes typed point identity without coercing attribute values", () => {
     expect(
-      normalizeProfileTargetV2({
+      normalizeProfileTarget({
         type: "point",
         scope: { name: "scope", version: "1" },
         kind: "counter",
@@ -78,7 +76,7 @@ describe("staged ProfileReport v2 contracts", () => {
   });
 
   it("validates finite measurements, masks and duration contribution evidence", () => {
-    const span = normalizeProfileSpanAggregateV2({
+    const span = normalizeProfileSpanAggregate({
       scope: { name: "scope", version: null },
       name: "work",
       callCount: 2,
@@ -96,14 +94,14 @@ describe("staged ProfileReport v2 contracts", () => {
     });
     expect(Object.is(span?.totalDurationSeconds, -0)).toBe(false);
     expect(
-      normalizeProfileSpanAggregateV2({
+      normalizeProfileSpanAggregate({
         ...span,
         totalDurationSeconds: Number.POSITIVE_INFINITY,
       }),
     ).toBeNull();
-    expect(normalizeProfileSpanAggregateV2({ ...span, unavailableFields: ["value"] })).toBeNull();
+    expect(normalizeProfileSpanAggregate({ ...span, unavailableFields: ["value"] })).toBeNull();
 
-    const counter = normalizeProfileCounterPointV2({
+    const counter = normalizeProfileCounterPoint({
       scope: { name: "scope", version: null },
       name: "count",
       unit: "{item}",
@@ -112,9 +110,9 @@ describe("staged ProfileReport v2 contracts", () => {
       unavailableFields: [],
     });
     expect(counter?.value).toBe(0);
-    expect(normalizeProfileCounterPointV2({ ...counter, value: Number.NaN })).toBeNull();
+    expect(normalizeProfileCounterPoint({ ...counter, value: Number.NaN })).toBeNull();
 
-    const histogram = normalizeProfileHistogramPointV2({
+    const histogram = normalizeProfileHistogramPoint({
       scope: { name: "scope", version: null },
       name: "duration",
       unit: "s",
@@ -128,6 +126,6 @@ describe("staged ProfileReport v2 contracts", () => {
       unavailableFields: [],
     });
     expect(histogram).not.toBeNull();
-    expect(normalizeProfileHistogramPointV2({ ...histogram, bucketCounts: [2] })).toBeNull();
+    expect(normalizeProfileHistogramPoint({ ...histogram, bucketCounts: [2] })).toBeNull();
   });
 });

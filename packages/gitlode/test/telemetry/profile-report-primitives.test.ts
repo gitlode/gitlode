@@ -1,26 +1,26 @@
 import type {
-  ProfileCounterPointV2,
-  ProfileHistogramPointV2,
-  ProfileSpanAggregateV2,
+  ProfileCounterPoint,
+  ProfileHistogramPoint,
+  ProfileSpanAggregate,
 } from "@gitlode/internal-contracts/telemetry";
 import { describe, expect, it } from "vitest";
 
 import {
-  BoundedProfileDiagnosticAccumulatorV2,
-  createFixedProfileReportFallbackV2,
-  deriveCounterNumericAvailabilityV2,
-  deriveHistogramNumericAvailabilityV2,
-  deriveProfileSignalStatusV2,
-  deriveSpanNumericAvailabilityV2,
+  BoundedDiagnosticAccumulator,
+  createFixedProfileReportFallback,
+  deriveCounterNumericAvailability,
+  deriveHistogramNumericAvailability,
+  deriveProfileSignalStatus,
+  deriveSpanNumericAvailability,
 } from "../../src/execution/telemetry/index.js";
-import type { ProfileDiagnosticInputV2 } from "../../src/execution/telemetry/index.js";
+import type { ProfileDiagnosticInput } from "../../src/execution/telemetry/index.js";
 
 const scope = { name: "example.scope", version: null } as const;
 
 function issue(
   name: string,
-  overrides: Partial<ProfileDiagnosticInputV2> = {},
-): ProfileDiagnosticInputV2 {
+  overrides: Partial<ProfileDiagnosticInput> = {},
+): ProfileDiagnosticInput {
   return {
     code: "attribute_reducer_conflict",
     stage: "span_aggregation",
@@ -34,9 +34,9 @@ function issue(
   };
 }
 
-describe("v2 diagnostic accumulation", () => {
+describe("profile diagnostic accumulation", () => {
   it("deduplicates only complete canonical identities", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(issue("work", { attributeKey: { type: "exact", key: "b" } }));
     accumulator.add(issue("work", { attributeKey: { type: "exact", key: "a" } }));
     accumulator.add(issue("work", { attributeKey: { type: "exact", key: "a" } }));
@@ -61,7 +61,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("canonicalizes sets and typed point attributes", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(
       issue("metric", {
         code: "invalid_aggregation",
@@ -94,7 +94,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("merges only known disjoint quantities and saturates safely", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     const quantity = {
       descriptor: "metric_points" as const,
       unit: "points",
@@ -136,7 +136,7 @@ describe("v2 diagnostic accumulation", () => {
     ).toBeNull();
     expect(diagnostics).toHaveLength(3);
 
-    const descriptors = new BoundedProfileDiagnosticAccumulatorV2();
+    const descriptors = new BoundedDiagnosticAccumulator();
     descriptors.add(issue("same", { lossQuantity: { ...quantity, value: 1 } }));
     descriptors.add(
       issue("same", {
@@ -152,7 +152,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("accounts for escaping within the 4096-code-unit structured detail budget", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(issue("plain", { attributeKey: { type: "exact", key: "x".repeat(3500) } }));
     accumulator.add(issue("escaped", { attributeKey: { type: "exact", key: "\\".repeat(3500) } }));
     const [plain, escaped] = accumulator.snapshot().diagnostics;
@@ -176,7 +176,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("summarizes a record whose retained fixed distinctions cannot fit the detail budget", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(
       issue("quantity", {
         lossQuantity: {
@@ -198,7 +198,7 @@ describe("v2 diagnostic accumulation", () => {
 
   it("retains 15 details and uses one fixed summary above capacity", () => {
     for (const count of [14, 15, 16]) {
-      const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+      const accumulator = new BoundedDiagnosticAccumulator();
       for (let index = 0; index < count; index += 1) accumulator.add(issue(`work-${index}`));
       const snapshot = accumulator.snapshot();
       expect(snapshot.diagnostics).toHaveLength(Math.min(count, 15));
@@ -215,7 +215,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("broadens over-budget escaped detail without claiming the enclosing target is wholly affected", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(
       issue(`${"\\".repeat(4096)}name`, {
         extent: "entire_target",
@@ -234,7 +234,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("does not invent measurement loss for lifecycle-only overflow", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     for (let index = 0; index < 16; index += 1)
       accumulator.add(
         issue(`shutdown-${index}`, {
@@ -253,14 +253,14 @@ describe("v2 diagnostic accumulation", () => {
 
   it("preserves signal meaning for lifecycle-only and confirmed whole-loss issues across compaction", () => {
     const statusFor = (
-      input: ProfileDiagnosticInputV2,
+      input: ProfileDiagnosticInput,
       retainedBefore: number,
     ): "complete" | "partial" | "unavailable" => {
-      const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+      const accumulator = new BoundedDiagnosticAccumulator();
       for (let index = 0; index < retainedBefore; index += 1)
         accumulator.add(issue(`retained-${index}`));
       accumulator.add(input);
-      return deriveProfileSignalStatusV2(
+      return deriveProfileSignalStatus(
         { spans: "complete", counters: "complete", histograms: "complete" },
         { spans: retainedBefore, counters: 0, histograms: 0 },
         accumulator.snapshot(),
@@ -304,7 +304,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("marks malformed supplied counts and detail-loss masks as invalid aggregation", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(issue("omitted"));
     accumulator.add(
       issue("explicit", {
@@ -321,7 +321,7 @@ describe("v2 diagnostic accumulation", () => {
       { attributeKey: "invalid" },
       { pointAttributes: 1 },
     ])
-      accumulator.add(issue("invalid-mask", { detailLoss } as Partial<ProfileDiagnosticInputV2>));
+      accumulator.add(issue("invalid-mask", { detailLoss } as Partial<ProfileDiagnosticInput>));
 
     const diagnostics = accumulator.snapshot().diagnostics;
     expect(diagnostics).toHaveLength(3);
@@ -349,7 +349,7 @@ describe("v2 diagnostic accumulation", () => {
   });
 
   it("sets saturation only for actual overflow and preserves prior saturation", () => {
-    const exact = new BoundedProfileDiagnosticAccumulatorV2();
+    const exact = new BoundedDiagnosticAccumulator();
     exact.add(issue("exact", { count: Number.MAX_SAFE_INTEGER - 1 }));
     exact.add(issue("exact", { count: 1 }));
     expect(exact.snapshot().diagnostics[0]).toMatchObject({
@@ -357,7 +357,7 @@ describe("v2 diagnostic accumulation", () => {
       countSaturated: false,
     });
 
-    const overflow = new BoundedProfileDiagnosticAccumulatorV2();
+    const overflow = new BoundedDiagnosticAccumulator();
     const quantity = {
       descriptor: "metric_points" as const,
       unit: "points",
@@ -373,7 +373,7 @@ describe("v2 diagnostic accumulation", () => {
       lossQuantity: { value: Number.MAX_SAFE_INTEGER, saturated: true },
     });
 
-    const summary = new BoundedProfileDiagnosticAccumulatorV2();
+    const summary = new BoundedDiagnosticAccumulator();
     for (let index = 0; index < 15; index += 1) summary.add(issue(`retained-${index}`));
     summary.add(issue("summary-exact", { count: Number.MAX_SAFE_INTEGER }));
     expect(summary.snapshot().summary).toMatchObject({
@@ -399,7 +399,7 @@ describe("v2 diagnostic accumulation", () => {
         },
       },
     );
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(issue("oversized-coverage", { signalCoverage: kinds }));
 
     expect(indexedReads).toBe(0);
@@ -409,8 +409,8 @@ describe("v2 diagnostic accumulation", () => {
   });
 });
 
-describe("v2 availability and fallback primitives", () => {
-  const span = (overrides: Partial<ProfileSpanAggregateV2> = {}): ProfileSpanAggregateV2 => ({
+describe("availability and fallback primitives", () => {
+  const span = (overrides: Partial<ProfileSpanAggregate> = {}): ProfileSpanAggregate => ({
     scope,
     name: "work",
     callCount: 2,
@@ -424,26 +424,26 @@ describe("v2 availability and fallback primitives", () => {
   });
 
   it("distinguishes genuine zero, partial duration, no duration and field masks", () => {
-    expect(deriveSpanNumericAvailabilityV2(span())).toEqual({
+    expect(deriveSpanNumericAvailability(span())).toEqual({
       calls: true,
       total: true,
       avg: true,
       max: true,
       errors: true,
     });
-    expect(deriveSpanNumericAvailabilityV2(span({ durationContributionCount: 1 })).avg).toBe(false);
-    expect(deriveSpanNumericAvailabilityV2(span({ durationContributionCount: 0 }))).toMatchObject({
+    expect(deriveSpanNumericAvailability(span({ durationContributionCount: 1 })).avg).toBe(false);
+    expect(deriveSpanNumericAvailability(span({ durationContributionCount: 0 }))).toMatchObject({
       total: false,
       avg: false,
       max: false,
     });
-    expect(deriveSpanNumericAvailabilityV2(span({ unavailableFields: ["errors"] })).errors).toBe(
+    expect(deriveSpanNumericAvailability(span({ unavailableFields: ["errors"] })).errors).toBe(
       false,
     );
   });
 
   it("derives counter/histogram optional and average availability", () => {
-    const counter: ProfileCounterPointV2 = {
+    const counter: ProfileCounterPoint = {
       scope,
       name: "count",
       unit: "{item}",
@@ -451,7 +451,7 @@ describe("v2 availability and fallback primitives", () => {
       value: 0,
       unavailableFields: [],
     };
-    const histogram: ProfileHistogramPointV2 = {
+    const histogram: ProfileHistogramPoint = {
       scope,
       name: "duration",
       unit: "s",
@@ -464,8 +464,8 @@ describe("v2 availability and fallback primitives", () => {
       bucketCounts: [2],
       unavailableFields: [],
     };
-    expect(deriveCounterNumericAvailabilityV2(counter)).toEqual({ value: true });
-    expect(deriveHistogramNumericAvailabilityV2(histogram)).toEqual({
+    expect(deriveCounterNumericAvailability(counter)).toEqual({ value: true });
+    expect(deriveHistogramNumericAvailability(histogram)).toEqual({
       samples: true,
       total: true,
       avg: true,
@@ -475,7 +475,7 @@ describe("v2 availability and fallback primitives", () => {
   });
 
   it("derives status from trusted effects while ignoring lifecycle-only notices", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     accumulator.add(issue("span-loss", { effects: ["incomplete_measurement_fields"] }));
     accumulator.add(
       issue("counter-shutdown", {
@@ -486,7 +486,7 @@ describe("v2 availability and fallback primitives", () => {
       }),
     );
     expect(
-      deriveProfileSignalStatusV2(
+      deriveProfileSignalStatus(
         { spans: "complete", counters: "complete", histograms: "unavailable" },
         { spans: 1, counters: 1, histograms: 0 },
         accumulator.snapshot(),
@@ -495,7 +495,7 @@ describe("v2 availability and fallback primitives", () => {
   });
 
   it("preserves whole-result unavailability through overflow compaction", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     for (let index = 0; index < 15; index += 1) accumulator.add(issue(`retained-${index}`));
     accumulator.add(
       issue("unavailable", {
@@ -507,7 +507,7 @@ describe("v2 availability and fallback primitives", () => {
       }),
     );
     expect(
-      deriveProfileSignalStatusV2(
+      deriveProfileSignalStatus(
         { spans: "complete", counters: "complete", histograms: "partial" },
         { spans: 1, counters: 1, histograms: 0 },
         accumulator.snapshot(),
@@ -516,26 +516,26 @@ describe("v2 availability and fallback primitives", () => {
   });
 
   it("rejects contradictory unavailable status and retained values without rewriting values", () => {
-    const empty = new BoundedProfileDiagnosticAccumulatorV2().snapshot();
+    const empty = new BoundedDiagnosticAccumulator().snapshot();
     expect(() =>
-      deriveProfileSignalStatusV2(
+      deriveProfileSignalStatus(
         { spans: "unavailable", counters: "complete", histograms: "complete" },
         { spans: 1, counters: 1, histograms: 0 },
         empty,
       ),
     ).toThrow(/unavailable.*retained/i);
     expect(
-      deriveProfileSignalStatusV2(
+      deriveProfileSignalStatus(
         { spans: "complete", counters: "unavailable", histograms: "complete" },
         { spans: 1, counters: 0, histograms: 0 },
         empty,
       ),
     ).toEqual({ spans: "complete", counters: "unavailable", histograms: "complete" });
 
-    const full = new BoundedProfileDiagnosticAccumulatorV2();
+    const full = new BoundedDiagnosticAccumulator();
     for (let index = 0; index < 16; index += 1) full.add(issue(`capacity-${index}`));
     expect(() =>
-      deriveProfileSignalStatusV2(
+      deriveProfileSignalStatus(
         { spans: "complete", counters: "complete", histograms: "unavailable" },
         { spans: 1, counters: 0, histograms: 1 },
         full.snapshot(),
@@ -551,7 +551,7 @@ describe("v2 availability and fallback primitives", () => {
         throw new Error("must not read");
       },
     });
-    const report = createFixedProfileReportFallbackV2(unsafe);
+    const report = createFixedProfileReportFallback(unsafe);
     expect(reads).toBe(0);
     expect({ ...report, diagnostics: undefined }).toMatchObject({
       schemaVersion: 2,
@@ -580,9 +580,9 @@ describe("v2 availability and fallback primitives", () => {
   });
 
   it("reserves the mandatory fallback record, 14 prior details and one summary", () => {
-    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    const accumulator = new BoundedDiagnosticAccumulator();
     for (let index = 0; index < 15; index += 1) accumulator.add(issue(`prior-${index}`));
-    const report = createFixedProfileReportFallbackV2(accumulator.snapshot());
+    const report = createFixedProfileReportFallback(accumulator.snapshot());
     expect(report.diagnostics).toHaveLength(16);
     expect(report.diagnostics[0]).toMatchObject({ effects: ["report_delivery_failure"], count: 1 });
     expect(report.diagnostics[15]).toMatchObject({
@@ -594,10 +594,10 @@ describe("v2 availability and fallback primitives", () => {
   });
 
   it("distinguishes a trusted empty diagnostic snapshot from no snapshot", () => {
-    const snapshot = new BoundedProfileDiagnosticAccumulatorV2().snapshot();
+    const snapshot = new BoundedDiagnosticAccumulator().snapshot();
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.diagnostics)).toBe(true);
-    const report = createFixedProfileReportFallbackV2(snapshot);
+    const report = createFixedProfileReportFallback(snapshot);
     expect(report.diagnostics).toHaveLength(1);
     expect(report.diagnostics[0]).toMatchObject({
       reportDelivery: { priorIssueDetail: "retained", measurementResults: "none" },

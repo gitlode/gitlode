@@ -178,7 +178,16 @@ export function convertLocalMetrics(
     diagnostics.add({
       code: "invalid_aggregation",
       stage: "metric_collection",
-      signal,
+      target: { type: "report" },
+      signalCoverage: [signal === "counters" ? "counter" : "histogram"],
+      effects: ["unknown_collection_coverage"],
+      extent: "unidentified_subset",
+      lossQuantity: {
+        descriptor: "observation_results",
+        unit: "results",
+        value: 1,
+        relationship: "overlapping_or_unknown",
+      },
     });
   };
   const overflow = (signal: "counters" | "histograms") => {
@@ -187,7 +196,16 @@ export function convertLocalMetrics(
     diagnostics.add({
       code: "metric_point_overflow",
       stage: "metric_collection",
-      signal,
+      target: { type: "report" },
+      signalCoverage: [signal === "counters" ? "counter" : "histogram"],
+      effects: ["missing_observations"],
+      extent: "unidentified_subset",
+      lossQuantity: {
+        descriptor: "metric_points",
+        unit: "points",
+        value: 1,
+        relationship: "disjoint",
+      },
     });
   };
 
@@ -228,6 +246,7 @@ export function convertLocalMetrics(
                 unit: metadata.unit,
                 attributes,
                 value: Object.is(point.value, -0) ? 0 : point.value,
+                unavailableFields: [],
               };
             } else if (
               metadata.instrument === "histogram" &&
@@ -260,6 +279,7 @@ export function convertLocalMetrics(
                       : histogramValue.max,
                 explicitBounds: [...histogramValue.buckets.boundaries],
                 bucketCounts: [...histogramValue.buckets.counts],
+                unavailableFields: [],
               };
             } else {
               invalid(signal);
@@ -316,12 +336,20 @@ export class LocalMetricReader extends MetricReader {
       diagnostics.add({
         code: "lifecycle_failure",
         stage: "metric_collection",
-        signal: "counters",
+        target: { type: "report" },
+        signalCoverage: ["counter"],
+        effects: ["unknown_collection_coverage"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
       });
       diagnostics.add({
         code: "lifecycle_failure",
         stage: "metric_collection",
-        signal: "histograms",
+        target: { type: "report" },
+        signalCoverage: ["histogram"],
+        effects: ["unknown_collection_coverage"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
       });
       return {
         counterStatus: "unavailable",
@@ -335,12 +363,18 @@ export class LocalMetricReader extends MetricReader {
     diagnostics.add({
       code: "lifecycle_failure",
       stage: "metric_collection",
-      signal: "counters",
+      target: { type: "report" },
+      signalCoverage: ["counter"],
+      effects: ["unknown_collection_coverage"],
+      extent: "unidentified_subset",
     });
     diagnostics.add({
       code: "lifecycle_failure",
       stage: "metric_collection",
-      signal: "histograms",
+      target: { type: "report" },
+      signalCoverage: ["histogram"],
+      effects: ["unknown_collection_coverage"],
+      extent: "unidentified_subset",
     });
     return {
       ...snapshot,

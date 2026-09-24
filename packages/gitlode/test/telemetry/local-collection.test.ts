@@ -124,13 +124,20 @@ describe("bounded diagnostic accumulator", () => {
         diagnostics.add({
           code: "lifecycle_failure",
           stage: "report_build",
-          signal: "report",
+          target: {
+            type: "observation",
+            scope: { name: "test", version: null },
+            kind: "span",
+            name: `failure-${index}`,
+          },
+          signalCoverage: ["span"],
+          effects: ["unknown_collection_coverage"],
+          extent: "unidentified_subset",
           message: `failure-${index}`,
         });
       const snapshot = diagnostics.snapshot();
-      expect(snapshot).toHaveLength(Math.min(count, PROFILE_COLLECTION_LIMITS.diagnostics.maximum));
-      const overflow = snapshot.find((entry) => entry.code === "diagnostic_overflow");
-      expect(overflow?.count ?? 0).toBe(Math.max(0, count - 15));
+      expect(snapshot.diagnostics).toHaveLength(Math.min(count, 15));
+      expect(snapshot.summary?.omittedOccurrences ?? 0).toBe(Math.max(0, count - 15));
     },
   );
 
@@ -140,24 +147,32 @@ describe("bounded diagnostic accumulator", () => {
     diagnostics.add({
       code: "lifecycle_failure",
       stage: "metric_collection",
-      signal: "telemetry",
+      target: { type: "report" },
+      signalCoverage: ["counter", "histogram"],
+      effects: ["unknown_collection_coverage"],
+      extent: "unidentified_subset",
       message: long,
     });
     diagnostics.add({
       code: "lifecycle_failure",
       stage: "metric_collection",
-      signal: "telemetry",
+      target: { type: "report" },
+      signalCoverage: ["counter", "histogram"],
+      effects: ["unknown_collection_coverage"],
+      extent: "unidentified_subset",
       message: long,
     });
     diagnostics.add({
       code: "lifecycle_failure",
       stage: "metric_collection",
-      signal: "telemetry",
+      target: { type: "report" },
+      signalCoverage: ["counter", "histogram"],
+      effects: ["unknown_collection_coverage"],
+      extent: "unidentified_subset",
       message: new Error("secret"),
     });
-    expect(diagnostics.snapshot()).toEqual([
-      expect.objectContaining({ count: 1, message: null, severity: "warning" }),
-      expect.objectContaining({ count: 2, message: "x".repeat(512), severity: "warning" }),
+    expect(diagnostics.snapshot().diagnostics).toEqual([
+      expect.objectContaining({ count: 3, message: "x".repeat(512), severity: "warning" }),
     ]);
   });
 });
@@ -311,7 +326,7 @@ describe("local span processor", () => {
         conflictCount: 1,
       },
     ]);
-    expect(diagnostics.snapshot()).toEqual([
+    expect(diagnostics.snapshot().diagnostics).toEqual([
       expect.objectContaining({ code: "attribute_reducer_conflict", count: 1 }),
     ]);
     first.attributes.arbitrary = "mutated";
@@ -378,8 +393,8 @@ describe("local span processor", () => {
         (attribute) => attribute.key === "gitlode.git.commit.walk.strategy",
       ),
     ).toBe(false);
-    expect(diagnostics.snapshot()).toEqual([
-      expect.objectContaining({ code: "invalid_aggregation", signal: "spans" }),
+    expect(diagnostics.snapshot().diagnostics).toEqual([
+      expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["span"] }),
     ]);
   });
 
@@ -628,7 +643,7 @@ describe("local metrics", () => {
     expect(snapshot.histograms).toEqual([
       expect.objectContaining({ scope: { name: "@example/plugin", version: null } }),
     ]);
-    expect(diagnostics.snapshot()).toEqual([]);
+    expect(diagnostics.snapshot().diagnostics).toEqual([]);
   });
 
   test("excludes unknown plugin metrics and core metrics recorded under plugin scopes", () => {
@@ -648,7 +663,7 @@ describe("local metrics", () => {
     expect(snapshot.histograms).toEqual([]);
     expect(snapshot.counterStatus).toBe("complete");
     expect(snapshot.histogramStatus).toBe("complete");
-    expect(diagnostics.snapshot()).toEqual([]);
+    expect(diagnostics.snapshot().diagnostics).toEqual([]);
   });
 
   test("isolates a resolved-plugin metric missing a required attribute", () => {
@@ -667,8 +682,8 @@ describe("local metrics", () => {
     );
     expect(snapshot.counterStatus).toBe("partial");
     expect(snapshot.counters).toEqual([]);
-    expect(diagnostics.snapshot()).toEqual([
-      expect.objectContaining({ code: "invalid_aggregation", signal: "counters" }),
+    expect(diagnostics.snapshot().diagnostics).toEqual([
+      expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["counter"] }),
     ]);
   });
 
@@ -716,8 +731,8 @@ describe("local metrics", () => {
         ]),
       }),
     ]);
-    expect(diagnostics.snapshot()).toEqual([
-      expect.objectContaining({ code: "invalid_aggregation", signal: "counters" }),
+    expect(diagnostics.snapshot().diagnostics).toEqual([
+      expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["counter"] }),
     ]);
   });
 
@@ -732,8 +747,8 @@ describe("local metrics", () => {
     );
     expect(snapshot.counterStatus).toBe("partial");
     expect(snapshot.counters).toEqual([expect.objectContaining({ value: 2 })]);
-    expect(diagnostics.snapshot()).toEqual([
-      expect.objectContaining({ code: "invalid_aggregation", signal: "counters" }),
+    expect(diagnostics.snapshot().diagnostics).toEqual([
+      expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["counter"] }),
     ]);
   });
 
@@ -788,6 +803,8 @@ describe("profile report builder", () => {
     errorCount: 0,
     totalDurationSeconds: 0,
     maxDurationSeconds: 0,
+    durationContributionCount: 1,
+    unavailableFields: [],
     attributes: [],
   });
   const counter = (name: string, value = 1): ProfileCounterPoint => ({
@@ -796,6 +813,7 @@ describe("profile report builder", () => {
     unit: "{item}",
     attributes: [],
     value,
+    unavailableFields: [],
   });
   const histogram = (name: string): ProfileHistogramPoint => ({
     scope,
@@ -808,6 +826,7 @@ describe("profile report builder", () => {
     maximum: 0,
     explicitBounds: [0],
     bucketCounts: [1, 0],
+    unavailableFields: [],
   });
 
   test("distinguishes complete, partial, and unavailable empty signals", () => {
@@ -817,18 +836,17 @@ describe("profile report builder", () => {
       counters: { status: "partial", values: [] },
       histograms: { status: "unavailable", values: [histogram("discarded")] },
     });
-    expect(report.schemaVersion).toBe(1);
+    expect(report.schemaVersion).toBe(2);
     expect(report.signalStatus).toEqual({
       spans: "complete",
       counters: "partial",
-      histograms: "unavailable",
+      histograms: "partial",
     });
     expect(report.spans).toEqual([]);
     expect(report.counters).toEqual([]);
-    expect(report.histograms).toEqual([]);
+    expect(report.histograms).toEqual([expect.objectContaining({ name: "discarded" })]);
     expect(report.diagnostics).toEqual([
-      expect.objectContaining({ code: "lifecycle_failure", signal: "counters" }),
-      expect.objectContaining({ code: "lifecycle_failure", signal: "histograms" }),
+      expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["histogram"] }),
     ]);
   });
 
@@ -870,7 +888,7 @@ describe("profile report builder", () => {
     expect(report.counters).toEqual([expect.objectContaining({ name: "negative-zero", value: 0 })]);
     expect(Object.is(report.counters[0]!.value, -0)).toBe(false);
     expect(report.diagnostics).toEqual([
-      expect.objectContaining({ code: "invalid_aggregation", signal: "counters" }),
+      expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["counter"] }),
     ]);
   });
 

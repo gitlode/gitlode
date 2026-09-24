@@ -1,29 +1,29 @@
 import {
-  PROFILE_REPORT_V2_SCHEMA_VERSION,
-  type PROFILE_COUNTER_FIELDS_V2,
-  type PROFILE_HISTOGRAM_FIELDS_V2,
-  type PROFILE_SPAN_FIELDS_V2,
-  type ProfileCounterPointV2,
-  type ProfileDiagnosticEffectV2,
-  type ProfileDiagnosticSummaryV2,
-  type ProfileDiagnosticV2,
-  type ProfileHistogramPointV2,
-  type ProfileReportV2,
-  type ProfileSignalStatusSetV2,
-  type ProfileSpanAggregateV2,
+  PROFILE_REPORT_SCHEMA_VERSION,
+  type PROFILE_COUNTER_FIELDS,
+  type PROFILE_HISTOGRAM_FIELDS,
+  type PROFILE_SPAN_FIELDS,
+  type ProfileCounterPoint,
+  type ProfileDiagnosticEffect,
+  type ProfileDiagnosticSummary,
+  type ProfileDiagnostic,
+  type ProfileHistogramPoint,
+  type ProfileReport,
+  type ProfileSignalStatusSet,
+  type ProfileSpanAggregate,
 } from "@gitlode/internal-contracts/telemetry";
 
 import {
-  isTrustedProfileDiagnosticsSnapshotV2,
-  profileDiagnosticV2Internals,
-  type ProfileDiagnosticsSnapshotV2,
-} from "./profile-diagnostic-v2-accumulator.js";
+  isTrustedProfileDiagnosticsSnapshot,
+  profileDiagnosticInternals,
+  type ProfileDiagnosticsSnapshot,
+} from "./diagnostic-accumulator.js";
 
 type NumericAvailability<Fields extends string> = Readonly<Record<Fields, boolean>>;
 
-export function deriveSpanNumericAvailabilityV2(
-  value: ProfileSpanAggregateV2,
-): NumericAvailability<(typeof PROFILE_SPAN_FIELDS_V2)[number]> {
+export function deriveSpanNumericAvailability(
+  value: ProfileSpanAggregate,
+): NumericAvailability<(typeof PROFILE_SPAN_FIELDS)[number]> {
   const unavailable = new Set(value.unavailableFields);
   const hasDuration = value.durationContributionCount > 0;
   return {
@@ -41,15 +41,15 @@ export function deriveSpanNumericAvailabilityV2(
   };
 }
 
-export function deriveCounterNumericAvailabilityV2(
-  value: ProfileCounterPointV2,
-): NumericAvailability<(typeof PROFILE_COUNTER_FIELDS_V2)[number]> {
+export function deriveCounterNumericAvailability(
+  value: ProfileCounterPoint,
+): NumericAvailability<(typeof PROFILE_COUNTER_FIELDS)[number]> {
   return { value: !value.unavailableFields.includes("value") };
 }
 
-export function deriveHistogramNumericAvailabilityV2(
-  value: ProfileHistogramPointV2,
-): NumericAvailability<(typeof PROFILE_HISTOGRAM_FIELDS_V2)[number]> {
+export function deriveHistogramNumericAvailability(
+  value: ProfileHistogramPoint,
+): NumericAvailability<(typeof PROFILE_HISTOGRAM_FIELDS)[number]> {
   const unavailable = new Set(value.unavailableFields);
   return {
     samples: !unavailable.has("samples"),
@@ -64,25 +64,25 @@ export function deriveHistogramNumericAvailabilityV2(
   };
 }
 
-export interface ProfileSignalEvidenceV2 {
+export interface ProfileSignalEvidence {
   readonly spans: "complete" | "partial" | "unavailable";
   readonly counters: "complete" | "partial" | "unavailable";
   readonly histograms: "complete" | "partial" | "unavailable";
 }
 
-const dataImpactEffects = new Set<ProfileDiagnosticEffectV2>([
+const dataImpactEffects = new Set<ProfileDiagnosticEffect>([
   "missing_observations",
   "incomplete_measurement_fields",
   "missing_attribute_detail",
   "unknown_collection_coverage",
 ]);
 
-export function deriveProfileSignalStatusV2(
-  evidence: ProfileSignalEvidenceV2,
+export function deriveProfileSignalStatus(
+  evidence: ProfileSignalEvidence,
   valueCounts: Readonly<Record<"spans" | "counters" | "histograms", number>>,
-  snapshot: ProfileDiagnosticsSnapshotV2,
-): ProfileSignalStatusSetV2 {
-  if (!isTrustedProfileDiagnosticsSnapshotV2(snapshot))
+  snapshot: ProfileDiagnosticsSnapshot,
+): ProfileSignalStatusSet {
+  if (!isTrustedProfileDiagnosticsSnapshot(snapshot))
     throw new TypeError("Profile signal status requires a trusted diagnostic snapshot");
   const result = { ...evidence };
   const mappings = [
@@ -133,7 +133,7 @@ export function deriveProfileSignalStatusV2(
 
 function mandatoryFallbackDiagnostic(
   priorIssueDetail: "retained" | "unavailable",
-): ProfileDiagnosticV2 {
+): ProfileDiagnostic {
   return {
     code: "lifecycle_failure",
     severity: "warning",
@@ -168,12 +168,12 @@ function mandatoryFallbackDiagnostic(
  * Constructs the minimum fixed report without invoking the normal builder or reading untrusted input.
  * P2 may pass only a snapshot issued by the v2 accumulator; arbitrary lookalikes are ignored.
  */
-export function createFixedProfileReportFallbackV2(possibleSnapshot?: unknown): ProfileReportV2 {
-  const trusted = isTrustedProfileDiagnosticsSnapshotV2(possibleSnapshot)
+export function createFixedProfileReportFallback(possibleSnapshot?: unknown): ProfileReport {
+  const trusted = isTrustedProfileDiagnosticsSnapshot(possibleSnapshot)
     ? possibleSnapshot
     : undefined;
   const priorIssueDetail = trusted ? "retained" : "unavailable";
-  const diagnostics: (ProfileDiagnosticV2 | ProfileDiagnosticSummaryV2)[] = [
+  const diagnostics: (ProfileDiagnostic | ProfileDiagnosticSummary)[] = [
     mandatoryFallbackDiagnostic(priorIssueDetail),
   ];
   let summary = trusted?.summary ?? null;
@@ -181,15 +181,15 @@ export function createFixedProfileReportFallbackV2(possibleSnapshot?: unknown): 
     for (const diagnostic of trusted.diagnostics) {
       if (diagnostics.length < 15) diagnostics.push(structuredClone(diagnostic));
       else
-        summary = profileDiagnosticV2Internals.mergeIntoSummary(
-          summary ?? profileDiagnosticV2Internals.createEmptySummary("retained"),
+        summary = profileDiagnosticInternals.mergeIntoSummary(
+          summary ?? profileDiagnosticInternals.createEmptySummary("retained"),
           diagnostic,
         );
     }
-  } else summary = profileDiagnosticV2Internals.createEmptySummary("unavailable");
+  } else summary = profileDiagnosticInternals.createEmptySummary("unavailable");
   if (summary) diagnostics.push(summary);
   return {
-    schemaVersion: PROFILE_REPORT_V2_SCHEMA_VERSION,
+    schemaVersion: PROFILE_REPORT_SCHEMA_VERSION,
     signalStatus: { spans: "unavailable", counters: "unavailable", histograms: "unavailable" },
     spans: [],
     counters: [],

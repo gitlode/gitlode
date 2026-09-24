@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 status: accepted_target
 
 report:
@@ -23,7 +23,7 @@ report:
   fields:
     schemaVersion:
       type: literal
-      value: 1
+      value: 2
     signalStatus:
       type: ProfileSignalStatusSet
     spans:
@@ -37,7 +37,9 @@ report:
       items: ProfileHistogramPoint
     diagnostics:
       type: array
-      items: ProfileDiagnostic
+      items:
+        - ProfileDiagnostic
+        - ProfileDiagnosticSummary
       maximum_items: 16
 
 types:
@@ -95,6 +97,11 @@ types:
       maxDurationSeconds:
         type: finite_nonnegative_number
         unit: s
+      durationContributionCount:
+        type: nonnegative_safe_integer
+      unavailableFields:
+        type: bounded_set
+        allowed: [calls, total, avg, max, errors]
       attributes:
         type: array
         items: ProfileSpanAttributeSummary
@@ -195,6 +202,9 @@ types:
         items: ProfileAttribute
       value:
         type: finite_nonnegative_number
+      unavailableFields:
+        type: bounded_set
+        allowed: [value]
     invariants:
       - attributes are sorted by key
     zero_semantics:
@@ -238,6 +248,9 @@ types:
       bucketCounts:
         type: array
         items: nonnegative_safe_integer
+      unavailableFields:
+        type: bounded_set
+        allowed: [samples, total, avg, min, max]
     invariants:
       - attributes are sorted by key
       - explicitBounds are strictly increasing
@@ -295,20 +308,48 @@ types:
           - metric_collection
           - report_build
           - telemetry_shutdown
-      signal:
-        enum:
-          - spans
-          - counters
-          - histograms
-          - report
-          - telemetry
+      target:
+        type: ProfileTarget
+      signalCoverage:
+        type: bounded_set
+        allowed: [span, counter, histogram]
+      effects:
+        type: bounded_set
+        allowed:
+          - missing_observations
+          - incomplete_measurement_fields
+          - missing_attribute_detail
+          - unknown_collection_coverage
+          - lost_issue_detail
+          - report_delivery_failure
+          - lifecycle_notice
+      extent:
+        enum: [entire_target, unidentified_subset]
+      attributeKey:
+        type: ProfileAttributeKeySelector
+      affectedFields:
+        type: ProfileAffectedFields
+      detailLoss:
+        type: ProfileDetailLossMask
+      lossQuantity:
+        type:
+          - ProfileLossQuantity
+          - "null"
+      wholeResultUnavailable:
+        type: boolean
       count:
         type: positive_safe_integer
+      countSaturated:
+        type: boolean
       message:
         type:
           - string
           - "null"
         maximum_utf16_code_units: 512
+      reportDelivery:
+        type:
+          - ProfileReportDeliveryProvenance
+          - "null"
     severity_policy:
       info:
         - span_group_overflow
@@ -331,9 +372,72 @@ types:
     deduplication_key:
       - code
       - stage
-      - signal
-      - message
+      - target
+      - signalCoverage
+      - effects
+      - extent
+      - attributeKey
+      - affectedFields
+      - detailLoss
+      - lossQuantity descriptor and unit
+      - wholeResultUnavailable
     deduplication_value: increment count
+
+  ProfileDiagnosticSummary:
+    fields:
+      code:
+        type: literal
+        value: diagnostic_overflow
+      signalCoverage:
+        type: bounded_set
+        allowed: [span, counter, histogram]
+      effectsByKind:
+        type: fixed_summary
+      reportEffects:
+        type: bounded_set
+      detailLoss:
+        type: ProfileDetailLossMask
+      omittedOccurrences:
+        type: nonnegative_safe_integer_or_null
+      maximumSeverity:
+        type: info_warning_or_null
+      priorIssueDetail:
+        enum: [retained, unavailable]
+    maximum_items: 1
+
+  ProfileTarget:
+    variants: [report, scope, observation, point]
+    point_identity: [scope, kind, name, canonical_attributes]
+
+  ProfileAttributeKeySelector:
+    variants: [not_applicable, exact, discarded]
+
+  ProfileAffectedFields:
+    per_kind:
+      span: [calls, total, avg, max, errors]
+      counter: [value]
+      histogram: [samples, total, avg, min, max]
+
+  ProfileDetailLossMask:
+    fixed_members:
+      [pointAttributes, observationIdentity, scopeIdentity, attributeKey, affectedFields]
+
+  ProfileLossQuantity:
+    descriptors:
+      [
+        span_groups,
+        span_duration_contributions,
+        span_attribute_values,
+        metric_points,
+        observation_results,
+      ]
+    value: nonnegative_safe_integer_or_null
+    saturation: explicit
+
+  ProfileReportDeliveryProvenance:
+    path: fixed_fallback
+    measurementResults: [none, trusted_snapshot]
+    priorIssueDetail: [retained, unavailable]
 
 limits:
   span_groups:
@@ -361,7 +465,8 @@ limits:
       entries: 1
       purpose: diagnostic_overflow
     overflow_effect:
-      - increment the reserved diagnostic_overflow entry
+      - merge omitted evidence into the fixed diagnostic_overflow summary
+    structured_detail_maximum_utf16_code_units: 4096
 
 canonical_order:
   scope:
@@ -382,10 +487,7 @@ canonical_order:
     - value_type
     - canonical_value
   diagnostics:
-    - code
-    - stage
-    - signal
-    - message
+    - complete canonical diagnostic identity
   string_comparison: locale-independent code-unit order
 
 availability:
@@ -394,116 +496,5 @@ availability:
   initialized_empty_profile: report present with complete empty signal arrays
   finalization_partial_failure: report present with signal status and diagnostics
   telemetry_shutdown_failure: preserve already-built signal data and add a bounded diagnostic when possible
+  report_builder_failure: emit the fixed schema-2 fallback with empty measurement arrays, unavailable signals and report-delivery provenance
   application_failure: finalize telemetry but retain the current success-only rendering policy
-
-# P1 implementation staging only. The active schema_version and runtime producer above remain v1
-# until P2 atomically migrates the worker, presentation, tooling, and tests.
-staged_v2_candidate:
-  schema_version: 2
-  source:
-    contract: packages/internal-contracts/src/telemetry/profile-report-v2.ts
-    normalization: packages/internal-contracts/src/telemetry/normalization-v2.ts
-    diagnostics: packages/gitlode/src/execution/telemetry/profile-diagnostic-v2-accumulator.ts
-    derivation_and_fallback: packages/gitlode/src/execution/telemetry/profile-report-v2-primitives.ts
-  report:
-    fields:
-      schemaVersion: 2
-      signalStatus: ProfileSignalStatusSetV2
-      spans: ProfileSpanAggregateV2[]
-      counters: ProfileCounterPointV2[]
-      histograms: ProfileHistogramPointV2[]
-      diagnostics: (ProfileDiagnosticV2 | ProfileDiagnosticSummaryV2)[]
-    active_runtime_producer: false
-    structured_clone_safe: true
-  measurement_extensions:
-    span:
-      unavailable_fields: [calls, total, avg, max, errors]
-      quality_evidence: durationContributionCount
-    counter:
-      unavailable_fields: [value]
-    histogram:
-      unavailable_fields: [samples, total, avg, min, max]
-    numeric_values:
-      requirement: finite
-      unavailable_zero_semantics: numeric slots remain finite but masks prevent treating defaults as observations
-  diagnostic:
-    detailed_capacity: 15
-    reserved_summary_capacity: 1
-    identity:
-      - code
-      - stage
-      - canonical target
-      - signal coverage
-      - effects
-      - extent
-      - attribute-key selector
-      - affected fields
-      - detail-loss mask
-      - loss-quantity descriptor and unit
-      - confirmed whole-result-unavailable evidence
-    target_variants:
-      - report
-      - scope
-      - observation
-      - metric point
-    attribute_key_selectors:
-      - not_applicable
-      - exact
-      - discarded
-    effects:
-      - missing_observations
-      - incomplete_measurement_fields
-      - missing_attribute_detail
-      - unknown_collection_coverage
-      - lost_issue_detail
-      - report_delivery_failure
-      - lifecycle_notice
-    extents:
-      - entire_target
-      - unidentified_subset
-    detail_loss_mask:
-      - pointAttributes
-      - observationIdentity
-      - scopeIdentity
-      - attributeKey
-      - affectedFields
-    structured_detail_maximum_utf16_code_units: 4096
-    message_maximum_utf16_code_units: 512
-    overflow_summary:
-      preserves:
-        - maximum original severity
-        - per-kind effect associations
-        - confirmed whole-result-unavailable evidence
-        - fixed detail-loss mask
-        - safely saturated omitted occurrence count when known
-      prohibits:
-        - lost-target lists
-        - lost-key lists
-    whole_result_unavailable:
-      detailed_and_summary: retained
-      requires_any_effect: [missing_observations, unknown_collection_coverage]
-      prohibited_as_sole_evidence:
-        - lifecycle_notice
-        - report_delivery_failure
-    malformed_semantic_input:
-      count_or_detail_loss_mask: bounded invalid_aggregation evidence
-      oversized_finite_set_array: reject before element iteration
-    quantity_merge:
-      known_disjoint: saturating sum
-      unknown_or_overlapping: unknown total
-      diagnostic_occurrences_are_loss_amounts: false
-  fixed_fallback:
-    normal_builder_calls: 0
-    measurements_without_trusted_snapshot: none
-    signal_status_without_trusted_snapshot: unavailable
-    mandatory_diagnostic:
-      code: lifecycle_failure
-      stage: report_build
-      severity: warning
-      target: report
-      extent: entire_target
-      effect: report_delivery_failure
-      count: 1
-    prior_detail_input: accumulator-issued detached frozen snapshot only
-    arbitrary_payload_reads: prohibited
-    active_worker_wiring: false

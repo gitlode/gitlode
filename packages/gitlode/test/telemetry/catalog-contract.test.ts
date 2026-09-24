@@ -1,7 +1,6 @@
 import {
   PROFILE_COLLECTION_LIMITS,
   PROFILE_DIAGNOSTIC_SEVERITY,
-  PROFILE_DIAGNOSTIC_SIGNALS,
   PROFILE_DIAGNOSTIC_STAGES,
   PROFILE_REPORT_SCHEMA_VERSION,
   PROFILE_SIGNAL_STATUSES,
@@ -94,7 +93,7 @@ describe("accepted telemetry catalog contract", () => {
     delete labels.lifecycle_failure;
     const reportFields = (catalogs.profileReport.report as Record<string, unknown>)
       .fields as Record<string, Record<string, unknown>>;
-    reportFields.schemaVersion!.value = 2;
+    reportFields.schemaVersion!.value = 1;
     const limits = catalogs.verification.limits as Record<string, unknown>[];
     limits[0]!.boundary_cases = [126, 128, 129];
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
@@ -254,7 +253,6 @@ describe("production profile report contract", () => {
     expect(Object.keys(PROFILE_DIAGNOSTIC_SEVERITY)).toEqual(diagnosticFields.code!.enum);
     expect(PROFILE_DIAGNOSTIC_SEVERITY).toEqual(severity);
     expect(PROFILE_DIAGNOSTIC_STAGES).toEqual(diagnosticFields.stage!.enum);
-    expect(PROFILE_DIAGNOSTIC_SIGNALS).toEqual(diagnosticFields.signal!.enum);
     expect(PROFILE_COLLECTION_LIMITS).toEqual({
       spanGroups: (limits.span_groups as Record<string, unknown>).maximum,
       distinctSpanAttributeValuesPerAttribute: (

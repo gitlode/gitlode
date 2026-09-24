@@ -394,6 +394,10 @@ Conflict rule:
 
 `--profile` appends a local signal-separated diagnostic profile to stderr after a successful run:
 
+Partial or unavailable signals are labeled in the Profile block. If report construction itself
+fails, the ordinary Profile block reports unavailable measurements; this does not change extraction
+results, JSONL output, or exit classification.
+
 ```bash
 gitlode --profile -r main ./my-repo
 ```

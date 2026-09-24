@@ -1,7 +1,13 @@
-import { compareProfileScopes } from "@gitlode/internal-contracts/telemetry";
+import {
+  compareProfileScopes,
+  deriveCounterNumericAvailability,
+  deriveHistogramNumericAvailability,
+  deriveSpanNumericAvailability,
+} from "@gitlode/internal-contracts/telemetry";
 import type {
   ProfileAttribute,
   ProfileDiagnostic,
+  ProfileDiagnosticSummary,
   ProfileHistogramPoint,
   ProfileReport,
   ProfileSpanAggregate,
@@ -64,13 +70,11 @@ export function formatProfileLines(
   appendMetrics(lines, "Counters", report.signalStatus.counters, report.counters, (point) => {
     const view = findProfileViewEntry("metric", point.name, point.scope.name);
     return metric(
+      point,
       view?.label ??
         (isResolvedPluginScope(point.scope.name)
           ? point.name
           : `${displayScope(point.scope)} / ${point.name}`),
-      point.value,
-      point.unit,
-      point.attributes,
     );
   });
   appendMetrics(lines, "Histograms", report.signalStatus.histograms, report.histograms, (point) => {
@@ -231,7 +235,8 @@ function spanRow(
   known: boolean,
   plugin: boolean,
 ): string {
-  const average = span.callCount ? span.totalDurationSeconds / span.callCount : 0;
+  const availability = deriveSpanNumericAvailability(span);
+  const average = availability.avg ? span.totalDurationSeconds / span.callCount : null;
   const identity = known
     ? label
     : plugin
@@ -240,19 +245,16 @@ function spanRow(
   const attrs = span.attributes
     .map((attribute) => attributeSummary(attribute, span.callCount))
     .join(", ");
-  return `${identity}: total=${unit(span.totalDurationSeconds, "s")}, calls=${formatCount(span.callCount)}, avg=${unit(average, "s")}, max=${unit(span.maxDurationSeconds, "s")}, errors=${formatCount(span.errorCount)}${attrs ? `, ${attrs}` : ""}`;
+  return `${identity}: total=${available(availability.total, span.totalDurationSeconds, "s")}, calls=${availability.calls ? formatCount(span.callCount) : "—"}, avg=${average === null ? "—" : unit(average, "s")}, max=${available(availability.max, span.maxDurationSeconds, "s")}, errors=${availability.errors ? formatCount(span.errorCount) : "—"}${attrs ? `, ${attrs}` : ""}`;
 }
-function metric(
-  name: string,
-  value: number,
-  unitName: string,
-  attrs: readonly ProfileAttribute[],
-): string {
-  return `${name}: ${unit(value, unitName)}${attrs.length ? `, ${attrs.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
+function metric(point: ProfileReport["counters"][number], name: string): string {
+  const availability = deriveCounterNumericAvailability(point);
+  return `${name}: ${availability.value ? unit(point.value, point.unit) : "—"}${point.attributes.length ? `, ${point.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
 }
 function histogram(point: ProfileHistogramPoint, label: string): string {
-  const average = point.count ? point.sum / point.count : 0;
-  return `${label}: count=${formatCount(point.count)}, total=${unit(point.sum, point.unit)}, avg=${unit(average, point.unit)}, min=${point.minimum === null ? "—" : unit(point.minimum, point.unit)}, max=${point.maximum === null ? "—" : unit(point.maximum, point.unit)}${point.attributes.length ? `, ${point.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
+  const availability = deriveHistogramNumericAvailability(point);
+  const average = availability.avg ? point.sum / point.count : null;
+  return `${label}: count=${availability.samples ? formatCount(point.count) : "—"}, total=${available(availability.total, point.sum, point.unit)}, avg=${average === null ? "—" : unit(average, point.unit)}, min=${availability.min && point.minimum !== null ? unit(point.minimum, point.unit) : "—"}, max=${availability.max && point.maximum !== null ? unit(point.maximum, point.unit) : "—"}${point.attributes.length ? `, ${point.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
 }
 function attributeSummary(
   attribute: ProfileSpanAggregate["attributes"][number],
@@ -266,9 +268,18 @@ function attributeSummary(
     return `${attribute.key}=${attribute.values.map((value) => `${value.value}(${value.count})`).join(",")}${attribute.overflowCount > 0 ? ` (overflow=${attribute.overflowCount})` : ""}`;
   return `${attribute.key}=${attribute.minimum}…${attribute.maximum}${observed}`;
 }
-function diagnostic(item: ProfileDiagnostic): string {
+function diagnostic(item: ProfileDiagnostic | ProfileDiagnosticSummary): string {
   const label = PROFILE_VIEW_DIAGNOSTIC_LABELS[item.code] ?? item.code;
-  return `${item.severity} ${item.signal}/${item.stage}: ${label}${item.count > 1 ? ` x${item.count}` : ""}${item.message ? ` (${item.message})` : ""}`;
+  if (item.code === "diagnostic_overflow")
+    return `${item.severity} report/${item.stage}: ${label}${item.omittedOccurrences === null ? " (prior detail unavailable)" : ` x${item.omittedOccurrences}`}`;
+  const signal = item.signalCoverage.length ? item.signalCoverage.join(",") : "report";
+  const delivery = item.reportDelivery
+    ? ": profile report construction failed; measurements unavailable"
+    : "";
+  return `${item.severity} ${signal}/${item.stage}: ${label}${item.count > 1 ? ` x${item.count}` : ""}${delivery}${item.message ? ` (${item.message})` : ""}`;
+}
+function available(isAvailable: boolean, value: number, unitName: string): string {
+  return isAvailable ? unit(value, unitName) : "—";
 }
 function attributesKey(attributes: readonly ProfileAttribute[]): string {
   return attributes.map((a) => `${a.key}=${String(a.value)}`).join("\0");

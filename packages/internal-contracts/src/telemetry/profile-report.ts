@@ -6,13 +6,6 @@ export const PROFILE_DIAGNOSTIC_STAGES = [
   "report_build",
   "telemetry_shutdown",
 ] as const;
-export const PROFILE_DIAGNOSTIC_SIGNALS = [
-  "spans",
-  "counters",
-  "histograms",
-  "report",
-  "telemetry",
-] as const;
 export const PROFILE_COLLECTION_LIMITS = {
   spanGroups: 128,
   distinctSpanAttributeValuesPerAttribute: 16,

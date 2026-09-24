@@ -54,14 +54,16 @@ Collector and report tests cover bounded span aggregation, metric conversion, re
 canonical sorting, signal status, structured cloning, and invalid aggregation. Completed span
 objects and raw histogram samples must not be retained.
 
-The staged schema-v2 P1 primitives additionally use literal contract cases for typed target
+The active schema-v2 contract and runtime use literal cases for typed target
 canonicalization, independently validated identity components, exact/discarded/not-applicable
 attribute selectors, per-kind fields/effects/coverage, quantity merge uncertainty, safe saturation,
 15+1 issue retention, escaped 4096-code-unit detail broadening, numeric availability, and the fixed
-fallback. These tests do not establish runtime fallback delivery: P2 must inject a real normal
-builder-body failure after invocation, verify worker transport and presentation, preserve
-cleanup/finalization idempotence under simultaneous failures, and migrate status/tooling consumers
-in the same atomic switch.
+fallback. Runtime tests inject a real normal builder-body failure after partial work, prove a single
+builder invocation, exercise broken diagnostic snapshots and simultaneous shutdown failures, and
+verify cached finalization, application-result identity, normal worker/application transport and the
+ordinary presentation path. Presentation and repository evaluators separately distinguish observed
+zero from unavailable numeric fields, partial/unavailable status, reserved summaries and fixed
+fallback provenance.
 
 Correction coverage also compares lifecycle-only and confirmed whole-signal-loss evidence before and
 after detailed-record compaction, rejects status/value contradictions without discarding retained

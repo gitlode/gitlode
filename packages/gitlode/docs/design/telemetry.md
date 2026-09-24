@@ -558,26 +558,23 @@ The worker emits the structured-clone-safe, SDK-independent `ProfileReport` defi
 
 ```ts
 interface ProfileReport {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly signalStatus: ProfileSignalStatusSet;
   readonly spans: readonly ProfileSpanAggregate[];
   readonly counters: readonly ProfileCounterPoint[];
   readonly histograms: readonly ProfileHistogramPoint[];
-  readonly diagnostics: readonly ProfileDiagnostic[];
+  readonly diagnostics: readonly (ProfileDiagnostic | ProfileDiagnosticSummary)[];
 }
 ```
 
-This schema-version-1 shape remains the active worker and presentation contract. A schema-version-2
-candidate is staged in `internal-contracts/telemetry` under explicit `V2` names. It adds typed issue
+Schema version 2 is the active worker, presentation and tooling contract. Diagnostics carry typed
 targets, signal coverage, effects, extent, attribute selectors, per-kind numeric-field masks,
-detail-loss masks, loss quantities, fixed overflow evidence, report-delivery provenance, and
-measurement `unavailableFields`. Its execution-owned candidate primitives provide bounded 15+1
-diagnostic retention, status/numeric-availability derivation, and a fixed empty-measurement fallback
-that does not call the normal report builder. The candidate is not emitted or rendered yet; P2 must
-replace the active v1 producer and every consumer atomically before changing
-`PROFILE_REPORT_SCHEMA_VERSION` or the catalog's active `schema_version`.
+detail-loss masks, loss quantities, fixed overflow evidence and report-delivery provenance.
+Measurements carry bounded `unavailableFields`; spans also carry a duration-contribution count so a
+default numeric slot is never interpreted as an observed zero. Diagnostic retention uses 15 detailed
+records plus one fixed summary.
 
-The staged diagnostic contract retains confirmed whole-result-unavailable evidence on each detailed
+The diagnostic contract retains confirmed whole-result-unavailable evidence on each detailed
 record and in the reserved summary. The accumulator accepts that evidence only with a collection-loss
 effect (`missing_observations` or `unknown_collection_coverage`); lifecycle and report-delivery
 effects cannot independently mark a signal unavailable. Explicit malformed counts and detail-loss
@@ -586,16 +583,15 @@ semantic inputs are rejected by fixed cardinality before iteration when their su
 the finite contract universe. Exact safe-integer sums are not saturation; only clamping sets the
 saturation flag, which remains set after later merges.
 
-The staged status primitive rejects an `unavailable` input paired with retained values. P2 must catch
-that report-validation rejection inside normal builder isolation, retain the values and valid
-siblings, and record bounded validation evidence; it must not let the rejection escape as an
-application failure or relabel the signal silently.
-
-The staged fallback accepts prior issue details only through an accumulator-issued, detached,
-runtime-frozen snapshot. Without that explicit completion boundary it returns empty measurement
-arrays, unavailable signal statuses, a mandatory report-delivery diagnostic, and fixed evidence that
-prior issue detail is unavailable. It does not inspect arbitrary collector/builder payloads or add a
-second collection traversal.
+Status derivation rejects an `unavailable` input paired with retained values. The normal builder
+isolates that validation rejection, retains valid measurements and sibling signals, records bounded
+validation evidence and derives a partial result. A real exception from the normal builder body takes
+the independent fixed fallback exactly once. The fallback accepts prior issue details only through
+an accumulator-issued, detached, runtime-frozen snapshot; otherwise it returns empty measurement
+arrays, unavailable signal statuses, a mandatory report-delivery diagnostic and fixed evidence that
+prior issue detail is unavailable. It never inspects the thrown payload, retries collection or calls
+the normal builder. Shutdown still runs once, and available shutdown evidence is incorporated without
+changing the application result.
 
 The report keeps spans, counters, and histograms as separate signals. Metrics are not attached back
 to a span-shaped `details` field. Individual trace IDs, span IDs, parent relationships, exceptions,

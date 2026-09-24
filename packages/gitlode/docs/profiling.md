@@ -29,6 +29,8 @@ otherwise `name`); namespace and configuration are not reconstructed as identiti
 When spans, counters, or histograms are partial or unavailable, a compact status summary appears
 before the signal sections and the affected section repeats its state. Complete empty signals are
 omitted. Collection overflow and lifecycle failures are profile diagnostics, not application warnings.
+If normal report construction fails, the same Profile block explains that the fixed fallback was
+used; all three signals are unavailable and no partial measurements are presented as recovered data.
 
 Durations use canonical seconds and may render as ns, µs, ms, or s. Byte values use B, KiB, MiB, or
 GiB. Entity units use readable plural labels and unknown units remain canonical. Nonzero values are

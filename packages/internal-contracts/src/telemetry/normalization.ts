@@ -517,3 +517,48 @@ export function normalizeProfileHistogramPoint(input: unknown): ProfileHistogram
     unavailableFields,
   };
 }
+
+type NumericAvailability<Fields extends string> = Readonly<Record<Fields, boolean>>;
+
+export function deriveSpanNumericAvailability(
+  value: ProfileSpanAggregate,
+): NumericAvailability<(typeof PROFILE_SPAN_FIELDS)[number]> {
+  const unavailable = new Set(value.unavailableFields);
+  const hasDuration = value.durationContributionCount > 0;
+  return {
+    calls: !unavailable.has("calls"),
+    total: hasDuration && !unavailable.has("total"),
+    avg:
+      hasDuration &&
+      value.callCount > 0 &&
+      value.durationContributionCount === value.callCount &&
+      !unavailable.has("avg") &&
+      !unavailable.has("calls") &&
+      !unavailable.has("total"),
+    max: hasDuration && !unavailable.has("max"),
+    errors: !unavailable.has("errors"),
+  };
+}
+
+export function deriveCounterNumericAvailability(
+  value: ProfileCounterPoint,
+): NumericAvailability<(typeof PROFILE_COUNTER_FIELDS)[number]> {
+  return { value: !value.unavailableFields.includes("value") };
+}
+
+export function deriveHistogramNumericAvailability(
+  value: ProfileHistogramPoint,
+): NumericAvailability<(typeof PROFILE_HISTOGRAM_FIELDS)[number]> {
+  const unavailable = new Set(value.unavailableFields);
+  return {
+    samples: !unavailable.has("samples"),
+    total: !unavailable.has("total"),
+    avg:
+      value.count > 0 &&
+      !unavailable.has("avg") &&
+      !unavailable.has("samples") &&
+      !unavailable.has("total"),
+    min: value.minimum !== null && !unavailable.has("min"),
+    max: value.maximum !== null && !unavailable.has("max"),
+  };
+}

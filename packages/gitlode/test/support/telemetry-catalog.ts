@@ -69,7 +69,9 @@ function refsFrom(value: unknown): string[] {
 export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
   const errors: string[] = [];
   for (const [name, catalog] of Object.entries(catalogs)) {
-    if (catalog.schema_version !== 1) errors.push(`${name}: schema_version must be 1`);
+    const expectedSchemaVersion = name === "profileReport" ? 2 : 1;
+    if (catalog.schema_version !== expectedSchemaVersion)
+      errors.push(`${name}: schema_version must be ${expectedSchemaVersion}`);
     if (catalog.status !== "accepted_target")
       errors.push(`${name}: status must be accepted_target`);
   }
@@ -101,9 +103,10 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
     }
   }
 
-  const spanIds = new Set(spans.map((entry) => text(entry.id)).filter(Boolean));
-  const metricIds = new Set(metrics.map((entry) => text(entry.id)).filter(Boolean));
-  const attributeIds = new Set(attributes.map((entry) => text(entry.id)).filter(Boolean));
+  const present = (value: string | undefined): value is string => value !== undefined;
+  const spanIds = new Set(spans.map((entry) => text(entry.id)).filter(present));
+  const metricIds = new Set(metrics.map((entry) => text(entry.id)).filter(present));
+  const attributeIds = new Set(attributes.map((entry) => text(entry.id)).filter(present));
 
   for (const span of spans) {
     for (const ref of refsFrom(span.attributes)) {

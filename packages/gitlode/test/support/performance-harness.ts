@@ -297,7 +297,7 @@ export function extractProfileReportMeasurements(report: unknown): TargetTelemet
     histograms = value.histograms,
     diagnostics = value.diagnostics;
   if (
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== 2 ||
     "rawSpans" in value ||
     "rawHistogramSamples" in value ||
     !Array.isArray(spans) ||
@@ -306,20 +306,38 @@ export function extractProfileReportMeasurements(report: unknown): TargetTelemet
     !Array.isArray(diagnostics)
   )
     throw new Error("collector output is missing ProfileReport arrays");
+  let endedAvailable = true;
   const ended = spans.reduce((sum, item) => {
     const calls =
       item && typeof item === "object" ? (item as Record<string, unknown>).callCount : undefined;
+    const unavailableFields =
+      item && typeof item === "object"
+        ? (item as Record<string, unknown>).unavailableFields
+        : undefined;
+    if (!Array.isArray(unavailableFields))
+      throw new Error("collector output has an invalid span unavailableFields mask");
+    if (unavailableFields.includes("calls")) endedAvailable = false;
     if (!Number.isSafeInteger(calls) || (calls as number) < 0)
       throw new Error("collector output has an invalid callCount");
     return sum + (calls as number);
   }, 0);
+  for (const point of [...counters, ...histograms]) {
+    const unavailableFields =
+      point && typeof point === "object"
+        ? (point as Record<string, unknown>).unavailableFields
+        : undefined;
+    if (!Array.isArray(unavailableFields))
+      throw new Error("collector output has an invalid metric unavailableFields mask");
+  }
   return {
     reportJsonBytes: {
       status: "available",
       value: Buffer.byteLength(JSON.stringify(report), "utf8"),
     },
     spanAggregateGroupCount: { status: "available", value: spans.length },
-    totalEndedSpanCount: { status: "available", value: ended },
+    totalEndedSpanCount: endedAvailable
+      ? { status: "available", value: ended }
+      : { status: "unavailable", reason: "span call counts are unavailable" },
     counterDatapointCount: { status: "available", value: counters.length },
     histogramDatapointCount: { status: "available", value: histograms.length },
     diagnosticCount: { status: "available", value: diagnostics.length },
@@ -805,18 +823,18 @@ export interface VolumeObservation {
 function classifyProfileReportSpans(report: unknown) {
   const value = report as { spans?: readonly Record<string, unknown>[] };
   const spans = value.spans ?? [];
-  const acceptedCoreScopes = new Set(
-    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map((span) => span.scope.name),
+  const coreSpans = TELEMETRY_SPANS.filter(
+    (span): span is Extract<(typeof TELEMETRY_SPANS)[number], { scope: { type: "core" } }> =>
+      span.scope.type === "core",
   );
+  const acceptedCoreScopes = new Set<string>(coreSpans.map((span) => span.scope.name));
   const acceptedCorePairs = new Set(
-    TELEMETRY_SPANS.filter((span) => span.scope.type === "core").map(
-      (span) => `${span.scope.name}\u0000${span.name}`,
-    ),
+    coreSpans.map((span) => `${span.scope.name}\u0000${span.name}`),
   );
   const gitCliPairs = new Set(
-    TELEMETRY_SPANS.filter(
-      (span) => span.scope.type === "core" && span.name.startsWith("gitlode.git.cli."),
-    ).map((span) => `${span.scope.name}\u0000${span.name}`),
+    coreSpans
+      .filter((span) => span.name.startsWith("gitlode.git.cli."))
+      .map((span) => `${span.scope.name}\u0000${span.name}`),
   );
   const scopeName = (span: Record<string, unknown>) => {
     const scope = span.scope;
@@ -887,18 +905,24 @@ export function volumeObservationFromProfileReport(
       sum + (Array.isArray(histogram.bucketCounts) ? histogram.bucketCounts.length : 0),
     0,
   );
+  const available = (measurement: Availability<number>, name: string): number => {
+    if (measurement.status !== "available")
+      throw new Error(`collector output has unavailable ${name}`);
+    return measurement.value;
+  };
   return {
     ...evidence,
-    spanGroups: measurements.spanAggregateGroupCount.value,
+    spanGroups: available(measurements.spanAggregateGroupCount, "span aggregate group count"),
     metricDatapoints:
-      measurements.counterDatapointCount.value + measurements.histogramDatapointCount.value,
+      available(measurements.counterDatapointCount, "counter datapoint count") +
+      available(measurements.histogramDatapointCount, "histogram datapoint count"),
     histogramBuckets,
     prohibitedScalingSpanCount: classification.prohibitedScalingSpanCount,
     gitCommandSpans: classification.gitCommandSpans,
     pluginSpans,
-    reportBytes: measurements.reportJsonBytes.value,
-    totalEndedSpanCount: measurements.totalEndedSpanCount.value,
-    diagnosticCount: measurements.diagnosticCount.value,
+    reportBytes: available(measurements.reportJsonBytes, "report byte count"),
+    totalEndedSpanCount: available(measurements.totalEndedSpanCount, "ended span count"),
+    diagnosticCount: available(measurements.diagnosticCount, "diagnostic count"),
   };
 }
 export function evaluateVolume(n: VolumeObservation, fourN: VolumeObservation) {
@@ -950,7 +974,10 @@ export function evaluateRepositoryProfileReport(report: unknown) {
   const value = report as { signalStatus?: Record<string, unknown>; diagnostics?: unknown[] };
   const failureReasons: string[] = [];
   const inconclusiveReasons: string[] = [];
-  if (measurements.reportJsonBytes.value > 1_048_576)
+  if (
+    measurements.reportJsonBytes.status === "available" &&
+    measurements.reportJsonBytes.value > 1_048_576
+  )
     failureReasons.push("ProfileReport exceeds 1 MiB");
   const prohibited = classifyProfileReportSpans(report).prohibitedScalingSpanCount;
   if (prohibited > 0) failureReasons.push("prohibited scaling spans observed");
@@ -962,7 +989,30 @@ export function evaluateRepositoryProfileReport(report: unknown) {
     inconclusiveReasons.push("ProfileReport signal status is incomplete");
   if (!Array.isArray(value.diagnostics))
     inconclusiveReasons.push("ProfileReport diagnostics are missing");
-  else if (value.diagnostics.length > 0) failureReasons.push("ProfileReport contains diagnostics");
+  else if (value.diagnostics.length > 0) {
+    failureReasons.push("ProfileReport contains diagnostics");
+    if (
+      value.diagnostics.some(
+        (item) =>
+          item &&
+          typeof item === "object" &&
+          (item as Record<string, unknown>).code === "diagnostic_overflow",
+      )
+    )
+      failureReasons.push("ProfileReport contains a reserved diagnostic summary");
+    if (
+      value.diagnostics.some((item) => {
+        if (!item || typeof item !== "object") return false;
+        const delivery = (item as Record<string, unknown>).reportDelivery;
+        return (
+          delivery !== null &&
+          typeof delivery === "object" &&
+          (delivery as Record<string, unknown>).path === "fixed_fallback"
+        );
+      })
+    )
+      failureReasons.push("ProfileReport was delivered by the fixed fallback");
+  }
   const reasons = [...failureReasons, ...inconclusiveReasons];
   return {
     status: failureReasons.length

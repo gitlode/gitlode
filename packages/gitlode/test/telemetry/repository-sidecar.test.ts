@@ -48,7 +48,7 @@ describe("repository profile sidecar", () => {
       expect(result.provenance.configSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(result.status).toBe("available");
       expect(result.report).toMatchObject({
-        schemaVersion: 1,
+        schemaVersion: 2,
         diagnostics: [],
       });
       expect(result.provenance).toMatchObject({
@@ -88,7 +88,7 @@ describe("repository profile sidecar", () => {
         rotationLines: 2,
       });
       expect(result.status).toBe("available");
-      expect(result.report).toMatchObject({ schemaVersion: 1 });
+      expect(result.report).toMatchObject({ schemaVersion: 2 });
       expect(result.provenance).toMatchObject({
         runId: "test-git-cli",
         fixture: "file_heavy_repository",
@@ -134,7 +134,7 @@ describe("repository profile sidecar", () => {
         recipeHash: "recipe-plugin",
       });
       expect(result.status).toBe("available");
-      expect(result.report).toMatchObject({ schemaVersion: 1 });
+      expect(result.report).toMatchObject({ schemaVersion: 2 });
       expect(result.provenance).toMatchObject({
         runId: "test-plugin",
         fixture: "plugin_heavy_projection",

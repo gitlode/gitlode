@@ -1,10 +1,28 @@
 import type { ProfileReport } from "@gitlode/internal-contracts/telemetry";
 import { describe, expect, it } from "vitest";
 
-import { formatProfileLines } from "../../../src/presentation/reporting/formatters.js";
+import { formatProfileLines as formatActiveProfileLines } from "../../../src/presentation/reporting/formatters.js";
+
+const formatProfileLines = (report: ProfileReport) =>
+  formatActiveProfileLines({
+    ...report,
+    spans: report.spans.map((span) => ({
+      ...span,
+      durationContributionCount: span.durationContributionCount ?? span.callCount,
+      unavailableFields: span.unavailableFields ?? [],
+    })),
+    counters: report.counters.map((point) => ({
+      ...point,
+      unavailableFields: point.unavailableFields ?? [],
+    })),
+    histograms: report.histograms.map((point) => ({
+      ...point,
+      unavailableFields: point.unavailableFields ?? [],
+    })),
+  });
 
 const emptyReport = (): ProfileReport => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
   spans: [],
   counters: [],
@@ -67,14 +85,126 @@ describe("formatProfileLines", () => {
       {
         code: "lifecycle_failure",
         severity: "warning",
-        signal: "spans",
         stage: "trace_flush",
+        target: { type: "report" },
+        signalCoverage: ["span"],
+        effects: ["unknown_collection_coverage"],
+        extent: "unidentified_subset",
+        attributeKey: { type: "not_applicable" },
+        affectedFields: [],
+        detailLoss: {
+          pointAttributes: false,
+          observationIdentity: false,
+          scopeIdentity: false,
+          attributeKey: false,
+          affectedFields: false,
+        },
+        lossQuantity: null,
+        wholeResultUnavailable: false,
         count: 1,
+        countSaturated: false,
         message: null,
+        reportDelivery: null,
       },
     ];
     expect(formatProfileLines(report).join("\n")).toContain("unavailable");
     expect(formatProfileLines(report).join("\n")).toContain("Telemetry lifecycle stage failed");
+  });
+
+  it("distinguishes observed zero, unavailable fields, duration mismatch and fallback delivery", () => {
+    const report = emptyReport();
+    report.signalStatus.spans = "partial";
+    report.signalStatus.counters = "partial";
+    report.spans = [
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "gitlode.run",
+        callCount: 2,
+        errorCount: 0,
+        totalDurationSeconds: 0,
+        maxDurationSeconds: 0,
+        durationContributionCount: 1,
+        unavailableFields: [],
+        attributes: [],
+      },
+    ];
+    report.counters = [
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "observed-zero",
+        unit: "{operation}",
+        attributes: [],
+        value: 0,
+        unavailableFields: [],
+      },
+      {
+        scope: { name: "gitlode.execution", version: null },
+        name: "unavailable-zero-slot",
+        unit: "{operation}",
+        attributes: [],
+        value: 0,
+        unavailableFields: ["value"],
+      },
+    ];
+    report.diagnostics = [
+      {
+        code: "lifecycle_failure",
+        severity: "warning",
+        stage: "report_build",
+        target: { type: "report" },
+        signalCoverage: ["counter", "histogram", "span"],
+        effects: ["report_delivery_failure"],
+        extent: "entire_target",
+        attributeKey: { type: "not_applicable" },
+        affectedFields: [],
+        detailLoss: {
+          pointAttributes: false,
+          observationIdentity: false,
+          scopeIdentity: false,
+          attributeKey: false,
+          affectedFields: false,
+        },
+        lossQuantity: null,
+        wholeResultUnavailable: false,
+        count: 1,
+        countSaturated: false,
+        message: null,
+        reportDelivery: {
+          path: "fixed_fallback",
+          measurementResults: "none",
+          priorIssueDetail: "retained",
+        },
+      },
+      {
+        code: "diagnostic_overflow",
+        severity: "warning",
+        stage: "report_build",
+        target: { type: "report" },
+        extent: "unidentified_subset",
+        effects: ["lost_issue_detail"],
+        signalCoverage: ["counter"],
+        effectsByKind: [],
+        reportEffects: [],
+        detailLoss: {
+          pointAttributes: false,
+          observationIdentity: false,
+          scopeIdentity: false,
+          attributeKey: false,
+          affectedFields: false,
+        },
+        omittedOccurrences: null,
+        countSaturated: false,
+        maximumSeverity: "warning",
+        priorIssueDetail: "unavailable",
+      },
+    ];
+
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("avg=—");
+    expect(output).toContain("observed-zero: 0 operations");
+    expect(output).toContain("unavailable-zero-slot: —");
+    expect(output).toContain("profile report construction failed; measurements unavailable");
+    expect(output).toContain("prior detail unavailable");
   });
 
   it("renders plugin scopes under one Plugins group and sorts independent of input order", () => {

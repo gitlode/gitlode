@@ -107,3 +107,122 @@ remaining consumer/runtime risks and a finite next-step recommendation. Do not r
 Append the review outcome to this packet. Save a documentation-only checkpoint on this child, normally
 push and verify actual remote equality. No force push or parent ref update. Human returns the outcome;
 trunk decides corrections or P3 assignment. P2 acceptance is not profile/M2 completion or PR approval.
+
+## Outcome
+
+Corrections are required for P2 at the fixed target
+`57ba7537068b00002b2618b2f4a364f9468365c7`. This review does not accept P2 and does not authorize
+P3, a PR, merge, formal measurement, package/release validation or an acceptance-record change.
+
+### Reviewed state
+
+- Review entry/checkpoint: `03516ac4c99d3617f0a91016480a078dcd2829e7`; local HEAD and the actual
+  `origin/feature/otel-redesign_M2_profile` ref agreed and the worktree was clean.
+- The fixed target and all three implementation checkpoints (`8f0f8cc8b4135817544131173d9c3fe167b51c13`,
+  `ca62c355edd4d8c8ee4d9cdc533a9cf967f01a10` and
+  `85c48e0ddc82211a899bb11e4aec70bba04eb96d`) are in the assigned history after base
+  `8af0b6af5f4630699dc0b95c00a5d6f478acaba8`; accepted P1 target
+  `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5` is an ancestor.
+- The base-to-target inventory is the expected 32 files. The target-to-entry delta contains only the
+  four routing/handoff documents named by trunk; no source or test change moved the fixed target.
+- Schema 2 is the only active `ProfileReport` export. The removed staging files and names have no
+  active source consumer. Unrelated application JSONL, performance artifact and release-acceptance
+  schema versions remain unchanged.
+
+### Mandatory findings
+
+1. **P2-R1: mixed valid/invalid Span durations expose incomplete totals and maxima as observed
+   numbers.** `LocalSpanProcessor.onEnd()` records the invalid contribution and increments neither
+   the duration sum nor contribution count, but `snapshot()` always emits `unavailableFields: []`
+   (`local-span-processor.ts:163-202,349-360`). With one valid two-second contribution followed by
+   one invalid contribution for the same aggregate, the independently executed probe produced
+   `callCount=2`, `durationContributionCount=1`, an empty mask, and numeric availability
+   `{total:true, avg:false, max:true}`. The accepted design requires detected duration omission to
+   make total, average and maximum unavailable/incomplete independently of diagnostic retention; a
+   retained accumulator value is not an exact total or maximum of all calls. The current presenter
+   and tooling therefore can display/count incomplete values as observed measurements. Populate the
+   fixed Span field mask at the producer for every affected duration field, preserve it through the
+   normal builder, and add a mixed-validity real-producer-to-presentation/tooling regression (also
+   retain the genuine-zero case).
+2. **P2-R2: a throwing normalizer discards later safe siblings and reports a falsely exact loss
+   quantity.** `ProfileReportBuilder.#buildSignal()` wraps the whole `for ... of` in one `try/catch`
+   (`profile-report-builder.ts:145-164`). A throwing getter in the first Counter point exits the loop;
+   a following valid point is never normalized, yet `#addValidationIssue()` records exactly one
+   disjoint `observation_results` loss. The probe returned no counters and `partial` for input
+   `[throwing, valid]`. This violates the normal-builder isolation contract that a throwing
+   normalizer must not discard safely processable siblings and also converts unknown additional loss
+   into an exact count. Isolate each normalization call so later array siblings continue; handle a
+   throwing iterator separately with unknown/unidentified remaining loss, and cover both paths.
+3. **P2-R3: metric diagnostics discard safely known target identity.** Both `invalid()` and
+   `overflow()` in `local-metric-reader.ts:175-216` always emit a report target. After catalog
+   admission and canonical attribute validation, the converter already knows Scope, instrument,
+   kind and point attributes (`local-metric-reader.ts:229-292`). An independently executed invalid
+   NaN Counter probe confirmed that the emitted target was `{type:"report"}` although the exact
+   empty-attribute point identity was safe. Point-retention overflow has the same loss. The accepted
+   detection-site mapping requires the narrowest safely evidenced observation/point target and must
+   not turn known loss into broad unknown coverage. Pass the known identity into point validation and
+   overflow diagnostics, falling back only as individual components fail validation, and add target,
+   extent and quantity assertions for invalid values, invalid attributes and retention overflow.
+4. **P2-R4: the formal repository consumer can mark a malformed schema-2 report healthy.**
+   `extractProfileReportMeasurements()` checks only version, top-level arrays, call counts and that
+   each `unavailableFields` value is an array (`performance-harness.ts:292-333`); it neither validates
+   allowed mask members nor the required point/report fields. `evaluateRepositoryProfileReport()`
+   then treats that partial check as schema validity (`performance-harness.ts:963-1025`). The probe
+   supplied a Counter containing only `unavailableFields: ["not-a-counter-field"]`, complete statuses
+   and empty diagnostics; evaluation returned `pass`. This can support a false `schemaValid` release
+   subcheck and healthy-empty interpretation. Validate the complete active bounded contract (or use a
+   shared total validator) before evaluating completeness, volume or diagnostics; malformed masks,
+   missing fields and malformed reserved summaries must be inconclusive/fail-closed. Add adversarial
+   evaluator tests without weakening thresholds or changing historical artifact schemas.
+
+### Confirmed behavior and evidence gap
+
+- Normal builder validation retains ordinary valid siblings for non-throwing invalid values. A
+  separate independent probe confirmed that contradictory unavailable status plus a retained value
+  remains on the normal path with a full 15+1 diagnostic budget: the value survived, status became
+  partial and the reserved summary remained within 16 entries.
+- Diagnostic identity, per-kind effects, whole-result evidence, count/quantity saturation and
+  fallback recompaction tests passed. Source inspection found no new diagnostic-capacity-dependent
+  numeric validity path beyond P2-R1.
+- Real repository sidecars traverse the worker entry and returned normal schema-2 reports for both
+  adapters and plugin fixtures. The fixed fallback is covered through an actual invoked builder-body
+  failure, unsafe thrown payload, broken diagnostic snapshot, simultaneous shutdown failures,
+  repeated/concurrent finalization, application return attachment and `structuredClone`.
+- There is still no actual `worker_threads` transport test carrying the fixed fallback: the
+  worker-client success fixture has no profile, while fallback assertions call execution/session code
+  directly. This is a concrete missing P2 proof, distinct from the four implementation findings.
+  Add one bounded worker-entry/client serialization regression that induces the real builder-body
+  fallback and observes schema 2, mandatory delivery provenance and application-result identity on
+  the receiving side.
+- Disabled and initialization-degraded sessions remain report-absent; normal success-only and quiet
+  presentation behavior is preserved. The intentionally old presentation bridge honors signal
+  unavailability, field masks supplied to it, genuine zero, fallback delivery and reserved summary
+  wording. Generic namespace layout and final styling remain P3 work.
+
+### Independent, reported and skipped checks
+
+- Independently run: `npm run build:dev` passed.
+- Independently run: the packet's exact 16-file `npx vitest run` selection passed 254 tests with
+  3 skipped (257 total). The additional presentation consumer suite
+  `packages/gitlode/test/presentation/presenter.test.ts` passed 7/7, reconciling the implementer's
+  17-file count to 261 passed and 3 skipped.
+- The three skips are the Linux-only supervised-workflow cases in
+  `performance-workflow.test.ts`: entrypoint setup failure and the two `stall=false/true` later-child
+  cases. They are platform skips, not passes. They exercise existing process-group supervision, not
+  a new P2 schema/producer/consumer path, so this review does not request a separate bounded Linux run.
+- Independently run: the exact changed-tooling strict command over `js-yaml.d.ts`,
+  `performance-harness.ts` and `telemetry-catalog.ts` passed. This is the tooling typecheck evidence;
+  Vitest is not test-source typechecking and the documented tooling-project `noCheck` boundary remains.
+- Independently run temporary probes: four counterexamples passed, and the full-budget normal-builder
+  probe passed. All probe files were deleted and absence was verified before documentation changes.
+- Independently run: `git diff --check 8af0b6af..57ba753` passed.
+- Reported only, not rerun here: the implementer's checkpoint-specific 3-file/63-test and
+  4-file/85-test runs, `npm test -w gitlode` (702 passed, 17 skipped), lint and architecture checks.
+  No full package/release/OS campaign or formal performance measurement was run.
+
+### Finite return
+
+Correct P2-R1 through P2-R4 and add the one real fallback worker-transport regression, then return a
+new fixed correction target for focused independent re-review. Preserve the accepted P1 primitives,
+the current 15+1 bounds, thresholds, blocked release record and historical evidence identities. Do
+not begin P3 while these P2 data-integrity, isolation and consumer-validation corrections remain open.

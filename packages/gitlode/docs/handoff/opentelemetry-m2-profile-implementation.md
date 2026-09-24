@@ -312,3 +312,83 @@ local/remote state, a four-finding correction/test matrix, preprocessing evidenc
 exact verification results in this same handoff. Do not self-certify P1 acceptance. Trunk will assign
 a separate focused re-review after the outcome. No P2, PR creation, merge, candidate freeze or publish
 is authorized. Repeated failure of the same issue follows the bounded correction/diagnosis policy.
+
+### P1 correction round 1 outcome
+
+Correction round 1 is implemented on `feature/otel-redesign_M2_profile`. P1 is not self-accepted;
+P2, PR creation, merge, candidate freeze and publish work were not started. The branch is returned
+for trunk-assigned independent re-review.
+
+#### Provenance and checkpoints
+
+- Exact entry OID: `ea8fd8d54e21bbd4d4dfd6c20e82810883f10d68`. The worktree was clean,
+  local and actual remote child-branch tips agreed, and the delta after review checkpoint
+  `2b276e9558fc79b60b8676881dc701375bd05c2c` was only the correction assignment in this packet.
+- Reviewed implementation remains `a9a48137cdcd222ba63cd0cf0459f867fa386718`.
+- Correction implementation checkpoint: `5f2d03b91471b7c7fb47f62c2fb9e93fb9ddc996`
+  (`fix: correct profile v2 P1 primitives`), normally pushed and verified equal to the actual remote
+  child-branch tip before this outcome update.
+- The documentation/final checkpoint is the commit containing this outcome on the same child branch;
+  its full local and actual remote OID equality is verified in the return message. No parent M2,
+  integration or main branch was updated.
+
+#### Pre-correction regression evidence
+
+The counterexample tests were added first and run against the entry implementation before production
+changes. This command failed exactly the five new correction/hardening tests while the 15 pre-existing
+tests in the file passed:
+
+`npx vitest run packages/gitlode/test/telemetry/profile-v2-primitives.test.ts`
+
+- 1 file: 5 failed, 15 passed.
+- P1-R1 observed lifecycle-only Counter status change from `complete` while detailed to `unavailable`
+  after compaction; detailed confirmed whole loss also failed to become unavailable.
+- P1-R2 observed no throw for an unavailable Span with one retained value; it was silently rewritten.
+- P1-R3 observed `countSaturated: true` for the exact `MAX_SAFE_INTEGER - 1 + 1` boundary.
+- P1-R4 retained malformed counts/masks as original exact diagnostics instead of aggregating them as
+  invalid input.
+- The 100,000 duplicate-kind probe observed 100,000 indexed element reads before identity construction.
+
+#### Correction matrix
+
+| Finding | Bounded correction                                                                                                                                                                                                                                                                                                            | Focused evidence after correction                                                                                                                                                                                                               |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-R1   | `wholeResultUnavailable` is retained in detailed identity and summary evidence. It is accepted only with `missing_observations` or `unknown_collection_coverage`; lifecycle-only and report-delivery-only combinations become bounded invalid-aggregation evidence. Status derivation checks both retained forms defensively. | The same lifecycle-only input remains `complete` below, at and beyond the 15-detail boundary, including with an existing summary. Report delivery remains distinct. Confirmed whole Counter loss is `unavailable` both detailed and summarized. |
+| P1-R2   | The pure status primitive rejects `unavailable` plus retained values instead of changing it to `partial`. It does not mutate or discard the values. P2 must catch this normal report-validation rejection inside builder isolation, retain valid values/siblings and add bounded validation evidence.                         | Empty trusted diagnostics, an unaffected empty unavailable kind, and a full 15+1 diagnostic snapshot are covered. Contradictory affected kinds throw in both empty and capacity-boundary cases.                                                 |
+| P1-R3   | Saturating addition uses strict overflow, and count/quantity/summary merges preserve an already-set saturation flag.                                                                                                                                                                                                          | Covers exact `0 + MAX_SAFE_INTEGER` summary accumulation, exact `MAX_SAFE_INTEGER - 1 + 1`, actual overflow, a later merge after saturation, occurrence counts, omitted-summary counts and known-disjoint loss quantity.                        |
+| P1-R4   | Omitted count still defaults to one; explicit zero, negative, fractional and non-finite counts are rejected. Supplied detail-loss containers and members are validated as booleans; omitted members retain false defaults. Invalid payloads merge into the fixed conservative invalid-aggregation diagnostic.                 | Covers valid omitted/explicit count and false/true mask values, plus null/string/array mask containers and non-boolean members. Nine malformed inputs become one bounded conservative record with occurrence count nine.                        |
+
+#### Preprocessing evidence and limitation
+
+Set-like kinds, effects, affected-kind entries and per-kind fields now reject arrays longer than their
+finite contract universe before element iteration. The focused 100,000 duplicate-kind proxy records
+zero indexed reads and produces one bounded invalid-aggregation diagnostic. Retained diagnostics
+remain 15+1 and serialized structured detail remains bounded independently. This hardening bounds
+accumulator preprocessing once the array is supplied; it does not and cannot bound the caller's work
+or memory used to allocate/populate that untrusted array. Other independently bounded target/string
+copying behavior was unchanged; no broad performance gate was introduced.
+
+#### Verification and changed scope
+
+Final commands on the correction implementation plus outcome documentation:
+
+- `npm run format:write`: passed across all workspaces.
+- `npm run format:check`: passed across all workspaces.
+- `npm run lint`: passed across all workspaces.
+- `npm run build:dev`: passed; production TypeScript projects were strictly compiled.
+- `npx vitest run packages/internal-contracts/test/telemetry/profile-contract.test.ts packages/internal-contracts/test/telemetry/normalization.test.ts packages/internal-contracts/test/telemetry/profile-v2-candidate.test.ts packages/gitlode/test/telemetry/profile-v2-primitives.test.ts packages/gitlode/test/telemetry/local-collection.test.ts packages/gitlode/test/telemetry/worker-telemetry-session.test.ts packages/gitlode/test/telemetry/catalog-contract.test.ts`:
+  7 files and 112 tests passed.
+- `npm run architecture:check`: all module/dependency checks passed; configuration lint reported the
+  existing one warning and zero errors.
+- `git diff --check`: passed.
+
+Vitest executed the focused sources, but they were not independently TypeScript-checked: gitlode's
+tooling project still has `noCheck: true`, and the internal-contracts production project excludes its
+tests. No stronger test-source typing claim is made.
+
+Changed scope is limited to staged v2 `profile-report-v2.ts`/`normalization-v2.ts`, the execution-owned
+v2 accumulator/status/fallback primitives, their focused test, the staged profile-report catalog and
+directly affected telemetry/verification guidance, plus this handoff. Active schema v1, collectors,
+worker transport/session, presentation, performance tooling and release/publish acceptance remain
+unchanged. The existing P2 inventory and residual real-builder/transport/presentation/finalization
+evidence above remain assigned to P2 only after independent P1 re-review.

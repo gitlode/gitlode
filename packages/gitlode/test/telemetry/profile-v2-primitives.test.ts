@@ -402,7 +402,7 @@ describe("v2 diagnostic accumulation", () => {
     const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
     accumulator.add(issue("oversized-coverage", { signalCoverage: kinds }));
 
-    expect(indexedReads).toBeLessThanOrEqual(3);
+    expect(indexedReads).toBe(0);
     expect(accumulator.snapshot().diagnostics).toEqual([
       expect.objectContaining({ code: "invalid_aggregation", count: 1 }),
     ]);

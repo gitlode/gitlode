@@ -114,7 +114,7 @@ export const program = new Command()
   .addOption(
     new Option(
       "--profile",
-      "Print per-stage timing information as an aligned block to stderr after a successful extraction. Suppressed by --quiet.",
+      "Collect and display a local Scope/namespace diagnostic profile after a successful extraction. Suppressed by --quiet.",
     )
       .default(false)
       .helpGroup("Runtime and Diagnostics"),

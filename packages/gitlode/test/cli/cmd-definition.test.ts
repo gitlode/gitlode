@@ -65,6 +65,9 @@ describe("program – help output wiring", () => {
 
     expect(optionsByLong.get("--quiet")?.helpGroupHeading).toBe("Runtime and Diagnostics");
     expect(optionsByLong.get("--profile")?.helpGroupHeading).toBe("Runtime and Diagnostics");
+    expect(optionsByLong.get("--profile")?.description).toBe(
+      "Collect and display a local Scope/namespace diagnostic profile after a successful extraction. Suppressed by --quiet.",
+    );
 
     expect(optionsByLong.get("--ref")?.helpGroupHeading).toBe("Required Input");
 

@@ -118,7 +118,7 @@ Both may be specified simultaneously — rotation triggers when **either** thres
 | Parameter   | Alias | Type    | Default | Description                                                                                                                         |
 | ----------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors are still emitted.                                    |
-| `--profile` |       | boolean | `false` | Print per-stage timing information as an aligned multi-line block to stderr after a successful extraction. Suppressed by `--quiet`. |
+| `--profile` |       | boolean | `false` | Collect and display a local Scope/namespace diagnostic profile to stderr after a successful extraction. Suppressed by `--quiet`. |
 
 ### Configuration File
 
@@ -153,7 +153,8 @@ When `--quiet` is not set and extraction succeeds, stderr output is fixed as fol
 - `Finalizing output`
 
 3. An aligned completion summary block.
-4. When `--profile` is set, an aligned profile block after a single blank line.
+4. When `--profile` is set, a Profile block after a single blank line. It uses the generic
+   Scope/two-level namespace hierarchy defined by the telemetry presentation contract.
 
 TTY-aware rendering is a CLI-edge concern. When `process.stderr.isTTY === true`, chalk-based
 color styling is applied (spinner, done marker, stage labels, field keys, values, units, refs, and
@@ -237,8 +238,8 @@ Extraction complete
   Refs              : main, develop
 ```
 
-The default summary remains distinct from profiling output. Per-stage timings stay exclusive to
-`--profile` and are not promoted into the normal successful-run summary.
+The default summary remains distinct from profiling output. Profile measurements and collection
+notices are not promoted into the normal successful-run summary.
 
 If a warning interrupts an in-place progress line, the warning is printed on its own line and the
 active stage line is then redrawn.

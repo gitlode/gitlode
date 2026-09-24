@@ -649,3 +649,81 @@ the bounded evidence to trunk rather than starting repairs or silently weakening
 Record a documentation-only checkpoint, normally push to this child and verify actual remote equality
 and clean status. Remain on this child: trunk is a planning-session role, not a Git ref. No force push
 or parent ref update. Review acceptance does not automatically authorize P3 or a PR.
+
+### Post-diagnosis R4 focused review outcome
+
+R4 and P2 are accepted at fixed target
+`755e7d34f3d0ea56c7346ce009ec7d7624bab32c`. This acceptance closes the bounded P2 correction review;
+it does not authorize P3, a PR, merge, candidate freeze, formal measurement, package/release work or
+an acceptance-record change.
+
+#### Reviewed state and scope
+
+- Review entry/checkpoint was `f5ce53ec45ee22a2028a82c8eec457bf83f710a7` on
+  `feature/otel-redesign_M2_profile`. The worktree was clean, and local HEAD, the local tracking ref
+  and the actual remote ref agreed. Entry/base `4fd2ac81bc70f5324247bdce9d4b1ff196f6f5f2`, accepted diagnosis
+  `cd65c002ceed7e18d10e308c31cef807a430811f`, implementation
+  `d2c4a7d2460d6089874c7a7367c324570a9b43e5` and the fixed target are ancestors of the checkpoint.
+- The diagnosis-to-target inventory contains the expected seven implementation/test/canonical files
+  plus the implementation handoff outcome. The fixed-target-to-entry delta contains only the four
+  routing/handoff documents identified by trunk. No later source or test change moved the target.
+- Review remained limited to the diagnosis-driven R4 correction and affected validator, builder,
+  accumulator and formal-consumer invariants. The previously accepted R1 qualification, R2, R3 and
+  worker transport were not reopened.
+
+#### Accepted relationship behavior
+
+- The unconditional whole-target-to-whole-signal reverse implication is removed. Detailed point,
+  observation or Scope loss can coexist with a retained same-kind sibling and `partial`; the 15+1
+  reserved summary preserves only an existential per-kind union after target identity is discarded.
+  Both forms normalize and extract without summary compaction strengthening their coverage.
+- The remaining reverse condition is target-aware and requires a detailed exact `report` target,
+  `entire_target` extent, coverage of the evaluated kind, `wholeResultUnavailable: true` and an
+  allowed whole-result effect. An `unidentified_subset` report target and the reserved summary do not
+  trigger it. Exact report-wide loss plus a retained same-kind value remains a rejected synthetic
+  contradiction. The normal builder's recovery diagnostic remains broadened to report/
+  `unidentified_subset` without a whole-result flag and is not rejected by this boundary.
+- The forward rules remain intact: unavailable signals are empty and require same-kind whole-result
+  evidence or the fixed no-measurement delivery exception; complete rejects same-kind data impact;
+  partial requires such impact. Zero and nonzero retained-value cases, detailed and summary
+  no-sibling unavailable, complete-empty, justified partial-empty, fixed fallback and broadened
+  target positives are covered.
+- The six original contradiction families still fail closed: unavailable with retained data,
+  unexplained unavailable, unexplained partial, delivery effect without provenance, provenance
+  without delivery effect, and target/coverage/affected-field kind contradiction. Normalization
+  rejects rather than repairs them, and formal extraction does not consume them.
+- Real accumulator/builder reports for a lost Counter point plus one retained sibling pass through
+  normalization and extraction in both detailed and 15+1 compacted form. Each extracts one Counter,
+  while repository formal evaluation returns `fail` because partial status and diagnostics are
+  non-healthy. This correctly distinguishes a valid partial report from a formal acceptance pass;
+  neither case becomes schema-invalid `inconclusive`.
+- The field comment and canonical telemetry/catalog wording now state the existing target-scoped
+  meaning. No schema/public shape, producer behavior, threshold, historical evidence identity or
+  formal policy changed. Removal of the old broad-Scope rejection follows the accepted diagnosis.
+
+#### Independent and reported evidence
+
+- Independently run: `npm run build:dev` passed. Production TypeScript was compiled by the normal
+  development solution.
+- Independently run: the exact seven-suite command from the correction outcome passed 157/157 tests
+  in 7 files with no skips. Vitest execution is not claimed to typecheck test sources.
+- Independently run: the explicit `npx tsc --ignoreConfig --noEmit --strict --target ES2022 --module
+NodeNext --moduleResolution NodeNext --types node --skipLibCheck` command over `js-yaml.d.ts`,
+  `performance-harness.ts` and `telemetry-catalog.ts` passed.
+- Independently inspected fail-before evidence: the pre-correction relationship predicate rejected
+  every detailed or summarized whole-result record unless the signal was empty/unavailable. The new
+  literal contract regression and two real formal-consumer sibling regressions directly exercise
+  that removed condition. Their reported pre-correction failures are semantic evidence; the initially
+  missing builder-test import is not. The pre-correction tests were not rerun in this review.
+- Independently run: `git diff --check 4fd2ac8..755e7d3` passed. No probe, full OS/package/transport
+  campaign or formal performance measurement was run. The implementation packet's lint and
+  fail-before execution counts remain reported-only.
+- Review documentation passed `npm run format:write`, `npm run format:check` and working-tree
+  `git diff --check`; formatting changed no file outside this review packet.
+
+#### Finite return
+
+No concrete residual R4 or P2 failure was found. P2 acceptance means only that this runtime and
+consumer migration slice may return to trunk for planning. P3 presentation/layout, its cumulative
+system/package validation, formal M2 measurement, candidate/release acceptance, PR creation and merge
+remain separate, unassigned responsibilities.

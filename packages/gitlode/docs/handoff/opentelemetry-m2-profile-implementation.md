@@ -1350,3 +1350,104 @@ removed view policy/remaining compatibility inventory, exact tests and reproduci
 Append outcome here. Return for independent P3 review, then human terminal/readability confirmation
 and cumulative Windows/Linux functional/package validation. Do not self-accept P3/M2, create PR,
 merge, freeze a performance candidate, update acceptance or start tests/system migration.
+
+### P3 implementation outcome
+
+P3 implementation is complete on `feature/otel-redesign_M2_profile` and is returned for independent
+review. This outcome does not accept P3 or cumulative M2, and no PR, merge, formal measurement,
+release-acceptance update or `tests/system` migration was performed.
+
+#### Provenance and checkpoints
+
+- Exact entry and planning checkpoint: `66acbfdffd8b4eae879c98709357763f85cac862`;
+  local and actual `origin/feature/otel-redesign_M2_profile` agreed and the worktree was clean.
+- Accepted P2 checkpoint `4ba32fad97897f00adafe9275e7fb9bd589f6b8f` and implementation
+  `755e7d34f3d0ea56c7346ce009ec7d7624bab32c` were confirmed ancestors.
+- Generic tree/tokens/numeric checkpoint: `665d3298ac56bce781c5cc37fecad44ce8af7821`.
+- Structured diagnostic placement/shared styling checkpoint:
+  `245caafe50c7b59ea5ebbf8893cf7cfec2e57345`.
+- Generic catalog/canonical guidance checkpoint: `9e096070c93a80b9d96050742982e5879ff4ade4`.
+- CLI help correction: `f90edebf14324a9db82ce800d7ed37d6a99eca9a`.
+- Real-output empty-version correction: `737f36338e45e08fbfed2095dcd2a81c5f09098d`.
+- Final implementation/evidence checkpoint before this outcome:
+  `bbf2792fb2f752d20466cd253812e3beabc64603`; it was pushed normally and matched the actual remote.
+
+#### Implemented presentation boundary
+
+- The active formatter now builds one deterministic Scope name/version tree over Span, counter and
+  histogram records. The first two dot-separated name segments are namespace nodes; remaining
+  segments are relative rows. Short observations, nodes that are both observations and namespaces,
+  cross-kind name collisions, repeated metric points, plugin Scopes and unknown admitted identities
+  all use the same path.
+- Ordering uses code units, Span/Counter/Histogram kind ties and typed canonical attributes. Own
+  values/attributes precede namespace children. Attribute keys shorten only at a namespace segment
+  boundary; otherwise they retain absolute slash form. Malformed-dot identities, delimiters,
+  controls, bidi/line controls and type-ambiguous strings use deterministic quoting. A present empty
+  Scope version renders as `@""`, distinct from a missing version.
+- Fixed per-kind fields honor schema-2 masks and duration contribution evidence. Counts and observed
+  zero remain exact; missing extrema and unavailable numeric slots render as `—`. Duration and size
+  values use at most four significant digits, threshold promotion and scientific notation for tiny
+  nonzero values without changing report values or attribute identity.
+- Span summaries and typed metric attributes render as flat supplements. Reducer conflicts and
+  overflow are no longer duplicated inline; structured diagnostics provide the explanation.
+- Detailed diagnostics are placed at report, Scope, observation or matching typed point targets.
+  Missing-only identified observations remain as `unavailable`; a shared instrument issue is emitted
+  once before retained points; valid siblings remain ordinary rows. Known loss, unknown loss,
+  occurrence count, detail loss and the reserved summary remain distinct. Fixed fallback and
+  lifecycle-only reports use the ordinary renderer without inventing collection failure.
+- `sectionHeading` and `separator` are shared semantic roles. Profile no longer uses the green
+  application-success role. Formatters decorate escaped tokens without direct chalk calls, and
+  indentation stays outside styled tokens. Existing summary/progress roles and non-TTY behavior are
+  unchanged.
+
+#### Removed policy and remaining compatibility inventory
+
+- The previous 431-line per-observation `PROFILE_SPAN_VIEW`/`PROFILE_METRIC_VIEW`, human labels,
+  preferred order, Plugins grouping and kind/fallback buckets were removed. `profile-view.ts` now
+  contains only generic typed identity comparison and diagnostic-code labels.
+- `profile-view.yaml` no longer enumerates observations. It owns generic hierarchy, ordering,
+  escaping, fields, units, diagnostic placement and style roles. Catalog validation now prohibits
+  per-observation groups while the independent Span/metric catalogs and admission/measurement
+  coverage remain unchanged.
+- `signalStatus` remains the schema-2 compatibility/validation summary for tooling; it does not
+  recreate CLI kind sections or place notices. Diagnostic-code cause labels remain a generic code
+  mapping, not observation display policy. Histogram buckets remain transported but undisplayed.
+- CLI help, `usage.md`, `profiling.md`, telemetry design/verification and verification catalog now
+  describe the active generic view. P1/P2 contracts, producers, collection bounds, worker transport,
+  application-result behavior and performance consumers were not changed.
+
+#### Verification
+
+Production TypeScript and all workspace formatting/lint checks passed. The focused run covered nine
+files and 66 tests: CLI help; generic formatter/numeric/diagnostic/style boundaries; profile-view
+drift; summary, presenter and success routing; catalog contract; P2 numeric/report primitives; and
+real worker fallback transport.
+
+Commands:
+
+- `npm run format:write` and `npm run format:check`: passed across all workspaces.
+- `npm run lint`: passed across all workspaces.
+- `npm run build:dev`: passed.
+- `npx vitest run packages/gitlode/test/cli/cmd-definition.test.ts packages/gitlode/test/presentation/reporting/formatters.test.ts packages/gitlode/test/presentation/reporting/profile-view-drift.test.ts packages/gitlode/test/presentation/reporting/summary-formatters.test.ts packages/gitlode/test/presentation/presenter.test.ts packages/gitlode/test/presentation/success-report.test.ts packages/gitlode/test/telemetry/catalog-contract.test.ts packages/gitlode/test/telemetry/profile-report-primitives.test.ts packages/gitlode/test/execution/worker-profile-fallback-transport.test.ts`:
+  9 files and 66 tests passed.
+- Explicit strict tooling check passed:
+  `npx tsc --ignoreConfig --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --types node --skipLibCheck packages/gitlode/test/support/js-yaml.d.ts packages/gitlode/test/support/telemetry-catalog.ts packages/gitlode/test/telemetry/catalog-contract.test.ts packages/gitlode/test/presentation/reporting/formatters.test.ts packages/gitlode/test/presentation/reporting/profile-view-drift.test.ts packages/gitlode/test/cli/cmd-definition.test.ts packages/gitlode/scripts/capture-profile-evidence.ts`.
+- `npm run architecture:check`: all dependency/module checks passed; configuration lint reported its
+  existing one warning and zero errors.
+- `git diff --check`: passed.
+
+Small real commit/file/plugin Scope excerpts, source OID, normal schema-2 provenance, stdout/stderr
+destinations and the exact reproduction command are saved in
+[`opentelemetry-m2-profile-p3-real-output.md`](opentelemetry-m2-profile-p3-real-output.md). The
+reproduction script is `packages/gitlode/scripts/capture-profile-evidence.ts`. These are actual
+non-TTY product captures; synthetic diagnostic/edge fixtures and the old transformed design samples
+are not represented as runtime evidence.
+
+#### Independent review and remaining gates
+
+No concrete implementation failure is known. Independent P3 review remains required, followed by
+human light/dark terminal readability and wrapping confirmation and cumulative Windows/Linux
+functional/package validation. Formal performance calibration/measurement, candidate freeze,
+release acceptance and `tests/system` migration remain explicitly unstarted. Review the cumulative
+delta from entry `66acbfdffd8b4eae879c98709357763f85cac862` through the final outcome checkpoint;
+do not treat this implementation session as P3 or M2 acceptance.

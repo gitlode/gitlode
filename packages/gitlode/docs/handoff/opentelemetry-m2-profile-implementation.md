@@ -1524,3 +1524,62 @@ four-group correction/test matrix, exact implementation/final OIDs, evidence cha
 remaining work here. Return for independent focused re-review; no self-acceptance, PR, merge, P3
 cumulative validation, tests/system move, candidate freeze or acceptance-record update. If scope/context
 requires continuation, return a clean committed incomplete checkpoint with finite remaining work.
+
+### P3 correction round 1 outcome
+
+The four bounded presentation corrections are implemented on
+`feature/otel-redesign_M2_profile` and are returned for independent focused re-review. This outcome
+does not accept P3 or M2. No PR, merge, formal measurement, cumulative package/OS validation,
+`tests/system` move or acceptance-record update was performed.
+
+#### Provenance and checkpoints
+
+- Exact entry: `f4d9f12788147b4054b48847574ba4cbc887d7d6`; the worktree was clean and local
+  `HEAD` matched the actual remote branch. Review checkpoint
+  `41a37e5385d2566f3db92e6b68021c5a0fedc8d0` and fixed reviewed implementation
+  `5df4f49732d9ff49fef4067493d3152d276a792d` were confirmed ancestors. The intervening entry delta
+  contained routing/planning documentation only.
+- Exact implementation checkpoint: `255b0aacebb5fc7c109d3fe151455abace7f9d51`.
+- Exact correction outcome/evidence checkpoint: `OUTCOME_CHECKPOINT_TO_BE_RECORDED`. The later child
+  tip only records that checkpoint OID and is a routing-only documentation delta.
+
+#### Correction and regression matrix
+
+| Group                        | Bounded correction                                                                                                                                                                                                                                                                                            | Fail-before evidence                                                                                                                               | Pass-after evidence                                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P3-R1 Scope identity         | Scope grouping now uses nested name and nullable-version maps, so missing and present-empty versions and delimiter-bearing components cannot alias. Measurement and diagnostic-only Scopes use the same `compareProfileScopes` equality/order.                                                                | Focused `-t P3-R1`: 1 failed, 19 skipped; four admitted identities collapsed to two headings.                                                      | Same command: 1 passed, 19 skipped, including both input orders, null/empty versions, measurement/diagnostic-only groups and embedded NUL components.                                                                              |
+| P3-R2 escaping and retention | The complete remaining observation suffix is escaped before decoration. Malformed-dot missing-only targets now produce quoted absolute issue rows in code-unit name order alongside measured malformed and ordinary namespace rows.                                                                           | Focused `-t P3-R2`: 2 failed, 18 skipped; controls split both measured/missing-only rows and all three malformed missing-only targets disappeared. | Same command: 2 passed, 18 skipped; literal newline/quote/slash/backslash/C1/line/bidi/delimiter expectations, row boundaries, empty-segment variants, ordinary ordering, namespace attribute base and styled/plain parity passed. |
+| P3-R3 loss and order         | Known loss renders descriptor meaning, exact/saturated value and unit separately from occurrence count; unknown amount and the duration-specific explanation remain distinct. Diagnostics sort by typed canonical target before code/stage/effects and retained selector/field/detail/quantity identity ties. | Focused `-t P3-R3`: 2 failed, 18 skipped; known quantities were absent and reversed inputs changed notice order.                                   | Same command: 2 passed, 18 skipped across all five descriptors, exact/saturated/unknown amounts, differing occurrence counts, nullable Scope/kind/typed point identity support and opposed input order.                            |
+| P3-R4 styling                | The Profile headline marker uses the highest retained detailed/summary severity while fixed fallback warnings remain fixed. Distinct-frequency digits and incomplete-coverage labels/counts/punctuation now use the accepted semantic roles.                                                                  | Focused `-t P3-R4`: 1 failed, 19 skipped; an info-only headline called `warnBadge`, and frequency/coverage roles were incomplete.                  | Same command: 1 passed, 19 skipped; info-only, warning, compacted info/warning maximum severity, frequency and coverage role spies passed with identical stripped text.                                                            |
+
+The generic view catalog now states the nullable collision-free Scope identity, complete suffix
+escaping, malformed missing-only row, diagnostic order/loss semantics and the completed style-role
+mapping. Active schema, collectors, admission, worker transport, CLI options, dependencies,
+thresholds and styling policy were not changed. The touched implementation/evidence files are
+`src/presentation/reporting/formatters.ts`, its focused formatter test, the generic view drift test
+and `docs/design/telemetry-catalog/profile-view.yaml`, plus this outcome.
+
+#### Verification
+
+- `npm run build:dev`: passed; production TypeScript was checked by the normal build.
+- Original P3 nine-file Vitest selection: 9 files, 72 tests passed, 0 failed and 0 skipped. The
+  command covered CLI help, formatter and view drift, shared summary/presenter/success behavior,
+  catalog contract, numeric/report primitives and worker fallback transport.
+- Exact explicit strict tooling command from P3, with the same formatter/view/catalog/CLI/capture
+  paths: passed separately from Vitest.
+- `npm run lint`: passed across all workspaces.
+- `npm run format:write` followed by `npm run format:check`: passed across all workspaces.
+- `git diff --check` and the staged implementation diff check: passed.
+- Architecture was not rerun because no export, import boundary, dependency or module ownership
+  changed.
+
+The three ordinary real-output captures were not rerun: no representative ordinary text changed,
+and synthetic boundary fixtures provide the correction evidence without turning them into runtime
+captures. Later human terminal confirmation can run the existing
+`packages/gitlode/scripts/capture-profile-evidence.ts` workflow and inspect an ordinary profiled CLI
+run in real light/dark TTYs for color and wrapping; it must not treat that readability check as a
+formal measurement workload.
+
+Independent focused re-review remains next. Human terminal/readability confirmation and cumulative
+Windows/Linux functional/package validation remain later gates. Formal calibration/measurement,
+candidate freeze, release acceptance and `tests/system` migration remain unstarted.

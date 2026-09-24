@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [post-diagnosis R4 focused review](opentelemetry-m2-profile-p2-review.md#post-diagnosis-r4-focused-review).
-Correction returned at `755e7d34f3d0ea56c7346ce009ec7d7624bab32c`. R4/P2 remain unaccepted;
-R1-R3 and transport remain accepted. P3 is unassigned. Earlier packets are historical context.
+Current assignment: [P3 generic profile presentation](#p3-generic-profile-presentation).
+P2 is accepted at `755e7d34f3d0ea56c7346ce009ec7d7624bab32c`, recorded at 4ba32fad.
+Earlier implementation/correction packets are historical context. P3 and cumulative acceptance remain open.
 
 ## Assignment, source and branch
 
@@ -1260,3 +1260,93 @@ No further concrete correction failure is known from this packet. The remaining 
 independent focused review of `d2c4a7d2460d6089874c7a7367c324570a9b43e5` plus this outcome
 checkpoint. That review, not this session,
 decides R4/P2 acceptance. The branch must remain here until trunk assigns subsequent work.
+
+## P3 generic profile presentation
+
+### Entry and scope
+
+Continue on `feature/otel-redesign_M2_profile` after P2 acceptance checkpoint
+`4ba32fad97897f00adafe9275e7fb9bd589f6b8f`. Accepted P2 implementation:
+`755e7d34f3d0ea56c7346ce009ec7d7624bab32c`. Verify clean status, ancestry and actual remote equality;
+record exact entry including this planning packet. Later entry changes should be handoff-only.
+Trunk is a conversation role, not a branch: stay on this child when returning the outcome.
+
+Implement the already human-approved [profile design](opentelemetry-m2-profile-design.md), including
+its [integrated examples](opentelemetry-m2-profile-integrated-review.md). Read the complete design,
+canonical profiling/telemetry/verification/view catalog, presentation architecture and current bridge.
+Do not reopen approved layout tradeoffs. Examples transformed from old output and hypothetical cases
+are design evidence, not current runtime captures; retain that distinction in new evidence.
+
+P3 replaces the temporary view with generic rendering, shared styling and matching canonical guidance.
+Keep accepted schema 2, collection admission, diagnostic semantics, numeric masks, duration coverage,
+P1/P2 isolation/transport and application result behavior. No Span retention redesign, new measurement,
+external export, tests/system move, release gate change or formal performance run. Return a concrete
+producer/contract blocker to trunk rather than expanding P3 into another collector redesign.
+
+### Implementation responsibilities
+
+- Organize by Scope name/version, then first two dot-separated name segments as namespace levels.
+  No kind sections/badges, Plugins bucket, human-label overrides or per-observation group/order table.
+  Preserve all reported observations and typed identities, including short/group-node names, name
+  collisions across kinds, repeated metric points and unknown admitted scopes/names.
+- Apply the accepted deterministic code-unit/kind/typed-attribute ordering. Keep own attributes before
+  children; use relative attribute keys only against the namespace at a segment boundary, otherwise
+  absolute slash notation. Follow quoted-token/control escaping and malformed-dot rules exactly.
+  No domain pivots, inherited attributes, synthetic totals, adaptive grouping or formatter wrapping.
+- Keep fixed field layout per kind regardless of frequency, exact counts, genuine zero, optional
+  extrema, unavailable markers and duration-contribution rules. Mixed-duration total/max remain
+  retained with incomplete explanation and unavailable average; all-invalid defaults never become
+  observed zero. Apply four-significant-digit duration/size formatting, unit promotion and tiny/large
+  value rules without changing underlying report values or rounding identity attributes.
+- Render typed Span attribute summaries/frequencies/ranges and metric scalar attributes faithfully.
+  Route diagnostics to the narrowest safely evidenced target and provide the agreed overall summary.
+  Explain missing observations even without a surviving measurement. Keep omitted detail, occurrence
+  count and known/unknown loss amount distinct; do not reconstruct discarded target identity.
+  Cover summary severity, report-delivery fallback and unknown prior-detail provenance. No duplicate
+  inline conflict explanation plus notification; no invented collection failure or hidden valid sibling.
+- Add shared `sectionHeading` and `separator` roles to styling.ts; use the accepted semantic role map.
+  Profile heading no longer uses application success styling. Do not color by domain values or call
+  chalk directly from profile formatters. Preserve TTY/color policy, plain text parity and existing
+  application/progress styling; escape before decoration and keep indentation outside styled tokens.
+- Remove per-observation view policy in profile-view.ts (delete or replace with genuinely generic
+  helpers) and migrate profile-view.yaml plus drift/coverage tests. Preserve observation catalogs and
+  admission checks; replacing view enumeration is not permission to weaken measurement coverage.
+  Keep formatter decomposition inside the existing presentation/reporting ownership boundaries.
+- Update profiling.md, relevant usage examples, telemetry/view/verification canonical guidance and
+  catalog/test helpers together. Remove obsolete v1/P2 bridge presentation claims. Do not describe
+  P3, terminal approval, cumulative validation or M2 as complete before their separate acceptance.
+
+### Checkpoints, checks and output evidence
+
+Use coherent checkpoints on the same child: (1) generic tree/tokens/numeric formatting,
+(2) diagnostic placement and shared styling, (3) catalog/docs removal of old policy and combined checks.
+These are not independent mergeable units. Normally commit/push meaningful progress; if context is
+insufficient, return committed incomplete scope with exact remaining work instead of rushing or
+claiming completion. No fresh branch per checkpoint or force push.
+
+Tests must cover representative ordinary rows and the design's boundary examples: short/group-node
+collisions, names/versions/typed attributes and escaping, numeric unit/rounding edges, masks and zeros,
+attribute summaries, detail/summary diagnostic placement, missing-only targets, partial siblings,
+fixed fallback and lifecycle-only notices. Use independent expected text/ordering and semantic-role
+spies; strip ANSI to verify styled/plain text equality. Preserve quiet, failed-run and complete-empty
+suppression and ordinary presenter/worker report routing. Avoid tests that derive expected output
+from the renderer's own ordering or policy tables.
+
+Run build:dev, affected presentation/presenter/styling/catalog/contract tests and relevant P2 mask/
+fallback regressions, architecture, lint, format write/check and diff check. Record exact commands,
+counts and any skips. Typecheck changed tooling explicitly if its project uses noCheck. No full
+Windows/Linux installed-package campaign in this implementation conversation; trunk assigns cumulative
+P3-R/V after independent review.
+
+Capture small real commit/file/plugin outputs using existing deterministic fixtures where possible.
+Record commands, source OID, report provenance and stdout/stderr destination; distinguish real captures
+from synthetic fault/edge fixtures and old transformed design examples. Keep samples bounded and
+reviewable (no bulk measurement archive in Git). A shell invocation is not human light/dark terminal
+approval: return representative samples and steps for that later check, leaving it pending. Warn
+before any lengthy external build/setup; do not run formal calibration/measurements for UI evidence.
+
+Return implementation/final OIDs, clean/actual remote state, affected-file responsibility summary,
+removed view policy/remaining compatibility inventory, exact tests and reproducible sample locations.
+Append outcome here. Return for independent P3 review, then human terminal/readability confirmation
+and cumulative Windows/Linux functional/package validation. Do not self-accept P3/M2, create PR,
+merge, freeze a performance candidate, update acceptance or start tests/system migration.

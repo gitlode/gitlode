@@ -1,8 +1,9 @@
 # P2 independent data-integrity and failure-isolation review
 
-Current assignment: [post-diagnosis R4 focused review](#post-diagnosis-r4-focused-review).
-The correction returned at 755e7d3. R4/P2 remain unaccepted; R1-R3 and transport remain accepted.
-Earlier packets/outcomes are historical context.
+P2 review complete: R4/P2 accepted at `755e7d34f3d0ea56c7346ce009ec7d7624bab32c`, recorded
+at `4ba32fad97897f00adafe9275e7fb9bd589f6b8f`. Next assignment:
+[P3 presentation](opentelemetry-m2-profile-implementation.md#p3-generic-profile-presentation).
+Earlier review packets/outcomes remain historical evidence; do not restart them.
 
 ## Fixed scope and authority
 

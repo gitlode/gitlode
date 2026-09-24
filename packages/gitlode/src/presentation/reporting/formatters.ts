@@ -18,7 +18,11 @@ import type {
 
 import { formatCount, formatElapsed, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
-import { compareAttributeSets, compareProfileIdentity, PROFILE_VIEW_DIAGNOSTIC_LABELS } from "./profile-view.js";
+import {
+  compareAttributeSets,
+  compareProfileIdentity,
+  PROFILE_VIEW_DIAGNOSTIC_LABELS,
+} from "./profile-view.js";
 import type { SummaryData } from "./types.js";
 
 type ProfileMeasurement =
@@ -49,8 +53,9 @@ export function formatSummaryLines(data: SummaryData, styling: Styling = plainSt
   ];
   return [
     styling.summaryHeader("Extraction complete"),
-    ...fields.map(([label, value]) =>
-      `  ${styling.fieldKey(label.padEnd(18))}${styling.separator(":")} ${value}`,
+    ...fields.map(
+      ([label, value]) =>
+        `  ${styling.fieldKey(label.padEnd(18))}${styling.separator(":")} ${value}`,
     ),
   ];
 }
@@ -68,7 +73,10 @@ export function formatProfileLines(
 
   const lines = [styling.sectionHeading("Profile")];
   appendProfileDiagnostics(lines, report.diagnostics, styling);
-  const byScope = new Map<string, { scope: ProfileInstrumentationScope; rows: ProfileMeasurement[] }>();
+  const byScope = new Map<
+    string,
+    { scope: ProfileInstrumentationScope; rows: ProfileMeasurement[] }
+  >();
   for (const measurement of measurements) {
     const scope = measurement.value.scope;
     const key = `${scope.name}\0${scope.version ?? ""}`;
@@ -125,6 +133,10 @@ function appendProfileDiagnostics(
   const detailed = diagnostics.filter(
     (diagnostic): diagnostic is ProfileDiagnostic => diagnostic.code !== "diagnostic_overflow",
   );
+  const summaries = diagnostics.filter(
+    (diagnostic): diagnostic is ProfileDiagnosticSummary =>
+      diagnostic.code === "diagnostic_overflow",
+  );
   const delivery = detailed.find((diagnostic) => diagnostic.reportDelivery !== null);
   if (delivery?.reportDelivery) {
     const result =
@@ -135,18 +147,31 @@ function appendProfileDiagnostics(
     if (delivery.reportDelivery.priorIssueDetail === "unavailable")
       lines.push(`  ${styling.warnBadge("!")} Earlier collection issue details are unavailable.`);
   } else {
-    const hasCollection = detailed.some((diagnostic) =>
-      diagnostic.effects.some((effect) => effect !== "lifecycle_notice"),
-    );
-    const hasLifecycle = detailed.some((diagnostic) =>
-      diagnostic.effects.includes("lifecycle_notice"),
-    );
+    const hasCollection =
+      detailed.some((diagnostic) =>
+        diagnostic.effects.some((effect) => effect !== "lifecycle_notice"),
+      ) ||
+      summaries.some(
+        (summary) =>
+          summary.effectsByKind.some((item) =>
+            item.effects.some((effect) => effect !== "lifecycle_notice"),
+          ) || summary.reportEffects.some((effect) => effect !== "lifecycle_notice"),
+      );
+    const hasLifecycle =
+      detailed.some((diagnostic) => diagnostic.effects.includes("lifecycle_notice")) ||
+      summaries.some(
+        (summary) =>
+          summary.effectsByKind.some((item) => item.effects.includes("lifecycle_notice")) ||
+          summary.reportEffects.includes("lifecycle_notice"),
+      );
     const headline =
       hasCollection && hasLifecycle
         ? "Collection and telemetry lifecycle issues detected."
         : hasCollection
           ? "Collection issues detected."
-          : "Telemetry lifecycle issues detected.";
+          : hasLifecycle
+            ? "Telemetry lifecycle issues detected."
+            : "Collection or telemetry lifecycle issue details were omitted.";
     lines.push(`  ${styling.warnBadge("!")} ${headline}`);
   }
   for (const diagnostic of diagnostics) {
@@ -161,8 +186,7 @@ function appendSummaryNotice(
   summary: ProfileDiagnosticSummary,
   styling: Styling,
 ): void {
-  const marker =
-    summary.maximumSeverity === "warning" ? styling.warnBadge("!") : "!";
+  const marker = summary.maximumSeverity === "warning" ? styling.warnBadge("!") : "!";
   const count =
     summary.omittedOccurrences === null
       ? "the number of omitted occurrences is unknown"
@@ -294,6 +318,7 @@ function renderScope(
     const path = segments.slice(0, 2);
     let nodes = roots;
     let absoluteName = "";
+    let targetNode: NamespaceNode | null = null;
     for (const segment of path) {
       absoluteName = absoluteName ? `${absoluteName}.${segment}` : segment;
       const node: NamespaceNode = nodes.get(segment) ?? {
@@ -303,9 +328,10 @@ function renderScope(
         children: new Map(),
       };
       nodes.set(segment, node);
+      targetNode = node;
       nodes = node.children;
     }
-    findNode(roots, path)!.rows.push(row);
+    targetNode?.rows.push(row);
   }
   for (const diagnostic of diagnostics) {
     if (diagnostic.target.type !== "observation" && diagnostic.target.type !== "point") continue;
@@ -333,17 +359,6 @@ function renderScope(
     renderNode(lines, node, 2, styling, true, diagnostics);
 }
 
-function findNode(roots: Map<string, NamespaceNode>, path: readonly string[]): NamespaceNode | null {
-  let nodes = roots;
-  let result: NamespaceNode | null = null;
-  for (const segment of path) {
-    result = nodes.get(segment) ?? null;
-    if (!result) return null;
-    nodes = result.children;
-  }
-  return result;
-}
-
 function renderNode(
   lines: string[],
   node: NamespaceNode,
@@ -358,10 +373,13 @@ function renderNode(
   const ownRows = rows.filter((row) => row.value.name === node.absoluteName);
   const childRows = rows.filter((row) => row.value.name !== node.absoluteName);
   const ownDiagnostics = diagnosticsForName(diagnostics, node.absoluteName);
-  if (ownRows.length === 1) {
-    lines.push(`${indent}${styling.sectionHeading(name)}${formatMeasurementFields(ownRows[0]!, styling)}`);
-    renderAttributes(lines, ownRows[0]!, node.absoluteName, depth + 1, styling);
-    appendMeasurementDiagnostics(lines, ownRows[0]!, ownDiagnostics, depth + 1, styling);
+  const ownRow = ownRows.at(0);
+  if (ownRows.length === 1 && ownRow) {
+    lines.push(
+      `${indent}${styling.sectionHeading(name)}${formatMeasurementFields(ownRow, styling)}`,
+    );
+    renderAttributes(lines, ownRow, node.absoluteName, depth + 1, styling);
+    appendMeasurementDiagnostics(lines, ownRow, ownDiagnostics, depth + 1, styling);
   } else if (ownRows.length === 0 && ownDiagnostics.length > 0) {
     const unavailable = ownDiagnostics.some(isEntireResultUnavailable);
     lines.push(
@@ -373,15 +391,7 @@ function renderNode(
     for (const diagnostic of ownDiagnostics.filter((item) => item.target.type !== "point"))
       appendNotice(lines, diagnostic, depth + 1, styling);
     for (const row of ownRows)
-      renderAbsoluteRow(
-        lines,
-        row,
-        depth + 1,
-        styling,
-        node.absoluteName,
-        false,
-        ownDiagnostics,
-      );
+      renderAbsoluteRow(lines, row, depth + 1, styling, node.absoluteName, false, ownDiagnostics);
   }
   const childNames = new Set([
     ...childRows.map((row) => row.value.name),
@@ -498,8 +508,18 @@ function formatMeasurementFields(row: ProfileMeasurement, styling: Styling): str
       ["samples", available.samples ? exact(point.count, styling) : UNAVAILABLE],
       ["total", available.total ? unit(point.sum, point.unit, styling) : UNAVAILABLE],
       ["avg", avg === null ? UNAVAILABLE : unit(avg, point.unit, styling)],
-      ["min", available.min && point.minimum !== null ? unit(point.minimum, point.unit, styling) : UNAVAILABLE],
-      ["max", available.max && point.maximum !== null ? unit(point.maximum, point.unit, styling) : UNAVAILABLE],
+      [
+        "min",
+        available.min && point.minimum !== null
+          ? unit(point.minimum, point.unit, styling)
+          : UNAVAILABLE,
+      ],
+      [
+        "max",
+        available.max && point.maximum !== null
+          ? unit(point.maximum, point.unit, styling)
+          : UNAVAILABLE,
+      ],
     ],
     styling,
   )}`;
@@ -519,7 +539,9 @@ function renderAttributes(
   styling: Styling,
 ): void {
   if (row.kind === "span") {
-    for (const attribute of [...row.value.attributes].sort((a, b) => compareCodeUnits(a.key, b.key)))
+    for (const attribute of [...row.value.attributes].sort((a, b) =>
+      compareCodeUnits(a.key, b.key),
+    ))
       renderAttributeLine(
         lines,
         attribute.key,
@@ -655,7 +677,7 @@ function scaledUnit(
   initialScale: number,
 ): { value: string; unit: string } {
   if (value === 0)
-    return { value: "0", unit: units[initialScale === 1 ? 0 : units.length - 1]! };
+    return { value: "0", unit: units[initialScale === 1 ? 0 : units.length - 1] ?? "" };
   let scaled = value * initialScale;
   let index = 0;
   while (Math.abs(scaled) >= threshold && index < units.length - 1) {
@@ -668,7 +690,7 @@ function scaledUnit(
     index += 1;
     rendered = formatNumber(scaled);
   }
-  return { value: rendered, unit: units[index]! };
+  return { value: rendered, unit: units[index] ?? "" };
 }
 
 function formatNumber(value: number): string {

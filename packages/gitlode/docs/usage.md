@@ -357,9 +357,9 @@ gitlode [options] <repository-path>
 
 ### Control
 
-| Parameter   | Alias | Type    | Default | Description                                                                                                  |
-| ----------- | ----- | ------- | ------- | ------------------------------------------------------------------------------------------------------------ |
-| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.                |
+| Parameter   | Alias | Type    | Default | Description                                                                                                 |
+| ----------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.               |
 | `--profile` |       | boolean | `false` | Collect and display a local Scope/namespace profile after a successful extraction. Suppressed by `--quiet`. |
 
 ### Configuration File

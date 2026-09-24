@@ -115,9 +115,9 @@ Both may be specified simultaneously — rotation triggers when **either** thres
 
 ### Control
 
-| Parameter   | Alias | Type    | Default | Description                                                                                                                         |
-| ----------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors are still emitted.                                    |
+| Parameter   | Alias | Type    | Default | Description                                                                                                                      |
+| ----------- | ----- | ------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors are still emitted.                                 |
 | `--profile` |       | boolean | `false` | Collect and display a local Scope/namespace diagnostic profile to stderr after a successful extraction. Suppressed by `--quiet`. |
 
 ### Configuration File

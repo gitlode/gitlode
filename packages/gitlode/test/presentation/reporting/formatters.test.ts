@@ -10,7 +10,9 @@ import { describe, expect, it } from "vitest";
 import { formatProfileLines } from "../../../src/presentation/reporting/formatters.js";
 import { createStyling, plainStyling, type Styling } from "../../../src/presentation/styling.js";
 
-const emptyReport = (): ProfileReport => ({
+type MutableProfileReport = { -readonly [Key in keyof ProfileReport]: ProfileReport[Key] };
+
+const emptyReport = (): MutableProfileReport => ({
   schemaVersion: 2,
   signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
   spans: [],
@@ -149,10 +151,34 @@ describe("generic profile formatting", () => {
       {
         ...span("example", "gitlode.projection"),
         attributes: [
-          { key: "gitlode.projection.mode", reducer: "single", value: "ready", observedCount: 2, conflictCount: 0 },
-          { key: "gitlode.project", reducer: "single", value: "true", observedCount: 1, conflictCount: 0 },
-          { key: "gitlode.projection.outcome", reducer: "distinct", values: [{ value: "ok", count: 2 }], overflowCount: 0 },
-          { key: "gitlode.projection.size", reducer: "min_max", minimum: 1, maximum: 9, observedCount: 2 },
+          {
+            key: "gitlode.projection.mode",
+            reducer: "single",
+            value: "ready",
+            observedCount: 2,
+            conflictCount: 0,
+          },
+          {
+            key: "gitlode.project",
+            reducer: "single",
+            value: "true",
+            observedCount: 1,
+            conflictCount: 0,
+          },
+          {
+            key: "gitlode.projection.outcome",
+            reducer: "distinct",
+            values: [{ value: "ok", count: 2 }],
+            overflowCount: 0,
+            observedCount: 2,
+          },
+          {
+            key: "gitlode.projection.size",
+            reducer: "min_max",
+            minimum: 1,
+            maximum: 9,
+            observedCount: 2,
+          },
         ],
       },
     ];
@@ -192,9 +218,7 @@ describe("generic profile formatting", () => {
 
   it("quotes an explicitly present empty Scope version", () => {
     const report = emptyReport();
-    report.counters = [
-      { ...counter("example", "count"), scope: { name: "example", version: "" } },
-    ];
+    report.counters = [{ ...counter("example", "count"), scope: { name: "example", version: "" } }];
     expect(formatProfileLines(report)).toContain('  Scope: example@""');
   });
 
@@ -238,8 +262,14 @@ describe("generic profile formatting", () => {
   it("places Scope, observation and point issues at their narrowest evidenced targets", () => {
     const report = emptyReport();
     report.counters = [
-      { ...counter("example", "example.cache.lookup", 1), attributes: [{ key: "mode", value: "a" }] },
-      { ...counter("example", "example.cache.lookup", 2), attributes: [{ key: "mode", value: "b" }] },
+      {
+        ...counter("example", "example.cache.lookup", 1),
+        attributes: [{ key: "mode", value: "a" }],
+      },
+      {
+        ...counter("example", "example.cache.lookup", 2),
+        attributes: [{ key: "mode", value: "b" }],
+      },
     ];
     report.diagnostics = [
       diagnostic({
@@ -365,7 +395,11 @@ describe("generic profile formatting", () => {
 
   it("renders fixed fallback and lifecycle-only reports through the ordinary path", () => {
     const fallback = emptyReport();
-    fallback.signalStatus = { spans: "unavailable", counters: "unavailable", histograms: "unavailable" };
+    fallback.signalStatus = {
+      spans: "unavailable",
+      counters: "unavailable",
+      histograms: "unavailable",
+    };
     fallback.diagnostics = [
       diagnostic({
         code: "lifecycle_failure",
@@ -419,15 +453,17 @@ describe("generic profile formatting", () => {
     ) as unknown as Styling;
     const styled = formatProfileLines(report, spy).join("\n");
     expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
-    expect(calls).toEqual(expect.arrayContaining([
-      "sectionHeading:Profile",
-      "sectionHeading:Scope: example",
-      "fieldKey:calls",
-      "separator: : ",
-      "primaryValue:1",
-      "unitSuffix: operations",
-      "warnBadge:!",
-    ]));
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        "sectionHeading:Profile",
+        "sectionHeading:Scope: example",
+        "fieldKey:calls",
+        "separator: : ",
+        "primaryValue:1",
+        "unitSuffix: operations",
+        "warnBadge:!",
+      ]),
+    );
 
     const ansi = /\u001b\[[0-9;]*m/gu;
     expect(formatProfileLines(report, createStyling(true)).join("\n").replace(ansi, "")).toBe(

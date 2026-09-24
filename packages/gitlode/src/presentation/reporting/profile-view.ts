@@ -53,8 +53,9 @@ export function compareAttributeSets(
 ): number {
   const length = Math.min(left.length, right.length);
   for (let index = 0; index < length; index += 1) {
-    const leftAttribute = left[index]!;
-    const rightAttribute = right[index]!;
+    const leftAttribute = left.at(index);
+    const rightAttribute = right.at(index);
+    if (!leftAttribute || !rightAttribute) break;
     const comparison =
       compareCodeUnits(leftAttribute.key, rightAttribute.key) ||
       compareProfileAttributeValues(leftAttribute.value, rightAttribute.value);

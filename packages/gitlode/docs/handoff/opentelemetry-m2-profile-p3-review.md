@@ -1,8 +1,8 @@
 # P3 independent presentation review
 
-Current assignment: [P3 correction round 1](opentelemetry-m2-profile-implementation.md#p3-correction-round-1).
-The independent review is complete with P3 corrections required. Preserve its evidence below;
-do not restart the original review or treat its accepted subparts as complete P3 acceptance.
+Current assignment: [P3 correction round 1 focused re-review](#p3-correction-round-1-focused-re-review).
+Corrections returned at 61a34c1; P3 remains unaccepted. Earlier review instructions/outcome are
+historical evidence. Human terminal and cumulative validation remain later gates.
 
 ## Fixed inputs and authority
 
@@ -233,3 +233,71 @@ Human light/dark real-terminal readability, color perception and wrapping remain
 of capture success. Cumulative Windows/Linux source and installed-package validation also remains a
 separate post-correction gate. No formal measurement, implementation repair, PR, merge, acceptance
 update or tests/system move was performed.
+
+## P3 correction round 1 focused re-review
+
+### Fixed inputs and authority
+
+Review in a fresh human-started independent conversation on `feature/otel-redesign_M2_profile`.
+
+- Correction entry/base: `f4d9f12788147b4054b48847574ba4cbc887d7d6`.
+- Implementation: `255b0aacebb5fc7c109d3fe151455abace7f9d51`.
+- Outcome: `094dcb81df02681f4de20daf9c160eaacbf0564c`.
+- Full fixed target: `61a34c1f13ee993099c4611b3e4ac966b2ab132c`.
+
+Trunk inspected four implementation/test/catalog files; implementation-to-final changes are confined
+to the implementation handoff. Verify ancestry, clean entry/exit and actual remote equality; identify
+any later source changes rather than silently reviewing a different target. Routing-only commits do
+not move this target. Trunk has not independently rerun the 72 reported tests or accepted P3.
+
+Read the original P3-R1..R4 findings above, the
+[correction outcome](opentelemetry-m2-profile-implementation.md#p3-correction-round-1-outcome), and the
+accepted design's identity, escaping, diagnostic ordering/quantities and semantic style rules. Compare
+new catalog wording to that design, not merely to new tests. P1/P2 remain accepted. Limit review to
+these corrections and concrete affected regressions; no layout preference redesign, implementation
+repair, PR, merge, formal performance or package/OS campaign.
+
+### Focused questions
+
+1. R1: same-name missing/present-empty versions remain separate for measurements and diagnostics,
+   in either input order. Embedded delimiters cannot alias identities. Group equality/order matches
+   accepted Scope comparison; rendering and admission are unchanged.
+2. R2: measured and issue-only suffixes escape the complete displayed token before decoration.
+   Check controls, quotes/slashes, C1/bidi/line separators with literal independent expectations.
+   Malformed-dot missing-only targets survive as absolute quoted rows, including mixed measured/
+   missing targets, cross-kind/typed point targets and ordinary siblings. No diagnostic loss or
+   duplicate attachment; ordering, row boundaries and attribute bases remain correct.
+3. R3: known loss meaning/unit/value/saturation remains distinct from occurrence count and unknown
+   amounts for all supported descriptors. Preserve duration explanation without duplication; no
+   fabricated quantity on compacted unknown details. Canonical target precedes code/stage/effect,
+   with deterministic retained ties and typed comparisons. Verify opposed input orders and nullable
+   versions, point attributes, selectors and same-target diagnostics; do not accept a comparator that
+   preserves arrival order for distinguishable output or aliases delimiters.
+4. R4: overall marker follows maximum retained severity, including reserved summary; info-only is
+   not warning-colored. Frequency digits and coverage label/count/punctuation use their own semantic
+   roles. Fixed fallback remains warning. Use role-spy evidence plus ANSI-stripped parity, and preserve
+   genuine values/unavailable text and application/progress styles. Styling-only changes preserve text.
+5. Check durable tests expose the original failures rather than derive expected tokens/order from
+   production helpers. Distinguish reported fail-before commands and skipped nonmatching tests from
+   independently reproduced evidence. Ensure ordinary rows, P2 masks/partial/fallback semantics and
+   routing are still covered without restarting accepted producer reviews.
+
+### Finite verification and return
+
+Run build:dev, the original nine-suite command and exact strict tooling command from the correction
+outcome (reported: 72 passed, no skips). Record actual results; Vitest execution alone is not test
+source typechecking. Inspect fail-before evidence for each group; use temporary bounded probes only
+for concrete uncovered concerns and remove/restore them before returning. Run fixed-diff whitespace
+checks and format write/check for review documentation. Lint/architecture may remain reported-only
+unless a new concern justifies rerunning them.
+
+Do not automatically repeat the three ordinary captures: prior reproduction is historical evidence,
+not proof of these synthetic boundaries. Reproduce a small case only if a correction plausibly changes
+its output. Capture script output is non-TTY; human light/dark styling and wrapping confirmation remains
+pending and requires actual TTY use, not merely rerunning the capture script. Do not claim human approval.
+
+Append per-finding accepted/corrections-required and overall P3 implementation decision, concrete
+remaining failures, independent versus reported checks and outstanding human/cumulative gates. Batch
+findings and return to trunk; no fixes within review. Normally commit/push documentation on this child,
+verify actual remote OID and clean status, and remain on the child. No force push or parent updates.
+Acceptance of this slice does not complete M2 or authorize PR/merge or the next validation campaign.

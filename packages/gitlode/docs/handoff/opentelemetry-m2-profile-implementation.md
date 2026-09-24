@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P3 correction round 1](#p3-correction-round-1).
-P3 review requires four bounded corrections. P1/P2 remain accepted; P3, human terminal confirmation
-and cumulative validation remain open. Earlier packets/outcomes are historical context.
+Current assignment: [P3 correction focused re-review](opentelemetry-m2-profile-p3-review.md#p3-correction-round-1-focused-re-review).
+Correction returned at `61a34c1f13ee993099c4611b3e4ac966b2ab132c`; P3 remains unaccepted.
+P1/P2 remain accepted. Human terminal and cumulative validation remain pending; earlier packets are historical.
 
 ## Assignment, source and branch
 

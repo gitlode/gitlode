@@ -161,12 +161,12 @@ export class ProfileReportBuilder {
       let next: IteratorResult<Value>;
       try {
         next = iterator.next();
+        if (next.done) break;
       } catch {
         status = "partial";
         this.#addValidationIssue(kind, false);
         break;
       }
-      if (next.done) break;
       try {
         const value = next.value;
         const normalized = normalize(value);

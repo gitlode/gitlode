@@ -1100,16 +1100,23 @@ describe("profile report builder", () => {
         throw new Error("unsafe getter");
       },
     });
-    const diagnostics = new BoundedDiagnosticAccumulator();
-    const report = new ProfileReportBuilder(diagnostics).build({
-      spans: { status: "complete", values: [] },
-      counters: { status: "complete", values: [throwing, counter("later")] },
-      histograms: { status: "complete", values: [] },
-    });
-    expect(report.counters.map((point) => point.name)).toEqual(["later"]);
-    expect(report.diagnostics[0]).toMatchObject({
-      lossQuantity: expect.objectContaining({ value: 1 }),
-    });
+    for (const values of [
+      [throwing, counter("later")],
+      [counter("before"), throwing, counter("after")],
+    ]) {
+      const diagnostics = new BoundedDiagnosticAccumulator();
+      const report = new ProfileReportBuilder(diagnostics).build({
+        spans: { status: "complete", values: [] },
+        counters: { status: "complete", values },
+        histograms: { status: "complete", values: [] },
+      });
+      expect(report.counters.map((point) => point.name)).toEqual(
+        values.length === 2 ? ["later"] : ["after", "before"],
+      );
+      expect(report.diagnostics[0]).toMatchObject({
+        lossQuantity: expect.objectContaining({ value: 1 }),
+      });
+    }
 
     const iterable = {
       [Symbol.iterator]() {

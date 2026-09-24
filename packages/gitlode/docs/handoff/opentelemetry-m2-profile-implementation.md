@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [independent correction re-review](opentelemetry-m2-profile-p1-review.md#correction-round-1-focused-re-review).
-Correction round 1 has returned; the assignments below are historical context. P1 is not accepted and
-P2 is unassigned. Do not recreate the branch or restart P1 from its original base.
+Current assignment: [P2 runtime and consumer migration](#p2-runtime-and-consumer-migration).
+P1 is accepted at `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`. Earlier assignments/outcomes below
+are historical context, not instructions to restart P1. P2 acceptance and P3 are still pending.
 
 ## Assignment, source and branch
 
@@ -401,3 +401,106 @@ with a clean worktree. This checkpoint includes both the outcome and a stricter 
 assertion in `profile-v2-primitives.test.ts`; it is not documentation-only relative to 5f2d03b.
 Trunk inspected the correction diff without repeating the reported build/test campaign. P1 remains
 unaccepted pending the [focused re-review](opentelemetry-m2-profile-p1-review.md#correction-round-1-focused-re-review).
+
+## P2 runtime and consumer migration
+
+### Entry, ownership and session boundary
+
+Continue `feature/otel-redesign_M2_profile` after the independent P1 acceptance recorded in
+`8ea9cfca2fb0cb7ab6455d9805cc1479ff19e932`. The accepted implementation is
+`dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`; subsequent changes through the review checkpoint are
+handoff-only. Verify clean status, ancestry, actual remote equality and the exact entry OID including
+this planning packet. Do not recreate/reset the child or update M2/integration/main.
+
+Read the accepted design, its integrated examples, the P1 correction re-review outcome, the P2 atomic
+inventory above, and canonical telemetry/verification/catalog contracts. P1 acceptance is established;
+reopen a primitive only for a concrete integration defect, recording why and its affected tests.
+
+P2 owns the complete producer/consumer schema switch. P3 owns the new generic namespace renderer,
+style and removal of old per-observation view policy. Do not implement P3's layout in this session.
+A minimal truthful presentation bridge is part of P2: it must honor availability and explain report
+construction failure through the ordinary report path, without pretending final display acceptance.
+No new observation, recorder, Span aggregation policy, external exporter or tests/system relocation.
+
+Atomic means a coherent final runtime protocol, not one commit or one uninterrupted conversation.
+Use these sequential internal checkpoints on the same child:
+
+1. Activate contracts, migrate existing detection sites/collectors and normal builder with tests.
+2. Wire lifecycle/fallback and worker/application transport with failure-isolation tests.
+3. Complete presentation/tooling consumers, canonical docs and combined verification.
+
+These are not independently mergeable or accepted slices. Checkpoint and normally push meaningful
+progress even if explicitly incomplete. If context or a concrete dependency prevents completing P2,
+return a clean committed continuation with exact completed/remaining inventory and failing checks;
+do not rush, silently narrow scope or call an intermediate schema state complete. Trunk will assign
+the next conversation. Warn before lengthy build/setup operations; formal measurement is not assigned.
+
+### Required implementation contracts
+
+- Replace staging-only v2 names/exports with the active report contract and schema 2. Update every
+  consumer in the inventory above and search for additional version/shape assumptions. No active
+  v1/v2 dual protocol. Preserve unrelated JSONL/application and performance-artifact schemas.
+- Map every existing detection site to target, kind coverage, effects, extent, attribute-key selector,
+  field/detail-loss masks, whole-result evidence and meaningful quantity descriptors. Return a finite
+  detection-site-to-producer/test inventory, including lifecycle/collection/aggregation/validation
+  cases; do not expand detection coverage beyond the accepted design.
+- Preserve diagnostic identity distinctions, bounded accumulation, per-kind effect associations and
+  count/quantity saturation established by P1. Retained measurement availability survives diagnostic
+  compaction. Unavailable numeric slots are never observations of zero; duration average requires
+  compatible contribution coverage. Preserve legitimate zero values and valid siblings.
+- Catch the status/value validation rejection inside the normal builder's validation isolation.
+  Preserve valid measurements and sibling signals and emit bounded explanatory validation evidence.
+  Derive an explained partial outcome where appropriate; do not globally catch and drop the report,
+  or route this recoverable inconsistency into the catastrophic builder fallback. Verify this path
+  with populated measurements and a full diagnostic budget, not only the throwing primitive.
+- Catch a real exception from the normal builder body and invoke the independent fixed fallback
+  exactly once. Use the accepted no-safe-measurement-snapshot option: empty arrays and unavailable
+  results with report-delivery provenance. Do not add a recovery traversal/buffer or salvage partial
+  builder data. A builder-entry hook is not evidence of body-failure handling.
+- The minimum fallback must survive failure of the normal diagnostic snapshot and avoid inspecting
+  thrown payloads. Retain the mandatory build-failure diagnostic within the 15+1 bound, and safely
+  incorporate shutdown evidence after cleanup, preserving unknown prior-detail provenance when needed.
+  Preserve one cached finalization promise, application result identity, cleanup order and ownership.
+- Keep disabled/degraded sessions without profile, no-op selection, success-only/quiet visibility and
+  async metric timeout behavior. Use the normal serializable worker report and normal presenter; do
+  not add an alternate warning/stderr/transport path for fallback.
+- Migrate performance/aggregation/report evaluators and release-acceptance consumers with the runtime
+  switch. Preserve complete-signal/empty-diagnostics/schema-validity obligations. Count reserved
+  diagnostic summaries and unavailable fields correctly; fallback cannot pass as a healthy empty
+  report. Do not relax thresholds, reset live blocked acceptance or relabel historical v1 evidence as
+  new schema-2 evidence. Historical artifacts remain bound to their original harness/product OIDs.
+
+### Documentation and finite verification
+
+Update active report/catalog, telemetry and verification contracts with activation; remove staged
+claims that are no longer true. Update profiling/usage interpretation only for actual bridge behavior;
+leave final namespace/view-policy migration to P3. Record all consumer migrations and residual P3
+work in this handoff, avoiding a second normative specification.
+
+Use meaningful focused tests for contracts/normalization, collectors, builder, diagnostic bounds,
+worker finalization, worker transport/application integration, presentation bridge, catalog and
+performance/aggregation/release consumers. Explicitly cover:
+
+- valid normal data, invalid point with valid siblings, availability masks versus observed zero,
+  duration-contribution mismatch and summary compaction;
+- recoverable contradictory status/value evidence versus actual builder-body exception;
+- builder failure after partial work, broken diagnostic snapshot, simultaneous shutdown failure,
+  mandatory fallback retention and no unsafe payload traversal;
+- concurrent/repeated finalize, cleanup once, fallback delivered by real worker serialization and
+  normal successful presentation, quiet/failed-run suppression, disabled/degraded behavior;
+- repository sidecar and aggregation classification of partial/unavailable/fallback reports and
+  reserved summaries, without executing formal performance measurement.
+
+Select tests from the actual affected inventory rather than fixing an obsolete test count. Keep the
+P1 regression assertions when moving/renaming candidate tests. Run `npm run build:dev`, affected
+Vitest suites, `npm run architecture:check`, `npm run lint`, `npm run format:write`,
+`npm run format:check`, and `git diff --check`. Typecheck changed tooling using its checked project
+or an explicit strict standalone command when its normal project uses noCheck; distinguish this from
+Vitest execution and production compilation. Record exact commands/results and any platform skips.
+Full Windows/Linux package validation remains the cumulative P3-R/V responsibility; no formal T13B,
+release/publish command, acceptance-record update, PR or merge is authorized.
+
+Return implementation and final checkpoint OIDs, local/actual remote equality, clean status,
+producer/consumer coverage, regression evidence and explicit residual work. Push normally to this
+child, never force-push. P2 is not self-accepted: trunk next assigns P2-R data-integrity/failure-isolation
+review at the full final target, including any post-implementation test changes. Do not begin P3.

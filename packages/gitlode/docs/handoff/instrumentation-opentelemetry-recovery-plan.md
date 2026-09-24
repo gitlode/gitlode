@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                                      | Remaining scope                                                            |
-| --------- | ------------------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only                   | Preserve historical evidence and environment                               |
-| M1        | complete                                    | Preserve corrected validation and squash attribution                       |
-| M2        | P1 correction re-review pending; P2 blocked | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates                   | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                    | Remaining scope                                                            |
+| --------- | ------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only | Preserve historical evidence and environment                               |
+| M1        | complete                  | Preserve corrected validation and squash attribution                       |
+| M2        | P1 accepted; P2 assigned  | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -57,14 +57,16 @@ measurement availability masks, collector/report propagation, worker fallback, g
 and shared styling are in scope. Observation admission, recorder ownership and Span aggregation
 identity remain unchanged. The collector changes cannot be attributed to presentation alone.
 
-P1 correction round 1 returned on `feature/otel-redesign_M2_profile` at
-`dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`, after the four required findings against a9a4813.
-Trunk confirmed clean local/actual remote equality. The full target includes a test-strengthening
-change after implementation checkpoint `5f2d03b`; it is not documentation-only. The next human-started
-conversation is [focused independent re-review](opentelemetry-m2-profile-p1-review.md#correction-round-1-focused-re-review).
-P1 remains unaccepted; P2 is unassigned. In particular, P2 must isolate contradictory status/value
-validation rejection, retain valid measurements/siblings and add bounded explanatory evidence;
-this is separate from catastrophic builder failure and the fixed report-delivery fallback.
+P1 is accepted at `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`, with independent re-review
+recorded at `8ea9cfca2fb0cb7ab6455d9805cc1479ff19e932`. All four corrections and preprocessing
+hardening were accepted; the reviewer independently ran build and 7 files / 112 tests. This is
+primitive acceptance, not runtime or M2 acceptance. The next human-started conversation is
+[P2 runtime and consumer migration](opentelemetry-m2-profile-implementation.md#p2-runtime-and-consumer-migration)
+on the same child branch, followed by P2-R. P2 has sequential remotely preserved internal checkpoints
+for producers/builder, lifecycle/transport, then consumers/docs/combined verification. They are not
+independently mergeable; if continuation is needed, return a precise incomplete checkpoint to trunk.
+P2 must isolate contradictory status/value rejection, retain valid values/siblings and explain the
+partial outcome, separately from catastrophic builder failure using the fixed empty fallback.
 
 ## Session sequence and dependencies
 
@@ -252,5 +254,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1 correction re-review
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named P2 implementation
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

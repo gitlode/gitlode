@@ -1,8 +1,8 @@
 # P1 independent review packet
 
-Current assignment: [correction round 1 focused re-review](#correction-round-1-focused-re-review).
-The original review packet and outcome below retain the prior findings; their old fixed target is
-not the target of this re-review.
+Review complete: [P1 accepted at dc6cfbd](#correction-round-1-re-review-outcome).
+The next assignment is [P2 implementation](opentelemetry-m2-profile-implementation.md#p2-runtime-and-consumer-migration).
+The review packets below are historical context; do not restart them.
 
 ## Fixed scope and authority
 

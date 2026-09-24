@@ -1,9 +1,8 @@
 # P2 independent data-integrity and failure-isolation review
 
-Current assignment: [P2 correction round 1](opentelemetry-m2-profile-implementation.md#p2-correction-round-1).
-The review is complete; the outcome below is preserved as review evidence. Trunk does not adopt
-P2-R1's blanket total/max unavailability: the accepted design explicitly permits retained mixed-validity
-total/max with an incompleteness notice. See the correction packet for the binding disposition.
+Current assignment: [correction round 1 focused re-review](#correction-round-1-focused-re-review).
+The original outcome is preserved below. Apply trunk's R1 qualification from the correction packet:
+mixed-validity total/max remain displayable with an incompleteness notice, not blanket unavailability.
 
 ## Fixed scope and authority
 
@@ -231,3 +230,74 @@ Correct P2-R1 through P2-R4 and add the one real fallback worker-transport regre
 new fixed correction target for focused independent re-review. Preserve the accepted P1 primitives,
 the current 15+1 bounds, thresholds, blocked release record and historical evidence identities. Do
 not begin P3 while these P2 data-integrity, isolation and consumer-validation corrections remain open.
+
+## Correction round 1 focused re-review
+
+### Fixed state and scope
+
+Continue on `feature/otel-redesign_M2_profile` in a new human-started independent review conversation.
+
+- Correction entry: `9e6ed7d28f0c5854d7ed6b62cd790f346ad6e4bf`.
+- Main correction: `bb5740e683e2463636ac4481b562308156703102`.
+- Follow-up implementation/tests: `3c0e11480897e6a14cf3d9e0028ec17152f812ea`.
+- **Full fixed target: `5bc2cf3c0910a5dc591ae53db05ca846f610cd05`.**
+
+Trunk inspected the 14-file correction inventory. The follow-up changes builder source as well as
+iterator tests; it must be included. Its delta to the final target is outcome documentation only.
+Verify ancestry, actual remote equality, clean worktree and entry/exit OIDs. Later routing-only commits
+do not change the target; identify any unexpected source delta before continuing.
+
+Read the [correction assignment and outcome](opentelemetry-m2-profile-implementation.md#p2-correction-round-1),
+original findings, accepted design sections 5/10 and the changed canonical guidance. Review correction
+paths and affected invariants, not a fresh redesign or a repeat of all previously resolved P1 questions.
+P2 is still unaccepted and P3 unassigned. No implementation repair, PR, merge, freeze or measurement.
+
+### Required questions
+
+1. **R1, qualified by trunk:** preserve mixed-validity retained total/max with incomplete-duration
+   explanation, unavailable average on coverage mismatch, all-invalid unavailability and genuine zero.
+   Follow real producer through builder, bridge and tooling, including both input orders and full
+   diagnostic budget/summary. Do not revive the rejected blanket total/max mask requirement. Available
+   retained numbers must not imply whole-run completeness or allow healthy formal acceptance.
+2. **R2:** independently verify throwing-first/middle point isolation, iterator acquisition/advance/
+   result-state failure, retention of already safe values and later safely obtainable siblings.
+   No retry of a failed iterator; exact one rejected value differs from unknown remaining loss.
+   Check follow-up source/test changes and normal-builder recovery rather than catastrophic fallback.
+3. **R3:** Counter/Histogram invalid values, attributes, getter failure and overflow preserve the
+   narrowest independently validated target. Confirm point identity is not built from unsafe values;
+   observation broadening retains known Scope/name, extent and quantity remain truthful, and existing
+   limits/admission are unchanged. Check restoration of any test-mutated limits.
+4. **R4:** independently audit the new complete report validator, not only the known malformed Counter
+   fixture. Check required fields, kind-specific masks, finite numbers, statuses, detail and summary
+   variants, bounds, target/effect associations, fallback provenance and canonical-equality handling.
+   Validation must be total/fail-closed for malformed inputs and must not repair them into acceptance;
+   valid producer reports must not be rejected merely because the validator shares a mistaken fixture.
+   Check normalization/detachment and equality against actual valid producer output, partial reports,
+   compacted diagnostics and fallback. Review all extraction/evaluator call sites and unchanged release
+   obligations; no threshold relaxation or historical artifact relabeling.
+5. **Transport proof:** the actual built worker entry must hit real builder-body failure and carry
+   the ordinary schema-2 fallback result to the client. Verify receiver-side application content and
+   classification (not reference equality across threads), mandatory delivery evidence, finite timeout,
+   progress routing and worker cleanup. Inspect the internal construction seam: no public request/CLI
+   failure switch, accidental normal-path injection or alternate message protocol.
+
+### Finite independent evidence and return
+
+Run build:dev, this packet's original 16 suites plus presenter.test.ts and
+`packages/gitlode/test/execution/worker-profile-fallback-transport.test.ts` (reported: 271 pass / 3
+Linux-only skips), and the exact strict changed-tooling command in the correction outcome. Record
+actual counts and skips; no full OS/package/formal-performance campaign. Existing supervision-only
+Linux skips remain outside these new paths unless a concrete dependency changes that assessment.
+
+Inspect the earlier independent counterexample evidence. The correction session did not rerun durable
+regressions on the old implementation, so do not describe its evidence as a new fail-before run.
+Use bounded independent probes or a temporary old-tree regression only when needed to resolve an
+actual uncertainty; restore/delete probes before return. Do not demand an expensive rerun solely
+for identical counts. Test execution and standalone typechecking remain distinct evidence.
+
+Run fixed-diff whitespace checks and format write/check for documentation. Return per-item decisions,
+P2 overall accepted/corrections-required, concrete remaining failure paths, independent versus reported
+checks and residual P3 responsibilities. If any correction remains, batch the findings and return to
+trunk instead of fixing them here. Trunk applies the bounded correction/diagnosis policy if needed.
+Append the outcome here, commit documentation only, normally push to this child and verify actual
+remote OID/clean status. No force push or parent updates. P2 acceptance alone does not authorize P3.

@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P2 correction round 1](#p2-correction-round-1). P2 remains unaccepted;
-P3 is unassigned. Read trunk's qualification of P2-R1 before applying the review's suggested fix.
-Earlier assignments/outcomes are historical context.
+Current assignment: [P2 correction focused re-review](opentelemetry-m2-profile-p2-review.md#correction-round-1-focused-re-review).
+Correction round 1 returned at `5bc2cf3c0910a5dc591ae53db05ca846f610cd05`. P2 remains unaccepted;
+P3 is unassigned. Earlier assignments/outcomes are historical context.
 
 ## Assignment, source and branch
 

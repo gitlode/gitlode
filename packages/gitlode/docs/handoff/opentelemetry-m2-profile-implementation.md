@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [R4 round 2 focused re-review](opentelemetry-m2-profile-p2-review.md#r4-round-2-focused-re-review).
-Round 2 returned at `280824cab82b85ca87a63eeb73b3e248df8df230`. R1-R3 and transport remain accepted;
-R4 and P2 overall await review. P3 is unassigned. Earlier assignments are historical context.
+Current assignment: [bounded R4 diagnosis](#bounded-r4-diagnosis).
+R4 remains unresolved after two correction rounds. No third correction is assigned. R1-R3 and
+transport remain accepted; P2 is unaccepted and P3 unassigned. Earlier packets are historical context.
 
 ## Assignment, source and branch
 
@@ -923,3 +923,73 @@ Re-review the returned tip for P2-R4-C1 only: shared-validator relationship tota
 association, fixed-delivery exception, legal broad/multi-kind and compacted evidence, and formal
 consumer fail-closed behavior. No unresolved implementation issue is known, but P2 remains
 unaccepted until that independent review. P3 remains unassigned.
+
+## Bounded R4 diagnosis
+
+### Purpose, fixed inputs and authority
+
+A fresh human-started diagnosis conversation must reconcile target-versus-signal semantics before
+another implementation assignment, following the two-correction convergence rule in
+[collaborative work](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
+This is a documentation/diagnosis task, not correction round 3 and not a new general code review.
+
+- Branch: `feature/otel-redesign_M2_profile` (continue; do not reset/create another branch).
+- Fixed implementation: `280824cab82b85ca87a63eeb73b3e248df8df230`.
+- Latest independent review: `8dea610737ab0a835e0b3419ac18c1cf3866393c`.
+- Prior round-2 implementation: `477fde1e7407ed9c63835541a32cde4bb8a987ae`.
+
+Verify ancestry, clean status and actual remote equality; record entry OID including this routing
+packet. Later documentation does not change the diagnostic implementation target. Read the latest
+[R4-C2 review](opentelemetry-m2-profile-p2-review.md#r4-round-2-focused-re-review-outcome), accepted
+profile design (especially target loss versus retained siblings), the round-2 matrix above, canonical
+report catalog and actual accumulator/status-builder/validator/consumer code. Distinguish original
+human-approved semantics from later implementation-authored matrix, docs and test expectations.
+
+Trunk accepts that the demonstrated producer/validator incompatibility blocks P2. Do not treat the
+reviewer's proposed line removal as an already approved complete implementation solution. R1 under
+trunk's duration qualification, R2, R3 and actual worker transport remain accepted. Six contradictory
+report families are correctly rejected; preserve that evidence and the fixed-delivery exception.
+
+### Finite diagnostic questions
+
+1. Define what `wholeResultUnavailable` proves at a point/observation/Scope/report target, what
+   `signalStatus` summarizes, and what the per-kind summary preserves after exact target information
+   is lost. Identify direction of each permitted implication; distinguish unavailable -> empty plus
+   evidence from target loss -> whole-signal loss. Do not invent stronger coverage from summary OR.
+2. Trace the reported detailed and 15+1 compacted lost-Counter-target plus retained sibling through
+   accumulator, `deriveProfileSignalStatus`, normal builder, shared validator and formal consumer.
+   Establish exactly where semantics diverge and whether the affected input is a current detection
+   site's output or a legal constructed input through real primitives. Neither evidence category
+   should be mislabeled. A valid partial report should be extractable but must not pass healthy
+   performance acceptance merely because validation succeeds.
+3. Produce a small relationship table for complete/partial/unavailable, zero/nonzero retained values,
+   absent/data-impact/whole-target/fixed-delivery evidence, and detailed/summary forms. Mark valid,
+   invalid or genuinely unresolved combinations with existing-contract reasons. Include the six
+   already-correct rejections and whole-target loss with no retained sibling; do not turn this into
+   an exhaustive unrelated telemetry redesign.
+4. Explain why the round-2 invariant matrix and its positive/negative fixtures encoded the reverse
+   implication. Identify the minimal ownership/document/test changes that prevent that expectation
+   from being repeated. Assess the proposed removal of the reverse rule against the table; list any
+   necessary companion changes and a finite regression plan with independent expected outcomes.
+5. Identify whether a human design decision is actually needed. If existing accepted contracts settle
+   the issue, say so and recommend the minimal correction; otherwise describe the exact ambiguity,
+   alternatives and compatibility impact. Do not silently amend the accepted design or canonical
+   contract during diagnosis.
+
+### Evidence, stop and output
+
+Reuse saved passing suites and review probes; no full build/test matrix just to repeat counts.
+Read-only inspection is primary. If needed, run only bounded probes for the two reported producer
+cases and a specific disputed boundary (build prerequisites only when necessary). Do not mutate
+production/tests or leave probe files; record actual versus reported evidence accurately. No
+performance run, package/release validation, P3, acceptance update, PR, merge or parent ref update.
+
+Append a concise diagnosis here: confirmed root cause, contract/implication table, evidence trace,
+minimal proposed file/change list, finite positive/negative regression cases, unresolved decisions
+(or none), and explicit return to trunk. Historical review outcomes and matrices stay attributable;
+label superseded interpretation rather than rewriting old evidence as if it were always correct.
+The diagnosis ends once those outputs are concrete; do not start implementing the recommendation.
+
+Run format write/check and diff check for the documentation outcome. Commit and normally push on
+this child, verify actual remote equality and clean status. Return exact OIDs. Trunk then decides a
+new bounded implementation packet; diagnosis itself does not accept R4/P2 or authorize P3.

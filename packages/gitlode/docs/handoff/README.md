@@ -19,8 +19,9 @@ work context, not active instructions to repeat M1. Stable contracts live in des
 The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`.
 P1 is [independently accepted](opentelemetry-m2-profile-p1-review.md#correction-round-1-re-review-outcome)
 at `dc6cfbd`. The active next assignment is
-[R4 round 2 focused re-review](opentelemetry-m2-profile-p2-review.md#r4-round-2-focused-re-review) at `280824c`.
-R1-R3 and actual transport are accepted; R4 cross-field validation remains open.
+[bounded R4 diagnosis](opentelemetry-m2-profile-implementation.md#bounded-r4-diagnosis).
+R1-R3 and actual transport are accepted; R4 target-versus-signal interpretation remains unresolved
+after two corrections. No third correction is assigned.
 P2/P3 and M2 acceptance remain pending.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are

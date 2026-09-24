@@ -1,8 +1,8 @@
 # P2 independent data-integrity and failure-isolation review
 
-Current assignment: [R4 round 2 focused re-review](#r4-round-2-focused-re-review).
-R1 (trunk-qualified), R2, R3 and transport remain accepted. Earlier review packets and outcomes
-are historical evidence. P2 remains unaccepted pending this review.
+Current assignment: [bounded R4 diagnosis](opentelemetry-m2-profile-implementation.md#bounded-r4-diagnosis).
+Round-2 review found P2-R4-C2; P2 remains unaccepted. R1-R3 and transport remain accepted.
+Earlier review packets/outcomes are historical evidence. No automatic third correction is assigned.
 
 ## Fixed scope and authority
 

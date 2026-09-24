@@ -504,3 +504,98 @@ Return implementation and final checkpoint OIDs, local/actual remote equality, c
 producer/consumer coverage, regression evidence and explicit residual work. Push normally to this
 child, never force-push. P2 is not self-accepted: trunk next assigns P2-R data-integrity/failure-isolation
 review at the full final target, including any post-implementation test changes. Do not begin P3.
+
+### P2 implementation outcome
+
+P2 runtime and consumer migration is implemented. P3, PR creation, merge, formal performance
+measurement, release/package validation and acceptance-record changes were not started. The result is
+ready for the assigned independent P2-R data-integrity/failure-isolation review; it is not
+self-accepted.
+
+#### Provenance and checkpoints
+
+- Entry and exact requested base: `8af0b6af5f4630699dc0b95c00a5d6f478acaba8`; the worktree was clean,
+  the local child and actual remote child agreed, and accepted P1 target
+  `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5` was an ancestor.
+- Contract/collector/builder checkpoint: `8f0f8cc8b4135817544131173d9c3fe167b51c13`
+  (`feat: activate profile report schema v2`).
+- Lifecycle/fallback checkpoint: `ca62c355edd4d8c8ee4d9cdc533a9cf967f01a10`
+  (`feat: isolate profile report fallback lifecycle`).
+- Presentation/tooling/catalog implementation target:
+  `85c48e0ddc82211a899bb11e4aec70bba04eb96d`
+  (`feat: migrate profile report consumers to schema v2`).
+- Every checkpoint was normally pushed to `origin/feature/otel-redesign_M2_profile`; no force push or
+  integration/main/M2 update was performed.
+
+#### Active contract and producer coverage
+
+- Schema 2 is the only active `ProfileReport` protocol. Staging-only v2 contract/normalization names,
+  files and exports were removed; measurement normalization, typed target/effect/field/detail-loss
+  contracts, 15+1 diagnostics and numeric availability are active SDK-independent contracts.
+- Span aggregation maps group overflow to missing-observation evidence, invalid/missing duration to
+  incomplete total/average/maximum evidence with a disjoint duration-contribution quantity, invalid
+  attributes and reducer conflicts/overflow to exact-key missing-detail evidence, and an unexpected
+  processor exception to bounded unknown-coverage evidence. It records duration contribution counts
+  and fixed availability masks without changing the aggregation key.
+- Metric conversion maps malformed type/attribute/value/histogram and unexpected traversal failures
+  to bounded unknown-coverage evidence, point retention overflow to missing-point evidence, SDK
+  collection errors to partial coverage, and collection failure/timeout to confirmed whole-result
+  unavailability for Counter and Histogram. Retained points carry fixed availability masks.
+- Normal report validation canonicalizes each value independently, retains valid siblings, records
+  bounded missing-result evidence for invalid values and catches contradictory unavailable status plus
+  retained values inside the builder. The contradiction becomes explained partial evidence and never
+  invokes the catastrophic fallback.
+- Trace/root flush, metric collection, report-hook and shutdown detection sites now emit structured
+  lifecycle evidence. Lifecycle-only shutdown notices do not mark measurement signals partial or
+  unavailable.
+
+#### Lifecycle and consumer migration
+
+- A real exception from inside the invoked builder body produces the independent fixed fallback once;
+  no measurement salvage/retraversal is attempted and thrown payloads are not inspected. The fallback
+  uses a trusted diagnostic snapshot when available and otherwise retains unknown-prior-detail
+  provenance. Cleanup remains ordered and once-only, concurrent/repeated finalization shares one
+  promise, and simultaneous shutdown evidence is retained even when the normal diagnostic snapshot is
+  broken.
+- The fallback follows the ordinary `ProfileReport` worker/application result path. Disabled and
+  initialization-degraded sessions still produce no report; application-result identity, failed-run
+  suppression, success-only display and quiet suppression remain unchanged.
+- The existing P2 presentation bridge remains intentionally pre-P3: it still uses the old
+  per-observation groups/order, but renders unavailable numeric slots as em dashes, preserves genuine
+  zero, suppresses unavailable arrays and explains fixed-fallback delivery and reserved summaries in
+  the ordinary Profile block.
+- Repository sidecar/performance evaluation now requires report schema 2, validates fixed availability
+  masks, refuses to invent an ended-span total when calls are unavailable, counts the reserved summary,
+  and classifies partial/unavailable status, diagnostics and fixed fallback separately. Historical
+  artifact and release-acceptance record schema versions remain unchanged, the live blocked record was
+  not edited, and no thresholds were relaxed.
+- The active catalog and canonical telemetry, verification, profiling and usage documents describe
+  deployed schema-2 behavior. The staged-candidate catalog section was removed.
+
+#### Verification
+
+- Focused contract/collection checkpoint: 3 files, 63 tests passed.
+- Lifecycle/fallback/application checkpoint: 4 files, 85 tests passed.
+- Combined affected command: 17 files, 261 tests passed and 3 skipped (264 total), covering active
+  contracts, collection, diagnostics/fallback, worker lifecycle, execute-run/worker client,
+  presentation, catalog, repository sidecar, aggregation, performance harness/workflow and release
+  consumer tests.
+- `npm test -w gitlode`: 52 files, 702 tests passed and 17 skipped (719 total). Its pretest production
+  development build passed.
+- Explicit changed-tooling check passed with `npx tsc --ignoreConfig --noEmit --strict --target ES2022
+--module NodeNext --moduleResolution NodeNext --types node --skipLibCheck` over `js-yaml.d.ts`,
+  `performance-harness.ts` and `telemetry-catalog.ts`. The normal tooling project still has the
+  documented pre-existing `noCheck` boundary; an initial wider standalone probe also surfaced
+  unrelated pre-existing calibration-workflow typing failures and was not claimed as passing.
+- Final `npm run format:write`, `npm run format:check`, `npm run lint`, `npm run build:dev`,
+  `npm run architecture:check` and `git diff --check` passed. Architecture config lint reported its
+  existing one warning and zero errors.
+
+#### Residual assigned work
+
+- P2-R must independently review the full final target, especially status/value validation isolation,
+  diagnostic identity/effect association after compaction, fallback retention with snapshot failure,
+  simultaneous shutdown and ordinary transport/presentation/tool classification.
+- P3 still owns the accepted generic Scope/namespace renderer, final style mapping and removal of
+  `profile-view.ts` per-observation grouping/order policy, followed by its cumulative validation. No
+  P3 implementation is present in this outcome.

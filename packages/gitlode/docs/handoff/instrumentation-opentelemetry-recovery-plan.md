@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                      | Remaining scope                                                            |
-| --------- | --------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only   | Preserve historical evidence and environment                               |
-| M1        | complete                    | Preserve corrected validation and squash attribution                       |
-| M2        | P1/P2 accepted; P3 assigned | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates   | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                            | Remaining scope                                                            |
+| --------- | --------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only         | Preserve historical evidence and environment                               |
+| M1        | complete                          | Preserve corrected validation and squash attribution                       |
+| M2        | P1/P2 accepted; P3 review pending | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates         | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -66,12 +66,13 @@ primitive acceptance, not runtime or M2 acceptance. P2 is accepted at
 157 focused tests, build and strict tooling checks were independently verified in the final review.
 This closes the runtime/consumer slice, not the complete profile or M2 acceptance.
 
-Next is [P3 generic profile presentation](opentelemetry-m2-profile-implementation.md#p3-generic-profile-presentation)
-on the same child, implementing the human-approved namespace/display/style design and canonical view
-policy migration. Follow with independent P3 review, human real-terminal/readability confirmation,
-then cumulative Windows/Linux functional/package validation before considering child integration.
-P3 may checkpoint in renderer, diagnostic/style and docs/verification stages; none is separately
-mergeable. Formal measurement and tests/system migration remain later assignments.
+P3 returned at `5df4f49732d9ff49fef4067493d3152d276a792d`, with implementation/evidence at
+`bbf2792fb2f752d20466cd253812e3beabc64603`; the final delta is outcome documentation only.
+Next is [independent P3 review](opentelemetry-m2-profile-p3-review.md), including the real-output
+capture script and evidence provenance. P3 is not accepted. After review, human terminal/readability
+confirmation and cumulative Windows/Linux functional/package validation remain necessary before child
+integration. Formal measurement and tests/system migration remain later assignments. The reported
+nine-suite/66-test evidence is implementer evidence until independently reproduced.
 
 Continue on `feature/otel-redesign_M2_profile`; trunk is a conversation role, not a Git ref. Return
 outcomes without switching to main or updating parent branches. PR/merge authority is unchanged.
@@ -262,5 +263,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named P3 implementation
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named independent P3 review
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

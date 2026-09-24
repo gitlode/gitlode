@@ -19,7 +19,7 @@ work context, not active instructions to repeat M1. Stable contracts live in des
 The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`.
 P1 is [independently accepted](opentelemetry-m2-profile-p1-review.md#correction-round-1-re-review-outcome)
 at `dc6cfbd`. The active next assignment is
-[P3 generic profile presentation](opentelemetry-m2-profile-implementation.md#p3-generic-profile-presentation).
+[independent P3 review](opentelemetry-m2-profile-p3-review.md) at `5df4f49`.
 P2 is accepted at `755e7d3`; P3, human terminal confirmation, cumulative validation and M2 acceptance
 remain pending.
 

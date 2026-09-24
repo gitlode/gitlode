@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P3 generic profile presentation](#p3-generic-profile-presentation).
-P2 is accepted at `755e7d34f3d0ea56c7346ce009ec7d7624bab32c`, recorded at 4ba32fad.
-Earlier implementation/correction packets are historical context. P3 and cumulative acceptance remain open.
+Current assignment: [independent P3 review](opentelemetry-m2-profile-p3-review.md).
+P3 returned at `5df4f49732d9ff49fef4067493d3152d276a792d`; it is not yet accepted. P1/P2 acceptance
+is maintained. Human terminal and cumulative validation gates remain open. Earlier packets are historical.
 
 ## Assignment, source and branch
 

@@ -679,3 +679,81 @@ Append an outcome here with correction/finding/test matrix, explicit R1 disposit
 proof, implementation/final OIDs and clean/remote status. Trunk assigns independent focused re-review.
 Do not start P3, PR, merge, freeze or acceptance updates. Repeated correction failure follows the
 existing bounded correction/diagnosis policy.
+
+### P2 correction round 1 outcome
+
+Correction round 1 is implemented on `feature/otel-redesign_M2_profile`. P2 is not self-accepted;
+P3, PR creation, merge, formal performance measurement, candidate freeze and acceptance-record work
+were not started. The branch is returned for trunk-assigned independent focused re-review.
+
+#### Provenance and checkpoints
+
+- Entry was clean at `9e6ed7d28f0c5854d7ed6b62cd790f346ad6e4bf`; local and actual remote
+  `feature/otel-redesign_M2_profile` agreed. Both review checkpoint
+  `b9a50f2dae9cddc824ac36ab9976aca11df7cdf3` and fixed reviewed implementation
+  `57ba7537068b00002b2618b2f4a364f9468365c7` are ancestors. The entry delta from the review
+  checkpoint contained only the four trunk routing/handoff documents recorded by the review.
+- Main correction checkpoint: `bb5740e683e2463636ac4481b562308156703102`
+  (`fix: correct profile report integrity handling`). Iterator-result and throwing-middle boundary
+  follow-up: `3c0e11480897e6a14cf3d9e0028ec17152f812ea`
+  (`test: cover profile iterator isolation boundaries`). Both were normally pushed before this
+  outcome; no force push or parent-branch update occurred.
+- The final correction target is `3c0e11480897e6a14cf3d9e0028ec17152f812ea`; the documentation
+  checkpoint containing this outcome follows it on the same child branch. The final return records
+  and verifies that documentation checkpoint and the actual remote OID after all checks.
+
+#### Correction and evidence matrix
+
+| Item      | Disposition and implementation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Regression evidence                                                                                                                                                                                                                                                                                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P2-R1     | Trunk's qualification is applied; the review's blanket total/max unavailability is rejected. Mixed-validity Spans retain valid total/max, contribution mismatch makes average unavailable, calls/errors remain valid, and the structured duration-omission diagnostic makes the signal partial. With no valid duration contribution, total/avg/max derive unavailable from the zero contribution count; a genuine zero contribution remains observed. No producer mask was added because the accepted retained total/max rule would be contradicted by marking those fields unavailable.               | Both valid/invalid input orders run through the real Span processor, builder, presentation formatter and formal tooling consumer. All-invalid defaults, genuine zero and 15-detail-plus-summary compaction are covered; the summary retains `incomplete_measurement_fields`, the section stays partial and the retained zero total/max are not confused with an available average. |
+| P2-R2     | Normalization is isolated per obtained value. Throwing values do not discard later siblings. Iterator creation/advance/result-state failure is isolated separately, retains already obtained values, is not retried and records unknown remaining `observation_results` loss; a single rejected value retains exact disjoint quantity one.                                                                                                                                                                                                                                                             | Throwing-first and throwing-middle point getters preserve following siblings. A custom iterator preserves its first safe value, then produces bounded unknown loss without catastrophic fallback. Ordinary invalid siblings remain covered.                                                                                                                                        |
+| P2-R3     | Metric conversion carries the narrowest independently validated target. Valid Scope/instrument with invalid attributes broadens only to observation; validated attributes permit exact Counter/Histogram point targets for invalid values, thrown getters and retention overflow. Exact rejected/overflowed points carry missing-observation evidence, entire-point extent and disjoint quantity one.                                                                                                                                                                                                  | Counter NaN, Histogram invalid aggregate, invalid attributes and a bounded overflow fixture assert target, effects, extent and quantity. Overflow testing temporarily narrows the existing limit inside `try/finally`; the production limit/catalog admission are unchanged.                                                                                                       |
+| P2-R4     | `normalizeProfileReport()` now validates and detaches the complete active bounded schema: version/status, all required measurement fields, finite values, permitted masks, collection bounds, every detailed diagnostic field and variant, target budget preservation, fixed delivery provenance and the one final reserved-summary shape. It accepts only input structurally equal to the canonical normalized result, so lossy repair, unknown fields and malformed masks cannot become healthy. Formal performance/repository extraction calls this shared contract before measuring or evaluating. | Independent fixtures cover the reported minimal Counter, missing required value, invalid mask, unexpected fields, malformed/misordered summaries, and valid normal, partial and fixed-fallback reports. Existing report-size, prohibited-span, diagnostic and status policies remain unchanged.                                                                                    |
+| Transport | An internal-only worker construction seam passes a test-only builder-body failure through `workerData`; it does not add a request field, public failure flag or alternate result message. The real built `worker-entry.js` invokes the normal builder, returns schema-2 fixed fallback through `dispatchWorkerRunRequest`, uses ordinary progress routing and terminates through the client path.                                                                                                                                                                                                      | A finite 15-second worker test compares normal and fallback runs over the same deterministic repository. Classification and all application/checkpoint content other than documented timestamps/elapsed/profile fields agree; fallback has empty measurements, unavailable statuses and mandatory fixed-delivery provenance.                                                       |
+
+The independent review already demonstrated the R2-R4 counterexamples against fixed target
+`57ba7537`. The durable regression cases were added with the corrections and pass at the returned
+target; this session did not create a detached pre-fix worktree solely to rerun the already recorded
+review probes.
+
+#### Changed ownership and scope
+
+- Internal contracts: active normalization/barrel and focused active-report tests now own total
+  report validation.
+- Execution: report builder value/iterator isolation, metric diagnostic targeting and the internal
+  worker test seam/client construction path were corrected; the new actual transport test exercises
+  the built entry.
+- Formal tooling: `test/support/performance-harness.ts` validates the whole shared contract first;
+  its evaluator tests now use complete schema-2 fixtures and adversarial malformed reports.
+- Canonical telemetry and verification guidance records mixed-duration quality, per-value isolation,
+  narrow metric identity, fail-closed consumer validation and actual worker transport evidence.
+- Active collection limits, P1 accumulator/fallback bounds, catalog admission, presentation layout,
+  thresholds, historical artifact schemas, publish gates and dependencies were not changed.
+
+#### Verification
+
+- `npm run build:dev`: passed; all changed production TypeScript is inside the strict production
+  projects.
+- The review packet's 16 suites plus `packages/gitlode/test/presentation/presenter.test.ts` and new
+  `packages/gitlode/test/execution/worker-profile-fallback-transport.test.ts`: 18 files, 271 passed
+  and 3 skipped (274 total). The three skips are the pre-existing Windows skips for Linux-only
+  supervised-workflow entrypoint setup and the `stall=false`/`stall=true` later-child cases; none is
+  a new correction path.
+- Focused final builder/collection run after the iterator follow-up: 1 file, 45 tests passed.
+- Changed-tooling strict check passed with
+  `npx tsc --ignoreConfig --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --types node --skipLibCheck packages/gitlode/test/support/js-yaml.d.ts packages/gitlode/test/support/performance-harness.ts packages/gitlode/test/support/telemetry-catalog.ts`.
+  This is separate tooling-source evidence; Vitest is not claimed to typecheck test sources and the
+  documented tooling-project `noCheck` boundary remains.
+- `npm run format:write`, `npm run format:check`, `npm run lint`, `npm run architecture:check` and
+  `git diff --check`: passed. Architecture config lint retained its existing one warning and zero
+  errors.
+- No full OS/package/release matrix, `npm test -w gitlode`, formal performance run or publish/release
+  command was run; none is assigned to this correction.
+
+#### Focused re-review return
+
+Re-review the final correction target plus this outcome, especially the shared total validator's
+diagnostic/summary acceptance, iterator unknown-loss evidence, point-to-observation broadening,
+mixed-duration effect-summary behavior and the internal worker seam remaining unreachable from the
+public request contract. P2 remains unaccepted until that independent review. P3 remains unassigned.

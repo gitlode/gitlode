@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                                       | Remaining scope                                                            |
-| --------- | -------------------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only                    | Preserve historical evidence and environment                               |
-| M1        | complete                                     | Preserve corrected validation and squash attribution                       |
-| M2        | P1 accepted; P2 R4 post-diagnosis correction | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates                    | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                   | Remaining scope                                                            |
+| --------- | ---------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only                | Preserve historical evidence and environment                               |
+| M1        | complete                                 | Preserve corrected validation and squash attribution                       |
+| M2        | P1 accepted; P2 R4 post-diagnosis review | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates                | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -60,17 +60,16 @@ identity remain unchanged. The collector changes cannot be attributed to present
 P1 is accepted at `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`, with independent re-review
 recorded at `8ea9cfca2fb0cb7ab6455d9805cc1479ff19e932`. All four corrections and preprocessing
 hardening were accepted; the reviewer independently ran build and 7 files / 112 tests. This is
-primitive acceptance, not runtime or M2 acceptance. Trunk adopts the bounded diagnosis at
-`cd65c002ceed7e18d10e308c31cef807a430811f`: target loss and compacted OR do not prove whole-signal
-loss; only exact detailed report/entire-target evidence supports the narrower reverse implication.
-Next is [post-diagnosis R4 correction](opentelemetry-m2-profile-implementation.md#post-diagnosis-r4-correction),
-then independent review. Preserve all forward rules and six contradiction rejections. R1-R3 and actual
-transport remain accepted, while R4/P2 are unaccepted and P3 unassigned. No new human design decision
-is pending; routine packet assignment is delegated to trunk. PR/merge authority is unchanged.
+primitive acceptance, not runtime or M2 acceptance. The diagnosis-driven R4 correction returned at
+`755e7d34f3d0ea56c7346ce009ec7d7624bab32c`; implementation is `d2c4a7d`, followed only by outcome
+documentation. Next is [post-diagnosis R4 focused review](opentelemetry-m2-profile-p2-review.md#post-diagnosis-r4-focused-review).
+Review the target-aware reverse condition and preserved forward rules, detailed/summary sibling
+acceptance, and healthy-performance rejection of valid partial reports. R1-R3 and transport remain
+accepted; R4/P2 await independent review and P3 is unassigned. Reported 157-test evidence has not
+been independently rerun by trunk. No full package/formal measurement campaign is assigned.
 
-The child remains `feature/otel-redesign_M2_profile`. Trunk is a conversation role, not a branch/ref;
-return outcomes without switching to main. The prior diagnosis session's clean-main switch was
-reversed by trunk without moving main or other parent refs.
+Continue on `feature/otel-redesign_M2_profile`; trunk is a conversation role, not a Git ref. Return
+outcomes without switching to main or updating parent branches. PR/merge authority is unchanged.
 
 ## Session sequence and dependencies
 
@@ -258,5 +257,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named post-diagnosis R4 correction
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named post-diagnosis R4 focused review
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

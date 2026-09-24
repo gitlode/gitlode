@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [post-diagnosis R4 correction](#post-diagnosis-r4-correction).
-Trunk accepts the bounded diagnosis at cd65c002. R4/P2 remain unaccepted; R1-R3 and transport remain
-accepted. P3 is unassigned. Earlier packets are historical context.
+Current assignment: [post-diagnosis R4 focused review](opentelemetry-m2-profile-p2-review.md#post-diagnosis-r4-focused-review).
+Correction returned at `755e7d34f3d0ea56c7346ce009ec7d7624bab32c`. R4/P2 remain unaccepted;
+R1-R3 and transport remain accepted. P3 is unassigned. Earlier packets are historical context.
 
 ## Assignment, source and branch
 

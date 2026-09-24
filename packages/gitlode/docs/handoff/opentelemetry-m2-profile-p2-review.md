@@ -1,8 +1,8 @@
 # P2 independent data-integrity and failure-isolation review
 
-Current assignment: [post-diagnosis R4 correction](opentelemetry-m2-profile-implementation.md#post-diagnosis-r4-correction).
-Trunk adopted diagnosis cd65c002. R4/P2 remain unaccepted; R1-R3 and transport remain accepted.
-Earlier review packets/outcomes are historical evidence, not active review instructions.
+Current assignment: [post-diagnosis R4 focused review](#post-diagnosis-r4-focused-review).
+The correction returned at 755e7d3. R4/P2 remain unaccepted; R1-R3 and transport remain accepted.
+Earlier packets/outcomes are historical context.
 
 ## Fixed scope and authority
 
@@ -588,3 +588,64 @@ assigned fresh bounded diagnosis session rather than starting an automatic third
 Diagnose the target-versus-signal implication, preserve all six valid contradiction rejections and
 the fixed-delivery exception, and return a new fixed target only if trunk assigns a correction. Do not
 start P3 while P2 remains unaccepted.
+
+## Post-diagnosis R4 focused review
+
+### Fixed target and authority
+
+Review in a new human-started independent conversation on `feature/otel-redesign_M2_profile`.
+
+- Entry/base: `4fd2ac81bc70f5324247bdce9d4b1ff196f6f5f2`.
+- Accepted diagnosis: `cd65c002ceed7e18d10e308c31cef807a430811f`.
+- Implementation: `d2c4a7d2460d6089874c7a7367c324570a9b43e5`.
+- Full fixed target: `755e7d34f3d0ea56c7346ce009ec7d7624bab32c`.
+
+Trunk inspected the eight-file inventory and normalization delta; the final delta after d2c4a7d is
+outcome documentation only. Verify ancestry, clean status, entry/exit OID and actual remote equality.
+Subsequent routing-only commits do not move the target. Investigate unexpected implementation changes.
+Trunk has not rerun the reported tests or accepted R4. R1 under trunk's duration qualification, R2,
+R3 and actual worker transport remain accepted absent a concrete affected dependency.
+
+Read the [diagnosis and correction outcome](opentelemetry-m2-profile-implementation.md#post-diagnosis-r4-correction-outcome),
+its preceding assignment, the prior R4-C2 finding and accepted target/extent/status contracts. Review
+only the diagnosis-driven correction and its affected invariants; do not restart the full P2 audit.
+No source/test fixes, P3, PR, merge, freeze, formal measurement or release/acceptance update.
+
+### Finite review questions
+
+1. Confirm the unconditional whole-target -> whole-signal reverse implication is removed. Detailed
+   point/observation/Scope loss and summary existential OR may coexist with partial retained siblings.
+   Normalization and extraction must preserve those legal outputs. Summary compaction cannot recreate
+   exact discarded target information or strengthen coverage.
+2. Confirm the remaining reverse condition uses exact detailed report/entire-target, covered kind,
+   whole-result flag and allowed effect. A broadened report/unidentified-subset and reserved summary
+   cannot trigger it. Check independent boundary cases, not an expectation copied from the predicate.
+   Verify exact report-wide loss plus retained values is a contradictory synthetic input, while the
+   existing normal-builder recovery path remains valid and unchanged.
+3. Preserve the forward unavailable/empty/evidence rule, complete-with-impact rejection, explained
+   partial, delivery exception and all six original contradiction families. Verify zero/nonzero
+   retained values, detailed/summary no-sibling unavailable, complete-empty, justified partial-empty,
+   fixed fallback and broadened target positives.
+4. Follow real accumulator/builder detailed and 15+1 compacted sibling reports through validator and
+   extraction. Both must be valid/extractable and formal evaluation must be non-healthy `fail`, not
+   `pass` or invalid-schema `inconclusive`. Do not confuse report validity with performance acceptance.
+5. Verify field comments and canonical changes clarify existing target semantics without changing
+   schema/public shape, producer behavior, thresholds or historical evidence. Check fixture changes
+   against the accepted diagnosis, especially removal of the old broad-Scope false rejection.
+
+Run build:dev and the exact seven-suite command in the latest correction outcome (reported 157 pass,
+no skips), plus its explicit strict tooling command. Record actual counts, and distinguish test
+execution from typechecking. Inspect fail-before evidence: two formal-consumer regressions and literal
+contract failure are semantic evidence; the corrected missing test import is not. Repeat bounded probes
+only for concrete uncertainties; no full OS/package/transport campaign or formal performance run.
+Run fixed-diff whitespace checks and format write/check for documentation. Remove/restore any temporary
+probe before returning; do not commit probe or implementation modifications during review.
+
+### Return and preservation
+
+Append R4 accepted/corrections-required, P2 overall decision, concrete residual failures (if any),
+independent versus reported evidence and residual P3 responsibility. If another issue remains, return
+the bounded evidence to trunk rather than starting repairs or silently weakening acceptance.
+Record a documentation-only checkpoint, normally push to this child and verify actual remote equality
+and clean status. Remain on this child: trunk is a planning-session role, not a Git ref. No force push
+or parent ref update. Review acceptance does not automatically authorize P3 or a PR.

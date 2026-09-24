@@ -1188,3 +1188,75 @@ outcome here with implementation/final OIDs, precise changed rules, positive/neg
 remaining issues. Remain on the child with clean status. Return for a separate independent focused
 review; do not self-accept R4/P2, start P3, create PR, merge, freeze or update acceptance. If another
 concrete failure remains, return it to trunk rather than iterating beyond this packet.
+
+## Post-diagnosis R4 correction outcome
+
+The bounded correction is implemented on `feature/otel-redesign_M2_profile`. R4/P2 are not
+self-accepted; P3, PR creation, merge, formal measurement and release work were not started. This
+child remains the review branch.
+
+### Provenance and checkpoints
+
+- Entry/local tracking/actual remote OID: `4fd2ac81bc70f5324247bdce9d4b1ff196f6f5f2`.
+  The worktree was clean, and both diagnosis `cd65c002ceed7e18d10e308c31cef807a430811f`
+  and fixed implementation `280824cab82b85ca87a63eeb73b3e248df8df230` were ancestors.
+- Implementation and final code OID: `d2c4a7d2460d6089874c7a7367c324570a9b43e5` (`fix: scope
+whole-result profile evidence to targets`), normally pushed before this outcome was written. The final documentation checkpoint is
+  the child-branch commit containing this section; its full local and actual remote OID is returned
+  with the session outcome.
+- Changed implementation scope is limited to active profile relationship normalization and the
+  `wholeResultUnavailable` field comment. Directly affected contract/builder/formal-consumer tests
+  and canonical telemetry/catalog wording changed with it. No schema field, export, producer,
+  threshold, dependency, worker transport, presentation or performance policy changed.
+
+### Corrected rule and boundary evidence
+
+- The validator still uses any same-kind detailed or summary whole-result evidence in the forward
+  `unavailable` requirement, but no longer reverses that evidence into signal-wide unavailability.
+  Point, observation and Scope losses, and the summary existential OR after target identity loss,
+  may coexist with retained siblings and `partial` status.
+- The only reverse rule now requires a detailed `target.type: report`, `extent: entire_target`,
+  `wholeResultUnavailable: true`, a whole-result effect and coverage of the evaluated kind. A
+  broadened report has `unidentified_subset` extent and remains target-scoped; the reserved summary
+  is never used for this reverse rule.
+- The exact-report/entire-target diagnostic with a retained same-kind value is rejected. This is an
+  intentionally contradictory synthetic boundary: normal builder validation recovery creates a
+  report target with `unidentified_subset` and no whole-result flag, while current collection sites
+  that emit exact report-wide whole-result evidence supply empty arrays. Accepted producer behavior
+  was therefore unchanged.
+- Before the production correction, the new formal-consumer cases built real detailed and 15+1
+  compacted reports with one retained Counter and `partial` status; both failed extraction because
+  normalization rejected them. The literal contract case likewise rejected the detailed sibling at
+  its first assertion. An initial builder-suite probe also had a missing test import, which was
+  corrected and is not counted as semantic fail-before evidence.
+- After correction, detailed and compacted real accumulator/builder reports normalize and extract
+  one retained Counter. Repository formal evaluation returns `fail`, not `pass` or `inconclusive`,
+  because the partial signal and diagnostics remain non-healthy. Compaction does not strengthen the
+  discarded target identity.
+- The finite positives pass: detailed and summarized lost target plus sibling; detailed and summary
+  whole-target evidence with no sibling and empty `unavailable`; complete-empty; justified
+  partial-empty; fixed no-measurement fallback; and a broadened report target with retained sibling.
+  The six existing contradiction families remain rejected: unavailable with retained data,
+  unexplained unavailable, unexplained partial, delivery effect without provenance, provenance
+  without delivery effect, and target/coverage/affected-field kind contradiction. Complete with
+  same-kind impact and exact detailed report-wide loss with retained data also remain rejected.
+
+### Verification and review state
+
+- `npm run build:dev`: passed; changed production TypeScript was compiled by the strict production
+  projects.
+- `npx vitest run packages/internal-contracts/test/telemetry/profile-report-active.test.ts packages/gitlode/test/telemetry/local-collection.test.ts packages/gitlode/test/telemetry/profile-report-primitives.test.ts packages/gitlode/test/telemetry/worker-telemetry-session.test.ts packages/gitlode/test/telemetry/performance-harness.test.ts packages/gitlode/test/telemetry/repository-sidecar.test.ts packages/gitlode/test/telemetry/catalog-contract.test.ts`:
+  7 files and 157 tests passed; no platform tests were skipped. Vitest execution is not claimed to
+  typecheck test sources.
+- Explicit tooling-source strict check passed:
+  `npx tsc --ignoreConfig --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --types node --skipLibCheck packages/gitlode/test/support/js-yaml.d.ts packages/gitlode/test/support/performance-harness.ts packages/gitlode/test/support/telemetry-catalog.ts`.
+- `npm run lint`, `npm run format:write`, `npm run format:check` and `git diff --check`: passed.
+  Architecture verification was not run because no boundary, import envelope or export changed.
+- The implementation changes seven files: active normalization and report contract, their active
+  contract test, builder and formal-consumer tests, and canonical telemetry/catalog documentation.
+  This handoff is the only additional final-checkpoint file.
+
+No further concrete correction failure is known from this packet. The remaining action is a separate
+independent focused review of `d2c4a7d2460d6089874c7a7367c324570a9b43e5` plus this outcome
+checkpoint. That review, not this session,
+decides R4/P2 acceptance. The branch must remain here until trunk assigns subsequent work.

@@ -63,6 +63,15 @@ builder-body failure after invocation, verify worker transport and presentation,
 cleanup/finalization idempotence under simultaneous failures, and migrate status/tooling consumers
 in the same atomic switch.
 
+Correction coverage also compares lifecycle-only and confirmed whole-signal-loss evidence before and
+after detailed-record compaction, rejects status/value contradictions without discarding retained
+values, distinguishes exact safe-integer boundaries from actual saturation, and routes explicitly
+malformed counts and detail-loss masks to invalid-aggregation evidence. A 100,000-entry duplicate-kind
+probe counts indexed reads before diagnostic identity construction; the normalizer must reject it by
+the fixed kind-universe cardinality without input-proportional traversal. This bounds accumulator
+preprocessing after the caller supplies the array, not the caller's cost to allocate or populate that
+untrusted input.
+
 Repository performance workflow tests use the same development-only sidecar orchestration as the
 formal workflow. They require a `target_on` report, classify missing or malformed reports as
 inconclusive, propagate report-size, prohibited-span, diagnostic, and signal-status outcomes to the

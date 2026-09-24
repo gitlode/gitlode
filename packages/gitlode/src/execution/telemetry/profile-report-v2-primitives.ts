@@ -91,7 +91,8 @@ export function deriveProfileSignalStatusV2(
     ["histogram", "histograms"],
   ] as const;
   for (const [kind, signal] of mappings) {
-    if (result[signal] === "unavailable" && valueCounts[signal] > 0) result[signal] = "partial";
+    if (result[signal] === "unavailable" && valueCounts[signal] > 0)
+      throw new TypeError(`Signal ${signal} is unavailable but has retained values`);
     if (result[signal] === "complete") {
       const detailedImpact = snapshot.diagnostics.some(
         (item) =>
@@ -105,9 +106,24 @@ export function deriveProfileSignalStatusV2(
       if (detailedImpact || summaryImpact) result[signal] = "partial";
     }
     if (
-      snapshot.summary?.effectsByKind.some(
-        (item) => item.kind === kind && item.wholeResultUnavailable,
-      ) &&
+      (snapshot.diagnostics.some(
+        (item) =>
+          item.signalCoverage.includes(kind) &&
+          item.wholeResultUnavailable &&
+          item.effects.some(
+            (effect) =>
+              effect === "missing_observations" || effect === "unknown_collection_coverage",
+          ),
+      ) ||
+        snapshot.summary?.effectsByKind.some(
+          (item) =>
+            item.kind === kind &&
+            item.wholeResultUnavailable &&
+            item.effects.some(
+              (effect) =>
+                effect === "missing_observations" || effect === "unknown_collection_coverage",
+            ),
+        )) &&
       valueCounts[signal] === 0
     )
       result[signal] = "unavailable";
@@ -136,6 +152,7 @@ function mandatoryFallbackDiagnostic(
       affectedFields: false,
     },
     lossQuantity: null,
+    wholeResultUnavailable: false,
     count: 1,
     countSaturated: false,
     message: null,
@@ -167,7 +184,6 @@ export function createFixedProfileReportFallbackV2(possibleSnapshot?: unknown): 
         summary = profileDiagnosticV2Internals.mergeIntoSummary(
           summary ?? profileDiagnosticV2Internals.createEmptySummary("retained"),
           diagnostic,
-          false,
         );
     }
   } else summary = profileDiagnosticV2Internals.createEmptySummary("unavailable");

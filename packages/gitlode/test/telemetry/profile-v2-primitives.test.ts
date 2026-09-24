@@ -250,6 +250,163 @@ describe("v2 diagnostic accumulation", () => {
     ]);
     expect(summary.effectsByKind[0]!.effects).not.toContain("missing_observations");
   });
+
+  it("preserves signal meaning for lifecycle-only and confirmed whole-loss issues across compaction", () => {
+    const statusFor = (
+      input: ProfileDiagnosticInputV2,
+      retainedBefore: number,
+    ): "complete" | "partial" | "unavailable" => {
+      const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+      for (let index = 0; index < retainedBefore; index += 1)
+        accumulator.add(issue(`retained-${index}`));
+      accumulator.add(input);
+      return deriveProfileSignalStatusV2(
+        { spans: "complete", counters: "complete", histograms: "complete" },
+        { spans: retainedBefore, counters: 0, histograms: 0 },
+        accumulator.snapshot(),
+      ).counters;
+    };
+    const lifecycleOnly = issue("counter-shutdown", {
+      code: "lifecycle_failure",
+      stage: "telemetry_shutdown",
+      signalCoverage: ["counter"],
+      effects: ["lifecycle_notice"],
+      wholeResultUnavailable: true,
+    });
+    const confirmedWholeLoss = issue("counter-collection", {
+      code: "lifecycle_failure",
+      stage: "metric_collection",
+      signalCoverage: ["counter"],
+      effects: ["unknown_collection_coverage"],
+      wholeResultUnavailable: true,
+    });
+    const reportDeliveryOnly = issue("report-delivery", {
+      code: "lifecycle_failure",
+      stage: "report_build",
+      signalCoverage: ["counter"],
+      effects: ["report_delivery_failure"],
+      wholeResultUnavailable: true,
+    });
+
+    expect([
+      statusFor(lifecycleOnly, 0),
+      statusFor(lifecycleOnly, 15),
+      statusFor(lifecycleOnly, 16),
+    ]).toEqual(["complete", "complete", "complete"]);
+    expect([statusFor(confirmedWholeLoss, 0), statusFor(confirmedWholeLoss, 15)]).toEqual([
+      "unavailable",
+      "unavailable",
+    ]);
+    expect([statusFor(reportDeliveryOnly, 0), statusFor(reportDeliveryOnly, 15)]).toEqual([
+      "complete",
+      "complete",
+    ]);
+  });
+
+  it("marks malformed supplied counts and detail-loss masks as invalid aggregation", () => {
+    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    accumulator.add(issue("omitted"));
+    accumulator.add(
+      issue("explicit", {
+        count: 2,
+        detailLoss: { pointAttributes: false, attributeKey: true },
+      }),
+    );
+    for (const count of [0, -1, 1.5, Number.POSITIVE_INFINITY])
+      accumulator.add(issue(`invalid-count-${String(count)}`, { count }));
+    for (const detailLoss of [
+      null,
+      "invalid",
+      [],
+      { attributeKey: "invalid" },
+      { pointAttributes: 1 },
+    ])
+      accumulator.add(issue("invalid-mask", { detailLoss } as Partial<ProfileDiagnosticInputV2>));
+
+    const diagnostics = accumulator.snapshot().diagnostics;
+    expect(diagnostics).toHaveLength(3);
+    expect(diagnostics.find((item) => item.code === "invalid_aggregation")).toMatchObject({
+      count: 9,
+      countSaturated: false,
+      detailLoss: {
+        pointAttributes: true,
+        observationIdentity: true,
+        scopeIdentity: true,
+        attributeKey: true,
+        affectedFields: true,
+      },
+    });
+    expect(
+      diagnostics.find(
+        (item) => item.target.type === "observation" && item.target.name === "omitted",
+      ),
+    ).toMatchObject({ count: 1, detailLoss: { attributeKey: false } });
+    expect(
+      diagnostics.find(
+        (item) => item.target.type === "observation" && item.target.name === "explicit",
+      ),
+    ).toMatchObject({ count: 2, detailLoss: { attributeKey: true } });
+  });
+
+  it("sets saturation only for actual overflow and preserves prior saturation", () => {
+    const exact = new BoundedProfileDiagnosticAccumulatorV2();
+    exact.add(issue("exact", { count: Number.MAX_SAFE_INTEGER - 1 }));
+    exact.add(issue("exact", { count: 1 }));
+    expect(exact.snapshot().diagnostics[0]).toMatchObject({
+      count: Number.MAX_SAFE_INTEGER,
+      countSaturated: false,
+    });
+
+    const overflow = new BoundedProfileDiagnosticAccumulatorV2();
+    const quantity = {
+      descriptor: "metric_points" as const,
+      unit: "points",
+      value: Number.MAX_SAFE_INTEGER - 1,
+      relationship: "disjoint" as const,
+    };
+    overflow.add(issue("overflow", { count: Number.MAX_SAFE_INTEGER, lossQuantity: quantity }));
+    overflow.add(issue("overflow", { count: 1, lossQuantity: { ...quantity, value: 2 } }));
+    overflow.add(issue("overflow", { count: 1, lossQuantity: { ...quantity, value: 0 } }));
+    expect(overflow.snapshot().diagnostics[0]).toMatchObject({
+      count: Number.MAX_SAFE_INTEGER,
+      countSaturated: true,
+      lossQuantity: { value: Number.MAX_SAFE_INTEGER, saturated: true },
+    });
+
+    const summary = new BoundedProfileDiagnosticAccumulatorV2();
+    for (let index = 0; index < 15; index += 1) summary.add(issue(`retained-${index}`));
+    summary.add(issue("summary-exact", { count: Number.MAX_SAFE_INTEGER }));
+    expect(summary.snapshot().summary).toMatchObject({
+      omittedOccurrences: Number.MAX_SAFE_INTEGER,
+      countSaturated: false,
+    });
+    summary.add(issue("summary-overflow", { count: 1 }));
+    summary.add(issue("summary-preserves-saturation", { count: 1 }));
+    expect(summary.snapshot().summary).toMatchObject({
+      omittedOccurrences: Number.MAX_SAFE_INTEGER,
+      countSaturated: true,
+    });
+  });
+
+  it("bounds duplicate-kind reads before identity construction", () => {
+    let indexedReads = 0;
+    const kinds = new Proxy(
+      Array.from({ length: 100_000 }, () => "span"),
+      {
+        get(target, property, receiver) {
+          if (typeof property === "string" && /^\d+$/.test(property)) indexedReads += 1;
+          return Reflect.get(target, property, receiver);
+        },
+      },
+    );
+    const accumulator = new BoundedProfileDiagnosticAccumulatorV2();
+    accumulator.add(issue("oversized-coverage", { signalCoverage: kinds }));
+
+    expect(indexedReads).toBeLessThanOrEqual(3);
+    expect(accumulator.snapshot().diagnostics).toEqual([
+      expect.objectContaining({ code: "invalid_aggregation", count: 1 }),
+    ]);
+  });
 });
 
 describe("v2 availability and fallback primitives", () => {
@@ -356,6 +513,34 @@ describe("v2 availability and fallback primitives", () => {
         accumulator.snapshot(),
       ).histograms,
     ).toBe("unavailable");
+  });
+
+  it("rejects contradictory unavailable status and retained values without rewriting values", () => {
+    const empty = new BoundedProfileDiagnosticAccumulatorV2().snapshot();
+    expect(() =>
+      deriveProfileSignalStatusV2(
+        { spans: "unavailable", counters: "complete", histograms: "complete" },
+        { spans: 1, counters: 1, histograms: 0 },
+        empty,
+      ),
+    ).toThrow(/unavailable.*retained/i);
+    expect(
+      deriveProfileSignalStatusV2(
+        { spans: "complete", counters: "unavailable", histograms: "complete" },
+        { spans: 1, counters: 0, histograms: 0 },
+        empty,
+      ),
+    ).toEqual({ spans: "complete", counters: "unavailable", histograms: "complete" });
+
+    const full = new BoundedProfileDiagnosticAccumulatorV2();
+    for (let index = 0; index < 16; index += 1) full.add(issue(`capacity-${index}`));
+    expect(() =>
+      deriveProfileSignalStatusV2(
+        { spans: "complete", counters: "complete", histograms: "unavailable" },
+        { spans: 1, counters: 0, histograms: 1 },
+        full.snapshot(),
+      ),
+    ).toThrow(/unavailable.*retained/i);
   });
 
   it("constructs a clone-safe minimum fallback without reading unsafe values", () => {

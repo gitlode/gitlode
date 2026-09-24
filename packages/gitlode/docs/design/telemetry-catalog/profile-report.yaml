@@ -440,6 +440,7 @@ staged_v2_candidate:
       - affected fields
       - detail-loss mask
       - loss-quantity descriptor and unit
+      - confirmed whole-result-unavailable evidence
     target_variants:
       - report
       - scope
@@ -478,6 +479,15 @@ staged_v2_candidate:
       prohibits:
         - lost-target lists
         - lost-key lists
+    whole_result_unavailable:
+      detailed_and_summary: retained
+      requires_any_effect: [missing_observations, unknown_collection_coverage]
+      prohibited_as_sole_evidence:
+        - lifecycle_notice
+        - report_delivery_failure
+    malformed_semantic_input:
+      count_or_detail_loss_mask: bounded invalid_aggregation evidence
+      oversized_finite_set_array: reject before element iteration
     quantity_merge:
       known_disjoint: saturating sum
       unknown_or_overlapping: unknown total

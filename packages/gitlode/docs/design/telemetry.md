@@ -577,6 +577,20 @@ that does not call the normal report builder. The candidate is not emitted or re
 replace the active v1 producer and every consumer atomically before changing
 `PROFILE_REPORT_SCHEMA_VERSION` or the catalog's active `schema_version`.
 
+The staged diagnostic contract retains confirmed whole-result-unavailable evidence on each detailed
+record and in the reserved summary. The accumulator accepts that evidence only with a collection-loss
+effect (`missing_observations` or `unknown_collection_coverage`); lifecycle and report-delivery
+effects cannot independently mark a signal unavailable. Explicit malformed counts and detail-loss
+mask members become bounded invalid-aggregation evidence instead of default exact values. Set-like
+semantic inputs are rejected by fixed cardinality before iteration when their supplied arrays exceed
+the finite contract universe. Exact safe-integer sums are not saturation; only clamping sets the
+saturation flag, which remains set after later merges.
+
+The staged status primitive rejects an `unavailable` input paired with retained values. P2 must catch
+that report-validation rejection inside normal builder isolation, retain the values and valid
+siblings, and record bounded validation evidence; it must not let the rejection escape as an
+application failure or relabel the signal silently.
+
 The staged fallback accepts prior issue details only through an accumulator-issued, detached,
 runtime-frozen snapshot. Without that explicit completion boundary it returns empty measurement
 arrays, unavailable signal statuses, a mandatory report-delivery diagnostic, and fixed evidence that

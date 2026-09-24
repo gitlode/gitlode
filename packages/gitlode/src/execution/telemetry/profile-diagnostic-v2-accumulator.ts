@@ -89,12 +89,13 @@ function saturatingAdd(
   left: number,
   right: number,
 ): { readonly value: number; readonly saturated: boolean } {
-  if (left >= MAXIMUM_COUNT - right) return { value: MAXIMUM_COUNT, saturated: true };
+  if (left > MAXIMUM_COUNT - right) return { value: MAXIMUM_COUNT, saturated: true };
   return { value: left + right, saturated: false };
 }
 
-function normalizeCount(value: unknown): number {
-  return Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : 1;
+function normalizeCount(value: unknown): number | null {
+  if (value === undefined) return 1;
+  return Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : null;
 }
 
 function normalizeMessage(value: unknown): string | null {
@@ -113,9 +114,14 @@ function escapedStringLengthWithin(value: string, maximum: number): number | nul
   return length;
 }
 
-function normalizeDetailLoss(value: unknown): ProfileDetailLossMaskV2 {
-  if (!value || typeof value !== "object") return { ...EMPTY_PROFILE_DETAIL_LOSS_MASK_V2 };
+function normalizeDetailLoss(value: unknown): ProfileDetailLossMaskV2 | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const mask = value as Partial<Record<keyof ProfileDetailLossMaskV2, unknown>>;
+  for (const key of Object.keys(EMPTY_PROFILE_DETAIL_LOSS_MASK_V2) as Array<
+    keyof ProfileDetailLossMaskV2
+  >) {
+    if (Object.hasOwn(mask, key) && typeof mask[key] !== "boolean") return null;
+  }
   return {
     pointAttributes: mask.pointAttributes === true,
     observationIdentity: mask.observationIdentity === true,
@@ -223,6 +229,7 @@ function diagnosticIdentity(value: ProfileDiagnosticV2): string {
     value.affectedFields,
     value.detailLoss,
     value.lossQuantity && [value.lossQuantity.descriptor, value.lossQuantity.unit],
+    value.wholeResultUnavailable,
   ]);
 }
 
@@ -263,7 +270,6 @@ function createEmptySummary(
 function mergeIntoSummary(
   summary: ProfileDiagnosticSummaryV2,
   diagnostic: ProfileDiagnosticV2,
-  wholeResultUnavailable: boolean,
 ): ProfileDiagnosticSummaryV2 {
   const coverage = new Set(summary.signalCoverage);
   const effectsByKind = new Map<ProfileObservationKindV2, ProfileDiagnosticEffectSummaryV2>();
@@ -274,7 +280,8 @@ function mergeIntoSummary(
     effectsByKind.set(kind, {
       kind,
       effects: [...new Set([...(prior?.effects ?? []), ...diagnostic.effects])].sort(),
-      wholeResultUnavailable: (prior?.wholeResultUnavailable ?? false) || wholeResultUnavailable,
+      wholeResultUnavailable:
+        (prior?.wholeResultUnavailable ?? false) || diagnostic.wholeResultUnavailable,
     });
   }
   const reportEffects =
@@ -343,6 +350,15 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         input.attributeKey ?? { type: "not_applicable" },
       );
       const quantity = normalizeQuantity(input.lossQuantity);
+      const count = normalizeCount(input.count);
+      const detailLoss =
+        input.detailLoss === undefined
+          ? { ...EMPTY_PROFILE_DETAIL_LOSS_MASK_V2 }
+          : normalizeDetailLoss(input.detailLoss);
+      const wholeResultUnavailable = input.wholeResultUnavailable ?? false;
+      const hasWholeResultLossEffect =
+        effects?.includes("missing_observations") ||
+        effects?.includes("unknown_collection_coverage");
       if (
         !signalCoverage ||
         !effects ||
@@ -350,20 +366,24 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         !affectedFields ||
         !attributeKey ||
         !quantity ||
+        count === null ||
+        detailLoss === null ||
+        typeof wholeResultUnavailable !== "boolean" ||
+        (wholeResultUnavailable && !hasWholeResultLossEffect) ||
         (input.extent !== "entire_target" && input.extent !== "unidentified_subset")
       )
         return this.#recordInvalid();
-      let detailLoss = normalizeDetailLoss(input.detailLoss);
+      let boundedDetailLoss = detailLoss;
       if (
         attributeKey.type === "exact" &&
         escapedStringLengthWithin(attributeKey.key, PROFILE_DIAGNOSTIC_DETAIL_UTF16_LIMIT_V2) ===
           null
       ) {
         attributeKey = { type: "discarded" };
-        detailLoss = { ...detailLoss, attributeKey: true };
+        boundedDetailLoss = { ...boundedDetailLoss, attributeKey: true };
       }
       const normalizedTarget = normalizeProfileTargetV2(input.target);
-      detailLoss = mergeDetailLossMasksV2(detailLoss, normalizedTarget.detailLoss);
+      boundedDetailLoss = mergeDetailLossMasksV2(boundedDetailLoss, normalizedTarget.detailLoss);
       const targetWasBroadened =
         normalizedTarget.detailLoss.pointAttributes ||
         normalizedTarget.detailLoss.observationIdentity ||
@@ -375,7 +395,7 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         extent: targetWasBroadened ? "unidentified_subset" : input.extent,
         attributeKey,
         affectedFields,
-        detailLoss,
+        detailLoss: boundedDetailLoss,
         lossQuantity: quantity.quantity,
       });
       const diagnostic: ProfileDiagnosticV2 = {
@@ -383,7 +403,8 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         severity,
         stage: input.stage,
         ...bounded,
-        count: normalizeCount(input.count),
+        wholeResultUnavailable,
+        count,
         countSaturated: false,
         message: normalizeMessage(input.message),
         reportDelivery: null,
@@ -392,7 +413,6 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         this.#summary = mergeIntoSummary(
           this.#summary ?? createEmptySummary("retained"),
           diagnostic,
-          input.wholeResultUnavailable === true,
         );
         return;
       }
@@ -409,7 +429,11 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
             diagnostic.lossQuantity.value !== null
           ) {
             const sum = saturatingAdd(lossQuantity.value, diagnostic.lossQuantity.value);
-            lossQuantity = { ...lossQuantity, value: sum.value, saturated: sum.saturated };
+            lossQuantity = {
+              ...lossQuantity,
+              value: sum.value,
+              saturated: lossQuantity.saturated || sum.saturated,
+            };
           } else lossQuantity = { ...lossQuantity, value: null, saturated: false };
         } else quantityComposable = false;
         current.diagnostic = {
@@ -428,7 +452,6 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         this.#summary = mergeIntoSummary(
           this.#summary ?? createEmptySummary("retained"),
           diagnostic,
-          input.wholeResultUnavailable === true,
         );
         return;
       }
@@ -464,6 +487,7 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
         affectedFields: true,
       },
       lossQuantity: null,
+      wholeResultUnavailable: false,
       count: 1,
       countSaturated: false,
       message: null,
@@ -476,7 +500,7 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
       current.diagnostic = {
         ...current.diagnostic,
         count: count.value,
-        countSaturated: count.saturated,
+        countSaturated: current.diagnostic.countSaturated || count.saturated,
       };
     } else if (
       this.#entries.size <
@@ -485,11 +509,7 @@ export class BoundedProfileDiagnosticAccumulatorV2 {
     )
       this.#entries.set(key, { diagnostic, quantityComposable: false });
     else
-      this.#summary = mergeIntoSummary(
-        this.#summary ?? createEmptySummary("retained"),
-        diagnostic,
-        false,
-      );
+      this.#summary = mergeIntoSummary(this.#summary ?? createEmptySummary("retained"), diagnostic);
   }
 }
 

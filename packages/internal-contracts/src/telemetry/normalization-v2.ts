@@ -53,6 +53,7 @@ function uniqueSorted<Value extends string>(
   input: readonly unknown[],
   allowed: ReadonlySet<string>,
 ): Value[] | null {
+  if (input.length > allowed.size) return null;
   const result = new Set<Value>();
   for (const value of input) {
     if (typeof value !== "string" || !allowed.has(value)) return null;
@@ -73,6 +74,7 @@ export function normalizeProfileEffectsV2(input: unknown): ProfileDiagnosticEffe
 
 export function normalizeAffectedFieldsV2(input: unknown): ProfileAffectedFieldsV2[] | null {
   if (!Array.isArray(input)) return null;
+  if (input.length > PROFILE_OBSERVATION_KINDS_V2.length) return null;
   const byKind = new Map<ProfileObservationKindV2, ProfileAffectedFieldsV2["fields"]>();
   for (const item of input) {
     if (!item || typeof item !== "object") return null;

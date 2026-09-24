@@ -489,3 +489,102 @@ round, recommend a fresh bounded diagnosis session, not an automatic third local
 accept merely to end the loop; tie each remaining mandatory finding to an existing contract and impact.
 Save a documentation-only checkpoint, normally push to this child and verify actual remote equality
 and clean status. No force push or parent updates. Human returns outcome; trunk assigns the next step.
+
+### R4 round 2 focused re-review outcome
+
+Corrections are still required for R4 at fixed target
+`280824cab82b85ca87a63eeb73b3e248df8df230`; consequently P2 remains unaccepted. This review does
+not authorize an automatic third correction round, P3, a PR, merge, formal measurement, package or
+release validation, or an acceptance-record change.
+
+#### Reviewed state
+
+- Review entry/instruction checkpoint `16727d8e8b6a13a4e1ec444a3f2c622b3e7851c4` was clean; local
+  HEAD and the actual `origin/feature/otel-redesign_M2_profile` ref agreed. Round-2 entry
+  `0595eeae51edfd3e4ce7bb1daad89f861761e240`, implementation
+  `477fde1e7407ed9c63835541a32cde4bb8a987ae` and the fixed target are ancestors/in the assigned
+  history. The fixed eight-file inventory matches the packet, and the target-to-entry delta contains
+  only the four expected routing/handoff documents.
+- Review remained limited to R4 relationships and the formal consumer boundary. No concrete new
+  dependency invalidated accepted R1-R3 or worker transport evidence.
+
+#### Mandatory finding
+
+**P2-R4-C2: the relationship validator rejects legitimate partial recovery when a diagnostic proves
+an entire target was lost.** `validateProfileReportRelationships()` treats any per-kind
+`wholeResultUnavailable` evidence as proof that the whole signal must be unavailable and empty
+(`normalization.ts:880-904`). That reverse implication is stronger than the accepted contract:
+`wholeResultUnavailable` qualifies the diagnostic's target, while `signalStatus` summarizes the
+kind. The accepted design explicitly distinguishes a wholly unavailable identified target from
+retained sibling points, requires retained evidence to be preserved, and says retained values cannot
+make a signal wholly unavailable (`opentelemetry-m2-profile-design.md:214-216,274-285`). The existing
+producer implements that boundary: `deriveProfileSignalStatus()` makes a kind unavailable from
+whole-result evidence only when its retained value count is zero; otherwise data-impact evidence
+leaves the retained result partial (`profile-report-primitives.ts:83-133`).
+
+Two independently executed temporary probes used the real `BoundedDiagnosticAccumulator` and
+`ProfileReportBuilder`. A lost Counter point with `extent: entire_target` and
+`wholeResultUnavailable: true`, plus a valid retained sibling point, produced a partial Counter
+signal with one retained value. `normalizeProfileReport()` rejected that producer report. Repeating
+the case after filling all 15 detailed slots caused the lost-point evidence to enter the reserved
+summary; the builder again produced partial with the sibling retained and the validator again
+rejected it. Both probes failed only at the expected normalize-equals-producer assertion and were
+deleted afterward.
+
+The committed positive test hides this valid boundary by changing broad Scope evidence to
+`wholeResultUnavailable: true` and expecting the otherwise-partial report to be rejected
+(`profile-report-active.test.ts:376-385`). This does not establish the stronger rule independently of
+the validator. The new canonical wording requires confirmed whole-result evidence to explain an
+_unavailable signal_; it does not state the converse that every whole-target loss makes the entire
+kind unavailable. The impact is producer/consumer incompatibility: formal extraction and evaluation
+classify a valid partial report as invalid/inconclusive and discard safely retained measurements.
+
+Bound the correction to removing the reverse signal-wide implication. Keep the forward rules:
+unavailable still requires empty values plus confirmed whole-result evidence for the kind (or the
+fixed no-measurement delivery exception), while whole-target evidence may coexist with partial status
+and retained sibling values in both detailed and compacted form. Add producer-to-validator and
+formal-consumer regressions for both representations. Reconcile the round-2 matrix/test wording with
+the established target versus signal distinction; do not weaken the six contradiction checks.
+
+#### Confirmed rejection and acceptance boundaries
+
+- The six assigned negative families fail closed: unavailable with retained data; unexplained
+  unavailable; unexplained partial; delivery effect without provenance; provenance without the
+  delivery effect; and target/coverage/affected-field kind contradictions. Detailed checks and the
+  reserved-summary kind/effect association checks are present. Normalization rejects rather than
+  repairs them.
+- Formal extraction invokes `normalizeProfileReport()` before reading measurements, and repository
+  evaluation maps validation failure to inconclusive. The committed consumer regressions confirm
+  that these contradictions do not become healthy passes. Thresholds, blocked acceptance and
+  historical artifact identities did not change.
+- Actual normal, mixed-duration partial, compacted and fixed-fallback producer cases in the focused
+  suites remain accepted. Complete-empty, justified partial-empty, broad/Scope and multi-kind
+  coverage, detail loss, report-only lifecycle notices, shutdown details and the no-measurement fixed
+  fallback also remain accepted. The exception is the legitimate whole-target/partial-sibling
+  boundary above, in both detailed and summary forms.
+- The performance fixture changes supply missing evidence for previously contradictory synthetic
+  partial states and make the fixed-fallback fixture internally consistent; they do not remove a
+  legitimate producer state. The active-contract test expectation identified above does encode the
+  unsupported reverse implication and must be corrected with the validator.
+
+#### Independent evidence
+
+- `npm run build:dev`: passed.
+- The exact six focused suites passed 140/140 tests with no skips.
+- `packages/gitlode/test/telemetry/catalog-contract.test.ts` passed 11/11 tests with no skips.
+- The exact strict tooling command from the round-2 outcome passed. This is a separate TypeScript
+  check; the Vitest counts are not claimed as test-source typechecking.
+- `git diff --check 0595eea..280824c` passed. The two bounded review probes failed as described above,
+  which is counterexample evidence rather than a suite regression; both temporary files were removed
+  and absence/clean status was verified before this documentation change.
+- Reported-only fail-before evidence (six inline probes and 3/8 grouped failures), lint, and the
+  implementer's format results were inspected but not relabeled as independent execution. Accepted
+  transport/full OS/package/release checks and formal measurement were not repeated.
+
+#### Finite return
+
+Because a relationship-validator issue remains after R4 correction round 2, return to trunk for the
+assigned fresh bounded diagnosis session rather than starting an automatic third local correction.
+Diagnose the target-versus-signal implication, preserve all six valid contradiction rejections and
+the fixed-delivery exception, and return a new fixed target only if trunk assigns a correction. Do not
+start P3 while P2 remains unaccepted.

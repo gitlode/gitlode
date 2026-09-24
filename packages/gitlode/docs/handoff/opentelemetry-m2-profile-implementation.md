@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [bounded R4 diagnosis](#bounded-r4-diagnosis).
-R4 remains unresolved after two correction rounds. No third correction is assigned. R1-R3 and
-transport remain accepted; P2 is unaccepted and P3 unassigned. Earlier packets are historical context.
+Current assignment: [post-diagnosis R4 correction](#post-diagnosis-r4-correction).
+Trunk accepts the bounded diagnosis at cd65c002. R4/P2 remain unaccepted; R1-R3 and transport remain
+accepted. P3 is unassigned. Earlier packets are historical context.
 
 ## Assignment, source and branch
 
@@ -1124,3 +1124,67 @@ target/extent model, sibling-retention rule, status definition and compaction co
 direction. Human action is still required to authorize the next correction packet and later accept
 R4/P2. This diagnosis makes no implementation, test, acceptance, P3, PR, merge, performance or
 release change and returns explicitly to trunk.
+
+## Post-diagnosis R4 correction
+
+### Assignment and authority
+
+Trunk adopts the bounded diagnosis at `cd65c002ceed7e18d10e308c31cef807a430811f` and assigns the
+minimal correction below. This is a new bounded assignment after diagnosis, not continuation of an
+automatic correction loop. The human already delegated routine session/packet and technical acceptance
+management to trunk. The diagnosis's last paragraph does not create a new human approval gate for
+this packet. Human approval before PR creation and human-controlled merge remain unchanged.
+
+Continue `feature/otel-redesign_M2_profile`. Verify clean status, local/actual remote equality and
+ancestry of diagnosis cd65c002 and fixed implementation `280824cab82b85ca87a63eeb73b3e248df8df230`.
+Record exact entry OID including this packet. Later changes should be routing documentation only.
+Do not reset/update main, integration or M2. **Trunk means this planning conversation's role, not a
+Git ref. Remain on the assigned child when returning the outcome; do not switch to main.**
+
+Read the diagnosis's meaning/implication table, evidence trace and finite regression plan. They
+supersede the unsupported reverse implication in the historical round-2 matrix/test, not the original
+accepted design. No new product decision is required. R1-R3 and actual worker transport stay accepted.
+
+### Bounded change
+
+Implement the diagnosis's minimal file/responsibility list:
+
+- Remove the unconditional reverse implication from per-kind whole-target evidence to signal-wide
+  unavailable/empty. Detailed point/observation/Scope loss and summary OR may coexist with retained
+  siblings and partial status.
+- Retain a target-aware reverse check only for exact detailed report target, entire-target extent,
+  whole-result evidence and the covered kind. Require the exactness evidence defined by existing
+  normalization/broadening rules; a broadened report target is not whole-signal proof. Never apply
+  this reverse check to a reserved summary that discarded target identity.
+- Preserve all forward unavailable/empty/evidence rules, complete-with-impact rejection, explained
+  partial, the six contradiction families, diagnostic/summary associations and fixed-delivery exception.
+- Clarify the TypeScript field comment and canonical telemetry/report catalog wording as target-scoped
+  evidence. No schema field, public shape, producer policy, threshold or historical artifact change.
+- Replace the broad-Scope rejection expectation with independent contract cases. Add the detailed
+  and compacted real accumulator/builder sibling cases at validator and formal-consumer boundaries.
+  Valid partial reports must normalize/extract and remain non-healthy (`fail`) for formal acceptance.
+
+Use the finite positive/negative list in the diagnosis, including no-sibling unavailable, complete-empty,
+justified partial-empty, fixed fallback and exact report-wide loss with retained values. Confirm that
+summary compaction cannot strengthen evidence. Check the exact-report rule against normal builder
+recovery and describe any contradictory synthetic input accurately; do not expand scope by changing
+accepted producer behavior merely to satisfy a newly stricter validator.
+
+For the two legitimate sibling cases establish fail-before/pass-after; preserve independent negative
+expectations for the six original contradictions and exact report-wide boundary. If a contract conflict
+or necessary scope expansion emerges, stop that dependent change and return evidence to trunk. Do not
+silently redesign representation or add a fresh blanket rule.
+
+### Verification and return
+
+Run build:dev; active-report, local-collection, report-primitives, worker-session, performance-harness,
+repository-sidecar and catalog-contract suites; the existing explicit strict tooling command; lint;
+format write/check and diff check. Architecture only if boundaries/exports change. Reuse unrelated
+accepted transport and OS/package evidence; no full release matrix or formal measurement. Report exact
+commands/counts/skips and before/after evidence without claiming Vitest typechecks test sources.
+
+Checkpoint and normally push progress to the child, verifying actual remote equality. Append the
+outcome here with implementation/final OIDs, precise changed rules, positive/negative results and
+remaining issues. Remain on the child with clean status. Return for a separate independent focused
+review; do not self-accept R4/P2, start P3, create PR, merge, freeze or update acceptance. If another
+concrete failure remains, return it to trunk rather than iterating beyond this packet.

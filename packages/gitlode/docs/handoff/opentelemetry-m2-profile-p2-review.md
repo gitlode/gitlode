@@ -1,8 +1,8 @@
 # P2 independent data-integrity and failure-isolation review
 
-Current assignment: [bounded R4 diagnosis](opentelemetry-m2-profile-implementation.md#bounded-r4-diagnosis).
-Round-2 review found P2-R4-C2; P2 remains unaccepted. R1-R3 and transport remain accepted.
-Earlier review packets/outcomes are historical evidence. No automatic third correction is assigned.
+Current assignment: [post-diagnosis R4 correction](opentelemetry-m2-profile-implementation.md#post-diagnosis-r4-correction).
+Trunk adopted diagnosis cd65c002. R4/P2 remain unaccepted; R1-R3 and transport remain accepted.
+Earlier review packets/outcomes are historical evidence, not active review instructions.
 
 ## Fixed scope and authority
 

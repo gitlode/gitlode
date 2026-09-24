@@ -221,3 +221,86 @@ start another implementation round during review. Trunk applies the bounded corr
 Append the outcome here, preserve a documentation-only checkpoint, push normally to the same child
 branch and verify actual remote OID. No force push or parent branch update. Review acceptance does not
 authorize P2 automatically; the human returns the outcome and trunk assigns its next bounded packet.
+
+### Correction round 1 re-review outcome
+
+P1 is accepted at the fixed target. This accepts only the staged P1 contracts and primitives; it is
+not P2 authorization, runtime profile acceptance, a PR/merge decision, a candidate freeze, or M2
+acceptance.
+
+#### Reviewed state
+
+- Fixed target: `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`; correction checkpoint
+  `5f2d03b91471b7c7fb47f62c2fb9e93fb9ddc996` and pre-correction entry
+  `ea8fd8d54e21bbd4d4dfd6c20e82810883f10d68` are ancestors in the assigned history.
+- Entry local and actual remote child-branch tip:
+  `721268157fd434371071f33eb84c52c1f550ebb8`. The worktree was clean. The target-to-entry delta
+  changes only four routing/handoff documents; there is no post-target source or test change.
+- The fixed target includes the zero-indexed-read strengthening after 5f2d03b. Active schema,
+  collectors, worker transport/session, presentation and performance consumers remain on v1.
+
+#### Finding decisions
+
+1. **P1-R1 accepted.** Confirmed whole-result evidence is part of detailed identity, is copied into
+   the per-kind summary association, and is accepted only with `missing_observations` or
+   `unknown_collection_coverage`. Lifecycle-only and report-delivery-only inputs with that flag
+   become conservative invalid-aggregation evidence rather than signal loss. Detailed, compacted,
+   mixed-summary and fallback-recompaction paths preserve valid whole loss without allowing retention
+   position to create or erase it. The staged contract/catalog documents the new detail field and P2
+   producer/consumer responsibility.
+2. **P1-R2 accepted.** An unavailable signal with retained values now throws an explicit report
+   validation rejection before any silent relabeling. Tests cover empty diagnostics, an unaffected
+   empty unavailable signal and a contradictory signal with a full 15+1 diagnostic snapshot. The
+   value arrays are not an input to this pure status function and are not mutated or discarded.
+   Canonical guidance and the P2 inventory require builder isolation to catch this recoverable
+   rejection, retain valid measurements and siblings, and add bounded explanation; it remains
+   distinct from catastrophic whole-builder failure and the fixed empty fallback.
+3. **P1-R3 accepted.** Saturation uses a strict overflow comparison. Exact
+   `0 + Number.MAX_SAFE_INTEGER` and `Number.MAX_SAFE_INTEGER - 1 + 1` remain unsaturated, actual
+   overflow clamps, and prior saturation survives later count, summary and known-disjoint quantity
+   merges. Unknown/overlapping quantity composition remains unknown rather than becoming a false
+   sum.
+4. **P1-R4 accepted.** Omitted count still defaults to one and omitted mask members default to
+   false. Explicit zero, negative, fractional and non-finite counts, malformed mask containers, and
+   non-boolean supplied members are routed to one bounded conservative invalid-aggregation identity;
+   they are no longer retained as false exact facts. The validation performs a fixed number of mask
+   member reads and exception isolation remains intact.
+
+Preprocessing hardening is also accepted for P1. Kinds, effects, affected-kind entries and per-kind
+field arrays check length against their finite semantic universes before indexed iteration. The
+100,000-duplicate-kind regression requires zero indexed reads and the staged normalization guidance
+records the rejection. This bounds accumulator work after an array is supplied; it does not claim to
+bound caller allocation/population or every other input path. Canonical producers use the finite
+sets, so the guard excludes no valid normal producer value.
+
+No remaining concrete failure path was found within this focused correction scope.
+
+#### Independent and reported evidence
+
+- `git diff --check ea8fd8d..dc6cfbd`: passed.
+- `npm run build:dev`: passed; this is production TypeScript compilation.
+- The assigned seven-file Vitest command: 7 files and 112 tests passed. Test execution is not
+  standalone test-source typechecking.
+- A read-only built-module probe combined an existing mixed summary, lifecycle-only Counter evidence,
+  confirmed whole-Counter loss and fallback recompaction. It produced Span `partial`, Counter
+  `unavailable`, retained the per-kind whole-loss flag, and kept the 16-entry fallback bound.
+- The implementer's pre-correction run of the newly added file reported exactly 5 failures and 15
+  pre-existing passes for the four findings plus oversized-array hardening. That fail-before run was
+  inspected but not independently reproduced against a temporary old tree; the pass-after state was
+  independently reproduced by the 112-test run above.
+- Implementer-reported lint and architecture checks were inspected but not rerun. Fixed fallback,
+  trusted-snapshot and active-v1 regressions were included in the independently executed affected
+  suites.
+
+#### Required P2 handoff
+
+P2 remains unassigned until trunk issues its next packet. It must atomically migrate the catalog,
+contracts, collectors/report builder, worker/application transport, presentation bridge and
+tooling/performance consumers listed in the implementation handoff. In particular it must catch the
+status/value validation rejection inside normal builder isolation, preserve valid values and sibling
+signals, emit bounded validation evidence, and never route that recoverable case through the fixed
+whole-report fallback. P2 must separately prove real builder-body failure delivery, structured
+producer evidence and masks, worker transport, presentation/tool interpretation, simultaneous
+shutdown handling, exactly-once finalization, and unchanged application-result/quiet/failed-run
+behavior. P3 and later runtime, terminal, performance and publish acceptance remain outside this
+review.

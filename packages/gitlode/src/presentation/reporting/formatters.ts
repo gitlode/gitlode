@@ -601,7 +601,8 @@ function formatScope(scope: ProfileInstrumentationScope): string {
 }
 
 function formatScopeToken(value: string): string {
-  return /[\s"\\\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(value)
+  return value.length === 0 ||
+    /[\s"\\\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(value)
     ? quote(value)
     : value;
 }

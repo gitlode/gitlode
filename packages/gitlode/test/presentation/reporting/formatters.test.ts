@@ -190,6 +190,14 @@ describe("generic profile formatting", () => {
     ]);
   });
 
+  it("quotes an explicitly present empty Scope version", () => {
+    const report = emptyReport();
+    report.counters = [
+      { ...counter("example", "count"), scope: { name: "example", version: "" } },
+    ];
+    expect(formatProfileLines(report)).toContain('  Scope: example@""');
+  });
+
   it("uses four significant digits, promotes rounded thresholds and never hides nonzero", () => {
     const report = emptyReport();
     report.counters = [

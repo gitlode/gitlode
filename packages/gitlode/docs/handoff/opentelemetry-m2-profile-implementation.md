@@ -1540,7 +1540,7 @@ does not accept P3 or M2. No PR, merge, formal measurement, cumulative package/O
   `5df4f49732d9ff49fef4067493d3152d276a792d` were confirmed ancestors. The intervening entry delta
   contained routing/planning documentation only.
 - Exact implementation checkpoint: `255b0aacebb5fc7c109d3fe151455abace7f9d51`.
-- Exact correction outcome/evidence checkpoint: `OUTCOME_CHECKPOINT_TO_BE_RECORDED`. The later child
+- Exact correction outcome/evidence checkpoint: `094dcb81df02681f4de20daf9c160eaacbf0564c`. The later child
   tip only records that checkpoint OID and is a routing-only documentation delta.
 
 #### Correction and regression matrix

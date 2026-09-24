@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P2 R4 correction round 2](#p2-r4-correction-round-2).
-R1 (trunk-qualified), R2, R3 and actual worker transport are accepted at 5bc2cf3. R4 remains open;
-P2 is unaccepted and P3 unassigned. Earlier assignments are historical context.
+Current assignment: [R4 round 2 focused re-review](opentelemetry-m2-profile-p2-review.md#r4-round-2-focused-re-review).
+Round 2 returned at `280824cab82b85ca87a63eeb73b3e248df8df230`. R1-R3 and transport remain accepted;
+R4 and P2 overall await review. P3 is unassigned. Earlier assignments are historical context.
 
 ## Assignment, source and branch
 

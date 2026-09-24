@@ -19,7 +19,7 @@ work context, not active instructions to repeat M1. Stable contracts live in des
 The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`.
 P1 is [independently accepted](opentelemetry-m2-profile-p1-review.md#correction-round-1-re-review-outcome)
 at `dc6cfbd`. The active next assignment is
-[P2 R4 correction round 2](opentelemetry-m2-profile-implementation.md#p2-r4-correction-round-2).
+[R4 round 2 focused re-review](opentelemetry-m2-profile-p2-review.md#r4-round-2-focused-re-review) at `280824c`.
 R1-R3 and actual transport are accepted; R4 cross-field validation remains open.
 P2/P3 and M2 acceptance remain pending.
 

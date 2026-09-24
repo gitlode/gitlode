@@ -1,8 +1,8 @@
 # P2 independent data-integrity and failure-isolation review
 
-Review complete: R1 (trunk-qualified), R2, R3 and transport accepted; R4 remains open.
-Current assignment: [P2 R4 correction round 2](opentelemetry-m2-profile-implementation.md#p2-r4-correction-round-2).
-Earlier review packets and outcomes below are historical evidence, not instructions to repeat them.
+Current assignment: [R4 round 2 focused re-review](#r4-round-2-focused-re-review).
+R1 (trunk-qualified), R2, R3 and transport remain accepted. Earlier review packets and outcomes
+are historical evidence. P2 remains unaccepted pending this review.
 
 ## Fixed scope and authority
 
@@ -415,3 +415,77 @@ thresholds or relabel historical artifacts.
 Correct only P2-R4-C1 and return a new fixed target for focused independent re-review. Preserve the
 accepted R1 mixed-duration behavior, R2/R3 corrections, worker transport proof, P1 bounds and fallback
 lifecycle, thresholds, blocked release record and historical evidence identities. Do not begin P3.
+
+## R4 round 2 focused re-review
+
+### Fixed scope
+
+Review independently on `feature/otel-redesign_M2_profile` in a new human-started conversation.
+
+- Round-2 entry: `0595eeae51edfd3e4ce7bb1daad89f861761e240`.
+- Implementation: `477fde1e7407ed9c63835541a32cde4bb8a987ae`.
+- Full fixed target: `280824cab82b85ca87a63eeb73b3e248df8df230`.
+
+Trunk checked the eight-file inventory and confirmed that implementation-to-final delta is only
+handoff outcome documentation. Verify clean entry/exit status, ancestry and actual remote equality;
+post-target routing-only commits do not change the target. Investigate unexpected source changes.
+
+Read [the invariant matrix and round-2 outcome](opentelemetry-m2-profile-implementation.md#p2-r4-correction-round-2),
+the prior R4-C1 finding, accepted design and active report catalog. Limit review to R4 relationship
+validation, affected consumer boundaries and regressions. R1-R3 and transport stay accepted unless a
+concrete new dependency invalidates their evidence. No production fixes, P3, PR, merge or measurement.
+
+### Questions and acceptance evidence
+
+- Check the matrix against pre-existing accepted contracts, not merely newly added canonical wording.
+  Distinguish collection status, retained-value availability, whole-result evidence, target extent and
+  report-delivery failure. Confirm kind/effect-specific explanations for partial/unavailable, empty
+  array semantics, and fixed fallback's special provenance.
+- Independently verify all six negative families: retained data with unavailable status; unexplained
+  unavailable; unexplained partial; delivery effect without provenance; reverse delivery association;
+  target/coverage/affected-field kind contradictions. Check both detailed and summary representations,
+  not just the exact previous fixtures. Normalization must reject rather than repair contradictory data.
+- Audit reverse implications introduced by the relationship pass as carefully as missing checks:
+  whole-result flags versus retained values/partial recovery, data-impact effects versus complete
+  status, and narrowed targets versus multi-kind coverage. Verify the rules do not turn evidence about
+  a target into a stronger unsupported claim about an entire signal. Use the existing builder's
+  recoverable status/value path as a positive boundary. Do not make a new semantic rule solely to
+  satisfy the validator; return a concrete contract conflict if one exists.
+- Preserve valid broad/Scope/multi-kind diagnostics, detail loss, per-kind summary unions, report-only
+  lifecycle notices, overflow exceptions and unknown prior-detail provenance. No demand for detailed
+  evidence that legitimate compaction intentionally discards. Test real producer normal, partial,
+  compacted and fixed-fallback reports, including mixed-duration retained total/max, empty cases and
+  shutdown details. Available retained values do not establish whole-run completeness.
+- Inspect changed fixtures: the primitive/performance fixture adjustments must correct invalid inputs,
+  not remove a legitimate producer state or hide a regression. Keep tests' expected relationships
+  independent from the validator's rule constants.
+- Confirm formal extraction/evaluation invokes validation first and rejects contradictory reports;
+  do not claim these six contradictions previously caused a healthy evaluator pass. The prior issue
+  was shared-validator/extraction validity, while current evaluator policy already made them non-pass.
+  Thresholds, blocked acceptance and historical artifact identities must remain unchanged.
+
+Run `npm run build:dev`, then the six focused suites:
+
+- `packages/internal-contracts/test/telemetry/profile-report-active.test.ts`
+- `packages/gitlode/test/telemetry/local-collection.test.ts`
+- `packages/gitlode/test/telemetry/profile-report-primitives.test.ts`
+- `packages/gitlode/test/telemetry/worker-telemetry-session.test.ts`
+- `packages/gitlode/test/telemetry/performance-harness.test.ts`
+- `packages/gitlode/test/telemetry/repository-sidecar.test.ts`
+
+Also run `packages/gitlode/test/telemetry/catalog-contract.test.ts` and the exact strict tooling command
+in the round-2 outcome. Reported results are 140 plus 11 passes, not independent evidence until run.
+Inspect fail-before evidence (six probes and grouped test failures); repeat only a bounded probe needed
+for an unresolved concern. Do not repeat accepted transport/full OS/package/formal measurement checks
+without a concrete changed dependency. Record test execution separately from TypeScript checks.
+Run fixed-diff whitespace checks and format write/check for review documentation.
+
+### Return
+
+Append R4 accepted/corrections-required and P2 overall decision, concrete remaining failures, tested
+positive boundaries, independent versus reported evidence and residual P3 work. Review only: do not
+repair source/tests during this conversation. If the same R4 issue remains after this second correction
+round, recommend a fresh bounded diagnosis session, not an automatic third local correction. Do not
+accept merely to end the loop; tie each remaining mandatory finding to an existing contract and impact.
+Save a documentation-only checkpoint, normally push to this child and verify actual remote equality
+and clean status. No force push or parent updates. Human returns outcome; trunk assigns the next step.

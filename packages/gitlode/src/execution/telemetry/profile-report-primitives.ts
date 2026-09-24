@@ -168,15 +168,21 @@ function mandatoryFallbackDiagnostic(
  * Constructs the minimum fixed report without invoking the normal builder or reading untrusted input.
  * P2 may pass only a snapshot issued by the v2 accumulator; arbitrary lookalikes are ignored.
  */
-export function createFixedProfileReportFallback(possibleSnapshot?: unknown): ProfileReport {
+export function createFixedProfileReportFallback(
+  possibleSnapshot?: unknown,
+  priorIssueDetailOverride?: "retained" | "unavailable",
+): ProfileReport {
   const trusted = isTrustedProfileDiagnosticsSnapshot(possibleSnapshot)
     ? possibleSnapshot
     : undefined;
-  const priorIssueDetail = trusted ? "retained" : "unavailable";
+  const priorIssueDetail = priorIssueDetailOverride ?? (trusted ? "retained" : "unavailable");
   const diagnostics: (ProfileDiagnostic | ProfileDiagnosticSummary)[] = [
     mandatoryFallbackDiagnostic(priorIssueDetail),
   ];
-  let summary = trusted?.summary ?? null;
+  let summary =
+    priorIssueDetail === "unavailable"
+      ? profileDiagnosticInternals.createEmptySummary("unavailable")
+      : (trusted?.summary ?? null);
   if (trusted) {
     for (const diagnostic of trusted.diagnostics) {
       if (diagnostics.length < 15) diagnostics.push(structuredClone(diagnostic));
@@ -186,7 +192,7 @@ export function createFixedProfileReportFallback(possibleSnapshot?: unknown): Pr
           diagnostic,
         );
     }
-  } else summary = profileDiagnosticInternals.createEmptySummary("unavailable");
+  } else summary = profileDiagnosticInternals.createEmptySummary(priorIssueDetail);
   if (summary) diagnostics.push(summary);
   return {
     schemaVersion: PROFILE_REPORT_SCHEMA_VERSION,

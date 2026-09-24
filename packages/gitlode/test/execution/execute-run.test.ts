@@ -327,6 +327,7 @@ describe("executeWorkerRunRequest profiling", () => {
       gitAdapter: "isomorphic-git" | "git-cli",
       degraded: boolean,
       withPlugin: boolean,
+      builderFailure = false,
     ) => {
       const outputDir = await makeTempDir("gitlode-noop-telemetry-output-");
       let telemetryClockReads = 0;
@@ -369,11 +370,13 @@ describe("executeWorkerRunRequest profiling", () => {
           environment: {},
           telemetryClock: () => ++telemetryClockReads,
           observeTelemetryComposition: (slot, component) => composition.push([slot, component]),
-          ...(degraded
+          ...(degraded || builderFailure
             ? {
                 createTelemetrySession: async () =>
                   await createWorkerTelemetrySessionForTest({
-                    failures: { meter_provider_construction: new Error("degrade") },
+                    failures: degraded
+                      ? { meter_provider_construction: new Error("degrade") }
+                      : { report_builder_body: new Error("builder failure") },
                   }),
               }
             : {}),
@@ -399,6 +402,7 @@ describe("executeWorkerRunRequest profiling", () => {
     const degraded = await run(true, "git-cli", true, true);
     const degradedBuiltIn = await run(true, "git-cli", true, false);
     const enabled = await run(true, "isomorphic-git", false, true);
+    const fallback = await run(true, "isomorphic-git", false, false, true);
 
     const commonNoopComposition = [
       ["git", NOOP_GIT_METRIC_RECORDER],
@@ -455,6 +459,21 @@ describe("executeWorkerRunRequest profiling", () => {
     expect(disabled.result.success.profileReport).toBeUndefined();
     expect(degraded.result.success.profileReport).toBeUndefined();
     expect(enabled.result.success.profileReport).toBeDefined();
+    expect(fallback.result.success.profileReport).toMatchObject({
+      schemaVersion: 2,
+      signalStatus: { spans: "unavailable", counters: "unavailable", histograms: "unavailable" },
+      spans: [],
+      counters: [],
+      histograms: [],
+    });
+    expect(fallback.result.success.profileReport?.diagnostics[0]).toMatchObject({
+      effects: ["report_delivery_failure"],
+      reportDelivery: { path: "fixed_fallback" },
+    });
+    expect(structuredClone(fallback.result).success.profileReport).toEqual(
+      fallback.result.success.profileReport,
+    );
+    expect(fallback.result.success.recordsWritten).toBe(enabled.result.success.recordsWritten);
     const compatibilityWarning = {
       severity: "warn",
       message:

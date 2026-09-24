@@ -12,7 +12,10 @@ import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-ho
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
 import { AlwaysOffSampler, BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 
-import { BoundedDiagnosticAccumulator } from "./diagnostic-accumulator.js";
+import {
+  BoundedDiagnosticAccumulator,
+  type ProfileDiagnosticsSnapshot,
+} from "./diagnostic-accumulator.js";
 import {
   createLocalMetricViews,
   LocalMetricReader,
@@ -20,6 +23,7 @@ import {
 } from "./local-metric-reader.js";
 import { LocalSpanProcessor } from "./local-span-processor.js";
 import { ProfileReportBuilder } from "./profile-report-builder.js";
+import { createFixedProfileReportFallback } from "./profile-report-primitives.js";
 
 const runSpanMetadata = (() => {
   const metadata = TELEMETRY_SPANS.find((span) => span.id === "run");
@@ -54,6 +58,8 @@ export type WorkerTelemetryTestAttempt =
   | "trace_flush"
   | "metric_collect"
   | "report_build"
+  | "report_builder_body"
+  | "diagnostic_snapshot"
   | "telemetry_shutdown"
   | "trace_provider_shutdown"
   | "meter_provider_shutdown"
@@ -96,6 +102,28 @@ function attempt(
 ): void {
   hooks?.onAttempt?.(name);
   if (hasFailure(hooks, name)) throw hooks?.failures?.[name];
+}
+
+function addLifecycleIssue(
+  diagnostics: BoundedDiagnosticAccumulator,
+  input: {
+    stage: "trace_flush" | "metric_collection" | "report_build" | "telemetry_shutdown";
+    kinds: readonly ("span" | "counter" | "histogram")[];
+    effect: "unknown_collection_coverage" | "lifecycle_notice";
+    wholeResultUnavailable?: boolean;
+    count?: number;
+  },
+): void {
+  diagnostics.add({
+    code: "lifecycle_failure",
+    stage: input.stage,
+    target: { type: "report" },
+    signalCoverage: input.kinds,
+    effects: [input.effect],
+    extent: input.wholeResultUnavailable ? "entire_target" : "unidentified_subset",
+    wholeResultUnavailable: input.wholeResultUnavailable,
+    count: input.count,
+  });
 }
 
 async function ignoreFailure(callback: () => void | Promise<void>): Promise<void> {
@@ -211,42 +239,46 @@ export class WorkerTelemetrySession {
       attempt(this.#hooks, "root_end");
     } catch {
       traceFailed = true;
-      active?.diagnostics.add({
-        code: "lifecycle_failure",
-        stage: "trace_flush",
-        signal: "spans",
-      });
+      if (active)
+        addLifecycleIssue(active.diagnostics, {
+          stage: "trace_flush",
+          kinds: ["span"],
+          effect: "unknown_collection_coverage",
+        });
     }
     try {
       this.#rootSpan.end();
     } catch {
       traceFailed = true;
-      active?.diagnostics.add({
-        code: "lifecycle_failure",
-        stage: "trace_flush",
-        signal: "spans",
-      });
+      if (active)
+        addLifecycleIssue(active.diagnostics, {
+          stage: "trace_flush",
+          kinds: ["span"],
+          effect: "unknown_collection_coverage",
+        });
     }
 
     try {
       attempt(this.#hooks, "trace_flush");
     } catch {
       traceFailed = true;
-      active?.diagnostics.add({
-        code: "lifecycle_failure",
-        stage: "trace_flush",
-        signal: "spans",
-      });
+      if (active)
+        addLifecycleIssue(active.diagnostics, {
+          stage: "trace_flush",
+          kinds: ["span"],
+          effect: "unknown_collection_coverage",
+        });
     }
     try {
       await this.#tracerProvider.forceFlush();
     } catch {
       traceFailed = true;
-      active?.diagnostics.add({
-        code: "lifecycle_failure",
-        stage: "trace_flush",
-        signal: "spans",
-      });
+      if (active)
+        addLifecycleIssue(active.diagnostics, {
+          stage: "trace_flush",
+          kinds: ["span"],
+          effect: "unknown_collection_coverage",
+        });
     }
 
     if (active) {
@@ -270,11 +302,12 @@ export class WorkerTelemetrySession {
         metricFailed = true;
       }
       if (metricFailed) {
-        for (const signal of ["counters", "histograms"] as const)
-          active.diagnostics.add({
-            code: "lifecycle_failure",
+        for (const kind of ["counter", "histogram"] as const)
+          addLifecycleIssue(active.diagnostics, {
             stage: "metric_collection",
-            signal,
+            kinds: [kind],
+            effect: "unknown_collection_coverage",
+            wholeResultUnavailable: true,
           });
       }
 
@@ -289,20 +322,23 @@ export class WorkerTelemetrySession {
       try {
         attempt(this.#hooks, "report_build");
       } catch {
-        active.diagnostics.add({
-          code: "lifecycle_failure",
+        addLifecycleIssue(active.diagnostics, {
           stage: "report_build",
-          signal: "report",
+          kinds: [],
+          effect: "lifecycle_notice",
         });
       }
       try {
         profileReport = active.reportBuilder.build(reportInput);
       } catch {
-        active.diagnostics.add({
-          code: "lifecycle_failure",
-          stage: "report_build",
-          signal: "report",
-        });
+        let snapshot: ProfileDiagnosticsSnapshot | undefined;
+        try {
+          attempt(this.#hooks, "diagnostic_snapshot");
+          snapshot = active.diagnostics.snapshot();
+        } catch {
+          // The fixed fallback does not depend on a working diagnostic snapshot.
+        }
+        profileReport = createFixedProfileReportFallback(snapshot);
       }
     }
 
@@ -324,14 +360,41 @@ export class WorkerTelemetrySession {
       );
 
     if (active && shutdownFailureCount > 0) {
-      for (let index = 0; index < shutdownFailureCount; index += 1)
-        active.diagnostics.add({
-          code: "lifecycle_failure",
-          stage: "telemetry_shutdown",
-          signal: "telemetry",
-        });
-      if (profileReport)
-        profileReport = { ...profileReport, diagnostics: active.diagnostics.snapshot() };
+      addLifecycleIssue(active.diagnostics, {
+        stage: "telemetry_shutdown",
+        kinds: [],
+        effect: "lifecycle_notice",
+        count: shutdownFailureCount,
+      });
+      if (profileReport) {
+        const isFallback = profileReport.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === "lifecycle_failure" && diagnostic.reportDelivery !== null,
+        );
+        try {
+          attempt(this.#hooks, "diagnostic_snapshot");
+          const snapshot = active.diagnostics.snapshot();
+          profileReport = isFallback
+            ? createFixedProfileReportFallback(snapshot)
+            : {
+                ...profileReport,
+                diagnostics: snapshot.summary
+                  ? [...snapshot.diagnostics, snapshot.summary]
+                  : snapshot.diagnostics,
+              };
+        } catch {
+          if (isFallback) {
+            const postFailure = new BoundedDiagnosticAccumulator();
+            addLifecycleIssue(postFailure, {
+              stage: "telemetry_shutdown",
+              kinds: [],
+              effect: "lifecycle_notice",
+              count: shutdownFailureCount,
+            });
+            profileReport = createFixedProfileReportFallback(postFailure.snapshot(), "unavailable");
+          }
+        }
+      }
     }
 
     return profileReport ? { ...initial, profileReport } : initial;
@@ -379,7 +442,10 @@ async function createSession(
     const diagnostics = new BoundedDiagnosticAccumulator();
     spanProcessor = new LocalSpanProcessor(diagnostics);
     metricReader = new LocalMetricReader(hooks?.metricCollectionTimeoutMillis);
-    const reportBuilder = new ProfileReportBuilder(diagnostics);
+    const reportBuilder = new ProfileReportBuilder(diagnostics, {
+      beforeBodyCompletion: () => attempt(hooks, "report_builder_body"),
+      beforeDiagnosticSnapshot: () => attempt(hooks, "diagnostic_snapshot"),
+    });
     attempt(hooks, "trace_provider_construction");
     tracerProvider = new BasicTracerProvider({ spanProcessors: [spanProcessor] });
     attempt(hooks, "meter_provider_construction");

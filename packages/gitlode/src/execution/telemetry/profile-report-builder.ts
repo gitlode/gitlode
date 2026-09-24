@@ -65,9 +65,16 @@ function compareObservations(
 
 export class ProfileReportBuilder {
   readonly #diagnostics: BoundedDiagnosticAccumulator;
+  readonly #beforeBodyCompletion?: () => void;
+  readonly #beforeDiagnosticSnapshot?: () => void;
 
-  constructor(diagnostics: BoundedDiagnosticAccumulator) {
+  constructor(
+    diagnostics: BoundedDiagnosticAccumulator,
+    hooks: { beforeBodyCompletion?: () => void; beforeDiagnosticSnapshot?: () => void } = {},
+  ) {
     this.#diagnostics = diagnostics;
+    this.#beforeBodyCompletion = hooks.beforeBodyCompletion;
+    this.#beforeDiagnosticSnapshot = hooks.beforeDiagnosticSnapshot;
   }
 
   build(input: ProfileReportBuildInput): ProfileReport {
@@ -95,6 +102,8 @@ export class ProfileReportBuilder {
       counters: counters.values.length,
       histograms: histograms.values.length,
     };
+    this.#beforeBodyCompletion?.();
+    this.#beforeDiagnosticSnapshot?.();
     let snapshot = this.#diagnostics.snapshot();
     let signalStatus: ProfileReport["signalStatus"];
     try {
@@ -116,6 +125,7 @@ export class ProfileReportBuilder {
           extent: "unidentified_subset",
         });
       }
+      this.#beforeDiagnosticSnapshot?.();
       snapshot = this.#diagnostics.snapshot();
       signalStatus = deriveProfileSignalStatus(evidence, counts, snapshot);
     }

@@ -301,3 +301,117 @@ remaining failures, independent versus reported checks and outstanding human/cum
 findings and return to trunk; no fixes within review. Normally commit/push documentation on this child,
 verify actual remote OID and clean status, and remain on the child. No force push or parent updates.
 Acceptance of this slice does not complete M2 or authorize PR/merge or the next validation campaign.
+
+## P3 correction round 1 focused re-review outcome
+
+Status: **corrections required** for the P3 implementation slice. P3-R1 and P3-R4 are accepted for
+this correction round. P3-R2 and P3-R3 still have bounded presentation failures, so this review does
+not accept P3 or M2 and does not authorize integration or the later validation campaign.
+
+### Reviewed provenance
+
+- Review entry/planning checkpoint: `46a3e603a0522d23284be7f48df49e853e83dfcd` on
+  `feature/otel-redesign_M2_profile`. The worktree was clean, and local `HEAD` and the actual
+  `origin/feature/otel-redesign_M2_profile` both resolved to that checkpoint at entry.
+- Fixed correction target: `61a34c1f13ee993099c4611b3e4ac966b2ab132c`; correction base
+  `f4d9f12788147b4054b48847574ba4cbc887d7d6`, implementation
+  `255b0aacebb5fc7c109d3fe151455abace7f9d51` and outcome
+  `094dcb81df02681f4de20daf9c160eaacbf0564c` are ancestors.
+- The base-to-target implementation/evidence inventory is the formatter, its focused test, the view
+  drift test, the generic view catalog and the correction outcome. The target-to-entry delta is
+  routing/handoff documentation only; there is no later source or test change to silently move the
+  fixed target.
+
+### Per-finding decision
+
+#### P3-R1: accepted
+
+Scope grouping uses nested maps keyed independently by name and nullable version. Missing and
+present-empty versions therefore remain distinct, delimiter-bearing components cannot alias, and
+the flattened groups use `compareProfileScopes` for the accepted equality/order. The durable test
+uses both measurement and diagnostic-only Scopes, both input orders, null/empty versions and embedded
+NUL components with literal headings. No rendering or admission change was found.
+
+#### P3-R2: corrections required for unmatched same-name targets
+
+Complete suffix escaping and malformed-dot missing-only construction are corrected for the covered
+cases. Literal control/quote/slash/backslash/C1/line/bidi expectations are independent of production
+escaping helpers, and styled/plain parity is checked.
+
+However, `renderScope()` suppresses construction of a missing-only node whenever _any_ measurement
+has the same observation name. The surviving diagnostic is then offered only to those rows, and
+`appendMeasurementDiagnostics()` discards it when its kind or typed point attributes do not match.
+Consequently, a retained Counter row plus an entire-target missing Span diagnostic of the same name
+shows neither an issue-only target nor its notice. The same loss occurs for a retained Counter point
+and a missing same-name Counter point with a different canonical attribute set. Independent temporary
+probes reproduced both paths: output retained the Profile summary and the unrelated measurement but
+lost `No valid result retained: invalid aggregation discarded.` entirely.
+
+This affects ordinary and malformed names and is a diagnostic-evidence loss, not a request for a kind
+section or badge. Bounded correction: partition same-name diagnostics by complete kind/point target,
+attach exact matches once, and render each unmatched retained target through the accepted issue-only
+convention without duplicating notices or changing namespace/attribute bases. Add durable literal
+tests for mixed measured/missing cross-kind and differing typed-point identities, in both relevant
+name layouts.
+
+#### P3-R3: corrections required for remaining deterministic ties
+
+Known loss descriptors now render semantic meaning, value, saturation and unit separately from
+occurrence count; unknown amounts and the duration-specific explanation remain distinct. The primary
+target comparison is typed and precedes code/stage/effect, and the durable opposed-order test covers
+different kinds, selectors and quantity descriptors.
+
+The remaining comparator stops after loss descriptor and unit and does not compare the retained loss
+value/saturation or diagnostic occurrence count/saturation. Those fields visibly change notice text.
+An independent temporary probe used two report diagnostics with the same target, code, stage, effects,
+descriptor and unit but different exact/saturated loss values and occurrence counts. Reversing the
+input reversed the two rendered notices. Thus distinguishable output still preserves producer arrival
+order, contrary to the accepted deterministic-retained-ties rule.
+
+Bounded correction: after canonical identity comparisons, compare every remaining output-distinguishing
+retained tie, including loss value/nullability and saturation plus occurrence count and saturation,
+using typed comparisons. Add an opposed-input-order regression where descriptor and unit are equal
+but those values differ. This requires no producer, schema or loss-meaning change.
+
+#### P3-R4: accepted
+
+The Profile headline now uses `warnBadge` only when the highest retained detailed or reserved-summary
+severity is warning; info-only detail and summary evidence use the default marker. Fixed delivery
+fallback remains warning. Distinct-frequency digits and coverage label/count/punctuation use their
+accepted roles, and the role spy verifies stripped-text parity for info, warning, compacted severity,
+frequency and coverage cases. No application-success/progress styling or plain text changed.
+
+### Independent checks and evidence separation
+
+- `npm run build:dev`: passed; the normal production TypeScript build completed.
+- Exact original nine-file Vitest selection: 9 files, 72 tests passed, 0 failed and 0 skipped.
+- Exact standalone strict tooling command from P3: passed separately from the production build and
+  Vitest execution.
+- Independently rerun focused current-target tests: P3-R1 1 passed/19 skipped; P3-R2 2 passed/18
+  skipped; P3-R3 2 passed/18 skipped; P3-R4 1 passed/19 skipped. These establish the implemented
+  covered cases, not the uncovered boundaries above.
+- Temporary bounded probes: one run had the cross-kind R2 and same-descriptor R3 probes both fail
+  with 20 nonmatching tests skipped; a second run had the typed-point R2 probe fail with 20
+  nonmatching tests skipped. All probe edits were removed before documentation changes.
+- Fixed base-to-target and target-to-entry `git diff --check`: passed.
+- Review documentation `npm run format:write`, `npm run format:check` and final `git diff --check`:
+  passed.
+
+The correction outcome's focused fail-before counts are **reported-only**. The implementation commit
+contains production and tests together, so this review did not treat its narrative as an independently
+executed red checkpoint. The outcome's lint and implementation-time format checks are also
+reported-only; no new boundary/export concern justified rerunning lint or architecture. The earlier
+ordinary captures remain historical non-TTY evidence and were not repeated because these failures are
+synthetic attachment/order boundaries, not representative ordinary-output changes. No capture or
+image is evidence of human light/dark TTY approval.
+
+The corrected R1/R4 behavior and much of R2/R3 are presentation-local. The two remaining failures are
+also formatter/test/catalog follow-up; no residual P1/P2 producer, report schema, admission, numeric
+mask, partial-value, fallback transport or routing regression was found in the focused scope. The
+catalog currently overstates complete missing-target retention and deterministic diagnostic ordering
+until these two paths are corrected.
+
+Human real-terminal light/dark readability and wrapping remain pending. Cumulative Windows/Linux
+source and installed-package validation remains a separate later gate. No implementation repair, PR,
+merge, formal measurement, cumulative package validation, acceptance update or `tests/system` move
+was performed.

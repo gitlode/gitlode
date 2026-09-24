@@ -8,12 +8,14 @@ const styled: Styling = {
   doneMarker: (text) => text,
   stageLabel: (text) => text,
   summaryHeader: (text) => text,
+  sectionHeading: (text) => text,
   warnBadge: (text) => `<warn>${text}</warn>`,
   errorBadge: (text) => `<error>${text}</error>`,
   fieldKey: (text) => text,
   primaryValue: (text) => text,
   unitSuffix: (text) => text,
   refsValue: (text) => text,
+  separator: (text) => text,
 };
 
 describe("presentation splitMessageLines", () => {

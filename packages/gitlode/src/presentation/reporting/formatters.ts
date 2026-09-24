@@ -1,41 +1,38 @@
 import {
+  compareCodeUnits,
   compareProfileScopes,
   deriveCounterNumericAvailability,
   deriveHistogramNumericAvailability,
   deriveSpanNumericAvailability,
 } from "@gitlode/internal-contracts/telemetry";
 import type {
-  ProfileAttribute,
-  ProfileDiagnostic,
-  ProfileDiagnosticSummary,
+  ProfileAttributeValue,
+  ProfileCounterPoint,
   ProfileHistogramPoint,
+  ProfileInstrumentationScope,
   ProfileReport,
   ProfileSpanAggregate,
 } from "@gitlode/internal-contracts/telemetry";
 
 import { formatCount, formatElapsed, humanizeBytes } from "../format-utils.js";
 import { plainStyling, type Styling } from "../styling.js";
-import {
-  findProfileViewEntry,
-  isResolvedPluginScope,
-  PROFILE_PRESENTATION_POLICY,
-  PROFILE_VIEW_DIAGNOSTIC_LABELS,
-} from "./profile-view.js";
+import { compareProfileIdentity } from "./profile-view.js";
 import type { SummaryData } from "./types.js";
 
-type GroupBucket = {
-  group: string;
-  subgroup: string;
-  scope?: { name: string; version: string | null };
-  order: number;
-  rows: Array<{
-    order: number;
-    key: string;
-    text: string;
-    scope: { name: string; version: string | null };
-    name: string;
-  }>;
-};
+type ProfileMeasurement =
+  | { kind: "span"; value: ProfileSpanAggregate }
+  | { kind: "counter"; value: ProfileCounterPoint }
+  | { kind: "histogram"; value: ProfileHistogramPoint };
+
+interface NamespaceNode {
+  readonly segment: string;
+  readonly absoluteName: string;
+  readonly rows: ProfileMeasurement[];
+  readonly children: Map<string, NamespaceNode>;
+}
+
+const UNAVAILABLE = "—";
+const TOKEN = /^[A-Za-z0-9_.@-]+$/u;
 
 export function formatSummaryLines(data: SummaryData, styling: Styling = plainStyling): string[] {
   const bytes = humanizeBytes(data.bytesWritten);
@@ -50,7 +47,9 @@ export function formatSummaryLines(data: SummaryData, styling: Styling = plainSt
   ];
   return [
     styling.summaryHeader("Extraction complete"),
-    ...fields.map(([label, value]) => `  ${styling.fieldKey(label.padEnd(18))}: ${value}`),
+    ...fields.map(([label, value]) =>
+      `  ${styling.fieldKey(label.padEnd(18))}${styling.separator(":")} ${value}`,
+    ),
   ];
 }
 
@@ -58,249 +57,315 @@ export function formatProfileLines(
   report: ProfileReport,
   styling: Styling = plainStyling,
 ): string[] {
-  const incomplete = (["spans", "counters", "histograms"] as const).filter(
-    (signal) => report.signalStatus[signal] !== "complete",
+  const measurements: ProfileMeasurement[] = [
+    ...report.spans.map((value) => ({ kind: "span" as const, value })),
+    ...report.counters.map((value) => ({ kind: "counter" as const, value })),
+    ...report.histograms.map((value) => ({ kind: "histogram" as const, value })),
+  ].sort(compareMeasurements);
+  if (measurements.length === 0 && report.diagnostics.length === 0) return [];
+
+  const lines = [styling.sectionHeading("Profile")];
+  const byScope = new Map<string, { scope: ProfileInstrumentationScope; rows: ProfileMeasurement[] }>();
+  for (const measurement of measurements) {
+    const scope = measurement.value.scope;
+    const key = `${scope.name}\0${scope.version ?? ""}`;
+    const entry = byScope.get(key) ?? { scope, rows: [] };
+    entry.rows.push(measurement);
+    byScope.set(key, entry);
+  }
+  for (const { scope, rows } of [...byScope.values()].sort((left, right) =>
+    compareProfileScopes(left.scope, right.scope),
+  )) {
+    lines.push(`  ${styling.sectionHeading(`Scope: ${formatScope(scope)}`)}`);
+    renderScope(lines, rows, styling);
+  }
+  return lines;
+}
+
+function compareMeasurements(left: ProfileMeasurement, right: ProfileMeasurement): number {
+  return compareProfileIdentity(
+    {
+      scope: left.value.scope,
+      name: left.value.name,
+      kind: left.kind,
+      attributes: left.kind === "span" ? [] : left.value.attributes,
+    },
+    {
+      scope: right.value.scope,
+      name: right.value.name,
+      kind: right.kind,
+      attributes: right.kind === "span" ? [] : right.value.attributes,
+    },
   );
-  const lines = [styling.summaryHeader("Profile")];
-  if (incomplete.length)
-    lines.push(
-      `  Status: ${incomplete.map((signal) => `${signal}=${report.signalStatus[signal]}`).join(", ")}`,
-    );
-  appendSpans(lines, report.signalStatus.spans, report.spans);
-  appendMetrics(lines, "Counters", report.signalStatus.counters, report.counters, (point) => {
-    const view = findProfileViewEntry("metric", point.name, point.scope.name);
-    return metric(
-      point,
-      view?.label ??
-        (isResolvedPluginScope(point.scope.name)
-          ? point.name
-          : `${displayScope(point.scope)} / ${point.name}`),
-    );
-  });
-  appendMetrics(lines, "Histograms", report.signalStatus.histograms, report.histograms, (point) => {
-    const view = findProfileViewEntry("metric", point.name, point.scope.name);
-    return histogram(
-      point,
-      view?.label ??
-        (isResolvedPluginScope(point.scope.name)
-          ? point.name
-          : `${displayScope(point.scope)} / ${point.name}`),
-    );
-  });
-  if (report.diagnostics.length || incomplete.length) {
-    lines.push("  Diagnostics");
-    if (report.diagnostics.length)
-      for (const item of report.diagnostics) lines.push(`    ${diagnostic(item)}`);
-    else lines.push("    (none)");
-  }
-  return lines.length === 1 ? [] : lines;
 }
 
-function appendSpans(
-  lines: string[],
-  status: string,
-  spans: readonly ProfileSpanAggregate[],
-): void {
-  if (status === "complete" && !spans.length) return;
-  lines.push(`  Spans${status === "complete" ? "" : ` (${status})`}`);
-  if (status === PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.statusLabel) {
-    lines.push("    (no observations)");
-    return;
-  }
-  const groups = new Map<string, GroupBucket>();
-  for (const span of spans) {
-    const view = findProfileViewEntry("span", span.name, span.scope.name);
-    const plugin = isResolvedPluginScope(span.scope.name);
-    const group =
-      view?.group ??
-      (plugin
-        ? PROFILE_PRESENTATION_POLICY.plugin.outerGroup
-        : PROFILE_PRESENTATION_POLICY.fallback.spans.group);
-    const subgroup = plugin ? displayScope(span.scope) : group;
-    const key = `${displayScope(span.scope)}\0${span.name}`;
-    const bucket: GroupBucket = groups.get(`${group}\0${subgroup}`) ?? {
-      group,
-      subgroup,
-      scope: plugin ? span.scope : undefined,
-      order: view?.order ?? Number.MAX_SAFE_INTEGER,
-      rows: [],
-    };
-    bucket.rows.push({
-      order: view?.order ?? Number.MAX_SAFE_INTEGER,
-      key,
-      text: spanRow(span, view?.label, Boolean(view), plugin),
-      scope: span.scope,
-      name: span.name,
-    });
-    groups.set(`${group}\0${subgroup}`, bucket);
-  }
-  renderGroups(lines, groups);
-  if (!spans.length) lines.push("    (no observations)");
-}
-
-function appendMetrics<T extends { name: string; scope: { name: string; version: string | null } }>(
-  lines: string[],
-  title: string,
-  status: string,
-  points: readonly T[],
-  format: (point: T) => string,
-): void {
-  if (status === "complete" && !points.length) return;
-  lines.push(`  ${title}${status === "complete" ? "" : ` (${status})`}`);
-  if (status === PROFILE_PRESENTATION_POLICY.sectionPolicy.unavailable.statusLabel) {
-    lines.push("    (no observations)");
-    return;
-  }
-  const groups = new Map<string, GroupBucket>();
-  for (const point of points) {
-    const view = findProfileViewEntry("metric", point.name, point.scope.name);
-    const plugin = isResolvedPluginScope(point.scope.name);
-    const fallback =
-      title === "Counters"
-        ? PROFILE_PRESENTATION_POLICY.fallback.counters.group
-        : PROFILE_PRESENTATION_POLICY.fallback.histograms.group;
-    const group =
-      view?.group ?? (plugin ? PROFILE_PRESENTATION_POLICY.plugin.outerGroup : fallback);
-    const subgroup = plugin ? displayScope(point.scope) : group;
-    const key = `${displayScope(point.scope)}\0${point.name}\0${attributesKey((point as T & { attributes: readonly ProfileAttribute[] }).attributes)}`;
-    const bucket: GroupBucket = groups.get(`${group}\0${subgroup}`) ?? {
-      group,
-      subgroup,
-      scope: plugin ? point.scope : undefined,
-      order: view?.order ?? Number.MAX_SAFE_INTEGER,
-      rows: [],
-    };
-    bucket.rows.push({
-      order: view?.order ?? Number.MAX_SAFE_INTEGER,
-      key,
-      text: format(point),
-      scope: point.scope,
-      name: point.name,
-    });
-    groups.set(`${group}\0${subgroup}`, bucket);
-  }
-  renderGroups(lines, groups);
-  if (!points.length) lines.push("    (no observations)");
-}
-
-function renderGroups(lines: string[], groups: Map<string, GroupBucket>): void {
-  let currentGroup: string | undefined;
-  for (const [, bucket] of [...groups].sort((a, b) => compareGroupKeys(a, b))) {
-    const { group, subgroup } = bucket;
-    if (group !== currentGroup) {
-      lines.push(`    ${group}`);
-      currentGroup = group;
+function renderScope(lines: string[], rows: ProfileMeasurement[], styling: Styling): void {
+  const roots = new Map<string, NamespaceNode>();
+  const malformed: ProfileMeasurement[] = [];
+  for (const row of rows) {
+    const segments = row.value.name.split(".");
+    if (segments.some((segment) => segment.length === 0)) {
+      malformed.push(row);
+      continue;
     }
-    if (subgroup !== group) lines.push(`      ${subgroup}`);
-    for (const row of bucket.rows.sort(
-      (a, b) =>
-        a.order - b.order ||
-        compareProfileScopes(a.scope, b.scope) ||
-        compareCodeUnits(a.name, b.name) ||
-        compareCodeUnits(a.key, b.key),
-    ))
-      lines.push(`      ${subgroup !== group ? "  " : ""}${row.text}`);
+    const path = segments.slice(0, 2);
+    let nodes = roots;
+    let absoluteName = "";
+    for (const segment of path) {
+      absoluteName = absoluteName ? `${absoluteName}.${segment}` : segment;
+      const node: NamespaceNode = nodes.get(segment) ?? {
+        segment,
+        absoluteName,
+        rows: [],
+        children: new Map(),
+      };
+      nodes.set(segment, node);
+      nodes = node.children;
+    }
+    findNode(roots, path)!.rows.push(row);
   }
+  for (const row of malformed) renderAbsoluteRow(lines, row, 2, styling, undefined, true);
+  for (const node of [...roots.values()].sort((a, b) => compareCodeUnits(a.segment, b.segment)))
+    renderNode(lines, node, 2, styling, true);
 }
 
-function compareGroupKeys(a: [string, GroupBucket], b: [string, GroupBucket]): number {
-  if (
-    a[1].group === PROFILE_PRESENTATION_POLICY.plugin.outerGroup &&
-    b[1].group === PROFILE_PRESENTATION_POLICY.plugin.outerGroup
-  ) {
-    return a[1].scope && b[1].scope
-      ? compareProfileScopes(a[1].scope, b[1].scope)
-      : compareCodeUnits(a[1].subgroup, b[1].subgroup);
+function findNode(roots: Map<string, NamespaceNode>, path: readonly string[]): NamespaceNode | null {
+  let nodes = roots;
+  let result: NamespaceNode | null = null;
+  for (const segment of path) {
+    result = nodes.get(segment) ?? null;
+    if (!result) return null;
+    nodes = result.children;
   }
-  return a[1].order - b[1].order || compareCodeUnits(a[0], b[0]);
+  return result;
 }
 
-function compareCodeUnits(a: string, b: string): number {
-  const length = Math.min(a.length, b.length);
-  for (let index = 0; index < length; index++) {
-    const difference = a.charCodeAt(index) - b.charCodeAt(index);
-    if (difference !== 0) return difference;
+function renderNode(
+  lines: string[],
+  node: NamespaceNode,
+  depth: number,
+  styling: Styling,
+  root: boolean,
+): void {
+  const indent = "  ".repeat(depth);
+  const name = `${root ? "/" : ""}${formatToken(node.segment)}`;
+  const rows = node.rows.sort(compareMeasurements);
+  const ownRows = rows.filter((row) => row.value.name === node.absoluteName);
+  const childRows = rows.filter((row) => row.value.name !== node.absoluteName);
+  if (ownRows.length === 1) {
+    lines.push(`${indent}${styling.sectionHeading(name)}${formatMeasurementFields(ownRows[0]!, styling)}`);
+    renderAttributes(lines, ownRows[0]!, node.absoluteName, depth + 1, styling);
+  } else {
+    lines.push(`${indent}${styling.sectionHeading(name)}`);
+    for (const row of ownRows)
+      renderAbsoluteRow(lines, row, depth + 1, styling, node.absoluteName);
   }
-  return a.length - b.length;
+  for (const row of childRows)
+    renderNamedRow(
+      lines,
+      row,
+      row.value.name.slice(node.absoluteName.length + 1),
+      depth + 1,
+      node.absoluteName,
+      styling,
+    );
+  for (const child of [...node.children.values()].sort((a, b) =>
+    compareCodeUnits(a.segment, b.segment),
+  ))
+    renderNode(lines, child, depth + 1, styling, false);
 }
 
-function displayScope(scope: { name: string; version?: string | null }): string {
-  return scope.version === null || scope.version === undefined
-    ? scope.name
-    : `${scope.name}@${scope.version}`;
+function renderAbsoluteRow(
+  lines: string[],
+  row: ProfileMeasurement,
+  depth: number,
+  styling: Styling,
+  attributeBase?: string,
+  forceQuote = false,
+): void {
+  renderNamedRow(
+    lines,
+    row,
+    `/` + (forceQuote ? quote(row.value.name) : formatToken(row.value.name)),
+    depth,
+    attributeBase,
+    styling,
+  );
 }
-function spanRow(
-  span: ProfileSpanAggregate,
-  label: string | undefined,
-  known: boolean,
-  plugin: boolean,
-): string {
-  const availability = deriveSpanNumericAvailability(span);
-  const average = availability.avg ? span.totalDurationSeconds / span.callCount : null;
-  const identity = known
-    ? label
-    : plugin
-      ? span.name
-      : `${displayScope(span.scope)} / ${span.name}`;
-  const attrs = span.attributes
-    .map((attribute) => attributeSummary(attribute, span.callCount))
-    .join(", ");
-  return `${identity}: total=${available(availability.total, span.totalDurationSeconds, "s")}, calls=${availability.calls ? formatCount(span.callCount) : "—"}, avg=${average === null ? "—" : unit(average, "s")}, max=${available(availability.max, span.maxDurationSeconds, "s")}, errors=${availability.errors ? formatCount(span.errorCount) : "—"}${attrs ? `, ${attrs}` : ""}`;
+
+function renderNamedRow(
+  lines: string[],
+  row: ProfileMeasurement,
+  name: string,
+  depth: number,
+  attributeBase: string | undefined,
+  styling: Styling,
+): void {
+  lines.push(`${"  ".repeat(depth)}${name}${formatMeasurementFields(row, styling)}`);
+  renderAttributes(lines, row, attributeBase, depth + 1, styling);
 }
-function metric(point: ProfileReport["counters"][number], name: string): string {
-  const availability = deriveCounterNumericAvailability(point);
-  return `${name}: ${availability.value ? unit(point.value, point.unit) : "—"}${point.attributes.length ? `, ${point.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
+
+function formatMeasurementFields(row: ProfileMeasurement, styling: Styling): string {
+  const separator = styling.separator(" : ");
+  if (row.kind === "span") {
+    const span = row.value;
+    const available = deriveSpanNumericAvailability(span);
+    const avg = available.avg ? span.totalDurationSeconds / span.callCount : null;
+    return `${separator}${fields(
+      [
+        ["calls", available.calls ? exact(span.callCount, styling) : UNAVAILABLE],
+        ["total", available.total ? unit(span.totalDurationSeconds, "s", styling) : UNAVAILABLE],
+        ["avg", avg === null ? UNAVAILABLE : unit(avg, "s", styling)],
+        ["max", available.max ? unit(span.maxDurationSeconds, "s", styling) : UNAVAILABLE],
+        ["errors", available.errors ? exact(span.errorCount, styling) : UNAVAILABLE],
+      ],
+      styling,
+    )}`;
+  }
+  if (row.kind === "counter") {
+    const available = deriveCounterNumericAvailability(row.value);
+    return `${separator}${available.value ? unit(row.value.value, row.value.unit, styling) : UNAVAILABLE}`;
+  }
+  const point = row.value;
+  const available = deriveHistogramNumericAvailability(point);
+  const avg = available.avg ? point.sum / point.count : null;
+  return `${separator}${fields(
+    [
+      ["samples", available.samples ? exact(point.count, styling) : UNAVAILABLE],
+      ["total", available.total ? unit(point.sum, point.unit, styling) : UNAVAILABLE],
+      ["avg", avg === null ? UNAVAILABLE : unit(avg, point.unit, styling)],
+      ["min", available.min && point.minimum !== null ? unit(point.minimum, point.unit, styling) : UNAVAILABLE],
+      ["max", available.max && point.maximum !== null ? unit(point.maximum, point.unit, styling) : UNAVAILABLE],
+    ],
+    styling,
+  )}`;
 }
-function histogram(point: ProfileHistogramPoint, label: string): string {
-  const availability = deriveHistogramNumericAvailability(point);
-  const average = availability.avg ? point.sum / point.count : null;
-  return `${label}: count=${availability.samples ? formatCount(point.count) : "—"}, total=${available(availability.total, point.sum, point.unit)}, avg=${average === null ? "—" : unit(average, point.unit)}, min=${availability.min && point.minimum !== null ? unit(point.minimum, point.unit) : "—"}, max=${availability.max && point.maximum !== null ? unit(point.maximum, point.unit) : "—"}${point.attributes.length ? `, ${point.attributes.map((a) => `${a.key}=${a.value}`).join(", ")}` : ""}`;
+
+function fields(entries: readonly (readonly [string, string])[], styling: Styling): string {
+  return entries
+    .map(([key, value]) => `${styling.fieldKey(key)}${styling.separator("=")}${value}`)
+    .join(styling.separator(", "));
 }
-function attributeSummary(
+
+function renderAttributes(
+  lines: string[],
+  row: ProfileMeasurement,
+  base: string | undefined,
+  depth: number,
+  styling: Styling,
+): void {
+  if (row.kind === "span") {
+    for (const attribute of [...row.value.attributes].sort((a, b) => compareCodeUnits(a.key, b.key)))
+      renderAttributeLine(
+        lines,
+        attribute.key,
+        formatSpanAttribute(attribute, row.value.callCount, styling),
+        base,
+        depth,
+        styling,
+      );
+    return;
+  }
+  for (const attribute of [...row.value.attributes].sort((a, b) => compareCodeUnits(a.key, b.key)))
+    renderAttributeLine(
+      lines,
+      attribute.key,
+      styling.primaryValue(formatAttributeValue(attribute.value)),
+      base,
+      depth,
+      styling,
+    );
+}
+
+function renderAttributeLine(
+  lines: string[],
+  key: string,
+  value: string,
+  base: string | undefined,
+  depth: number,
+  styling: Styling,
+): void {
+  lines.push(
+    `${"  ".repeat(depth)}${styling.fieldKey(formatAttributeKey(key, base))} ${styling.separator("=")} ${value}`,
+  );
+}
+
+function formatSpanAttribute(
   attribute: ProfileSpanAggregate["attributes"][number],
   callCount: number,
+  styling: Styling,
 ): string {
   const observed =
-    attribute.observedCount < callCount ? ` (observedCount=${attribute.observedCount})` : "";
+    attribute.observedCount < callCount ? ` (observed ${attribute.observedCount})` : "";
   if (attribute.reducer === "single")
-    return `${attribute.key}=${attribute.value}${observed}${attribute.conflictCount > 0 ? ` (conflicts=${attribute.conflictCount})` : ""}`;
+    return styling.primaryValue(formatAttributeValue(attribute.value)) + observed;
   if (attribute.reducer === "distinct")
-    return `${attribute.key}=${attribute.values.map((value) => `${value.value}(${value.count})`).join(",")}${attribute.overflowCount > 0 ? ` (overflow=${attribute.overflowCount})` : ""}`;
-  return `${attribute.key}=${attribute.minimum}…${attribute.maximum}${observed}`;
+    return attribute.values
+      .map(
+        ({ value, count }) =>
+          styling.primaryValue(formatAttributeValue(value)) + styling.separator(`(${count})`),
+      )
+      .join(styling.separator(", "));
+  return (
+    styling.primaryValue(formatNumber(attribute.minimum)) +
+    styling.separator("…") +
+    styling.primaryValue(formatNumber(attribute.maximum)) +
+    observed
+  );
 }
-function diagnostic(item: ProfileDiagnostic | ProfileDiagnosticSummary): string {
-  const label = PROFILE_VIEW_DIAGNOSTIC_LABELS[item.code] ?? item.code;
-  if (item.code === "diagnostic_overflow")
-    return `${item.severity} report/${item.stage}: ${label}${item.omittedOccurrences === null ? " (prior detail unavailable)" : ` x${item.omittedOccurrences}`}`;
-  const signal = item.signalCoverage.length ? item.signalCoverage.join(",") : "report";
-  const delivery = item.reportDelivery
-    ? ": profile report construction failed; measurements unavailable"
-    : "";
-  return `${item.severity} ${signal}/${item.stage}: ${label}${item.count > 1 ? ` x${item.count}` : ""}${delivery}${item.message ? ` (${item.message})` : ""}`;
+
+function formatAttributeKey(key: string, base: string | undefined): string {
+  if (base && key.startsWith(`${base}.`) && key.length > base.length + 1)
+    return formatToken(key.slice(base.length + 1));
+  return `/` + formatToken(key);
 }
-function available(isAvailable: boolean, value: number, unitName: string): string {
-  return isAvailable ? unit(value, unitName) : "—";
+
+function formatAttributeValue(value: ProfileAttributeValue): string {
+  if (typeof value !== "string") return String(value);
+  if (value === "true" || value === "false" || isFiniteNumberString(value)) return quote(value);
+  return formatToken(value);
 }
-function attributesKey(attributes: readonly ProfileAttribute[]): string {
-  return attributes.map((a) => `${a.key}=${String(a.value)}`).join("\0");
+
+function isFiniteNumberString(value: string): boolean {
+  if (value.trim() === "") return false;
+  return Number.isFinite(Number(value));
 }
-function unit(value: number, unitName: string): string {
-  if (unitName === "s") {
-    const n = Math.abs(value);
-    if (n && n < 1e-6) return `${(value * 1e9).toPrecision(4)} ns`;
-    if (n && n < 1e-3) return `${(value * 1e6).toPrecision(4)} µs`;
-    if (n && n < 1) return `${(value * 1e3).toPrecision(4)} ms`;
-  }
-  if (unitName === "By") {
-    const units = ["B", "KiB", "MiB", "GiB"];
-    let index = 0;
-    while (Math.abs(value) >= 1024 && index < 3) {
-      value /= 1024;
-      index++;
-    }
-    return `${Number(value.toPrecision(4))} ${units[index]}`;
-  }
-  const annotated: Record<string, string> = {
+
+function formatScope(scope: ProfileInstrumentationScope): string {
+  const name = formatScopeToken(scope.name);
+  return scope.version === null ? name : `${name}@${formatScopeToken(scope.version)}`;
+}
+
+function formatScopeToken(value: string): string {
+  return /[\s"\\\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(value)
+    ? quote(value)
+    : value;
+}
+
+function formatToken(value: string): string {
+  return TOKEN.test(value) && !value.startsWith("/") ? value : quote(value);
+}
+
+function quote(value: string): string {
+  return JSON.stringify(value).replace(
+    /[\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/gu,
+    (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
+
+function exact(value: number, styling: Styling): string {
+  return styling.primaryValue(formatCount(value));
+}
+
+function unit(value: number, canonicalUnit: string, styling: Styling): string {
+  const formatted = formatUnit(value, canonicalUnit);
+  return styling.primaryValue(formatted.value) + styling.unitSuffix(` ${formatted.unit}`);
+}
+
+function formatUnit(value: number, canonicalUnit: string): { value: string; unit: string } {
+  if (canonicalUnit === "s") return scaledUnit(value, ["ns", "µs", "ms", "s"], 1000, 1e9);
+  if (canonicalUnit === "By") return scaledUnit(value, ["B", "KiB", "MiB", "GiB"], 1024, 1);
+  const entityUnits: Readonly<Record<string, string>> = {
     "{commit}": "commits",
     "{record}": "records",
     "{file}": "files",
@@ -312,5 +377,41 @@ function unit(value: number, unitName: string): string {
     "{expansion}": "expansions",
     "{fallback}": "fallbacks",
   };
-  return `${value} ${annotated[unitName] ?? unitName}`;
+  return {
+    value: Number.isSafeInteger(value) ? String(value) : formatNumber(value),
+    unit: entityUnits[canonicalUnit] ?? canonicalUnit,
+  };
+}
+
+function scaledUnit(
+  value: number,
+  units: readonly string[],
+  threshold: number,
+  initialScale: number,
+): { value: string; unit: string } {
+  if (value === 0)
+    return { value: "0", unit: units[initialScale === 1 ? 0 : units.length - 1]! };
+  let scaled = value * initialScale;
+  let index = 0;
+  while (Math.abs(scaled) >= threshold && index < units.length - 1) {
+    scaled /= threshold;
+    index += 1;
+  }
+  let rendered = formatNumber(scaled);
+  if (Math.abs(Number(rendered)) >= threshold && index < units.length - 1) {
+    scaled /= threshold;
+    index += 1;
+    rendered = formatNumber(scaled);
+  }
+  return { value: rendered, unit: units[index]! };
+}
+
+function formatNumber(value: number): string {
+  if (value === 0) return "0";
+  const absolute = Math.abs(value);
+  if (absolute >= 1e-3 && absolute < 1e7) return Number(value.toPrecision(4)).toString();
+  return value
+    .toExponential(3)
+    .replace(/\.0+(?=e)/u, "")
+    .replace(/(\.\d*?[1-9])0+(?=e)/u, "$1");
 }

@@ -56,12 +56,14 @@ const plainStyling: Styling = {
   doneMarker: (text) => text,
   stageLabel: (text) => text,
   summaryHeader: (text) => text,
+  sectionHeading: (text) => text,
   warnBadge: (text) => text,
   errorBadge: (text) => text,
   fieldKey: (text) => text,
   primaryValue: (text) => text,
   unitSuffix: (text) => text,
   refsValue: (text) => text,
+  separator: (text) => text,
 };
 
 describe("presentation normalizeUnknownError", () => {

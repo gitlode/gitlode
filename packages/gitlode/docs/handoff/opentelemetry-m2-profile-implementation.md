@@ -1,5 +1,8 @@
 # M2 profile implementation: P1 handoff
 
+Current assignment: [P1 correction round 1](#p1-correction-round-1). The original assignment and
+outcome below are historical context; do not recreate the branch or restart P1 from its original base.
+
 ## Assignment, source and branch
 
 This packet assigns only P1: schema v2 contracts and bounded issue/fallback primitives with focused
@@ -237,3 +240,75 @@ transport and ordinary presentation, broken normal diagnostic snapshot isolation
 shutdown failure, concurrent/repeated finalize identity, and unchanged application-result,
 failed-run suppression, quiet, disabled and initialization-degraded behavior. These are deliberately
 not claimed by P1 helper tests.
+
+## P1 correction round 1
+
+### Entry and scope
+
+Trunk accepts the four concrete findings in the [independent review outcome](opentelemetry-m2-profile-p1-review.md#outcome)
+as correction requirements. P1 remains unaccepted; P2 is unassigned. This is the first implementation
+correction round, not a request to reopen the human-approved profile design.
+
+Continue on `feature/otel-redesign_M2_profile`. The reviewed implementation is
+`a9a48137cdcd222ba63cd0cf0459f867fa386718`; the review checkpoint is
+`2b276e9558fc79b60b8676881dc701375bd05c2c`. Verify a clean worktree, local/actual remote equality,
+and that any subsequent entry delta is only this planning documentation. Record the exact entry OID.
+Do not reset, create another correction branch, or modify the parent M2 branch.
+
+Limit changes to staged v2 contracts/normalization, execution-owned accumulator/report primitives,
+their focused tests, and directly affected staged canonical guidance. Keep active v1 runtime paths,
+collectors, worker transport, presentation, performance tooling and publish acceptance unchanged.
+Preserve the fixed fallback and trusted-snapshot boundary. If a correction requires an unresolved
+product/design choice or expansion into P2, return the concrete dependency to trunk.
+
+### Required corrections and regression evidence
+
+1. **P1-R1: compaction must preserve signal meaning.** Validate the association between
+   `wholeResultUnavailable`, confirmed whole-result loss, effects and signal coverage. Preserve
+   legitimate evidence across detailed retention and reserved-summary compaction; lifecycle-only
+   notices must never invent collection loss. Test the same lifecycle-only input before/after the
+   retention boundary and with other summary entries, plus legitimate whole-loss inputs in both
+   representations. Keep report-delivery failure distinct from collection failure.
+2. **P1-R2: explain contradictory status/value evidence.** Retain valid measurements when an
+   `unavailable` status contradicts retained values. Produce bounded validation evidence, or reject
+   the contradictory input under an explicit primitive contract; never silently relabel it as
+   `partial`. If choosing rejection, document the required P2 failure-isolation handling so it cannot
+   become an unhandled application failure. Test empty trusted diagnostics, affected/unaffected
+   kinds, and diagnostic-capacity boundaries. Do not discard values to hide the contradiction.
+3. **P1-R3: distinguish exact maximum from saturation.** Set saturation only for actual clamping,
+   and preserve already-saturated state. Cover `0 + MAX_SAFE_INTEGER`, `MAX_SAFE_INTEGER - 1 + 1`,
+   actual overflow and prior saturation. Check occurrence counts, omitted-summary counts, loss
+   quantities and malformed-input aggregation wherever they share or propagate this arithmetic.
+4. **P1-R4: reject malformed supplied semantic fields.** Distinguish omitted defaults from explicitly
+   invalid counts and detail-loss masks. Omitted count may default to one; explicit zero, negative,
+   fractional or non-finite count must not become the original issue with exact count one. Supplied
+   mask members must be valid booleans; omitted optional members may retain documented defaults.
+   Route invalid payloads to bounded invalid-aggregation evidence or explicitly disclosed uncertainty,
+   without falsely claiming no detail loss. Test malformed mask containers/members as well as valid
+   omitted and explicit values; preserve safe handling of untrusted input.
+
+Use independent literal expectations for these counterexamples. Establish that each regression test
+fails against the pre-correction implementation and passes after correction; record how this was
+verified. Avoid tests that merely reproduce the helper's own inventory or arithmetic.
+
+The 100,000-duplicate-kind scan is an additional evidence/hardening gap, not a fifth independent
+blocker. Add a bounded probe or focused test of processing before identity construction/budget
+application (for example indexed reads and attempted copies), and distinguish retained memory,
+serialized budget and input-proportional CPU work. Apply a small local hardening change if justified;
+otherwise explicitly document the measured limitation and return it to trunk. Do not claim bounded
+preprocessing solely from a bounded final JSON length, or introduce a broad new performance gate.
+
+### Finite verification and exit
+
+Run `npm run build:dev`, the existing seven-file affected Vitest command in this packet, lint,
+`npm run format:write`, `npm run format:check`, and `git diff --check`. Run architecture checks if
+exports or boundaries change. Production compilation and Vitest execution are different evidence:
+do not claim the test sources were independently typechecked without a separate successful check.
+No formal performance runs, Windows/Linux package campaign or full release validation is assigned.
+
+Preserve progress in checkpoint commits and normal pushes to this child branch; verify actual remote
+OID with `ls-remote`. Do not force-push. Return the implementation OID, documentation/final OID,
+local/remote state, a four-finding correction/test matrix, preprocessing evidence/limitations and
+exact verification results in this same handoff. Do not self-certify P1 acceptance. Trunk will assign
+a separate focused re-review after the outcome. No P2, PR creation, merge, candidate freeze or publish
+is authorized. Repeated failure of the same issue follows the bounded correction/diagnosis policy.

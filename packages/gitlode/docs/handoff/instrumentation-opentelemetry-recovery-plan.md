@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                                  | Remaining scope                                                            |
-| --------- | --------------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only               | Preserve historical evidence and environment                               |
-| M1        | complete                                | Preserve corrected validation and squash attribution                       |
-| M2        | P1 returned; independent review pending | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates               | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                              | Remaining scope                                                            |
+| --------- | ----------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only           | Preserve historical evidence and environment                               |
+| M1        | complete                            | Preserve corrected validation and squash attribution                       |
+| M2        | P1 corrections required; P2 blocked | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates           | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -58,10 +58,13 @@ and shared styling are in scope. Observation admission, recorder ownership and S
 identity remain unchanged. The collector changes cannot be attributed to presentation alone.
 
 P1 returned on `feature/otel-redesign_M2_profile` at
-`a9a48137cdcd222ba63cd0cf0459f867fa386718`; trunk confirmed local/actual remote equality and clean
-worktree. P1 is not yet independently accepted. The next human-started conversation is
-[P1-R: independent primitive review](opentelemetry-m2-profile-p1-review.md), fixed to that full target,
-not only its first implementation checkpoint. P2 remains unassigned until that review is resolved.
+`a9a48137cdcd222ba63cd0cf0459f867fa386718`. Independent review recorded four required corrections
+at `2b276e9558fc79b60b8676881dc701375bd05c2c`: compaction/status semantics, unexplained status/value
+contradictions, exact-boundary saturation, and malformed mask/count normalization. Trunk adopts
+these findings; P1 is not accepted. The next human-started conversation is
+[P1 correction round 1](opentelemetry-m2-profile-implementation.md#p1-correction-round-1) on the same
+child branch, followed by independent focused re-review. Pre-budget processing evidence is a
+separate hardening gap, not an additional independent blocker. P2 remains unassigned.
 
 ## Session sequence and dependencies
 
@@ -249,5 +252,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1-R review
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1 correction round 1
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

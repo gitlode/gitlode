@@ -1,7 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P1 correction round 1](#p1-correction-round-1). The original assignment and
-outcome below are historical context; do not recreate the branch or restart P1 from its original base.
+Current assignment: [independent correction re-review](opentelemetry-m2-profile-p1-review.md#correction-round-1-focused-re-review).
+Correction round 1 has returned; the assignments below are historical context. P1 is not accepted and
+P2 is unassigned. Do not recreate the branch or restart P1 from its original base.
 
 ## Assignment, source and branch
 
@@ -392,3 +393,11 @@ directly affected telemetry/verification guidance, plus this handoff. Active sch
 worker transport/session, presentation, performance tooling and release/publish acceptance remain
 unchanged. The existing P2 inventory and residual real-builder/transport/presentation/finalization
 evidence above remain assigned to P2 only after independent P1 re-review.
+
+#### Trunk intake for re-review
+
+Full correction target: `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`, confirmed equal to actual remote
+with a clean worktree. This checkpoint includes both the outcome and a stricter zero-indexed-read
+assertion in `profile-v2-primitives.test.ts`; it is not documentation-only relative to 5f2d03b.
+Trunk inspected the correction diff without repeating the reported build/test campaign. P1 remains
+unaccepted pending the [focused re-review](opentelemetry-m2-profile-p1-review.md#correction-round-1-focused-re-review).

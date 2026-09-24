@@ -17,9 +17,8 @@ corrected functional/package validation and squash attribution. These four notes
 work context, not active instructions to repeat M1. Stable contracts live in design/contributing docs.
 
 The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`.
-[P1 implementation](opentelemetry-m2-profile-implementation.md) returned at `a9a4813`; the active next
-assignment is [P1 correction round 1](opentelemetry-m2-profile-implementation.md#p1-correction-round-1)
-for the four required findings in the [independent review](opentelemetry-m2-profile-p1-review.md#outcome).
+[P1 correction implementation](opentelemetry-m2-profile-implementation.md) returned at `dc6cfbd`;
+the active next assignment is [focused independent re-review](opentelemetry-m2-profile-p1-review.md#correction-round-1-focused-re-review).
 P1 is not accepted; P2 is not yet assigned.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are

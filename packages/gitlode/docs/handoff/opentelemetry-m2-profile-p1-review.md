@@ -1,5 +1,9 @@
 # P1 independent review packet
 
+Current assignment: [correction round 1 focused re-review](#correction-round-1-focused-re-review).
+The original review packet and outcome below retain the prior findings; their old fixed target is
+not the target of this re-review.
+
 ## Fixed scope and authority
 
 Review P1 primitives independently in a separate human-started conversation. Do not implement P2,
@@ -151,3 +155,69 @@ separate finding, but correction tests should cover work before final serialized
 Residual real-builder failure, worker transport, presentation, simultaneous shutdown,
 finalization-idempotence and active-v1 behavior evidence remains deliberately assigned to P2; none
 of it changes the P1 corrections-required decision.
+
+## Correction round 1 focused re-review
+
+### Fixed inputs and authority
+
+Review independently in a new human-started conversation on `feature/otel-redesign_M2_profile`.
+
+- Pre-correction entry: `ea8fd8d54e21bbd4d4dfd6c20e82810883f10d68`.
+- Correction implementation checkpoint: `5f2d03b91471b7c7fb47f62c2fb9e93fb9ddc996`.
+- **Full fixed re-review target: `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`.**
+- Original reviewed implementation: `a9a48137cdcd222ba63cd0cf0459f867fa386718`.
+
+The full target is not documentation-only relative to 5f2d03b: it also strengthens the oversized-array
+probe from at most three indexed reads to exactly zero. Include that test change. Trunk verified
+clean local/actual remote equality at dc6cfbd and checked the correction diff, but has not independently
+rerun the reported 112 tests or accepted P1. Subsequent routing-only commits do not move this target.
+Verify ancestry, entry/exit OIDs, worktree and actual remote state; investigate any post-target source
+changes before reviewing a different state.
+
+Read the four original findings above and the correction matrix in
+[the implementation outcome](opentelemetry-m2-profile-implementation.md#p1-correction-round-1-outcome).
+Review only those corrections, their affected invariants and concrete regressions. Do not reopen the
+accepted normal presentation design or require P2 runtime evidence while active runtime remains v1.
+No production/test fixes, P2, PR, merge, freeze or publish are assigned.
+
+### Review and finite verification
+
+1. P1-R1: whole-result evidence must preserve meaning in details, summary and fallback compaction.
+   Check effect/coverage association, lifecycle-only and report-delivery distinctions, valid whole
+   loss, and mixed summary entries. A retained-versus-compacted change alone must not create loss or
+   hide known loss. Confirm the new detail identity/field is documented for P2 consumers.
+2. P1-R2: contradictory unavailable status plus retained measurements must not silently become
+   partial. Review the explicit rejection contract and test coverage at diagnostic-capacity limits.
+   Confirm the P2 inventory requires catching it as report validation, retaining valid measurements
+   and siblings, and adding bounded explanation. Do not confuse this recoverable validation path with
+   catastrophic whole-builder failure that uses the fixed empty fallback. Runtime proof belongs to P2.
+3. P1-R3: distinguish exact representable maximum from overflow in counts, summary and quantities;
+   retain prior saturation. Verify independent boundary expectations and unchanged quantity-composition
+   rules, not only the shared helper implementation.
+4. P1-R4: supplied invalid count/mask evidence must not be normalized to false exact facts. Check
+   valid omitted defaults and supplied values, malformed containers/members, conservative invalid
+   aggregation, and safe bounded processing. Report a concrete accepted-contract failure if one remains.
+5. Preprocessing: verify the length guards precede indexed reads for set-like arrays, their finite
+   universe limits, and that rejecting oversized duplicates is reflected in staged normalization
+   guidance. Distinguish this from caller allocation and other input-processing paths; the zero-read
+   test is not proof that all untrusted processing is universally constant-time. This was a hardening
+   gap, not a separate blocker. Check that no normal producer contract is inadvertently excluded.
+
+Run `npm run build:dev` and the seven-file affected Vitest command from the implementation outcome.
+The reported result is 112 passed; record your actual counts. Inspect the five pre-correction
+counterexamples and their reported fail-before/pass-after evidence. Add bounded independent probes
+only for a concrete uncovered concern; no broad fuzz/performance campaign or full release matrix.
+Preserve fixed fallback/trusted-snapshot and active-v1 regression coverage. Run fixed-diff whitespace
+checks; format write/check when recording the documentation outcome. Test execution does not establish
+standalone test-source typechecking. Separate reproduced evidence from implementer-only reports.
+
+### Return and preservation
+
+Return accepted / corrections required for each of P1-R1 through P1-R4, preprocessing assessment,
+P1 overall decision, exact fixed target, actual checks, remaining concrete failure paths and explicit
+P2 obligations. If a finding remains, batch concrete counterexamples and bounded corrections; do not
+start another implementation round during review. Trunk applies the bounded correction/diagnosis policy.
+
+Append the outcome here, preserve a documentation-only checkpoint, push normally to the same child
+branch and verify actual remote OID. No force push or parent branch update. Review acceptance does not
+authorize P2 automatically; the human returns the outcome and trunk assigns its next bounded packet.

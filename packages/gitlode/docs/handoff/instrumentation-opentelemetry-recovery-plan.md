@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                              | Remaining scope                                                            |
-| --------- | ----------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only           | Preserve historical evidence and environment                               |
-| M1        | complete                            | Preserve corrected validation and squash attribution                       |
-| M2        | P1 corrections required; P2 blocked | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates           | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                      | Remaining scope                                                            |
+| --------- | ------------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only                   | Preserve historical evidence and environment                               |
+| M1        | complete                                    | Preserve corrected validation and squash attribution                       |
+| M2        | P1 correction re-review pending; P2 blocked | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates                   | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -57,14 +57,14 @@ measurement availability masks, collector/report propagation, worker fallback, g
 and shared styling are in scope. Observation admission, recorder ownership and Span aggregation
 identity remain unchanged. The collector changes cannot be attributed to presentation alone.
 
-P1 returned on `feature/otel-redesign_M2_profile` at
-`a9a48137cdcd222ba63cd0cf0459f867fa386718`. Independent review recorded four required corrections
-at `2b276e9558fc79b60b8676881dc701375bd05c2c`: compaction/status semantics, unexplained status/value
-contradictions, exact-boundary saturation, and malformed mask/count normalization. Trunk adopts
-these findings; P1 is not accepted. The next human-started conversation is
-[P1 correction round 1](opentelemetry-m2-profile-implementation.md#p1-correction-round-1) on the same
-child branch, followed by independent focused re-review. Pre-budget processing evidence is a
-separate hardening gap, not an additional independent blocker. P2 remains unassigned.
+P1 correction round 1 returned on `feature/otel-redesign_M2_profile` at
+`dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`, after the four required findings against a9a4813.
+Trunk confirmed clean local/actual remote equality. The full target includes a test-strengthening
+change after implementation checkpoint `5f2d03b`; it is not documentation-only. The next human-started
+conversation is [focused independent re-review](opentelemetry-m2-profile-p1-review.md#correction-round-1-focused-re-review).
+P1 remains unaccepted; P2 is unassigned. In particular, P2 must isolate contradictory status/value
+validation rejection, retain valid measurements/siblings and add bounded explanatory evidence;
+this is separate from catastrophic builder failure and the fixed report-delivery fallback.
 
 ## Session sequence and dependencies
 
@@ -252,5 +252,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1 correction round 1
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named P1 correction re-review
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

@@ -993,3 +993,134 @@ The diagnosis ends once those outputs are concrete; do not start implementing th
 Run format write/check and diff check for the documentation outcome. Commit and normally push on
 this child, verify actual remote equality and clean status. Return exact OIDs. Trunk then decides a
 new bounded implementation packet; diagnosis itself does not accept R4/P2 or authorize P3.
+
+### Bounded R4 diagnosis outcome
+
+This diagnosis is complete at instruction checkpoint
+`2cc6b2332827f0131e47d6aeb92a7b43838b7ae7` against fixed implementation
+`280824cab82b85ca87a63eeb73b3e248df8df230`. Entry was clean on
+`feature/otel-redesign_M2_profile`; local HEAD, the local tracking ref and the actual remote ref all
+equaled the instruction checkpoint. The fixed implementation, round-2 implementation
+`477fde1e7407ed9c63835541a32cde4bb8a987ae` and latest review
+`8dea610737ab0a835e0b3419ac18c1cf3866393c` are ancestors. The fixed-target-to-entry delta is the
+four expected routing/handoff documents and contains no source or test change.
+
+#### Meaning and permitted inference direction
+
+- A diagnostic `target` names the object for which evidence is held: one point, one observation,
+  one Scope, or the report. `extent: entire_target` says the identified target is wholly affected;
+  it does not widen that target. Point, observation and Scope targets can therefore have unaffected
+  siblings in the same signal kind. A report target is signal-wide only for the kinds in its
+  `signalCoverage`, and only when it remains exact with `entire_target`; broadening to report changes
+  extent to `unidentified_subset`.
+- `wholeResultUnavailable` confirms that the diagnostic's target result could not be obtained or
+  safely supplied. It is legal only with `missing_observations` or
+  `unknown_collection_coverage`. It does not by itself say that the entire covered signal kind is
+  unavailable. The implementation-authored comment in `profile-report.ts` saying "entire covered
+  signal result" is too broad and helped create the faulty interpretation.
+- `signalStatus` summarizes the supplied result for a whole kind. `complete` has no known
+  data-impact loss; `partial` has or may have usable results plus data-impact loss; `unavailable`
+  has no supplied results and requires confirmed whole-result evidence for that kind, except for
+  the fixed no-measurement delivery path.
+- A reserved summary preserves only a per-kind union of effects and whether at least one omitted
+  diagnostic had whole-target-unavailable evidence. Its OR no longer identifies which target was
+  lost and cannot prove that every target in the kind was lost.
+
+The permitted implications are therefore one-way. `unavailable` implies an empty signal array plus
+same-kind whole-result evidence (or the fixed-delivery exception). Data-impact evidence implies that
+the status cannot be `complete`. A detailed exact report/`entire_target` loss implies signal-wide
+loss for each covered kind. In the other direction, whole-target loss at point, observation or Scope
+does **not** imply whole-signal loss; nor does a summary OR. With retained siblings those forms imply
+`partial`, not `unavailable`. Zero retained values is array cardinality, not a proof that an
+instrumented run observed nothing or that one target covered the entire signal.
+
+| Status and retained values    | Evidence form                                                                                                  | Decision and reason                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `complete`, zero or nonzero   | absent                                                                                                         | Valid; an empty complete signal means successful collection with no observations.         |
+| `complete`, zero or nonzero   | any same-kind data-impact or whole-target evidence, detailed or summary                                        | Invalid; known impact forbids complete.                                                   |
+| `partial`, zero or nonzero    | same-kind data-impact, without whole-target evidence                                                           | Valid; partial arrays may be empty and retained values remain usable.                     |
+| `partial`, nonzero            | detailed whole point/observation/Scope target plus data-impact                                                 | Valid; the target was lost but a sibling was retained.                                    |
+| `partial`, nonzero            | summary whole-target OR plus data-impact                                                                       | Valid; compaction lost the target and cannot strengthen the evidence to signal-wide loss. |
+| `partial`, zero or nonzero    | exact detailed report target, `entire_target`, whole-result evidence for the kind                              | Invalid; this narrower detailed form really does cover the whole signal domain.           |
+| `partial`, zero or nonzero    | absent, lifecycle-only, report-only, or unrelated-kind evidence                                                | Invalid; partial is unexplained.                                                          |
+| `unavailable`, nonzero        | any evidence                                                                                                   | Invalid; unavailable must not discard or relabel retained values.                         |
+| `unavailable`, zero           | same-kind whole-result evidence, detailed or summary                                                           | Valid; this is the forward unavailable-to-evidence rule.                                  |
+| `unavailable`, zero           | data-impact without whole-result evidence, absent evidence, or unrelated lifecycle evidence                    | Invalid; whole-signal unavailability is unexplained.                                      |
+| all kinds `unavailable`, zero | exact fixed-delivery/no-measurement provenance                                                                 | Valid fixed exception; it proves report delivery failure, not collection failure.         |
+| any other status/values       | delivery effect without provenance, provenance without delivery effect, or target/coverage/field-kind mismatch | Invalid; these are the already-correct relationship rejections.                           |
+
+#### Evidence trace and root cause
+
+The reviewed lost-Counter case is a legal constructed input through production primitives, not an
+output currently emitted by a detection site. Current `wholeResultUnavailable: true` sites are the
+metric collection failure paths; they use report targets and return empty Counter/Histogram arrays.
+The accepted contract nevertheless deliberately supports a wholly lost identified point or
+observation alongside retained siblings.
+
+For the detailed case, `BoundedDiagnosticAccumulator` retains the Counter point target, the
+collection-loss effect, `entire_target` and `wholeResultUnavailable: true`. With one valid sibling,
+`deriveProfileSignalStatus()` first sees data impact and derives `partial`; its whole-result branch
+changes the kind to `unavailable` only when the retained count is zero. `ProfileReportBuilder`
+therefore emits one Counter and `partial`. `validateProfileReportRelationships()` then computes
+`hasWholeResultEvidence` without considering target breadth and rejects every status except empty
+`unavailable`. Formal extraction calls this validator, throws, and repository evaluation becomes
+inconclusive; the usable sibling never reaches measurement extraction.
+
+At 15+1 capacity, `mergeIntoSummary()` ORs `wholeResultUnavailable` per kind while unioning effects
+and deliberately discards exact target identity. Status derivation again produces `partial` because
+the sibling count is nonzero. The validator repeats the same rejection from the summary flag, even
+though compaction has strictly less evidence. The summary path is thus an especially clear invalid
+strengthening: an existential fact (some omitted target was wholly lost) became a universal fact
+(the whole kind was lost).
+
+The root cause was introduced in the round-2 invariant matrix and fixtures, not in the original
+human-approved design. The matrix correctly stated the forward rule that unavailable needs
+whole-result evidence, but its check text said that only flagged evidence can explain unavailable
+and implementation turned that necessary condition into a biconditional. The positive fixture then
+set `wholeResultUnavailable: true` on broad Scope evidence and expected rejection, deriving its
+oracle from the new validator rather than the accepted sibling-retention examples. Ambiguous later
+phrasing and the signal-wide TypeScript comment reinforced the reversal. Those historical claims
+remain evidence of round 2 but this diagnosis supersedes their reverse implication.
+
+The latest review's two bounded probes are reused as reported evidence: real accumulator/builder
+detailed and compacted cases both produced a retained Counter with `partial`, then failed only at
+normalization. No probe or full suite was rerun in this diagnosis; source inspection confirms the
+reported path and the fixed implementation has not changed since those probes.
+
+#### Minimal correction and finite regression plan
+
+A subsequent explicitly assigned correction should remain within these files and responsibilities:
+
+1. In `internal-contracts/src/telemetry/normalization.ts`, remove the unconditional reverse rule
+   from any per-kind whole-target evidence to empty `unavailable`. Preserve unavailable -> empty,
+   unavailable -> same-kind whole evidence/fixed delivery, complete -> no data impact, partial ->
+   data impact, all six contradiction checks and summary association checks. Retain a target-aware
+   reverse check only for an exact detailed report target with `extent: entire_target`; never derive
+   it from the reserved summary.
+2. In `internal-contracts/src/telemetry/profile-report.ts`, describe
+   `wholeResultUnavailable` as applying to the diagnostic target, not automatically to the covered
+   signal. Clarify the same one-way rule in `docs/design/telemetry.md` and
+   `docs/design/telemetry-catalog/profile-report.yaml`; no schema field or public shape changes.
+3. In `internal-contracts/test/telemetry/profile-report-active.test.ts`, replace the
+   implementation-derived broad-Scope rejection with independent detailed and summary sibling
+   cases. Add the exact report-target boundary rather than accepting every whole-evidence/partial
+   combination.
+4. In the existing builder/primitives and formal-consumer suites, cover both real-primitives paths:
+   detailed lost Counter point plus retained sibling, and the same evidence after 15+1 compaction.
+   Both reports must normalize and extract; repository evaluation must remain non-healthy
+   (`fail`, because partial/diagnostics are present), not become `pass`. Do not change thresholds.
+
+Finite positive cases are: detailed and summarized lost target plus retained sibling -> partial and
+extractable; whole target with no sibling -> empty unavailable and accepted in both retained forms;
+complete-empty; justified partial-empty; and the fixed no-measurement fallback. Finite negative
+cases are the six preserved families: unavailable with retained data, unexplained unavailable,
+unexplained partial, delivery effect without provenance, provenance without delivery effect, and
+target/coverage/affected-field kind contradiction. Also retain complete-with-impact rejection and
+add exact detailed report/entire-target whole loss plus retained data as invalid. Expectations must
+be literal contract outcomes rather than copied validator predicates.
+
+No new human product or compatibility decision is needed for this bounded issue: the accepted
+target/extent model, sibling-retention rule, status definition and compaction contract settle the
+direction. Human action is still required to authorize the next correction packet and later accept
+R4/P2. This diagnosis makes no implementation, test, acceptance, P3, PR, merge, performance or
+release change and returns explicitly to trunk.

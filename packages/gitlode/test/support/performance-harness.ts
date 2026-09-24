@@ -5,7 +5,7 @@ import { cpus, release, totalmem } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
+import { normalizeProfileReport, TELEMETRY_SPANS } from "@gitlode/internal-contracts/telemetry";
 
 import {
   performanceChild,
@@ -290,49 +290,20 @@ export interface TargetTelemetryMeasurements {
   readonly diagnosticCount: Availability<number>;
 }
 export function extractProfileReportMeasurements(report: unknown): TargetTelemetryMeasurements {
-  if (!report || typeof report !== "object") throw new Error("collector output is not an object");
-  const value = report as Record<string, unknown>;
-  const spans = value.spans,
-    counters = value.counters,
-    histograms = value.histograms,
-    diagnostics = value.diagnostics;
-  if (
-    value.schemaVersion !== 2 ||
-    "rawSpans" in value ||
-    "rawHistogramSamples" in value ||
-    !Array.isArray(spans) ||
-    !Array.isArray(counters) ||
-    !Array.isArray(histograms) ||
-    !Array.isArray(diagnostics)
-  )
-    throw new Error("collector output is missing ProfileReport arrays");
+  const value = normalizeProfileReport(report);
+  if (!value) throw new Error("collector output has an invalid ProfileReport schema");
+  const { spans, counters, histograms, diagnostics } = value;
   let endedAvailable = true;
   const ended = spans.reduce((sum, item) => {
-    const calls =
-      item && typeof item === "object" ? (item as Record<string, unknown>).callCount : undefined;
-    const unavailableFields =
-      item && typeof item === "object"
-        ? (item as Record<string, unknown>).unavailableFields
-        : undefined;
-    if (!Array.isArray(unavailableFields))
-      throw new Error("collector output has an invalid span unavailableFields mask");
+    const calls = item.callCount;
+    const unavailableFields = item.unavailableFields;
     if (unavailableFields.includes("calls")) endedAvailable = false;
-    if (!Number.isSafeInteger(calls) || (calls as number) < 0)
-      throw new Error("collector output has an invalid callCount");
-    return sum + (calls as number);
+    return sum + calls;
   }, 0);
-  for (const point of [...counters, ...histograms]) {
-    const unavailableFields =
-      point && typeof point === "object"
-        ? (point as Record<string, unknown>).unavailableFields
-        : undefined;
-    if (!Array.isArray(unavailableFields))
-      throw new Error("collector output has an invalid metric unavailableFields mask");
-  }
   return {
     reportJsonBytes: {
       status: "available",
-      value: Buffer.byteLength(JSON.stringify(report), "utf8"),
+      value: Buffer.byteLength(JSON.stringify(value), "utf8"),
     },
     spanAggregateGroupCount: { status: "available", value: spans.length },
     totalEndedSpanCount: endedAvailable

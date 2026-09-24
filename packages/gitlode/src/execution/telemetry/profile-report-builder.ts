@@ -149,23 +149,41 @@ export class ProfileReportBuilder {
   ): { status: ProfileSignalStatus; values: Value[] } {
     const values: Value[] = [];
     let status = input.status;
+    let iterator: Iterator<Value>;
     try {
-      for (const value of input.values) {
+      iterator = input.values[Symbol.iterator]();
+    } catch {
+      status = "partial";
+      this.#addValidationIssue(kind, false);
+      return { status, values };
+    }
+    while (true) {
+      let next: IteratorResult<Value>;
+      try {
+        next = iterator.next();
+      } catch {
+        status = "partial";
+        this.#addValidationIssue(kind, false);
+        break;
+      }
+      if (next.done) break;
+      try {
+        const value = next.value;
         const normalized = normalize(value);
         if (normalized) values.push(normalized);
         else {
           status = "partial";
-          this.#addValidationIssue(kind);
+          this.#addValidationIssue(kind, true);
         }
+      } catch {
+        status = "partial";
+        this.#addValidationIssue(kind, true);
       }
-    } catch {
-      status = "partial";
-      this.#addValidationIssue(kind);
     }
     return { status, values };
   }
 
-  #addValidationIssue(kind: ProfileObservationKind): void {
+  #addValidationIssue(kind: ProfileObservationKind, exactSingleLoss: boolean): void {
     this.#diagnostics.add({
       code: "invalid_aggregation",
       stage: "report_build",
@@ -176,8 +194,8 @@ export class ProfileReportBuilder {
       lossQuantity: {
         descriptor: "observation_results",
         unit: "results",
-        value: 1,
-        relationship: "disjoint",
+        value: exactSingleLoss ? 1 : null,
+        relationship: exactSingleLoss ? "disjoint" : "overlapping_or_unknown",
       },
     });
   }

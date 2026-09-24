@@ -27,9 +27,21 @@ function isWorkerRunMessage(value: unknown): value is WorkerRunMessage {
 export async function dispatchWorkerRunRequest(
   request: WorkerRunRequest,
   reporters: ExecutionRunReporters,
+  internalOptions: {
+    readonly workerEntry?: URL;
+    readonly telemetryTestFailure?: "report_builder_body";
+  } = {},
 ): Promise<WorkerRunResult> {
   return await new Promise<WorkerRunResult>((resolve) => {
-    const worker = new Worker(new URL("./worker-entry.js", import.meta.url));
+    const worker = new Worker(
+      internalOptions.workerEntry ?? new URL("./worker-entry.js", import.meta.url),
+      {
+        workerData:
+          internalOptions.telemetryTestFailure === undefined
+            ? undefined
+            : { gitlodeTelemetryTestFailure: internalOptions.telemetryTestFailure },
+      },
+    );
 
     let settled = false;
     let resultReceived = false;

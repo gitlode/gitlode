@@ -65,6 +65,18 @@ ordinary presentation path. Presentation and repository evaluators separately di
 zero from unavailable numeric fields, partial/unavailable status, reserved summaries and fixed
 fallback provenance.
 
+Mixed valid/invalid Span duration tests run both input orders through the real processor, report
+builder and presentation/tooling bridges. They preserve retained total/maximum, suppress the average,
+disclose omitted contributions after diagnostic compaction, reject all-invalid defaults as observed
+zero and retain a genuine zero-duration contribution. Report-builder isolation separately covers
+throwing first/middle values and iterator failure, including honest exact versus unknown loss.
+
+Repository-consumer fixtures include complete normal, partial and fixed-fallback reports plus
+missing required fields, invalid field masks and malformed reserved summaries. Acceptance is based
+on complete shared-contract normalization before measurement extraction. An actual worker-thread
+entry/client test injects an invoked builder-body failure through an internal-only seam and verifies
+fallback serialization, ordinary result routing, application-result equivalence and finite cleanup.
+
 Correction coverage also compares lifecycle-only and confirmed whole-signal-loss evidence before and
 after detailed-record compaction, rejects status/value contradictions without discarding retained
 values, distinguishes exact safe-integer boundaries from actual saturation, and routes explicitly

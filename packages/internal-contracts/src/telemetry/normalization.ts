@@ -1,9 +1,16 @@
 import {
   PROFILE_COUNTER_FIELDS,
+  PROFILE_COLLECTION_LIMITS,
   PROFILE_DIAGNOSTIC_DETAIL_UTF16_LIMIT,
   PROFILE_DIAGNOSTIC_EFFECTS,
+  PROFILE_DIAGNOSTIC_EXTENTS,
+  PROFILE_DIAGNOSTIC_SEVERITY,
+  PROFILE_DIAGNOSTIC_STAGES,
   PROFILE_HISTOGRAM_FIELDS,
+  PROFILE_LOSS_QUANTITY_DESCRIPTORS,
   PROFILE_OBSERVATION_KINDS,
+  PROFILE_REPORT_SCHEMA_VERSION,
+  PROFILE_SIGNAL_STATUSES,
   PROFILE_SPAN_FIELDS,
 } from "./profile-report.js";
 import type {
@@ -14,9 +21,15 @@ import type {
   ProfileCounterPoint,
   ProfileDetailLossMask,
   ProfileDiagnosticEffect,
+  ProfileDiagnostic,
+  ProfileDiagnosticEffectSummary,
+  ProfileDiagnosticSeverity,
+  ProfileDiagnosticSummary,
   ProfileHistogramPoint,
   ProfileInstrumentationScope,
+  ProfileLossQuantityDescriptor,
   ProfileObservationKind,
+  ProfileReport,
   ProfileSpanAggregate,
   ProfileSpanAttributeSummary,
   ProfileTarget,
@@ -561,4 +574,277 @@ export function deriveHistogramNumericAvailability(
     min: value.minimum !== null && !unavailable.has("min"),
     max: value.maximum !== null && !unavailable.has("max"),
   };
+}
+
+function normalizeDetailLossMask(input: unknown): ProfileDetailLossMask | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const value = input as Record<string, unknown>;
+  const keys = Object.keys(EMPTY_PROFILE_DETAIL_LOSS_MASK) as Array<keyof ProfileDetailLossMask>;
+  if (keys.some((key) => typeof value[key] !== "boolean")) return null;
+  return Object.fromEntries(
+    keys.map((key) => [key, value[key]]),
+  ) as unknown as ProfileDetailLossMask;
+}
+
+function samePlainValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((item, index) => samePlainValue(item, right[index]));
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key) => Object.hasOwn(rightRecord, key) && samePlainValue(leftRecord[key], rightRecord[key]),
+    )
+  );
+}
+
+function normalizeDetailedDiagnostic(input: unknown): ProfileDiagnostic | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const value = input as Record<string, unknown>;
+  if (
+    typeof value.code !== "string" ||
+    value.code === "diagnostic_overflow" ||
+    !(value.code in PROFILE_DIAGNOSTIC_SEVERITY) ||
+    value.severity !==
+      PROFILE_DIAGNOSTIC_SEVERITY[value.code as keyof typeof PROFILE_DIAGNOSTIC_SEVERITY] ||
+    !PROFILE_DIAGNOSTIC_STAGES.includes(value.stage as never) ||
+    !PROFILE_DIAGNOSTIC_EXTENTS.includes(value.extent as never)
+  )
+    return null;
+  const boundedTarget = normalizeProfileTarget(value.target);
+  const signalCoverage = normalizeProfileKinds(value.signalCoverage);
+  const effects = normalizeProfileEffects(value.effects);
+  const attributeKey = normalizeAttributeKeySelector(value.attributeKey);
+  const affectedFields = normalizeAffectedFields(value.affectedFields);
+  const detailLoss = normalizeDetailLossMask(value.detailLoss);
+  if (
+    !samePlainValue(boundedTarget.target, value.target) ||
+    !signalCoverage ||
+    !effects ||
+    effects.length === 0 ||
+    !attributeKey ||
+    !affectedFields ||
+    !detailLoss ||
+    typeof value.wholeResultUnavailable !== "boolean" ||
+    !positiveSafeInteger(value.count) ||
+    typeof value.countSaturated !== "boolean" ||
+    (value.message !== null &&
+      (typeof value.message !== "string" ||
+        value.message.length > PROFILE_COLLECTION_LIMITS.diagnosticMessageUtf16CodeUnits))
+  )
+    return null;
+  const hasWholeResultEffect =
+    effects.includes("missing_observations") || effects.includes("unknown_collection_coverage");
+  if (value.wholeResultUnavailable && !hasWholeResultEffect) return null;
+
+  let lossQuantity: ProfileDiagnostic["lossQuantity"] = null;
+  if (value.lossQuantity !== null) {
+    if (!value.lossQuantity || typeof value.lossQuantity !== "object") return null;
+    const quantity = value.lossQuantity as Record<string, unknown>;
+    if (
+      !PROFILE_LOSS_QUANTITY_DESCRIPTORS.includes(quantity.descriptor as never) ||
+      typeof quantity.unit !== "string" ||
+      escapedStringLengthWithin(quantity.unit, PROFILE_DIAGNOSTIC_DETAIL_UTF16_LIMIT) === null ||
+      (quantity.value !== null && !nonnegativeSafeInteger(quantity.value)) ||
+      typeof quantity.saturated !== "boolean"
+    )
+      return null;
+    lossQuantity = {
+      descriptor: quantity.descriptor as ProfileLossQuantityDescriptor,
+      unit: quantity.unit,
+      value: quantity.value as number | null,
+      saturated: quantity.saturated,
+    };
+  }
+
+  let reportDelivery: ProfileDiagnostic["reportDelivery"] = null;
+  if (value.reportDelivery !== null) {
+    if (!value.reportDelivery || typeof value.reportDelivery !== "object") return null;
+    const delivery = value.reportDelivery as Record<string, unknown>;
+    if (
+      delivery.path !== "fixed_fallback" ||
+      (delivery.measurementResults !== "none" &&
+        delivery.measurementResults !== "trusted_snapshot") ||
+      (delivery.priorIssueDetail !== "retained" && delivery.priorIssueDetail !== "unavailable")
+    )
+      return null;
+    reportDelivery = {
+      path: "fixed_fallback",
+      measurementResults: delivery.measurementResults,
+      priorIssueDetail: delivery.priorIssueDetail,
+    };
+  }
+
+  const detail = {
+    target: boundedTarget.target,
+    signalCoverage,
+    effects,
+    extent: value.extent,
+    attributeKey,
+    affectedFields,
+    detailLoss,
+    lossQuantity,
+  };
+  if (JSON.stringify(detail).length > PROFILE_DIAGNOSTIC_DETAIL_UTF16_LIMIT) return null;
+  return {
+    code: value.code as ProfileDiagnostic["code"],
+    severity: value.severity as ProfileDiagnosticSeverity,
+    stage: value.stage as ProfileDiagnostic["stage"],
+    ...detail,
+    extent: value.extent as ProfileDiagnostic["extent"],
+    wholeResultUnavailable: value.wholeResultUnavailable,
+    count: value.count,
+    countSaturated: value.countSaturated,
+    message: value.message as string | null,
+    reportDelivery,
+  };
+}
+
+function normalizeEffectSummary(input: unknown): ProfileDiagnosticEffectSummary | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const value = input as Record<string, unknown>;
+  if (!PROFILE_OBSERVATION_KINDS.includes(value.kind as never)) return null;
+  const effects = normalizeProfileEffects(value.effects);
+  return effects && effects.length > 0 && typeof value.wholeResultUnavailable === "boolean"
+    ? {
+        kind: value.kind as ProfileObservationKind,
+        effects,
+        wholeResultUnavailable: value.wholeResultUnavailable,
+      }
+    : null;
+}
+
+function normalizeDiagnosticSummary(input: unknown): ProfileDiagnosticSummary | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const value = input as Record<string, unknown>;
+  const signalCoverage = normalizeProfileKinds(value.signalCoverage);
+  const reportEffects = normalizeProfileEffects(value.reportEffects);
+  const detailLoss = normalizeDetailLossMask(value.detailLoss);
+  if (
+    value.code !== "diagnostic_overflow" ||
+    value.severity !== "warning" ||
+    value.stage !== "report_build" ||
+    !samePlainValue(value.target, { type: "report" }) ||
+    value.extent !== "unidentified_subset" ||
+    !samePlainValue(value.effects, ["lost_issue_detail"]) ||
+    !signalCoverage ||
+    !reportEffects ||
+    !detailLoss ||
+    !Array.isArray(value.effectsByKind) ||
+    value.effectsByKind.length > PROFILE_OBSERVATION_KINDS.length ||
+    (value.omittedOccurrences !== null && !nonnegativeSafeInteger(value.omittedOccurrences)) ||
+    typeof value.countSaturated !== "boolean" ||
+    (value.maximumSeverity !== null &&
+      value.maximumSeverity !== "info" &&
+      value.maximumSeverity !== "warning") ||
+    (value.priorIssueDetail !== "retained" && value.priorIssueDetail !== "unavailable")
+  )
+    return null;
+  const effectsByKind: ProfileDiagnosticEffectSummary[] = [];
+  const seenKinds = new Set<ProfileObservationKind>();
+  for (const item of value.effectsByKind) {
+    const normalized = normalizeEffectSummary(item);
+    if (!normalized || seenKinds.has(normalized.kind)) return null;
+    seenKinds.add(normalized.kind);
+    effectsByKind.push(normalized);
+  }
+  if ((value.priorIssueDetail === "unavailable") !== (value.omittedOccurrences === null))
+    return null;
+  return {
+    code: "diagnostic_overflow",
+    severity: "warning",
+    stage: "report_build",
+    target: { type: "report" },
+    extent: "unidentified_subset",
+    effects: ["lost_issue_detail"],
+    signalCoverage,
+    effectsByKind: effectsByKind.sort((left, right) => compareCodeUnits(left.kind, right.kind)),
+    reportEffects,
+    detailLoss,
+    omittedOccurrences: value.omittedOccurrences as number | null,
+    countSaturated: value.countSaturated,
+    maximumSeverity: value.maximumSeverity as ProfileDiagnosticSeverity | null,
+    priorIssueDetail: value.priorIssueDetail,
+  };
+}
+
+/** Validates and detaches a complete active ProfileReport without repairing invalid fields. */
+export function normalizeProfileReport(input: unknown): ProfileReport | null {
+  try {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+    const value = input as Record<string, unknown>;
+    if (
+      value.schemaVersion !== PROFILE_REPORT_SCHEMA_VERSION ||
+      !value.signalStatus ||
+      typeof value.signalStatus !== "object" ||
+      !Array.isArray(value.spans) ||
+      !Array.isArray(value.counters) ||
+      !Array.isArray(value.histograms) ||
+      !Array.isArray(value.diagnostics) ||
+      value.spans.length > PROFILE_COLLECTION_LIMITS.spanGroups ||
+      value.diagnostics.length > PROFILE_COLLECTION_LIMITS.diagnostics.maximum
+    )
+      return null;
+    const status = value.signalStatus as Record<string, unknown>;
+    if (
+      !PROFILE_SIGNAL_STATUSES.includes(status.spans as never) ||
+      !PROFILE_SIGNAL_STATUSES.includes(status.counters as never) ||
+      !PROFILE_SIGNAL_STATUSES.includes(status.histograms as never)
+    )
+      return null;
+    const spans = value.spans.map(normalizeProfileSpanAggregate);
+    const counters = value.counters.map(normalizeProfileCounterPoint);
+    const histograms = value.histograms.map(normalizeProfileHistogramPoint);
+    if ([...spans, ...counters, ...histograms].some((item) => item === null)) return null;
+    const instrumentCounts = new Map<string, number>();
+    for (const [kind, points] of [
+      ["counter", counters],
+      ["histogram", histograms],
+    ] as const) {
+      for (const point of points) {
+        if (!point) return null;
+        const key = JSON.stringify([kind, point.scope.name, point.scope.version, point.name]);
+        const count = (instrumentCounts.get(key) ?? 0) + 1;
+        if (count > PROFILE_COLLECTION_LIMITS.metricPointsPerInstrument) return null;
+        instrumentCounts.set(key, count);
+      }
+    }
+    const diagnostics: Array<ProfileDiagnostic | ProfileDiagnosticSummary> = [];
+    let summarySeen = false;
+    for (const [index, item] of value.diagnostics.entries()) {
+      const isSummary =
+        !!item &&
+        typeof item === "object" &&
+        (item as Record<string, unknown>).code === "diagnostic_overflow";
+      const normalized = isSummary
+        ? normalizeDiagnosticSummary(item)
+        : normalizeDetailedDiagnostic(item);
+      if (!normalized || summarySeen || (isSummary && index !== value.diagnostics.length - 1))
+        return null;
+      summarySeen = isSummary;
+      diagnostics.push(normalized);
+    }
+    const report: ProfileReport = {
+      schemaVersion: PROFILE_REPORT_SCHEMA_VERSION,
+      signalStatus: {
+        spans: status.spans as ProfileReport["signalStatus"]["spans"],
+        counters: status.counters as ProfileReport["signalStatus"]["counters"],
+        histograms: status.histograms as ProfileReport["signalStatus"]["histograms"],
+      },
+      spans: spans as ProfileSpanAggregate[],
+      counters: counters as ProfileCounterPoint[],
+      histograms: histograms as ProfileHistogramPoint[],
+      diagnostics,
+    };
+    return samePlainValue(value, report) ? report : null;
+  } catch {
+    return null;
+  }
 }

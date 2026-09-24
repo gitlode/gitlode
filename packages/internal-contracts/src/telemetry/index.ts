@@ -91,6 +91,7 @@ export {
   normalizeProfileHistogramPoint,
   normalizeProfileInstrumentationScope,
   normalizeProfileKinds,
+  normalizeProfileReport,
   normalizeProfileSpanAggregate,
   normalizeProfileTarget,
   type BoundedProfileTarget,

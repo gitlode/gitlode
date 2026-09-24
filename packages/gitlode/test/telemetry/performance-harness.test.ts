@@ -418,10 +418,46 @@ describe("performance harness contracts", () => {
   it("extracts ProfileReport measurements without inventing unavailable values", () => {
     const measurements = extractProfileReportMeasurements({
       schemaVersion: 2,
-      spans: [{ callCount: 3, unavailableFields: [] }],
-      counters: [{ unavailableFields: [] }],
-      histograms: [{ count: 2, bucketCounts: [1, 1], unavailableFields: [] }],
-      diagnostics: [{ code: "x" }],
+      signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
+      spans: [
+        {
+          scope: { name: "scope", version: null },
+          name: "span",
+          callCount: 3,
+          errorCount: 0,
+          totalDurationSeconds: 1,
+          maxDurationSeconds: 1,
+          durationContributionCount: 3,
+          unavailableFields: [],
+          attributes: [],
+        },
+      ],
+      counters: [
+        {
+          scope: { name: "scope", version: null },
+          name: "counter",
+          unit: "{item}",
+          attributes: [],
+          value: 1,
+          unavailableFields: [],
+        },
+      ],
+      histograms: [
+        {
+          scope: { name: "scope", version: null },
+          name: "histogram",
+          unit: "s",
+          attributes: [],
+          count: 2,
+          sum: 1,
+          minimum: 0,
+          maximum: 1,
+          explicitBounds: [0],
+          bucketCounts: [1, 1],
+          unavailableFields: [],
+        },
+      ],
+      diagnostics: [],
     });
     expect(measurements).toMatchObject({
       reportJsonBytes: { status: "available" },
@@ -429,19 +465,32 @@ describe("performance harness contracts", () => {
       totalEndedSpanCount: { value: 3 },
       counterDatapointCount: { value: 1 },
       histogramDatapointCount: { value: 1 },
-      diagnosticCount: { value: 1 },
+      diagnosticCount: { value: 0 },
     });
     expect(unavailableTargetTelemetry("target_off").reportJsonBytes.status).toBe("unavailable");
     expect(
       extractProfileReportMeasurements({
         schemaVersion: 2,
-        spans: [{ callCount: 0, unavailableFields: ["calls"] }],
+        signalStatus: { spans: "partial", counters: "complete", histograms: "complete" },
+        spans: [
+          {
+            scope: { name: "scope", version: null },
+            name: "span",
+            callCount: 0,
+            errorCount: 0,
+            totalDurationSeconds: 0,
+            maxDurationSeconds: 0,
+            durationContributionCount: 0,
+            unavailableFields: ["calls"],
+            attributes: [],
+          },
+        ],
         counters: [],
         histograms: [],
         diagnostics: [],
       }).totalEndedSpanCount,
     ).toMatchObject({ status: "unavailable" });
-    expect(() => extractProfileReportMeasurements({ spans: [] })).toThrow(/missing/);
+    expect(() => extractProfileReportMeasurements({ spans: [] })).toThrow(/invalid/);
   });
   it("formally evaluates repository reports without leaking malformed input", () => {
     const report = (overrides: Record<string, unknown> = {}) => ({
@@ -453,6 +502,30 @@ describe("performance harness contracts", () => {
       signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
       ...overrides,
     });
+    const diagnostic = {
+      code: "invalid_aggregation",
+      severity: "warning",
+      stage: "report_build",
+      target: { type: "report" },
+      signalCoverage: ["counter"],
+      effects: ["unknown_collection_coverage"],
+      extent: "unidentified_subset",
+      attributeKey: { type: "not_applicable" },
+      affectedFields: [],
+      detailLoss: {
+        pointAttributes: false,
+        observationIdentity: false,
+        scopeIdentity: false,
+        attributeKey: false,
+        affectedFields: false,
+      },
+      lossQuantity: null,
+      wholeResultUnavailable: false,
+      count: 1,
+      countSaturated: false,
+      message: null,
+      reportDelivery: null,
+    };
     expect(evaluateRepositoryProfileReport(report()).status).toBe("pass");
     expect(
       evaluateRepositoryProfileReport({ schemaVersion: 2, spans: [{ callCount: "bad" }] }).status,
@@ -469,18 +542,56 @@ describe("performance harness contracts", () => {
         }),
       ).status,
     ).toBe("inconclusive");
-    expect(
-      evaluateRepositoryProfileReport(report({ diagnostics: [{ code: "overflow" }] })).status,
-    ).toBe("fail");
+    expect(evaluateRepositoryProfileReport(report({ diagnostics: [diagnostic] })).status).toBe(
+      "fail",
+    );
     expect(
       evaluateRepositoryProfileReport(
         report({
-          spans: Array.from({ length: 30_000 }, () => ({
-            scope: { name: "plugin.valid" },
-            name: "plugin.operation",
-            callCount: 0,
-            unavailableFields: [],
-          })),
+          counters: [
+            {
+              scope: { name: "scope", version: null },
+              name: "counter",
+              unit: "{item}",
+              attributes: [],
+              value: 1,
+              unavailableFields: ["not-a-counter-field"],
+            },
+          ],
+        }),
+      ).status,
+    ).toBe("inconclusive");
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          counters: [
+            {
+              scope: { name: "scope", version: null },
+              name: "counter",
+              unit: "{item}",
+              attributes: [],
+              unavailableFields: [],
+            },
+          ],
+        }),
+      ).status,
+    ).toBe("inconclusive");
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          spans: [
+            {
+              scope: { name: `plugin.${"x".repeat(1_100_000)}`, version: null },
+              name: "plugin.operation",
+              callCount: 0,
+              errorCount: 0,
+              totalDurationSeconds: 0,
+              maxDurationSeconds: 0,
+              durationContributionCount: 0,
+              unavailableFields: [],
+              attributes: [],
+            },
+          ],
         }),
       ).status,
     ).toBe("fail");
@@ -489,10 +600,15 @@ describe("performance harness contracts", () => {
         report({
           spans: [
             {
-              scope: { name: "gitlode.git" },
+              scope: { name: "gitlode.git", version: null },
               name: "gitlode.unknown",
               callCount: 1,
+              errorCount: 0,
+              totalDurationSeconds: 1,
+              maxDurationSeconds: 1,
+              durationContributionCount: 1,
               unavailableFields: [],
+              attributes: [],
             },
           ],
         }),
@@ -504,6 +620,24 @@ describe("performance harness contracts", () => {
           diagnostics: [
             {
               code: "diagnostic_overflow",
+              severity: "warning",
+              stage: "report_build",
+              target: { type: "report" },
+              extent: "unidentified_subset",
+              effects: ["lost_issue_detail"],
+              signalCoverage: [],
+              effectsByKind: [],
+              reportEffects: [],
+              detailLoss: {
+                pointAttributes: true,
+                observationIdentity: true,
+                scopeIdentity: true,
+                attributeKey: true,
+                affectedFields: true,
+              },
+              omittedOccurrences: null,
+              countSaturated: false,
+              maximumSeverity: null,
               priorIssueDetail: "unavailable",
             },
           ],
@@ -515,8 +649,16 @@ describe("performance harness contracts", () => {
         report({
           diagnostics: [
             {
+              ...diagnostic,
               code: "lifecycle_failure",
-              reportDelivery: { path: "fixed_fallback" },
+              signalCoverage: ["counter", "histogram", "span"],
+              effects: ["report_delivery_failure"],
+              extent: "entire_target",
+              reportDelivery: {
+                path: "fixed_fallback",
+                measurementResults: "none",
+                priorIssueDetail: "retained",
+              },
             },
           ],
         }),
@@ -524,7 +666,7 @@ describe("performance harness contracts", () => {
     ).toContain("ProfileReport was delivered by the fixed fallback");
     expect(evaluateRepositoryProfileReport({ nope: true })).toMatchObject({
       status: "inconclusive",
-      reasons: ["collector output is missing ProfileReport arrays"],
+      reasons: ["collector output has an invalid ProfileReport schema"],
     });
   });
   it("marks unsupported platforms and empty RSS readers inconclusive", async () => {
@@ -677,6 +819,7 @@ describe("performance harness contracts", () => {
   it("classifies report spans by exact metadata pairs and fixture-owned scopes", () => {
     const report = {
       schemaVersion: 2,
+      signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
       spans: [
         { scope: { name: "gitlode.git" }, name: "gitlode.git.cli.rev_list", callCount: 3 },
         { scope: { name: "gitlode.execution" }, name: "gitlode.git.cli.rev_list", callCount: 2 },
@@ -685,7 +828,16 @@ describe("performance harness contracts", () => {
         { scope: { name: "plugin.unscoped" }, name: "plugin.project", callCount: 7 },
         { scope: { name: "plugin.fallback" }, name: "plugin.fallback", callCount: 11 },
         { scope: { name: "fixture.synthetic" }, name: "synthetic.operation", callCount: 13 },
-      ].map((span) => ({ ...span, unavailableFields: [] })),
+      ].map((span) => ({
+        ...span,
+        scope: { ...span.scope, version: null },
+        errorCount: 0,
+        totalDurationSeconds: span.callCount,
+        maxDurationSeconds: span.callCount > 0 ? 1 : 0,
+        durationContributionCount: span.callCount,
+        unavailableFields: [],
+        attributes: [],
+      })),
       counters: [],
       histograms: [],
       diagnostics: [],

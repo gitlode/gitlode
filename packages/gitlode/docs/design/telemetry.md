@@ -574,6 +574,12 @@ Measurements carry bounded `unavailableFields`; spans also carry a duration-cont
 default numeric slot is never interpreted as an observed zero. Diagnostic retention uses 15 detailed
 records plus one fixed summary.
 
+A detected invalid Span duration does not erase valid retained duration contributions. Mixed-validity
+aggregates expose the retained total and maximum, make the average unavailable when contribution and
+call coverage differ, and carry a partial status plus bounded omission evidence. If no valid duration
+contribution remains, total, average and maximum are all unavailable; an observed zero-duration
+contribution remains a valid zero.
+
 The diagnostic contract retains confirmed whole-result-unavailable evidence on each detailed
 record and in the reserved summary. The accumulator accepts that evidence only with a collection-loss
 effect (`missing_observations` or `unknown_collection_coverage`); lifecycle and report-delivery
@@ -601,6 +607,11 @@ Span aggregates use scope and span name as identity. Metric datapoints use scope
 and the sorted attribute set. An unobserved metric is absent; presentation does not synthesize a
 zero. An explicitly recorded zero remains distinguishable.
 
+Each report value is normalized in its own isolation boundary. A rejected or throwing value cannot
+discard later safely iterable siblings. Iterator failure retains values already obtained, does not
+retry the iterator and records unknown remaining loss rather than an exact count. Metric diagnostics
+retain the narrowest independently validated Scope, observation or point identity.
+
 Signal status is `complete`, `partial`, or `unavailable` independently for spans, counters, and
 histograms. A complete empty array means collection succeeded with no observations; an unavailable
 signal has an empty array and a diagnostic; a partial signal may retain any usable observations.
@@ -627,6 +638,12 @@ Collector output has the exact canonical deterministic order defined by the repo
 name, nullable scope version, observation name, and metric attributes, with subordinate span
 attributes and diagnostics similarly sorted. Comparison is locale-independent. The collector has
 no knowledge of pipeline display order or particular span names.
+
+Formal repository and performance consumers validate the complete active report before extracting
+measurements or declaring it healthy. Validation covers every required measurement and diagnostic
+field, permitted masks and variants, finite values, collection bounds and the reserved-summary
+shape. It returns a detached canonical report only when the supplied value already has the same
+complete schema; malformed input is inconclusive rather than repaired into an accepted report.
 
 Presentation owns the declarative
 [`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog with group, preferred order, and

@@ -29,6 +29,11 @@ import {
   LocalSpanProcessor,
   ProfileReportBuilder,
 } from "../../src/execution/telemetry/index.js";
+import { formatProfileLines } from "../../src/presentation/reporting/formatters.js";
+import {
+  evaluateRepositoryProfileReport,
+  extractProfileReportMeasurements,
+} from "../support/performance-harness.js";
 
 function fakeSpan(
   name: string,
@@ -463,6 +468,118 @@ describe("local span processor", () => {
     );
   });
 
+  test.each([
+    [
+      "valid-first",
+      [
+        [0, 10],
+        [-1, 0],
+      ],
+    ],
+    [
+      "invalid-first",
+      [
+        [-1, 0],
+        [0, 10],
+      ],
+    ],
+  ] as const)(
+    "preserves retained mixed-duration values and discloses omission: %s",
+    (_name, durations) => {
+      const diagnostics = new BoundedDiagnosticAccumulator();
+      const processor = new LocalSpanProcessor(diagnostics);
+      for (const duration of durations)
+        processor.onEnd(fakeSpan("plugin.operation", { duration: [...duration] }));
+      const snapshot = processor.snapshot();
+      const report = new ProfileReportBuilder(diagnostics).build({
+        spans: { status: snapshot.status, values: snapshot.spans },
+        counters: { status: "complete", values: [] },
+        histograms: { status: "complete", values: [] },
+      });
+      expect(report.spans[0]).toMatchObject({
+        callCount: 2,
+        durationContributionCount: 1,
+        totalDurationSeconds: 1e-8,
+        maxDurationSeconds: 1e-8,
+        unavailableFields: [],
+      });
+      expect(report.signalStatus.spans).toBe("partial");
+      expect(formatProfileLines(report).join("\n")).toMatch(/total=.*calls=2, avg=.*max=/);
+      expect(formatProfileLines(report).join("\n")).toContain("Invalid aggregation discarded");
+      expect(extractProfileReportMeasurements(report).totalEndedSpanCount).toMatchObject({
+        status: "available",
+        value: 2,
+      });
+      expect(evaluateRepositoryProfileReport(report).status).toBe("fail");
+    },
+  );
+
+  test("keeps all duration fields unavailable when every contribution is invalid", () => {
+    const diagnostics = new BoundedDiagnosticAccumulator();
+    const processor = new LocalSpanProcessor(diagnostics);
+    processor.onEnd(fakeSpan("plugin.operation", { duration: [-1, 0] }));
+    const report = new ProfileReportBuilder(diagnostics).build({
+      spans: {
+        status: processor.snapshot().status,
+        values: processor.snapshot().spans,
+      },
+      counters: { status: "complete", values: [] },
+      histograms: { status: "complete", values: [] },
+    });
+    const output = formatProfileLines(report).join("\n");
+    expect(report.spans[0]).toMatchObject({
+      callCount: 1,
+      durationContributionCount: 0,
+      totalDurationSeconds: 0,
+      maxDurationSeconds: 0,
+    });
+    expect(output).toMatch(/total=.*calls=1, avg=.*max=/);
+    expect(output).not.toContain("total=0 s");
+  });
+
+  test("keeps mixed-duration quality visible after diagnostic detail overflow", () => {
+    const diagnostics = new BoundedDiagnosticAccumulator();
+    for (let index = 0; index < 15; index += 1)
+      diagnostics.add({
+        code: "lifecycle_failure",
+        stage: "telemetry_shutdown",
+        target: {
+          type: "observation",
+          scope: { name: "scope", version: null },
+          kind: "span",
+          name: `notice-${index}`,
+        },
+        signalCoverage: ["span"],
+        effects: ["lifecycle_notice"],
+        extent: "unidentified_subset",
+      });
+    const processor = new LocalSpanProcessor(diagnostics);
+    processor.onEnd(fakeSpan("plugin.operation", { duration: [0, 0] }));
+    processor.onEnd(fakeSpan("plugin.operation", { duration: [-1, 0] }));
+    const snapshot = processor.snapshot();
+    const report = new ProfileReportBuilder(diagnostics).build({
+      spans: { status: snapshot.status, values: snapshot.spans },
+      counters: { status: "complete", values: [] },
+      histograms: { status: "complete", values: [] },
+    });
+    expect(report.spans[0]).toMatchObject({
+      totalDurationSeconds: 0,
+      maxDurationSeconds: 0,
+      durationContributionCount: 1,
+      unavailableFields: [],
+    });
+    expect(report.diagnostics.at(-1)).toMatchObject({
+      code: "diagnostic_overflow",
+      effectsByKind: [
+        expect.objectContaining({ kind: "span", effects: ["incomplete_measurement_fields"] }),
+      ],
+    });
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("Spans (partial)");
+    expect(output).toContain("Additional diagnostics omitted");
+    expect(evaluateRepositoryProfileReport(report).status).toBe("fail");
+  });
+
   test("works as a real SDK span processor", async () => {
     const diagnostics = new BoundedDiagnosticAccumulator();
     const processor = new LocalSpanProcessor(diagnostics);
@@ -748,8 +865,92 @@ describe("local metrics", () => {
     expect(snapshot.counterStatus).toBe("partial");
     expect(snapshot.counters).toEqual([expect.objectContaining({ value: 2 })]);
     expect(diagnostics.snapshot().diagnostics).toEqual([
-      expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["counter"] }),
+      expect.objectContaining({
+        code: "invalid_aggregation",
+        signalCoverage: ["counter"],
+        target: {
+          type: "point",
+          scope: { name: "gitlode.extraction", version: null },
+          kind: "counter",
+          name: metric.name,
+          attributes: [],
+        },
+        effects: ["missing_observations"],
+        extent: "entire_target",
+        lossQuantity: expect.objectContaining({ descriptor: "observation_results", value: 1 }),
+      }),
     ]);
+  });
+
+  test("broadens invalid attributes only to the known observation", () => {
+    const metric = getTelemetryMetricMetadata("git_object_read");
+    const diagnostics = new BoundedDiagnosticAccumulator();
+    convertLocalMetrics(
+      resourceMetrics("gitlode.git", [
+        sumMetric(metric.name, [{ value: 1, attributes: { unexpected: "value" } }]),
+      ]),
+      diagnostics,
+    );
+    expect(diagnostics.snapshot().diagnostics[0]).toMatchObject({
+      target: {
+        type: "observation",
+        scope: { name: "gitlode.git", version: null },
+        kind: "counter",
+        name: metric.name,
+      },
+      extent: "unidentified_subset",
+    });
+  });
+
+  test("keeps exact point identity for histogram invalidity and point overflow", () => {
+    const histogram = getTelemetryMetricMetadata("line_diff_compute_duration");
+    const invalidMetric = histogramMetric(histogram.name, histogram.explicitBucketBoundaries, {
+      "gitlode.line_diff.compute.outcome": "success",
+    });
+    (invalidMetric.dataPoints[0]!.value as { count: number }).count = 0;
+    const invalidDiagnostics = new BoundedDiagnosticAccumulator();
+    convertLocalMetrics(resourceMetrics("gitlode.line_diff", [invalidMetric]), invalidDiagnostics);
+    expect(invalidDiagnostics.snapshot().diagnostics[0]).toMatchObject({
+      target: {
+        type: "point",
+        scope: { name: "gitlode.line_diff", version: null },
+        kind: "histogram",
+        name: histogram.name,
+        attributes: [{ key: "gitlode.line_diff.compute.outcome", value: "success" }],
+      },
+    });
+
+    const counter = getTelemetryMetricMetadata("extraction_commit_accepted");
+    const limits = PROFILE_COLLECTION_LIMITS as { metricPointsPerInstrument: number };
+    const originalLimit = limits.metricPointsPerInstrument;
+    limits.metricPointsPerInstrument = 1;
+    try {
+      const overflowDiagnostics = new BoundedDiagnosticAccumulator();
+      convertLocalMetrics(
+        resourceMetrics("gitlode.extraction", [
+          sumMetric(counter.name, [
+            { value: 1, attributes: { "gitlode.extraction.granularity": "commit" } },
+            { value: 1, attributes: { "gitlode.extraction.granularity": "file" } },
+          ]),
+        ]),
+        overflowDiagnostics,
+      );
+      expect(overflowDiagnostics.snapshot().diagnostics[0]).toMatchObject({
+        code: "metric_point_overflow",
+        target: {
+          type: "point",
+          scope: { name: "gitlode.extraction", version: null },
+          kind: "counter",
+          name: counter.name,
+          attributes: [{ key: "gitlode.extraction.granularity", value: "file" }],
+        },
+        effects: ["missing_observations"],
+        extent: "entire_target",
+        lossQuantity: expect.objectContaining({ descriptor: "metric_points", value: 1 }),
+      });
+    } finally {
+      limits.metricPointsPerInstrument = originalLimit;
+    }
   });
 
   test("isolates an invalid histogram aggregation from a valid sibling", () => {
@@ -890,6 +1091,53 @@ describe("profile report builder", () => {
     expect(report.diagnostics).toEqual([
       expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["counter"] }),
     ]);
+  });
+
+  test("isolates throwing values and separately reports unknown iterator loss", () => {
+    const throwing = counter("throwing") as ProfileCounterPoint & { value: number };
+    Object.defineProperty(throwing, "value", {
+      get() {
+        throw new Error("unsafe getter");
+      },
+    });
+    const diagnostics = new BoundedDiagnosticAccumulator();
+    const report = new ProfileReportBuilder(diagnostics).build({
+      spans: { status: "complete", values: [] },
+      counters: { status: "complete", values: [throwing, counter("later")] },
+      histograms: { status: "complete", values: [] },
+    });
+    expect(report.counters.map((point) => point.name)).toEqual(["later"]);
+    expect(report.diagnostics[0]).toMatchObject({
+      lossQuantity: expect.objectContaining({ value: 1 }),
+    });
+
+    const iterable = {
+      [Symbol.iterator]() {
+        let read = false;
+        return {
+          next() {
+            if (!read) {
+              read = true;
+              return { done: false as const, value: counter("obtained") };
+            }
+            throw new Error("iterator failed");
+          },
+        };
+      },
+    };
+    const iteratorDiagnostics = new BoundedDiagnosticAccumulator();
+    const iteratorReport = new ProfileReportBuilder(iteratorDiagnostics).build({
+      spans: { status: "complete", values: [] },
+      counters: {
+        status: "complete",
+        values: iterable as unknown as readonly ProfileCounterPoint[],
+      },
+      histograms: { status: "complete", values: [] },
+    });
+    expect(iteratorReport.counters.map((point) => point.name)).toEqual(["obtained"]);
+    expect(iteratorReport.diagnostics[0]).toMatchObject({
+      lossQuantity: expect.objectContaining({ value: null }),
+    });
   });
 
   test("detaches the report from source input mutation", () => {

@@ -12,6 +12,7 @@ import type {
   ProfileAttribute,
   ProfileCounterPoint,
   ProfileHistogramPoint,
+  ProfileTarget,
   ProfileSignalStatus,
   TelemetryAttributeId,
 } from "@gitlode/internal-contracts/telemetry";
@@ -172,34 +173,38 @@ export function convertLocalMetrics(
   let counterStatus: ProfileSignalStatus = "complete";
   let histogramStatus: ProfileSignalStatus = "complete";
 
-  const invalid = (signal: "counters" | "histograms") => {
+  const invalid = (
+    signal: "counters" | "histograms",
+    target: ProfileTarget = { type: "report" },
+    exactSingleLoss = false,
+  ) => {
     if (signal === "counters") counterStatus = "partial";
     else histogramStatus = "partial";
     diagnostics.add({
       code: "invalid_aggregation",
       stage: "metric_collection",
-      target: { type: "report" },
+      target,
       signalCoverage: [signal === "counters" ? "counter" : "histogram"],
-      effects: ["unknown_collection_coverage"],
-      extent: "unidentified_subset",
+      effects: [exactSingleLoss ? "missing_observations" : "unknown_collection_coverage"],
+      extent: exactSingleLoss && target.type === "point" ? "entire_target" : "unidentified_subset",
       lossQuantity: {
         descriptor: "observation_results",
         unit: "results",
-        value: 1,
-        relationship: "overlapping_or_unknown",
+        value: exactSingleLoss ? 1 : null,
+        relationship: exactSingleLoss ? "disjoint" : "overlapping_or_unknown",
       },
     });
   };
-  const overflow = (signal: "counters" | "histograms") => {
+  const overflow = (signal: "counters" | "histograms", target: ProfileTarget) => {
     if (signal === "counters") counterStatus = "partial";
     else histogramStatus = "partial";
     diagnostics.add({
       code: "metric_point_overflow",
       stage: "metric_collection",
-      target: { type: "report" },
+      target,
       signalCoverage: [signal === "counters" ? "counter" : "histogram"],
       effects: ["missing_observations"],
-      extent: "unidentified_subset",
+      extent: "entire_target",
       lossQuantity: {
         descriptor: "metric_points",
         unit: "points",
@@ -219,25 +224,40 @@ export function convertLocalMetrics(
         const metadata = acceptedMetric(scope.name, metric);
         if (!metadata) continue;
         const signal = metadata.instrument === "counter" ? "counters" : "histograms";
+        const observationTarget: ProfileTarget = {
+          type: "observation",
+          scope,
+          kind: metadata.instrument,
+          name: metadata.name,
+        };
         const expectedType =
           metadata.instrument === "counter" ? DataPointType.SUM : DataPointType.HISTOGRAM;
         if (metric.dataPointType !== expectedType) {
-          invalid(signal);
+          invalid(signal, observationTarget);
           continue;
         }
         const instrumentKey = JSON.stringify([scope.name, scope.version, metadata.name]);
         for (const point of metric.dataPoints) {
+          let safeTarget: ProfileTarget = observationTarget;
           try {
             const attributes = attributesFor(point.attributes, metadata);
             if (!attributes) {
-              invalid(signal);
+              invalid(signal, observationTarget, true);
               continue;
             }
+            const pointTarget: ProfileTarget = {
+              type: "point",
+              scope,
+              kind: metadata.instrument,
+              name: metadata.name,
+              attributes,
+            };
+            safeTarget = pointTarget;
             const identity = metricIdentity(scope, metadata.name, attributes);
             let converted: ProfileCounterPoint | ProfileHistogramPoint;
             if (metadata.instrument === "counter" && metric.dataPointType === DataPointType.SUM) {
               if (!metric.isMonotonic || !finiteNonnegative(point.value)) {
-                invalid("counters");
+                invalid("counters", pointTarget, true);
                 continue;
               }
               converted = {
@@ -255,7 +275,7 @@ export function convertLocalMetrics(
               const boundaries = metadata.explicitBucketBoundaries ?? [];
               const histogramValue = point.value as Histogram;
               if (!validHistogram(histogramValue, boundaries)) {
-                invalid("histograms");
+                invalid("histograms", pointTarget, true);
                 continue;
               }
               converted = {
@@ -282,7 +302,7 @@ export function convertLocalMetrics(
                 unavailableFields: [],
               };
             } else {
-              invalid(signal);
+              invalid(signal, pointTarget, true);
               continue;
             }
             let retention = retainedPerInstrument.get(instrumentKey);
@@ -294,17 +314,17 @@ export function convertLocalMetrics(
             }
             const acceptance = retention.accept(identity, () => true);
             if (!acceptance.accepted) {
-              overflow(signal);
+              overflow(signal, pointTarget);
               continue;
             }
             if (!acceptance.isNew) {
-              invalid(signal);
+              invalid(signal, pointTarget, true);
               continue;
             }
             if (metadata.instrument === "counter") counters.push(converted as ProfileCounterPoint);
             else histograms.push(converted as ProfileHistogramPoint);
           } catch {
-            invalid(signal);
+            invalid(signal, safeTarget, true);
           }
         }
       }

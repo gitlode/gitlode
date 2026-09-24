@@ -285,6 +285,9 @@ types:
       - a complete empty array means that collection succeeded and observed no values
       - a partial array may be empty
       - every partial or unavailable status has an explanatory diagnostic unless diagnostics themselves overflowed
+      - explanatory evidence is associated with the same signal kind through detailed signalCoverage or reserved-summary effectsByKind
+      - unavailable requires confirmed whole-result evidence for the kind or fixed-fallback delivery provenance with no supplied measurements
+      - lifecycle-only and report-only effects do not explain partial or unavailable signal status
 
   ProfileDiagnostic:
     fields:
@@ -382,6 +385,11 @@ types:
       - lossQuantity descriptor and unit
       - wholeResultUnavailable
     deduplication_value: increment count
+    invariants:
+      - an observation or point target kind is included in signalCoverage
+      - every affectedFields kind is included in signalCoverage
+      - wholeResultUnavailable requires missing_observations or unknown_collection_coverage
+      - report_delivery_failure is present if and only if fixed reportDelivery provenance is present
 
   ProfileDiagnosticSummary:
     fields:
@@ -404,6 +412,11 @@ types:
       priorIssueDetail:
         enum: [retained, unavailable]
     maximum_items: 1
+    invariants:
+      - signalCoverage contains exactly the unique kinds represented by effectsByKind
+      - wholeResultUnavailable in effectsByKind requires missing_observations or unknown_collection_coverage for that kind
+      - reportEffects is report-wide evidence and does not explain an individual signal status
+      - report_delivery_failure is retained as the mandatory detailed provenance record and is not represented only by this summary
 
   ProfileTarget:
     variants: [report, scope, observation, point]

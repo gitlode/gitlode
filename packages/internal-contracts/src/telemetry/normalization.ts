@@ -775,6 +775,145 @@ function normalizeDiagnosticSummary(input: unknown): ProfileDiagnosticSummary | 
   };
 }
 
+const PROFILE_DATA_IMPACT_EFFECTS = new Set<ProfileDiagnosticEffect>([
+  "missing_observations",
+  "incomplete_measurement_fields",
+  "missing_attribute_detail",
+  "unknown_collection_coverage",
+]);
+const PROFILE_WHOLE_RESULT_EFFECTS = new Set<ProfileDiagnosticEffect>([
+  "missing_observations",
+  "unknown_collection_coverage",
+]);
+
+function hasEffect(
+  effects: readonly ProfileDiagnosticEffect[],
+  accepted: ReadonlySet<ProfileDiagnosticEffect>,
+): boolean {
+  return effects.some((effect) => accepted.has(effect));
+}
+
+function isMandatoryDeliveryDiagnostic(diagnostic: ProfileDiagnostic): boolean {
+  return (
+    diagnostic.code === "lifecycle_failure" &&
+    diagnostic.stage === "report_build" &&
+    samePlainValue(diagnostic.target, { type: "report" }) &&
+    samePlainValue(diagnostic.signalCoverage, ["counter", "histogram", "span"]) &&
+    samePlainValue(diagnostic.effects, ["report_delivery_failure"]) &&
+    diagnostic.extent === "entire_target" &&
+    samePlainValue(diagnostic.attributeKey, { type: "not_applicable" }) &&
+    diagnostic.affectedFields.length === 0 &&
+    samePlainValue(diagnostic.detailLoss, EMPTY_PROFILE_DETAIL_LOSS_MASK) &&
+    diagnostic.lossQuantity === null &&
+    !diagnostic.wholeResultUnavailable &&
+    diagnostic.count === 1 &&
+    !diagnostic.countSaturated &&
+    diagnostic.message === null
+  );
+}
+
+function validateDetailedDiagnosticRelationships(diagnostic: ProfileDiagnostic): boolean {
+  if (
+    (diagnostic.target.type === "observation" || diagnostic.target.type === "point") &&
+    !diagnostic.signalCoverage.includes(diagnostic.target.kind)
+  )
+    return false;
+  if (
+    diagnostic.affectedFields.some((affected) => !diagnostic.signalCoverage.includes(affected.kind))
+  )
+    return false;
+  if (
+    diagnostic.wholeResultUnavailable &&
+    !hasEffect(diagnostic.effects, PROFILE_WHOLE_RESULT_EFFECTS)
+  )
+    return false;
+  const hasDeliveryEffect = diagnostic.effects.includes("report_delivery_failure");
+  if (hasDeliveryEffect !== (diagnostic.reportDelivery !== null)) return false;
+  return diagnostic.reportDelivery === null || isMandatoryDeliveryDiagnostic(diagnostic);
+}
+
+function validateDiagnosticSummaryRelationships(summary: ProfileDiagnosticSummary): boolean {
+  if (
+    summary.reportEffects.includes("report_delivery_failure") ||
+    summary.effectsByKind.some((item) => item.effects.includes("report_delivery_failure"))
+  )
+    return false;
+  if (
+    !samePlainValue(
+      summary.signalCoverage,
+      summary.effectsByKind.map((item) => item.kind),
+    )
+  )
+    return false;
+  return summary.effectsByKind.every(
+    (item) => !item.wholeResultUnavailable || hasEffect(item.effects, PROFILE_WHOLE_RESULT_EFFECTS),
+  );
+}
+
+function validateProfileReportRelationships(report: ProfileReport): boolean {
+  const details = report.diagnostics.filter(
+    (diagnostic): diagnostic is ProfileDiagnostic => diagnostic.code !== "diagnostic_overflow",
+  );
+  const summary = report.diagnostics.find(
+    (diagnostic): diagnostic is ProfileDiagnosticSummary =>
+      diagnostic.code === "diagnostic_overflow",
+  );
+  if (
+    details.some((diagnostic) => !validateDetailedDiagnosticRelationships(diagnostic)) ||
+    (summary && !validateDiagnosticSummaryRelationships(summary))
+  )
+    return false;
+
+  const fixedDeliveryWithoutMeasurements = details.some(
+    (diagnostic) => diagnostic.reportDelivery?.measurementResults === "none",
+  );
+  const signals = [
+    ["span", "spans"],
+    ["counter", "counters"],
+    ["histogram", "histograms"],
+  ] as const;
+  for (const [kind, signal] of signals) {
+    const status = report.signalStatus[signal];
+    const detailedImpact = details.some(
+      (diagnostic) =>
+        diagnostic.signalCoverage.includes(kind) &&
+        hasEffect(diagnostic.effects, PROFILE_DATA_IMPACT_EFFECTS),
+    );
+    const detailedWhole = details.some(
+      (diagnostic) =>
+        diagnostic.signalCoverage.includes(kind) &&
+        diagnostic.wholeResultUnavailable &&
+        hasEffect(diagnostic.effects, PROFILE_WHOLE_RESULT_EFFECTS),
+    );
+    const summaryEvidence = summary?.effectsByKind.find((item) => item.kind === kind);
+    const summaryImpact =
+      summaryEvidence !== undefined &&
+      hasEffect(summaryEvidence.effects, PROFILE_DATA_IMPACT_EFFECTS);
+    const summaryWhole =
+      summaryEvidence !== undefined &&
+      summaryEvidence.wholeResultUnavailable &&
+      hasEffect(summaryEvidence.effects, PROFILE_WHOLE_RESULT_EFFECTS);
+    const hasImpact = detailedImpact || summaryImpact;
+    const hasWholeResultEvidence = detailedWhole || summaryWhole;
+
+    if (status === "unavailable" && report[signal].length > 0) return false;
+    if (hasWholeResultEvidence && (status !== "unavailable" || report[signal].length > 0))
+      return false;
+    if (status === "complete" && (hasImpact || hasWholeResultEvidence)) return false;
+    if (status === "partial" && !hasImpact) return false;
+    if (status === "unavailable" && !hasWholeResultEvidence && !fixedDeliveryWithoutMeasurements)
+      return false;
+  }
+  if (
+    fixedDeliveryWithoutMeasurements &&
+    signals.some(
+      ([, signal]) => report.signalStatus[signal] !== "unavailable" || report[signal].length !== 0,
+    )
+  )
+    return false;
+  return true;
+}
+
 /** Validates and detaches a complete active ProfileReport without repairing invalid fields. */
 export function normalizeProfileReport(input: unknown): ProfileReport | null {
   try {
@@ -843,7 +982,9 @@ export function normalizeProfileReport(input: unknown): ProfileReport | null {
       histograms: histograms as ProfileHistogramPoint[],
       diagnostics,
     };
-    return samePlainValue(value, report) ? report : null;
+    return samePlainValue(value, report) && validateProfileReportRelationships(report)
+      ? report
+      : null;
   } catch {
     return null;
   }

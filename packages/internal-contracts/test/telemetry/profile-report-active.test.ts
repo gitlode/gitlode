@@ -158,6 +158,26 @@ describe("active ProfileReport contracts", () => {
     const { value: _value, ...missingValue } = report.counters[0]!;
     expect(normalizeProfileReport({ ...report, counters: [missingValue] })).toBeNull();
     expect(normalizeProfileReport({ ...report, unexpected: true })).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        signalStatus: { ...report.signalStatus, counters: "unavailable" },
+      }),
+    ).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        counters: [],
+        signalStatus: { ...report.signalStatus, counters: "unavailable" },
+      }),
+    ).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        counters: [],
+        signalStatus: { ...report.signalStatus, counters: "partial" },
+      }),
+    ).toBeNull();
   });
 
   it("accepts valid partial and fixed-fallback diagnostic variants but rejects malformed summaries", () => {
@@ -224,6 +244,40 @@ describe("active ProfileReport contracts", () => {
     expect(
       normalizeProfileReport({
         ...fallback,
+        diagnostics: [{ ...delivery, reportDelivery: null }, summary],
+      }),
+    ).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...fallback,
+        diagnostics: [{ ...delivery, effects: ["lifecycle_notice"] }, summary],
+      }),
+    ).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...fallback,
+        diagnostics: [
+          {
+            ...delivery,
+            target: {
+              type: "point",
+              scope: { name: "scope", version: null },
+              kind: "histogram",
+              name: "duration",
+              attributes: [],
+            },
+            signalCoverage: ["counter"],
+            effects: ["incomplete_measurement_fields"],
+            affectedFields: [{ kind: "span", fields: ["total"] }],
+            reportDelivery: null,
+          },
+          summary,
+        ],
+      }),
+    ).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...fallback,
         diagnostics: [{ ...summary, effects: [] }],
       }),
     ).toBeNull();
@@ -231,6 +285,108 @@ describe("active ProfileReport contracts", () => {
       normalizeProfileReport({
         ...fallback,
         diagnostics: [summary, delivery],
+      }),
+    ).toBeNull();
+  });
+
+  it("accepts legal kind subsets, broad targets and reserved-summary associations", () => {
+    const detailLoss = {
+      pointAttributes: false,
+      observationIdentity: false,
+      scopeIdentity: false,
+      attributeKey: false,
+      affectedFields: false,
+    };
+    const detail = {
+      code: "invalid_aggregation",
+      severity: "warning",
+      stage: "report_build",
+      target: { type: "scope", scope: { name: "scope", version: null } },
+      signalCoverage: ["counter", "histogram"],
+      effects: ["incomplete_measurement_fields"],
+      extent: "unidentified_subset",
+      attributeKey: { type: "not_applicable" },
+      affectedFields: [{ kind: "counter", fields: ["value"] }],
+      detailLoss,
+      lossQuantity: null,
+      wholeResultUnavailable: false,
+      count: 1,
+      countSaturated: false,
+      message: null,
+      reportDelivery: null,
+    };
+    const summary = {
+      code: "diagnostic_overflow",
+      severity: "warning",
+      stage: "report_build",
+      target: { type: "report" },
+      extent: "unidentified_subset",
+      effects: ["lost_issue_detail"],
+      signalCoverage: ["histogram"],
+      effectsByKind: [
+        {
+          kind: "histogram",
+          effects: ["missing_observations"],
+          wholeResultUnavailable: false,
+        },
+      ],
+      reportEffects: ["lifecycle_notice"],
+      detailLoss: {
+        pointAttributes: true,
+        observationIdentity: true,
+        scopeIdentity: true,
+        attributeKey: true,
+        affectedFields: true,
+      },
+      omittedOccurrences: 2,
+      countSaturated: false,
+      maximumSeverity: "warning",
+      priorIssueDetail: "retained",
+    };
+    const report = {
+      schemaVersion: 2,
+      signalStatus: { spans: "complete", counters: "partial", histograms: "partial" },
+      spans: [],
+      counters: [],
+      histograms: [],
+      diagnostics: [detail, summary],
+    };
+    expect(normalizeProfileReport(report)).toEqual(report);
+    expect(
+      normalizeProfileReport({
+        schemaVersion: 2,
+        signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
+        spans: [],
+        counters: [],
+        histograms: [],
+        diagnostics: [
+          {
+            ...detail,
+            target: { type: "report" },
+            signalCoverage: [],
+            effects: ["lifecycle_notice"],
+            affectedFields: [],
+          },
+        ],
+      }),
+    ).not.toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        diagnostics: [
+          {
+            ...detail,
+            effects: ["missing_observations"],
+            wholeResultUnavailable: true,
+          },
+          summary,
+        ],
+      }),
+    ).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        diagnostics: [detail, { ...summary, signalCoverage: ["counter", "histogram"] }],
       }),
     ).toBeNull();
   });

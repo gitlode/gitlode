@@ -1,7 +1,8 @@
-import type {
-  ProfileCounterPoint,
-  ProfileHistogramPoint,
-  ProfileSpanAggregate,
+import {
+  normalizeProfileReport,
+  type ProfileCounterPoint,
+  type ProfileHistogramPoint,
+  type ProfileSpanAggregate,
 } from "@gitlode/internal-contracts/telemetry";
 import { describe, expect, it } from "vitest";
 
@@ -576,6 +577,7 @@ describe("availability and fallback primitives", () => {
       priorIssueDetail: "unavailable",
       omittedOccurrences: null,
     });
+    expect(normalizeProfileReport(report)).toEqual(report);
     expect(structuredClone(report)).toEqual(report);
   });
 
@@ -591,6 +593,7 @@ describe("availability and fallback primitives", () => {
       omittedOccurrences: 1,
       maximumSeverity: "warning",
     });
+    expect(normalizeProfileReport(report)).toEqual(report);
   });
 
   it("distinguishes a trusted empty diagnostic snapshot from no snapshot", () => {

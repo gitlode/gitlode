@@ -487,7 +487,32 @@ describe("performance harness contracts", () => {
         ],
         counters: [],
         histograms: [],
-        diagnostics: [],
+        diagnostics: [
+          {
+            code: "invalid_aggregation",
+            severity: "warning",
+            stage: "report_build",
+            target: { type: "report" },
+            signalCoverage: ["span"],
+            effects: ["incomplete_measurement_fields"],
+            extent: "unidentified_subset",
+            attributeKey: { type: "not_applicable" },
+            affectedFields: [{ kind: "span", fields: ["calls"] }],
+            detailLoss: {
+              pointAttributes: false,
+              observationIdentity: false,
+              scopeIdentity: false,
+              attributeKey: false,
+              affectedFields: false,
+            },
+            lossQuantity: null,
+            wholeResultUnavailable: false,
+            count: 1,
+            countSaturated: false,
+            message: null,
+            reportDelivery: null,
+          },
+        ],
       }).totalEndedSpanCount,
     ).toMatchObject({ status: "unavailable" });
     expect(() => extractProfileReportMeasurements({ spans: [] })).toThrow(/invalid/);
@@ -542,9 +567,14 @@ describe("performance harness contracts", () => {
         }),
       ).status,
     ).toBe("inconclusive");
-    expect(evaluateRepositoryProfileReport(report({ diagnostics: [diagnostic] })).status).toBe(
-      "fail",
-    );
+    expect(
+      evaluateRepositoryProfileReport(
+        report({
+          signalStatus: { spans: "complete", counters: "partial", histograms: "complete" },
+          diagnostics: [diagnostic],
+        }),
+      ).status,
+    ).toBe("fail");
     expect(
       evaluateRepositoryProfileReport(
         report({
@@ -647,6 +677,11 @@ describe("performance harness contracts", () => {
     expect(
       evaluateRepositoryProfileReport(
         report({
+          signalStatus: {
+            spans: "unavailable",
+            counters: "unavailable",
+            histograms: "unavailable",
+          },
           diagnostics: [
             {
               ...diagnostic,
@@ -664,6 +699,49 @@ describe("performance harness contracts", () => {
         }),
       ).reasons,
     ).toContain("ProfileReport was delivered by the fixed fallback");
+
+    const counter = {
+      scope: { name: "scope", version: null },
+      name: "counter",
+      unit: "{item}",
+      attributes: [],
+      value: 1,
+      unavailableFields: [],
+    };
+    const contradictoryReports = [
+      report({
+        signalStatus: { spans: "complete", counters: "unavailable", histograms: "complete" },
+        counters: [counter],
+      }),
+      report({
+        signalStatus: { spans: "complete", counters: "unavailable", histograms: "complete" },
+      }),
+      report({
+        signalStatus: { spans: "complete", counters: "partial", histograms: "complete" },
+        diagnostics: [{ ...diagnostic, effects: ["report_delivery_failure"] }],
+      }),
+      report({
+        signalStatus: { spans: "partial", counters: "partial", histograms: "complete" },
+        diagnostics: [
+          {
+            ...diagnostic,
+            target: {
+              type: "point",
+              scope: { name: "scope", version: null },
+              kind: "histogram",
+              name: "duration",
+              attributes: [],
+            },
+            effects: ["incomplete_measurement_fields"],
+            affectedFields: [{ kind: "span", fields: ["total"] }],
+          },
+        ],
+      }),
+    ];
+    for (const contradictory of contradictoryReports) {
+      expect(evaluateRepositoryProfileReport(contradictory).status).toBe("inconclusive");
+      expect(() => extractProfileReportMeasurements(contradictory)).toThrow(/invalid/);
+    }
     expect(evaluateRepositoryProfileReport({ nope: true })).toMatchObject({
       status: "inconclusive",
       reasons: ["collector output has an invalid ProfileReport schema"],

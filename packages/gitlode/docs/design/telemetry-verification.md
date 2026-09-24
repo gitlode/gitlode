@@ -72,10 +72,15 @@ zero and retain a genuine zero-duration contribution. Report-builder isolation s
 throwing first/middle values and iterator failure, including honest exact versus unknown loss.
 
 Repository-consumer fixtures include complete normal, partial and fixed-fallback reports plus
-missing required fields, invalid field masks and malformed reserved summaries. Acceptance is based
-on complete shared-contract normalization before measurement extraction. An actual worker-thread
-entry/client test injects an invoked builder-body failure through an internal-only seam and verifies
-fallback serialization, ordinary result routing, application-result equivalence and finite cleanup.
+compacted producer output, missing required fields, invalid field masks and malformed reserved
+summaries. Relationship cases reject unavailable signals with values, unexplained partial or
+unavailable status, delivery effect/provenance mismatches, target/coverage/affected-field kind
+contradictions and summary-association bypasses. Legal empty signals, broad or multi-kind targets,
+detail loss, lifecycle-only notices and mixed-duration retained totals remain accepted. Acceptance
+is based on complete shared-contract normalization before measurement extraction. An actual
+worker-thread entry/client test injects an invoked builder-body failure through an internal-only seam
+and verifies fallback serialization, ordinary result routing, application-result equivalence and
+finite cleanup.
 
 Correction coverage also compares lifecycle-only and confirmed whole-signal-loss evidence before and
 after detailed-record compaction, rejects status/value contradictions without discarding retained

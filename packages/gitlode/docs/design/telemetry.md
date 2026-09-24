@@ -641,9 +641,15 @@ no knowledge of pipeline display order or particular span names.
 
 Formal repository and performance consumers validate the complete active report before extracting
 measurements or declaring it healthy. Validation covers every required measurement and diagnostic
-field, permitted masks and variants, finite values, collection bounds and the reserved-summary
-shape. It returns a detached canonical report only when the supplied value already has the same
-complete schema; malformed input is inconclusive rather than repaired into an accepted report.
+field, permitted masks and variants, finite values, collection bounds, the reserved-summary shape,
+and semantic relationships. An unavailable signal cannot retain measurements; partial/unavailable
+status requires data-impact evidence for that kind, with confirmed whole-result evidence or the
+fixed no-measurement delivery path required for unavailable. Observation/point and affected-field
+kinds must be covered by the diagnostic, while broad report/Scope and multi-kind coverage remain
+valid. Delivery-failure effects and fixed provenance are inseparable, and reserved-summary coverage
+must retain its per-kind associations. The validator returns a detached canonical report only when
+the supplied value already has the same complete schema; contradictions and malformed input are
+inconclusive rather than repaired into an accepted report.
 
 Presentation owns the declarative
 [`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog with group, preferred order, and

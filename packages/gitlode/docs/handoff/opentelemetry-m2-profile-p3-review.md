@@ -1,5 +1,9 @@
 # P3 independent presentation review
 
+Current assignment: [P3 correction round 1](opentelemetry-m2-profile-implementation.md#p3-correction-round-1).
+The independent review is complete with P3 corrections required. Preserve its evidence below;
+do not restart the original review or treat its accepted subparts as complete P3 acceptance.
+
 ## Fixed inputs and authority
 
 Review in a fresh human-started conversation on `feature/otel-redesign_M2_profile`.

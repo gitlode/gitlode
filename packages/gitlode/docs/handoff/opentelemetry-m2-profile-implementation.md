@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [independent P3 review](opentelemetry-m2-profile-p3-review.md).
-P3 returned at `5df4f49732d9ff49fef4067493d3152d276a792d`; it is not yet accepted. P1/P2 acceptance
-is maintained. Human terminal and cumulative validation gates remain open. Earlier packets are historical.
+Current assignment: [P3 correction round 1](#p3-correction-round-1).
+P3 review requires four bounded corrections. P1/P2 remain accepted; P3, human terminal confirmation
+and cumulative validation remain open. Earlier packets/outcomes are historical context.
 
 ## Assignment, source and branch
 
@@ -1451,3 +1451,76 @@ functional/package validation. Formal performance calibration/measurement, candi
 release acceptance and `tests/system` migration remain explicitly unstarted. Review the cumulative
 delta from entry `66acbfdffd8b4eae879c98709357763f85cac862` through the final outcome checkpoint;
 do not treat this implementation session as P3 or M2 acceptance.
+
+## P3 correction round 1
+
+### Entry and scope
+
+Continue `feature/otel-redesign_M2_profile` after independent review checkpoint
+`41a37e5385d2566f3db92e6b68021c5a0fedc8d0`. Fixed reviewed implementation:
+`5df4f49732d9ff49fef4067493d3152d276a792d`. Verify ancestry, clean entry and actual remote equality;
+record the exact entry including this planning packet. Later changes must be identified as routing
+only before proceeding. Remain on this child when returning; trunk is not a Git ref.
+
+Trunk adopts P3-R1 through R4 in the [review outcome](opentelemetry-m2-profile-p3-review.md#independent-review-outcome).
+This is P3's first correction round, separate from the completed P2 corrections. Preserve accepted
+P1/P2 and generic hierarchy/view-policy removal. Scope is presentation formatter/identity helpers,
+focused tests and directly affected documentation/catalog wording. No collector/schema, admission,
+public CLI option, dependency, threshold or styling-policy redesign. Existing design settles these
+issues; return any new design conflict rather than silently changing it.
+
+### Required corrections and independent regression expectations
+
+1. **P3-R1 ? collision-free Scope identity.** Group measurement and diagnostic scopes consistently
+   with nullable version equality and `compareProfileScopes`. Missing and present-empty versions must
+   remain separate, and embedded delimiters must not alias distinct admitted identities. Use a
+   structured collision-free key/equality, not a new string sentinel. Test same-name null/empty versions
+   together, both input orders, measurements and diagnostic-only targets, and delimiter-bearing tokens.
+   Preserve existing rendering (`@""` for present empty) and admission rules.
+2. **P3-R2 ? suffix escaping and missing-only retention.** Escape the complete displayed suffix before
+   decoration for measured and issue-only long names. Include newline, quotes, slash/backslash, C1,
+   bidi/line controls and delimiter punctuation with literal expected output independent of renderer
+   helpers. Build the accepted quoted absolute rows for malformed-dot diagnostic-only targets; do not
+   drop the target or notice because there is no measurement. Check empty-segment variants, ordinary
+   sibling ordering, namespace attribute base, and measured plus missing-only target combinations.
+   Plain and styled paths must retain exactly the same safe text and expected row boundaries.
+3. **P3-R3 ? loss meaning and deterministic diagnostic order.** Display known semantic loss quantities,
+   units and saturation without substituting diagnostic occurrences for lost measurements. Preserve
+   unknown-amount wording and existing duration-specific explanation without double-reporting it.
+   Cover current quantity descriptors, counts differing from occurrences, exact versus saturated,
+   and unknown values. Order by complete canonical retained target before code/stage/effect, then
+   deterministic retained selector/tie distinctions as defined by the design. Use typed comparisons
+   (kind, point attributes and nullable Scope version), not locale or producer arrival order. Test
+   opposed input orders with same code/stage but different targets/selectors/quantities. Do not invent
+   discarded target detail from a summary or synthesize totals from noncomposable losses.
+4. **P3-R4 ? semantic role completeness.** Derive Profile-level marker severity from highest retained
+   detailed/summary evidence; info-only uses default marker text. Keep fixed warning fallback behavior.
+   Style distinct-frequency digits with primaryValue and punctuation with separator. Style coverage
+   labels/counts/punctuation with fieldKey/primaryValue/separator. Extend role spies for info-only,
+   warning, compacted maximum severity, frequency and incomplete coverage. Verify identical plain
+   text after stripping ANSI and no domain-value styling; style-only fixes must not alter text.
+
+Add meaningful durable regression tests before production correction and record fail-before/pass-after
+for each group, including both R2 failure paths. A missing import/setup failure is not semantic
+regression evidence. Avoid tests whose expected tokens/order/roles are generated by production helpers.
+Keep previously accepted numeric masks, mixed-duration semantics, fallback, quiet/failed-run and
+shared application/progress style behavior covered by the existing affected suites.
+
+### Finite checks and return
+
+Run build:dev, the original P3 nine-suite command plus any new directly affected suites, its exact
+explicit strict tooling command (extend paths if new modules/tests require it), lint, format write/check
+and diff check. Architecture is needed if boundaries/exports change. Record actual counts/skips and
+separate TypeScript checks from Vitest execution. No full OS/package/formal performance campaign.
+
+Previously reproduced ordinary commit/file/plugin captures remain historical evidence, not proof of
+new boundary fixes. Reproduce the three small captures at most once after correction if needed to
+update representative output; preserve original source attribution and distinguish synthetic boundary
+cases. Do not rerun for timings or claim human light/dark/TTY acceptance. Return how later terminal
+confirmation can exercise the corrected output without a formal measurement workload.
+
+Commit/push meaningful progress normally to the child and verify actual remote equality. Append the
+four-group correction/test matrix, exact implementation/final OIDs, evidence changes, checks and
+remaining work here. Return for independent focused re-review; no self-acceptance, PR, merge, P3
+cumulative validation, tests/system move, candidate freeze or acceptance-record update. If scope/context
+requires continuation, return a clean committed incomplete checkpoint with finite remaining work.

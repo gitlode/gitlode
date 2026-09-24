@@ -644,12 +644,16 @@ measurements or declaring it healthy. Validation covers every required measureme
 field, permitted masks and variants, finite values, collection bounds, the reserved-summary shape,
 and semantic relationships. An unavailable signal cannot retain measurements; partial/unavailable
 status requires data-impact evidence for that kind, with confirmed whole-result evidence or the
-fixed no-measurement delivery path required for unavailable. Observation/point and affected-field
-kinds must be covered by the diagnostic, while broad report/Scope and multi-kind coverage remain
-valid. Delivery-failure effects and fixed provenance are inseparable, and reserved-summary coverage
-must retain its per-kind associations. The validator returns a detached canonical report only when
-the supplied value already has the same complete schema; contradictions and malformed input are
-inconclusive rather than repaired into an accepted report.
+fixed no-measurement delivery path required for unavailable. Whole-result evidence applies to the
+identified target: a lost point, observation, or Scope may coexist with retained siblings and a
+partial signal. Only a detailed exact report target with `entire_target` extent proves signal-wide
+loss for its covered kinds; a broadened report target or reserved-summary union cannot strengthen
+target-scoped evidence into that proof. Observation/point and affected-field kinds must be covered
+by the diagnostic, while broad report/Scope and multi-kind coverage remain valid. Delivery-failure
+effects and fixed provenance are inseparable, and reserved-summary coverage must retain its per-kind
+associations. The validator returns a detached canonical report only when the supplied value already
+has the same complete schema; contradictions and malformed input are inconclusive rather than
+repaired into an accepted report.
 
 Presentation owns the declarative
 [`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog with group, preferred order, and

@@ -289,6 +289,233 @@ describe("active ProfileReport contracts", () => {
     ).toBeNull();
   });
 
+  it("accepts target-scoped whole-result loss with retained siblings and after compaction", () => {
+    const detailLoss = {
+      pointAttributes: false,
+      observationIdentity: false,
+      scopeIdentity: false,
+      attributeKey: false,
+      affectedFields: false,
+    };
+    const detail = {
+      code: "invalid_aggregation",
+      severity: "warning",
+      stage: "report_build",
+      target: { type: "scope", scope: { name: "scope", version: null } },
+      signalCoverage: ["counter", "histogram"],
+      effects: ["incomplete_measurement_fields"],
+      extent: "unidentified_subset",
+      attributeKey: { type: "not_applicable" },
+      affectedFields: [{ kind: "counter", fields: ["value"] }],
+      detailLoss,
+      lossQuantity: null,
+      wholeResultUnavailable: false,
+      count: 1,
+      countSaturated: false,
+      message: null,
+      reportDelivery: null,
+    };
+    const summary = {
+      code: "diagnostic_overflow",
+      severity: "warning",
+      stage: "report_build",
+      target: { type: "report" },
+      extent: "unidentified_subset",
+      effects: ["lost_issue_detail"],
+      signalCoverage: ["histogram"],
+      effectsByKind: [
+        {
+          kind: "histogram",
+          effects: ["missing_observations"],
+          wholeResultUnavailable: false,
+        },
+      ],
+      reportEffects: ["lifecycle_notice"],
+      detailLoss: {
+        pointAttributes: true,
+        observationIdentity: true,
+        scopeIdentity: true,
+        attributeKey: true,
+        affectedFields: true,
+      },
+      omittedOccurrences: 2,
+      countSaturated: false,
+      maximumSeverity: "warning",
+      priorIssueDetail: "retained",
+    };
+    const report = {
+      schemaVersion: 2,
+      signalStatus: { spans: "complete", counters: "partial", histograms: "partial" },
+      spans: [],
+      counters: [],
+      histograms: [],
+      diagnostics: [detail, summary],
+    };
+    expect(normalizeProfileReport(report)).toEqual(report);
+    const wholeScopeLoss = {
+      ...detail,
+      signalCoverage: ["counter"],
+      effects: ["missing_observations"],
+      extent: "entire_target",
+      wholeResultUnavailable: true,
+    };
+    expect(
+      normalizeProfileReport({
+        ...report,
+        counters: [
+          {
+            scope: { name: "retained", version: null },
+            name: "count",
+            unit: "{item}",
+            attributes: [],
+            value: 1,
+            unavailableFields: [],
+          },
+        ],
+        signalStatus: { ...report.signalStatus, histograms: "complete" },
+        diagnostics: [wholeScopeLoss],
+      }),
+    ).not.toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        counters: [
+          {
+            scope: { name: "retained", version: null },
+            name: "count",
+            unit: "{item}",
+            attributes: [],
+            value: 1,
+            unavailableFields: [],
+          },
+        ],
+        signalStatus: { ...report.signalStatus, histograms: "complete" },
+        diagnostics: [
+          {
+            ...summary,
+            signalCoverage: ["counter"],
+            effectsByKind: [
+              {
+                kind: "counter",
+                effects: ["missing_observations"],
+                wholeResultUnavailable: true,
+              },
+            ],
+            reportEffects: [],
+          },
+        ],
+      }),
+    ).not.toBeNull();
+  });
+
+  it("preserves signal-status contradictions and the exact report-wide boundary", () => {
+    const detailLoss = {
+      pointAttributes: false,
+      observationIdentity: false,
+      scopeIdentity: false,
+      attributeKey: false,
+      affectedFields: false,
+    };
+    const detail = {
+      code: "invalid_aggregation",
+      severity: "warning",
+      stage: "report_build",
+      target: { type: "scope", scope: { name: "scope", version: null } },
+      signalCoverage: ["counter"],
+      effects: ["missing_observations"],
+      extent: "entire_target",
+      attributeKey: { type: "not_applicable" },
+      affectedFields: [],
+      detailLoss,
+      lossQuantity: null,
+      wholeResultUnavailable: true,
+      count: 1,
+      countSaturated: false,
+      message: null,
+      reportDelivery: null,
+    };
+    const retainedCounter = {
+      scope: { name: "retained", version: null },
+      name: "count",
+      unit: "{item}",
+      attributes: [],
+      value: 1,
+      unavailableFields: [],
+    };
+    const report = {
+      schemaVersion: 2,
+      signalStatus: { spans: "complete", counters: "partial", histograms: "complete" },
+      spans: [],
+      counters: [retainedCounter],
+      histograms: [],
+      diagnostics: [detail],
+    };
+    expect(normalizeProfileReport(report)).not.toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        diagnostics: [{ ...detail, target: { type: "report" } }],
+      }),
+    ).toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        diagnostics: [
+          {
+            ...detail,
+            target: { type: "report" },
+            extent: "unidentified_subset",
+            detailLoss: { ...detailLoss, scopeIdentity: true },
+          },
+        ],
+      }),
+    ).not.toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        counters: [],
+        signalStatus: { ...report.signalStatus, counters: "unavailable" },
+      }),
+    ).not.toBeNull();
+    expect(
+      normalizeProfileReport({
+        ...report,
+        counters: [],
+        signalStatus: { ...report.signalStatus, counters: "unavailable" },
+        diagnostics: [
+          {
+            code: "diagnostic_overflow",
+            severity: "warning",
+            stage: "report_build",
+            target: { type: "report" },
+            extent: "unidentified_subset",
+            effects: ["lost_issue_detail"],
+            signalCoverage: ["counter"],
+            effectsByKind: [
+              {
+                kind: "counter",
+                effects: ["missing_observations"],
+                wholeResultUnavailable: true,
+              },
+            ],
+            reportEffects: [],
+            detailLoss: {
+              pointAttributes: true,
+              observationIdentity: true,
+              scopeIdentity: true,
+              attributeKey: true,
+              affectedFields: true,
+            },
+            omittedOccurrences: 1,
+            countSaturated: false,
+            maximumSeverity: "warning",
+            priorIssueDetail: "retained",
+          },
+        ],
+      }),
+    ).not.toBeNull();
+  });
+
   it("accepts legal kind subsets, broad targets and reserved-summary associations", () => {
     const detailLoss = {
       pointAttributes: false,
@@ -370,19 +597,6 @@ describe("active ProfileReport contracts", () => {
         ],
       }),
     ).not.toBeNull();
-    expect(
-      normalizeProfileReport({
-        ...report,
-        diagnostics: [
-          {
-            ...detail,
-            effects: ["missing_observations"],
-            wholeResultUnavailable: true,
-          },
-          summary,
-        ],
-      }),
-    ).toBeNull();
     expect(
       normalizeProfileReport({
         ...report,

@@ -885,6 +885,14 @@ function validateProfileReportRelationships(report: ProfileReport): boolean {
         diagnostic.wholeResultUnavailable &&
         hasEffect(diagnostic.effects, PROFILE_WHOLE_RESULT_EFFECTS),
     );
+    const detailedSignalWideLoss = details.some(
+      (diagnostic) =>
+        diagnostic.target.type === "report" &&
+        diagnostic.extent === "entire_target" &&
+        diagnostic.signalCoverage.includes(kind) &&
+        diagnostic.wholeResultUnavailable &&
+        hasEffect(diagnostic.effects, PROFILE_WHOLE_RESULT_EFFECTS),
+    );
     const summaryEvidence = summary?.effectsByKind.find((item) => item.kind === kind);
     const summaryImpact =
       summaryEvidence !== undefined &&
@@ -897,8 +905,7 @@ function validateProfileReportRelationships(report: ProfileReport): boolean {
     const hasWholeResultEvidence = detailedWhole || summaryWhole;
 
     if (status === "unavailable" && report[signal].length > 0) return false;
-    if (hasWholeResultEvidence && (status !== "unavailable" || report[signal].length > 0))
-      return false;
+    if (detailedSignalWideLoss && status !== "unavailable") return false;
     if (status === "complete" && (hasImpact || hasWholeResultEvidence)) return false;
     if (status === "partial" && !hasImpact) return false;
     if (status === "unavailable" && !hasWholeResultEvidence && !fixedDeliveryWithoutMeasurements)

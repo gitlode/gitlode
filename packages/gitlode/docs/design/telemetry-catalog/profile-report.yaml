@@ -340,6 +340,7 @@ types:
           - "null"
       wholeResultUnavailable:
         type: boolean
+        meaning: confirmed failure to obtain or safely supply the entire identified target result
       count:
         type: positive_safe_integer
       countSaturated:
@@ -389,6 +390,8 @@ types:
       - an observation or point target kind is included in signalCoverage
       - every affectedFields kind is included in signalCoverage
       - wholeResultUnavailable requires missing_observations or unknown_collection_coverage
+      - wholeResultUnavailable is target-scoped and does not by itself prove that every target of a covered kind is unavailable
+      - only an exact detailed report target with entire_target extent and wholeResultUnavailable proves signal-wide loss for its covered kinds
       - report_delivery_failure is present if and only if fixed reportDelivery provenance is present
 
   ProfileDiagnosticSummary:
@@ -415,6 +418,7 @@ types:
     invariants:
       - signalCoverage contains exactly the unique kinds represented by effectsByKind
       - wholeResultUnavailable in effectsByKind requires missing_observations or unknown_collection_coverage for that kind
+      - summarized wholeResultUnavailable is an existential union after target identity was discarded and cannot prove signal-wide loss
       - reportEffects is report-wide evidence and does not explain an individual signal status
       - report_delivery_failure is retained as the mandatory detailed provenance record and is not represented only by this summary
 

@@ -1,5 +1,6 @@
 import {
   getTelemetryMetricMetadata,
+  normalizeProfileReport,
   PROFILE_COLLECTION_LIMITS,
   TELEMETRY_METRICS,
 } from "@gitlode/internal-contracts/telemetry";
@@ -1092,6 +1093,49 @@ describe("profile report builder", () => {
       expect.objectContaining({ code: "invalid_aggregation", signalCoverage: ["counter"] }),
     ]);
   });
+
+  test.each([false, true])(
+    "retains a sibling when whole-target Counter loss is %s",
+    (compacted) => {
+      const diagnostics = new BoundedDiagnosticAccumulator();
+      if (compacted) {
+        for (let index = 0; index < 15; index += 1) {
+          diagnostics.add({
+            code: "lifecycle_failure",
+            stage: "telemetry_shutdown",
+            target: { type: "observation", scope, kind: "span", name: `notice-${index}` },
+            signalCoverage: ["span"],
+            effects: ["lifecycle_notice"],
+            extent: "unidentified_subset",
+          });
+        }
+      }
+      diagnostics.add({
+        code: "invalid_aggregation",
+        stage: "metric_collection",
+        target: {
+          type: "point",
+          scope,
+          kind: "counter",
+          name: "lost",
+          attributes: [],
+        },
+        signalCoverage: ["counter"],
+        effects: ["missing_observations"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      });
+      const report = new ProfileReportBuilder(diagnostics).build({
+        spans: { status: "complete", values: [] },
+        counters: { status: "complete", values: [counter("retained")] },
+        histograms: { status: "complete", values: [] },
+      });
+
+      expect(report.signalStatus.counters).toBe("partial");
+      expect(report.counters.map((point) => point.name)).toEqual(["retained"]);
+      expect(normalizeProfileReport(report)).toEqual(report);
+    },
+  );
 
   test("isolates throwing values and separately reports unknown iterator loss", () => {
     const throwing = counter("throwing") as ProfileCounterPoint & { value: number };

@@ -174,7 +174,7 @@ export interface ProfileDiagnostic {
   readonly affectedFields: readonly ProfileAffectedFields[];
   readonly detailLoss: ProfileDetailLossMask;
   readonly lossQuantity: ProfileLossQuantity | null;
-  /** Confirmed failure to obtain or safely supply the entire covered signal result. */
+  /** Confirmed failure to obtain or safely supply the entire identified target result. */
   readonly wholeResultUnavailable: boolean;
   readonly count: number;
   readonly countSaturated: boolean;

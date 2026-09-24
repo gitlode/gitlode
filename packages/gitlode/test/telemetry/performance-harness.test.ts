@@ -7,6 +7,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  BoundedDiagnosticAccumulator,
+  ProfileReportBuilder,
+} from "../../src/execution/telemetry/index.js";
+import {
   comparePerformanceBehavior,
   normalizePerformanceFilename,
 } from "../support/performance-equivalence.js";
@@ -517,6 +521,64 @@ describe("performance harness contracts", () => {
     ).toMatchObject({ status: "unavailable" });
     expect(() => extractProfileReportMeasurements({ spans: [] })).toThrow(/invalid/);
   });
+  it.each([false, true])(
+    "extracts retained sibling measurements and fails formal acceptance after whole-target loss (compacted: %s)",
+    (compacted) => {
+      const scope = { name: "scope", version: null } as const;
+      const diagnostics = new BoundedDiagnosticAccumulator();
+      if (compacted) {
+        for (let index = 0; index < 15; index += 1) {
+          diagnostics.add({
+            code: "lifecycle_failure",
+            stage: "telemetry_shutdown",
+            target: { type: "observation", scope, kind: "span", name: `notice-${index}` },
+            signalCoverage: ["span"],
+            effects: ["lifecycle_notice"],
+            extent: "unidentified_subset",
+          });
+        }
+      }
+      diagnostics.add({
+        code: "invalid_aggregation",
+        stage: "metric_collection",
+        target: {
+          type: "point",
+          scope,
+          kind: "counter",
+          name: "lost",
+          attributes: [],
+        },
+        signalCoverage: ["counter"],
+        effects: ["missing_observations"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      });
+      const report = new ProfileReportBuilder(diagnostics).build({
+        spans: { status: "complete", values: [] },
+        counters: {
+          status: "complete",
+          values: [
+            {
+              scope,
+              name: "retained",
+              unit: "{item}",
+              attributes: [],
+              value: 1,
+              unavailableFields: [],
+            },
+          ],
+        },
+        histograms: { status: "complete", values: [] },
+      });
+
+      expect(report.signalStatus.counters).toBe("partial");
+      expect(extractProfileReportMeasurements(report).counterDatapointCount).toEqual({
+        status: "available",
+        value: 1,
+      });
+      expect(evaluateRepositoryProfileReport(report).status).toBe("fail");
+    },
+  );
   it("formally evaluates repository reports without leaking malformed input", () => {
     const report = (overrides: Record<string, unknown> = {}) => ({
       schemaVersion: 2,

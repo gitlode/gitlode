@@ -1,5 +1,10 @@
 # P2 independent data-integrity and failure-isolation review
 
+Current assignment: [P2 correction round 1](opentelemetry-m2-profile-implementation.md#p2-correction-round-1).
+The review is complete; the outcome below is preserved as review evidence. Trunk does not adopt
+P2-R1's blanket total/max unavailability: the accepted design explicitly permits retained mixed-validity
+total/max with an incompleteness notice. See the correction packet for the binding disposition.
+
 ## Fixed scope and authority
 
 Review in a new human-started conversation on `feature/otel-redesign_M2_profile`.

@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [independent P2-R review](opentelemetry-m2-profile-p2-review.md).
-P2 returned at `57ba7537068b00002b2618b2f4a364f9468365c7`; it is not yet accepted. P1 acceptance
-remains unchanged. Earlier assignments are historical context; P3 is not assigned.
+Current assignment: [P2 correction round 1](#p2-correction-round-1). P2 remains unaccepted;
+P3 is unassigned. Read trunk's qualification of P2-R1 before applying the review's suggested fix.
+Earlier assignments/outcomes are historical context.
 
 ## Assignment, source and branch
 
@@ -599,3 +599,83 @@ self-accepted.
 - P3 still owns the accepted generic Scope/namespace renderer, final style mapping and removal of
   `profile-view.ts` per-observation grouping/order policy, followed by its cumulative validation. No
   P3 implementation is present in this outcome.
+
+## P2 correction round 1
+
+### Entry and trunk disposition
+
+Continue `feature/otel-redesign_M2_profile` after review checkpoint
+`b9a50f2dae9cddc824ac36ab9976aca11df7cdf3`. Fixed reviewed implementation:
+`57ba7537068b00002b2618b2f4a364f9468365c7`. Verify clean status, ancestry, local/actual remote equality
+and that later entry changes contain only this planning packet. Record the full entry OID. Do not
+reset or update parent branches. This is P2's first correction round; accepted P1 is preserved.
+
+Read the [review outcome](opentelemetry-m2-profile-p2-review.md#outcome), but apply this disposition:
+
+- P2-R2, R3 and R4 are accepted correction requirements.
+- **P2-R1's proposed blanket total/max unavailability is not adopted.** The human-approved design's
+  sections 5 and 10 explicitly retain mixed-validity total/max with an incompleteness notice; its
+  two-call example displays the retained 10 ms total/max and unavailable average. The review conflates
+  an available retained number with an exact whole-run total. Do not silently change that agreement.
+  Verify/fix the actual producer-to-consumer quality explanation and all-invalid behavior instead.
+  Any contradictory canonical wording must be reconciled to that accepted design, not the inverse.
+- Actual fixed-fallback worker-thread transport remains a required missing P2 proof, separate from
+  the implementation findings. A structuredClone or direct session test alone is insufficient.
+
+### Bounded correction and evidence
+
+1. **P2-R1 qualification: duration quality.** For mixed valid/invalid contributions preserve retained
+   total/max, make average unavailable when coverage differs, preserve calls/errors and disclose
+   omitted durations. All-invalid duration defaults must not appear as observed zero: affected
+   duration fields are unavailable, while a genuine zero-duration contribution stays valid. Verify
+   both input orders and diagnostic retention/overflow using real Span processor output through
+   builder and bridge/tool interpretation. Confirm notices/effect summaries cannot silently imply
+   completeness when details compact. Correct masks or notification propagation only where the
+   accepted rule is violated. Record if a reviewed counterexample already behaves as designed;
+   do not manufacture a failing regression by adopting the rejected blanket rule.
+2. **P2-R2: per-value isolation and honest loss.** Isolate each normalization call so a throwing
+   point/getter cannot skip later safely processable array siblings. Handle iterator failure separately:
+   preserve safely obtained values, do not retry an untrusted failing iterator or claim an exact count
+   of unknown remaining loss. Tests cover throwing-first/middle points, valid siblings, iterator
+   failure and correct target/extent/quantity evidence, without catastrophic report fallback.
+3. **P2-R3: retain safely known metric identity.** After validated Scope/instrument/attributes,
+   point invalidity and retention overflow must carry the narrowest safe target. Invalid attributes
+   can justify observation-level broadening, not erasure of independently valid Scope/name. Preserve
+   key distinctions when safely known and use the existing budget broadening rules. Test Counter and
+   Histogram invalid values, attribute failure and overflow, asserting targets, effects, extent and
+   quantities. Do not expand catalog admission or invent identities from unvalidated payloads.
+4. **P2-R4: full report validation before acceptance.** Validate the complete active bounded schema
+   before repository/performance extraction or healthy acceptance. Cover required record fields,
+   permitted masks, finite values, statuses, diagnostic variants and reserved-summary structure/bounds.
+   A malformed report must be fail-closed/inconclusive, not repaired into an accepted report by lossy
+   normalization. Reuse pure contracts where suitable; avoid divergent duplicated schema definitions.
+   Add independent adversarial fixtures for the reported minimal Counter, malformed masks, missing
+   fields and malformed summaries, plus valid normal/partial/fallback reports to prevent over-rejection.
+   Preserve thresholds, historical artifact schemas and the blocked acceptance record.
+5. **Transport proof.** Add a bounded actual worker-entry/client test that induces real invoked
+   builder-body failure and receives schema 2 fallback with mandatory delivery provenance. Verify
+   unchanged application result content/classification (reference identity cannot cross serialization),
+   normal message routing and cleanup. Use an internal test seam/fixture, no public failure flag or
+   alternate production message path. Keep timeout finite and ensure the worker is stopped on failure.
+
+For actual defects, demonstrate new tests fail before the correction and pass after it; distinguish
+these from already-passing contract clarification cases. Preserve P1 bounds/identity, status/value
+validation recovery, lifecycle/fallback and no-op contracts. Limit changes to the affected producer,
+builder, consumer validation, transport test seam/tests and directly affected canonical documentation.
+No P3 layout/style work, test relocation or broad refactoring. If a new product choice is necessary,
+return the concrete issue rather than changing the agreed display or loss semantics.
+
+### Verification and exit
+
+Run build:dev, the P2-R packet's 16 affected suites plus presenter.test.ts, new regression/transport
+suites, changed-tooling strict TypeScript check, lint, architecture, format write/check and diff check.
+Record exact commands, actual counts, platform skips and source/test typechecking scope separately.
+Existing Linux-only supervision skips do not require a new campaign unless a correction changes that
+path. No full OS/package matrix, formal performance run or release/publish command is assigned.
+
+Save meaningful checkpoint commits and normally push to this child, verifying actual remote OID.
+If continuation is needed, return committed progress and finite remaining work; do not mark P2 accepted.
+Append an outcome here with correction/finding/test matrix, explicit R1 disposition and transport
+proof, implementation/final OIDs and clean/remote status. Trunk assigns independent focused re-review.
+Do not start P3, PR, merge, freeze or acceptance updates. Repeated correction failure follows the
+existing bounded correction/diagnosis policy.

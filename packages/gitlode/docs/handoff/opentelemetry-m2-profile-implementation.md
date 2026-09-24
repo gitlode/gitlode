@@ -851,3 +851,75 @@ implementation/final OIDs, test results and unresolved issues to this handoff. R
 focused R4 re-review; do not self-accept P2 or start P3/PR/merge. If this second correction round still
 leaves the same validator issue unresolved, the next step is a fresh bounded diagnosis session under
 the collaboration policy, not an automatic third local correction round.
+
+### P2 R4 correction round 2 outcome
+
+R4 correction round 2 is implemented on `feature/otel-redesign_M2_profile` and is returned for
+independent focused re-review. P2 is not self-accepted. P3, PR creation, merge, formal performance
+measurement, candidate freeze and acceptance-record work were not started.
+
+#### Provenance and checkpoints
+
+- Entry was clean at `0595eeae51edfd3e4ce7bb1daad89f861761e240`; local and actual remote
+  `feature/otel-redesign_M2_profile` agreed. Review checkpoint
+  `5ba4de18d485c0092db1ef09ff5e54acbee96433` and reviewed implementation
+  `5bc2cf3c0910a5dc591ae53db05ca846f610cd05` are ancestors; the later entry delta was the assigned
+  routing/handoff documentation only.
+- Implementation checkpoint: `477fde1e7407ed9c63835541a32cde4bb8a987ae`
+  (`fix: validate profile report relationships`). The documentation checkpoint containing this
+  outcome is the returned branch tip and is normally pushed to the same child; no parent branch or
+  integration ref is updated.
+
+#### R4 correction and preservation
+
+- The invariant/check/test matrix above was completed before source changes. No accepted contract
+  conflict was found.
+- `normalizeProfileReport()` still performs bounded structural normalization, canonical detachment
+  and exact plain-value equality first. A pure relationship pass then rejects status/array/evidence
+  contradictions, kind mismatches among exact targets, coverage and affected fields, invalid
+  whole-result associations, delivery effect/provenance mismatches and reserved-summary association
+  bypasses. It does not repair or discard untrusted input.
+- Partial/unavailable explanation is indexed by affected kind and data-impact effect. Unavailable
+  additionally requires confirmed whole-result evidence, except for the exact fixed fallback with
+  no supplied measurement results. Lifecycle-only and report-only evidence cannot explain data loss.
+- Broad report/Scope targets, multi-kind coverage, complete-empty and justified partial-empty
+  reports, detail loss, 15+1 compaction, fixed fallback, shutdown-only notices and retained
+  mixed-duration total/maximum with unavailable average remain accepted. Unknown prior-detail
+  provenance is disclosure, not fabricated signal evidence.
+- Formal extraction/evaluation continues to call the shared validator before consuming values. The
+  four review counterexamples, the reverse delivery association and partial-without-explanation now
+  fail closed at both the contract and formal-consumer boundaries.
+- No producer, builder, accumulator, worker/session, transport, presentation, threshold, historical
+  artifact, blocked acceptance record, package manifest, dependency or public API changed. Accepted
+  R1 under trunk's duration qualification, R2, R3 and actual worker transport are preserved and were
+  not reopened.
+
+#### Fail-before and pass-after evidence
+
+- Against detached start checkpoint `0595eea`, an inline probe independently returned accepted for
+  all six contradictions: unavailable Counter with a retained point, unexplained unavailable,
+  unexplained partial, delivery effect without provenance, provenance without the delivery effect,
+  and Histogram point/Counter coverage/Span affected-field mismatch. The temporary worktree and
+  probe were removed after the run.
+- The first durable-test run before the source correction failed 3 of 8 grouped active-contract
+  tests at the expected relationship assertions. After implementation, the active-contract suite
+  passed 8 of 8 and the independent fixtures remain in the committed test.
+- `npm run build:dev`: passed. Changed production TypeScript is in the strict internal-contracts
+  production project.
+- Focused required command over active-report contract, local collection, report primitives, worker
+  lifecycle, performance harness and repository sidecar: 6 files and 140 tests passed, no skips.
+- Additional directly affected catalog contract: 1 file and 11 tests passed, no skips.
+- Exact round-1 tooling check passed:
+  `npx tsc --ignoreConfig --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --types node --skipLibCheck packages/gitlode/test/support/js-yaml.d.ts packages/gitlode/test/support/performance-harness.ts packages/gitlode/test/support/telemetry-catalog.ts`.
+  This is tooling-source evidence; Vitest is not claimed to typecheck test sources.
+- `npm run lint`, `npm run format:write`, `npm run format:check` and `git diff --check`: passed.
+  Architecture check was not run because no export, import boundary or dependency changed.
+- No accepted transport-test repetition, full OS/package/release matrix, formal performance run or
+  publish/release command was run. There were no platform skips in the assigned focused suites.
+
+#### Independent re-review return
+
+Re-review the returned tip for P2-R4-C1 only: shared-validator relationship totality, kind/effect
+association, fixed-delivery exception, legal broad/multi-kind and compacted evidence, and formal
+consumer fail-closed behavior. No unresolved implementation issue is known, but P2 remains
+unaccepted until that independent review. P3 remains unassigned.

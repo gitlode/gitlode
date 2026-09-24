@@ -208,10 +208,12 @@ P1 implemented on `feature/otel-redesign_M2_profile`; P2 and PR creation were no
 
 ### Verification and residual runtime evidence
 
-The P1 focused suites use checked TypeScript and independent literal cases; no pre-existing
-`noCheck` test is claimed as strict type evidence. The focused/affected run covered 7 files and 107
-tests: active profile contract/normalization, candidate v2 contract, candidate primitives, local
-collection, worker session, and catalog contract.
+The P1 production modules are compiled by the strict production TypeScript projects. The focused
+test sources are executed by Vitest but do not have standalone checked-TypeScript evidence:
+`packages/gitlode/tsconfig.tooling.json` sets `noCheck: true`, and the internal-contracts production
+project excludes its test sources. The focused/affected run covered 7 files and 107 tests: active
+profile contract/normalization, candidate v2 contract, candidate primitives, local collection,
+worker session, and catalog contract.
 
 Final commands:
 

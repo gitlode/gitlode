@@ -85,4 +85,69 @@ profile completion, a measurement freeze or M2 acceptance.
 
 ## Outcome
 
-Pending independent review.
+Corrections required for P1. This is not P2 authorization or a runtime/M2 acceptance decision.
+
+### Reviewed state
+
+- Fixed base: `12b43f911ff9d9e1c9ecab09faa0148b3db2dbe6`.
+- Fixed implementation target: `a9a48137cdcd222ba63cd0cf0459f867fa386718`.
+- Entry local/remote child-branch tip: `ae9ce5fcbe3fc2d4eb43cc9d960d3c32a456d85f`;
+  the target-to-entry delta contained only the assigned review/handoff documentation.
+- Entry worktree was clean. The active schema, collectors, worker session, presentation and
+  performance path remain v1 as required.
+
+### Mandatory findings
+
+1. **Lifecycle-only compaction can invent whole-signal data loss.**
+   `mergeIntoSummary()` copies the caller's `wholeResultUnavailable` flag for every covered kind
+   without checking the issue effects. `deriveProfileSignalStatusV2()` then applies that flag
+   without checking effects. A `lifecycle_notice` for Counter with the flag set leaves Counter
+   `complete` while retained as a detailed record, but the same record becomes Counter
+   `unavailable` when it is the sixteenth identity and is compacted. This violates the accepted
+   requirements that lifecycle-only issues not invent data loss and that compaction preserve
+   semantics. Validate the association between confirmed whole-result evidence and collection/data
+   effects, and make the evidence independent of whether the diagnostic is retained or summarized.
+
+2. **Conflicting status/value evidence is silently rewritten without the required validation
+   issue.** `deriveProfileSignalStatusV2()` changes an `unavailable` signal with a nonzero retained
+   value count to `partial`, but it neither requires validated evidence nor returns/records the
+   report-validation issue required by the accepted contract. An accumulator-issued empty snapshot,
+   `{ spans: "unavailable" }`, and `spans: 1` therefore produce `partial` with no diagnostic or
+   summary. Keep the retained value, but reject the contradictory evidence or produce a bounded
+   validation diagnostic so every non-complete result remains explained.
+
+3. **Safe-integer saturation is reported at the exact boundary.** `saturatingAdd()` uses
+   `left >= MAXIMUM_COUNT - right`; merging an omitted diagnostic whose count is exactly
+   `Number.MAX_SAFE_INTEGER` into a zero-count summary returns the exact value but sets
+   `countSaturated: true`. The flag must indicate actual clamping, not an exact representable sum.
+   Use a strict overflow comparison and retain prior saturation state.
+
+4. **Malformed semantic fields are converted into false exact evidence.**
+   `normalizeDetailLoss()` treats every supplied non-`true` value as `false`, so, for example,
+   `{ attributeKey: "invalid" }` is retained as an exact claim that no attribute-key detail was
+   lost. Separately, an explicitly invalid diagnostic count such as `0` is normalized to occurrence
+   count `1`, indistinguishable from the intentional omitted-count default. This conflicts with the
+   P1 invalid-payload and fixed-mask/count invariants. Validate supplied mask members and supplied
+   counts; route malformed input to bounded invalid-aggregation evidence (or conservatively disclose
+   loss) instead of manufacturing exact values.
+
+The focused tests do not cover these counterexamples. They also do not directly establish bounded
+pre-identity work: a probe with 100,000 duplicate kind entries caused 100,000 indexed reads before
+canonicalization. The retained set is fixed-size, so this is an evidence/hardening gap rather than a
+separate finding, but correction tests should cover work before final serialized-length assertions.
+
+### Independent evidence
+
+- `git diff --check 12b43f9..a9a4813`: passed.
+- `npm run build:dev`: passed; this strictly compiles production `src` projects.
+- The assigned seven-file Vitest command: 7 files and 107 tests passed.
+- The focused test sources were not independently typechecked. The gitlode tooling project has
+  `noCheck: true`, and the internal-contracts production project excludes tests. The implementation
+  handoff was corrected to remove the unsupported checked-suite claim.
+- Read-only built-module probes reproduced all four failure paths above. The focused fallback test
+  confirmed that an untrusted getter payload is not read. Implementer-reported lint and architecture
+  checks were inspected but not independently rerun in this review.
+
+Residual real-builder failure, worker transport, presentation, simultaneous shutdown,
+finalization-idempotence and active-v1 behavior evidence remains deliberately assigned to P2; none
+of it changes the P1 corrections-required decision.

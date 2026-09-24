@@ -1,8 +1,8 @@
 # P2 independent data-integrity and failure-isolation review
 
-Current assignment: [correction round 1 focused re-review](#correction-round-1-focused-re-review).
-The original outcome is preserved below. Apply trunk's R1 qualification from the correction packet:
-mixed-validity total/max remain displayable with an incompleteness notice, not blanket unavailability.
+Review complete: R1 (trunk-qualified), R2, R3 and transport accepted; R4 remains open.
+Current assignment: [P2 R4 correction round 2](opentelemetry-m2-profile-implementation.md#p2-r4-correction-round-2).
+Earlier review packets and outcomes below are historical evidence, not instructions to repeat them.
 
 ## Fixed scope and authority
 

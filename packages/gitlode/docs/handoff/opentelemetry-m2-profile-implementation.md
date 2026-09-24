@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P2 correction focused re-review](opentelemetry-m2-profile-p2-review.md#correction-round-1-focused-re-review).
-Correction round 1 returned at `5bc2cf3c0910a5dc591ae53db05ca846f610cd05`. P2 remains unaccepted;
-P3 is unassigned. Earlier assignments/outcomes are historical context.
+Current assignment: [P2 R4 correction round 2](#p2-r4-correction-round-2).
+R1 (trunk-qualified), R2, R3 and actual worker transport are accepted at 5bc2cf3. R4 remains open;
+P2 is unaccepted and P3 unassigned. Earlier assignments are historical context.
 
 ## Assignment, source and branch
 
@@ -757,3 +757,81 @@ Re-review the final correction target plus this outcome, especially the shared t
 diagnostic/summary acceptance, iterator unknown-loss evidence, point-to-observation broadening,
 mixed-duration effect-summary behavior and the internal worker seam remaining unreachable from the
 public request contract. P2 remains unaccepted until that independent review. P3 remains unassigned.
+
+## P2 R4 correction round 2
+
+### Fixed entry and disposition
+
+Continue `feature/otel-redesign_M2_profile` after review checkpoint
+`5ba4de18d485c0092db1ef09ff5e54acbee96433`. Reviewed implementation:
+`5bc2cf3c0910a5dc591ae53db05ca846f610cd05`. Verify clean status, ancestry and actual remote equality;
+record the exact entry including this documentation packet. No reset or parent branch updates.
+
+Trunk accepts P2-R4-C1 as a required correction. R1 under trunk's duration qualification, R2, R3 and
+actual worker transport remain accepted. Do not reopen their implementations without a concrete
+regression. The four newly probed contradictions do not currently become healthy evaluator passes:
+they are independently rejected by status/diagnostic policy. The remaining defect is that the shared
+complete-schema validator accepts contradictory inputs and extraction can consume them. Preserve
+this distinction in reporting; do not exaggerate current publish exposure.
+
+### Reconcile contracts before coding
+
+Create a concise invariant-to-check-to-test matrix in this handoff before implementing. Derive it
+from the accepted profile design, active report catalog, diagnostic types and real producers. Cover
+report status/arrays/explanation, diagnostic target/coverage/affected fields, effects/whole-result
+flags, fixed delivery provenance, and per-kind/overall summary associations. Include legal boundary
+cases, not just the four negative examples. This is a bounded inventory of existing relationships,
+not authorization to invent new telemetry obligations or redesign producers.
+
+If actual accepted contracts conflict, return the precise alternatives to trunk before changing them.
+Unknown/lost detail must remain different from absent or not-applicable detail. Broad report/Scope
+and multi-kind diagnostics are legal where evidenced. Do not demand exact target/coverage equality
+when the contract permits broadening or subsets. A compacted summary's per-kind evidence and unknown
+prior-detail provenance cannot be treated as an ordinary detailed diagnostic or fabricated explanation.
+
+### Implementation and regression scope
+
+Correct only the shared active report validator and directly affected contract/consumer tests and
+documentation. Add pure relationship checks after structural normalization and before accepting the
+report. Remain total/fail-closed for untrusted input; reject contradictions rather than repairing or
+silently dropping them. Preserve canonical detachment/equality, bounds and valid producer acceptance.
+
+Required negative cases, each independently demonstrated against the pre-correction implementation:
+
+- unavailable signal with retained measurements;
+- unavailable signal without explanatory evidence (also cover partial with missing explanation);
+- report-delivery failure effect without required delivery provenance, and the reverse association;
+- contradictory point/observation kind, signal coverage and affected-field kind.
+
+Validate evidence by affected kind and effect, not merely the presence of any diagnostic. Unrelated
+lifecycle notices must not explain arbitrary collection loss. Apply the catalog's overflow exception
+through legitimate reserved-summary semantics, preserving legal compacted evidence and fallback's
+report-delivery explanation. Check summary associations in the same finite matrix so the fix does
+not leave an equivalent bypass through a different representation.
+
+Positive tests must include actual normal, partial, compacted and fixed-fallback producer output,
+complete empty reports, partial empty reports where justified, multi-kind/broadened targets, detail
+loss, and retained mixed-duration totals with unavailable averages. Keep shutdown-only notices from
+inventing data loss. Use independent expected relationships, not a test oracle derived solely from
+validator constants. Formal consumers must reject malformed reports before extraction; verify the
+four original cases and valid producer reports at the validator and consumer boundaries.
+
+No weakening thresholds, historical artifact changes, blocked-record update, P3 layout, new public
+API or dependency restructuring. If a valid existing producer contradicts a proposed rule, determine
+whether the rule is too strong before changing that accepted producer; return any necessary scope
+expansion with concrete evidence.
+
+### Finite checks and return
+
+Run build:dev; focused active-report contract, local collection, primitives, worker lifecycle,
+performance-harness and repository-sidecar tests; the exact strict tooling check from round 1;
+lint, format write/check and diff check. Include additional affected suites only for actual changed
+paths. Architecture check is needed if exports/dependencies change. No full OS/package matrix,
+formal measurement or repetition of the accepted transport test solely for a matching test count.
+Report exact commands, skips and fail-before/pass-after evidence separately from prior results.
+
+Normally commit/push progress on this child and verify actual remote OID. Append the invariant matrix,
+implementation/final OIDs, test results and unresolved issues to this handoff. Return for independent
+focused R4 re-review; do not self-accept P2 or start P3/PR/merge. If this second correction round still
+leaves the same validator issue unresolved, the next step is a fresh bounded diagnosis session under
+the collaboration policy, not an automatic third local correction round.

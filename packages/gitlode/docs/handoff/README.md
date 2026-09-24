@@ -19,7 +19,7 @@ work context, not active instructions to repeat M1. Stable contracts live in des
 The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`.
 P1 is [independently accepted](opentelemetry-m2-profile-p1-review.md#correction-round-1-re-review-outcome)
 at `dc6cfbd`. The active next assignment is
-[P2 runtime and consumer migration](opentelemetry-m2-profile-implementation.md#p2-runtime-and-consumer-migration).
+[independent P2-R review](opentelemetry-m2-profile-p2-review.md) of the returned `57ba753` target.
 P2/P3 and M2 acceptance remain pending.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are

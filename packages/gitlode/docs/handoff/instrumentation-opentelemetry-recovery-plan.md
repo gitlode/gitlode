@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                    | Remaining scope                                                            |
-| --------- | ------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only | Preserve historical evidence and environment                               |
-| M1        | complete                  | Preserve corrected validation and squash attribution                       |
-| M2        | P1 accepted; P2 assigned  | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                         | Remaining scope                                                            |
+| --------- | ------------------------------ | -------------------------------------------------------------------------- |
+| M0        | complete, one target only      | Preserve historical evidence and environment                               |
+| M1        | complete                       | Preserve corrected validation and squash attribution                       |
+| M2        | P1 accepted; P2 review pending | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates      | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -60,13 +60,14 @@ identity remain unchanged. The collector changes cannot be attributed to present
 P1 is accepted at `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`, with independent re-review
 recorded at `8ea9cfca2fb0cb7ab6455d9805cc1479ff19e932`. All four corrections and preprocessing
 hardening were accepted; the reviewer independently ran build and 7 files / 112 tests. This is
-primitive acceptance, not runtime or M2 acceptance. The next human-started conversation is
-[P2 runtime and consumer migration](opentelemetry-m2-profile-implementation.md#p2-runtime-and-consumer-migration)
-on the same child branch, followed by P2-R. P2 has sequential remotely preserved internal checkpoints
-for producers/builder, lifecycle/transport, then consumers/docs/combined verification. They are not
-independently mergeable; if continuation is needed, return a precise incomplete checkpoint to trunk.
-P2 must isolate contradictory status/value rejection, retain valid values/siblings and explain the
-partial outcome, separately from catastrophic builder failure using the fixed empty fallback.
+primitive acceptance, not runtime or M2 acceptance. P2 returned at
+`57ba7537068b00002b2618b2f4a364f9468365c7`; the delta after last implementation checkpoint
+`85c48e0ddc82211a899bb11e4aec70bba04eb96d` is outcome documentation only. The next human-started
+conversation is [independent P2-R review](opentelemetry-m2-profile-p2-review.md), covering all three
+implementation stages and the runtime/consumer boundary. P2 is not accepted; P3 remains unassigned.
+The reported 17-file affected tests and gitlode-wide tests are implementer evidence until independently
+verified; platform skips must remain explicit. No formal measurement or cumulative package validation
+is assigned to this review.
 
 ## Session sequence and dependencies
 
@@ -254,5 +255,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named P2 implementation
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named P2-R review
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

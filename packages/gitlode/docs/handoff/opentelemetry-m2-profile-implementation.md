@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P2 runtime and consumer migration](#p2-runtime-and-consumer-migration).
-P1 is accepted at `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`. Earlier assignments/outcomes below
-are historical context, not instructions to restart P1. P2 acceptance and P3 are still pending.
+Current assignment: [independent P2-R review](opentelemetry-m2-profile-p2-review.md).
+P2 returned at `57ba7537068b00002b2618b2f4a364f9468365c7`; it is not yet accepted. P1 acceptance
+remains unchanged. Earlier assignments are historical context; P3 is not assigned.
 
 ## Assignment, source and branch
 

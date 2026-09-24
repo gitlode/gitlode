@@ -12,8 +12,10 @@ import type {
   ProfileDiagnosticSummary,
   ProfileHistogramPoint,
   ProfileInstrumentationScope,
+  ProfileLossQuantity,
   ProfileReport,
   ProfileSpanAggregate,
+  ProfileTarget,
 } from "@gitlode/internal-contracts/telemetry";
 
 import { formatCount, formatElapsed, humanizeBytes } from "../format-utils.js";
@@ -75,22 +77,25 @@ export function formatProfileLines(
   appendProfileDiagnostics(lines, report.diagnostics, styling);
   const byScope = new Map<
     string,
-    { scope: ProfileInstrumentationScope; rows: ProfileMeasurement[] }
+    Map<string | null, { scope: ProfileInstrumentationScope; rows: ProfileMeasurement[] }>
   >();
+  const scopeEntry = (scope: ProfileInstrumentationScope) => {
+    const byVersion = byScope.get(scope.name) ?? new Map();
+    byScope.set(scope.name, byVersion);
+    const entry = byVersion.get(scope.version) ?? { scope, rows: [] };
+    byVersion.set(scope.version, entry);
+    return entry;
+  };
   for (const measurement of measurements) {
     const scope = measurement.value.scope;
-    const key = `${scope.name}\0${scope.version ?? ""}`;
-    const entry = byScope.get(key) ?? { scope, rows: [] };
-    entry.rows.push(measurement);
-    byScope.set(key, entry);
+    scopeEntry(scope).rows.push(measurement);
   }
   for (const diagnostic of report.diagnostics) {
     if (diagnostic.code === "diagnostic_overflow" || diagnostic.target.type === "report") continue;
-    const scope = diagnostic.target.scope;
-    const key = `${scope.name}\0${scope.version ?? ""}`;
-    if (!byScope.has(key)) byScope.set(key, { scope, rows: [] });
+    scopeEntry(diagnostic.target.scope);
   }
-  for (const { scope, rows } of [...byScope.values()].sort((left, right) =>
+  const scopeEntries = [...byScope.values()].flatMap((byVersion) => [...byVersion.values()]);
+  for (const { scope, rows } of scopeEntries.sort((left, right) =>
     compareProfileScopes(left.scope, right.scope),
   )) {
     lines.push(`  ${styling.sectionHeading(`Scope: ${formatScope(scope)}`)}`);
@@ -100,7 +105,9 @@ export function formatProfileLines(
         diagnostic.target.type !== "report" &&
         compareProfileScopes(diagnostic.target.scope, scope) === 0,
     );
-    for (const diagnostic of diagnostics.filter((item) => item.target.type === "scope"))
+    for (const diagnostic of diagnostics
+      .filter((item) => item.target.type === "scope")
+      .sort(compareDiagnostics))
       appendNotice(lines, diagnostic, 2, styling);
     renderScope(lines, rows, diagnostics, styling);
   }
@@ -172,13 +179,17 @@ function appendProfileDiagnostics(
           : hasLifecycle
             ? "Telemetry lifecycle issues detected."
             : "Collection or telemetry lifecycle issue details were omitted.";
-    lines.push(`  ${styling.warnBadge("!")} ${headline}`);
+    const warning =
+      detailed.some((diagnostic) => diagnostic.severity === "warning") ||
+      summaries.some((summary) => summary.maximumSeverity === "warning");
+    const marker = warning ? styling.warnBadge("!") : "!";
+    lines.push(`  ${marker} ${headline}`);
   }
-  for (const diagnostic of diagnostics) {
-    if (diagnostic.code === "diagnostic_overflow") appendSummaryNotice(lines, diagnostic, styling);
-    else if (diagnostic.target.type === "report" && diagnostic !== delivery)
-      appendNotice(lines, diagnostic, 1, styling);
-  }
+  for (const diagnostic of detailed
+    .filter((item) => item.target.type === "report" && item !== delivery)
+    .sort(compareDiagnostics))
+    appendNotice(lines, diagnostic, 1, styling);
+  for (const summary of summaries) appendSummaryNotice(lines, summary, styling);
 }
 
 function appendSummaryNotice(
@@ -211,9 +222,76 @@ function diagnosticsForName(
 
 function compareDiagnostics(left: ProfileDiagnostic, right: ProfileDiagnostic): number {
   return (
+    compareDiagnosticTargets(left.target, right.target) ||
     compareCodeUnits(left.code, right.code) ||
     compareCodeUnits(left.stage, right.stage) ||
-    compareCodeUnits(left.effects.join("\0"), right.effects.join("\0"))
+    compareStringArrays(left.effects, right.effects) ||
+    compareStringArrays(left.signalCoverage, right.signalCoverage) ||
+    compareCodeUnits(left.extent, right.extent) ||
+    compareAttributeKeySelectors(left.attributeKey, right.attributeKey) ||
+    compareCodeUnits(JSON.stringify(left.affectedFields), JSON.stringify(right.affectedFields)) ||
+    compareCodeUnits(JSON.stringify(left.detailLoss), JSON.stringify(right.detailLoss)) ||
+    compareLossQuantities(left.lossQuantity, right.lossQuantity) ||
+    Number(left.wholeResultUnavailable) - Number(right.wholeResultUnavailable)
+  );
+}
+
+function compareDiagnosticTargets(left: ProfileTarget, right: ProfileTarget): number {
+  const order: Readonly<Record<ProfileTarget["type"], number>> = {
+    report: 0,
+    scope: 1,
+    observation: 2,
+    point: 3,
+  };
+  const byType = order[left.type] - order[right.type];
+  if (byType !== 0) return byType;
+  if (left.type === "report" || right.type === "report") return 0;
+  const byScope = compareProfileScopes(left.scope, right.scope);
+  if (byScope !== 0 || left.type === "scope" || right.type === "scope") return byScope;
+  return compareProfileIdentity(
+    {
+      scope: left.scope,
+      name: left.name,
+      kind: left.kind,
+      attributes: left.type === "point" ? left.attributes : [],
+    },
+    {
+      scope: right.scope,
+      name: right.name,
+      kind: right.kind,
+      attributes: right.type === "point" ? right.attributes : [],
+    },
+  );
+}
+
+function compareStringArrays(left: readonly string[], right: readonly string[]): number {
+  const length = Math.min(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const comparison = compareCodeUnits(left[index] ?? "", right[index] ?? "");
+    if (comparison !== 0) return comparison;
+  }
+  return left.length - right.length;
+}
+
+function compareAttributeKeySelectors(
+  left: ProfileDiagnostic["attributeKey"],
+  right: ProfileDiagnostic["attributeKey"],
+): number {
+  const order = { not_applicable: 0, exact: 1, discarded: 2 } as const;
+  const byType = order[left.type] - order[right.type];
+  return (
+    byType ||
+    (left.type === "exact" && right.type === "exact" ? compareCodeUnits(left.key, right.key) : 0)
+  );
+}
+
+function compareLossQuantities(
+  left: ProfileLossQuantity | null,
+  right: ProfileLossQuantity | null,
+): number {
+  if (left === null || right === null) return left === right ? 0 : left === null ? -1 : 1;
+  return (
+    compareCodeUnits(left.descriptor, right.descriptor) || compareCodeUnits(left.unit, right.unit)
   );
 }
 
@@ -262,7 +340,7 @@ function diagnosticText(diagnostic: ProfileDiagnostic): string {
       diagnostic.lossQuantity.value !== null
     ) {
       const count = diagnostic.lossQuantity.value;
-      text = `Duration summary excludes ${count} invalid duration${count === 1 ? "" : "s"}`;
+      text = `Duration summary excludes ${count}${diagnostic.lossQuantity.saturated ? "+" : ""} invalid duration${count === 1 ? "" : "s"}`;
       const fields = diagnostic.affectedFields
         .flatMap((item) => item.fields)
         .filter((field) => field === "avg" || field === "total" || field === "max");
@@ -285,13 +363,27 @@ function diagnosticText(diagnostic: ProfileDiagnostic): string {
     text += ".";
   } else text = `${PROFILE_VIEW_DIAGNOSTIC_LABELS[diagnostic.code] ?? diagnostic.code}.`;
 
-  if (diagnostic.lossQuantity && diagnostic.lossQuantity.value === null)
-    text += " The amount of lost data is unknown.";
+  if (diagnostic.lossQuantity) {
+    if (diagnostic.lossQuantity.value === null) text += " The amount of lost data is unknown.";
+    else if (diagnostic.lossQuantity.descriptor !== "span_duration_contributions")
+      text += ` ${formatKnownLoss(diagnostic.lossQuantity)}`;
+  }
   if (diagnostic.detailLoss.attributeKey) text += " The affected attribute key is unknown.";
   if (diagnostic.detailLoss.affectedFields) text += " Affected field detail was omitted.";
   if (diagnostic.count > 1)
     text += ` Repeated ${diagnostic.count}${diagnostic.countSaturated ? "+" : ""} times.`;
   return text;
+}
+
+function formatKnownLoss(quantity: ProfileLossQuantity): string {
+  const labels: Readonly<Record<ProfileLossQuantity["descriptor"], string>> = {
+    span_groups: "Span groups",
+    span_duration_contributions: "duration contributions",
+    span_attribute_values: "Span attribute values",
+    metric_points: "metric points",
+    observation_results: "observation results",
+  };
+  return `Known loss: ${quantity.value}${quantity.saturated ? "+" : ""} ${labels[quantity.descriptor]}; unit=${formatToken(quantity.unit)}.`;
 }
 
 function isEntireResultUnavailable(diagnostic: ProfileDiagnostic): boolean {
@@ -354,7 +446,34 @@ function renderScope(
       nodes = node.children;
     }
   }
-  for (const row of malformed) renderAbsoluteRow(lines, row, 2, styling, undefined, true);
+  const malformedNames = new Set([
+    ...malformed.map((row) => row.value.name),
+    ...diagnostics
+      .filter(
+        (diagnostic) =>
+          (diagnostic.target.type === "observation" || diagnostic.target.type === "point") &&
+          diagnostic.target.name.split(".").some((segment) => segment.length === 0),
+      )
+      .map((diagnostic) =>
+        diagnostic.target.type === "observation" || diagnostic.target.type === "point"
+          ? diagnostic.target.name
+          : "",
+      ),
+  ]);
+  for (const name of [...malformedNames].sort(compareCodeUnits)) {
+    const namedRows = malformed.filter((row) => row.value.name === name).sort(compareMeasurements);
+    const namedDiagnostics = diagnosticsForName(diagnostics, name);
+    if (namedRows.length === 0) {
+      const unavailable = namedDiagnostics.some(isEntireResultUnavailable);
+      lines.push(
+        `${"  ".repeat(2)}/${quote(name)}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
+      );
+      for (const diagnostic of namedDiagnostics) appendNotice(lines, diagnostic, 3, styling);
+    } else {
+      for (const row of namedRows)
+        renderAbsoluteRow(lines, row, 2, styling, undefined, true, namedDiagnostics);
+    }
+  }
   for (const node of [...roots.values()].sort((a, b) => compareCodeUnits(a.segment, b.segment)))
     renderNode(lines, node, 2, styling, true, diagnostics);
 }
@@ -391,7 +510,15 @@ function renderNode(
     for (const diagnostic of ownDiagnostics.filter((item) => item.target.type !== "point"))
       appendNotice(lines, diagnostic, depth + 1, styling);
     for (const row of ownRows)
-      renderAbsoluteRow(lines, row, depth + 1, styling, node.absoluteName, false, ownDiagnostics);
+      renderAbsoluteRow(
+        lines,
+        row,
+        depth + 1,
+        styling,
+        node.absoluteName,
+        false,
+        ownDiagnostics.filter((item) => item.target.type === "point"),
+      );
   }
   const childNames = new Set([
     ...childRows.map((row) => row.value.name),
@@ -411,7 +538,7 @@ function renderNode(
   for (const childName of [...childNames].sort(compareCodeUnits)) {
     const namedRows = childRows.filter((row) => row.value.name === childName);
     const namedDiagnostics = diagnosticsForName(diagnostics, childName);
-    const relativeName = childName.slice(node.absoluteName.length + 1);
+    const relativeName = formatToken(childName.slice(node.absoluteName.length + 1));
     if (namedRows.length === 0) {
       const unavailable = namedDiagnostics.some(isEntireResultUnavailable);
       lines.push(
@@ -581,23 +708,41 @@ function formatSpanAttribute(
   callCount: number,
   styling: Styling,
 ): string {
-  const observed =
-    attribute.observedCount < callCount ? ` (observed ${attribute.observedCount})` : "";
+  const observed = formatObservedCoverage(attribute.observedCount, callCount, styling);
   if (attribute.reducer === "single")
     return styling.primaryValue(formatAttributeValue(attribute.value)) + observed;
   if (attribute.reducer === "distinct")
-    return attribute.values
-      .map(
-        ({ value, count }) =>
-          styling.primaryValue(formatAttributeValue(value)) + styling.separator(`(${count})`),
-      )
-      .join(styling.separator(", "));
+    return (
+      attribute.values
+        .map(
+          ({ value, count }) =>
+            styling.primaryValue(formatAttributeValue(value)) +
+            styling.separator("(") +
+            styling.primaryValue(String(count)) +
+            styling.separator(")"),
+        )
+        .join(styling.separator(", ")) + observed
+    );
   return (
     styling.primaryValue(formatNumber(attribute.minimum)) +
     styling.separator("…") +
     styling.primaryValue(formatNumber(attribute.maximum)) +
     observed
   );
+}
+
+function formatObservedCoverage(
+  observedCount: number,
+  callCount: number,
+  styling: Styling,
+): string {
+  return observedCount < callCount
+    ? styling.separator(" (") +
+        styling.fieldKey("observed") +
+        " " +
+        styling.primaryValue(String(observedCount)) +
+        styling.separator(")")
+    : "";
 }
 
 function formatAttributeKey(key: string, base: string | undefined): string {

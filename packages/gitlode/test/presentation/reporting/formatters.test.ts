@@ -88,6 +88,363 @@ const diagnostic = (overrides: Partial<ProfileDiagnostic> = {}): ProfileDiagnost
 });
 
 describe("generic profile formatting", () => {
+  it("P3-R1 keeps nullable and delimiter-bearing Scope identities collision-free", () => {
+    const measurementScopes = [
+      { name: "scope", version: null },
+      { name: "scope", version: "" },
+      { name: "scope", version: "x\0y" },
+      { name: "scope\0x", version: "y" },
+    ] as const;
+    for (const scopes of [measurementScopes, [...measurementScopes].reverse()]) {
+      const report = emptyReport();
+      report.counters = scopes.map((scope, index) => ({
+        ...counter("unused", "count", index + 1),
+        scope,
+      }));
+      const headings = formatProfileLines(report).filter((line) => line.startsWith("  Scope:"));
+      expect(headings).toEqual([
+        "  Scope: scope",
+        '  Scope: scope@""',
+        '  Scope: scope@"x\\u0000y"',
+        '  Scope: "scope\\u0000x"@y',
+      ]);
+    }
+
+    const diagnosticScopes = [
+      { name: "diagnostic", version: null },
+      { name: "diagnostic", version: "" },
+    ] as const;
+    for (const scopes of [diagnosticScopes, [...diagnosticScopes].reverse()]) {
+      const report = emptyReport();
+      report.diagnostics = scopes.map((scope) =>
+        diagnostic({
+          target: { type: "observation", scope, kind: "counter", name: "missing.count" },
+          extent: "entire_target",
+          wholeResultUnavailable: true,
+        }),
+      );
+      expect(formatProfileLines(report).filter((line) => line.startsWith("  Scope:"))).toEqual([
+        "  Scope: diagnostic",
+        '  Scope: diagnostic@""',
+      ]);
+    }
+  });
+
+  it("P3-R2 escapes complete measured and missing-only suffixes without changing row boundaries", () => {
+    const measuredName = 'root.ns.measured\n"slash/\\\u0085\u2028\u202etest:=,()';
+    const missingName = 'root.ns.missing\n"slash/\\\u0085\u2028\u202etest:=,()';
+    const report = emptyReport();
+    report.counters = [counter("example", measuredName, 1)];
+    report.diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: missingName,
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const expected = [
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      "    /root",
+      "      ns",
+      '        "measured\\n\\"slash/\\\\\\u0085\\u2028\\u202etest:=,()" : 1 operations',
+      '        "missing\\n\\"slash/\\\\\\u0085\\u2028\\u202etest:=,()" : unavailable',
+      "          ! No valid result retained: invalid aggregation discarded.",
+    ];
+    expect(formatProfileLines(report)).toEqual(expected);
+
+    const tagged = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => `<${role}>${text}</${role}>`,
+      ]),
+    ) as unknown as Styling;
+    expect(
+      formatProfileLines(report, tagged)
+        .join("\n")
+        .replace(/<\/?[^>]+>/gu, ""),
+    ).toBe(expected.join("\n"));
+  });
+
+  it("P3-R2 retains quoted malformed-dot missing-only targets beside measured and ordinary rows", () => {
+    const report = emptyReport();
+    report.counters = [
+      counter("example", "measured..bad", 2),
+      {
+        ...counter("example", "alpha.beta.ok", 3),
+        attributes: [{ key: "alpha.beta.mode", value: "ready" }],
+      },
+    ];
+    report.diagnostics = [".leading", "alpha..missing", "trailing."].map((name) =>
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name,
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    );
+    expect(formatProfileLines(report)).toEqual([
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      '    /".leading" : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      '    /"alpha..missing" : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      '    /"measured..bad" : 2 operations',
+      '    /"trailing." : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      "    /alpha",
+      "      beta",
+      "        ok : 3 operations",
+      "          mode = ready",
+    ]);
+  });
+
+  it("P3-R3 renders every loss descriptor independently from occurrences", () => {
+    const cases = [
+      ["span_groups", "groups", 2, false, "Known loss: 2 Span groups; unit=groups."],
+      [
+        "span_duration_contributions",
+        "contributions",
+        3,
+        true,
+        "Duration summary excludes 3+ invalid durations",
+      ],
+      [
+        "span_attribute_values",
+        "values",
+        4,
+        false,
+        "Known loss: 4 Span attribute values; unit=values.",
+      ],
+      ["metric_points", "points", 5, true, "Known loss: 5+ metric points; unit=points."],
+      [
+        "observation_results",
+        "results",
+        6,
+        false,
+        "Known loss: 6 observation results; unit=results.",
+      ],
+    ] as const;
+    for (const [descriptor, unit, value, saturated, expected] of cases) {
+      const report = emptyReport();
+      report.diagnostics = [
+        diagnostic({
+          count: 2,
+          lossQuantity: { descriptor, unit, value, saturated },
+        }),
+      ];
+      const output = formatProfileLines(report).join("\n");
+      expect(output).toContain(expected);
+      expect(output).toContain("Repeated 2 times.");
+    }
+
+    const unknown = emptyReport();
+    unknown.diagnostics = [
+      diagnostic({
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: null,
+          saturated: false,
+        },
+      }),
+    ];
+    expect(formatProfileLines(unknown).join("\n")).toContain("The amount of lost data is unknown.");
+  });
+
+  it("P3-R3 orders complete typed diagnostic identities independently of arrival", () => {
+    const baseTarget = {
+      type: "observation" as const,
+      scope: { name: "example", version: null },
+      name: "same",
+    };
+    const diagnostics = [
+      diagnostic({
+        code: "attribute_reducer_conflict",
+        target: { ...baseTarget, kind: "histogram" },
+        signalCoverage: ["histogram"],
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "a" },
+      }),
+      diagnostic({
+        code: "attribute_reducer_conflict",
+        target: { ...baseTarget, kind: "counter" },
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "z" },
+      }),
+      diagnostic({
+        code: "span_attribute_value_overflow",
+        severity: "info",
+        stage: "span_aggregation",
+        target: { ...baseTarget, kind: "span" },
+        signalCoverage: ["span"],
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "b" },
+        lossQuantity: {
+          descriptor: "span_attribute_values",
+          unit: "{value}",
+          value: 2,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        code: "span_attribute_value_overflow",
+        severity: "info",
+        stage: "span_aggregation",
+        target: { ...baseTarget, kind: "span" },
+        signalCoverage: ["span"],
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "a" },
+        lossQuantity: {
+          descriptor: "span_groups",
+          unit: "{operation}",
+          value: 1,
+          saturated: false,
+        },
+      }),
+    ];
+    const render = (ordered: ProfileDiagnostic[]): string => {
+      const report = emptyReport();
+      report.counters = [counter("example", "same", 1)];
+      report.histograms = [histogram("example", "same")];
+      report.spans = [span("example", "same")];
+      report.diagnostics = ordered;
+      return formatProfileLines(report).join("\n");
+    };
+    const forward = render(diagnostics);
+    const reverse = render([...diagnostics].reverse());
+    expect(reverse).toBe(forward);
+    const positions = [
+      "a: additional attribute values omitted",
+      "b: additional attribute values omitted",
+      "z: conflicting Span attribute values",
+      "a: conflicting Span attribute values",
+    ].map((token) => forward.indexOf(token));
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+  });
+
+  it("P3-R4 assigns headline, frequency and coverage tokens to semantic roles", () => {
+    const report = emptyReport();
+    report.spans = [
+      {
+        ...span("example", "operation"),
+        attributes: [
+          {
+            key: "outcome",
+            reducer: "distinct",
+            values: [{ value: "ok", count: 3 }],
+            overflowCount: 0,
+            observedCount: 1,
+          },
+        ],
+      },
+    ];
+    report.diagnostics = [
+      diagnostic({
+        code: "span_group_overflow",
+        severity: "info",
+        stage: "span_aggregation",
+        signalCoverage: ["span"],
+      }),
+    ];
+    const calls: string[] = [];
+    const spy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (calls.push(`${role}:${text}`), `<${role}>${text}</${role}>`),
+      ]),
+    ) as unknown as Styling;
+    const styled = formatProfileLines(report, spy).join("\n");
+    expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
+    expect(calls).not.toContain("warnBadge:!");
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        "separator:(",
+        "primaryValue:3",
+        "separator:)",
+        "separator: (",
+        "fieldKey:observed",
+        "primaryValue:1",
+      ]),
+    );
+
+    const warningSummary = emptyReport();
+    warningSummary.diagnostics = [
+      {
+        code: "diagnostic_overflow",
+        severity: "warning",
+        stage: "report_build",
+        target: { type: "report" },
+        extent: "unidentified_subset",
+        effects: ["lost_issue_detail"],
+        signalCoverage: [],
+        effectsByKind: [],
+        reportEffects: [],
+        detailLoss: {
+          pointAttributes: false,
+          observationIdentity: false,
+          scopeIdentity: false,
+          attributeKey: false,
+          affectedFields: false,
+        },
+        omittedOccurrences: 1,
+        countSaturated: false,
+        maximumSeverity: "warning",
+        priorIssueDetail: "retained",
+      },
+    ];
+    const warningCalls: string[] = [];
+    const warningSpy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (warningCalls.push(`${role}:${text}`), text),
+      ]),
+    ) as unknown as Styling;
+    formatProfileLines(warningSummary, warningSpy);
+    expect(warningCalls.filter((call) => call === "warnBadge:!")).toHaveLength(2);
+
+    const infoSummary = emptyReport();
+    infoSummary.diagnostics = [
+      {
+        ...warningSummary.diagnostics[0],
+        maximumSeverity: "info",
+      } as (typeof warningSummary.diagnostics)[number],
+    ];
+    const infoSummaryCalls: string[] = [];
+    const infoSummarySpy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (infoSummaryCalls.push(`${role}:${text}`), text),
+      ]),
+    ) as unknown as Styling;
+    formatProfileLines(infoSummary, infoSummarySpy);
+    expect(infoSummaryCalls).not.toContain("warnBadge:!");
+
+    const warningDetail = emptyReport();
+    warningDetail.diagnostics = [diagnostic()];
+    const warningDetailCalls: string[] = [];
+    const warningDetailSpy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (warningDetailCalls.push(`${role}:${text}`), text),
+      ]),
+    ) as unknown as Styling;
+    formatProfileLines(warningDetail, warningDetailSpy);
+    expect(warningDetailCalls.filter((call) => call === "warnBadge:!")).toHaveLength(2);
+  });
+
   it("organizes every kind in one Scope and two namespace levels", () => {
     const report = emptyReport();
     report.spans = [span("gitlode.git", "gitlode.git.commit.walk")];

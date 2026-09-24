@@ -27,6 +27,12 @@ describe("generic profile view drift", () => {
     expect((view.generic_hierarchy as Record<string, unknown>).group_by).toBe(
       "instrumentation_scope_name_and_version",
     );
+    expect((view.generic_hierarchy as Record<string, unknown>).scope_version_identity).toBe(
+      "nullable_and_collision_free",
+    );
+    expect((view.generic_hierarchy as Record<string, unknown>).remaining_suffix_escaping).toBe(
+      "complete_suffix_before_decoration",
+    );
     expect((view.generic_hierarchy as Record<string, unknown>).namespace_segments).toBe(2);
   });
 
@@ -45,6 +51,23 @@ describe("generic profile view drift", () => {
         separator: "separator",
         profile_uses_application_success_style: false,
         styled_plain_text_parity: true,
+        profile_marker_severity: "highest_retained_detailed_or_summary_evidence",
+        distinct_frequency: { digits: "primaryValue", punctuation: "separator" },
+        incomplete_coverage: {
+          label: "fieldKey",
+          count: "primaryValue",
+          punctuation: "separator",
+        },
+      }),
+    );
+    expect(view.diagnostic_rendering).toEqual(
+      expect.objectContaining({
+        occurrence_count_is_loss_amount: false,
+        loss_quantity: {
+          known: "descriptor_value_unit_and_saturation",
+          unknown: "explicit_unknown_amount",
+          occurrence_count: "separately_rendered",
+        },
       }),
     );
   });

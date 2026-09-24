@@ -14,6 +14,7 @@ layout:
 
 generic_hierarchy:
   group_by: instrumentation_scope_name_and_version
+  scope_version_identity: nullable_and_collision_free
   scope_label:
     version_present: "Scope: <scope-name>@<version>"
     version_absent: "Scope: <scope-name>"
@@ -23,6 +24,8 @@ generic_hierarchy:
   short_name_values: group_node_line
   group_node_collision: repeat_absolute_observation_name_on_child_rows
   malformed_dot_name: quoted_absolute_observation_row
+  malformed_dot_missing_only_target: quoted_absolute_issue_row
+  remaining_suffix_escaping: complete_suffix_before_decoration
   attributes_before_namespace_children: true
   unknown_admitted_identity: include
 
@@ -44,6 +47,12 @@ ordering:
     - boolean
     - number
     - string
+  diagnostics:
+    - complete_canonical_target
+    - code
+    - stage
+    - effects
+    - retained_selector_and_quantity_ties
 
 tokens:
   ordinary_pattern: "[A-Za-z0-9_.@-]+"
@@ -127,6 +136,10 @@ diagnostic_rendering:
   shared_instrument_issue: one_name_only_row_before_retained_points
   duplicate_inline_and_notification: false
   occurrence_count_is_loss_amount: false
+  loss_quantity:
+    known: descriptor_value_unit_and_saturation
+    unknown: explicit_unknown_amount
+    occurrence_count: separately_rendered
   labels:
     span_group_overflow: Span groups truncated
     span_attribute_value_overflow: Span attribute values truncated
@@ -145,6 +158,14 @@ styling:
   separator: separator
   warning_marker: warnBadge
   info_marker_and_explanation: default
+  profile_marker_severity: highest_retained_detailed_or_summary_evidence
+  distinct_frequency:
+    digits: primaryValue
+    punctuation: separator
+  incomplete_coverage:
+    label: fieldKey
+    count: primaryValue
+    punctuation: separator
   profile_uses_application_success_style: false
   indentation_outside_styled_tokens: true
   escaped_before_decoration: true

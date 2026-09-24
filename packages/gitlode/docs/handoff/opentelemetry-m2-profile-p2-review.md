@@ -301,3 +301,117 @@ checks and residual P3 responsibilities. If any correction remains, batch the fi
 trunk instead of fixing them here. Trunk applies the bounded correction/diagnosis policy if needed.
 Append the outcome here, commit documentation only, normally push to this child and verify actual
 remote OID/clean status. No force push or parent updates. P2 acceptance alone does not authorize P3.
+
+### Correction round 1 focused re-review outcome
+
+Corrections are still required for P2 at fixed correction target
+`5bc2cf3c0910a5dc591ae53db05ca846f610cd05`. R1, R2, R3 and the actual worker-thread transport
+proof are accepted in this focused re-review. R4 remains incomplete, so this review does not accept
+P2 and does not authorize P3, a PR, merge, formal measurement, package/release validation or an
+acceptance-record change.
+
+#### Reviewed state
+
+- Review entry/checkpoint was clean at `d63b84229b0f13ef25bcdbd74239bda34392d654`; local HEAD and
+  the actual `origin/feature/otel-redesign_M2_profile` ref agreed. Correction entry
+  `9e6ed7d28f0c5854d7ed6b62cd790f346ad6e4bf`, main correction
+  `bb5740e683e2463636ac4481b562308156703102`, builder/test follow-up
+  `3c0e11480897e6a14cf3d9e0028ec17152f812ea` and fixed target `5bc2cf3...` are all in the assigned
+  ancestry.
+- The correction entry-to-target inventory is the expected 14 files. The target-to-entry delta is
+  limited to the four routing/handoff documents identified by trunk; there is no unexpected source
+  or test change after the fixed target.
+- The follow-up builder source change was reviewed, not treated as test-only: reading `next.done` is
+  now inside the iterator advance boundary, so a throwing result-state getter records unknown
+  remaining loss without retrying the iterator.
+
+#### Per-item decisions
+
+1. **R1 accepted under trunk's qualification.** Both valid/invalid input orders pass through the real
+   Span processor and builder with `callCount=2`, `durationContributionCount=1`, retained total/max,
+   unavailable average and partial status. All-invalid duration slots remain unavailable despite zero
+   accumulator defaults, while a genuine zero contribution remains available. Under a full 15-detail
+   budget, the reserved summary retains `incomplete_measurement_fields`; presentation keeps the
+   partial/incompleteness notice and formal tooling fails the report rather than accepting it as
+   healthy. No blanket total/max mask is required or requested.
+2. **R2 accepted.** Each obtained value has its own normalization boundary. Throwing first and middle
+   values retain later array siblings and record exact one-result loss. Iterator acquisition,
+   `next()`/`done` failure retains already obtained values, stops without retry and records unknown
+   remaining loss; a throwing value getter remains a one-value rejection and iteration can continue.
+   These paths remain in the normal partial builder result rather than invoking catastrophic fallback.
+3. **R3 accepted.** Invalid Counter/Histogram values and value getter failures use an exact point
+   target only after Scope, instrument and attributes are independently normalized. Invalid attribute
+   input broadens to the known observation without erasing Scope/name. Point overflow carries the
+   rejected point, entire-target extent and exact disjoint quantity one. Catalog admission and the
+   production point limit are unchanged; the test-only limit mutation is restored in `finally`.
+4. **R4 corrections required.** The shared validator is total for throwing inputs, validates and
+   detaches required scalar/container fields, masks, finite numbers, collection bounds, detailed and
+   summary variants, and requires exact canonical equality. Valid normal, partial, compacted and fixed
+   fallback producer reports are accepted, so the correction does not merely share a malformed
+   fixture. All formal extraction/evaluation call sites use it before measurement or acceptance, and
+   thresholds and historical artifact schemas are unchanged. However, the validator does not enforce
+   cross-field report or diagnostic invariants; the mandatory finding below remains.
+5. **Transport proof accepted.** The test starts the actual built `dist/execution/worker-entry.js`,
+   triggers an invoked builder-body failure through worker construction data, and receives the normal
+   schema-2 fixed fallback result through `dispatchWorkerRunRequest`. It verifies success
+   classification, receiver-side application/checkpoint content equivalence, mandatory fixed-delivery
+   provenance, progress routing and a finite timeout; the client settles by terminating the worker.
+   The seam is absent from `WorkerRunRequest`, CLI/config and public package surfaces and does not add
+   an alternate result protocol or normal-path injection.
+
+#### Mandatory finding
+
+**P2-R4-C1: the complete-report validator accepts internally contradictory reports and diagnostics.**
+`normalizeProfileReport()` normalizes each measurement and diagnostic and then checks plain canonical
+equality, but it does not validate the relationships between signal status, retained arrays and
+diagnostic evidence, nor the associations among diagnostic target, coverage, affected fields,
+effects and delivery provenance (`packages/internal-contracts/src/telemetry/normalization.ts:608-846`).
+The canonical report catalog requires an unavailable signal to have an empty array and every partial
+or unavailable status to have explanatory evidence
+(`packages/gitlode/docs/design/telemetry-catalog/profile-report.yaml:283-287`); fixed builder failure
+also requires report-delivery provenance.
+
+An independently executed, non-mutating probe against the built fixed target returned `true` from
+`normalizeProfileReport()` for all of these malformed cases:
+
+- an `unavailable` Counter signal with a retained Counter point;
+- an empty `unavailable` Counter signal with no explanatory diagnostic;
+- a `report_delivery_failure` diagnostic whose `reportDelivery` is `null`; and
+- one diagnostic whose point target is Histogram, coverage is Counter and affected fields are Span.
+
+The evaluator happens to classify the first two examples as inconclusive because their status is not
+complete, and any detailed diagnostic makes the latter examples fail, so the known malformed reports
+do not become a healthy formal pass today. Nevertheless, the shared function advertised as the
+complete active-schema validator returns them as valid, and `extractProfileReportMeasurements()` can
+therefore extract from contradictory reports outside the evaluator. This violates R4's total,
+fail-closed validation contract and leaves future consumers dependent on incidental evaluator policy.
+
+Bounded fix: add report-level status/array/explanation validation and diagnostic association checks,
+including fixed-delivery effect/provenance consistency, to the shared validator. Add adversarial
+contract and formal-consumer cases for the four counterexamples while retaining acceptance tests for
+actual normal, partial, compacted-summary and fixed-fallback producer output. Do not weaken evaluator
+thresholds or relabel historical artifacts.
+
+#### Independent, reported and skipped evidence
+
+- Independently run: `npm run build:dev` passed.
+- Independently run: the original 16 suites plus `presenter.test.ts` and
+  `worker-profile-fallback-transport.test.ts` passed 271 tests with 3 skipped (18 files, 274 total).
+  The skips are the existing Windows skips for the Linux-only supervised-workflow entrypoint setup
+  and `stall=false`/`stall=true` later-child cases. They are unrelated to the corrected producer,
+  validator and worker transport paths, so no bounded Linux request is added.
+- Independently run: the exact correction-outcome strict TypeScript command over `js-yaml.d.ts`,
+  `performance-harness.ts` and `telemetry-catalog.ts` passed. This is tooling-source typechecking;
+  Vitest is not claimed to typecheck test sources.
+- Independently run: fixed correction diff whitespace check
+  `git diff --check 9e6ed7d..5bc2cf3` passed. The four R4 counterexamples above were inline runtime
+  probes and created no files.
+- Reported only, not rerun in this focused review: the correction session's focused 45-test builder
+  run, lint, architecture check and implementation-time format checks. No full OS/package/release
+  campaign or formal performance measurement was run.
+
+#### Finite return
+
+Correct only P2-R4-C1 and return a new fixed target for focused independent re-review. Preserve the
+accepted R1 mixed-duration behavior, R2/R3 corrections, worker transport proof, P1 bounds and fallback
+lifecycle, thresholds, blocked release record and historical evidence identities. Do not begin P3.

@@ -5,7 +5,8 @@ gitlode extracts Git commit history from a local repository and writes it as
 ingestion into data warehouses, analytics platforms, or any system that consumes
 newline-delimited JSON.
 
-The `--profile` option collects a local, signal-separated diagnostic profile for successful runs.
+The `--profile` option collects a local diagnostic profile for successful runs and presents all
+retained signal kinds in one Scope/namespace hierarchy.
 It does not select a different extraction path. Use `--quiet` to suppress summary, progress, and
 profile presentation.
 
@@ -359,7 +360,7 @@ gitlode [options] <repository-path>
 | Parameter   | Alias | Type    | Default | Description                                                                                                  |
 | ----------- | ----- | ------- | ------- | ------------------------------------------------------------------------------------------------------------ |
 | `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.                |
-| `--profile` |       | boolean | `false` | Collect and display a local signal-separated profile after a successful extraction. Suppressed by `--quiet`. |
+| `--profile` |       | boolean | `false` | Collect and display a local Scope/namespace profile after a successful extraction. Suppressed by `--quiet`. |
 
 ### Configuration File
 
@@ -392,11 +393,12 @@ Conflict rule:
 
 ### Profiling
 
-`--profile` appends a local signal-separated diagnostic profile to stderr after a successful run:
+`--profile` appends a local diagnostic profile to stderr after a successful run. Spans, counters,
+and histograms share a generic Scope/namespace hierarchy rather than separate kind sections:
 
-Partial or unavailable signals are labeled in the Profile block. If report construction itself
-fails, the ordinary Profile block reports unavailable measurements; this does not change extraction
-results, JSONL output, or exit classification.
+Collection and lifecycle issues are placed beside the narrowest safely identified target. If report
+construction itself fails, the ordinary Profile block reports whether validated measurements could
+be supplied; this does not change extraction results, JSONL output, or exit classification.
 
 ```bash
 gitlode --profile -r main ./my-repo

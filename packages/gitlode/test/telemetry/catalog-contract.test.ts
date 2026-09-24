@@ -38,52 +38,37 @@ describe("accepted telemetry catalog contract", () => {
       ]),
     );
   });
-  it("rejects duplicate identities, names, and view placements", () => {
+  it("rejects duplicate identities and names", () => {
     const catalogs = clone(accepted);
     const spans = catalogs.spans.spans as Record<string, unknown>[];
     spans[1]!.id = spans[0]!.id;
     spans[1]!.name = spans[0]!.name;
-    const groups = catalogs.profileView.span_groups as Record<string, unknown>[];
-    (groups[1]!.observations as unknown[]).push(
-      structuredClone((groups[0]!.observations as unknown[])[0]),
-    );
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("duplicate span id"),
         expect.stringContaining("duplicate span name"),
-        expect.stringContaining("duplicate span profile view placement"),
       ]),
     );
   });
-  it("rejects unknown observation and attribute references", () => {
+  it("rejects unknown attribute references", () => {
     const catalogs = clone(accepted);
     const spans = catalogs.spans.spans as Record<string, unknown>[];
     ((spans[0]!.attributes as Record<string, unknown>).initial as unknown[]).push({
       ref: "missing_attribute",
     });
-    const groups = catalogs.profileView.metric_groups as Record<string, unknown>[];
-    (groups[0]!.observations as unknown[]).push({ ref: "missing_metric", label: "Missing" });
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("unknown attribute"),
-        expect.stringContaining("non-metric observation"),
-      ]),
+      expect.arrayContaining([expect.stringContaining("unknown attribute")]),
     );
   });
-  it("rejects unreferenced attributes and missing view placements", () => {
+  it("rejects unreferenced attributes", () => {
     const catalogs = clone(accepted);
     (catalogs.attributes.attributes as unknown[]).push({
       id: "orphan",
       key: "gitlode.orphan",
       type: "string",
     });
-    const groups = catalogs.profileView.metric_groups as Record<string, unknown>[];
-    (groups[0]!.observations as unknown[]).splice(0, 1);
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("not referenced"),
-        expect.stringMatching(/accepted metric .* has 0 profile view placements/),
-      ]),
+      expect.arrayContaining([expect.stringContaining("not referenced")]),
     );
   });
   it("rejects diagnostic labels and report/verification boundary drift", () => {
@@ -104,21 +89,15 @@ describe("accepted telemetry catalog contract", () => {
       ]),
     );
   });
-  it("rejects invalid parent and cross-signal profile placements", () => {
+  it("rejects invalid parent and obsolete per-observation view policy", () => {
     const catalogs = clone(accepted);
     const spans = catalogs.spans.spans as Record<string, unknown>[];
     spans[3]!.parent = { type: "explicit_span_context", ref: "missing_parent" };
-    const spanGroups = catalogs.profileView.span_groups as Record<string, unknown>[];
-    (spanGroups[0]!.observations as Record<string, unknown>[])[0]!.ref = (
-      catalogs.metrics.metrics as Record<string, unknown>[]
-    )[0]!.id;
-    const metricGroups = catalogs.profileView.metric_groups as Record<string, unknown>[];
-    (metricGroups[0]!.observations as Record<string, unknown>[])[0]!.ref = spans[0]!.id;
+    catalogs.profileView.span_groups = [];
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("unknown parent span: missing_parent"),
-        expect.stringContaining("span profile group references non-span observation"),
-        expect.stringContaining("metric profile group references non-metric observation"),
+        expect.stringContaining("must not define per-observation groups"),
       ]),
     );
   });
@@ -127,20 +106,13 @@ describe("accepted telemetry catalog contract", () => {
     delete (catalogs.spans.spans as Record<string, unknown>[])[0]!.id;
     (catalogs.metrics.metrics as Record<string, unknown>[])[0]!.name = 42;
     delete (catalogs.attributes.attributes as Record<string, unknown>[])[0]!.key;
-    delete (catalogs.profileView.span_groups as Record<string, unknown>[])[0]!.id;
-    delete (
-      (catalogs.profileView.metric_groups as Record<string, unknown>[])[0]!.observations as Record<
-        string,
-        unknown
-      >[]
-    )[0]!.ref;
+    (catalogs.profileView.generic_hierarchy as Record<string, unknown>).namespace_segments = 3;
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("span 0 requires string id"),
         expect.stringContaining("metric 0 requires string name"),
         expect.stringContaining("attribute 0 requires string key"),
-        expect.stringContaining("span profile group 0 requires string id"),
-        expect.stringContaining("metric profile observation 0:0 requires string ref"),
+        expect.stringContaining("exactly two namespace segments"),
       ]),
     );
   });

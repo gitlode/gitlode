@@ -158,10 +158,12 @@ shape.
 
 ## Presentation verification
 
-Presentation tests primarily assert a structured view model: grouping, labels, preferred order,
-plugin scopes, fallback, signal state, diagnostics, zero semantics, units, and omission of
-percentiles. Formatter smoke tests assert meaningful content without treating padding, borders, or
-column widths as compatibility contracts.
+Presentation tests assert the generic Scope/two-level namespace tree, code-unit/kind/typed-attribute
+ordering, short/group-node collisions, plugin and unknown identities, escaping, attribute bases,
+fixed per-kind fields, masks, zero semantics, unit thresholds and omission of percentiles. Diagnostic
+tests cover report/Scope/observation/point placement, missing-only targets, valid siblings, fixed
+fallback, lifecycle-only notices and reserved detail summaries. Semantic-role spies and ANSI removal
+prove styled/plain text parity without treating padding, wrapping or column widths as contracts.
 
 The successful-run-only profile UX and `--quiet` suppression remain covered until a separate product
 decision changes them.

@@ -246,8 +246,9 @@ Structured observation definitions live beside this document:
 - [`telemetry-catalog/profile-report.yaml`](telemetry-catalog/profile-report.yaml) owns the
   structured-clone report fields, signal status, aggregate invariants, diagnostics, limits, and
   canonical collection order; and
-- [`telemetry-catalog/profile-view.yaml`](telemetry-catalog/profile-view.yaml) owns profile grouping,
-  labels, preferred reading order, and unknown-observation fallback.
+- [`telemetry-catalog/profile-view.yaml`](telemetry-catalog/profile-view.yaml) owns the generic
+  Scope/namespace hierarchy, deterministic ordering, tokens, numeric formatting, diagnostic
+  placement, and semantic styling roles.
 
 Markdown remains canonical for rationale, cross-cutting behavior, and policies that are better read
 as prose. YAML is canonical for repetitive structured definitions. The same field must not be
@@ -289,7 +290,8 @@ maximum theoretical attribute combination count for one metric must not exceed 1
 
 Shared identifiers and collection policy live in the observation and attribute catalogs. The
 collector does not contain operation-specific knowledge. Domain recorders own when and how values
-are recorded, while the profile-view catalog owns grouping, labels, and preferred display order.
+are recorded, while presentation applies one generic hierarchy without observation-specific labels,
+groups, or ordering metadata.
 
 ## Accepted observation inventory
 
@@ -656,34 +658,27 @@ has the same complete schema; contradictions and malformed input are inconclusiv
 repaired into an accepted report.
 
 Presentation owns the declarative
-[`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog with group, preferred order, and
-label for known observations. Span names do not contain numeric display prefixes. Unknown
-observations remain visible using canonical fallback order. Preferred display order is a diagnostic
-reading order, not an assertion about chronology.
-
-The profile is presented in separate span, counter, histogram, and diagnostic sections. Formatting
-may convert canonical units into readable units. Percentiles are omitted initially rather than
-presenting bucket approximations as exact measurements.
-
-Known spans and metrics appear in the catalog's diagnostic reading order; groups without
-observations are omitted. Plugin observations are subgrouped by resolved scope name and optional
-version. Core scope is normally omitted from known row labels, while plugin and fallback identity
-remains visible. A known observation name under an unexpected scope is treated as unknown rather
-than receiving a misleading known label.
+[`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog. All admitted observations are
+grouped by Scope name/version, then by the first two dot-separated name segments. Remaining segments
+form the row name. Spans, counters and histograms share this hierarchy; kind is used only for field
+shape, identity and deterministic tie ordering. Plugin, core and unknown admitted identities follow
+the same rules. No Plugins bucket, fallback bucket, kind section, human label override or
+per-observation preferred order exists.
 
 Span rows show total, calls, average, maximum, errors, and bounded attribute summaries. Counter rows
 show one value per attribute set. Histogram rows show count, sum, average, nullable minimum and
 maximum, unit, and attributes. Explicit bucket counts remain in `ProfileReport` but are not expanded
 by the initial CLI view, and zero rows are never synthesized for absent metrics.
 
-Duration and byte values may be humanized by presentation while the report retains `s` and `By`.
-Rounding must not display a nonzero value as an unqualified zero. Exact padding, borders, column
-widths, decimal places, and punctuation are not compatibility contracts.
+Duration and byte values use four-significant-digit presentation with unit promotion while the
+report retains `s` and `By`. Nonzero never becomes unqualified zero. Exact padding, terminal wrapping
+and punctuation are not compatibility contracts.
 
-When any signal is partial or unavailable, a compact status summary precedes the signal sections and
-the affected section repeats its state. Diagnostics render their severity, signal, stage, cataloged
-label, repeated or dropped count, and bounded message when present. Collection overflow stays inside
-the profile as informational diagnostic data and does not become an application warning.
+When diagnostics exist, a compact issue headline follows the Profile title. Structured details are
+placed at the narrowest safely evidenced report, Scope, observation, point or attribute target.
+Missing-only observations remain visible, while valid siblings and unaffected fields remain intact.
+Occurrence count is not loss quantity; known, unknown and omitted detail remain distinct. Collection
+overflow stays in the Profile block and does not become an application warning.
 
 ## Failure isolation
 

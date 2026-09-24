@@ -153,47 +153,13 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
   }
 
   const view = catalogs.profileView;
-  const spanGroups = objects(view.span_groups);
-  const metricGroups = objects(view.metric_groups);
-  for (const [kind, groups, validIds] of [
-    ["span", spanGroups, spanIds],
-    ["metric", metricGroups, metricIds],
-  ] as const) {
-    for (const [groupIndex, group] of groups.entries()) {
-      if (typeof group.id !== "string" || group.id.length === 0)
-        errors.push(`${kind} profile group ${groupIndex} requires string id`);
-      for (const [observationIndex, observation] of objects(group.observations).entries()) {
-        if (typeof observation.ref !== "string" || observation.ref.length === 0) {
-          errors.push(
-            `${kind} profile observation ${groupIndex}:${observationIndex} requires string ref`,
-          );
-        } else if (!validIds.has(observation.ref)) {
-          errors.push(
-            `${kind} profile group references non-${kind} observation: ${observation.ref}`,
-          );
-        }
-      }
-    }
-  }
-  for (const id of duplicateValues([...spanGroups, ...metricGroups].map((group) => text(group.id))))
-    errors.push(`duplicate profile view group id: ${id}`);
-  const spanPlacements = spanGroups.flatMap((group) =>
-    objects(group.observations).map((entry) => text(entry.ref)),
-  );
-  const metricPlacements = metricGroups.flatMap((group) =>
-    objects(group.observations).map((entry) => text(entry.ref)),
-  );
-  for (const [kind, ids, placements] of [
-    ["span", spanIds, spanPlacements],
-    ["metric", metricIds, metricPlacements],
-  ] as const) {
-    for (const id of ids) {
-      const count = placements.filter((placement) => placement === id).length;
-      if (count !== 1) errors.push(`accepted ${kind} ${id} has ${count} profile view placements`);
-    }
-    for (const ref of duplicateValues(placements))
-      errors.push(`duplicate ${kind} profile view placement: ${ref}`);
-  }
+  const hierarchy = view.generic_hierarchy as Record<string, unknown> | undefined;
+  if (hierarchy?.group_by !== "instrumentation_scope_name_and_version")
+    errors.push("profile view must group by instrumentation scope name and version");
+  if (hierarchy?.namespace_segments !== 2)
+    errors.push("profile view must use exactly two namespace segments");
+  if (view.span_groups !== undefined || view.metric_groups !== undefined)
+    errors.push("profile view must not define per-observation groups");
 
   const report = catalogs.profileReport;
   const reportDefinition = report.report as Record<string, unknown> | undefined;

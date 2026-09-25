@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                            | Remaining scope                                                            |
-| --------- | --------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only         | Preserve historical evidence and environment                               |
-| M1        | complete                          | Preserve corrected validation and squash attribution                       |
-| M2        | P1/P2 accepted; P3 round 2 review | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates         | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                               | Remaining scope                                                            |
+| --------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| M0        | complete, one target only            | Preserve historical evidence and environment                               |
+| M1        | complete                             | Preserve corrected validation and squash attribution                       |
+| M2        | P1-P3 accepted; terminal preparation | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates            | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -66,14 +66,17 @@ primitive acceptance, not runtime or M2 acceptance. P2 is accepted at
 157 focused tests, build and strict tooling checks were independently verified in the final review.
 This closes the runtime/consumer slice, not the complete profile or M2 acceptance.
 
-P3 R2/R3 round-2 corrections returned at `c694b69cc964226ccbf07325ee45ab32b6ff2e74`, with
-implementation `4d49d73` and documentation-only final delta. Next is
-[P3 round 2 focused re-review](opentelemetry-m2-profile-p3-review.md#p3-round-2-focused-re-review)
-for complete target attachment and deterministic visible diagnostic ties. P3-R1/R4 and P1/P2 remain
-accepted. P3 overall awaits review; human terminal and cumulative Windows/Linux validation remain
-later gates. Reported 75-test evidence has not been independently rerun by trunk. If the same R2/R3
-issue remains after round 2, use bounded diagnosis before further correction. No formal/package
-campaign is assigned.
+P3 implementation is accepted at `c694b69cc964226ccbf07325ee45ab32b6ff2e74`, recorded by independent
+review at `1a012d589604c6e570e155b3aa49a6d31a038f5d`. R1-R4 are closed; build, strict tooling and
+nine suites/75 tests were independently verified. P1/P2 remain accepted. This is implementation
+acceptance, not human terminal/cumulative/M2 acceptance.
+
+Next is [real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md) in a
+bounded branch session, using small existing fixtures with inherited terminal streams. Existing
+capture output is non-TTY and cannot establish color/readability. Trunk then presents exact commands
+for explicit human light/dark/wrapping confirmation. After feedback is resolved, assign cumulative
+Windows/Linux source and installed-package validation at a fixed candidate. No formal measurement,
+parent integration or tests/system move is assigned now.
 
 Continue on `feature/otel-redesign_M2_profile`; trunk is a conversation role, not a Git ref. Return
 outcomes without switching to main or updating parent branches. PR/merge authority is unchanged.
@@ -264,5 +267,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named P3 round 2 focused re-review
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named real-terminal confirmation preparation
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

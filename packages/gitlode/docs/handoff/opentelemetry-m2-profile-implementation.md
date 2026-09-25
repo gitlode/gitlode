@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P3 round 2 focused re-review](opentelemetry-m2-profile-p3-review.md#p3-round-2-focused-re-review).
-R2/R3 corrections returned at `c694b69cc964226ccbf07325ee45ab32b6ff2e74`. R1/R4 and P1/P2 remain
-accepted; P3 remains unaccepted. Earlier packets are historical context.
+P1/P2/P3 implementation slices are accepted; P3 fixed target is c694b69, with review at 1a012d5.
+Next assignment: [real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md).
+Human confirmation and cumulative validation remain pending. Earlier packets are historical context.
 
 ## Assignment, source and branch
 

@@ -1,8 +1,8 @@
 # P3 independent presentation review
 
-Current outcome: [P3 round 2 focused re-review outcome](#p3-round-2-focused-re-review-outcome).
-R2/R3 and the P3 implementation slice are accepted. R1/R4 and P1/P2 remain accepted; human terminal
-and cumulative validation are later gates. Earlier packets are historical context.
+P3 implementation review is complete: accepted at c694b69, recorded at 1a012d5.
+Next: [real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md).
+Human real-TTY and cumulative validation are pending. Earlier packets are historical evidence.
 
 ## Fixed inputs and authority
 

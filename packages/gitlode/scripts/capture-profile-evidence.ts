@@ -24,13 +24,17 @@ const scenarios = {
 } as const;
 
 type ScenarioName = keyof typeof scenarios;
-type RunMode = { kind: "capture" } | { kind: "terminal"; scenario: ScenarioName };
+type RunMode =
+  | { kind: "capture" }
+  | { kind: "plain"; scenario: ScenarioName }
+  | { kind: "terminal"; scenario: ScenarioName };
 
 function usage(): string {
   return [
     "Usage:",
     "  npx tsx packages/gitlode/scripts/capture-profile-evidence.ts",
     "  npx tsx packages/gitlode/scripts/capture-profile-evidence.ts --terminal <commit|file|plugin>",
+    "  npx tsx packages/gitlode/scripts/capture-profile-evidence.ts --plain <commit|file|plugin>",
   ].join("\n");
 }
 
@@ -40,6 +44,8 @@ function parseRunMode(args: string[]): RunMode {
     console.log(usage());
     process.exit(0);
   }
+  if (args.length === 2 && args[0] === "--plain" && args[1] in scenarios)
+    return { kind: "plain", scenario: args[1] as ScenarioName };
   if (args.length === 2 && args[0] === "--terminal" && args[1] in scenarios)
     return { kind: "terminal", scenario: args[1] as ScenarioName };
   throw new Error(`invalid arguments\n${usage()}`);
@@ -106,6 +112,18 @@ async function capture(root: string, name: ScenarioName): Promise<void> {
   console.log(result.stdout);
   console.log(`=== ${name} stderr excerpt ===`);
   console.log(scopeExcerpt(result.stderr, scenarios[name].scope));
+}
+
+async function capturePlain(root: string, name: ScenarioName): Promise<void> {
+  const fixture = await createScenario(root, name);
+  const result = await execute(process.execPath, fixture.args, {
+    maxBuffer: 2 * 1024 * 1024,
+    timeout: executionTimeoutMs,
+  });
+  console.error(`=== ${name} plain stdout (${Buffer.byteLength(result.stdout)} bytes) ===`);
+  process.stdout.write(result.stdout);
+  console.error(`=== ${name} plain stderr (${Buffer.byteLength(result.stderr)} bytes) ===`);
+  process.stderr.write(result.stderr);
 }
 
 function environmentValue(name: string): string {
@@ -194,6 +212,7 @@ async function main(): Promise<void> {
   process.once("SIGTERM", interrupt);
   try {
     if (mode.kind === "terminal") await runInTerminal(root, mode.scenario, abortController.signal);
+    else if (mode.kind === "plain") await capturePlain(root, mode.scenario);
     else for (const name of Object.keys(scenarios) as ScenarioName[]) await capture(root, name);
   } finally {
     process.off("SIGINT", interrupt);

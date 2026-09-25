@@ -8,12 +8,16 @@ import {
   formatProfileLines,
   formatSummaryLines,
 } from "../src/presentation/reporting/formatters.js";
-import { createStyling } from "../src/presentation/styling.js";
+import { createStyling, type Styling } from "../src/presentation/styling.js";
 
 const mode = process.argv.slice(2);
-if (mode.length !== 1 || (mode[0] !== "--terminal" && mode[0] !== "--plain")) {
+if (
+  (mode.length !== 1 && mode.length !== 2) ||
+  (mode[0] !== "--terminal" && mode[0] !== "--plain") ||
+  (mode.length === 2 && mode[1] !== "--compare-headings")
+) {
   console.error(
-    "Usage: npx tsx packages/gitlode/scripts/preview-terminal-styling.ts --terminal|--plain",
+    "Usage: npx tsx packages/gitlode/scripts/preview-terminal-styling.ts --terminal|--plain [--compare-headings]",
   );
   process.exit(1);
 }
@@ -109,7 +113,11 @@ const report: ProfileReport = {
 };
 
 console.error("SYNTHETIC styling sample: fixed data, no extraction or actual failure.");
-console.error("Active/done lines below are static samples, not a live progress demonstration.");
+console.error(
+  mode[1] === "--compare-headings"
+    ? "Both candidates below use the real Profile renderer with fixed synthetic data."
+    : "Active/done lines below are static samples, not a live progress demonstration.",
+);
 console.error(
   `Mode: ${terminal ? "terminal" : "plain"}; width: ${process.stderr.columns ?? "unknown"}; ` +
     `Chalk color level: ${chalk.level}; stderr color support: ${supportsColorStderr ? supportsColorStderr.level : "unavailable"}`,
@@ -117,57 +125,101 @@ console.error(
 if (terminal && chalk.level === 0)
   console.error("Color is unavailable; this run provides plain readability evidence only.");
 
-// Compare Chalk primitives directly, independently of gitlode's semantic roles.
-const chalkSamples: readonly [string, (text: string) => string][] = [
-  ["no style", (text) => text],
-  ["chalk.bold", chalk.bold],
-  ["chalk.dim", chalk.dim],
-  ["chalk.bold.dim", chalk.bold.dim],
-  ["chalk.italic", chalk.italic],
-  ["chalk.underline", chalk.underline],
-  ["chalk.inverse", chalk.inverse],
-  ["chalk.cyan", chalk.cyan],
-  ["chalk.cyan.bold", chalk.cyan.bold],
-  ["chalk.cyanBright", chalk.cyanBright],
-  ["chalk.white", chalk.white],
-  ["chalk.white.bold", chalk.white.bold],
-  ["chalk.whiteBright", chalk.whiteBright],
-  ["chalk.black.bgYellow", chalk.black.bgYellow],
-];
-const sampleText = "ABC abc Il1 0123456789 calls=12 total=24 ms";
-console.error("\nChalk primitives (identical text; labels are unstyled):");
-console.error("Compare stroke weight and color/brightness separately.");
-console.error("Record the font and Windows Terminal intenseTextStyle with your observations.");
-console.error("In --plain mode every sample intentionally has no styling.");
-for (const [label, decorate] of chalkSamples)
-  console.error(`  ${label.padEnd(20)} | ${terminal ? decorate(sampleText) : sampleText}`);
-console.error("\nHeading padding comparison (preview only; product spacing is unchanged):");
-for (const role of ["h1", "h2", "h3", "h4"] as const) {
-  console.error(`  ${role} no padding | ${styling[role]("Heading")}`);
-  console.error(`  ${role} one space  | ${styling[role](" Heading ")}`);
-}
-console.error("\ngitlode semantic roles (synthetic renderer output):");
+if (mode[1] === "--compare-headings") {
+  // Preview-only candidates reuse the production factory and renderer.
+  // Pad before decoration so styled/plain output contains identical text.
+  const padded: Styling = {
+    ...styling,
+    h1: (text) => styling.h1(` ${text} `),
+    h2: (text) => styling.h2(` ${text} `),
+    h3: (text) => styling.h3(` ${text} `),
+    h4: (text) => styling.h4(` ${text} `),
+  };
+  const candidates: readonly [string, Styling][] = [
+    ["A: same namespace style (black on cyan at both depths)", { ...padded, h4: padded.h3 }],
+    [
+      "C: related namespace styles (black on cyan / bright cyan)",
+      {
+        ...padded,
+        h4: (text) => (terminal ? chalk.black.bgCyanBright(` ${text} `) : ` ${text} `),
+      },
+    ],
+  ];
+  const comparisonReport: ProfileReport = {
+    ...report,
+    counters: [
+      ...report.counters,
+      {
+        scope,
+        name: "sample.output.records",
+        value: 3108,
+        unit: "{record}",
+        unavailableFields: [],
+        attributes: [],
+      },
+    ],
+  };
+  console.error(
+    "\nA/C heading comparison: same synthetic data, order and one-space heading padding.",
+  );
+  console.error("Only the second namespace level's style differs; product styling is unchanged.");
+  for (const [label, candidate] of candidates) {
+    console.error(`\n${label}`);
+    for (const line of formatProfileLines(comparisonReport, candidate)) console.error(line);
+  }
+} else {
+  // Compare Chalk primitives directly, independently of gitlode's semantic roles.
+  const chalkSamples: readonly [string, (text: string) => string][] = [
+    ["no style", (text) => text],
+    ["chalk.bold", chalk.bold],
+    ["chalk.dim", chalk.dim],
+    ["chalk.bold.dim", chalk.bold.dim],
+    ["chalk.italic", chalk.italic],
+    ["chalk.underline", chalk.underline],
+    ["chalk.inverse", chalk.inverse],
+    ["chalk.cyan", chalk.cyan],
+    ["chalk.cyan.bold", chalk.cyan.bold],
+    ["chalk.cyanBright", chalk.cyanBright],
+    ["chalk.white", chalk.white],
+    ["chalk.white.bold", chalk.white.bold],
+    ["chalk.whiteBright", chalk.whiteBright],
+    ["chalk.black.bgYellow", chalk.black.bgYellow],
+  ];
+  const sampleText = "ABC abc Il1 0123456789 calls=12 total=24 ms";
+  console.error("\nChalk primitives (identical text; labels are unstyled):");
+  console.error("Compare stroke weight and color/brightness separately.");
+  console.error("Record the font and Windows Terminal intenseTextStyle with your observations.");
+  console.error("In --plain mode every sample intentionally has no styling.");
+  for (const [label, decorate] of chalkSamples)
+    console.error(`  ${label.padEnd(20)} | ${terminal ? decorate(sampleText) : sampleText}`);
+  console.error("\nHeading padding comparison (preview only; product spacing is unchanged):");
+  for (const role of ["h1", "h2", "h3", "h4"] as const) {
+    console.error(`  ${role} no padding | ${styling[role]("Heading")}`);
+    console.error(`  ${role} one space  | ${styling[role](" Heading ")}`);
+  }
+  console.error("\ngitlode semantic roles (synthetic renderer output):");
 
-const lines = [
-  "",
-  formatActiveLine(snapshot, "⠋", styling),
-  formatDoneLine({ ...snapshot, refIndex: 1 }, styling),
-  "",
-  ...formatSummaryLines(
-    {
-      recordsWritten: snapshot.recordsWritten,
-      commitsTraversed: snapshot.commitsTraversed,
-      filesCreated: 2,
-      bytesWritten: snapshot.bytesWritten,
-      elapsedMs: snapshot.nowMs,
-      refs: ["main", "release"],
-    },
-    styling,
-  ),
-  "",
-  ...formatDiagnosticLines("warn", "Synthetic warning; no extraction was attempted.", styling),
-  ...formatDiagnosticLines("error", "Synthetic error; no application failure occurred.", styling),
-  "",
-  ...formatProfileLines(report, styling),
-];
-for (const line of lines) console.error(line);
+  const lines = [
+    "",
+    formatActiveLine(snapshot, "⠋", styling),
+    formatDoneLine({ ...snapshot, refIndex: 1 }, styling),
+    "",
+    ...formatSummaryLines(
+      {
+        recordsWritten: snapshot.recordsWritten,
+        commitsTraversed: snapshot.commitsTraversed,
+        filesCreated: 2,
+        bytesWritten: snapshot.bytesWritten,
+        elapsedMs: snapshot.nowMs,
+        refs: ["main", "release"],
+      },
+      styling,
+    ),
+    "",
+    ...formatDiagnosticLines("warn", "Synthetic warning; no extraction was attempted.", styling),
+    ...formatDiagnosticLines("error", "Synthetic error; no application failure occurred.", styling),
+    "",
+    ...formatProfileLines(report, styling),
+  ];
+  for (const line of lines) console.error(line);
+}

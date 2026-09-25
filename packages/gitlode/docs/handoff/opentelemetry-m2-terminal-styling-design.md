@@ -332,6 +332,45 @@ tests** passed (presentation plus collector-to-presentation coverage). The added
 structural heading routing, measured/issue-only namespace cases, exclusion of values/notices from
 heading decoration and text parity. Automated checks do not establish visual acceptance.
 
-Status: **continuation needed; awaiting Trial 3 visual feedback**. Primary values are adopted;
-heading palette and padding remain pending. Full root/release/package/CI validation and independent
-final review remain for return, not claimed by these bounded trial checks.
+### Trial 3 feedback and A/C sample
+
+Human viewed `7178f28d5bacef76395e1199d31e21c8404dd283` in Windows Terminal, Campbell / Tango Light,
+Cascadia Mono (the previously recorded terminal version is 1.24.11911.0). Adopted: Profile and
+application summary share `h1`; headings have one space of padding on each side; background-based
+heading differentiation is appropriate in principle. Primary values remain adopted as plain body
+text. Padding is approved for subsequent product implementation, not implemented in the product yet.
+
+Open issue: blue Scope and cyan first-level namespace appear related, while the two namespace
+levels should read as a group. The human requested A/C comparison after discussing same-style
+namespaces (A) and related base/bright backgrounds within existing levels (C). The comparison
+does not add a new subheading role or a product theme selector.
+
+`preview-terminal-styling.ts --terminal --compare-headings` displays only two labeled synthetic
+Profile blocks using the same data and real renderer. Both have the approved one-space heading
+padding, common `h1`/`h2` and black-on-cyan first-level namespaces. A makes the second namespace
+level use the same treatment; C uses black on bright cyan there. Only that decoration changes.
+Two sibling second-level namespaces (`git`, `output`) make the grouping repeat visible. Both
+include the same numbers, attributes, missing values and warning. `--plain --compare-headings`
+retains the padding and produces identical report bodies for both candidates. The normal preview
+mode still supplies the previous primitive, padding and full shared-role samples.
+
+```powershell
+npx tsx packages/gitlode/scripts/preview-terminal-styling.ts --terminal --compare-headings
+npx tsx packages/gitlode/scripts/preview-terminal-styling.ts --plain --compare-headings
+```
+
+No rebuild is needed for this helper-only change. Repeat in both agreed schemes; compare the
+namespace grouping against Scope, whether C's bright background makes the child appear overly
+prominent, and whether the extra distinction helps beyond A's indentation. Both are candidates;
+the source product palette remains Trial 3. Record the next human-viewed source OID and selection.
+
+A/C sample checks: strict standalone TypeScript checking and focused oxlint passed. Plain comparison
+completed; an isolated simulated-TTY/Chalk-level-1 check verified identical A/C text and padding,
+decoration differences confined to the two second-level namespace headings, and full styled/plain
+text parity. Terminal mode without a TTY and an unknown comparison argument both exited 1. These
+are helper/composition checks, not visual evidence or a new product validation campaign.
+
+Status: **continuation needed; awaiting A/C sample feedback**. Primary values, common `h1`,
+heading padding and background emphasis in principle are adopted. Namespace treatment remains
+pending. Product padding and selected palette application, the light-scheme yellow issue,
+unavailable GNOME evidence, final checks and independent review remain open.

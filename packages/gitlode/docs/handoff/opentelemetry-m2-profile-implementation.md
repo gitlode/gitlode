@@ -1684,3 +1684,64 @@ validation, PR, merge, freeze, tests/system migration or release acceptance work
 Trunk assigns an independent focused re-review after return. If the same underlying R2 or R3 issue
 remains after this second round, use a fresh bounded diagnosis before any further correction; do not
 automatically continue local patches or accept unresolved defects merely to end the loop.
+
+### P3 R2/R3 correction round 2 outcome
+
+Status: the bounded R2/R3 implementation and regression evidence are complete; P3 is not
+self-accepted. The branch remains `feature/otel-redesign_M2_profile` for an independent focused
+re-review.
+
+#### Provenance and implementation
+
+- Entry, local/actual remote equality and routing checkpoint:
+  `df71db30e06e0340e665226ab8f28f37c43ddd33`. Review checkpoint
+  `e6d1d7a9a1c1e19acf3125d8d5e7d56b3fc11ed5` and reviewed implementation
+  `61a34c1f13ee993099c4611b3e4ac966b2ab132c` were ancestors; their delta to entry was the round-2
+  routing packet only.
+- Implementation checkpoint: `4d49d73dd34c957204f7bc0d5690ae19c2a2b0e2`
+  (`fix: preserve complete profile diagnostic targets`). The final documentation checkpoint is the
+  subsequent branch tip containing this outcome; its exact OID and actual remote equality are
+  reported on return.
+- The pre-edit matrix above was recorded before tests or production changed. Formatter attachment
+  now partitions each name by complete observation/point target. Exact observation matches attach
+  once, exact points require kind plus typed attributes, and unmatched targets each retain one
+  issue-only row. Unmatched point rows retain their attributes and namespace-relative base; unrelated
+  measured siblings retain their ordinary available values. The same partition is used for
+  short/group-node, longer-suffix and malformed quoted-absolute paths.
+- Diagnostic sorting retains target/code/stage/effects precedence and now uses typed comparisons for
+  affected fields and detail-loss flags. Loss quantity compares presence, descriptor, unit,
+  null/known numeric value and saturation; whole-result evidence, numeric occurrence count, count
+  saturation and severity close the remaining visible ties. No formatted notice text or locale
+  comparison is used.
+- R1 nullable/collision-free Scope grouping and R4 semantic styling were not changed. The active
+  report schema, producers, admission, worker/fallback transport, CLI, style policy and dependencies
+  were not changed. The generic view catalog only makes the corrected target-retention and ordering
+  guarantees explicit.
+
+Changed files are `src/presentation/reporting/formatters.ts`, its focused formatter test, the generic
+view drift test, `docs/design/telemetry-catalog/profile-view.yaml`, and this handoff.
+
+#### Independent expectations and verification
+
+- Fail-before, with the literal expected lines already present and production still at entry:
+  `npx vitest run packages/gitlode/test/presentation/reporting/formatters.test.ts -t 'P3-R[23]'`
+  produced 3 failed, 4 passed and 16 skipped. Both ordinary and malformed R2 cases lost the unmatched
+  rows/notices and point attributes; the R3 case retained arrival order for null/known values,
+  quantity saturation and occurrence saturation.
+- Pass-after, same command and unchanged independent literals: 7 passed and 16 skipped. Both input
+  orders produce the same complete output; matched/unmatched notices and targets occur exactly once,
+  measured siblings remain available, and numeric 2 sorts before numeric 10.
+- Direct formatter/catalog suites: 2 files and 26 tests passed.
+- Existing P3 nine-suite command: 9 files and 75 tests passed, with no failures or skips. It covered
+  CLI help, formatter/view/catalog behavior, shared presentation, report primitives and fallback
+  transport.
+- The exact explicit strict tooling command from P3 passed with the formatter, drift, catalog, CLI
+  and capture-script paths. This is separate test-source TypeScript evidence; Vitest alone is not
+  claimed as typechecking. `npm run build:dev` passed for production TypeScript.
+- `npm run lint`, root `npm run format:write`, `npm run format:check`, and `git diff --check` passed.
+  Architecture was not rerun because no export, import boundary, dependency or ownership changed.
+
+No ordinary capture, human TTY review, formal measurement, cumulative Windows/Linux or package
+validation, `tests/system` migration, candidate freeze, release acceptance, PR or merge was started.
+Those remain later gates. The immediate next step is independent focused R2/R3 re-review of the
+recorded implementation and final documentation checkpoints.

@@ -505,8 +505,12 @@ describe("local span processor", () => {
         unavailableFields: [],
       });
       expect(report.signalStatus.spans).toBe("partial");
-      expect(formatProfileLines(report).join("\n")).toMatch(/total=.*calls=2, avg=.*max=/);
-      expect(formatProfileLines(report).join("\n")).toContain("Invalid aggregation discarded");
+      const output = formatProfileLines(report).join("\n");
+      expect(output).toContain("operation : calls=2, total=10 ns, avg=—, max=10 ns, errors=0");
+      expect(output).toContain(
+        "Duration summary excludes 1 invalid duration; average unavailable.",
+      );
+      expect(output).not.toContain("total/avg/max unavailable");
       expect(extractProfileReportMeasurements(report).totalEndedSpanCount).toMatchObject({
         status: "available",
         value: 2,
@@ -534,7 +538,11 @@ describe("local span processor", () => {
       totalDurationSeconds: 0,
       maxDurationSeconds: 0,
     });
-    expect(output).toMatch(/total=.*calls=1, avg=.*max=/);
+    expect(report.signalStatus.spans).toBe("partial");
+    expect(output).toContain("operation : calls=1, total=—, avg=—, max=—, errors=0");
+    expect(output).toContain(
+      "Duration summary excludes 1 invalid duration; total/average/maximum unavailable.",
+    );
     expect(output).not.toContain("total=0 s");
   });
 
@@ -576,8 +584,11 @@ describe("local span processor", () => {
       ],
     });
     const output = formatProfileLines(report).join("\n");
-    expect(output).toContain("Spans (partial)");
-    expect(output).toContain("Additional diagnostics omitted");
+    expect(report.signalStatus.spans).toBe("partial");
+    expect(output).toContain("Collection and telemetry lifecycle issues detected.");
+    expect(output).toContain("operation : calls=2, total=0 s, avg=—, max=0 s, errors=0");
+    expect(output).toContain("Additional diagnostic detail omitted (1 occurrence omitted).");
+    expect(output).not.toContain("Duration summary excludes");
     expect(evaluateRepositoryProfileReport(report).status).toBe("fail");
   });
 

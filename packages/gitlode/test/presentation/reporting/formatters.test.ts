@@ -959,7 +959,7 @@ describe("generic profile formatting", () => {
       },
     ];
     const output = formatProfileLines(report).join("\n");
-    expect(output).toContain("Duration summary excludes 1 invalid duration; avg unavailable.");
+    expect(output).toContain("Duration summary excludes 1 invalid duration; average unavailable.");
     expect(output).toContain("Repeated 3 times.");
     expect(output).toContain("the number of omitted occurrences is unknown");
     expect(output).toContain("prior issue detail unavailable");

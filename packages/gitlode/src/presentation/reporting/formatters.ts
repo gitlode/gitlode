@@ -368,7 +368,7 @@ function appendMeasurementDiagnostics(
       if (compareAttributeSets(diagnostic.target.attributes, row.value.attributes) !== 0) continue;
     } else if (diagnostic.target.type === "observation" && diagnostic.target.kind !== row.kind)
       continue;
-    appendNotice(lines, diagnostic, depth, styling);
+    appendNotice(lines, diagnostic, depth, styling, row);
   }
 }
 
@@ -459,12 +459,13 @@ function appendNotice(
   diagnostic: ProfileDiagnostic,
   depth: number,
   styling: Styling,
+  row?: ProfileMeasurement,
 ): void {
   const marker = diagnostic.severity === "warning" ? styling.warnBadge("!") : "!";
-  lines.push(`${"  ".repeat(depth)}${marker} ${diagnosticText(diagnostic)}`);
+  lines.push(`${"  ".repeat(depth)}${marker} ${diagnosticText(diagnostic, row)}`);
 }
 
-function diagnosticText(diagnostic: ProfileDiagnostic): string {
+function diagnosticText(diagnostic: ProfileDiagnostic, row?: ProfileMeasurement): string {
   const attribute =
     diagnostic.attributeKey.type === "exact" ? `${formatToken(diagnostic.attributeKey.key)}: ` : "";
   let text: string;
@@ -484,9 +485,20 @@ function diagnosticText(diagnostic: ProfileDiagnostic): string {
       const count = diagnostic.lossQuantity.value;
       text = `Duration summary excludes ${count}${diagnostic.lossQuantity.saturated ? "+" : ""} invalid duration${count === 1 ? "" : "s"}`;
       const fields = diagnostic.affectedFields
+        .filter((item) => item.kind === "span")
         .flatMap((item) => item.fields)
         .filter((field) => field === "avg" || field === "total" || field === "max");
-      if (fields.length > 0) text += `; ${fields.join("/")} unavailable`;
+      const availability = row?.kind === "span" ? deriveSpanNumericAvailability(row.value) : null;
+      const unavailableFields =
+        availability === null ? [] : fields.filter((field) => !availability[field]);
+      const labels: Readonly<Record<(typeof fields)[number], string>> = {
+        total: "total",
+        avg: "average",
+        max: "maximum",
+      };
+      if (unavailableFields.length > 0)
+        text += `; ${unavailableFields.map((field) => labels[field]).join("/")} unavailable`;
+      else if (fields.length > 0 && availability === null) text += "; duration summary incomplete";
       text += ".";
     } else if (isEntireResultUnavailable(diagnostic))
       text = "No valid result retained: invalid aggregation discarded.";

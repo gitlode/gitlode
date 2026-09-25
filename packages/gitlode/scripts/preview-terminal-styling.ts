@@ -116,6 +116,33 @@ console.error(
 );
 if (terminal && chalk.level === 0)
   console.error("Color is unavailable; this run provides plain readability evidence only.");
+
+// Compare Chalk primitives directly, independently of gitlode's semantic roles.
+const chalkSamples: readonly [string, (text: string) => string][] = [
+  ["no style", (text) => text],
+  ["chalk.bold", chalk.bold],
+  ["chalk.dim", chalk.dim],
+  ["chalk.bold.dim", chalk.bold.dim],
+  ["chalk.italic", chalk.italic],
+  ["chalk.underline", chalk.underline],
+  ["chalk.inverse", chalk.inverse],
+  ["chalk.cyan", chalk.cyan],
+  ["chalk.cyan.bold", chalk.cyan.bold],
+  ["chalk.cyanBright", chalk.cyanBright],
+  ["chalk.white", chalk.white],
+  ["chalk.white.bold", chalk.white.bold],
+  ["chalk.whiteBright", chalk.whiteBright],
+  ["chalk.black.bgYellow", chalk.black.bgYellow],
+];
+const sampleText = "ABC abc Il1 0123456789 calls=12 total=24 ms";
+console.error("\nChalk primitives (identical text; labels are unstyled):");
+console.error("Compare stroke weight and color/brightness separately.");
+console.error("Record the font and Windows Terminal intenseTextStyle with your observations.");
+console.error("In --plain mode every sample intentionally has no styling.");
+for (const [label, decorate] of chalkSamples)
+  console.error(`  ${label.padEnd(20)} | ${terminal ? decorate(sampleText) : sampleText}`);
+console.error("\ngitlode semantic roles (synthetic renderer output):");
+
 const lines = [
   "",
   formatActiveLine(snapshot, "⠋", styling),

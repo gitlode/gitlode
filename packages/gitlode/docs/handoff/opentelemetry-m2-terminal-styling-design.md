@@ -194,6 +194,17 @@ and never forces color. `--terminal` requires direct TTY stdout/stderr; `--plain
 plain factory. Check number-heavy Profile rows for excessive bold as well as legibility.
 Spacing/separator changes follow role adoption.
 
+Before judging Trial 1, the human requested direct Chalk samples because bold appeared
+indistinguishable from unstyled text in the current Windows Terminal environment. This is a
+provisional observation, not acceptance or rejection of the role assignment; the viewed OID and
+font/intensity settings are not yet recorded. The preview now prints a separate compact Chalk
+primitive section: identical text with no style, bold, dim, bold+dim, italic, underline, inverse,
+cyan/cyan+bold/brightCyan, white/white+bold/brightWhite, and black on yellow. Labels remain unstyled.
+Compare stroke weight independently from brightness and record the font and `intenseTextStyle`;
+do not infer that an emitted bold sequence necessarily produces a visible weight difference.
+Plain mode removes decoration from these samples too. This addition changes the helper only, not
+the product styling candidate.
+
 Human-confirmed working matrix: **Windows Terminal 1.24.11911.0**, **Campbell / Tango Light**,
 plus plain text. The human has no GNOME Terminal installation and authorized proceeding with Windows
 and plain checks first; preparing a VM is not part of this trial. GNOME **Tango dark / Tango light**

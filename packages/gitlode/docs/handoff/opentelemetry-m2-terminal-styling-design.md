@@ -137,3 +137,67 @@ Existing accepted P1/P2 and unrelated P3 behavior remain accepted. M2 and releas
 open; the publish record stays blocked. Formal measurement, freeze, PR and merge are not authorized by
 this packet. Finish on the styling child with committed, remotely preserved work and an explicit
 complete-for-review or continuation-needed outcome.
+
+## Styling session entry and first proposal
+
+Entry source: `76486d25870172528ce9af086ace756388b6c8d8`. The worktree was clean,
+`f653688361b430045bbc5bfeb1a3cd7340de114f` was an ancestor, and `git ls-remote`
+confirmed actual profile remote equality. The styling child did not exist locally or remotely;
+`feature/otel-redesign_M2_styling` was created at that source and normally pushed with upstream
+tracking. No visual trial has been implemented or observed at this checkpoint.
+
+### Inspected implementation and lessons
+
+- Locked and installed Vitest: **4.1.10**. Inspected installed
+  `node_modules/vitest/dist/chunks/utils.BS4fH3nR.js` (`formatTestPath`, `getStateString`,
+  `formatProjectName`, `withLabel`, `padSummaryTitle`) and
+  `index.UpGiHP7g.js` (`reportTestSummary`). Labels/separators/details use dim; file basenames
+  use default-foreground bold; pass/fail use green/red plus words or symbols; total duration
+  uses default foreground. Project labels use black text with palette backgrounds.
+- Its locked/installed color dependency is **tinyrainbow 3.1.0**, not Chalk. Inspected
+  `node_modules/tinyrainbow/dist/index.js`: bold/dim are SGR 1/2; white/brightWhite are 37/97.
+  Its color-support detection differs from gitlode's; do not copy it as product policy.
+- gitlode's installed/locked Chalk is **6.0.0**. Inspected `source/index.js` and
+  `source/vendor/ansi-styles/index.js`, plus [official Chalk documentation](https://github.com/chalk/chalk).
+  The existing factory gates on stderr TTY but uses the default Chalk instance (stdout color
+  capability); the terminal helper requires both streams to be TTY. Preserve this existing policy
+  in the first role trial and record both stream conditions when checking output.
+- Inspected shared consumers: progress active/done formatters, completion summary, Profile
+  measurement/attribute/diagnostic formatters and application diagnostic badges. `primaryValue`
+  affects progress counters/times, summary quantities, Profile numbers and scalar attributes.
+  Unavailable values and diagnostic explanations already use default foreground.
+- Inference for the trial: selective color and weight can retain useful hierarchy without fixing
+  primary values to a named white palette entry. Vitest is an example, not contrast evidence or
+  a mandate to copy its colors/backgrounds.
+
+Official references inspected: [Windows Terminal schemes](https://learn.microsoft.com/en-us/windows/terminal/customize-settings/color-schemes),
+[profile appearance](https://learn.microsoft.com/en-us/windows/terminal/customize-settings/profile-appearance)
+and [GNOME Terminal colors](https://help.gnome.org/gnome-terminal/app-colors.html).
+Default foreground and named ANSI colors are distinct settings. Bold rendering can depend on
+terminal intensity settings; record those if weight/brightness is surprising. Window theme and
+text-area scheme must be recorded separately.
+
+### Proposed bounded trial (pending)
+
+| Principle                                         | Trial                                                                                              | Human result | Decision |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------ | -------- |
+| Readable primary values on light/dark backgrounds | Change only `primaryValue` from `chalk.whiteBright` to `chalk.bold`                                | Not run      | Pending  |
+| Useful semantic colors and secondary emphasis     | Observe existing cyan spinner/refs, green completion, yellow/red badges, dim keys/units/separators | Not run      | Pending  |
+
+Reuse the terminal-check helper for real commit/file/plugin output and plain comparison. Add a
+clearly labeled synthetic sample using the real factory and formatters to cover all 12 roles,
+including active progress, warning/error badges and unavailable fields. Check number-heavy Profile
+rows for excessive bold as well as legibility. Spacing/separator changes follow role adoption.
+
+Proposed finite matrix: Windows Terminal **Campbell / Tango Light**, GNOME Terminal
+**Tango dark / Tango light**, plus ordinary non-TTY plain output. Start at the user's usual width
+(approximately 120 columns if no preference), then about 80 columns. Include the previously failing
+Windows scheme as the regression case if different; settle substitutions with the human rather than
+expanding indefinitely. Exact terminal versions, schemes, widths and GNOME GUI availability are
+awaiting human input. This agent has not observed either GUI renderer. WSL inside Windows Terminal
+does not supply GNOME evidence; unavailable GNOME evidence remains an explicit return gap.
+
+Status: **continuation needed** after the initial investigation/proposal. No role choice is adopted,
+no human-viewed trial OID exists, and no build/test/visual acceptance is claimed for this documentation
+checkpoint. Next: settle available environments, implement the small trial and supply exact commands
+and its committed source OID for human observation.

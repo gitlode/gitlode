@@ -554,3 +554,84 @@ P3 implementation acceptance does not authorize integration. Human light/dark re
 color perception and wrapping remain pending, as does the separately assigned cumulative Windows/Linux
 source and installed-package validation. Formal measurement and later M2/release decisions also remain
 outside this review.
+
+## Focused CI and duration-diagnostic correction review outcome
+
+Status: **accepted** for the bounded CI-failure and duration-diagnostic correction at
+`d9e994cc28bc91b9ca86f3a3e6e798371ec85481`. No correction-required finding was found in the fixed
+three-file implementation delta. This decision does not reopen accepted P1/P2/P3 contracts and does
+not accept the human real-terminal gate, cumulative validation, M2, integration, release, PR or merge.
+
+### Reviewed provenance and scope
+
+- Review entry and outcome checkpoint: `7043f2c80e2b5deb33f7a69b49a2c39c5e1733d2` on
+  `feature/otel-redesign_M2_profile`; entry was clean, and local `HEAD`, the tracking ref and the
+  actual remote ref resolved to that OID before the review checkpoint. Baseline
+  `ea9811b548254a51c8f595a595c0eff8b0b42a9a`, fixed implementation
+  `d9e994cc28bc91b9ca86f3a3e6e798371ec85481` and the outcome checkpoint form the requested ancestor
+  chain. The implementation-to-outcome delta contains only the implementation and terminal-check
+  handoffs.
+- The fixed implementation delta changes only `formatters.ts`, its focused formatter test and
+  `local-collection.test.ts`. No producer, schema, aggregation, admission or accepted P1/P2/P3 policy
+  changed. Review was confined to numeric availability, target-local diagnostic rendering, test
+  meaning and compacted quality evidence.
+
+### Decision and failure-path analysis
+
+- Measurement-attached duration diagnostics now receive the exact rendered measurement row and use
+  the same `deriveSpanNumericAvailability()` result as its numeric fields. Mixed input therefore keeps
+  retained total/maximum and marks only average unavailable; all-invalid input marks
+  total/average/maximum unavailable; a retained genuine-zero contribution remains displayed as zero.
+  `affectedFields` limits the explanatory candidates but no longer independently declares them
+  unavailable.
+- Availability cannot leak from a same-name unrelated row. Existing partitioning first requires the
+  target kind for an observation and kind plus complete typed attributes for a point. Only that matched
+  row is passed to the diagnostic formatter. Issue-only rows and shared same-name headings pass no
+  measurement, so they use the non-inferential `duration summary incomplete` wording rather than
+  borrowing another kind or point's availability.
+- The producer-to-report-to-formatter tests retain exact aggregate values, contribution coverage,
+  partial status and formal-consumer failure semantics for both mixed input orders. They independently
+  require all-invalid unavailability, preserve genuine zero after mixed compaction, and require the
+  reserved summary's Span incomplete-field effect and visible omitted-detail notification. The updated
+  assertions replace stale field order, kind heading and wording dependencies with stronger semantic
+  checks; they do not suppress the diagnostic to pass.
+- After diagnostic compaction, the reserved summary still states that collection/telemetry issues
+  exist, preserves the Span `incomplete_measurement_fields` association and reports one omitted
+  occurrence. It does not invent a target or affected-field detail that the summary did not retain.
+  No concrete failure path remained after inspection and the bounded probe below.
+
+### Independent execution, CI confirmation and reported evidence
+
+- Independent `npm run build:dev`: passed.
+- Independent focused Vitest run over `local-collection.test.ts` and `formatters.test.ts`: 2 files and
+  70 tests passed, with no failures or skips.
+- Independent established P3 standalone strict TypeScript command over the YAML/catalog support,
+  catalog/formatter/drift/CLI tests and capture script: passed. Vitest is not treated as test-source
+  typechecking.
+- A temporary formatter probe covered a same-name Counter beside an absent Span target and a shared
+  same-name Span/Counter heading. It passed 1 test with 23 skipped: both non-row-attached notices used
+  `duration summary incomplete` and neither borrowed `average unavailable` from a different row. The
+  probe was removed, and all three implementation/test files returned exactly to the fixed target
+  before this document was edited.
+- GitHub API confirmation of [implementation run
+  36085229805](https://github.com/gitlode/gitlode/actions/runs/36085229805) found head SHA
+  `d9e994cc28bc91b9ca86f3a3e6e798371ec85481`, completed/success, with its sole `Test and Build` job
+  successful. `Run source tests`, `Build release artifact`, `Validate packed package metadata` and
+  `Run installed-package system test` each completed successfully and none was skipped.
+- The same independent API check of [outcome run
+  36085475426](https://github.com/gitlode/gitlode/actions/runs/36085475426) found head SHA
+  `7043f2c80e2b5deb33f7a69b49a2c39c5e1733d2` and the same job and four required steps completed
+  successfully without skips.
+- The implementation author's fail-before sequence, full 94-file/1245-test root run, nine-suite run,
+  lint and other pass-after evidence were inspected as reported evidence only; this review did not
+  relabel or rerun them. No concrete concern justified another full suite or package-validation run.
+
+### Unconfirmed and remaining gates
+
+The exploratory whole-file standalone strict check for `local-collection.test.ts` was not repeated.
+Its recorded line-69 `Record<string, unknown>` versus OTel `Attributes` mismatch predates this delta;
+the changed paths pass the established strict scope, so the mismatch remains an unresolved non-blocker
+for this bounded correction. Human light/dark, normal/narrow-width and plain-output real-terminal
+confirmation remains **PENDING**. Cumulative Windows/Linux source and installed-package validation,
+formal measurement, M2 completion and release acceptance remain separate later gates. Trunk must
+explicitly assign the next step.

@@ -1,16 +1,33 @@
-# Terminal-aware styling: interactive design assignment
+# Terminal-aware styling: interactive design and prototype assignment
 
 ## Status and authority
 
 Human terminal feedback requests changes before cosmetic fine tuning. This is a bounded extension
 of M2 profile readability, not a new telemetry architecture workstream. The human starts a separate
-interactive design conversation; do not implement before the design returns to trunk.
+interactive conversation. This packet supersedes the former design-only assignment: small production,
+test and sample changes are authorized to make style decisions from real output. Do not require a
+complete design document before trying a bounded candidate with the human.
 
-Continue on `feature/otel-redesign_M2_profile`. Entry known to trunk is
-`aab058e0b0507fc599a2aae7b2cd4474ea3043ce`; verify the current clean tip, ancestry and remote before
-work. This planning packet will advance that tip. Preserve checkpoints through normal commit/push.
-Do not switch to main, update parent refs, create PRs, merge, or rewrite preserved history.
-The child still targets a human-approved squash into M2 after cumulative acceptance.
+## Branch and checkpoint boundary
+
+Planning is on `feature/otel-redesign_M2_profile`, based on clean checkpoint
+`f653688361b430045bbc5bfeb1a3cd7340de114f`; this packet advances that tip. At entry, verify the
+planning commit containing this packet, ancestry, clean worktree and actual remote equality. Record
+its full OID, then create `feature/otel-redesign_M2_styling` from that verified profile tip and normally
+push with upstream tracking. If the styling branch already exists, inspect it and resume only when
+its provenance matches; never reset or overwrite it. Trunk is a conversation role, not a Git ref.
+
+Commit and normally push meaningful trials, including explicitly unfinished states, before handoff
+or long pauses. Record which OID the human actually viewed and which choices were adopted. Do not
+rewrite pushed checkpoints. Keep trial history on the styling child; the recommended return is a
+human squash into `feature/otel-redesign_M2_profile` after final review/CI and human acceptance.
+The profile child later enters M2 by human squash after cumulative acceptance. Preserve the styling
+source ref until trunk accounts for post-squash content and evidence; only the human deletes branches.
+No formal performance candidate is frozen here. Do not claim a squash OID was the tested source;
+record the mapping and assess its delta before later validation/freezing.
+
+Do not create a PR without explicit human approval naming source and base. Only the human merges.
+Do not update profile/M2/integration/main refs, force push, or switch to main at completion.
 
 ## Confirmed context and principles
 
@@ -34,7 +51,7 @@ The child still targets a human-approved squash into M2 after cumulative accepta
   Default foreground with bold for primary values is a proposal, not a final palette decision.
 - Keep semantic roles centralized in `src/presentation/styling.ts`; do not color by domain attributes.
 
-## Design work, with the human
+## Investigation and trials, with the human
 
 Read applicable AGENTS instructions, canonical CLI styling and profiling contracts, accepted profile
 sections on styling, and the terminal-check packet. Inspect current shared role consumers, including
@@ -59,31 +76,64 @@ WSL inside Windows Terminal does not test a separate terminal renderer. Distingu
 from text-area palette. Do not auto-detect or query background colors unless a concrete need emerges;
 a theme-detection subsystem is outside the proposed scope.
 
-Produce, in this document:
+## Interactive loop and scope
 
-1. Accepted principles, explicit tradeoffs and the finite environment matrix.
-2. A role-to-style table, including primaryValue, keys, units, separators, notices and headers.
-3. Shared-consumer impact and exact canonical documentation changes required.
-4. Bounded implementation/review checks: correct role use, plain/styled text parity, CI, and real
-   light/dark visibility. ANSI snapshots do not prove contrast. Cover every role in a clearly labeled
-   synthetic style sample when ordinary fixtures do not exercise notices/unavailable values; do not
-   add product failure injection merely to demonstrate colors.
-5. Open questions, human decisions, and an implementation handoff with finite completion criteria.
+1. Inspect role consumers and the locked Vitest implementation; summarize a small number of concrete
+   lessons and candidate role assignments. Confirm the finite terminal/palette matrix with the human.
+2. Implement a small reversible styling candidate and a clearly labeled synthetic role sample where
+   ordinary fixtures lack warnings, errors or unavailable values. Reuse the real styling factory and
+   renderer; no second product renderer, permanent theme picker or product failure injection.
+3. Provide exact commands, expected workload and what to compare. The human runs real terminals;
+   do not claim automated ANSI snapshots establish readability. Record palette names separately from
+   window themes, approximate widths, source OID and unobserved environments/roles.
+4. Ask for feedback, adjust the candidate and repeat within this conversation. Ordinary bounded
+   trials do not need a trunk round trip. Keep a short decision table: principle, trial, human result,
+   adopted/rejected/pending. Do not mistake an unreviewed prototype for an accepted policy.
+5. Once palette principles and shared roles are adopted, handle spacing/separators or other fine
+   adjustments as a distinct pass with separate rationale. Do not mix an individual preference into
+   a universal rule. Stop after agreed findings are resolved; do not exhaustively tune arbitrary themes.
 
-Ask the human about material choices interactively. Do not reopen namespace, numeric availability,
-aggregation, schema, performance, system-test organization, or spacing/alignment fine tuning.
-No production/test changes, formal measurement, acceptance-record changes or candidate freeze.
-Design documents only; run format:write, format:check and diff check, commit and normally push.
-Return exact OIDs, clean/remote status and decisions for trunk integration review. Design approval
-is not implementation approval or human approval of the resulting terminal output.
+Use the existing terminal-check helper for real commit/file/plugin output and check shared progress
+and completion output too. A synthetic sample should cover all styling roles, clearly distinguished
+from observed CLI behavior. Preserve plain/styled text parity except separately agreed textual/layout
+changes. Respect existing color-support and non-TTY behavior; never force colors in the product.
 
-## Sequence after design
+Escalate to trunk if a fix requires telemetry/schema/aggregation changes, substantial output-structure
+redesign, a new terminal capability/theme subsystem, or a material expansion of supported environments.
+Do not silently broaden into performance, tests/system organization or release acceptance. If context
+becomes too large or the same issue remains after two correction rounds, checkpoint exact state and
+return a bounded diagnosis/continuation request rather than starting another unbounded patch cycle.
 
-1. Trunk reviews fit with M2 and assigns a bounded implementation session.
-2. Implementation updates shared styles and affected canonical docs/tests together; preserve OIDs.
-3. Independent review and green CI precede renewed human light/dark confirmation.
-4. Only then handle spacing or other cosmetic feedback in a separate bounded pass.
-5. Freeze the resulting functional candidate for cumulative Windows/Linux/package validation.
+## Completion and verification
 
-Existing accepted P1/P2 and unrelated P3 behavior remain accepted. M2, human readability and release
-acceptance remain open; the publish record stays blocked. This adds no new permanent Git branch.
+The goal is useful colored/weighted output that stays readable in the agreed light/dark matrix, not
+identical appearance on every terminal. Weak/unsupported decoration is acceptable when text remains
+readable; color-free output must retain meaning. Human approval is required for the selected visual
+result. If Linux GUI evidence is unavailable, record the gap and return it to trunk; do not substitute
+WSL inside Windows Terminal or silently waive it.
+
+During trials run meaningful affected checks, not a full campaign for each color edit. Before return:
+
+- Verify role use, target-local behavior and plain/styled text parity with affected tests, including
+  collector-to-presentation tests if formatting behavior changes. Avoid tests that merely duplicate
+  a color assignment without checking a contract.
+- Run build, applicable strict tooling checks, lint, format:write, format:check and diff check.
+- Run root source tests and verify final-source CI including release build, packed metadata and
+  installed-package tests; distinguish skipped/unverified checks. Warn before long execution/waits.
+- Update durable policy with the adopted implementation: `docs/design/cli.md`, `docs/profiling.md`
+  and relevant profile-view catalog/tests as affected. Reconcile superseded styling statements in
+  the profile design; do not keep conflicting dim/role rules. Update usage only if its contract changes.
+- Record source OIDs, human environment/results, adopted role table, checks and residual issues here;
+  keep this note compact instead of appending every transcript or duplicating canonical policy.
+
+Return for independent focused review of the final diff, shared-consumer effects, tests and contracts.
+Do not self-accept the implementation. Human trial approval may serve as visual evidence only for the
+recorded content; later visible corrections require another targeted human check. Trunk assigns review
+and, once accepted with green CI and human visual approval, prepares the source/base PR for permission.
+After human squash, trunk verifies content correspondence before cumulative Windows/Linux/package
+validation at a fixed profile candidate. CI does not replace that cumulative acceptance packet.
+
+Existing accepted P1/P2 and unrelated P3 behavior remain accepted. M2 and release acceptance remain
+open; the publish record stays blocked. Formal measurement, freeze, PR and merge are not authorized by
+this packet. Finish on the styling child with committed, remotely preserved work and an explicit
+complete-for-review or continuation-needed outcome.

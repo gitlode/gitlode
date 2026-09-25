@@ -75,16 +75,19 @@ The CI/duration correction at `d9e994c` is accepted, recorded at `aab058e`; its 
 and outcome CI passed. Human terminal feedback then identified unreadable bright-white primary
 values on a light background. Human readability is changes-requested, not accepted.
 
-Next is the [interactive terminal styling design](opentelemetry-m2-terminal-styling-design.md).
-Settle palette-aware principles and shared role assignments before implementation or spacing tweaks.
-Keep useful colors and dim; do not optimize for all conceivable themes by removing styling.
-The sequence is design with the human, trunk scope review, bounded implementation, independent review
-and green CI, renewed human terminal confirmation, then separate cosmetic feedback if needed.
-After feedback is resolved, assign cumulative Windows/Linux source and installed-package validation
-at a fixed candidate. Formal performance and other M2 gates are unchanged.
+Next is the [interactive styling design/prototype session](opentelemetry-m2-terminal-styling-design.md).
+The human adopted a small implementation -> real-output feedback -> recorded decision loop, not a
+strict design-only/implementation split. Keep useful colors and dim; do not optimize for all conceivable
+themes by removing styling. Settle palette principles through bounded trials before the separate fine
+spacing/style pass. Shared progress and completion styling are included, not only Profile.
 
-Continue on `feature/otel-redesign_M2_profile`; trunk is a conversation role, not a Git ref. Return
-outcomes without switching to main or updating parent branches. PR/merge authority is unchanged.
+Planning remains on `feature/otel-redesign_M2_profile`; the human-started session creates
+`feature/otel-redesign_M2_styling` from the verified remote-backed planning tip. Its packet authorizes
+bounded production/test/sample edits, checkpoints and normal pushes. Independent focused review,
+green final-source CI and human visual approval precede a human-approved squash back into profile.
+After checking post-squash content correspondence, assign cumulative Windows/Linux source and
+installed-package validation at a fixed candidate. Formal performance and other M2 gates are unchanged.
+Trunk is a conversation role, not a Git ref; no automatic parent-ref updates or PR/merge authority.
 
 ## Session sequence and dependencies
 
@@ -100,13 +103,15 @@ accepting a preparatory slice does not accept the entire profile feature or publ
 | P2-R                  | Independent data-integrity/failure-isolation review                                                                                  | Existing detection matrix, actual builder failure, diagnostic failure, overflow and shutdown combinations                          |
 | P3                    | Generic Scope/name display, precision/escaping, shared style and removal of old per-name view policy                                 | P2 accepted; migrate canonical display/catalog contracts together; no transitional v1 support remains                              |
 | P3-R/V                | Independent cumulative review, real commit/file/plugin output and human terminal review, Windows/Linux functional/package validation | Complete profile child branch; runtime output approval and evidence before its integration into M2                                 |
+| P3-style              | Interactive shared-style trials, human feedback, adopted policy and independent focused review                                       | P3/CI correction accepted; styling child returns by human squash into profile before cumulative validation                         |
 | S-D/I/R               | Separate private tests/system boundary design, bounded migration and review                                                          | Profile schema/tooling stable; preserve commands and checked TypeScript for moved tooling; do not combine file moves with P2       |
 | F                     | Trunk history review, candidate/package/harness preservation and measurement-readiness checks                                        | Profile/system slices accepted; no pending source changes affecting timed inputs; exact remotely preserved OIDs and archive hashes |
 | T13B execution/review | Bounded Linux operator sessions, then independent evidence review                                                                    | F; calibration/reuse decision, legacy capture, comparisons and aggregation/volume matrix from canonical contracts                  |
 | Final/T13C            | Combined release-candidate delta, final Windows/Linux/package evidence, durable documentation and acceptance record                  | Full obligations; account for unrelated integration changes and version/lockfile changes before final acceptance                   |
 
 P1-P3 share `feature/otel-redesign_M2_profile`, created from the remote-backed M2 checkpoint containing
-this plan. Use sequential conversations on that branch, not a fresh branch per correction. This keeps
+this plan. Use sequential conversations on that branch, not a fresh branch per correction. The
+explicit styling child below is the bounded exception for human-driven visual trials. This keeps
 coupled schema/collector/view work off M2 until coherent. P1 may temporarily stage v2-only primitives
 beside the active v1 contract; that is not permission for a shipped dual-version protocol. P2 completes
 the producer/consumer switch; P3 removes transitional code. Never merge a preparatory checkpoint by
@@ -148,6 +153,7 @@ M2 and its child branches may use any appropriate strategy, subject to human PR/
 | ----------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `feature/otel-redesign_M2`                | Trunk planning plus accepted cumulative changes; push meaningful checkpoints | Into integration: normal merge after history review and candidate freeze |
 | `feature/otel-redesign_M2_profile`        | P1-P3 and review corrections; commit/push even explicitly unfinished stages  | Into M2: human squash after cumulative acceptance                        |
+| `feature/otel-redesign_M2_styling`        | Interactive visual trials; preserve source OIDs and human decisions          | Into profile: human squash after focused review, CI and visual approval  |
 | `feature/otel-redesign_M2_system`         | First system workspace slice and corrections; commit/push independently      | Into M2: human squash after its acceptance                               |
 | `archive/otel-m2-profile-design-20260918` | Immutable accepted design at `d87bfd6fb8d4e874bb78424111f21f78fd6c9a6d`      | Never merge as a work branch                                             |
 | `archive/otel-m2-product-<oid12>`         | F records exact product OID and immutable runtime/package identities         | Never move; product OID must remain an ancestor of final/publish source  |
@@ -265,12 +271,13 @@ tests and limited M2 responsibility clarification. None is an automatic implemen
 
 ## Session boundaries
 
-Trunk owns interactive design decisions, acceptance, dependency ordering and the next bounded packet.
+Trunk owns overall scope, acceptance, dependency ordering and the next bounded packet. The assigned
+styling conversation works directly with the human on in-scope visual decisions and trials.
 The human launches implementation, review and measurement conversations. Each packet fixes its source,
 scope, exclusions, finite checks and exit evidence. Implementation and formal measurement are separate;
 operators return evidence or a diagnosis request rather than repairing code during a measurement run.
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named interactive terminal styling design
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named interactive terminal styling design/prototype session
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

@@ -3,11 +3,14 @@
 ## Current routing: styling changes requested
 
 The human performed terminal checks and reported unreadable bright-white primary values on a light
-background. Readability is **changes requested**. Fine cosmetic adjustments and renewed acceptance
-are held until the [interactive styling design](opentelemetry-m2-terminal-styling-design.md), bounded
-implementation and independent review complete. The CI correction is accepted at `d9e994c`, recorded
-at `aab058e`; CI is no longer the hold reason. Commands below remain reproduction tools, not current
-acceptance instructions. The following preparation/result sections are historical context.
+background. Readability is **changes requested**. Continue with the
+[interactive styling design and trials](opentelemetry-m2-terminal-styling-design.md) on the dedicated
+styling child. Its prototype authority supersedes the preparation-only restrictions below: real-output
+feedback informs design in the same conversation. Fine cosmetic changes follow adoption of palette
+principles as a distinct pass. Independent review and green CI still gate final acceptance.
+The CI correction is accepted at `d9e994c`, recorded at `aab058e`; CI is no longer the hold reason.
+Commands below remain reproduction tools; record each new trial source OID instead of the historical
+template OIDs. The following preparation/result sections are historical context.
 
 ## Previous assignment: bounded preparation
 
@@ -217,4 +220,5 @@ mixed-duration notice were corrected at
 `d9e994cc28bc91b9ca86f3a3e6e798371ec85481`. Detailed evidence is kept in the implementation handoff.
 This changes the source the human should eventually inspect, but does not constitute a real-terminal
 observation or approval. Human light/dark, normal/narrow-width and plain-output confirmation remains
-**PENDING** until the correction receives independent focused review and trunk reopens that check.
+**changes requested** after the subsequent human light-background check. The correction is accepted;
+the active styling packet governs the next trial and renewed visual confirmation.

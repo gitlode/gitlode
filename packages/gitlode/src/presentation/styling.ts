@@ -43,7 +43,7 @@ export function createStyling(isTTY: boolean): Styling {
     warnBadge: (t) => chalk.yellow.bold(t),
     errorBadge: (t) => chalk.red.bold(t),
     fieldKey: (t) => chalk.dim(t),
-    primaryValue: (t) => chalk.whiteBright(t),
+    primaryValue: (t) => chalk.bold(t),
     unitSuffix: (t) => chalk.dim(t),
     refsValue: (t) => chalk.cyan(t),
     separator: (t) => chalk.dim(t),

@@ -1,0 +1,141 @@
+import type { ProfileReport } from "@gitlode/internal-contracts/telemetry";
+import chalk, { supportsColorStderr } from "chalk";
+
+import { formatDiagnosticLines } from "../src/presentation/diagnostics.js";
+import { formatActiveLine, formatDoneLine } from "../src/presentation/progress/formatters.js";
+import type { PhaseSnapshot } from "../src/presentation/progress/types.js";
+import {
+  formatProfileLines,
+  formatSummaryLines,
+} from "../src/presentation/reporting/formatters.js";
+import { createStyling } from "../src/presentation/styling.js";
+
+const mode = process.argv.slice(2);
+if (mode.length !== 1 || (mode[0] !== "--terminal" && mode[0] !== "--plain")) {
+  console.error(
+    "Usage: npx tsx packages/gitlode/scripts/preview-terminal-styling.ts --terminal|--plain",
+  );
+  process.exit(1);
+}
+const terminal = mode[0] === "--terminal";
+if (terminal && (!process.stdout.isTTY || !process.stderr.isTTY)) {
+  console.error("--terminal requires direct TTY stdout and stderr; do not pipe or redirect.");
+  process.exit(1);
+}
+
+const styling = createStyling(terminal && process.stderr.isTTY === true);
+const snapshot: PhaseSnapshot = {
+  phase: "extracting",
+  startMs: 0,
+  nowMs: 1250,
+  refIndex: 0,
+  refCount: 2,
+  commitsTraversed: 1542,
+  recordsWritten: 3108,
+  bytesWritten: 1250000,
+};
+const scope = { name: "synthetic.styling", version: "1.0.0" };
+const report: ProfileReport = {
+  schemaVersion: 2,
+  signalStatus: { spans: "complete", counters: "partial", histograms: "complete" },
+  spans: [
+    {
+      scope,
+      name: "sample.git.walk",
+      callCount: 12,
+      errorCount: 0,
+      totalDurationSeconds: 0.024,
+      maxDurationSeconds: 0.005,
+      durationContributionCount: 12,
+      unavailableFields: [],
+      attributes: [],
+    },
+  ],
+  counters: [
+    {
+      scope,
+      name: "sample.git.objects",
+      value: 670,
+      unit: "{object}",
+      unavailableFields: [],
+      attributes: [
+        { key: "sample.git.adapter", value: "isomorphic-git" },
+        { key: "sample.git.outcome", value: "error" },
+        { key: "sample.git.ready", value: true },
+      ],
+    },
+  ],
+  histograms: [
+    {
+      scope,
+      name: "sample.git.duration",
+      unit: "s",
+      count: 2,
+      sum: 0.003,
+      minimum: null,
+      maximum: null,
+      explicitBounds: [],
+      bucketCounts: [],
+      unavailableFields: [],
+      attributes: [],
+    },
+  ],
+  diagnostics: [
+    {
+      code: "invalid_aggregation",
+      severity: "warning",
+      stage: "report_build",
+      target: { type: "observation", scope, kind: "counter", name: "sample.git.missing" },
+      signalCoverage: ["counter"],
+      effects: ["missing_observations"],
+      extent: "entire_target",
+      attributeKey: { type: "not_applicable" },
+      affectedFields: [],
+      detailLoss: {
+        pointAttributes: false,
+        observationIdentity: false,
+        scopeIdentity: false,
+        attributeKey: false,
+        affectedFields: false,
+      },
+      lossQuantity: null,
+      wholeResultUnavailable: true,
+      count: 1,
+      countSaturated: false,
+      message: null,
+      reportDelivery: null,
+    },
+  ],
+};
+
+console.error("SYNTHETIC styling sample: fixed data, no extraction or actual failure.");
+console.error("Active/done lines below are static samples, not a live progress demonstration.");
+console.error(
+  `Mode: ${terminal ? "terminal" : "plain"}; width: ${process.stderr.columns ?? "unknown"}; ` +
+    `Chalk color level: ${chalk.level}; stderr color support: ${supportsColorStderr ? supportsColorStderr.level : "unavailable"}`,
+);
+if (terminal && chalk.level === 0)
+  console.error("Color is unavailable; this run provides plain readability evidence only.");
+const lines = [
+  "",
+  formatActiveLine(snapshot, "⠋", styling),
+  formatDoneLine({ ...snapshot, refIndex: 1 }, styling),
+  "",
+  ...formatSummaryLines(
+    {
+      recordsWritten: snapshot.recordsWritten,
+      commitsTraversed: snapshot.commitsTraversed,
+      filesCreated: 2,
+      bytesWritten: snapshot.bytesWritten,
+      elapsedMs: snapshot.nowMs,
+      refs: ["main", "release"],
+    },
+    styling,
+  ),
+  "",
+  ...formatDiagnosticLines("warn", "Synthetic warning; no extraction was attempted.", styling),
+  ...formatDiagnosticLines("error", "Synthetic error; no application failure occurred.", styling),
+  "",
+  ...formatProfileLines(report, styling),
+];
+for (const line of lines) console.error(line);

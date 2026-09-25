@@ -177,27 +177,63 @@ Default foreground and named ANSI colors are distinct settings. Bold rendering c
 terminal intensity settings; record those if weight/brightness is surprising. Window theme and
 text-area scheme must be recorded separately.
 
-### Proposed bounded trial (pending)
+### Trial 1 (implemented; human observation pending)
 
 | Principle                                         | Trial                                                                                              | Human result | Decision |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------ | -------- |
 | Readable primary values on light/dark backgrounds | Change only `primaryValue` from `chalk.whiteBright` to `chalk.bold`                                | Not run      | Pending  |
 | Useful semantic colors and secondary emphasis     | Observe existing cyan spinner/refs, green completion, yellow/red badges, dim keys/units/separators | Not run      | Pending  |
 
-Reuse the terminal-check helper for real commit/file/plugin output and plain comparison. Add a
-clearly labeled synthetic sample using the real factory and formatters to cover all 12 roles,
-including active progress, warning/error badges and unavailable fields. Check number-heavy Profile
-rows for excessive bold as well as legibility. Spacing/separator changes follow role adoption.
+The proposed `primaryValue` change is implemented. The existing terminal-check helper supplies real
+commit/file/plugin output and plain comparison. `scripts/preview-terminal-styling.ts` now supplies a
+clearly labeled synthetic sample using the real factory and progress/summary/diagnostic/Profile
+formatters, covering all 12 roles. Its active/done lines are static samples, not evidence of live
+progress behavior. Warning/error badges, `—`, `unavailable` and ordinary `error`/boolean attributes
+are included without product failure injection. The sample creates no files or extraction workload
+and never forces color. `--terminal` requires direct TTY stdout/stderr; `--plain` selects the real
+plain factory. Check number-heavy Profile rows for excessive bold as well as legibility.
+Spacing/separator changes follow role adoption.
 
-Proposed finite matrix: Windows Terminal **Campbell / Tango Light**, GNOME Terminal
-**Tango dark / Tango light**, plus ordinary non-TTY plain output. Start at the user's usual width
-(approximately 120 columns if no preference), then about 80 columns. Include the previously failing
-Windows scheme as the regression case if different; settle substitutions with the human rather than
-expanding indefinitely. Exact terminal versions, schemes, widths and GNOME GUI availability are
-awaiting human input. This agent has not observed either GUI renderer. WSL inside Windows Terminal
-does not supply GNOME evidence; unavailable GNOME evidence remains an explicit return gap.
+Human-confirmed working matrix: **Windows Terminal 1.24.11911.0**, **Campbell / Tango Light**,
+plus plain text. The human has no GNOME Terminal installation and authorized proceeding with Windows
+and plain checks first; preparing a VM is not part of this trial. GNOME **Tango dark / Tango light**
+remain unobserved and an explicit return gap, not waived acceptance. WSL inside Windows Terminal
+does not supply GNOME evidence. Start at the usual width (approximately 120 columns if no preference),
+then about 80 columns; actual widths and window theme remain to be recorded with results.
 
-Status: **continuation needed** after the initial investigation/proposal. No role choice is adopted,
-no human-viewed trial OID exists, and no build/test/visual acceptance is claimed for this documentation
-checkpoint. Next: settle available environments, implement the small trial and supply exact commands
-and its committed source OID for human observation.
+From the repository root, build once, then run the sample and real scenarios without piping or
+redirection. Repeat terminal commands in both agreed text-area schemes. Build and child startup
+take time; each real scenario uses only the existing five-commit fixture and a 120-second child limit.
+The existing helper prints and cleans its owned temporary repository/config/JSONL output paths.
+
+```powershell
+git rev-parse HEAD
+npm run build:dev
+npx tsx packages/gitlode/scripts/preview-terminal-styling.ts --terminal
+npx tsx packages/gitlode/scripts/capture-profile-evidence.ts --terminal commit
+npx tsx packages/gitlode/scripts/capture-profile-evidence.ts --terminal file
+npx tsx packages/gitlode/scripts/capture-profile-evidence.ts --terminal plugin
+npx tsx packages/gitlode/scripts/preview-terminal-styling.ts --plain
+npx tsx packages/gitlode/scripts/capture-profile-evidence.ts --plain commit
+```
+
+Record source OID, scheme, window theme, width, primary-value readability/emphasis, dim key/unit
+readability, cyan/green/yellow/red readability, unavailable markers and progress/summary/Profile
+coexistence. If the five-commit fixture finishes before the active spinner is observed, record that
+gap; the static sample establishes glyph appearance only. Plain mode intentionally suppresses live
+progress, so compare equivalent rendered text and report content, not identical run transcripts or
+wall-clock numbers. Neither automated parity nor this environment agreement is visual approval.
+
+Trial checks: `npm run build:dev` and explicit strict standalone TypeScript checking of the new
+script passed. Presentation tests passed **10 files / 55 tests**, including role mappings,
+target-local rendering, styled/plain parity, progress and presenter coverage. Focused oxlint passed.
+Synthetic `--plain` and real `--plain commit` completed. An isolated in-memory check simulated TTY
+capabilities and Chalk level 1, verified that styled sample output contained ANSI, plain output
+contained none, and their sample bodies matched exactly after stripping ANSI. This is not real-TTY
+or contrast evidence. Invalid arguments and terminal mode without TTY both correctly exited 1.
+
+Status: **continuation needed; awaiting Trial 1 visual feedback**. No role choice is adopted and no
+human-viewed trial OID exists yet. The trial temporarily revises the old bright-white assignment;
+reconcile durable CLI/profiling/profile-design guidance with the selected treatment after human
+adoption. Full root/release/package/CI validation and independent final review remain for return,
+not claimed by the bounded checks above.

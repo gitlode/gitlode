@@ -211,6 +211,160 @@ describe("generic profile formatting", () => {
     ]);
   });
 
+  it("P3-R2 partitions ordinary same-name diagnostics by complete target identity", () => {
+    const measured = [
+      {
+        ...counter("example", "root.ns", 7),
+        attributes: [{ key: "root.ns.mode", value: "kept" }],
+      },
+      {
+        ...counter("example", "root.ns.long", 8),
+        attributes: [{ key: "root.ns.id", value: 1 }],
+      },
+    ];
+    const diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "span",
+          name: "root.ns",
+        },
+        signalCoverage: ["span"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+      diagnostic({
+        code: "metric_point_overflow",
+        severity: "info",
+        stage: "metric_collection",
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.ns",
+        },
+        extent: "unidentified_subset",
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 1,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.ns",
+          attributes: [{ key: "root.ns.mode", value: "missing" }],
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+      diagnostic({
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.ns.long",
+          attributes: [{ key: "root.ns.id", value: 2 }],
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const expected = [
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      "    /root",
+      "      ns",
+      "        /root.ns : unavailable",
+      "          ! No valid result retained: invalid aggregation discarded.",
+      "        /root.ns : 7 operations",
+      "          mode = kept",
+      '          ! Additional attribute combinations omitted: datapoint retention limit reached. Known loss: 1 metric points; unit="{point}".',
+      "        /root.ns : unavailable",
+      "          mode = missing",
+      "          ! No valid result retained: invalid aggregation discarded.",
+      "        long : 8 operations",
+      "          id = 1",
+      "        long : unavailable",
+      "          id = 2",
+      "          ! No valid result retained: invalid aggregation discarded.",
+    ];
+    for (const reverse of [false, true]) {
+      const report = emptyReport();
+      report.counters = reverse ? [...measured].reverse() : measured;
+      report.diagnostics = reverse ? [...diagnostics].reverse() : diagnostics;
+      expect(formatProfileLines(report)).toEqual(expected);
+    }
+  });
+
+  it("P3-R2 retains malformed matched and unmatched targets exactly once", () => {
+    const point = {
+      ...counter("example", "bad..name", 4),
+      attributes: [{ key: "bad.mode", value: false }],
+    };
+    const diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "span",
+          name: "bad..name",
+        },
+        signalCoverage: ["span"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+      diagnostic({
+        code: "metric_point_overflow",
+        severity: "info",
+        stage: "metric_collection",
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "bad..name",
+          attributes: [{ key: "bad.mode", value: false }],
+        },
+      }),
+      diagnostic({
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "bad..name",
+          attributes: [{ key: "bad.mode", value: "false" }],
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const expected = [
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      '    /"bad..name" : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      '    /"bad..name" : 4 operations',
+      "      /bad.mode = false",
+      "      ! Additional attribute combinations omitted: datapoint retention limit reached.",
+      '    /"bad..name" : unavailable',
+      '      /bad.mode = "false"',
+      "      ! No valid result retained: invalid aggregation discarded.",
+    ];
+    for (const reverse of [false, true]) {
+      const report = emptyReport();
+      report.counters = [point];
+      report.diagnostics = reverse ? [...diagnostics].reverse() : diagnostics;
+      expect(formatProfileLines(report)).toEqual(expected);
+    }
+  });
+
   it("P3-R3 renders every loss descriptor independently from occurrences", () => {
     const cases = [
       ["span_groups", "groups", 2, false, "Known loss: 2 Span groups; unit=groups."],
@@ -333,6 +487,67 @@ describe("generic profile formatting", () => {
       "a: conflicting Span attribute values",
     ].map((token) => forward.indexOf(token));
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
+  });
+
+  it("P3-R3 orders visible quantity and occurrence ties independently of arrival", () => {
+    const variants = [
+      diagnostic({
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 10,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        count: 2,
+        countSaturated: true,
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 2,
+          saturated: true,
+        },
+      }),
+      diagnostic({
+        count: 2,
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 2,
+          saturated: true,
+        },
+      }),
+      diagnostic({
+        count: 2,
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 2,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: null,
+          saturated: false,
+        },
+      }),
+    ];
+    const expectedNotices = [
+      "  ! Invalid aggregation detail was discarded. The amount of lost data is unknown.",
+      '  ! Invalid aggregation detail was discarded. Known loss: 2 metric points; unit="{point}". Repeated 2 times.',
+      '  ! Invalid aggregation detail was discarded. Known loss: 2+ metric points; unit="{point}". Repeated 2 times.',
+      '  ! Invalid aggregation detail was discarded. Known loss: 2+ metric points; unit="{point}". Repeated 2+ times.',
+      '  ! Invalid aggregation detail was discarded. Known loss: 10 metric points; unit="{point}".',
+    ];
+    for (const diagnostics of [variants, [...variants].reverse()]) {
+      const report = emptyReport();
+      report.diagnostics = diagnostics;
+      expect(formatProfileLines(report).slice(2)).toEqual(expectedNotices);
+    }
   });
 
   it("P3-R4 assigns headline, frequency and coverage tokens to semantic roles", () => {

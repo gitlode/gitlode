@@ -1613,6 +1613,37 @@ Also list retained fields that can distinguish rendered diagnostic text and how 
 Keep canonical target/code/stage/effect precedence, and use typed/null-aware comparisons for remaining
 fields. Do not derive the test oracle from the comparator's own field list.
 
+#### Pre-edit attachment and ordering matrix
+
+Recorded before test or production edits at entry `df71db30e06e0340e665226ab8f28f37c43ddd33`.
+Local `HEAD` and the actual `origin/feature/otel-redesign_M2_profile` agreed, the worktree was clean,
+and review checkpoint `e6d1d7a9a1c1e19acf3125d8d5e7d56b3fc11ed5` and reviewed implementation
+`61a34c1f13ee993099c4611b3e4ac966b2ab132c` were ancestors. The checkpoint-to-entry delta is this
+routing packet only.
+
+| Target evidence                                     | Same-name retained measurement     | Attachment/result                                                                                |
+| --------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Observation, matching kind                          | Any point or Span row of that kind | Attach once to the matching observation; repeated points do not repeat the notice.               |
+| Observation, nonmatching kind                       | Row exists only for another kind   | Keep one separate issue-only observation row and notice; leave the unrelated row available.      |
+| Observation, no retained row                        | None                               | Keep one issue-only observation row and notice.                                                  |
+| Point, matching kind and typed attributes           | Exact Counter/Histogram point      | Attach once to that exact point.                                                                 |
+| Point, matching kind but different typed attributes | Other point exists                 | Keep one issue-only point row with its typed attributes and notice; leave the sibling available. |
+| Point, nonmatching kind or no retained row          | Unrelated or absent point          | Keep one issue-only point row with its typed attributes and notice.                              |
+
+Every row applies to ordinary short/group-node names, ordinary longer suffix rows and malformed-dot
+quoted absolute rows. A matched observation notice uses the existing shared name-only row when the
+name has repeated retained rows. Unmatched complete targets remain separate even when their names
+are equal; diagnostics for the same unmatched target share one issue row and are sorted once.
+Namespace-relative attribute keys continue to use the same first-two-segment base as measured rows.
+
+The retained ordering inventory keeps target, code, stage and effects first, followed by signal
+coverage, extent, attribute-key selector, affected fields, detail-loss flags, loss-quantity presence,
+descriptor, unit, null/known value and saturation, whole-result evidence, occurrence count and count
+saturation, then severity. Comparisons are code-unit, enum-order, numeric, boolean or explicit
+null-aware comparisons as appropriate. These fields either select placement/wording, change visible
+notice text, or change warning styling. The retained free-form `message` is not rendered by this view
+and therefore remains an output-indistinguishable tie.
+
 ### Bounded fixes and regression evidence
 
 - **R2:** partition same-name diagnostics by complete target identity; attach exact matches once and

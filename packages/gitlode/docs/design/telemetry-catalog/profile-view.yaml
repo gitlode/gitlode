@@ -52,7 +52,10 @@ ordering:
     - code
     - stage
     - effects
-    - retained_selector_and_quantity_ties
+    - retained_selector_field_and_detail_ties
+    - loss_quantity_null_value_and_saturation
+    - occurrence_count_and_saturation
+    - severity
 
 tokens:
   ordinary_pattern: "[A-Za-z0-9_.@-]+"
@@ -133,6 +136,8 @@ diagnostic_rendering:
     point: beside_matching_typed_point
     exact_attribute: attribute_supplement
   missing_only_target: issue_only_row
+  unmatched_same_name_target: separate_complete_identity_issue_row
+  unmatched_point_attributes: retained_on_issue_row
   shared_instrument_issue: one_name_only_row_before_retained_points
   duplicate_inline_and_notification: false
   occurrence_count_is_loss_amount: false

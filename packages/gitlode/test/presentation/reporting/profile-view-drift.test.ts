@@ -63,6 +63,8 @@ describe("generic profile view drift", () => {
     expect(view.diagnostic_rendering).toEqual(
       expect.objectContaining({
         occurrence_count_is_loss_amount: false,
+        unmatched_same_name_target: "separate_complete_identity_issue_row",
+        unmatched_point_attributes: "retained_on_issue_row",
         loss_quantity: {
           known: "descriptor_value_unit_and_saturation",
           unknown: "explicit_unknown_amount",
@@ -70,6 +72,16 @@ describe("generic profile view drift", () => {
         },
       }),
     );
+    expect((view.ordering as Record<string, unknown>).diagnostics).toEqual([
+      "complete_canonical_target",
+      "code",
+      "stage",
+      "effects",
+      "retained_selector_field_and_detail_ties",
+      "loss_quantity_null_value_and_saturation",
+      "occurrence_count_and_saturation",
+      "severity",
+    ]);
   });
 
   it("orders typed identities without labels or policy tables", () => {

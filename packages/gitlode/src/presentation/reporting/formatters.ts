@@ -39,6 +39,17 @@ interface NamespaceNode {
   readonly children: Map<string, NamespaceNode>;
 }
 
+type NamedProfileTarget = Extract<ProfileTarget, { type: "observation" | "point" }>;
+
+interface IssueOnlyTarget {
+  readonly target: NamedProfileTarget;
+  readonly diagnostics: ProfileDiagnostic[];
+}
+
+type NamedProfileEntry =
+  | { readonly type: "measurement"; readonly row: ProfileMeasurement }
+  | { readonly type: "issue"; readonly issue: IssueOnlyTarget };
+
 const UNAVAILABLE = "—";
 const TOKEN = /^[A-Za-z0-9_.@-]+$/u;
 
@@ -229,10 +240,13 @@ function compareDiagnostics(left: ProfileDiagnostic, right: ProfileDiagnostic): 
     compareStringArrays(left.signalCoverage, right.signalCoverage) ||
     compareCodeUnits(left.extent, right.extent) ||
     compareAttributeKeySelectors(left.attributeKey, right.attributeKey) ||
-    compareCodeUnits(JSON.stringify(left.affectedFields), JSON.stringify(right.affectedFields)) ||
-    compareCodeUnits(JSON.stringify(left.detailLoss), JSON.stringify(right.detailLoss)) ||
+    compareAffectedFields(left.affectedFields, right.affectedFields) ||
+    compareDetailLoss(left.detailLoss, right.detailLoss) ||
     compareLossQuantities(left.lossQuantity, right.lossQuantity) ||
-    Number(left.wholeResultUnavailable) - Number(right.wholeResultUnavailable)
+    compareBooleans(left.wholeResultUnavailable, right.wholeResultUnavailable) ||
+    left.count - right.count ||
+    compareBooleans(left.countSaturated, right.countSaturated) ||
+    compareCodeUnits(left.severity, right.severity)
   );
 }
 
@@ -291,8 +305,54 @@ function compareLossQuantities(
 ): number {
   if (left === null || right === null) return left === right ? 0 : left === null ? -1 : 1;
   return (
-    compareCodeUnits(left.descriptor, right.descriptor) || compareCodeUnits(left.unit, right.unit)
+    compareCodeUnits(left.descriptor, right.descriptor) ||
+    compareCodeUnits(left.unit, right.unit) ||
+    compareNullableNumbers(left.value, right.value) ||
+    compareBooleans(left.saturated, right.saturated)
   );
+}
+
+function compareAffectedFields(
+  left: ProfileDiagnostic["affectedFields"],
+  right: ProfileDiagnostic["affectedFields"],
+): number {
+  const length = Math.min(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftItem = left[index];
+    const rightItem = right[index];
+    if (!leftItem || !rightItem) continue;
+    const comparison =
+      compareCodeUnits(leftItem.kind, rightItem.kind) ||
+      compareStringArrays(leftItem.fields, rightItem.fields);
+    if (comparison !== 0) return comparison;
+  }
+  return left.length - right.length;
+}
+
+function compareDetailLoss(
+  left: ProfileDiagnostic["detailLoss"],
+  right: ProfileDiagnostic["detailLoss"],
+): number {
+  for (const field of [
+    "pointAttributes",
+    "observationIdentity",
+    "scopeIdentity",
+    "attributeKey",
+    "affectedFields",
+  ] as const) {
+    const comparison = compareBooleans(left[field], right[field]);
+    if (comparison !== 0) return comparison;
+  }
+  return 0;
+}
+
+function compareNullableNumbers(left: number | null, right: number | null): number {
+  if (left === null || right === null) return left === right ? 0 : left === null ? -1 : 1;
+  return left - right;
+}
+
+function compareBooleans(left: boolean, right: boolean): number {
+  return Number(left) - Number(right);
 }
 
 function appendMeasurementDiagnostics(
@@ -310,6 +370,88 @@ function appendMeasurementDiagnostics(
       continue;
     appendNotice(lines, diagnostic, depth, styling);
   }
+}
+
+function diagnosticMatchesMeasurement(
+  diagnostic: ProfileDiagnostic,
+  row: ProfileMeasurement,
+): boolean {
+  if (diagnostic.target.type === "observation") return diagnostic.target.kind === row.kind;
+  if (diagnostic.target.type !== "point" || row.kind === "span") return false;
+  return (
+    diagnostic.target.kind === row.kind &&
+    compareAttributeSets(diagnostic.target.attributes, row.value.attributes) === 0
+  );
+}
+
+function partitionNameDiagnostics(
+  rows: readonly ProfileMeasurement[],
+  diagnostics: readonly ProfileDiagnostic[],
+): { matched: ProfileDiagnostic[]; unmatched: IssueOnlyTarget[] } {
+  const matched = diagnostics.filter((diagnostic) =>
+    rows.some((row) => diagnosticMatchesMeasurement(diagnostic, row)),
+  );
+  const unmatched: IssueOnlyTarget[] = [];
+  for (const diagnostic of diagnostics) {
+    if (matched.includes(diagnostic)) continue;
+    if (diagnostic.target.type !== "observation" && diagnostic.target.type !== "point") continue;
+    const existing = unmatched.find(
+      (issue) => compareDiagnosticTargets(issue.target, diagnostic.target) === 0,
+    );
+    if (existing) existing.diagnostics.push(diagnostic);
+    else unmatched.push({ target: diagnostic.target, diagnostics: [diagnostic] });
+  }
+  for (const issue of unmatched) issue.diagnostics.sort(compareDiagnostics);
+  unmatched.sort((left, right) => compareDiagnosticTargets(left.target, right.target));
+  return { matched, unmatched };
+}
+
+function namedEntryTarget(entry: NamedProfileEntry): NamedProfileTarget {
+  if (entry.type === "issue") return entry.issue.target;
+  const { row } = entry;
+  return row.kind === "span"
+    ? {
+        type: "observation",
+        scope: row.value.scope,
+        kind: row.kind,
+        name: row.value.name,
+      }
+    : {
+        type: "point",
+        scope: row.value.scope,
+        kind: row.kind,
+        name: row.value.name,
+        attributes: row.value.attributes,
+      };
+}
+
+function namedEntries(
+  rows: readonly ProfileMeasurement[],
+  issues: readonly IssueOnlyTarget[],
+): NamedProfileEntry[] {
+  return [
+    ...rows.map((row): NamedProfileEntry => ({ type: "measurement", row })),
+    ...issues.map((issue): NamedProfileEntry => ({ type: "issue", issue })),
+  ].sort((left, right) =>
+    compareDiagnosticTargets(namedEntryTarget(left), namedEntryTarget(right)),
+  );
+}
+
+function renderIssueOnlyRow(
+  lines: string[],
+  issue: IssueOnlyTarget,
+  name: string,
+  depth: number,
+  attributeBase: string | undefined,
+  styling: Styling,
+): void {
+  const unavailable = issue.diagnostics.some(isEntireResultUnavailable);
+  lines.push(
+    `${"  ".repeat(depth)}${name}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
+  );
+  if (issue.target.type === "point")
+    renderPointAttributes(lines, issue.target.attributes, attributeBase, depth + 1, styling);
+  for (const diagnostic of issue.diagnostics) appendNotice(lines, diagnostic, depth + 1, styling);
 }
 
 function appendNotice(
@@ -463,15 +605,25 @@ function renderScope(
   for (const name of [...malformedNames].sort(compareCodeUnits)) {
     const namedRows = malformed.filter((row) => row.value.name === name).sort(compareMeasurements);
     const namedDiagnostics = diagnosticsForName(diagnostics, name);
-    if (namedRows.length === 0) {
-      const unavailable = namedDiagnostics.some(isEntireResultUnavailable);
-      lines.push(
-        `${"  ".repeat(2)}/${quote(name)}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
-      );
-      for (const diagnostic of namedDiagnostics) appendNotice(lines, diagnostic, 3, styling);
-    } else {
-      for (const row of namedRows)
-        renderAbsoluteRow(lines, row, 2, styling, undefined, true, namedDiagnostics);
+    const { matched, unmatched } = partitionNameDiagnostics(namedRows, namedDiagnostics);
+    const matchedObservations = matched.filter((item) => item.target.type === "observation");
+    if (namedRows.length > 1 && matchedObservations.length > 0) {
+      lines.push(`${"  ".repeat(2)}/${quote(name)}`);
+      for (const diagnostic of matchedObservations) appendNotice(lines, diagnostic, 3, styling);
+    }
+    for (const entry of namedEntries(namedRows, unmatched)) {
+      if (entry.type === "issue")
+        renderIssueOnlyRow(lines, entry.issue, `/${quote(name)}`, 2, undefined, styling);
+      else
+        renderAbsoluteRow(
+          lines,
+          entry.row,
+          2,
+          styling,
+          undefined,
+          true,
+          namedRows.length > 1 ? matched.filter((item) => item.target.type === "point") : matched,
+        );
     }
   }
   for (const node of [...roots.values()].sort((a, b) => compareCodeUnits(a.segment, b.segment)))
@@ -492,33 +644,56 @@ function renderNode(
   const ownRows = rows.filter((row) => row.value.name === node.absoluteName);
   const childRows = rows.filter((row) => row.value.name !== node.absoluteName);
   const ownDiagnostics = diagnosticsForName(diagnostics, node.absoluteName);
-  const ownRow = ownRows.at(0);
-  if (ownRows.length === 1 && ownRow) {
+  const ownPartition = partitionNameDiagnostics(ownRows, ownDiagnostics);
+  const ownEntries = namedEntries(ownRows, ownPartition.unmatched);
+  const ownEntry = ownEntries.at(0);
+  if (ownEntries.length === 1 && ownEntry?.type === "measurement") {
+    const ownRow = ownEntry.row;
     lines.push(
       `${indent}${styling.sectionHeading(name)}${formatMeasurementFields(ownRow, styling)}`,
     );
     renderAttributes(lines, ownRow, node.absoluteName, depth + 1, styling);
-    appendMeasurementDiagnostics(lines, ownRow, ownDiagnostics, depth + 1, styling);
-  } else if (ownRows.length === 0 && ownDiagnostics.length > 0) {
-    const unavailable = ownDiagnostics.some(isEntireResultUnavailable);
-    lines.push(
-      `${indent}${styling.sectionHeading(name)}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
+    appendMeasurementDiagnostics(lines, ownRow, ownPartition.matched, depth + 1, styling);
+  } else if (ownEntries.length === 1 && ownEntry?.type === "issue") {
+    renderIssueOnlyRow(
+      lines,
+      ownEntry.issue,
+      styling.sectionHeading(name),
+      depth,
+      node.absoluteName,
+      styling,
     );
-    for (const diagnostic of ownDiagnostics) appendNotice(lines, diagnostic, depth + 1, styling);
   } else {
     lines.push(`${indent}${styling.sectionHeading(name)}`);
-    for (const diagnostic of ownDiagnostics.filter((item) => item.target.type !== "point"))
-      appendNotice(lines, diagnostic, depth + 1, styling);
-    for (const row of ownRows)
-      renderAbsoluteRow(
-        lines,
-        row,
-        depth + 1,
-        styling,
-        node.absoluteName,
-        false,
-        ownDiagnostics.filter((item) => item.target.type === "point"),
-      );
+    if (ownRows.length > 1) {
+      for (const diagnostic of ownPartition.matched.filter(
+        (item) => item.target.type === "observation",
+      ))
+        appendNotice(lines, diagnostic, depth + 1, styling);
+    }
+    for (const entry of ownEntries) {
+      if (entry.type === "issue")
+        renderIssueOnlyRow(
+          lines,
+          entry.issue,
+          `/${formatToken(node.absoluteName)}`,
+          depth + 1,
+          node.absoluteName,
+          styling,
+        );
+      else
+        renderAbsoluteRow(
+          lines,
+          entry.row,
+          depth + 1,
+          styling,
+          node.absoluteName,
+          false,
+          ownRows.length > 1
+            ? ownPartition.matched.filter((item) => item.target.type === "point")
+            : ownPartition.matched,
+        );
+    }
   }
   const childNames = new Set([
     ...childRows.map((row) => row.value.name),
@@ -539,32 +714,33 @@ function renderNode(
     const namedRows = childRows.filter((row) => row.value.name === childName);
     const namedDiagnostics = diagnosticsForName(diagnostics, childName);
     const relativeName = formatToken(childName.slice(node.absoluteName.length + 1));
-    if (namedRows.length === 0) {
-      const unavailable = namedDiagnostics.some(isEntireResultUnavailable);
-      lines.push(
-        `${"  ".repeat(depth + 1)}${relativeName}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
-      );
-      for (const diagnostic of namedDiagnostics)
-        appendNotice(lines, diagnostic, depth + 2, styling);
-      continue;
-    }
-    if (namedRows.length > 1 && namedDiagnostics.some((item) => item.target.type !== "point")) {
+    const partition = partitionNameDiagnostics(namedRows, namedDiagnostics);
+    if (
+      namedRows.length > 1 &&
+      partition.matched.some((item) => item.target.type === "observation")
+    ) {
       lines.push(`${"  ".repeat(depth + 1)}${relativeName}`);
-      for (const diagnostic of namedDiagnostics.filter((item) => item.target.type !== "point"))
+      for (const diagnostic of partition.matched.filter(
+        (item) => item.target.type === "observation",
+      ))
         appendNotice(lines, diagnostic, depth + 2, styling);
     }
-    for (const row of namedRows)
-      renderNamedRow(
-        lines,
-        row,
-        relativeName,
-        depth + 1,
-        node.absoluteName,
-        styling,
-        namedRows.length > 1
-          ? namedDiagnostics.filter((item) => item.target.type === "point")
-          : namedDiagnostics,
-      );
+    for (const entry of namedEntries(namedRows, partition.unmatched)) {
+      if (entry.type === "issue")
+        renderIssueOnlyRow(lines, entry.issue, relativeName, depth + 1, node.absoluteName, styling);
+      else
+        renderNamedRow(
+          lines,
+          entry.row,
+          relativeName,
+          depth + 1,
+          node.absoluteName,
+          styling,
+          namedRows.length > 1
+            ? partition.matched.filter((item) => item.target.type === "point")
+            : partition.matched,
+        );
+    }
   }
   for (const child of [...node.children.values()].sort((a, b) =>
     compareCodeUnits(a.segment, b.segment),
@@ -680,6 +856,24 @@ function renderAttributes(
     return;
   }
   for (const attribute of [...row.value.attributes].sort((a, b) => compareCodeUnits(a.key, b.key)))
+    renderAttributeLine(
+      lines,
+      attribute.key,
+      styling.primaryValue(formatAttributeValue(attribute.value)),
+      base,
+      depth,
+      styling,
+    );
+}
+
+function renderPointAttributes(
+  lines: string[],
+  attributes: readonly { readonly key: string; readonly value: ProfileAttributeValue }[],
+  base: string | undefined,
+  depth: number,
+  styling: Styling,
+): void {
+  for (const attribute of [...attributes].sort((a, b) => compareCodeUnits(a.key, b.key)))
     renderAttributeLine(
       lines,
       attribute.key,

@@ -1,6 +1,15 @@
 # Profile real-terminal confirmation preparation
 
-## Current assignment: bounded preparation
+## Current routing: styling changes requested
+
+The human performed terminal checks and reported unreadable bright-white primary values on a light
+background. Readability is **changes requested**. Fine cosmetic adjustments and renewed acceptance
+are held until the [interactive styling design](opentelemetry-m2-terminal-styling-design.md), bounded
+implementation and independent review complete. The CI correction is accepted at `d9e994c`, recorded
+at `aab058e`; CI is no longer the hold reason. Commands below remain reproduction tools, not current
+acceptance instructions. The following preparation/result sections are historical context.
+
+## Previous assignment: bounded preparation
 
 P3 implementation is accepted at `c694b69cc964226ccbf07325ee45ab32b6ff2e74`, recorded by independent
 review at `1a012d589604c6e570e155b3aa49a6d31a038f5d`. Human terminal confirmation and cumulative

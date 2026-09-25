@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                               | Remaining scope                                                            |
-| --------- | ------------------------------------ | -------------------------------------------------------------------------- |
-| M0        | complete, one target only            | Preserve historical evidence and environment                               |
-| M1        | complete                             | Preserve corrected validation and squash attribution                       |
-| M2        | P1-P3 accepted; terminal preparation | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates            | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                  | Remaining scope                                                            |
+| --------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only               | Preserve historical evidence and environment                               |
+| M1        | complete                                | Preserve corrected validation and squash attribution                       |
+| M2        | P1-P3 accepted; styling design revision | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates               | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -71,12 +71,17 @@ review at `1a012d589604c6e570e155b3aa49a6d31a038f5d`. R1-R4 are closed; build, s
 nine suites/75 tests were independently verified. P1/P2 remain accepted. This is implementation
 acceptance, not human terminal/cumulative/M2 acceptance.
 
-Next is [real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md) in a
-bounded branch session, using small existing fixtures with inherited terminal streams. Existing
-capture output is non-TTY and cannot establish color/readability. Trunk then presents exact commands
-for explicit human light/dark/wrapping confirmation. After feedback is resolved, assign cumulative
-Windows/Linux source and installed-package validation at a fixed candidate. No formal measurement,
-parent integration or tests/system move is assigned now.
+The CI/duration correction at `d9e994c` is accepted, recorded at `aab058e`; its implementation
+and outcome CI passed. Human terminal feedback then identified unreadable bright-white primary
+values on a light background. Human readability is changes-requested, not accepted.
+
+Next is the [interactive terminal styling design](opentelemetry-m2-terminal-styling-design.md).
+Settle palette-aware principles and shared role assignments before implementation or spacing tweaks.
+Keep useful colors and dim; do not optimize for all conceivable themes by removing styling.
+The sequence is design with the human, trunk scope review, bounded implementation, independent review
+and green CI, renewed human terminal confirmation, then separate cosmetic feedback if needed.
+After feedback is resolved, assign cumulative Windows/Linux source and installed-package validation
+at a fixed candidate. Formal performance and other M2 gates are unchanged.
 
 Continue on `feature/otel-redesign_M2_profile`; trunk is a conversation role, not a Git ref. Return
 outcomes without switching to main or updating parent branches. PR/merge authority is unchanged.
@@ -267,5 +272,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named real-terminal confirmation preparation
+chooses squash/merge strategy and performs the merge or branch deletion. Only the named interactive terminal styling design
 is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.

@@ -19,7 +19,9 @@ work context, not active instructions to repeat M1. Stable contracts live in des
 The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`.
 P1 is [independently accepted](opentelemetry-m2-profile-p1-review.md#correction-round-1-re-review-outcome)
 at `dc6cfbd`. The active next assignment is
-[real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md).
+[interactive terminal styling design](opentelemetry-m2-terminal-styling-design.md).
+CI corrections are accepted; human light-background feedback requires shared styling revision before
+fine cosmetic adjustments. The terminal-check packet retains reproduction commands.
 P1/P2/P3 implementation slices are accepted. Human real-TTY confirmation, cumulative Windows/Linux
 validation and M2 acceptance remain pending.
 

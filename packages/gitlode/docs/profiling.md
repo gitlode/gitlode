@@ -60,6 +60,10 @@ measurement results are present. Without a trusted snapshot, all three results a
 no partial measurements are reconstructed. If earlier issue provenance is unavailable, that is
 stated separately.
 
+Available numeric values and scalar attribute values use the terminal's default foreground without
+additional emphasis. This body-text treatment is shared with progress and completion values.
+Color and emphasis supplement the hierarchy and notices; plain text retains their meaning.
+
 Terminal formatting is for human diagnosis and is not a machine-readable compatibility contract.
 Consumers requiring a protocol should use the structured `ProfileReport` at the worker boundary
 rather than parsing CLI spacing or punctuation.

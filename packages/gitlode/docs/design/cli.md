@@ -179,7 +179,8 @@ removed and the `✓` done marker is placed in the spinner column with a trailin
 ```
 
 Measured values use no-space `number+unit` tokens (e.g. `1.2MB`, `8.5s`, `12.34ms`).
-The numeric part is rendered with primary-value emphasis; the unit suffix is rendered with dim styling.
+The numeric part uses the `primaryValue` role with default foreground and no decoration, treating
+values as body text; the unit suffix is rendered with dim styling.
 
 The extracting line always renders fields in this order: spinner/done frame, stage label, branch
 position, `commits traversed`, `records written`, humanized `bytes written`, and elapsed time.

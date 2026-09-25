@@ -141,6 +141,11 @@ console.error("Record the font and Windows Terminal intenseTextStyle with your o
 console.error("In --plain mode every sample intentionally has no styling.");
 for (const [label, decorate] of chalkSamples)
   console.error(`  ${label.padEnd(20)} | ${terminal ? decorate(sampleText) : sampleText}`);
+console.error("\nHeading padding comparison (preview only; product spacing is unchanged):");
+for (const role of ["h1", "h2", "h3", "h4"] as const) {
+  console.error(`  ${role} no padding | ${styling[role]("Heading")}`);
+  console.error(`  ${role} one space  | ${styling[role](" Heading ")}`);
+}
 console.error("\ngitlode semantic roles (synthetic renderer output):");
 
 const lines = [

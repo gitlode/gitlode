@@ -65,7 +65,7 @@ export function formatSummaryLines(data: SummaryData, styling: Styling = plainSt
     ["Refs", styling.refsValue(data.refs.join(", ") || "(none)")],
   ];
   return [
-    styling.summaryHeader("Extraction complete"),
+    styling.h1("Extraction complete"),
     ...fields.map(
       ([label, value]) =>
         `  ${styling.fieldKey(label.padEnd(18))}${styling.separator(":")} ${value}`,
@@ -84,7 +84,7 @@ export function formatProfileLines(
   ].sort(compareMeasurements);
   if (measurements.length === 0 && report.diagnostics.length === 0) return [];
 
-  const lines = [styling.sectionHeading("Profile")];
+  const lines = [styling.h1("Profile")];
   appendProfileDiagnostics(lines, report.diagnostics, styling);
   const byScope = new Map<
     string,
@@ -109,7 +109,7 @@ export function formatProfileLines(
   for (const { scope, rows } of scopeEntries.sort((left, right) =>
     compareProfileScopes(left.scope, right.scope),
   )) {
-    lines.push(`  ${styling.sectionHeading(`Scope: ${formatScope(scope)}`)}`);
+    lines.push(`  ${styling.h2(`Scope: ${formatScope(scope)}`)}`);
     const diagnostics = report.diagnostics.filter(
       (diagnostic): diagnostic is ProfileDiagnostic =>
         diagnostic.code !== "diagnostic_overflow" &&
@@ -652,6 +652,7 @@ function renderNode(
 ): void {
   const indent = "  ".repeat(depth);
   const name = `${root ? "/" : ""}${formatToken(node.segment)}`;
+  const heading = root ? styling.h3 : styling.h4;
   const rows = node.rows.sort(compareMeasurements);
   const ownRows = rows.filter((row) => row.value.name === node.absoluteName);
   const childRows = rows.filter((row) => row.value.name !== node.absoluteName);
@@ -661,22 +662,13 @@ function renderNode(
   const ownEntry = ownEntries.at(0);
   if (ownEntries.length === 1 && ownEntry?.type === "measurement") {
     const ownRow = ownEntry.row;
-    lines.push(
-      `${indent}${styling.sectionHeading(name)}${formatMeasurementFields(ownRow, styling)}`,
-    );
+    lines.push(`${indent}${heading(name)}${formatMeasurementFields(ownRow, styling)}`);
     renderAttributes(lines, ownRow, node.absoluteName, depth + 1, styling);
     appendMeasurementDiagnostics(lines, ownRow, ownPartition.matched, depth + 1, styling);
   } else if (ownEntries.length === 1 && ownEntry?.type === "issue") {
-    renderIssueOnlyRow(
-      lines,
-      ownEntry.issue,
-      styling.sectionHeading(name),
-      depth,
-      node.absoluteName,
-      styling,
-    );
+    renderIssueOnlyRow(lines, ownEntry.issue, heading(name), depth, node.absoluteName, styling);
   } else {
-    lines.push(`${indent}${styling.sectionHeading(name)}`);
+    lines.push(`${indent}${heading(name)}`);
     if (ownRows.length > 1) {
       for (const diagnostic of ownPartition.matched.filter(
         (item) => item.target.type === "observation",

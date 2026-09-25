@@ -4,8 +4,10 @@ export interface Styling {
   spinnerGlyph(text: string): string;
   doneMarker(text: string): string;
   stageLabel(text: string): string;
-  summaryHeader(text: string): string;
-  sectionHeading(text: string): string;
+  h1(text: string): string;
+  h2(text: string): string;
+  h3(text: string): string;
+  h4(text: string): string;
   warnBadge(text: string): string;
   errorBadge(text: string): string;
   fieldKey(text: string): string;
@@ -20,8 +22,10 @@ export const plainStyling: Styling = {
   spinnerGlyph: (t) => t,
   doneMarker: (t) => t,
   stageLabel: (t) => t,
-  summaryHeader: (t) => t,
-  sectionHeading: (t) => t,
+  h1: (t) => t,
+  h2: (t) => t,
+  h3: (t) => t,
+  h4: (t) => t,
   warnBadge: (t) => t,
   errorBadge: (t) => t,
   fieldKey: (t) => t,
@@ -38,8 +42,10 @@ export function createStyling(isTTY: boolean): Styling {
     spinnerGlyph: (t) => chalk.cyan(t),
     doneMarker: (t) => chalk.green.bold(t),
     stageLabel: (t) => chalk.bold(t),
-    summaryHeader: (t) => chalk.black.bgGreen(t),
-    sectionHeading: (t) => chalk.black.bgCyan(t),
+    h1: (t) => chalk.black.bgGreen(t),
+    h2: (t) => chalk.white.bgBlue(t),
+    h3: (t) => chalk.black.bgCyan(t),
+    h4: (t) => chalk.black.bgWhite(t),
     warnBadge: (t) => chalk.yellow.bold(t),
     errorBadge: (t) => chalk.red.bold(t),
     fieldKey: (t) => chalk.dim(t),

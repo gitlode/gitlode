@@ -266,12 +266,12 @@ guarantee for other palettes. Windows Terminal's documented `intenseTextStyle` c
 without weight; the reported appearance is consistent with that option, but the actual setting
 has not been established. See the official references above.
 
-| Principle                                                           | Trial 2 candidate                                                                      | Human result | Decision                |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------ | ----------------------- |
-| Values serve as body text                                           | `primaryValue`: default foreground, no decoration                                      | Pending      | Trying at human request |
-| Strong emphasis occupies compact structural tokens                  | `sectionHeading`: black on cyan for Profile, Scope and namespace headings              | Pending      | Trying at human request |
-| Application success remains distinct from neutral Profile structure | `summaryHeader`: black on green                                                        | Pending      | Candidate               |
-| Bold is optional support, not essential meaning                     | Existing stage/marker bold retained; value and heading emphasis no longer relies on it | Pending      | No blanket prohibition  |
+| Principle                                                           | Trial 2 candidate                                                                      | Human result                                                      | Decision                              |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------- |
+| Values serve as body text                                           | `primaryValue`: default foreground, no decoration                                      | Appropriate removal of ineffective decoration                     | Adopted                               |
+| Strong emphasis occupies compact structural tokens                  | `sectionHeading`: black on cyan for Profile, Scope and namespace headings              | Readable and appropriately placed; needs semantic differentiation | Refine in Trial 3                     |
+| Application success remains distinct from neutral Profile structure | `summaryHeader`: black on green                                                        | Human proposes sharing top-level heading treatment with Profile   | Replace with structural h1 in Trial 3 |
+| Bold is optional support, not essential meaning                     | Existing stage/marker bold retained; value and heading emphasis no longer relies on it | Pending                                                           | No blanket prohibition                |
 
 Trial 2 changes only these three shared role assignments. Backgrounds cover the existing heading
 tokens, not indentation, row padding or measurement fields; a namespace that also has measurements
@@ -290,7 +290,48 @@ passed. An isolated check with simulated TTY/Chalk level 1 verified complete pre
 text parity and confirmed that a measured namespace heading closes its background before the
 measurement fields. These checks establish text/composition behavior, not human readability.
 
-Status: **continuation needed; awaiting Trial 2 visual feedback**. Human feedback selects the next
-experiment, not a final role table. Reconcile durable CLI/profiling/profile-design guidance with
-the selected treatment after human adoption. Full root/release/package/CI validation and independent
-final review remain for return, not claimed by the bounded trial checks.
+### Trial 3: structural heading levels and separate padding comparison
+
+Human explicitly viewed `5f1aa77e0c2dc25814c7c61143a638d3c2b2b88f` in Windows Terminal 1.24.11911.0,
+Campbell / Tango Light, **Cascadia Mono**. Background heading emphasis and its placement were judged
+readable and appropriate. Undecorated primary values were accepted as removal of ineffective
+decoration, not a claim of dramatically improved contrast. Exact widths/intensity settings remain
+unrecorded. This result does not establish GNOME readability or resolve the earlier yellow issue.
+
+The human requested generic structural names and distinct heading semantics, then explicitly selected
+separate `h3` / `h4` for namespace depth. Trial 3 replaces `summaryHeader` / `sectionHeading` with:
+
+| Role | Meaning / consumers                              | Candidate foreground + background | Status                  |
+| ---- | ------------------------------------------------ | --------------------------------- | ----------------------- |
+| `h1` | Top-level title: application summary and Profile | black + green                     | Visual feedback pending |
+| `h2` | Section: Scope                                   | white + blue                      | Visual feedback pending |
+| `h3` | First namespace level                            | black + cyan                      | Visual feedback pending |
+| `h4` | Second namespace level                           | black + white                     | Visual feedback pending |
+
+These are structural roles, not domain names or severity colors. Sharing `h1` removes the previous
+success-specific meaning from the summary heading; completion text and done markers retain that
+meaning. The catalog and role-contract tests now distinguish title, Scope and both namespace levels.
+Group-node measurements and issue-only namespace rows use the same level rules. Backgrounds end
+before measurement fields, and indentation remains outside decoration. Product text is unchanged.
+Adopted primary-value treatment is reflected in CLI/profiling guidance; superseded bright-white and
+uniform-bold statements in the profile design are reconciled with the active trial.
+
+Padding is a **separate preview-only comparison**: each real heading role renders `Heading` and
+`Heading`, with one space on each side in the latter. The product renderer does not add padding
+yet, and both sample variants preserve styled/plain text parity. This isolates palette/hierarchy
+feedback from a future intentional layout change. Installed Vitest 4.1.10's `formatProjectName`
+and `withLabel` in `utils.BS4fH3nR.js` do put one space on each side inside background decoration;
+that is an inspected implementation fact, not a requirement to copy its complete formatting.
+
+Use the existing preview and real commit/file/plugin commands after rebuilding. Compare the
+semantic levels, the new white-on-blue and black-on-white pairs, padding alternatives and both
+namespace depths. The direct Chalk section is unchanged. Record the next viewed source OID.
+
+Trial 3 checks: development build, explicit strict preview-script typecheck and **11 files / 103
+tests** passed (presentation plus collector-to-presentation coverage). The added regression checks
+structural heading routing, measured/issue-only namespace cases, exclusion of values/notices from
+heading decoration and text parity. Automated checks do not establish visual acceptance.
+
+Status: **continuation needed; awaiting Trial 3 visual feedback**. Primary values are adopted;
+heading palette and padding remain pending. Full root/release/package/CI validation and independent
+final review remain for return, not claimed by these bounded trial checks.

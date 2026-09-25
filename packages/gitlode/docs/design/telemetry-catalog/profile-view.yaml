@@ -155,7 +155,10 @@ diagnostic_rendering:
     diagnostic_overflow: Additional diagnostics omitted
 
 styling:
-  title_scope_namespace: sectionHeading
+  title: h1
+  scope: h2
+  namespace_first_level: h3
+  namespace_second_level: h4
   observation_name: default
   field_and_attribute_key: fieldKey
   available_value: primaryValue

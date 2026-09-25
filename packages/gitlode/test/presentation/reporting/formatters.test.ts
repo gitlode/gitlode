@@ -1009,6 +1009,42 @@ describe("generic profile formatting", () => {
     ]);
   });
 
+  it("keeps heading levels structural and excludes fields and notices from heading decoration", () => {
+    const report = emptyReport();
+    report.spans = [span("example", "root"), span("example", "root.child")];
+    report.diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.missing",
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const styling: Styling = {
+      ...plainStyling,
+      h1: (text) => `<h1>${text}</h1>`,
+      h2: (text) => `<h2>${text}</h2>`,
+      h3: (text) => `<h3>${text}</h3>`,
+      h4: (text) => `<h4>${text}</h4>`,
+    };
+    const lines = formatProfileLines(report, styling);
+    expect(lines[0]).toBe("<h1>Profile</h1>");
+    expect(lines).toContain("  <h2>Scope: example</h2>");
+    expect(lines.some((line) => line.startsWith("    <h3>/root</h3> : calls="))).toBe(true);
+    expect(lines.some((line) => line.startsWith("      <h4>child</h4> : calls="))).toBe(true);
+    expect(lines).toContain("      <h4>missing</h4> : unavailable");
+    expect(lines.filter((line) => line.includes("! ")).every((line) => !line.includes("<h"))).toBe(
+      true,
+    );
+    expect(lines.map((line) => line.replace(/<\/?h[1-4]>/gu, ""))).toEqual(
+      formatProfileLines(report),
+    );
+  });
+
   it("uses semantic style roles while preserving styled/plain text parity", () => {
     const report = emptyReport();
     report.spans = [
@@ -1027,8 +1063,10 @@ describe("generic profile formatting", () => {
     expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
     expect(calls).toEqual(
       expect.arrayContaining([
-        "sectionHeading:Profile",
-        "sectionHeading:Scope: example",
+        "h1:Profile",
+        "h2:Scope: example",
+        "h3:/example",
+        "h4:operation",
         "fieldKey:calls",
         "separator: : ",
         "primaryValue:1",

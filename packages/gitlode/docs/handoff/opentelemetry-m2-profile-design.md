@@ -194,11 +194,11 @@ units or at very small magnitudes use scientific notation as necessary, not new 
 Zero duration uses `0 s`; zero size uses `0 B`. Preserve canonical unknown units and existing entity
 unit labels; do not round arbitrary non-duration/non-size attributes without semantic unit evidence.
 
-Initial styling: Scope/namespace headings bold; ordinary observation names readable normal style;
-values bright; field names, keys, units and separators subdued. A node serving as both namespace
-and observation uses heading emphasis for its name. Keep warning text readable without color.
-Use existing styling/no-color behavior, not signal-specific colors. Future feedback may change
-styling; no review deadline is prescribed.
+Shared styling follows section 11 and the active
+[terminal styling trial](opentelemetry-m2-terminal-styling-design.md). Values use default foreground
+without decoration; field names, keys, units and separators remain subdued. A node serving as both
+namespace and observation uses its heading role for the name only. Keep warning text readable
+without color and preserve existing styling/no-color behavior, not signal-specific colors.
 
 ## 5. Collection issues: accepted behavior
 
@@ -607,17 +607,21 @@ do not infer severity from domain data, numeric magnitude, ratios or elapsed tim
 
 Add shared roles when existing roles do not fit semantically. Do not repurpose `stageLabel` for
 arbitrary headings or `refsValue` for generic identifiers simply because their colors look useful.
-Existing progress/application-summary styling remains as defined. This extension is an initial
-specification subject to operational feedback, without a prescribed review date.
+The active terminal styling session may revise shared heading roles and their application-summary
+use. Human acceptance of values as undecorated body text is recorded there; the heading palette is
+still a trial rather than a visually accepted policy.
 
-### Accepted role mapping
+### Current role mapping (heading trial)
 
 | Profile element                                               | Shared semantic role    | Initial treatment                 |
 | ------------------------------------------------------------- | ----------------------- | --------------------------------- |
-| Profile title, Scope heading, namespace heading               | New `sectionHeading`    | Default foreground, bold          |
+| Profile title                                                 | `h1`                    | Heading trial                     |
+| Scope heading                                                 | `h2`                    | Heading trial                     |
+| First namespace level                                         | `h3`                    | Heading trial                     |
+| Second namespace level                                        | `h4`                    | Heading trial                     |
 | Ordinary observation name                                     | Default text            | Default foreground, normal weight |
 | Numeric field label and attribute key                         | Existing `fieldKey`     | Dim                               |
-| Available numeric value and scalar attribute value            | Existing `primaryValue` | Bright white                      |
+| Available numeric value and scalar attribute value            | Existing `primaryValue` | Default foreground, no decoration |
 | Unit                                                          | Existing `unitSuffix`   | Dim                               |
 | Structural separators `:`, `=`, field commas                  | New `separator`         | Dim                               |
 | Unavailable numeric `—` and result `unavailable`              | Default text            | Default foreground, normal weight |
@@ -625,14 +629,15 @@ specification subject to operational feedback, without a prescribed review date.
 | Info-severity notification marker `!`                         | Default text            | Default foreground, normal weight |
 | Notification explanation                                      | Default text            | Default foreground, normal weight |
 
-The two new roles describe general structure and punctuation, not profile-only concepts. Their
-plainStyling implementations return input unchanged. `sectionHeading` uses `chalk.bold` and
-`separator` uses `chalk.dim` in the shared factory. A role may initially share visual treatment with
-another role without sharing its meaning.
+The shared `h1` through `h4` roles describe structural heading levels, not profile-specific concepts
+or diagnostic severity. Their plainStyling implementations return input unchanged. `separator` uses
+`chalk.dim` in the shared factory. Candidate heading palettes and padding comparisons are recorded
+in the active styling handoff; padding currently exists only in the synthetic preview comparison.
 
-Use `sectionHeading` instead of the current green `summaryHeader` for Profile. Keep
-`summaryHeader` for the existing application completion summary. Profile's heading does not assert
-that measurements are complete or operations error-free, including when printed after success.
+Profile and the application completion summary both use `h1` for their top-level titles. This
+replaces the former success-specific `summaryHeader` and uniform `sectionHeading`. Their shared
+heading treatment does not assert that measurements are complete or operations error-free;
+application completion remains explicit in its text and progress done markers.
 
 Style only a group-node observation's name as a heading; style its fields by their own roles.
 Style the entire `Scope: name@version` heading together. The root `/` and attribute absolute-name

@@ -177,14 +177,14 @@ Default foreground and named ANSI colors are distinct settings. Bold rendering c
 terminal intensity settings; record those if weight/brightness is surprising. Window theme and
 text-area scheme must be recorded separately.
 
-### Trial 1 (implemented; human observation pending)
+### Trial 1 (superseded by Trial 2 after human feedback)
 
-| Principle                                         | Trial                                                                                              | Human result | Decision |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------ | -------- |
-| Readable primary values on light/dark backgrounds | Change only `primaryValue` from `chalk.whiteBright` to `chalk.bold`                                | Not run      | Pending  |
-| Useful semantic colors and secondary emphasis     | Observe existing cyan spinner/refs, green completion, yellow/red badges, dim keys/units/separators | Not run      | Pending  |
+| Principle                                         | Trial                                                               | Human result                                                   | Decision              |
+| ------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------- |
+| Readable primary values on light/dark backgrounds | Change only `primaryValue` from `chalk.whiteBright` to `chalk.bold` | Weak and overused emphasis                                     | Superseded by Trial 2 |
+| Useful semantic colors and secondary emphasis     | Observe existing colors and dim                                     | Cyan readable; yellow slightly weak on light; dim not reported | Continue evaluation   |
 
-The proposed `primaryValue` change is implemented. The existing terminal-check helper supplies real
+Trial 1 implemented the proposed bold `primaryValue`. The existing terminal-check helper supplies real
 commit/file/plugin output and plain comparison. `scripts/preview-terminal-styling.ts` now supplies a
 clearly labeled synthetic sample using the real factory and progress/summary/diagnostic/Profile
 formatters, covering all 12 roles. Its active/done lines are static samples, not evidence of live
@@ -196,8 +196,7 @@ Spacing/separator changes follow role adoption.
 
 Before judging Trial 1, the human requested direct Chalk samples because bold appeared
 indistinguishable from unstyled text in the current Windows Terminal environment. This is a
-provisional observation, not acceptance or rejection of the role assignment; the viewed OID and
-font/intensity settings are not yet recorded. The preview now prints a separate compact Chalk
+preliminary observation, later refined in the feedback below. The preview prints a separate compact Chalk
 primitive section: identical text with no style, bold, dim, bold+dim, italic, underline, inverse,
 cyan/cyan+bold/brightCyan, white/white+bold/brightWhite, and black on yellow. Labels remain unstyled.
 Compare stroke weight independently from brightness and record the font and `intenseTextStyle`;
@@ -243,8 +242,55 @@ capabilities and Chalk level 1, verified that styled sample output contained ANS
 contained none, and their sample bodies matched exactly after stripping ANSI. This is not real-TTY
 or contrast evidence. Invalid arguments and terminal mode without TTY both correctly exited 1.
 
-Status: **continuation needed; awaiting Trial 1 visual feedback**. No role choice is adopted and no
-human-viewed trial OID exists yet. The trial temporarily revises the old bright-white assignment;
-reconcile durable CLI/profiling/profile-design guidance with the selected treatment after human
-adoption. Full root/release/package/CI validation and independent final review remain for return,
-not claimed by the bounded checks above.
+### Human feedback and Trial 2
+
+Trial 1 product source: `ccd9589e6e283bf79505acfd2a965ee8d51b5704`; direct Chalk sample source:
+`70e9e0dee8274d646c9f3872ee7a4eb385e317fd`. The human explicitly confirmed viewing `70e9e0d`.
+Font, intensity setting and widths remain unrecorded.
+
+Windows Terminal 1.24.11911.0 / Campbell and Tango Light observations:
+
+- Bold changed brightness, not font weight; the light scheme sometimes showed little or no change.
+  Bold is not prohibited, but cannot be the sole expected source of strong emphasis. The dense use
+  of bold across values also diluted differentiation, independently of terminal support.
+- Italic and underline worked; italic was a relatively weak effect. Foreground/background pairs
+  produced clear emphasis and are candidates for compact labels/headings, not broad body areas.
+- White/brightWhite were readable on dark but very difficult on light. Cyan was distinguishable
+  from background and normal text on both schemes; yellow on light had a minor readability issue.
+- Respect these findings without optimizing exclusively for Windows Terminal. No GNOME evidence
+  has been obtained. Dim and real progress coexistence have not received an explicit result yet.
+
+Interpretation: named cyan and white both select configurable ANSI palette entries. The observed
+cyan success is evidence for these schemes, not automatic semantic contrast adjustment or a
+guarantee for other palettes. Windows Terminal's documented `intenseTextStyle` can select brightness
+without weight; the reported appearance is consistent with that option, but the actual setting
+has not been established. See the official references above.
+
+| Principle                                                           | Trial 2 candidate                                                                      | Human result | Decision                |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------ | ----------------------- |
+| Values serve as body text                                           | `primaryValue`: default foreground, no decoration                                      | Pending      | Trying at human request |
+| Strong emphasis occupies compact structural tokens                  | `sectionHeading`: black on cyan for Profile, Scope and namespace headings              | Pending      | Trying at human request |
+| Application success remains distinct from neutral Profile structure | `summaryHeader`: black on green                                                        | Pending      | Candidate               |
+| Bold is optional support, not essential meaning                     | Existing stage/marker bold retained; value and heading emphasis no longer relies on it | Pending      | No blanket prohibition  |
+
+Trial 2 changes only these three shared role assignments. Backgrounds cover the existing heading
+tokens, not indentation, row padding or measurement fields; a namespace that also has measurements
+keeps those values on the ordinary background. Because Profile, Scope and namespace share a role,
+all receive the cyan treatment for this trial. Assess whether repeated namespace badges occupy too
+much attention; narrowing the role mapping can be a subsequent bounded trial if needed. No spacing,
+text, severity interpretation, detection policy or palette autodetection changes are included.
+Keep the small light-scheme yellow finding open while judging this candidate.
+
+Use the same commands above after rebuilding. Focus on body readability, heading/body separation,
+the amount of background color in a real Profile and the cyan/green distinction in both schemes.
+The direct Chalk primitive section remains unchanged as a comparison reference.
+
+Trial 2 checks: development build, presentation tests (**10 files / 55 tests**) and focused oxlint
+passed. An isolated check with simulated TTY/Chalk level 1 verified complete preview styled/plain
+text parity and confirmed that a measured namespace heading closes its background before the
+measurement fields. These checks establish text/composition behavior, not human readability.
+
+Status: **continuation needed; awaiting Trial 2 visual feedback**. Human feedback selects the next
+experiment, not a final role table. Reconcile durable CLI/profiling/profile-design guidance with
+the selected treatment after human adoption. Full root/release/package/CI validation and independent
+final review remain for return, not claimed by the bounded trial checks.

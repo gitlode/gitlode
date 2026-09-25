@@ -1,8 +1,8 @@
 # P3 independent presentation review
 
-Current assignment: [P3 R2/R3 correction round 2](opentelemetry-m2-profile-implementation.md#p3-r2r3-correction-round-2).
-Focused review accepted R1/R4; R2/R3 remain open. Preserve outcomes below as historical evidence.
-Human terminal and cumulative validation remain later gates.
+Current assignment: [P3 round 2 focused re-review](#p3-round-2-focused-re-review).
+R2/R3 correction returned at c694b69. R1/R4 and P1/P2 remain accepted. P3 overall remains unaccepted;
+human terminal and cumulative validation are later gates. Earlier packets are historical context.
 
 ## Fixed inputs and authority
 
@@ -415,3 +415,60 @@ Human real-terminal light/dark readability and wrapping remain pending. Cumulati
 source and installed-package validation remains a separate later gate. No implementation repair, PR,
 merge, formal measurement, cumulative package validation, acceptance update or `tests/system` move
 was performed.
+
+## P3 round 2 focused re-review
+
+### Fixed scope
+
+Use a fresh human-started independent conversation on `feature/otel-redesign_M2_profile`.
+
+- Entry/base: `df71db30e06e0340e665226ab8f28f37c43ddd33`.
+- Implementation: `4d49d73dd34c957204f7bc0d5690ae19c2a2b0e2`.
+- Full fixed target: `c694b69cc964226ccbf07325ee45ab32b6ff2e74`.
+
+Trunk inspected the five-file inventory: formatter, formatter/drift tests, view catalog and handoff.
+Implementation-to-final delta is outcome documentation only. Verify ancestry, clean status, local/actual
+remote equality and post-target changes; later routing-only commits do not change this fixed target.
+No independent test execution or P3 acceptance has been performed by trunk at intake.
+
+Read the original and focused R2/R3 findings, accepted display design and the
+[round-2 matrix/outcome](opentelemetry-m2-profile-implementation.md#p3-r2r3-correction-round-2).
+Review these corrections and their affected paths. R1/R4 and P1/P2 remain accepted unless a concrete
+regression affects them. Do not reopen layout preferences or start implementation repair, PR, merge,
+formal measurement, cumulative package validation or tests/system work.
+
+### Required checks
+
+- R2: follow the shared name partition through short/group-node, long suffix and malformed absolute
+  paths. Observation notices attach once at matching kind; points require complete typed attributes.
+  Same-name unrelated measured rows must not suppress missing targets. Independently verify cross-kind
+  and differing typed-point cases, matched plus unmatched targets, multiple notices per target and both
+  input orders. Target, attributes and notice must each survive at the right location exactly once;
+  valid siblings remain available. Preserve Scope identity, escaping, attribute namespace base and
+  styling on every new issue-row path. Do not mistake a broad observation notice for a distinct point.
+- R3: verify target/code/stage/effect precedence and all output-distinguishing retained ties. Cover
+  equal descriptor/unit with null/known loss values, numeric 2 versus 10, loss/count saturation,
+  occurrences and severity, plus typed attributes and detail/field selectors. Reversed inputs must
+  produce identical complete output. Comparator equality may remain for truly indistinguishable
+  output; do not sort by formatted text, locale or a lossy delimiter key.
+- Test quality: inspect literal expected output and the pre-edit matrix against the accepted design,
+  not just the new implementation/catalog. Check the larger formatter rewrite for duplicate/missing
+  attachment or unintended ordinary layout changes. Keep prior R1/R4 and P2 masks/fallback behavior
+  covered. Do not change schema/producers to rationalize a formatter failure.
+
+Run build:dev, the existing exact P3 nine-suite command (reported 75 pass, no skips), and the exact
+explicit strict tooling command from the outcome. Record actual evidence and TypeScript scope.
+Inspect reported fail-before (3 failed/4 passed) and pass-after evidence without relabeling it as your
+own execution. Run bounded additional probes only for a concrete uncovered concern; restore/remove
+probes before return. No repeated ordinary captures or full OS/package/performance campaigns unless
+a concrete changed dependency requires a new trunk assignment. Human real-TTY approval remains pending.
+Run fixed-diff whitespace checks and format write/check for review documentation.
+
+### Return
+
+Append R2/R3 decisions and P3 implementation overall accepted/corrections-required, concrete remaining
+failure paths, independent versus reported checks and residual human/cumulative gates. If the same
+underlying R2/R3 issue remains after round 2, recommend a fresh bounded diagnosis; do not repair it or
+start an automatic third correction. Accepted implementation is not terminal/M2 or integration acceptance.
+Commit documentation only, normally push to the child, verify actual remote equality and clean status,
+and remain on the child. Trunk is a session role, not a ref; no force push or parent branch updates.

@@ -1745,3 +1745,45 @@ No ordinary capture, human TTY review, formal measurement, cumulative Windows/Li
 validation, `tests/system` migration, candidate freeze, release acceptance, PR or merge was started.
 Those remain later gates. The immediate next step is independent focused R2/R3 re-review of the
 recorded implementation and final documentation checkpoints.
+
+## Focused CI and duration-diagnostic correction outcome
+
+Status: **implemented and returned for independent focused review**. This correction does not reopen
+accepted P1/P2 collection semantics or P3 presentation policy, and it does not accept the human
+real-terminal gate, cumulative validation or M2.
+
+- Entry was the clean requested branch checkpoint `ea9811b548254a51c8f595a595c0eff8b0b42a9a`.
+  Local `HEAD`, the tracking ref and the actual remote ref agreed at entry. The implementation
+  checkpoint is `d9e994cc28bc91b9ca86f3a3e6e798371ec85481`.
+- The four source-test failures were stale generic-renderer expectations in
+  `local-collection.test.ts`: old field order, legacy `Invalid aggregation discarded`, kind-section
+  status and old diagnostic-overflow wording. The corrected expectations retain exact mixed,
+  all-invalid, genuine-zero, compaction, partial-status and formal-evaluation assertions.
+- A separate presentation defect caused `diagnosticText()` to equate diagnostic
+  `affectedFields` with unavailable numeric fields. Measurement-attached duration notices now use
+  the same derived availability as the displayed Span row. Mixed input therefore retains total/max
+  and reports only `average unavailable`; all-invalid input reports total/average/maximum unavailable.
+  When no measurement row is available, the notice reports an incomplete duration summary instead
+  of inferring field availability. Producer availability, schema and aggregation semantics are
+  unchanged.
+- Fail-before evidence: the original local-collection run had 4 failed and 43 passed; after replacing
+  stale UI assertions with the accepted generic output, the real processor → report builder →
+  formatter regression still failed in both input orders because it observed
+  `total/avg/max unavailable` beside retained total/max. Pass-after: the affected formatter and
+  local-collection selection passed 2 files and 70 tests.
+- The accepted P3 nine-suite selection passed 9 files and 75 tests. Root `npm test` passed 94 files,
+  1245 tests, with 17 skipped and no failures. `npm run build:dev`, the existing P3 standalone strict
+  test/tooling check, `npm run lint`, `npm run format:write`, `npm run format:check` and
+  `git diff --check` passed. An additional exploratory strict invocation over the whole
+  `local-collection.test.ts` found its pre-existing line-69 `Record<string, unknown>` versus OTel
+  `Attributes` helper mismatch; that file is outside the established standalone strict set, and the
+  changed production/test paths passed their required project and explicit checks.
+- CI for the implementation checkpoint is
+  [run 36085229805](https://github.com/gitlode/gitlode/actions/runs/36085229805): the single
+  `Test and Build` job completed successfully. Source tests, release artifact build, packed-package
+  metadata validation and the installed-package system test all ran and passed; no CI step was
+  skipped. Format, lint, architecture, development build and generated-artifact checks also passed.
+
+Only `formatters.ts`, its focused formatter test and the collector-to-presentation regression test
+changed in the implementation checkpoint. Human terminal confirmation remains pending, and this
+outcome awaits independent focused review before any acceptance or later gate proceeds.

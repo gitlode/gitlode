@@ -200,3 +200,12 @@ be interpreted as acceptance.
 - `npx oxlint packages/gitlode/scripts/capture-profile-evidence.ts`, `npm run format:write`,
   `npm run format:check` and `git diff --check` passed. No product suite, package/OS campaign or formal
   telemetry command was run because the change is confined to the bounded operator helper and handoff.
+
+## CI correction status
+
+The generic renderer's collector-to-presentation regression expectations and its contradictory
+mixed-duration notice were corrected at
+`d9e994cc28bc91b9ca86f3a3e6e798371ec85481`. Detailed evidence is kept in the implementation handoff.
+This changes the source the human should eventually inspect, but does not constitute a real-terminal
+observation or approval. Human light/dark, normal/narrow-width and plain-output confirmation remains
+**PENDING** until the correction receives independent focused review and trunk reopens that check.

@@ -1,8 +1,8 @@
 # P3 independent presentation review
 
-Current assignment: [P3 round 2 focused re-review](#p3-round-2-focused-re-review).
-R2/R3 correction returned at c694b69. R1/R4 and P1/P2 remain accepted. P3 overall remains unaccepted;
-human terminal and cumulative validation are later gates. Earlier packets are historical context.
+Current outcome: [P3 round 2 focused re-review outcome](#p3-round-2-focused-re-review-outcome).
+R2/R3 and the P3 implementation slice are accepted. R1/R4 and P1/P2 remain accepted; human terminal
+and cumulative validation are later gates. Earlier packets are historical context.
 
 ## Fixed inputs and authority
 
@@ -472,3 +472,85 @@ underlying R2/R3 issue remains after round 2, recommend a fresh bounded diagnosi
 start an automatic third correction. Accepted implementation is not terminal/M2 or integration acceptance.
 Commit documentation only, normally push to the child, verify actual remote equality and clean status,
 and remain on the child. Trunk is a session role, not a ref; no force push or parent branch updates.
+
+## P3 round 2 focused re-review outcome
+
+Status: **accepted** for P3-R2, P3-R3 and the P3 implementation slice. Complete target identity now
+controls notification attachment and issue-only retention, and every retained field that can change
+the displayed diagnostic has a typed deterministic tie-break. This is implementation acceptance only;
+it does not accept the real-terminal or cumulative gates, M2, integration, release, PR or merge.
+
+### Reviewed provenance and scope
+
+- Review entry and requested checkpoint: `f784c4d12be57c2d564b4618c2123f6a305d3749` on
+  `feature/otel-redesign_M2_profile`. Entry was clean, and local `HEAD` and the actual
+  `origin/feature/otel-redesign_M2_profile` both resolved to that OID.
+- Fixed target: `c694b69cc964226ccbf07325ee45ab32b6ff2e74`; implementation
+  `4d49d73dd34c957204f7bc0d5690ae19c2a2b0e2` and entry/base
+  `df71db30e06e0340e665226ab8f28f37c43ddd33` are ancestors. The fixed five-file inventory was
+  reviewed. The implementation-to-fixed-target delta is outcome documentation only, and the sole
+  post-target change at entry is the round-2 review assignment in this document.
+- Review was limited to the returned R2/R3 formatter, tests, generic view catalog and their directly
+  affected paths. No source repair, capture, formal measurement, cumulative package/OS validation,
+  tests/system work, PR, merge or parent-branch update was performed.
+
+### R2 decision: accepted
+
+`partitionNameDiagnostics()` now classifies diagnostics against retained rows using the complete
+admitted target: observation matching requires kind, while point matching requires kind and the full
+typed attribute set. Diagnostics with no exact retained match are grouped by the same typed target
+comparison and rendered once as separate issue-only rows. The target's attributes, unavailable state
+and all of its notices remain local to that row; unrelated same-name measurements remain available.
+
+The same partition is used for short/group-node observations, longer suffix rows and quoted malformed
+absolute rows. Scope selection remains nullable and collision-free, suffix/absolute tokens remain
+escaped before styling, and point attributes retain the accepted namespace-relative or absolute base.
+Observation-wide notices are emitted once rather than repeated for every retained point, while exact
+point notices attach only to the matching typed point. Multiple diagnostics for one target remain
+distinct and are each emitted once.
+
+The committed literal expectations cover both input orders, matched and unmatched observation/point
+targets, cross-kind same-name rows, boolean versus boolean-looking string attributes, ordinary long
+names and malformed names. An additional temporary probe combined two Counter points, a same-name
+Histogram, boolean `false`, string `"false"`, an unmatched numeric point and multiple notices for one
+observation. Forward and reversed inputs produced identical complete output; each notice appeared once,
+the unmatched target's attribute survived, and the valid siblings remained available. The probe was
+removed before this documentation change.
+
+### R3 decision: accepted
+
+The comparator preserves complete canonical target, code, stage and effects precedence, followed by
+the retained coverage, extent, attribute-key, affected-field and detail-loss selectors. It then compares
+loss-quantity presence, descriptor, unit, null versus known numeric value and saturation, whole-result
+evidence, numeric occurrence count, count saturation and severity. Scope versions, kinds, point values,
+nullable numbers and booleans use their typed comparisons; no formatted text, lossy delimiter key,
+locale comparison or producer arrival order is used. Comparator equality remains only for fields such
+as the unrendered free-form message or otherwise display-indistinguishable records.
+
+The committed tests independently fix the complete expected notice order, including unknown versus
+known quantity, numeric 2 versus 10, quantity saturation, occurrence count and occurrence saturation.
+They also reverse complete target/selector inputs and compare the entire output. The temporary probe
+additionally opposed diagnostics whose visible duration field and detail-loss explanations differ;
+forward and reversed inputs were byte-identical. Known loss quantity remains separate from occurrence
+count and no P2 numeric/mask/fallback behavior changed.
+
+### Independent checks and residual gates
+
+- `npm run build:dev`: passed; this typechecked the normal production project.
+- Exact assigned P3 nine-suite Vitest selection: 9 files, 75 tests passed, 0 failed and 0 skipped.
+- Exact assigned standalone `tsc --ignoreConfig --noEmit --strict` command over the YAML support,
+  catalog/formatter/drift/CLI tests and capture script: passed. This is test/tooling-source evidence
+  separate from Vitest and the production build.
+- Temporary bounded probe: 1 passed and 23 skipped; it was removed, and the formatter test returned
+  byte-for-byte to the fixed target before the review document was edited.
+- Fixed entry/base-to-target and target-to-review-checkpoint `git diff --check`: passed. The reported
+  implementation fail-before result (3 failed, 4 passed, 16 skipped) and pass-after result (7 passed,
+  16 skipped) were inspected as reported evidence and were not relabeled as independent execution.
+- R1/R4 and P1/P2 remain accepted. No affected regression or need to reopen those decisions was found.
+  The previously reported lint result remains reported-only; no boundary change justified an
+  architecture rerun.
+
+P3 implementation acceptance does not authorize integration. Human light/dark real-TTY readability,
+color perception and wrapping remain pending, as does the separately assigned cumulative Windows/Linux
+source and installed-package validation. Formal measurement and later M2/release decisions also remain
+outside this review.

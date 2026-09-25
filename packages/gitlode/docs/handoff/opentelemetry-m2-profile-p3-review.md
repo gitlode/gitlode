@@ -1,8 +1,8 @@
 # P3 independent presentation review
 
-Current assignment: [P3 correction round 1 focused re-review](#p3-correction-round-1-focused-re-review).
-Corrections returned at 61a34c1; P3 remains unaccepted. Earlier review instructions/outcome are
-historical evidence. Human terminal and cumulative validation remain later gates.
+Current assignment: [P3 R2/R3 correction round 2](opentelemetry-m2-profile-implementation.md#p3-r2r3-correction-round-2).
+Focused review accepted R1/R4; R2/R3 remain open. Preserve outcomes below as historical evidence.
+Human terminal and cumulative validation remain later gates.
 
 ## Fixed inputs and authority
 

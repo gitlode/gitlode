@@ -1,8 +1,8 @@
 # M2 profile implementation: P1 handoff
 
-Current assignment: [P3 correction focused re-review](opentelemetry-m2-profile-p3-review.md#p3-correction-round-1-focused-re-review).
-Correction returned at `61a34c1f13ee993099c4611b3e4ac966b2ab132c`; P3 remains unaccepted.
-P1/P2 remain accepted. Human terminal and cumulative validation remain pending; earlier packets are historical.
+Current assignment: [P3 R2/R3 correction round 2](#p3-r2r3-correction-round-2).
+P3-R1/R4 and P1/P2 remain accepted. R2/R3 and P3 overall remain unaccepted; human terminal and
+cumulative validation are later gates. Earlier packets are historical context.
 
 ## Assignment, source and branch
 
@@ -1583,3 +1583,73 @@ formal measurement workload.
 Independent focused re-review remains next. Human terminal/readability confirmation and cumulative
 Windows/Linux functional/package validation remain later gates. Formal calibration/measurement,
 candidate freeze, release acceptance and `tests/system` migration remain unstarted.
+
+## P3 R2/R3 correction round 2
+
+### Entry and disposition
+
+Continue `feature/otel-redesign_M2_profile` after review checkpoint
+`e6d1d7a9a1c1e19acf3125d8d5e7d56b3fc11ed5`. Reviewed implementation:
+`61a34c1f13ee993099c4611b3e4ac966b2ab132c`. Verify clean status, ancestry and actual remote equality;
+record full entry including this packet. Later entry differences must be accounted for as routing-only.
+Remain on this child; trunk is a conversation role, not a ref. No parent branch updates.
+
+Trunk adopts the two remaining findings in the
+[focused review outcome](opentelemetry-m2-profile-p3-review.md#p3-correction-round-1-focused-re-review-outcome).
+Keep P3-R1/R4, corrected suffix escaping/known quantity rendering, and P1/P2 accepted behavior.
+This is the second P3 correction round, confined to missing-target attachment and deterministic
+remaining diagnostic ties. No producer/schema/admission/CLI/style-policy redesign or new kind labels.
+
+### Map identities before editing
+
+Record a concise attachment matrix for observation versus point targets, matching/nonmatching kind,
+matching/nonmatching typed attributes, measured/missing-only rows and ordinary/malformed names.
+Observation-wide notices attach once to their matching observation; point notices require complete
+point identity. Same-name unrelated measurements are not evidence that the target has a row. Account
+for short/group-node observations as well as longer suffix rows using the existing layout conventions.
+This is a finite inventory of existing contracts, not a new design exercise.
+
+Also list retained fields that can distinguish rendered diagnostic text and how ties are compared.
+Keep canonical target/code/stage/effect precedence, and use typed/null-aware comparisons for remaining
+fields. Do not derive the test oracle from the comparator's own field list.
+
+### Bounded fixes and regression evidence
+
+- **R2:** partition same-name diagnostics by complete target identity; attach exact matches once and
+  retain unmatched targets as issue-only rows through the accepted generic layout. Cover measured
+  Counter plus missing Span of the same name, and measured Counter plus missing Counter point with
+  different typed attributes. Exercise ordinary and malformed names, both input orders, and same-name
+  matched/unmatched targets together. Preserve identity/attributes and notices without coalescing or
+  duplicate attachment; keep namespace attribute base and R1 nullable Scope identity. Retain corrected
+  escaping on every new issue-row path. Do not fabricate unavailable status for unrelated siblings.
+- **R3:** after canonical identity comparisons, compare all remaining output-distinguishing retained
+  ties, including known/null loss value, loss saturation, occurrence count and count saturation.
+  Different notices must not depend on arrival order; comparator equality is acceptable for truly
+  indistinguishable output. Use numeric/boolean/null comparisons rather than formatted text or locale.
+  Cover same target/code/stage/effect/descriptor/unit with differing quantities and occurrences,
+  opposed input orders and isolated saturation/nullability differences. Preserve loss semantics,
+  unknown wording, diagnostic severity styling and accepted primary ordering.
+
+Add durable independent expected-output tests first and record semantic fail-before/pass-after for
+both findings. Verify missing targets and their notices each survive exactly once, and permutation
+invariance covers output rather than merely sorted input arrays. Do not weaken catalog guarantees or
+remove valid fixtures to make the implementation pass. If a design conflict emerges, return evidence
+before changing the accepted display contract.
+
+### Finite verification and return
+
+Run build:dev, the existing P3 nine-suite command plus new directly affected suites, the exact explicit
+strict tooling check (extend new source/test paths if needed), lint, format write/check and diff check.
+Architecture only if boundaries/exports change. Record actual counts/skips, before/after evidence and
+TypeScript scope separately. No full OS/package/capture/performance campaign: previous ordinary real
+captures remain attributed historical evidence and cannot replace these boundary tests.
+
+Limit production changes to presentation formatters/identity helpers, focused tests and directly
+necessary canonical/catalog clarification. Append matrix, changed rules, commands, implementation/final
+OIDs, local/actual remote equality and residual issues here. Normally commit/push progress; return a
+clean committed continuation if the session cannot finish. Do not self-accept P3 or start human/cumulative
+validation, PR, merge, freeze, tests/system migration or release acceptance work.
+
+Trunk assigns an independent focused re-review after return. If the same underlying R2 or R3 issue
+remains after this second round, use a fresh bounded diagnosis before any further correction; do not
+automatically continue local patches or accept unresolved defects merely to end the loop.

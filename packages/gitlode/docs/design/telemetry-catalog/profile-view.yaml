@@ -18,7 +18,9 @@ generic_hierarchy:
   scope_label:
     version_present: "Scope: <scope-name>@<version>"
     version_absent: "Scope: <scope-name>"
-  namespace_segments: 2
+  namespace_segments_default: 2
+  namespace_segments_source: src/presentation/reporting/profile-layout.ts
+  namespace_segments_constraint: positive_safe_integer
   root_prefix: "/"
   remaining_segments: joined_observation_row
   short_name_values: group_node_line
@@ -159,6 +161,7 @@ styling:
   scope: h2
   namespace_first_level: h3
   namespace_second_level: h4
+  namespace_deeper_levels: unstyled_without_padding
   observation_name: default
   field_and_attribute_key: fieldKey
   available_value: primaryValue

@@ -21,6 +21,7 @@ export interface NamespaceNode {
   readonly segment: string;
   readonly absoluteName: string;
   readonly rows: ProfileMeasurement[];
+  readonly diagnostics: ProfileDiagnostic[];
   readonly children: Map<string, NamespaceNode>;
 }
 
@@ -82,58 +83,49 @@ export function groupProfileScopes(report: ProfileReport): ScopeContext[] {
     }));
 }
 
-export function buildScopeTree({ rows, diagnostics }: ScopeContext): {
+export function buildScopeTree(
+  { rows, diagnostics }: ScopeContext,
+  namespaceDepth: number,
+): {
   roots: NamespaceNode[];
   malformed: ProfileMeasurement[];
 } {
+  if (!Number.isSafeInteger(namespaceDepth) || namespaceDepth < 1)
+    throw new RangeError("Namespace depth must be a positive safe integer");
   const roots = new Map<string, NamespaceNode>();
   const malformed: ProfileMeasurement[] = [];
-  for (const row of rows) {
-    const segments = row.value.name.split(".");
-    if (segments.some((segment) => segment.length === 0)) {
-      malformed.push(row);
-      continue;
-    }
-    const path = segments.slice(0, 2);
+
+  // Measurements and diagnostic-only identities use the same path construction.
+  function nodeFor(name: string): NamespaceNode | undefined {
+    const segments = name.split(".");
+    if (segments.some((segment) => segment.length === 0)) return undefined;
     let nodes = roots;
     let absoluteName = "";
-    let targetNode: NamespaceNode | null = null;
-    for (const segment of path) {
-      absoluteName = absoluteName ? `${absoluteName}.${segment}` : segment;
+    let target: NamespaceNode | undefined;
+    for (const segment of segments.slice(0, namespaceDepth)) {
+      absoluteName = absoluteName ? absoluteName + "." + segment : segment;
       const node: NamespaceNode = nodes.get(segment) ?? {
         segment,
         absoluteName,
         rows: [],
+        diagnostics: [],
         children: new Map(),
       };
       nodes.set(segment, node);
-      targetNode = node;
+      target = node;
       nodes = node.children;
     }
-    targetNode?.rows.push(row);
+    return target;
+  }
+  for (const row of rows) {
+    const node = nodeFor(row.value.name);
+    if (node) node.rows.push(row);
+    else malformed.push(row);
   }
   for (const diagnostic of diagnostics) {
     if (diagnostic.target.type !== "observation" && diagnostic.target.type !== "point") continue;
-    const name = diagnostic.target.name;
-    if (rows.some((row) => row.value.name === name)) continue;
-    const segments = name.split(".");
-    if (segments.some((segment) => segment.length === 0)) continue;
-    const path = segments.slice(0, 2);
-    let nodes = roots;
-    let absoluteName = "";
-    for (const segment of path) {
-      absoluteName = absoluteName ? `${absoluteName}.${segment}` : segment;
-      const node: NamespaceNode = nodes.get(segment) ?? {
-        segment,
-        absoluteName,
-        rows: [],
-        children: new Map(),
-      };
-      nodes.set(segment, node);
-      nodes = node.children;
-    }
+    nodeFor(diagnostic.target.name)?.diagnostics.push(diagnostic);
   }
-
   return {
     roots: [...roots.values()].sort((a, b) => compareCodeUnits(a.segment, b.segment)),
     malformed,

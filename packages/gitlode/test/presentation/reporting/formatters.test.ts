@@ -1135,3 +1135,62 @@ describe("streaming Profile rendering", () => {
     expect(lines).toEqual([]);
   });
 });
+
+describe("source-configurable namespace depth", () => {
+  it.each([1, 2, 3, 4, 8])(
+    "places measurements and diagnostic-only names at depth %i",
+    (namespaceDepth) => {
+      const report = emptyReport();
+      report.counters = [
+        {
+          ...counter("example", "a.b.c.d.count"),
+          attributes: [{ key: "a.b.c.d.label", value: "ok" }],
+        },
+      ];
+      report.diagnostics = [
+        diagnostic({
+          target: {
+            type: "observation",
+            scope: { name: "example", version: null },
+            kind: "counter",
+            name: "a.b.c.d.missing",
+          },
+          wholeResultUnavailable: true,
+        }),
+      ];
+      const lines: string[] = [];
+      renderProfile(
+        { writeLine: (line) => lines.push(line) },
+        report,
+        {
+          ...plainStyling,
+          h3: (text) => "<h3>" + text + "</h3>",
+          h4: (text) => "<h4>" + text + "</h4>",
+        },
+        { namespaceDepth },
+      );
+      expect(lines.filter((line) => line.includes("<h3>"))).toEqual(["    <h3>/a</h3>"]);
+      expect(lines.filter((line) => line.includes("<h4>"))).toEqual(
+        namespaceDepth > 1 ? ["      <h4>b</h4>"] : [],
+      );
+      if (namespaceDepth >= 3) expect(lines).toContain("        c");
+      if (namespaceDepth >= 4) expect(lines).toContain("          d");
+      const segments = ["a", "b", "c", "d", "count"];
+      const valueDepth = Math.min(namespaceDepth, 4) + 2;
+      const valueName = segments.slice(Math.min(namespaceDepth, 4)).join(".");
+      expect(lines).toContain("  ".repeat(valueDepth) + valueName + " : 1 operations");
+      const missingName = ["a", "b", "c", "d", "missing"]
+        .slice(Math.min(namespaceDepth, 4))
+        .join(".");
+      expect(lines.filter((line) => line.endsWith(missingName + " : unavailable"))).toEqual([
+        "  ".repeat(valueDepth) + missingName + " : unavailable",
+      ]);
+      expect(lines.filter((line) => line.includes("!"))).toHaveLength(2);
+      const attributeName =
+        namespaceDepth <= 4
+          ? ["a", "b", "c", "d"].slice(namespaceDepth).concat("label").join(".")
+          : "/a.b.c.d.label";
+      expect(lines).toContain("  ".repeat(valueDepth + 1) + attributeName + " = ok");
+    },
+  );
+});

@@ -183,8 +183,16 @@ useful for individual roles but do not establish the overall balance of a real r
 `createStyling(false)` retains configured padding while suppressing all decoration. The exported
 `plainStyling` object is an identity baseline for isolated formatter callers/tests; actual CLI
 styled/plain comparisons must use `createStyling(true)` and `createStyling(false)`. No runtime
-theme configuration, background detection or forced color is introduced. Namespace depth and
-diagnostic placement remain formatter contracts, outside this role-parameter table.
+theme configuration, background detection or forced color is introduced. Namespace depth is a separate source parameter, outside this role-parameter table.
+
+Edit `profileLayout.namespaceDepth` in `src/presentation/reporting/profile-layout.ts` to set
+how many leading dot-separated segments form namespace levels (positive safe integer, default 2).
+Build and rerun the CLI to apply it. Remaining segments stay together on an observation row;
+names shorter than the limit carry values on their final namespace line. Measurements and
+diagnostic-only identities use the same tree construction. Heading styles are selected from
+`[styling.h3, styling.h4]`; deeper namespace headings have no decoration or heading padding.
+Indentation and the root slash remain independent of decoration. This is a source-level tuning
+parameter, not a runtime CLI/configuration setting.
 
 Profile layout experiments can also change the rendering functions directly; they need not be
 expressed as configuration parameters. In `src/presentation/reporting/`, `profile-renderer.ts`

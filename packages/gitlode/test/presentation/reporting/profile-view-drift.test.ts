@@ -33,7 +33,7 @@ describe("generic profile view drift", () => {
     expect((view.generic_hierarchy as Record<string, unknown>).remaining_suffix_escaping).toBe(
       "complete_suffix_before_decoration",
     );
-    expect((view.generic_hierarchy as Record<string, unknown>).namespace_segments).toBe(2);
+    expect((view.generic_hierarchy as Record<string, unknown>).namespace_segments_default).toBe(2);
   });
 
   it("matches generic kind, diagnostic, unit and style policy", async () => {

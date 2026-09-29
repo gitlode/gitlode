@@ -22,6 +22,7 @@ import {
   type IssueOnlyTarget,
   type ProfileMeasurement,
 } from "./profile-data.js";
+import { profileLayout } from "./profile-layout.js";
 import {
   diagnosticText,
   formatAttributeKey,
@@ -48,7 +49,6 @@ interface MeasurementContext {
 }
 interface NamespaceContext {
   readonly node: NamespaceNode;
-  readonly diagnostics: readonly ProfileDiagnostic[];
 }
 
 /** Emit synchronously; a rendering/sink failure propagates without replaying already written lines. */
@@ -56,6 +56,7 @@ export function renderProfile(
   sink: ProfileSink,
   report: ProfileReport,
   styling: Styling = plainStyling,
+  options: Readonly<typeof profileLayout> = profileLayout,
 ): void {
   if (
     report.spans.length +
@@ -68,14 +69,15 @@ export function renderProfile(
   const scopes = groupProfileScopes(report);
   sink.writeLine(styling.h1("Profile"));
   renderProfileDiagnostics(sink, report.diagnostics, styling, { depth: 1 });
-  for (const scope of scopes) renderScope(sink, scope, styling, { depth: 1 });
+  for (const scope of scopes)
+    renderScope(sink, scope, styling, { depth: 1, namespaceDepth: options.namespaceDepth });
 }
 
 function renderScope(
   sink: ProfileSink,
   context: ScopeContext,
   styling: Styling,
-  options: RenderOptions,
+  options: RenderOptions & { readonly namespaceDepth: number },
 ): void {
   const { scope, diagnostics } = context;
   const { depth } = options;
@@ -84,12 +86,12 @@ function renderScope(
     .filter((item) => item.target.type === "scope")
     .sort(compareDiagnostics))
     renderNotice(sink, diagnostic, styling, { depth: depth + 1 });
-  const { roots, malformed } = buildScopeTree(context);
+  const { roots, malformed } = buildScopeTree(context, options.namespaceDepth);
   renderMalformedObservations(sink, { rows: malformed, diagnostics }, styling, {
     depth: depth + 1,
   });
   for (const node of roots)
-    renderNamespace(sink, { node, diagnostics }, styling, { depth: depth + 1, firstLevel: true });
+    renderNamespace(sink, { node }, styling, { depth: depth + 1, namespaceLevel: 0 });
 }
 
 function renderMalformedObservations(
@@ -292,16 +294,16 @@ function renderNamespace(
   sink: ProfileSink,
   context: NamespaceContext,
   styling: Styling,
-  options: RenderOptions & { readonly firstLevel: boolean },
+  options: RenderOptions & { readonly namespaceLevel: number },
 ): void {
   renderNamespaceHeading(sink, context, styling, options);
   renderNamespaceObservations(sink, context, styling, options);
   for (const child of [...context.node.children.values()].sort((a, b) =>
     compareCodeUnits(a.segment, b.segment),
   ))
-    renderNamespace(sink, { node: child, diagnostics: context.diagnostics }, styling, {
+    renderNamespace(sink, { node: child }, styling, {
       depth: options.depth + 1,
-      firstLevel: false,
+      namespaceLevel: options.namespaceLevel + 1,
     });
 }
 
@@ -309,13 +311,14 @@ function renderNamespaceHeading(
   sink: ProfileSink,
   context: NamespaceContext,
   styling: Styling,
-  options: RenderOptions & { readonly firstLevel: boolean },
+  options: RenderOptions & { readonly namespaceLevel: number },
 ): void {
-  const { node, diagnostics } = context;
-  const { depth, firstLevel: root } = options;
+  const { node } = context;
+  const { diagnostics } = node;
+  const { depth, namespaceLevel } = options;
   const indent = "  ".repeat(depth);
-  const name = `${root ? "/" : ""}${formatToken(node.segment)}`;
-  const heading = root ? styling.h3 : styling.h4;
+  const name = `${namespaceLevel === 0 ? "/" : ""}${formatToken(node.segment)}`;
+  const heading = [styling.h3, styling.h4][namespaceLevel] ?? ((text: string) => text);
   const rows = [...node.rows].sort(compareMeasurements);
   const ownRows = rows.filter((row) => row.value.name === node.absoluteName);
   const ownDiagnostics = diagnosticsForName(diagnostics, node.absoluteName);
@@ -376,7 +379,8 @@ function renderNamespaceObservations(
   styling: Styling,
   options: RenderOptions,
 ): void {
-  const { node, diagnostics } = context;
+  const { node } = context;
+  const { diagnostics } = node;
   const { depth } = options;
   const childRows = [...node.rows]
     .sort(compareMeasurements)
@@ -387,7 +391,6 @@ function renderNamespaceObservations(
       .filter(
         (diagnostic) =>
           (diagnostic.target.type === "observation" || diagnostic.target.type === "point") &&
-          diagnostic.target.name.split(".").slice(0, 2).join(".") === node.absoluteName &&
           diagnostic.target.name.startsWith(`${node.absoluteName}.`),
       )
       .map((diagnostic) =>

@@ -14,7 +14,7 @@ sanitized warning and no Profile block.
 ## Generic hierarchy
 
 The view groups every retained Span, counter, and histogram by instrumentation Scope name and
-optional version. Within each Scope, the first two dot-separated observation-name segments form
+optional version. Within each Scope, by default the first two dot-separated observation-name segments form
 namespace levels; remaining segments form the observation row. The root namespace begins with `/`.
 Kinds are not separate sections or badges. Different kinds and repeated metric points with the
 same name remain independent rows, ordered by kind and typed attributes.

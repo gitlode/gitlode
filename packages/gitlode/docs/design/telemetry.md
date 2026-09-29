@@ -659,7 +659,7 @@ repaired into an accepted report.
 
 Presentation owns the declarative
 [`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog. All admitted observations are
-grouped by Scope name/version, then by the first two dot-separated name segments. Remaining segments
+grouped by Scope name/version, then by a source-configured number of dot-separated name segments (default: two). Remaining segments
 form the row name. Spans, counters and histograms share this hierarchy; kind is used only for field
 shape, identity and deterministic tie ordering. Plugin, core and unknown admitted identities follow
 the same rules. No Plugins bucket, fallback bucket, kind section, human label override or

@@ -438,3 +438,12 @@ The development build and 12 relevant test files / 113 tests pass, including str
 empty-report behavior and the active-progress boundary. Real-data visual iteration remains with
 the human; no repository preparation or repository identity recording is needed. No performance
 claim, visual acceptance or PR authorization is implied by this refactor.
+
+### Source-configured namespace depth
+
+Namespace depth can now be edited in `profile-layout.ts` (default 2, positive safe integer).
+Tree construction assigns both measurements and diagnostic targets to their namespace nodes,
+so rendering no longer re-derives diagnostic membership using a two-segment prefix.
+Namespace rendering tracks its level separately from indentation. Styles use h3/h4 for the
+first two levels and identity (no padding) thereafter. Existing default output is preserved.
+The human can edit this parameter, build and run their own repository as before.

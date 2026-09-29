@@ -370,7 +370,56 @@ decoration differences confined to the two second-level namespace headings, and 
 text parity. Terminal mode without a TTY and an unknown comparison argument both exited 1. These
 are helper/composition checks, not visual evidence or a new product validation campaign.
 
-Status: **continuation needed; awaiting A/C sample feedback**. Primary values, common `h1`,
-heading padding and background emphasis in principle are adopted. Namespace treatment remains
-pending. Product padding and selected palette application, the light-scheme yellow issue,
-unavailable GNOME evidence, final checks and independent review remain open.
+### Revised workflow: whole-output tuning on human-owned real data
+
+The human selected **C** after the A/C comparison (sample supplied at
+`e8a421674abb53412ff84ab7b033efaccb4f5bce`; the reply did not explicitly restate the viewed OID).
+The combined design still does not feel balanced, so component-by-component voting is replaced
+by hands-on tuning of the complete output on real repositories. Prior lessons are constraints and
+starting points, not proof that the complete composition is accepted. Bold emphasis can be weak;
+compact background labels benefit from padding; perceived color grouping should agree with meaning;
+and hierarchy's horizontal/vertical tradeoff depends on actual data.
+
+The human explicitly owns repository preparation and choice and does **not** request recording
+which repository was used. Do not create a repository, select a range on their behalf or maintain
+a repository identity log. Source revision and visual decisions can still be recorded. The existing
+fixture helper remains useful for automated regression checks, not whole-output visual approval.
+
+Implementation for this workflow:
+
+- `src/presentation/styling.ts` exposes a typed `styleRules` source table. Edit `decorate` (a Chalk
+  chain) and `padding` (spaces on each side) for any role without changing renderer logic. The
+  starting settings apply selected C and one-space heading padding to the actual CLI.
+- The factory applies padding in styled, color-suppressed TTY and non-TTY modes, then decoration
+  only where allowed. `plainStyling` remains an identity baseline for isolated formatter callers;
+  actual styled/plain comparisons use the factory in both modes. Text parity includes padding.
+- The synthetic preview reuses this table and factory. Historical A/C mode keeps fixed candidates,
+  and its explicit padding comparison avoids doubling the newly configured padding.
+- The fixture excerpt helper now locates padded Scope headings without relying on exact indentation.
+  No real-repository setup helper, public theme picker, dependency, background autodetection or
+  telemetry/aggregation change is added. Namespace-depth changes remain a separate structural topic.
+
+The repeatable workflow is documented in [CLI styling guidance](../design/cli.md): edit the table,
+build, run the normal CLI against a repository supplied by the human, then judge the whole output.
+An optional build watcher supports repeated source edits. Example PowerShell command shape, with
+paths/ref replaced by the human and an existing output directory:
+
+```powershell
+npm run build:dev
+node packages/gitlode/dist/index.js --profile --ref <ref> --output-dir <output-directory> <repository-path>
+```
+
+Ordinary CLI options such as `--since-ref`, `--since-date`, `--per-file` and `--config` can be used
+for the desired workload. Run directly for TTY color/progress. Extraction work and elapsed times
+are real and can vary; this is not a frozen performance measurement or a cached report replay.
+
+Checks: development build, strict typechecking of both preview/capture scripts and **12 files /
+109 tests** passed. Tests cover padding-before-decoration, no decorator invocation in non-TTY mode,
+color-suppressed TTY parity, invalid source padding, existing heading-role routing and collector-to-
+presentation behavior. Existing commit/file/plugin fixture capture completed with padded headings.
+These checks do not replace the requested real-data visual tuning.
+
+Status: **continuation needed; whole-output tuning is ready for human iteration**. C and heading
+padding are applied as the starting settings. Overall balance, the light-scheme yellow finding,
+unavailable GNOME evidence, final validation and independent review remain open. No final design,
+visual acceptance, performance freeze, PR or merge is claimed.

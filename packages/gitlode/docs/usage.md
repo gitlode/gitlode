@@ -10,6 +10,10 @@ retained signal kinds in one Scope/namespace hierarchy.
 It does not select a different extraction path. Use `--quiet` to suppress summary, progress, and
 profile presentation.
 
+On terminals with color support, report headings use background colors; values use the default
+text color. Plain output preserves the heading spacing and information. See the
+[profiling guide](profiling.md) for interpreting the report.
+
 ---
 
 ## Extraction Modes

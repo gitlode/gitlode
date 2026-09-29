@@ -161,6 +161,31 @@ color styling is applied (spinner, done marker, stage labels, field keys, values
 severity badges). When `process.stderr.isTTY === false`, styling is disabled and the same text
 content is emitted with no ANSI escape sequences.
 
+Source-level visual parameters live in `src/presentation/styling.ts` as the typed `styleRules`
+table. Each role has a Chalk `decorate` function and a nonnegative integer `padding` count for
+spaces on each side. Padding is applied before decoration, in both styled and plain modes; it is
+layout rather than a color effect. A role's background includes its padding but not surrounding
+indentation or sibling measurement fields. Headings currently use one space per side.
+
+The shared `h1` role serves both application-summary and Profile titles; `h2` serves Scope,
+`h3` the first namespace level, and `h4` the second. Their colors identify structural levels,
+not success or diagnostic severity. `h3` and `h4` start with related cyan/bright-cyan backgrounds.
+Color assignments remain source parameters for whole-output tuning, not a public theme API.
+
+To try a visual change, edit a role's `decorate` chain (for example `chalk.black.bgCyanBright`
+or `chalk.cyan.underline`) or its `padding`, run `npm run build:dev`, then run the built CLI on
+the human's repository with ordinary `--profile`, ref/range and output options. These edits do
+not require formatter logic changes. `npm run build:watch` in a separate terminal can replace
+repeated builds; wait for compilation to finish before rerunning the CLI. Extraction still runs
+normally and writes JSONL to the specified existing output directory. Synthetic previews remain
+useful for individual roles but do not establish the overall balance of a real report.
+
+`createStyling(false)` retains configured padding while suppressing all decoration. The exported
+`plainStyling` object is an identity baseline for isolated formatter callers/tests; actual CLI
+styled/plain comparisons must use `createStyling(true)` and `createStyling(false)`. No runtime
+theme configuration, background detection or forced color is introduced. Namespace depth and
+diagnostic placement remain formatter contracts, outside this role-parameter table.
+
 When `process.stderr.isTTY === true`, the stage lines are rendered in place using a braille spinner:
 
 ```text

@@ -8,7 +8,12 @@ import {
   formatProfileLines,
   formatSummaryLines,
 } from "../src/presentation/reporting/formatters.js";
-import { createStyling, type Styling } from "../src/presentation/styling.js";
+import {
+  createStyling,
+  styleRules,
+  type StyleRules,
+  type Styling,
+} from "../src/presentation/styling.js";
 
 const mode = process.argv.slice(2);
 if (
@@ -127,22 +132,21 @@ if (terminal && chalk.level === 0)
 
 if (mode[1] === "--compare-headings") {
   // Preview-only candidates reuse the production factory and renderer.
-  // Pad before decoration so styled/plain output contains identical text.
-  const padded: Styling = {
-    ...styling,
-    h1: (text) => styling.h1(` ${text} `),
-    h2: (text) => styling.h2(` ${text} `),
-    h3: (text) => styling.h3(` ${text} `),
-    h4: (text) => styling.h4(` ${text} `),
+  const comparisonRules: StyleRules = {
+    ...styleRules,
+    h1: { ...styleRules.h1, padding: 1 },
+    h2: { ...styleRules.h2, padding: 1 },
+    h3: { decorate: chalk.black.bgCyan, padding: 1 },
+    h4: { decorate: chalk.black.bgCyanBright, padding: 1 },
   };
   const candidates: readonly [string, Styling][] = [
-    ["A: same namespace style (black on cyan at both depths)", { ...padded, h4: padded.h3 }],
+    [
+      "A: same namespace style (black on cyan at both depths)",
+      createStyling(terminal, { ...comparisonRules, h4: comparisonRules.h3 }),
+    ],
     [
       "C: related namespace styles (black on cyan / bright cyan)",
-      {
-        ...padded,
-        h4: (text) => (terminal ? chalk.black.bgCyanBright(` ${text} `) : ` ${text} `),
-      },
+      createStyling(terminal, comparisonRules),
     ],
   ];
   const comparisonReport: ProfileReport = {
@@ -162,7 +166,9 @@ if (mode[1] === "--compare-headings") {
   console.error(
     "\nA/C heading comparison: same synthetic data, order and one-space heading padding.",
   );
-  console.error("Only the second namespace level's style differs; product styling is unchanged.");
+  console.error(
+    "Only the second namespace level's style differs; these are fixed comparison candidates.",
+  );
   for (const [label, candidate] of candidates) {
     console.error(`\n${label}`);
     for (const line of formatProfileLines(comparisonReport, candidate)) console.error(line);
@@ -192,10 +198,16 @@ if (mode[1] === "--compare-headings") {
   console.error("In --plain mode every sample intentionally has no styling.");
   for (const [label, decorate] of chalkSamples)
     console.error(`  ${label.padEnd(20)} | ${terminal ? decorate(sampleText) : sampleText}`);
-  console.error("\nHeading padding comparison (preview only; product spacing is unchanged):");
+  console.error(
+    "\nHeading padding comparison (zero vs one space, independent of configured padding):",
+  );
   for (const role of ["h1", "h2", "h3", "h4"] as const) {
-    console.error(`  ${role} no padding | ${styling[role]("Heading")}`);
-    console.error(`  ${role} one space  | ${styling[role](" Heading ")}`);
+    const unpadded = createStyling(terminal, {
+      ...styleRules,
+      [role]: { ...styleRules[role], padding: 0 },
+    });
+    console.error(`  ${role} no padding | ${unpadded[role]("Heading")}`);
+    console.error(`  ${role} one space  | ${unpadded[role](" Heading ")}`);
   }
   console.error("\ngitlode semantic roles (synthetic renderer output):");
 

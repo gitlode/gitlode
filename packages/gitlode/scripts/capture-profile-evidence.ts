@@ -53,9 +53,11 @@ function parseRunMode(args: string[]): RunMode {
 
 function scopeExcerpt(stderr: string, scope: string): string {
   const lines = stderr.split(/\r?\n/u);
-  const start = lines.indexOf(`  Scope: ${scope}`);
+  const start = lines.findIndex((line) => line.trim() === `Scope: ${scope}`);
   if (start < 0) throw new Error(`missing Scope: ${scope}`);
-  const next = lines.findIndex((line, index) => index > start && line.startsWith("  Scope: "));
+  const next = lines.findIndex(
+    (line, index) => index > start && line.trimStart().startsWith("Scope: "),
+  );
   return lines.slice(start, next < 0 ? undefined : next).join("\n");
 }
 

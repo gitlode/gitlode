@@ -63,6 +63,9 @@ stated separately.
 Available numeric values and scalar attribute values use the terminal's default foreground without
 additional emphasis. This body-text treatment is shared with progress and completion values.
 Color and emphasis supplement the hierarchy and notices; plain text retains their meaning.
+Heading backgrounds include one space of padding on each side. Plain output retains the same
+spacing. Developers adjusting the display can follow the source-level styling guidance in
+[`design/cli.md`](design/cli.md) and evaluate the complete output on their own repositories.
 
 Terminal formatting is for human diagnosis and is not a machine-readable compatibility contract.
 Consumers requiring a protocol should use the structured `ProfileReport` at the worker boundary

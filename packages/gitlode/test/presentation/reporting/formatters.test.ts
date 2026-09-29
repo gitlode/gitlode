@@ -1077,7 +1077,7 @@ describe("generic profile formatting", () => {
 
     const ansi = /\u001b\[[0-9;]*m/gu;
     expect(formatProfileLines(report, createStyling(true)).join("\n").replace(ansi, "")).toBe(
-      formatProfileLines(report).join("\n"),
+      formatProfileLines(report, createStyling(false)).join("\n"),
     );
   });
 });

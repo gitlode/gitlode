@@ -630,9 +630,12 @@ still a trial rather than a visually accepted policy.
 | Notification explanation                                      | Default text            | Default foreground, normal weight |
 
 The shared `h1` through `h4` roles describe structural heading levels, not profile-specific concepts
-or diagnostic severity. Their plainStyling implementations return input unchanged. `separator` uses
-`chalk.dim` in the shared factory. Candidate heading palettes and padding comparisons are recorded
-in the active styling handoff; padding currently exists only in the synthetic preview comparison.
+or diagnostic severity. Production styling, including non-TTY output, applies the shared source-level
+padding before decoration; see the [CLI styling contract](../design/cli.md). The `plainStyling`
+identity baseline remains available for isolated formatter callers. The active tuning baseline
+uses related cyan/bright-cyan namespace backgrounds and one space of heading padding per side.
+Whole-output visual adjustment continues in the styling handoff; semantic grouping and notification
+placement remain independent of these visual parameters.
 
 Profile and the application completion summary both use `h1` for their top-level titles. This
 replaces the former success-specific `summaryHeader` and uniform `sectionHeading`. Their shared

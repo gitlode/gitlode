@@ -49,8 +49,8 @@ describe("generic profile view drift", () => {
       expect.objectContaining({
         title: "h1",
         scope: "h2",
-        namespace_first_level: "h3",
-        namespace_second_level: "h4",
+        first_level_below_scope: "h3",
+        second_level_below_scope: "h4",
         separator: "separator",
         profile_uses_application_success_style: false,
         styled_plain_text_parity: true,

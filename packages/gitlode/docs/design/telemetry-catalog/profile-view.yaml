@@ -20,7 +20,8 @@ generic_hierarchy:
     version_absent: "Scope: <scope-name>"
   namespace_segments_default: 2
   namespace_segments_source: src/presentation/reporting/profile-layout.ts
-  namespace_segments_constraint: positive_safe_integer
+  namespace_segments_constraint: nonnegative_safe_integer
+  zero_namespace_segments: absolute_observation_rows_under_scope
   root_prefix: "/"
   remaining_segments: joined_observation_row
   short_name_values: group_node_line
@@ -159,9 +160,10 @@ diagnostic_rendering:
 styling:
   title: h1
   scope: h2
-  namespace_first_level: h3
-  namespace_second_level: h4
-  namespace_deeper_levels: unstyled_without_padding
+  first_level_below_scope: h3
+  second_level_below_scope: h4
+  deeper_levels: unstyled_without_padding
+  heading_style_basis: display_depth_for_namespaces_and_entry_names
   observation_name: default
   field_and_attribute_key: fieldKey
   available_value: primaryValue

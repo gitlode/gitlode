@@ -51,6 +51,11 @@ interface NamespaceContext {
   readonly node: NamespaceNode;
 }
 
+/** Heading decoration depends only on display depth, never on the entry kind. */
+function headingStyle(styling: Styling, depth: number): (text: string) => string {
+  return [styling.h1, styling.h2, styling.h3, styling.h4][depth] ?? ((text: string) => text);
+}
+
 /** Emit synchronously; a rendering/sink failure propagates without replaying already written lines. */
 export function renderProfile(
   sink: ProfileSink,
@@ -86,15 +91,14 @@ function renderScope(
     .filter((item) => item.target.type === "scope")
     .sort(compareDiagnostics))
     renderNotice(sink, diagnostic, styling, { depth: depth + 1 });
-  const { roots, malformed } = buildScopeTree(context, options.namespaceDepth);
-  renderMalformedObservations(sink, { rows: malformed, diagnostics }, styling, {
+  const { roots, ungrouped } = buildScopeTree(context, options.namespaceDepth);
+  renderUngroupedObservations(sink, ungrouped, styling, {
     depth: depth + 1,
   });
-  for (const node of roots)
-    renderNamespace(sink, { node }, styling, { depth: depth + 1, namespaceLevel: 0 });
+  for (const node of roots) renderNamespace(sink, { node }, styling, { depth: depth + 1 });
 }
 
-function renderMalformedObservations(
+function renderUngroupedObservations(
   sink: ProfileSink,
   context: {
     readonly rows: ProfileMeasurement[];
@@ -103,15 +107,14 @@ function renderMalformedObservations(
   styling: Styling,
   options: RenderOptions,
 ): void {
-  const { rows: malformed, diagnostics } = context;
+  const { rows, diagnostics } = context;
   const { depth } = options;
-  const malformedNames = new Set([
-    ...malformed.map((row) => row.value.name),
+  const names = new Set([
+    ...rows.map((row) => row.value.name),
     ...diagnostics
       .filter(
         (diagnostic) =>
-          (diagnostic.target.type === "observation" || diagnostic.target.type === "point") &&
-          diagnostic.target.name.split(".").some((segment) => segment.length === 0),
+          diagnostic.target.type === "observation" || diagnostic.target.type === "point",
       )
       .map((diagnostic) =>
         diagnostic.target.type === "observation" || diagnostic.target.type === "point"
@@ -119,20 +122,22 @@ function renderMalformedObservations(
           : "",
       ),
   ]);
-  for (const name of [...malformedNames].sort(compareCodeUnits)) {
-    const namedRows = malformed.filter((row) => row.value.name === name).sort(compareMeasurements);
+  for (const name of [...names].sort(compareCodeUnits)) {
+    const forceQuote = name.split(".").some((segment) => segment.length === 0);
+    const absoluteName = "/" + (forceQuote ? quote(name) : formatToken(name));
+    const namedRows = rows.filter((row) => row.value.name === name).sort(compareMeasurements);
     const namedDiagnostics = diagnosticsForName(diagnostics, name);
     const { matched, unmatched } = partitionNameDiagnostics(namedRows, namedDiagnostics);
     const matchedObservations = matched.filter((item) => item.target.type === "observation");
     if (namedRows.length > 1 && matchedObservations.length > 0) {
-      sink.writeLine(`${"  ".repeat(depth)}/${quote(name)}`);
+      sink.writeLine(`${"  ".repeat(depth)}${headingStyle(styling, depth)(absoluteName)}`);
       for (const diagnostic of matchedObservations)
         renderNotice(sink, diagnostic, styling, { depth: depth + 1 });
     }
     for (const entry of namedEntries(namedRows, unmatched)) {
       if (entry.type === "issue")
         renderIssueOnlyRow(sink, entry.issue, styling, {
-          name: `/${quote(name)}`,
+          name: absoluteName,
           depth: depth,
           attributeBase: undefined,
         });
@@ -147,7 +152,7 @@ function renderMalformedObservations(
                 : matched,
           },
           styling,
-          { depth: depth, attributeBase: undefined, forceQuote: true },
+          { depth: depth, attributeBase: undefined, forceQuote },
         );
     }
   }
@@ -268,7 +273,7 @@ function renderIssueOnlyRow(
   const { name, depth, attributeBase } = options;
   const unavailable = issue.diagnostics.some(isEntireResultUnavailable);
   sink.writeLine(
-    `${"  ".repeat(depth)}${name}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
+    `${"  ".repeat(depth)}${headingStyle(styling, depth)(name)}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
   );
   if (issue.target.type === "point")
     renderPointAttributes(sink, issue.target.attributes, styling, {
@@ -294,7 +299,7 @@ function renderNamespace(
   sink: ProfileSink,
   context: NamespaceContext,
   styling: Styling,
-  options: RenderOptions & { readonly namespaceLevel: number },
+  options: RenderOptions,
 ): void {
   renderNamespaceHeading(sink, context, styling, options);
   renderNamespaceObservations(sink, context, styling, options);
@@ -303,7 +308,6 @@ function renderNamespace(
   ))
     renderNamespace(sink, { node: child }, styling, {
       depth: options.depth + 1,
-      namespaceLevel: options.namespaceLevel + 1,
     });
 }
 
@@ -311,14 +315,14 @@ function renderNamespaceHeading(
   sink: ProfileSink,
   context: NamespaceContext,
   styling: Styling,
-  options: RenderOptions & { readonly namespaceLevel: number },
+  options: RenderOptions,
 ): void {
   const { node } = context;
   const { diagnostics } = node;
-  const { depth, namespaceLevel } = options;
+  const { depth } = options;
   const indent = "  ".repeat(depth);
-  const name = `${namespaceLevel === 0 ? "/" : ""}${formatToken(node.segment)}`;
-  const heading = [styling.h3, styling.h4][namespaceLevel] ?? ((text: string) => text);
+  const name = `${depth === 2 ? "/" : ""}${formatToken(node.segment)}`;
+  const heading = headingStyle(styling, depth);
   const rows = [...node.rows].sort(compareMeasurements);
   const ownRows = rows.filter((row) => row.value.name === node.absoluteName);
   const ownDiagnostics = diagnosticsForName(diagnostics, node.absoluteName);
@@ -337,7 +341,7 @@ function renderNamespaceHeading(
     );
   } else if (ownEntries.length === 1 && ownEntry?.type === "issue") {
     renderIssueOnlyRow(sink, ownEntry.issue, styling, {
-      name: heading(name),
+      name,
       depth: depth,
       attributeBase: node.absoluteName,
     });
@@ -408,7 +412,7 @@ function renderNamespaceObservations(
       namedRows.length > 1 &&
       partition.matched.some((item) => item.target.type === "observation")
     ) {
-      sink.writeLine(`${"  ".repeat(depth + 1)}${relativeName}`);
+      sink.writeLine(`${"  ".repeat(depth + 1)}${headingStyle(styling, depth + 1)(relativeName)}`);
       for (const diagnostic of partition.matched.filter(
         (item) => item.target.type === "observation",
       ))
@@ -461,7 +465,9 @@ function renderObservation(
 ): void {
   const { row, diagnostics } = context;
   const { name, depth, attributeBase } = options;
-  sink.writeLine(`${"  ".repeat(depth)}${name}${formatMeasurementFields(row, styling)}`);
+  sink.writeLine(
+    `${"  ".repeat(depth)}${headingStyle(styling, depth)(name)}${formatMeasurementFields(row, styling)}`,
+  );
   renderAttributes(sink, row, styling, { attributeBase: attributeBase, depth: depth + 1 });
   renderMeasurementDiagnostics(sink, { row: row, diagnostics: diagnostics }, styling, {
     depth: depth + 1,

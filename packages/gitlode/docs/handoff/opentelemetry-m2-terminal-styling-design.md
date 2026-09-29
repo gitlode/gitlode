@@ -447,3 +447,12 @@ so rendering no longer re-derives diagnostic membership using a two-segment pref
 Namespace rendering tracks its level separately from indentation. Styles use h3/h4 for the
 first two levels and identity (no padding) thereafter. Existing default output is preserved.
 The human can edit this parameter, build and run their own repository as before.
+
+### Flat output and depth-based entry styling
+
+The namespace-depth range now includes 0 (no grouping): absolute observation names are rendered
+under Scope, including diagnostic-only targets. Heading styling follows display depth for both
+namespaces and telemetry entries: h3 immediately below Scope, h4 on the next level, then identity.
+Thus namespaceDepth 1 gives child telemetry entries h4. Only names receive heading decoration;
+measurement fields, attributes and notices retain their existing roles. The default remains 2.
+This supersedes the positive-only depth range and namespace-only styling described above.

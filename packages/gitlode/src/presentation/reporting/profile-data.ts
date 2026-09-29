@@ -88,12 +88,15 @@ export function buildScopeTree(
   namespaceDepth: number,
 ): {
   roots: NamespaceNode[];
-  malformed: ProfileMeasurement[];
+  ungrouped: { rows: ProfileMeasurement[]; diagnostics: ProfileDiagnostic[] };
 } {
-  if (!Number.isSafeInteger(namespaceDepth) || namespaceDepth < 1)
-    throw new RangeError("Namespace depth must be a positive safe integer");
+  if (!Number.isSafeInteger(namespaceDepth) || namespaceDepth < 0)
+    throw new RangeError("Namespace depth must be a nonnegative safe integer");
   const roots = new Map<string, NamespaceNode>();
-  const malformed: ProfileMeasurement[] = [];
+  const ungrouped: { rows: ProfileMeasurement[]; diagnostics: ProfileDiagnostic[] } = {
+    rows: [],
+    diagnostics: [],
+  };
 
   // Measurements and diagnostic-only identities use the same path construction.
   function nodeFor(name: string): NamespaceNode | undefined {
@@ -120,15 +123,17 @@ export function buildScopeTree(
   for (const row of rows) {
     const node = nodeFor(row.value.name);
     if (node) node.rows.push(row);
-    else malformed.push(row);
+    else ungrouped.rows.push(row);
   }
   for (const diagnostic of diagnostics) {
     if (diagnostic.target.type !== "observation" && diagnostic.target.type !== "point") continue;
-    nodeFor(diagnostic.target.name)?.diagnostics.push(diagnostic);
+    const node = nodeFor(diagnostic.target.name);
+    if (node) node.diagnostics.push(diagnostic);
+    else ungrouped.diagnostics.push(diagnostic);
   }
   return {
     roots: [...roots.values()].sort((a, b) => compareCodeUnits(a.segment, b.segment)),
-    malformed,
+    ungrouped,
   };
 }
 

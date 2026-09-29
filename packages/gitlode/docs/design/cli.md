@@ -154,7 +154,7 @@ When `--quiet` is not set and extraction succeeds, stderr output is fixed as fol
 
 3. An aligned completion summary block.
 4. When `--profile` is set, a Profile block after a single blank line. It uses the generic
-   Scope/two-level namespace hierarchy defined by the telemetry presentation contract.
+   Scope/source-configured namespace hierarchy defined by the telemetry presentation contract.
 
 TTY-aware rendering is a CLI-edge concern. When `process.stderr.isTTY === true`, chalk-based
 color styling is applied (spinner, done marker, stage labels, field keys, values, units, refs, and
@@ -168,7 +168,7 @@ layout rather than a color effect. A role's background includes its padding but 
 indentation or sibling measurement fields. Headings currently use one space per side.
 
 The shared `h1` role serves both application-summary and Profile titles; `h2` serves Scope,
-`h3` the first namespace level, and `h4` the second. Their colors identify structural levels,
+`h3` the first level below Scope, and `h4` the next, for both namespaces and telemetry entries. Their colors identify structural levels,
 not success or diagnostic severity. `h3` and `h4` start with related cyan/bright-cyan backgrounds.
 Color assignments remain source parameters for whole-output tuning, not a public theme API.
 
@@ -186,11 +186,14 @@ styled/plain comparisons must use `createStyling(true)` and `createStyling(false
 theme configuration, background detection or forced color is introduced. Namespace depth is a separate source parameter, outside this role-parameter table.
 
 Edit `profileLayout.namespaceDepth` in `src/presentation/reporting/profile-layout.ts` to set
-how many leading dot-separated segments form namespace levels (positive safe integer, default 2).
-Build and rerun the CLI to apply it. Remaining segments stay together on an observation row;
+how many leading dot-separated segments form namespace levels (nonnegative safe integer, default 2).
+Build and rerun the CLI to apply it. Zero disables namespace grouping and emits absolute entry
+names directly under Scope. Remaining segments stay together on an observation row;
 names shorter than the limit carry values on their final namespace line. Measurements and
-diagnostic-only identities use the same tree construction. Heading styles are selected from
-`[styling.h3, styling.h4]`; deeper namespace headings have no decoration or heading padding.
+diagnostic-only identities use the same tree construction. Heading styles depend only on display depth, for both namespace headings and entry names:
+`[styling.h3, styling.h4]` below Scope, then no decoration or heading padding. With depth 0,
+entries use h3; with depth 1, namespaces use h3 and their child entries use h4. Measurement
+fields, attributes and diagnostic text keep their own roles.
 Indentation and the root slash remain independent of decoration. This is a source-level tuning
 parameter, not a runtime CLI/configuration setting.
 

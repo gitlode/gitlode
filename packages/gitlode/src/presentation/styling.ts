@@ -1,37 +1,39 @@
 import chalk from "chalk";
 
 export interface Styling {
-  spinnerGlyph(text: string): string;
-  doneMarker(text: string): string;
-  stageLabel(text: string): string;
+  active(text: string): string;
+  success(text: string): string;
+  label(text: string): string;
   h1(text: string): string;
   h2(text: string): string;
   h3(text: string): string;
   h4(text: string): string;
-  warnBadge(text: string): string;
-  errorBadge(text: string): string;
-  fieldKey(text: string): string;
-  primaryValue(text: string): string;
-  unitSuffix(text: string): string;
-  refsValue(text: string): string;
+  warning(text: string): string;
+  error(text: string): string;
+  fieldLabel(text: string): string;
+  attributeName(text: string): string;
+  value(text: string): string;
+  unit(text: string): string;
+  reference(text: string): string;
   separator(text: string): string;
 }
 
 /** Identity baseline for formatter callers that request neither decoration nor padding. */
 export const plainStyling: Styling = {
-  spinnerGlyph: (t) => t,
-  doneMarker: (t) => t,
-  stageLabel: (t) => t,
+  active: (t) => t,
+  success: (t) => t,
+  label: (t) => t,
   h1: (t) => t,
   h2: (t) => t,
   h3: (t) => t,
   h4: (t) => t,
-  warnBadge: (t) => t,
-  errorBadge: (t) => t,
-  fieldKey: (t) => t,
-  primaryValue: (t) => t,
-  unitSuffix: (t) => t,
-  refsValue: (t) => t,
+  warning: (t) => t,
+  error: (t) => t,
+  fieldLabel: (t) => t,
+  attributeName: (t) => t,
+  value: (t) => t,
+  unit: (t) => t,
+  reference: (t) => t,
   separator: (t) => t,
 };
 
@@ -44,19 +46,20 @@ export type StyleRules = Readonly<Record<keyof Styling, StyleRule>>;
 
 /** Source-editable visual parameters; no theme detection or public configuration is involved. */
 export const styleRules: StyleRules = {
-  spinnerGlyph: { decorate: chalk.cyan, padding: 0 },
-  doneMarker: { decorate: chalk.green.bold, padding: 0 },
-  stageLabel: { decorate: chalk.bold, padding: 0 },
+  active: { decorate: chalk.cyan, padding: 0 },
+  success: { decorate: chalk.green.bold, padding: 0 },
+  label: { decorate: chalk.bold, padding: 0 },
   h1: { decorate: chalk.black.bgGreen, padding: 1 },
   h2: { decorate: chalk.white.bgBlue, padding: 1 },
   h3: { decorate: chalk.black.bgCyan, padding: 1 },
   h4: { decorate: chalk.black.bgCyanBright, padding: 1 },
-  warnBadge: { decorate: chalk.yellow.bold, padding: 0 },
-  errorBadge: { decorate: chalk.red.bold, padding: 0 },
-  fieldKey: { decorate: chalk.dim, padding: 0 },
-  primaryValue: { decorate: plainStyling.primaryValue, padding: 0 },
-  unitSuffix: { decorate: chalk.dim, padding: 0 },
-  refsValue: { decorate: chalk.cyan, padding: 0 },
+  warning: { decorate: chalk.yellow.bold, padding: 0 },
+  error: { decorate: chalk.red.bold, padding: 0 },
+  fieldLabel: { decorate: chalk.dim, padding: 0 },
+  attributeName: { decorate: plainStyling.attributeName, padding: 0 },
+  value: { decorate: plainStyling.value, padding: 0 },
+  unit: { decorate: chalk.dim, padding: 0 },
+  reference: { decorate: chalk.cyan, padding: 0 },
   separator: { decorate: chalk.dim, padding: 0 },
 };
 

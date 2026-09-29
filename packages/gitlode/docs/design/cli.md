@@ -161,6 +161,13 @@ color styling is applied (spinner, done marker, stage labels, field keys, values
 severity badges). When `process.stderr.isTTY === false`, styling is disabled and the same text
 content is emitted with no ANSI escape sequences.
 
+Style roles describe output roles: `active`, `success`, `warning` and `error` for status;
+`label` for labels such as stage names; `h1`?`h4` for headings; `value`, `unit`,
+`reference` and `separator` for their respective tokens. `fieldLabel` is a dim fixed label
+such as calls/total/avg. `attributeName` is a separate role because the name itself carries
+information; it starts with the default foreground, no decoration and zero padding. Attribute
+values continue to use `value`.
+
 Source-level visual parameters live in `src/presentation/styling.ts` as the typed `styleRules`
 table. Each role has a Chalk `decorate` function and a nonnegative integer `padding` count for
 spaces on each side. Padding is applied before decoration, in both styled and plain modes; it is
@@ -233,7 +240,7 @@ removed and the `✓` done marker is placed in the spinner column with a trailin
 ```
 
 Measured values use no-space `number+unit` tokens (e.g. `1.2MB`, `8.5s`, `12.34ms`).
-The numeric part uses the `primaryValue` role with default foreground and no decoration, treating
+The numeric part uses the `value` role with default foreground and no decoration, treating
 values as body text; the unit suffix is rendered with dim styling.
 
 The extracting line always renders fields in this order: spinner/done frame, stage label, branch

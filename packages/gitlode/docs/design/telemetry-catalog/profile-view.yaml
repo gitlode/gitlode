@@ -165,19 +165,20 @@ styling:
   deeper_levels: unstyled_without_padding
   heading_style_basis: display_depth_for_namespaces_and_entry_names
   observation_name: default
-  field_and_attribute_key: fieldKey
-  available_value: primaryValue
-  unit: unitSuffix
+  field_label: fieldLabel
+  attribute_name: attributeName
+  available_value: value
+  unit: unit
   separator: separator
-  warning_marker: warnBadge
+  warning_marker: warning
   info_marker_and_explanation: default
   profile_marker_severity: highest_retained_detailed_or_summary_evidence
   distinct_frequency:
-    digits: primaryValue
+    digits: value
     punctuation: separator
   incomplete_coverage:
-    label: fieldKey
-    count: primaryValue
+    label: fieldLabel
+    count: value
     punctuation: separator
   profile_uses_application_success_style: false
   indentation_outside_styled_tokens: true

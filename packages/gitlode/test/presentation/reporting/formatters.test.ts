@@ -584,15 +584,17 @@ describe("generic profile formatting", () => {
     ) as unknown as Styling;
     const styled = formatProfileLines(report, spy).join("\n");
     expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
-    expect(calls).not.toContain("warnBadge:!");
+    expect(calls).not.toContain("warning:!");
+    expect(calls).toContain("attributeName:/outcome");
+    expect(calls).not.toContain("fieldLabel:/outcome");
     expect(calls).toEqual(
       expect.arrayContaining([
         "separator:(",
-        "primaryValue:3",
+        "value:3",
         "separator:)",
         "separator: (",
-        "fieldKey:observed",
-        "primaryValue:1",
+        "fieldLabel:observed",
+        "value:1",
       ]),
     );
 
@@ -629,7 +631,7 @@ describe("generic profile formatting", () => {
       ]),
     ) as unknown as Styling;
     formatProfileLines(warningSummary, warningSpy);
-    expect(warningCalls.filter((call) => call === "warnBadge:!")).toHaveLength(2);
+    expect(warningCalls.filter((call) => call === "warning:!")).toHaveLength(2);
 
     const infoSummary = emptyReport();
     infoSummary.diagnostics = [
@@ -646,7 +648,7 @@ describe("generic profile formatting", () => {
       ]),
     ) as unknown as Styling;
     formatProfileLines(infoSummary, infoSummarySpy);
-    expect(infoSummaryCalls).not.toContain("warnBadge:!");
+    expect(infoSummaryCalls).not.toContain("warning:!");
 
     const warningDetail = emptyReport();
     warningDetail.diagnostics = [diagnostic()];
@@ -658,7 +660,7 @@ describe("generic profile formatting", () => {
       ]),
     ) as unknown as Styling;
     formatProfileLines(warningDetail, warningDetailSpy);
-    expect(warningDetailCalls.filter((call) => call === "warnBadge:!")).toHaveLength(2);
+    expect(warningDetailCalls.filter((call) => call === "warning:!")).toHaveLength(2);
   });
 
   it("organizes every kind in one Scope and two namespace levels", () => {
@@ -1068,11 +1070,11 @@ describe("generic profile formatting", () => {
         "h2:Scope: example",
         "h3:/example",
         "h4:operation",
-        "fieldKey:calls",
+        "fieldLabel:calls",
         "separator: : ",
-        "primaryValue:1",
-        "unitSuffix: operations",
-        "warnBadge:!",
+        "value:1",
+        "unit: operations",
+        "warning:!",
       ]),
     );
 

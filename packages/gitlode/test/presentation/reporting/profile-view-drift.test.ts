@@ -55,10 +55,10 @@ describe("generic profile view drift", () => {
         profile_uses_application_success_style: false,
         styled_plain_text_parity: true,
         profile_marker_severity: "highest_retained_detailed_or_summary_evidence",
-        distinct_frequency: { digits: "primaryValue", punctuation: "separator" },
+        distinct_frequency: { digits: "value", punctuation: "separator" },
         incomplete_coverage: {
-          label: "fieldKey",
-          count: "primaryValue",
+          label: "fieldLabel",
+          count: "value",
           punctuation: "separator",
         },
       }),

@@ -182,11 +182,11 @@ function renderProfileDiagnostics(
         ? "validated measurement results are shown below"
         : "measurement results could not be provided";
     sink.writeLine(
-      `${indent}${styling.warnBadge("!")} Profile report construction failed; ${result}.`,
+      `${indent}${styling.warning("!")} Profile report construction failed; ${result}.`,
     );
     if (delivery.reportDelivery.priorIssueDetail === "unavailable")
       sink.writeLine(
-        `${indent}${styling.warnBadge("!")} Earlier collection issue details are unavailable.`,
+        `${indent}${styling.warning("!")} Earlier collection issue details are unavailable.`,
       );
   } else {
     const hasCollection =
@@ -217,7 +217,7 @@ function renderProfileDiagnostics(
     const warning =
       detailed.some((diagnostic) => diagnostic.severity === "warning") ||
       summaries.some((summary) => summary.maximumSeverity === "warning");
-    const marker = warning ? styling.warnBadge("!") : "!";
+    const marker = warning ? styling.warning("!") : "!";
     sink.writeLine(`${indent}${marker} ${headline}`);
   }
   for (const diagnostic of detailed
@@ -234,7 +234,7 @@ function renderSummaryNotice(
   options: RenderOptions,
 ): void {
   const indent = "  ".repeat(options.depth);
-  const marker = summary.maximumSeverity === "warning" ? styling.warnBadge("!") : "!";
+  const marker = summary.maximumSeverity === "warning" ? styling.warning("!") : "!";
   const count =
     summary.omittedOccurrences === null
       ? "the number of omitted occurrences is unknown"
@@ -291,7 +291,7 @@ function renderNotice(
   options: RenderOptions & { readonly row?: ProfileMeasurement },
 ): void {
   const { depth, row } = options;
-  const marker = diagnostic.severity === "warning" ? styling.warnBadge("!") : "!";
+  const marker = diagnostic.severity === "warning" ? styling.warning("!") : "!";
   sink.writeLine(`${"  ".repeat(depth)}${marker} ${diagnosticText(diagnostic, row)}`);
 }
 
@@ -496,7 +496,7 @@ function renderAttributes(
   for (const attribute of [...row.value.attributes].sort((a, b) => compareCodeUnits(a.key, b.key)))
     renderAttribute(
       sink,
-      { key: attribute.key, value: styling.primaryValue(formatAttributeValue(attribute.value)) },
+      { key: attribute.key, value: styling.value(formatAttributeValue(attribute.value)) },
       styling,
       { attributeBase: base, depth: depth },
     );
@@ -512,7 +512,7 @@ function renderPointAttributes(
   for (const attribute of [...attributes].sort((a, b) => compareCodeUnits(a.key, b.key)))
     renderAttribute(
       sink,
-      { key: attribute.key, value: styling.primaryValue(formatAttributeValue(attribute.value)) },
+      { key: attribute.key, value: styling.value(formatAttributeValue(attribute.value)) },
       styling,
       { attributeBase: base, depth: depth },
     );
@@ -527,6 +527,6 @@ function renderAttribute(
   const { key, value } = context;
   const { depth, attributeBase: base } = options;
   sink.writeLine(
-    `${"  ".repeat(depth)}${styling.fieldKey(formatAttributeKey(key, base))} ${styling.separator("=")} ${value}`,
+    `${"  ".repeat(depth)}${styling.attributeName(formatAttributeKey(key, base))} ${styling.separator("=")} ${value}`,
   );
 }

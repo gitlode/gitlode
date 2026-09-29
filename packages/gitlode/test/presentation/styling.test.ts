@@ -22,7 +22,7 @@ describe("source-editable style rules", () => {
     const styled = createStyling(true, rules);
     expect(styled.h1("Title")).toBe("<heading>  Title  </heading>");
     expect(calls).toEqual(["  Title  "]);
-    expect(plain.primaryValue("12")).toBe("12");
+    expect(plain.value("12")).toBe("12");
   });
 
   it("keeps factory-styled and plain summaries equal after stripping ANSI", () => {

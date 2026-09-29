@@ -456,3 +456,13 @@ namespaces and telemetry entries: h3 immediately below Scope, h4 on the next lev
 Thus namespaceDepth 1 gives child telemetry entries h4. Only names receive heading decoration;
 measurement fields, attributes and notices retain their existing roles. The default remains 2.
 This supersedes the positive-only depth range and namespace-only styling described above.
+
+### Role naming and attribute names
+
+The human accepted role-based names: spinnerGlyph ? active, doneMarker ? success,
+stageLabel ? label, warnBadge ? warning, errorBadge ? error, fieldKey ? fieldLabel,
+primaryValue ? value, unitSuffix ? unit, refsValue ? reference. h1?h4 and separator stay.
+Earlier entries in this handoff retain historical names. Attribute names now use their own
+attributeName role (default foreground, no decoration, zero padding); fixed field labels such
+as calls/total/avg remain dim. Other role decorations are unchanged. The source table and
+all presentation callers/tests use the new names; previews inherit them through the renderer.

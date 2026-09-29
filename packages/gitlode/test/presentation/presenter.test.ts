@@ -52,19 +52,20 @@ function makeScheduler(): Scheduler & { cancelCount: number } {
 }
 
 const plainStyling: Styling = {
-  spinnerGlyph: (text) => text,
-  doneMarker: (text) => text,
-  stageLabel: (text) => text,
+  active: (text) => text,
+  success: (text) => text,
+  label: (text) => text,
   h1: (text) => text,
   h2: (text) => text,
   h3: (text) => text,
   h4: (text) => text,
-  warnBadge: (text) => text,
-  errorBadge: (text) => text,
-  fieldKey: (text) => text,
-  primaryValue: (text) => text,
-  unitSuffix: (text) => text,
-  refsValue: (text) => text,
+  warning: (text) => text,
+  error: (text) => text,
+  fieldLabel: (text) => text,
+  attributeName: (text) => text,
+  value: (text) => text,
+  unit: (text) => text,
+  reference: (text) => text,
   separator: (text) => text,
 };
 

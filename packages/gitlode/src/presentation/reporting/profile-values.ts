@@ -142,7 +142,7 @@ export function formatMeasurementFields(row: ProfileMeasurement, styling: Stylin
 
 function fields(entries: readonly (readonly [string, string])[], styling: Styling): string {
   return entries
-    .map(([key, value]) => `${styling.fieldKey(key)}${styling.separator("=")}${value}`)
+    .map(([key, value]) => `${styling.fieldLabel(key)}${styling.separator("=")}${value}`)
     .join(styling.separator(", "));
 }
 
@@ -153,23 +153,23 @@ export function formatSpanAttribute(
 ): string {
   const observed = formatObservedCoverage(attribute.observedCount, callCount, styling);
   if (attribute.reducer === "single")
-    return styling.primaryValue(formatAttributeValue(attribute.value)) + observed;
+    return styling.value(formatAttributeValue(attribute.value)) + observed;
   if (attribute.reducer === "distinct")
     return (
       attribute.values
         .map(
           ({ value, count }) =>
-            styling.primaryValue(formatAttributeValue(value)) +
+            styling.value(formatAttributeValue(value)) +
             styling.separator("(") +
-            styling.primaryValue(String(count)) +
+            styling.value(String(count)) +
             styling.separator(")"),
         )
         .join(styling.separator(", ")) + observed
     );
   return (
-    styling.primaryValue(formatNumber(attribute.minimum)) +
+    styling.value(formatNumber(attribute.minimum)) +
     styling.separator("…") +
-    styling.primaryValue(formatNumber(attribute.maximum)) +
+    styling.value(formatNumber(attribute.maximum)) +
     observed
   );
 }
@@ -181,9 +181,9 @@ function formatObservedCoverage(
 ): string {
   return observedCount < callCount
     ? styling.separator(" (") +
-        styling.fieldKey("observed") +
+        styling.fieldLabel("observed") +
         " " +
-        styling.primaryValue(String(observedCount)) +
+        styling.value(String(observedCount)) +
         styling.separator(")")
     : "";
 }
@@ -229,12 +229,12 @@ export function quote(value: string): string {
 }
 
 function exact(value: number, styling: Styling): string {
-  return styling.primaryValue(formatCount(value));
+  return styling.value(formatCount(value));
 }
 
 function unit(value: number, canonicalUnit: string, styling: Styling): string {
   const formatted = formatUnit(value, canonicalUnit);
-  return styling.primaryValue(formatted.value) + styling.unitSuffix(` ${formatted.unit}`);
+  return styling.value(formatted.value) + styling.unit(` ${formatted.unit}`);
 }
 
 function formatUnit(value: number, canonicalUnit: string): { value: string; unit: string } {

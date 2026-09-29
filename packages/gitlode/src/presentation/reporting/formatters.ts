@@ -9,18 +9,18 @@ export function formatSummaryLines(data: SummaryData, styling: Styling = plainSt
   const bytes = humanizeBytes(data.bytesWritten);
   const elapsed = formatElapsed(data.elapsedMs);
   const fields: Array<[string, string]> = [
-    ["Records written", styling.primaryValue(formatCount(data.recordsWritten))],
-    ["Commits traversed", styling.primaryValue(formatCount(data.commitsTraversed))],
-    ["Files created", styling.primaryValue(formatCount(data.filesCreated))],
-    ["Bytes written", styling.primaryValue(bytes.value) + styling.unitSuffix(bytes.unit)],
-    ["Elapsed time", styling.primaryValue(elapsed.value) + styling.unitSuffix(elapsed.unit)],
-    ["Refs", styling.refsValue(data.refs.join(", ") || "(none)")],
+    ["Records written", styling.value(formatCount(data.recordsWritten))],
+    ["Commits traversed", styling.value(formatCount(data.commitsTraversed))],
+    ["Files created", styling.value(formatCount(data.filesCreated))],
+    ["Bytes written", styling.value(bytes.value) + styling.unit(bytes.unit)],
+    ["Elapsed time", styling.value(elapsed.value) + styling.unit(elapsed.unit)],
+    ["Refs", styling.reference(data.refs.join(", ") || "(none)")],
   ];
   return [
     styling.h1("Extraction complete"),
     ...fields.map(
       ([label, value]) =>
-        `  ${styling.fieldKey(label.padEnd(18))}${styling.separator(":")} ${value}`,
+        `  ${styling.fieldLabel(label.padEnd(18))}${styling.separator(":")} ${value}`,
     ),
   ];
 }

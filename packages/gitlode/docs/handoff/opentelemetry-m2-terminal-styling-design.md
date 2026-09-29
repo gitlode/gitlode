@@ -423,3 +423,18 @@ Status: **continuation needed; whole-output tuning is ready for human iteration*
 padding are applied as the starting settings. Overall balance, the light-scheme yellow finding,
 unavailable GNOME evidence, final validation and independent review remain open. No final design,
 visual acceptance, performance freeze, PR or merge is claimed.
+
+### Renderer refactor for direct layout iteration
+
+The human clarified that easy experimentation, including editing rendering logic, is the goal;
+parameterizing every layout choice is unnecessary. Profile rendering now has template-like Scope,
+Namespace, Observation, Attribute and Notice functions with sink/context/styling/options arguments.
+Scope owns its entire output. Data grouping/diagnostic matching and value formatting live in
+separate modules, while the CLI streams rendered lines. The existing array formatter delegates to
+the same renderer for previews and tests. See [CLI rendering guidance](../design/cli.md) for the
+module map and partial-output-on-error contract. No palette or intended output content changed.
+
+The development build and 12 relevant test files / 113 tests pass, including streaming failures,
+empty-report behavior and the active-progress boundary. Real-data visual iteration remains with
+the human; no repository preparation or repository identity recording is needed. No performance
+claim, visual acceptance or PR authorization is implied by this refactor.

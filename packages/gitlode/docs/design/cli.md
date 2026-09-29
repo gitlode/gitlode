@@ -186,6 +186,24 @@ styled/plain comparisons must use `createStyling(true)` and `createStyling(false
 theme configuration, background detection or forced color is introduced. Namespace depth and
 diagnostic placement remain formatter contracts, outside this role-parameter table.
 
+Profile layout experiments can also change the rendering functions directly; they need not be
+expressed as configuration parameters. In `src/presentation/reporting/`, `profile-renderer.ts`
+owns the template hierarchy: Profile, Scope, Namespace, Observation, Attribute and Notice.
+`renderScope` owns its heading, scope identity, notices and contents. Namespace rendering separates
+its heading/own measurements, descendant observations and recursive child namespaces. Rendering
+functions take `(sink, context, styling, options)`; local options carry depth, displayed name or
+attribute base as needed. `profile-data.ts` owns grouping, identity ordering and diagnostic matching;
+`profile-values.ts` owns value and diagnostic text formatting. Preserve those identity and
+availability contracts when experimenting with layout.
+
+The CLI calls `renderProfile` with a `writeLine` sink (the used subset of `TerminalSink`) and emits
+lines synchronously, without retaining the complete rendered `string[]`. Grouping still allocates
+intermediate data; this is not a measured performance improvement. `formatProfileLines` is a thin
+collecting adapter for previews and tests, using the same renderer. The presenter closes active
+progress and adds its separating newline only on the first emitted line; an empty report does
+neither. Rendering and sink exceptions propagate without replay or rollback, so an error after
+the first write can leave a partial report on the terminal.
+
 When `process.stderr.isTTY === true`, the stage lines are rendered in place using a braille spinner:
 
 ```text

@@ -8,6 +8,7 @@ import type {
 import { describe, expect, it } from "vitest";
 
 import { formatProfileLines } from "../../../src/presentation/reporting/formatters.js";
+import { renderProfile } from "../../../src/presentation/reporting/profile-renderer.js";
 import { createStyling, plainStyling, type Styling } from "../../../src/presentation/styling.js";
 
 type MutableProfileReport = { -readonly [Key in keyof ProfileReport]: ProfileReport[Key] };
@@ -1079,5 +1080,58 @@ describe("generic profile formatting", () => {
     expect(formatProfileLines(report, createStyling(true)).join("\n").replace(ansi, "")).toBe(
       formatProfileLines(report, createStyling(false)).join("\n"),
     );
+  });
+});
+
+describe("streaming Profile rendering", () => {
+  it("writes earlier sections before formatting later sections and preserves completed lines on failure", () => {
+    const report = emptyReport();
+    report.counters = [counter("example", "work.count")];
+    const lines: string[] = [];
+    const failure = new Error("decoration failed");
+    expect(() =>
+      renderProfile({ writeLine: (line) => lines.push(line) }, report, {
+        ...plainStyling,
+        h2: () => {
+          expect(lines).toEqual(["Profile"]);
+          throw failure;
+        },
+      }),
+    ).toThrow(failure);
+    expect(lines).toEqual(["Profile"]);
+  });
+
+  it("propagates a sink failure immediately without rendering or replaying later lines", () => {
+    const report = emptyReport();
+    report.counters = [counter("example", "work.count")];
+    const failure = new Error("sink failed");
+    let writes = 0;
+    let scopeFormatted = false;
+    expect(() =>
+      renderProfile(
+        {
+          writeLine: () => {
+            writes++;
+            throw failure;
+          },
+        },
+        report,
+        {
+          ...plainStyling,
+          h2: (text) => {
+            scopeFormatted = true;
+            return text;
+          },
+        },
+      ),
+    ).toThrow(failure);
+    expect(writes).toBe(1);
+    expect(scopeFormatted).toBe(false);
+  });
+
+  it("does not write an empty report", () => {
+    const lines: string[] = [];
+    renderProfile({ writeLine: (line) => lines.push(line) }, emptyReport());
+    expect(lines).toEqual([]);
   });
 });

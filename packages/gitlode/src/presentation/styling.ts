@@ -35,7 +35,7 @@ export const plainStyling: Styling = {
   separator: (t) => t,
 };
 
-export interface StyleRule {
+interface StyleRule {
   readonly decorate: (text: string) => string;
   readonly padding: number;
 }

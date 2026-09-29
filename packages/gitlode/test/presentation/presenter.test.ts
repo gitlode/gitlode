@@ -175,3 +175,51 @@ describe("presentation createRunPresenter", () => {
     expect(sink.records[1]).toEqual({ type: "writeLine", text: "Extraction complete" });
   });
 });
+
+describe("Profile progress boundary", () => {
+  it("leaves active progress untouched for an empty report and closes it before the first Profile line", () => {
+    const sink = makeSink();
+    const presenter = createRunPresenter({
+      sink,
+      clock: makeClock(1000),
+      scheduler: makeScheduler(),
+      uiMode: "tty-interactive",
+      styling: plainStyling,
+    });
+    const report = {
+      schemaVersion: 2 as const,
+      signalStatus: {
+        spans: "complete" as const,
+        counters: "complete" as const,
+        histograms: "complete" as const,
+      },
+      spans: [],
+      counters: [],
+      histograms: [],
+      diagnostics: [],
+    };
+    presenter.handleProgressEvent({ type: "phase-start", phase: "extracting" });
+    const before = [...sink.records];
+    presenter.renderProfile(report);
+    expect(sink.records).toEqual(before);
+    presenter.renderProfile({
+      ...report,
+      counters: [
+        {
+          scope: { name: "example", version: null },
+          name: "work.count",
+          value: 1,
+          unit: "{operation}",
+          unavailableFields: [],
+          attributes: [],
+        },
+      ],
+    });
+    expect(sink.records.slice(before.length, before.length + 3)).toEqual([
+      { type: "newline" },
+      { type: "newline" },
+      { type: "writeLine", text: "Profile" },
+    ]);
+    expect(sink.records.filter((record) => record.type === "rewriteLine")).toHaveLength(1);
+  });
+});

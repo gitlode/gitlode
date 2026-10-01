@@ -1,25 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { formatSummaryLines } from "../../../src/presentation/reporting/formatters.js";
+import { plainStyling } from "../../../src/presentation/styling.js";
 
 describe("formatSummaryLines", () => {
   it("keeps the complete styled summary contract and field order", () => {
     const calls: string[] = [];
     const styling = {
+      ...plainStyling,
       h1: (value: string) => (calls.push(`header:${value}`), `<h>${value}</h>`),
-      h2: (value: string) => value,
-      h3: (value: string) => value,
-      h4: (value: string) => value,
       fieldLabel: (value: string) => (calls.push(`key:${value}`), `<k>${value}</k>`),
       value: (value: string) => (calls.push(`primary:${value}`), `<p>${value}</p>`),
       unit: (value: string) => (calls.push(`unit:${value}`), `<u>${value}</u>`),
       reference: (value: string) => (calls.push(`refs:${value}`), `<r>${value}</r>`),
-      separator: (value: string) => value,
-      active: (value: string) => value,
-      success: (value: string) => value,
-      label: (value: string) => value,
-      warning: (value: string) => value,
-      error: (value: string) => value,
     };
     const lines = formatSummaryLines(
       {
@@ -55,20 +48,10 @@ describe("formatSummaryLines", () => {
     const units: string[] = [];
     const refs: string[] = [];
     const styling = {
-      h1: (value: string) => value,
-      h2: (value: string) => value,
-      h3: (value: string) => value,
-      h4: (value: string) => value,
-      fieldLabel: (value: string) => value,
+      ...plainStyling,
       value: (value: string) => (primary.push(value), value),
       unit: (value: string) => (units.push(value), value),
       reference: (value: string) => (refs.push(value), value),
-      separator: (value: string) => value,
-      active: (value: string) => value,
-      success: (value: string) => value,
-      label: (value: string) => value,
-      warning: (value: string) => value,
-      error: (value: string) => value,
     };
     formatSummaryLines(
       {

@@ -106,13 +106,41 @@ describe("accepted telemetry catalog contract", () => {
     delete (catalogs.spans.spans as Record<string, unknown>[])[0]!.id;
     (catalogs.metrics.metrics as Record<string, unknown>[])[0]!.name = 42;
     delete (catalogs.attributes.attributes as Record<string, unknown>[])[0]!.key;
-    (catalogs.profileView.generic_hierarchy as Record<string, unknown>).namespace_segments = 3;
     expect(validateTelemetryCatalogs(catalogs)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("span 0 requires string id"),
         expect.stringContaining("metric 0 requires string name"),
         expect.stringContaining("attribute 0 requires string key"),
-        expect.stringContaining("exactly two namespace segments"),
+      ]),
+    );
+  });
+  it.each([0, 1, 2, 3, Number.MAX_SAFE_INTEGER])("accepts namespace depth %s", (depth) => {
+    const catalogs = clone(accepted);
+    (catalogs.profileView.generic_hierarchy as Record<string, unknown>).namespace_segments_default =
+      depth;
+    expect(validateTelemetryCatalogs(catalogs)).toEqual([]);
+  });
+  it.each([undefined, null, "0", -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects invalid namespace depth %s",
+    (depth) => {
+      const catalogs = clone(accepted);
+      (
+        catalogs.profileView.generic_hierarchy as Record<string, unknown>
+      ).namespace_segments_default = depth;
+      expect(validateTelemetryCatalogs(catalogs)).toContain(
+        "profile view namespace_segments_default must be a nonnegative safe integer",
+      );
+    },
+  );
+  it("rejects obsolete fixed-depth fields and constraints", () => {
+    const catalogs = clone(accepted);
+    const hierarchy = catalogs.profileView.generic_hierarchy as Record<string, unknown>;
+    hierarchy.namespace_segments = 2;
+    hierarchy.namespace_segments_constraint = "positive_safe_integer";
+    expect(validateTelemetryCatalogs(catalogs)).toEqual(
+      expect.arrayContaining([
+        "profile view must not define obsolete namespace_segments",
+        "profile view namespace_segments_constraint must be nonnegative_safe_integer",
       ]),
     );
   });

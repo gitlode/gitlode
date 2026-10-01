@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { profileLayout } from "../../../src/presentation/reporting/profile-layout.js";
 import {
   compareAttributeSets,
   compareProfileIdentity,
@@ -33,7 +34,9 @@ describe("generic profile view drift", () => {
     expect((view.generic_hierarchy as Record<string, unknown>).remaining_suffix_escaping).toBe(
       "complete_suffix_before_decoration",
     );
-    expect((view.generic_hierarchy as Record<string, unknown>).namespace_segments_default).toBe(0);
+    expect((view.generic_hierarchy as Record<string, unknown>).namespace_segments_default).toBe(
+      profileLayout.namespaceDepth,
+    );
   });
 
   it("matches generic kind, diagnostic, unit and style policy", async () => {

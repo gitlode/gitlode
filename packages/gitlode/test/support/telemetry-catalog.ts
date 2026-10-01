@@ -156,8 +156,17 @@ export function validateTelemetryCatalogs(catalogs: CatalogSet): string[] {
   const hierarchy = view.generic_hierarchy as Record<string, unknown> | undefined;
   if (hierarchy?.group_by !== "instrumentation_scope_name_and_version")
     errors.push("profile view must group by instrumentation scope name and version");
-  if (hierarchy?.namespace_segments !== 2)
-    errors.push("profile view must use exactly two namespace segments");
+  const namespaceDepth = hierarchy?.namespace_segments_default;
+  if (
+    typeof namespaceDepth !== "number" ||
+    !Number.isSafeInteger(namespaceDepth) ||
+    namespaceDepth < 0
+  )
+    errors.push("profile view namespace_segments_default must be a nonnegative safe integer");
+  if (hierarchy?.namespace_segments_constraint !== "nonnegative_safe_integer")
+    errors.push("profile view namespace_segments_constraint must be nonnegative_safe_integer");
+  if (hierarchy && "namespace_segments" in hierarchy)
+    errors.push("profile view must not define obsolete namespace_segments");
   if (view.span_groups !== undefined || view.metric_groups !== undefined)
     errors.push("profile view must not define per-observation groups");
 

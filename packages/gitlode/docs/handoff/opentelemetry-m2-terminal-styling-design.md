@@ -4,7 +4,9 @@
 
 Human visual tuning is complete for now: the human judged the Profile CLI output acceptable after
 selecting a flat layout and compact unit tokens. The maintenance refactor and subsequent catalog-test
-fix were also explicitly confirmed. Local cleanup/final validation is complete; exact-source CI is checked after the return commit.
+fix were also explicitly confirmed. Cleanup and validation at f0558856f018f24b5766d6ed8b5d241f9cb02747
+are complete. See the [independent review request](opentelemetry-m2-terminal-styling-review.md)
+for the pinned review range, CI results and unresolved test instability discovered in this session.
 Independent review is assigned by trunk. Do not self-accept the implementation or infer M2/release acceptance.
 
 Source branch: feature/otel-redesign_M2_styling. Intended return base: feature/otel-redesign_M2_profile.
@@ -82,7 +84,10 @@ format, architecture, schema checks and release build passed. Packed metadata (p
 and installed-package CLI/worker/both adapters/line diff/dynamic plugin/schema/TypeScript consumer
 checks passed. The first package check encountered sandbox npm-cache EPERM; rerunning only the
 package checks with the required permissions passed. Owned failed-run temp directories were removed.
-Exact-source CI is to be recorded in the completion message after pushing this commit. Keep skipped/unobserved evidence explicit. This packet does not waive publish
+Exact-source Linux CI at f055885 passed on its third attempt: 95 files / 1294 tests, release build,
+strict publint and installed-package tests. The two preceding attempts failed in different tests;
+their evidence and unresolved attribution are recorded in the linked review request. A successful
+retry is not a fix for that instability. Keep skipped/unobserved evidence explicit. This packet does not waive publish
 or cumulative Windows/Linux/package acceptance gates. No publish command is authorized.
 
 Trunk should assign independent focused review of the entry-to-final diff, shared consumers,

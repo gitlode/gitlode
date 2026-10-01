@@ -1,5 +1,10 @@
 # M2 profile implementation: P1 handoff
 
+> Historical evidence: the temporary capture helper and its commands below were retired during
+> styling-session cleanup. They are not current execution instructions. The helper is preserved
+> in commit a4bb707; use the ordinary built CLI with a human-supplied repository for new checks.
+> Current styling decisions and return status: [styling handoff](opentelemetry-m2-terminal-styling-design.md).
+
 P1/P2/P3 implementation slices are accepted; P3 fixed target is c694b69, with review at 1a012d5.
 Next assignment: [real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md).
 Human confirmation and cumulative validation remain pending. Earlier packets are historical context.

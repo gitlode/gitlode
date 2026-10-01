@@ -43,7 +43,7 @@ and obtain operational feedback. Do not repeatedly reopen release scope for loca
 
 ### Included in v0.13.0
 
-1. Uniform Scope grouping, two namespace levels, relative names, stable ordering, readable precision,
+1. Uniform Scope grouping, optional source-configured namespace levels, relative names, stable ordering, readable precision,
    flat supplementary attributes and initial styling.
 2. Replace per-observation display group/order rules with general rules.
 3. For problems already detected by collection/report generation, preserve structured impact evidence
@@ -91,8 +91,11 @@ Scope identity is name plus nullable version. Display `Scope: name@version` when
 Do not add a Plugins group, signal-kind sections, per-row kind badges or human-label overrides.
 Generic presentation does not expand collector admission policy.
 
-Split observation names at dots. The first two segments each create one namespace level beneath
-Scope. Remaining segments stay joined by dots on an observation row. Prefix the root name with `/`.
+The current default is flat within each Scope: full observation names carry a `/` prefix.
+Namespace grouping remains implemented for future source-level experiments, with a nonnegative
+segment limit in profile-layout.ts. With grouping enabled, leading segments form namespace levels
+and the remaining suffix stays on the observation row. The examples in this section illustrate
+the retained two-level option, not the current default; cosmetic spacing is historical.
 Do not adaptively compress groups or use Scope as a prefix to strip.
 
 ```text
@@ -111,7 +114,7 @@ Scope: gitlode.git
 ```
 
 Use two-space indentation, one attribute per supplementary line and minimal separator spacing;
-no global column padding. Names with one or two segments may carry their own values on the group
+no global column padding. Names within the configured segment limit may carry their own values on the group
 line. Show their own attributes before child observations. Their attribute base is that group name.
 A measurement row with a longer suffix does not extend the namespace base.
 
@@ -191,12 +194,13 @@ For unit edges, use ns/µs/ms/s and B/KiB/MiB/GiB with existing canonical bases;
 select the largest supported unit whose unrounded magnitude is at least one, with the smallest
 unit below that threshold. Promote if rounding reaches the next unit threshold. Beyond supported
 units or at very small magnitudes use scientific notation as necessary, not new unit families.
-Zero duration uses `0 s`; zero size uses `0 B`. Preserve canonical unknown units and existing entity
+Zero duration uses `0s`; zero size uses `0B`. Measurement numbers and units have no separating space. Preserve canonical unknown units and existing entity
 unit labels; do not round arbitrary non-duration/non-size attributes without semantic unit evidence.
 
 Shared styling follows section 11 and the active
 [terminal styling trial](opentelemetry-m2-terminal-styling-design.md). Values use default foreground
-without decoration; field names, keys, units and separators remain subdued. A node serving as both
+without decoration; fixed field labels, units and separators remain subdued. Attribute names use
+their own undecorated role. A node serving as both
 namespace and observation uses its heading role for the name only. Keep warning text readable
 without color and preserve existing styling/no-color behavior, not signal-specific colors.
 
@@ -594,87 +598,21 @@ The retained measurement mask and fixed fallback effect summary serve different 
 
 ## 11. Shared cosmetic styling extension
 
-### Required principles
+The adopted roles, padding, depth-based name styling and source-editable parameters are defined
+in [CLI styling](../design/cli.md) and the [profile view catalog](../design/telemetry-catalog/profile-view.yaml).
+This replaces the earlier bright-white/bold value policies and namespace-only heading trials.
 
-Styling supplements an already interpretable plain-text result. It must not carry information
-available only through color, weight or brightness. Styled and plain modes have identical text,
-ordering, indentation, punctuation and notification placement after removing styling escapes.
+- Profile and completion titles use h1; Scope uses h2. Names below Scope use h3, then h4,
+  then undecorated text, independently of whether they are namespaces or measured entries.
+- fieldLabel describes fixed labels such as calls/total/avg; attributeName is distinct and uses
+  default foreground without decoration. Values are also undecorated; units and separators are dim.
+- active/success/warning/error describe status roles; label and reference describe their token roles.
+- Heading padding belongs to text layout in both TTY and plain modes. Indentation and measurement
+  fields stay outside heading decoration. Escape identity tokens before decorating them.
+- Color is supplementary. Preserve existing TTY/color-support behavior without forced ANSI or
+  background detection. Do not select styles from domain values such as success/error attributes.
 
-Use semantic roles in shared `src/presentation/styling.ts`, with terminal colors/weights defined
-there. Profile formatters must not call chalk directly or choose colors from names or attribute
-values. Values such as `success`, `error`, `ready`, `true` and `false` have the same value style;
-do not infer severity from domain data, numeric magnitude, ratios or elapsed time.
-
-Add shared roles when existing roles do not fit semantically. Do not repurpose `stageLabel` for
-arbitrary headings or `refsValue` for generic identifiers simply because their colors look useful.
-The active terminal styling session may revise shared heading roles and their application-summary
-use. Human acceptance of values as undecorated body text is recorded there; the heading palette is
-still a trial rather than a visually accepted policy.
-
-### Current role mapping (heading trial)
-
-| Profile element                                               | Shared semantic role    | Initial treatment                 |
-| ------------------------------------------------------------- | ----------------------- | --------------------------------- |
-| Profile title                                                 | `h1`                    | Heading trial                     |
-| Scope heading                                                 | `h2`                    | Heading trial                     |
-| First namespace level                                         | `h3`                    | Heading trial                     |
-| Second namespace level                                        | `h4`                    | Heading trial                     |
-| Ordinary observation name                                     | Default text            | Default foreground, normal weight |
-| Numeric field label and attribute key                         | Existing `fieldKey`     | Dim                               |
-| Available numeric value and scalar attribute value            | Existing `primaryValue` | Default foreground, no decoration |
-| Unit                                                          | Existing `unitSuffix`   | Dim                               |
-| Structural separators `:`, `=`, field commas                  | New `separator`         | Dim                               |
-| Unavailable numeric `—` and result `unavailable`              | Default text            | Default foreground, normal weight |
-| Warning-severity collection/lifecycle notification marker `!` | Existing `warnBadge`    | Yellow, bold                      |
-| Info-severity notification marker `!`                         | Default text            | Default foreground, normal weight |
-| Notification explanation                                      | Default text            | Default foreground, normal weight |
-
-The shared `h1` through `h4` roles describe structural heading levels, not profile-specific concepts
-or diagnostic severity. Production styling, including non-TTY output, applies the shared source-level
-padding before decoration; see the [CLI styling contract](../design/cli.md). The `plainStyling`
-identity baseline remains available for isolated formatter callers. The active tuning baseline
-uses related cyan/bright-cyan namespace backgrounds and one space of heading padding per side.
-Whole-output visual adjustment continues in the styling handoff; semantic grouping and notification
-placement remain independent of these visual parameters.
-
-Profile and the application completion summary both use `h1` for their top-level titles. This
-replaces the former success-specific `summaryHeader` and uniform `sectionHeading`. Their shared
-heading treatment does not assert that measurements are complete or operations error-free;
-application completion remains explicit in its text and progress done markers.
-
-Style only a group-node observation's name as a heading; style its fields by their own roles.
-Style the entire `Scope: name@version` heading together. The root `/` and attribute absolute-name
-`/` belong to their name/key token and inherit that token's style; do not dim them separately as
-separators. Quoting/escaping is performed first and inherits the escaped token's role.
-
-For attribute summaries, scalar values and frequency/range numbers use `primaryValue`; punctuation
-such as parentheses, commas and the range ellipsis uses `separator`. Thus `exhausted(3)` retains
-the same meaning in both modes. Coverage labels use `fieldKey` and their counts use `primaryValue`.
-Placeholders are not measurement numbers; keep `—` visible in default foreground rather than dim.
-
-Use diagnostic severity supplied by telemetry, not inferred from message text. Summary-marker
-severity is the highest retained issue severity, including severity preserved in the bounded
-fallback. Preserve that fixed severity evidence during diagnostic compaction. Current profile
-diagnostics have info/warning severity, so no use of `errorBadge` is needed. This does not turn a
-profile diagnostic into an application warning. Explanatory text must convey impact without color;
-the decoration alone is not a new displayed severity field.
-
-Keep `errors=0` and `errors=2` in ordinary field/value styles in this initial mapping. The numeric
-error count is telemetry-defined and could support later emphasis, but this extension introduces
-no conditional numeric coloring or thresholds. `unavailable` is not automatically red/yellow:
-any warning emphasis comes from an evidenced accompanying diagnostic, not from missingness alone.
-
-### Composition and acceptance
-
-Apply escaping, formatting, ordering and spacing to semantic tokens before decoration. Leave
-indentation/line breaks outside decorators and avoid styling whole measurement/attribute rows.
-Reuse the existing stderr TTY-aware factory and color-support policy; add no color flag or forced
-ANSI mode. Plain/non-TTY output contains no styling escapes. Color capability may suppress colors
-even in a TTY; the text remains independently readable.
-
-Verify token-to-role mapping with a test Styling implementation and verify styled/plain text
-equivalence after stripping ANSI. Include group-node observations, quoted identifiers, relative
-and absolute attributes, frequencies/ranges, missing fields, info/warning notifications and their
-overflow summary. Test that domain values such as success/error do not select styles. Inspect
-representative terminal output on light/dark backgrounds; this remains runtime acceptance, not
-evidence established by Markdown examples. Do not make exact ANSI sequences a public contract.
+The human judged the current Profile output acceptable after real-data tuning. Recorded environment:
+Windows Terminal 1.24.11911.0, Campbell/Tango Light, Cascadia Mono. GNOME remains unobserved.
+See the [styling handoff](opentelemetry-m2-terminal-styling-design.md) for source checkpoints,
+validation and review boundaries; visual approval does not constitute independent implementation review.

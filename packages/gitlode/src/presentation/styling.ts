@@ -42,7 +42,7 @@ interface StyleRule {
   readonly padding: number;
 }
 
-export type StyleRules = Readonly<Record<keyof Styling, StyleRule>>;
+type StyleRules = Readonly<Record<keyof Styling, StyleRule>>;
 
 /** Source-editable visual parameters; no theme detection or public configuration is involved. */
 export const styleRules: StyleRules = {

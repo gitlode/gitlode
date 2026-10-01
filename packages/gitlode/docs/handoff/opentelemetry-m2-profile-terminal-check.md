@@ -1,5 +1,10 @@
 # Profile real-terminal confirmation preparation
 
+> Historical evidence: the temporary capture helper and its commands below were retired during
+> styling-session cleanup. They are not current execution instructions. The helper is preserved
+> in commit a4bb707; use the ordinary built CLI with a human-supplied repository for new checks.
+> Current styling decisions and return status: [styling handoff](opentelemetry-m2-terminal-styling-design.md).
+
 ## Current routing: styling changes requested
 
 The human performed terminal checks and reported unreadable bright-white primary values on a light

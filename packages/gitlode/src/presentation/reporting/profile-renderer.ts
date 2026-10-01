@@ -12,11 +12,10 @@ import {
   buildScopeTree,
   compareMeasurements,
   compareDiagnostics,
-  diagnosticsForName,
+  prepareObservationGroup,
+  groupObservations,
   groupProfileScopes,
   isEntireResultUnavailable,
-  namedEntries,
-  partitionNameDiagnostics,
   type ScopeContext,
   type NamespaceNode,
   type IssueOnlyTarget,
@@ -41,7 +40,7 @@ interface RenderOptions {
   readonly attributeBase?: string;
 }
 interface NamedRowOptions extends RenderOptions {
-  readonly name: string;
+  readonly displayName: string;
 }
 interface MeasurementContext {
   readonly row: ProfileMeasurement;
@@ -101,7 +100,7 @@ function renderScope(
 function renderUngroupedObservations(
   sink: ProfileSink,
   context: {
-    readonly rows: ProfileMeasurement[];
+    readonly rows: readonly ProfileMeasurement[];
     readonly diagnostics: readonly ProfileDiagnostic[];
   },
   styling: Styling,
@@ -109,35 +108,19 @@ function renderUngroupedObservations(
 ): void {
   const { rows, diagnostics } = context;
   const { depth } = options;
-  const names = new Set([
-    ...rows.map((row) => row.value.name),
-    ...diagnostics
-      .filter(
-        (diagnostic) =>
-          diagnostic.target.type === "observation" || diagnostic.target.type === "point",
-      )
-      .map((diagnostic) =>
-        diagnostic.target.type === "observation" || diagnostic.target.type === "point"
-          ? diagnostic.target.name
-          : "",
-      ),
-  ]);
-  for (const name of [...names].sort(compareCodeUnits)) {
-    const forceQuote = name.split(".").some((segment) => segment.length === 0);
-    const absoluteName = "/" + (forceQuote ? quote(name) : formatToken(name));
-    const namedRows = rows.filter((row) => row.value.name === name).sort(compareMeasurements);
-    const namedDiagnostics = diagnosticsForName(diagnostics, name);
-    const { matched, unmatched } = partitionNameDiagnostics(namedRows, namedDiagnostics);
-    const matchedObservations = matched.filter((item) => item.target.type === "observation");
-    if (namedRows.length > 1 && matchedObservations.length > 0) {
+  for (const group of groupObservations(rows, diagnostics)) {
+    const observationName = group.observationName;
+    const forceQuote = observationName.split(".").some((segment) => segment.length === 0);
+    const absoluteName = "/" + (forceQuote ? quote(observationName) : formatToken(observationName));
+    if (group.sharedDiagnostics.length > 0) {
       sink.writeLine(`${"  ".repeat(depth)}${headingStyle(styling, depth)(absoluteName)}`);
-      for (const diagnostic of matchedObservations)
+      for (const diagnostic of group.sharedDiagnostics)
         renderNotice(sink, diagnostic, styling, { depth: depth + 1 });
     }
-    for (const entry of namedEntries(namedRows, unmatched)) {
+    for (const entry of group.entries) {
       if (entry.type === "issue")
         renderIssueOnlyRow(sink, entry.issue, styling, {
-          name: absoluteName,
+          displayName: absoluteName,
           depth: depth,
           attributeBase: undefined,
         });
@@ -146,10 +129,7 @@ function renderUngroupedObservations(
           sink,
           {
             row: entry.row,
-            diagnostics:
-              namedRows.length > 1
-                ? matched.filter((item) => item.target.type === "point")
-                : matched,
+            diagnostics: group.measurementDiagnostics,
           },
           styling,
           { depth: depth, attributeBase: undefined, forceQuote },
@@ -270,10 +250,10 @@ function renderIssueOnlyRow(
   styling: Styling,
   options: NamedRowOptions,
 ): void {
-  const { name, depth, attributeBase } = options;
+  const { displayName, depth, attributeBase } = options;
   const unavailable = issue.diagnostics.some(isEntireResultUnavailable);
   sink.writeLine(
-    `${"  ".repeat(depth)}${headingStyle(styling, depth)(name)}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
+    `${"  ".repeat(depth)}${headingStyle(styling, depth)(displayName)}${unavailable ? `${styling.separator(" : ")}unavailable` : ""}`,
   );
   if (issue.target.type === "point")
     renderPointAttributes(sink, issue.target.attributes, styling, {
@@ -311,6 +291,7 @@ function renderNamespace(
     });
 }
 
+/** Render the heading and its own result, or separate absolute rows for colliding identities. */
 function renderNamespaceHeading(
   sink: ProfileSink,
   context: NamespaceContext,
@@ -323,11 +304,8 @@ function renderNamespaceHeading(
   const indent = "  ".repeat(depth);
   const name = `${depth === 2 ? "/" : ""}${formatToken(node.segment)}`;
   const heading = headingStyle(styling, depth);
-  const rows = [...node.rows].sort(compareMeasurements);
-  const ownRows = rows.filter((row) => row.value.name === node.absoluteName);
-  const ownDiagnostics = diagnosticsForName(diagnostics, node.absoluteName);
-  const ownPartition = partitionNameDiagnostics(ownRows, ownDiagnostics);
-  const ownEntries = namedEntries(ownRows, ownPartition.unmatched);
+  const group = prepareObservationGroup(node.absoluteName, node.rows, diagnostics);
+  const ownEntries = group.entries;
   const ownEntry = ownEntries.at(0);
   if (ownEntries.length === 1 && ownEntry?.type === "measurement") {
     const ownRow = ownEntry.row;
@@ -335,28 +313,24 @@ function renderNamespaceHeading(
     renderAttributes(sink, ownRow, styling, { attributeBase: node.absoluteName, depth: depth + 1 });
     renderMeasurementDiagnostics(
       sink,
-      { row: ownRow, diagnostics: ownPartition.matched },
+      { row: ownRow, diagnostics: group.measurementDiagnostics },
       styling,
       { depth: depth + 1 },
     );
   } else if (ownEntries.length === 1 && ownEntry?.type === "issue") {
     renderIssueOnlyRow(sink, ownEntry.issue, styling, {
-      name,
+      displayName: name,
       depth: depth,
       attributeBase: node.absoluteName,
     });
   } else {
     sink.writeLine(`${indent}${heading(name)}`);
-    if (ownRows.length > 1) {
-      for (const diagnostic of ownPartition.matched.filter(
-        (item) => item.target.type === "observation",
-      ))
-        renderNotice(sink, diagnostic, styling, { depth: depth + 1 });
-    }
+    for (const diagnostic of group.sharedDiagnostics)
+      renderNotice(sink, diagnostic, styling, { depth: depth + 1 });
     for (const entry of ownEntries) {
       if (entry.type === "issue")
         renderIssueOnlyRow(sink, entry.issue, styling, {
-          name: `/${formatToken(node.absoluteName)}`,
+          displayName: `/${formatToken(node.absoluteName)}`,
           depth: depth + 1,
           attributeBase: node.absoluteName,
         });
@@ -365,10 +339,7 @@ function renderNamespaceHeading(
           sink,
           {
             row: entry.row,
-            diagnostics:
-              ownRows.length > 1
-                ? ownPartition.matched.filter((item) => item.target.type === "point")
-                : ownPartition.matched,
+            diagnostics: group.measurementDiagnostics,
           },
           styling,
           { depth: depth + 1, attributeBase: node.absoluteName, forceQuote: false },
@@ -389,39 +360,22 @@ function renderNamespaceObservations(
   const childRows = [...node.rows]
     .sort(compareMeasurements)
     .filter((row) => row.value.name !== node.absoluteName);
-  const childNames = new Set([
-    ...childRows.map((row) => row.value.name),
-    ...diagnostics
-      .filter(
-        (diagnostic) =>
-          (diagnostic.target.type === "observation" || diagnostic.target.type === "point") &&
-          diagnostic.target.name.startsWith(`${node.absoluteName}.`),
-      )
-      .map((diagnostic) =>
-        diagnostic.target.type === "observation" || diagnostic.target.type === "point"
-          ? diagnostic.target.name
-          : "",
-      ),
-  ]);
-  for (const childName of [...childNames].sort(compareCodeUnits)) {
-    const namedRows = childRows.filter((row) => row.value.name === childName);
-    const namedDiagnostics = diagnosticsForName(diagnostics, childName);
-    const relativeName = formatToken(childName.slice(node.absoluteName.length + 1));
-    const partition = partitionNameDiagnostics(namedRows, namedDiagnostics);
-    if (
-      namedRows.length > 1 &&
-      partition.matched.some((item) => item.target.type === "observation")
-    ) {
+  const childDiagnostics = diagnostics.filter(
+    (diagnostic) =>
+      (diagnostic.target.type === "observation" || diagnostic.target.type === "point") &&
+      diagnostic.target.name.startsWith(node.absoluteName + "."),
+  );
+  for (const group of groupObservations(childRows, childDiagnostics)) {
+    const relativeName = formatToken(group.observationName.slice(node.absoluteName.length + 1));
+    if (group.sharedDiagnostics.length > 0) {
       sink.writeLine(`${"  ".repeat(depth + 1)}${headingStyle(styling, depth + 1)(relativeName)}`);
-      for (const diagnostic of partition.matched.filter(
-        (item) => item.target.type === "observation",
-      ))
+      for (const diagnostic of group.sharedDiagnostics)
         renderNotice(sink, diagnostic, styling, { depth: depth + 2 });
     }
-    for (const entry of namedEntries(namedRows, partition.unmatched)) {
+    for (const entry of group.entries) {
       if (entry.type === "issue")
         renderIssueOnlyRow(sink, entry.issue, styling, {
-          name: relativeName,
+          displayName: relativeName,
           depth: depth + 1,
           attributeBase: node.absoluteName,
         });
@@ -430,13 +384,10 @@ function renderNamespaceObservations(
           sink,
           {
             row: entry.row,
-            diagnostics:
-              namedRows.length > 1
-                ? partition.matched.filter((item) => item.target.type === "point")
-                : partition.matched,
+            diagnostics: group.measurementDiagnostics,
           },
           styling,
-          { name: relativeName, depth: depth + 1, attributeBase: node.absoluteName },
+          { displayName: relativeName, depth: depth + 1, attributeBase: node.absoluteName },
         );
     }
   }
@@ -451,7 +402,7 @@ function renderAbsoluteRow(
   const { row, diagnostics } = context;
   const { depth, attributeBase, forceQuote = false } = options;
   renderObservation(sink, { row: row, diagnostics: diagnostics }, styling, {
-    name: `/` + (forceQuote ? quote(row.value.name) : formatToken(row.value.name)),
+    displayName: `/` + (forceQuote ? quote(row.value.name) : formatToken(row.value.name)),
     depth: depth,
     attributeBase: attributeBase,
   });
@@ -464,9 +415,9 @@ function renderObservation(
   options: NamedRowOptions,
 ): void {
   const { row, diagnostics } = context;
-  const { name, depth, attributeBase } = options;
+  const { displayName, depth, attributeBase } = options;
   sink.writeLine(
-    `${"  ".repeat(depth)}${headingStyle(styling, depth)(name)}${formatMeasurementFields(row, styling)}`,
+    `${"  ".repeat(depth)}${headingStyle(styling, depth)(displayName)}${formatMeasurementFields(row, styling)}`,
   );
   renderAttributes(sink, row, styling, { attributeBase: attributeBase, depth: depth + 1 });
   renderMeasurementDiagnostics(sink, { row: row, diagnostics: diagnostics }, styling, {
@@ -524,9 +475,9 @@ function renderAttribute(
   styling: Styling,
   options: RenderOptions,
 ): void {
-  const { key, value } = context;
+  const { key: attributeName, value: formattedValue } = context;
   const { depth, attributeBase: base } = options;
   sink.writeLine(
-    `${"  ".repeat(depth)}${styling.attributeName(formatAttributeKey(key, base))} ${styling.separator("=")} ${value}`,
+    `${"  ".repeat(depth)}${styling.attributeName(formatAttributeKey(attributeName, base))} ${styling.separator("=")} ${formattedValue}`,
   );
 }

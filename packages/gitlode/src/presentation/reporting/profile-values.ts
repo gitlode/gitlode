@@ -19,6 +19,7 @@ import { PROFILE_VIEW_DIAGNOSTIC_LABELS } from "./profile-view.js";
 const UNAVAILABLE = "—";
 const TOKEN = /^[A-Za-z0-9_.@-]+$/u;
 
+/** Explain retained diagnostic evidence; derive unavailable duration fields from the supplied row. */
 export function diagnosticText(diagnostic: ProfileDiagnostic, row?: ProfileMeasurement): string {
   const attribute =
     diagnostic.attributeKey.type === "exact" ? `${formatToken(diagnostic.attributeKey.key)}: ` : "";
@@ -100,39 +101,50 @@ export function formatMeasurementFields(row: ProfileMeasurement, styling: Stylin
     const span = row.value;
     const available = deriveSpanNumericAvailability(span);
     const avg = available.avg ? span.totalDurationSeconds / span.callCount : null;
-    return `${separator}${fields(
+    return `${separator}${formatFieldList(
       [
-        ["calls", available.calls ? exact(span.callCount, styling) : UNAVAILABLE],
-        ["total", available.total ? unit(span.totalDurationSeconds, "s", styling) : UNAVAILABLE],
-        ["avg", avg === null ? UNAVAILABLE : unit(avg, "s", styling)],
-        ["max", available.max ? unit(span.maxDurationSeconds, "s", styling) : UNAVAILABLE],
-        ["errors", available.errors ? exact(span.errorCount, styling) : UNAVAILABLE],
+        ["calls", available.calls ? formatExactCount(span.callCount, styling) : UNAVAILABLE],
+        [
+          "total",
+          available.total
+            ? formatStyledQuantity(span.totalDurationSeconds, "s", styling)
+            : UNAVAILABLE,
+        ],
+        ["avg", avg === null ? UNAVAILABLE : formatStyledQuantity(avg, "s", styling)],
+        [
+          "max",
+          available.max ? formatStyledQuantity(span.maxDurationSeconds, "s", styling) : UNAVAILABLE,
+        ],
+        ["errors", available.errors ? formatExactCount(span.errorCount, styling) : UNAVAILABLE],
       ],
       styling,
     )}`;
   }
   if (row.kind === "counter") {
     const available = deriveCounterNumericAvailability(row.value);
-    return `${separator}${available.value ? unit(row.value.value, row.value.unit, styling) : UNAVAILABLE}`;
+    return `${separator}${available.value ? formatStyledQuantity(row.value.value, row.value.unit, styling) : UNAVAILABLE}`;
   }
   const point = row.value;
   const available = deriveHistogramNumericAvailability(point);
   const avg = available.avg ? point.sum / point.count : null;
-  return `${separator}${fields(
+  return `${separator}${formatFieldList(
     [
-      ["samples", available.samples ? exact(point.count, styling) : UNAVAILABLE],
-      ["total", available.total ? unit(point.sum, point.unit, styling) : UNAVAILABLE],
-      ["avg", avg === null ? UNAVAILABLE : unit(avg, point.unit, styling)],
+      ["samples", available.samples ? formatExactCount(point.count, styling) : UNAVAILABLE],
+      [
+        "total",
+        available.total ? formatStyledQuantity(point.sum, point.unit, styling) : UNAVAILABLE,
+      ],
+      ["avg", avg === null ? UNAVAILABLE : formatStyledQuantity(avg, point.unit, styling)],
       [
         "min",
         available.min && point.minimum !== null
-          ? unit(point.minimum, point.unit, styling)
+          ? formatStyledQuantity(point.minimum, point.unit, styling)
           : UNAVAILABLE,
       ],
       [
         "max",
         available.max && point.maximum !== null
-          ? unit(point.maximum, point.unit, styling)
+          ? formatStyledQuantity(point.maximum, point.unit, styling)
           : UNAVAILABLE,
       ],
     ],
@@ -140,9 +152,15 @@ export function formatMeasurementFields(row: ProfileMeasurement, styling: Stylin
   )}`;
 }
 
-function fields(entries: readonly (readonly [string, string])[], styling: Styling): string {
+function formatFieldList(
+  entries: readonly (readonly [string, string])[],
+  styling: Styling,
+): string {
   return entries
-    .map(([key, value]) => `${styling.fieldLabel(key)}${styling.separator("=")}${value}`)
+    .map(
+      ([fieldLabel, formattedValue]) =>
+        `${styling.fieldLabel(fieldLabel)}${styling.separator("=")}${formattedValue}`,
+    )
     .join(styling.separator(", "));
 }
 
@@ -188,12 +206,21 @@ function formatObservedCoverage(
     : "";
 }
 
-export function formatAttributeKey(key: string, base: string | undefined): string {
-  if (base && key.startsWith(`${base}.`) && key.length > base.length + 1)
-    return formatToken(key.slice(base.length + 1));
-  return `/` + formatToken(key);
+/** Relativize only at a dot-segment boundary; otherwise retain an absolute attribute name. */
+export function formatAttributeKey(
+  attributeName: string,
+  namespacePath: string | undefined,
+): string {
+  if (
+    namespacePath &&
+    attributeName.startsWith(namespacePath + ".") &&
+    attributeName.length > namespacePath.length + 1
+  )
+    return formatToken(attributeName.slice(namespacePath.length + 1));
+  return "/" + formatToken(attributeName);
 }
 
+/** Quote type-ambiguous strings so string, number and boolean attributes remain distinguishable. */
 export function formatAttributeValue(value: ProfileAttributeValue): string {
   if (typeof value !== "string") return String(value);
   if (value === "true" || value === "false" || isFiniteNumberString(value)) return quote(value);
@@ -221,6 +248,7 @@ export function formatToken(value: string): string {
   return TOKEN.test(value) && !value.startsWith("/") ? value : quote(value);
 }
 
+/** Extend JSON quoting to escape controls and direction marks that can obscure terminal identities. */
 export function quote(value: string): string {
   return JSON.stringify(value).replace(
     /[\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/gu,
@@ -228,18 +256,18 @@ export function quote(value: string): string {
   );
 }
 
-function exact(value: number, styling: Styling): string {
+function formatExactCount(value: number, styling: Styling): string {
   return styling.value(formatCount(value));
 }
 
-function unit(value: number, canonicalUnit: string, styling: Styling): string {
+function formatStyledQuantity(value: number, canonicalUnit: string, styling: Styling): string {
   const formatted = formatUnit(value, canonicalUnit);
-  return styling.value(formatted.value) + styling.unit(`${formatted.unit}`);
+  return styling.value(formatted.value) + styling.unit(formatted.unit);
 }
 
 function formatUnit(value: number, canonicalUnit: string): { value: string; unit: string } {
-  if (canonicalUnit === "s") return scaledUnit(value, ["ns", "µs", "ms", "s"], 1000, 1e9);
-  if (canonicalUnit === "By") return scaledUnit(value, ["B", "KiB", "MiB", "GiB"], 1024, 1);
+  if (canonicalUnit === "s") return scaleQuantity(value, ["ns", "µs", "ms", "s"], 1000, 1e9);
+  if (canonicalUnit === "By") return scaleQuantity(value, ["B", "KiB", "MiB", "GiB"], 1024, 1);
   const entityUnits: Readonly<Record<string, string>> = {
     "{commit}": "commits",
     "{record}": "records",
@@ -258,7 +286,8 @@ function formatUnit(value: number, canonicalUnit: string): { value: string; unit
   };
 }
 
-function scaledUnit(
+/** Scale units and promote again after rounding; retain nonzero values through scientific notation. */
+function scaleQuantity(
   value: number,
   units: readonly string[],
   threshold: number,

@@ -9,6 +9,7 @@ import type {
   ProfileSpanAggregate,
   ProfileTarget,
 } from "@gitlode/internal-contracts/telemetry";
+import type { Brand } from "@gitlode/internal-foundation/type-utils";
 
 import { compareAttributeSets, compareProfileIdentity } from "./profile-view.js";
 
@@ -17,12 +18,23 @@ export type ProfileMeasurement =
   | { kind: "counter"; value: ProfileCounterPoint }
   | { kind: "histogram"; value: ProfileHistogramPoint };
 
+/** Full raw observation identity; not an escaped label or a namespace fragment. */
+type ObservationName = Brand<string, "ProfileObservationName">;
+
+interface ObservationGroup {
+  readonly observationName: ObservationName;
+  readonly entries: readonly NamedProfileEntry[];
+  readonly sharedDiagnostics: readonly ProfileDiagnostic[];
+  readonly measurementDiagnostics: readonly ProfileDiagnostic[];
+}
+
+/** Read-only rendering input. Rows belong to this grouping node, not its entire subtree. */
 export interface NamespaceNode {
   readonly segment: string;
   readonly absoluteName: string;
-  readonly rows: ProfileMeasurement[];
-  readonly diagnostics: ProfileDiagnostic[];
-  readonly children: Map<string, NamespaceNode>;
+  readonly rows: readonly ProfileMeasurement[];
+  readonly diagnostics: readonly ProfileDiagnostic[];
+  readonly children: ReadonlyMap<string, NamespaceNode>;
 }
 
 type NamedProfileTarget = Extract<ProfileTarget, { type: "observation" | "point" }>;
@@ -42,6 +54,7 @@ export interface ScopeContext {
   readonly diagnostics: readonly ProfileDiagnostic[];
 }
 
+/** Include scopes evidenced only by diagnostics; preserve null versus empty versions. */
 export function groupProfileScopes(report: ProfileReport): ScopeContext[] {
   const measurements: ProfileMeasurement[] = [
     ...report.spans.map((value) => ({ kind: "span" as const, value })),
@@ -83,31 +96,46 @@ export function groupProfileScopes(report: ProfileReport): ScopeContext[] {
     }));
 }
 
+type MutableNamespaceNode = {
+  segment: string;
+  absoluteName: string;
+  rows: ProfileMeasurement[];
+  diagnostics: ProfileDiagnostic[];
+  children: Map<string, MutableNamespaceNode>;
+};
+
+/**
+ * Group by leading name segments. Depth zero and malformed dot names stay ungrouped.
+ * Assign each measurement/diagnostic to one node, including diagnostic-only identities.
+ */
 export function buildScopeTree(
   { rows, diagnostics }: ScopeContext,
   namespaceDepth: number,
 ): {
-  roots: NamespaceNode[];
-  ungrouped: { rows: ProfileMeasurement[]; diagnostics: ProfileDiagnostic[] };
+  readonly roots: readonly NamespaceNode[];
+  readonly ungrouped: {
+    readonly rows: readonly ProfileMeasurement[];
+    readonly diagnostics: readonly ProfileDiagnostic[];
+  };
 } {
   if (!Number.isSafeInteger(namespaceDepth) || namespaceDepth < 0)
     throw new RangeError("Namespace depth must be a nonnegative safe integer");
-  const roots = new Map<string, NamespaceNode>();
+  const roots = new Map<string, MutableNamespaceNode>();
   const ungrouped: { rows: ProfileMeasurement[]; diagnostics: ProfileDiagnostic[] } = {
     rows: [],
     diagnostics: [],
   };
 
   // Measurements and diagnostic-only identities use the same path construction.
-  function nodeFor(name: string): NamespaceNode | undefined {
-    const segments = name.split(".");
+  function getOrCreateNamespaceNode(observationName: string): MutableNamespaceNode | undefined {
+    const segments = observationName.split(".");
     if (segments.some((segment) => segment.length === 0)) return undefined;
     let nodes = roots;
     let absoluteName = "";
-    let target: NamespaceNode | undefined;
+    let target: MutableNamespaceNode | undefined;
     for (const segment of segments.slice(0, namespaceDepth)) {
       absoluteName = absoluteName ? absoluteName + "." + segment : segment;
-      const node: NamespaceNode = nodes.get(segment) ?? {
+      const node: MutableNamespaceNode = nodes.get(segment) ?? {
         segment,
         absoluteName,
         rows: [],
@@ -121,13 +149,13 @@ export function buildScopeTree(
     return target;
   }
   for (const row of rows) {
-    const node = nodeFor(row.value.name);
+    const node = getOrCreateNamespaceNode(row.value.name);
     if (node) node.rows.push(row);
     else ungrouped.rows.push(row);
   }
   for (const diagnostic of diagnostics) {
     if (diagnostic.target.type !== "observation" && diagnostic.target.type !== "point") continue;
-    const node = nodeFor(diagnostic.target.name);
+    const node = getOrCreateNamespaceNode(diagnostic.target.name);
     if (node) node.diagnostics.push(diagnostic);
     else ungrouped.diagnostics.push(diagnostic);
   }
@@ -154,9 +182,9 @@ export function compareMeasurements(left: ProfileMeasurement, right: ProfileMeas
   );
 }
 
-export function diagnosticsForName(
+function diagnosticsForName(
   diagnostics: readonly ProfileDiagnostic[],
-  name: string,
+  name: ObservationName,
 ): ProfileDiagnostic[] {
   return diagnostics
     .filter(
@@ -303,14 +331,15 @@ function diagnosticMatchesMeasurement(
   );
 }
 
-export function partitionNameDiagnostics(
+/** Inputs must already share a Scope and observation name; match kind and typed point attributes. */
+function partitionNameDiagnostics(
   rows: readonly ProfileMeasurement[],
   diagnostics: readonly ProfileDiagnostic[],
 ): { matched: ProfileDiagnostic[]; unmatched: IssueOnlyTarget[] } {
   const matched = diagnostics.filter((diagnostic) =>
     rows.some((row) => diagnosticMatchesMeasurement(diagnostic, row)),
   );
-  const unmatched: IssueOnlyTarget[] = [];
+  const unmatched: { target: NamedProfileTarget; diagnostics: ProfileDiagnostic[] }[] = [];
   for (const diagnostic of diagnostics) {
     if (matched.includes(diagnostic)) continue;
     if (diagnostic.target.type !== "observation" && diagnostic.target.type !== "point") continue;
@@ -344,7 +373,8 @@ function namedEntryTarget(entry: NamedProfileEntry): NamedProfileTarget {
       };
 }
 
-export function namedEntries(
+/** Interleave measured and issue-only identities using the same canonical target ordering. */
+function namedEntries(
   rows: readonly ProfileMeasurement[],
   issues: readonly IssueOnlyTarget[],
 ): NamedProfileEntry[] {
@@ -361,4 +391,48 @@ export function isEntireResultUnavailable(diagnostic: ProfileDiagnostic): boolea
     diagnostic.wholeResultUnavailable ||
     (diagnostic.extent === "entire_target" && diagnostic.effects.includes("missing_observations"))
   );
+}
+
+/**
+ * Prepare one name within a single Scope, retaining unmatched diagnostic targets as issue rows.
+ * Observation-wide notices are shared only for multiple measured rows; point notices stay local.
+ */
+export function prepareObservationGroup(
+  observationName: string,
+  rows: readonly ProfileMeasurement[],
+  diagnostics: readonly ProfileDiagnostic[],
+): ObservationGroup {
+  // This marks the identity's role, not validity: malformed names must remain displayable.
+  const identityName = observationName as ObservationName;
+  const namedRows = rows.filter((row) => row.value.name === identityName).sort(compareMeasurements);
+  const partition = partitionNameDiagnostics(
+    namedRows,
+    diagnosticsForName(diagnostics, identityName),
+  );
+  return {
+    observationName: identityName,
+    entries: namedEntries(namedRows, partition.unmatched),
+    sharedDiagnostics:
+      namedRows.length > 1
+        ? partition.matched.filter((item) => item.target.type === "observation")
+        : [],
+    measurementDiagnostics:
+      namedRows.length > 1
+        ? partition.matched.filter((item) => item.target.type === "point")
+        : partition.matched,
+  };
+}
+
+/** Collect measured and diagnostic-only names without imposing a layout or inventing results. */
+export function groupObservations(
+  rows: readonly ProfileMeasurement[],
+  diagnostics: readonly ProfileDiagnostic[],
+): readonly ObservationGroup[] {
+  const names = new Set(rows.map((row) => row.value.name));
+  for (const diagnostic of diagnostics)
+    if (diagnostic.target.type === "observation" || diagnostic.target.type === "point")
+      names.add(diagnostic.target.name);
+  return [...names]
+    .sort(compareCodeUnits)
+    .map((name) => prepareObservationGroup(name, rows, diagnostics));
 }

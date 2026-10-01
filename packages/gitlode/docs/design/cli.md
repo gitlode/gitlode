@@ -212,7 +212,10 @@ owns the template hierarchy: Profile, Scope, Namespace, Observation, Attribute a
 its heading/own measurements, descendant observations and recursive child namespaces. Rendering
 functions take `(sink, context, styling, options)`; local options carry depth, displayed name or
 attribute base as needed. `profile-data.ts` owns grouping, identity ordering and diagnostic matching;
-`profile-values.ts` owns value and diagnostic text formatting. Preserve those identity and
+`profile-values.ts` owns value and diagnostic text formatting. Data preparation shares the
+same-name measurement/diagnostic grouping across flat and nested layouts. Its observation-name
+brand marks raw identity, not validation; escaped display names remain ordinary strings. Rendering
+consumes read-only collections, while tree construction keeps mutable storage internal. Preserve those identity and
 availability contracts when experimenting with layout.
 
 The CLI calls `renderProfile` with a `writeLine` sink (the used subset of `TerminalSink`) and emits

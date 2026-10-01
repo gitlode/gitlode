@@ -476,3 +476,13 @@ of this change. Explicit-depth regression tests retain coverage of grouped layou
 formatter test covers flat absolute names and compact units. Historical A/C preview fixes depth 2
 so both compared heading levels remain visible; the ordinary preview uses the current defaults.
 Earlier entries retain historical defaults and do not supersede this choice.
+
+### Maintenance refactor before final cleanup
+
+Shared observation grouping now prepares measured/issue-only entries and separates shared
+observation notices from per-measurement diagnostics. Renderers consume read-only collections.
+A presentation-local observation-name brand is attached at data preparation; display names and
+attribute names use explicit variable names without introducing brands for namespace fragments.
+JSDoc records grouping, matching, ordering, escaping and rounding preconditions. Display behavior
+and the retained optional namespace hierarchy are unchanged. Temporary helper cleanup and final
+whole-repository validation remain separate pending tasks.

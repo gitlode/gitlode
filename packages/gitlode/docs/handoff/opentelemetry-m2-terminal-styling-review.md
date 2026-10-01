@@ -39,6 +39,127 @@ consumer visual gaps remain open separately. Do not infer harmlessness or closur
 After supervisor triage, trunk assigns fixture-lifecycle diagnosis; the PR remains pending their
 explicit disposition and the visual follow-up decisions. No new full-suite campaign is assigned here.
 
+## Bounded supervisor diagnosis returned to trunk — 2026-10-01
+
+**Inconclusive for the saved CI failure; no instability closure.** Started at
+`c6aa33e2a63b5fc072aaef07b63de25e72aad111` on `feature/otel-redesign_M2_styling`, initially clean.
+Compared isolated, detached Linux clones of entry `76486d25870172528ce9af086ace756388b6c8d8`
+and failure source `f0558856f018f24b5766d6ed8b5d241f9cb02747`. Ran only
+`kills an owned grandchild that ignores TERM when the worker exits first`, **one attempt per
+source, two total**. Both passed (one selected test, 21 skipped per invocation); neither reproduced
+post-return `R`. Stopped after obtaining the paired ownership/signal/termination traces, without
+using the remaining allowance or retrying until green. This is diagnostic evidence, not formal
+measurement, full-suite validation, or M2 acceptance.
+
+### Environment and observation method
+
+Re-fetched the saved attempt-2 job `110189713245` through the GitHub connector. Its decoded log
+confirms the failure source, the named test's 395 ms failure, and expected `missing`/`Z` versus
+observed `R`. It contains no PID identity or later state. CI used Ubuntu 24.04.5, Node 22.23.3,
+Git 2.55.0; the actual CI kernel was not printed. Local probes used Ubuntu 26.04 LTS on WSL2,
+kernel `6.18.33.1-microsoft-standard-WSL2`, Linux Node 22.23.1, npm 10.9.8, Git 2.53.0,
+Vitest 4.1.10 and Linux-native checkout/temp storage. These were isolated tests, unlike the CI
+suite's concurrent workload. No historical environment or extra workload was provisioned.
+Dependencies were copied from the existing Linux `m1-corrected-20260914T061714Z-6fd46d3/source`
+installation after byte-comparing its lockfile with both sources; no dependency install was run.
+The supervisor, test, atomic-JSON helper, lockfile, and root/package Vitest configurations have
+identical source hashes across the two pinned revisions. This establishes shared code, not that
+the CI symptom was already observed at entry or that scheduling is unaffected by other changes.
+
+Each invocation had a Python-enforced **20-second outer deadline**, with owned-process identity
+checks for emergency cleanup; neither deadline fired. Existing preparation/execution/processing,
+grace and cleanup deadlines remained 3000/150/150/80/500 ms. The temporary probe captured
+monotonic/wall timestamps, raw `/proc/<pid>/stat`, PID/PPID/PGID/start ticks, IPC, signal success
+or error, worker close, stop, supervisor return, and the original one-read assertion value.
+It retained that value unchanged for the assertion and added an approximately one-second history
+afterward (5 ms scheduled sampling; final timer wakeup can overshoot slightly). Fixture snapshots,
+worker script and diagnostic logs were copied before the existing teardown removed the fixture.
+The probe's synchronous reads and identity-log writes perturb scheduling and may mask a narrow
+race; these instrumented passes do not exonerate the uninstrumented test.
+
+### Evidence and cause confidence
+
+Times below are milliseconds relative to the probe event immediately before group SIGKILL;
+they bracket observations, not exact kernel signal-delivery times.
+
+| Observation                             | Entry attempt 1               | Failure-source attempt 1      |
+| --------------------------------------- | ----------------------------- | ----------------------------- |
+| Worker / child PID; owned PGID          | 39349 / 39356; 39349          | 39439 / 39446; 39439          |
+| Worker / child start ticks              | 131670852 / 131670855         | 131671968 / 131671971         |
+| TERM call event; worker close (SIGTERM) | -80.838; -75.410              | -80.243; -75.964              |
+| Child immediately before KILL           | S, original PGID/start        | S, original PGID/start        |
+| KILL-success event; observed child      | +0.375; Z                     | +0.347; Z                     |
+| Supervisor-return event; observed child | +1.845; Z                     | +1.643; Z                     |
+| Original assertion observation          | +3.405; missing               | +3.236; missing               |
+| Additional history samples              | 192, all ENOENT for both PIDs | 193, all ENOENT for both PIDs |
+
+- **Delayed termination observation:** the missing descendant-completion barrier is supported with
+  high confidence by shared source: the grace callback sends KILL and calls `stop()` when worker
+  exit is already known; the close handler after forced termination likewise observes only the
+  worker. Final persistence adds incidental time, not a descendant barrier. Both local traces
+  exercised the worker-first path, but neither caught post-KILL/post-return `R`; explaining the
+  historical `R` as a transient terminating process remains a plausible, unproven hypothesis.
+- **Surviving owned descendant:** the child survived TERM and worker close as intended, was Z at
+  return, then absent throughout the sampled history. Final `/proc` group scans found no members
+  of either owned PGID. No extra cleanup signal was necessary. There is no observed local survivor;
+  the saved CI log cannot exclude one or establish its duration.
+- **Wrong PID/group or PID reuse:** initial PPID equaled the worker, child PGID equaled the detached
+  worker PID, and child start ticks/PGID stayed constant through KILL and Z. Reparenting after worker
+  close changed PPID to 39265/39368, not PGID. The assertion selected that same child PID. These
+  explanations are excluded for the two local traces, not for the unidentified historical CI PID.
+- **Failed signaling:** both TERM and KILL calls returned without error, including KILL after the
+  group leader had disappeared; both terminal snapshots have empty `cleanupErrors`. No ESRCH or
+  other signal error was observed. Successful sending alone is not proof of descendant completion;
+  the following Z/missing observations supply that evidence locally. CI signal results are unknown.
+
+The [cleanup contract](../design/telemetry-performance.md#execution-supervision) includes owned
+descendants after worker exit and places terminal persistence after cleanup. The implementation
+does not establish their quiescence before returning. Therefore a transient `R`, if later confirmed,
+would still expose a completion-contract gap; passing after a delay would not by itself make the
+cleanup contract satisfied. This return does not reclassify the CI failure as harmless test timing.
+
+### Proposed correction and regression checks for trunk's decision
+
+Smallest supported correction direction: use the **existing** bounded cleanup budget after KILL
+to observe both worker close and absence of live owned group members, including the worker-first
+and normal-completion paths. Distinguish Z from running/sleeping members, retain PID/start/group
+identity against reuse, and report inaccessible observation, signal errors, or deadline exhaustion
+as cleanup uncertainty/failure in the terminal evidence. Child PIDs from IPC must remain diagnostic,
+never arbitrary kill targets. Group `kill(..., 0)` alone cannot distinguish zombies. Do not repair
+this solely by polling longer in the test, increasing deadlines, or accepting R in the assertion.
+This is a proposal, not an implemented or proven fix for the saved failure.
+
+Before accepting a correction, require deterministic tests of successful KILL followed by delayed
+descendant quiescence, worker-first and worker-last close, a member live through the existing bound,
+signal/observation failure, PID identity mismatch and zombies. Retain a bounded real-Linux test
+with a TERM-ready grandchild, asserting no live owned descendant at supervisor return, unchanged
+stage deadlines/exit classification, final cleanup evidence, and no signaling of unrelated groups.
+Normal-completion descendant cleanup also needs coverage. None of those new tests or fixes was
+introduced here; fixture-lifecycle diagnosis and all other open gates remain separate assignments.
+
+### Preserved artifacts and delivery scope
+
+Evidence root: `D:/gitlode_test/m2-supervisor-20261001-c6aa33e-7f3b`, mirrored under
+`/home/t-wakabayashi/gitlode-performance/m2-supervisor-20261001-c6aa33e-7f3b`.
+The Linux root additionally retains both restored, clean, detached checkouts. `entry-attempt-1/`
+and `failure-attempt-1/` contain raw trace, identity ledger, exact command/outer deadline, Vitest
+log, result/process audit, and copied fixture supervision JSON/diagnostic log. Root files contain
+environment, source/restoration audit, instrumentation patches/helpers, preparation/run/analysis
+scripts, decoded CI log, and the timeline summary. No previous archive was overwritten.
+
+SHA-256 anchors (the manifest covers all delivered evidence files except itself and the checkouts):
+
+- `SHA256SUMS`: `3ac167ef89ee65ca5540ebc3ee578982521a19114fbc6d1df87ca8572f22ad8e`
+- `ci-attempt-2.log`: `6b28c11ef4374da428cfb5fd0e6bc0398cf533be7c543ccc689b9a613b736660`
+- `entry-attempt-1/trace.json`: `fc580fa15ce313f1ca576ab88aa471023e86fe6254ca766dfa55647506d3c72f`
+- `failure-attempt-1/trace.json`: `46f1f858e2618559269e358213d6829bc89bb39ba60a933e8d3f6221649b53b3`
+
+Temporary instrumentation was restored and the helper removed in each isolated checkout; both
+`git status --porcelain` outputs are empty. The return changes only this document. No permanent
+production/test change, timeout/assertion change, formal measurement, PR, merge or parent-ref
+update was performed. Documentation formatting/diff checks and the normal-push checkpoint are
+reported in the final handoff; trunk retains the correction and acceptance decision.
+
 ## Independent result returned to trunk — 2026-10-01
 
 **Corrections required.** One new validation blocker was independently reproduced (R1 below).

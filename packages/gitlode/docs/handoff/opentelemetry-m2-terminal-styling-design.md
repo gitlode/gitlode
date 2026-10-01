@@ -15,6 +15,37 @@ equality were verified before creating the styling child. Trunk is a conversatio
 Normal commits/pushes preserve history. No force push, base-ref update, PR, merge or branch deletion.
 PR requires explicit human approval naming source/base; only the human merges and deletes branches.
 
+## R1 bounded correction outcome — 2026-10-01
+
+R1 is corrected; trunk's limited-diff confirmation is pending. The independent review remains
+**Corrections required** as recorded; this correction does not grant M2 acceptance.
+
+- Start: `0d944b3113c481231218f2ca2f4f1cf53995d693`, equal to local/tracking/actual remote,
+  on the requested styling branch with one clean worktree. Checkpoint ancestry was verified.
+- Implementation correction: `0256c71bc3e429c13e0dc0aa938514d87858fd1b`. Only
+  `test/presentation/reporting/summary-formatters.test.ts` changed: both stubs spread
+  `plainStyling` and override their existing observed roles. Callbacks and output assertions are
+  unchanged. No production/interface, palette, layout, collector, schema or unrelated test changes.
+- Before correction, the review's exact summary-only strict command reproduced TS2741 at lines
+  33 and 82. After correction, that command passed. The same flags also passed for all six changed
+  presentation tests: styling, diagnostics, presenter, reporting/formatters, reporting/profile-view-drift
+  and reporting/summary-formatters (with `test/support/js-yaml.d.ts`). No diagnostic suppression.
+- Focused Vitest passed 2 files / 8 tests (summary-formatters and styling). Focused oxlint, root
+  `npm run format:write`, root `npm run format:check` and `git diff --check` passed. No additional
+  local full-suite or package verification was run. The separate `local-collection.test.ts:69`
+  Attributes issue was neither changed nor claimed resolved.
+- Correction push CI: [run 36812819253](https://github.com/gitlode/gitlode/actions/runs/36812819253),
+  exact source `0256c71bc3e429c13e0dc0aa938514d87858fd1b`, attempt 1: success. Job
+  `110211391160` reports successful source tests, release build, packed metadata and installed-package
+  system test steps, as well as the preceding validation steps. No new failure or retry.
+- This outcome is a subsequent documentation-only checkpoint, distinct from the implementation
+  correction OID above. Its own OID and push CI are reported in the final handoff, not attributed
+  to the correction-source CI.
+
+Unresolved instability, unobserved display environments/shared-consumer visual checks, and M2
+acceptance remain open as detailed in the independent review. No CI retry, PR, merge, parent-ref
+update or formal measurement is part of this correction.
+
 ## Adopted outcome
 
 Canonical contracts: [CLI styling](../design/cli.md), [profiling guide](../profiling.md),

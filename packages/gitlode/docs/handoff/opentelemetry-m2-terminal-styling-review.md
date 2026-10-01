@@ -1,5 +1,119 @@
 # M2 terminal styling: independent review
 
+## Independent supervisor cleanup correction review returned to trunk — 2026-10-01
+
+**Accepted for this correction; no required corrections found.** Reviewed all six files in
+`c53206a1d480d2fdb47fc8f594923ab01264cce4` →
+`97cab518ddd77667e56010ca1d902ded0f309c8d`, against the execution-supervision contract and the
+preceding diagnosis. Entry HEAD was `bdb929c5052c07d520527ddf3bfeca94a0f1a81e` on
+`feature/otel-redesign_M2_styling`; local, tracking and actual remote matched, with a clean single
+worktree. Merge-base checks establish the stated pre-correction → implementation → handoff ancestry.
+The implementation-to-entry delta is only the 64-line continuation note in this document. Styling
+was not reopened. This acceptance does not establish the historical CI `R` cause, instability
+closure, M2 acceptance or release acceptance.
+
+### Contract findings and concrete failure paths
+
+- **Completion barrier:** failure keeps TERM and the existing grace, then enters KILL/confirmation;
+  normal protocol completion enters the same confirmation helper. Worker close alone cannot stop
+  cleanup. The helper requires both `closed()` and an observation with no non-Z owned member.
+  Worker-first, worker-last and normal completion are covered by independent real Linux execution,
+  alongside deterministic delayed-member tests. Successful signaling alone cannot produce acceptance.
+- **Single budget:** `completeProcessGroup` starts its deadline before force signaling, passes that
+  deadline into scans, and checks elapsed time again after observation. Close never rearms it;
+  polling sleeps use only the remaining budget. A slow final synchronous `/proc` read can overshoot
+  the deadline, but its result cannot be accepted afterward. Independent probe: a 60 ms read under a
+  50 ms budget returns false with `group-quiescence-not-confirmed`. This is a cooperative observation
+  deadline, not a preemptive bound on synchronous kernel I/O; the canonical documented limit matches
+  the implementation. TERM observation precedes grace and has its own bounded scan allowance; the
+  KILL confirmation budget is not restarted or shared with the preceding TERM/grace phase.
+- **Observation and ownership:** parsing uses the last closing parenthesis, preserving comm spaces,
+  parentheses and newlines, and checks PID/group/start fields. ENOENT means disappearance; denied
+  reads or enumeration fail conservatively. Only Z is quiescent; R/S and other states remain live.
+  Observed PID/start identities survive disappearance and reject observed reuse. The leader must
+  initially have PID = PGID. Signaling uses only the captured negative worker PGID after a validating
+  scan; IPC PIDs never supply signal targets, and other groups are filtered. Independent probes
+  exercise parser edge cases, disappearance, unrelated-group filtering and actual observer error
+  propagation, without requiring a different process manager.
+- **Failure evidence:** normal completion plus a live member, denied observation, identity mismatch
+  or signal error produces `cleanupConfirmed: false`, inconclusive/exit 2. Deadline failure plus
+  cleanup errors retains the original deadline reason. No confirmation path converts uncertainty
+  into completed. Completed protocol exit 2 remains distinct from supervision failure. Existing
+  completed-pilot retention, final diagnostic failure, one terminal-snapshot recovery write and
+  persistent-storage-failure reporting remain covered by the selected suite. The unchanged operator
+  entrypoint assigns the returned exit code and reports terminal-artifact availability.
+- **Finite release:** when worker close is unknown, stop destroys output streams, disconnects IPC
+  and unreferences the child, clears deadline/heartbeat/grace, and settles once. The selected denied
+  observation test returns despite a live worker, then reclaims only its captured identity. No
+  unhandled error/rejection or live owned process at outer return occurred. IPC updates are guarded
+  after stop; late close can fill the private `exit` variable but cannot restart cleanup, enqueue
+  persistence or mutate the returned result/on-disk terminal artifact. The retained child error
+  handler consumes errors through guarded termination. No new timer/listener leak was identified.
+
+The guarantees remain **observed group quiescence**, not an atomic process-table snapshot. A process
+can disappear during a scan; retained identities detect reuse only when that PID is observed again.
+Unobserved group turnover, group escape and observation-to-signal PID/group races are not eliminated.
+No independent test forces kernel PID reuse or uninterruptible I/O. These limits do not excuse
+skipping the worker-plus-descendant barrier or accepting observation failure; neither happens here.
+There is no blocking failure path, severity or minimum required fix to assign. Optional follow-up:
+retain direct parser/read-error tests like the temporary probe in a future separately authorized
+test change; the delivered tests currently cover those paths mainly through the real OS or injected
+observer boundary. This is a coverage improvement, not a correction acceptance condition.
+
+### Verification provenance
+
+**Independently executed:** Windows `npm run build:dev` and related strict TypeScript passed. Strict
+command used `npx tsc --ignoreConfig --noEmit --strict --target ES2022 --module NodeNext
+--moduleResolution NodeNext --types node --skipLibCheck` with the two changed tooling files and two
+changed test files. A new detached Linux checkout at the full implementation OID matched all six
+pinned files and the existing dependency lockfile. One focused invocation passed **2 suites / 40
+tests** with a 45-second outer deadline, including all three TERM-ready grandchild paths and denied
+observation with a live worker. Readiness follows handler registration and IPC, not a startup sleep.
+The real tests call the real `/proc` observer after return and require no non-Z group member; their
+individual PID read is supplementary. One temporary observer probe passed **4/4** under a 20-second
+outer deadline. Its filesystem injection tests the actual parser/scanner/helper, not real kernel
+faults. No outer deadline fired or owned live process remained. Linux: Ubuntu/WSL2 kernel
+`6.18.33.1-microsoft-standard-WSL2`, Node `22.23.1`, Git `2.53.0`, Vitest `4.1.10`.
+
+The first shell-based probe placement failed before any test started because native argument
+passing lost a shell variable; Python placement corrected that preparation issue. There was one
+actual probe invocation, no retry of a test failure. Probe removal ran in `finally`; the dependency
+symlink was removed and the isolated checkout is clean. Windows temporary helpers were also removed.
+No implementation edits, full-suite run, formal measurement or CI rerun were added.
+
+**Saved evidence independently inspected:** the original correction evidence manifest's **76 files**
+all matched its recorded SHA-256 anchor. Inspected final normal/stall/failure raw snapshots, pilots,
+outer audits, readiness/ownership runner and worker restoration: exits **0/2/2**, confirmed cleanup,
+empty cleanup errors, original failure reasons and retained completed pilots. The archived original
+worker equals the restored worker byte-for-byte and the pinned source after newline normalization.
+Their group observations are after the operator process exits, rather than a timestamped observation
+at the internal supervisor return; the independent focused real-process tests supply that closer
+barrier check. No concrete entrypoint concern required a new normal/stall/failure invocation.
+
+Independently fetched the supplied CI job metadata and decoded logs: implementation run
+[36831779393](https://github.com/gitlode/gitlode/actions/runs/36831779393), job `110269806458`, checks
+out `97cab518ddd77667e56010ca1d902ded0f309c8d`; handoff run
+[36832084738](https://github.com/gitlode/gitlode/actions/runs/36832084738), job `110270787213`, checks
+out `bdb929c5052c07d520527ddf3bfeca94a0f1a81e`. Both jobs completed successfully, including format,
+build, **96 files / 1312 source tests**, release metadata and installed-package checks. These are
+saved CI runs, not independently rerun full suites. The first-attempt claim remains the preceding
+report's provenance; latest-job metadata alone does not establish attempt history.
+
+**Report-derived only:** historical diagnosis causality remains inconclusive; this review does not
+repeat its two instrumented traces or independently reproduce the old CI `R`. Prior incremental
+implementation runs and their fail-before invocation remain the correction author's report, separate
+from this review's one focused run and one probe.
+
+Independent evidence root: `/home/t-wakabayashi/gitlode-performance/m2-cleanup-review-20261001`.
+`focused.{log,audit.json}`, `probe.{test.ts,log,audit.json}`, `source-audit.json` and
+`saved-evidence-review.json` retain the new results. Manifest SHA-256:
+`72782f8c662e05bb2531a8e8c9a023e01197b81266958429827407a10fd55a8c`.
+Root format:write/check and final diff check are recorded at documentation delivery. Only this review
+document is committed and normally pushed on the styling branch; final local/tracking/actual remote
+equality and clean status are returned separately because the delivery OID cannot identify itself.
+ENOTEMPTY, Windows timeout/EBUSY, Attributes typing and missing display-environment evidence remain
+separate open matters. No PR, merge, parent-ref update or broader acceptance is performed.
+
 ## Bounded supervisor cleanup correction returned for focused review — 2026-10-01
 
 Implementation checkpoint: `97cab518ddd77667e56010ca1d902ded0f309c8d`, normal-pushed on

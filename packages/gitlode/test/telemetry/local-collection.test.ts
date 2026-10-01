@@ -506,7 +506,7 @@ describe("local span processor", () => {
       });
       expect(report.signalStatus.spans).toBe("partial");
       const output = formatProfileLines(report).join("\n");
-      expect(output).toContain("operation : calls=2, total=10 ns, avg=—, max=10 ns, errors=0");
+      expect(output).toContain("operation : calls=2, total=10ns, avg=—, max=10ns, errors=0");
       expect(output).toContain(
         "Duration summary excludes 1 invalid duration; average unavailable.",
       );
@@ -543,7 +543,7 @@ describe("local span processor", () => {
     expect(output).toContain(
       "Duration summary excludes 1 invalid duration; total/average/maximum unavailable.",
     );
-    expect(output).not.toContain("total=0 s");
+    expect(output).not.toContain("total=0s");
   });
 
   test("keeps mixed-duration quality visible after diagnostic detail overflow", () => {
@@ -586,7 +586,7 @@ describe("local span processor", () => {
     const output = formatProfileLines(report).join("\n");
     expect(report.signalStatus.spans).toBe("partial");
     expect(output).toContain("Collection and telemetry lifecycle issues detected.");
-    expect(output).toContain("operation : calls=2, total=0 s, avg=—, max=0 s, errors=0");
+    expect(output).toContain("operation : calls=2, total=0s, avg=—, max=0s, errors=0");
     expect(output).toContain("Additional diagnostic detail omitted (1 occurrence omitted).");
     expect(output).not.toContain("Duration summary excludes");
     expect(evaluateRepositoryProfileReport(report).status).toBe("fail");

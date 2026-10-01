@@ -8,6 +8,7 @@ import {
   formatProfileLines,
   formatSummaryLines,
 } from "../src/presentation/reporting/formatters.js";
+import { renderProfile } from "../src/presentation/reporting/profile-renderer.js";
 import {
   createStyling,
   styleRules,
@@ -167,11 +168,13 @@ if (mode[1] === "--compare-headings") {
     "\nA/C heading comparison: same synthetic data, order and one-space heading padding.",
   );
   console.error(
-    "Only the second namespace level's style differs; these are fixed comparison candidates.",
+    "Namespace depth is fixed at 2. Only the second namespace level's style differs; these are fixed comparison candidates.",
   );
   for (const [label, candidate] of candidates) {
     console.error(`\n${label}`);
-    for (const line of formatProfileLines(comparisonReport, candidate)) console.error(line);
+    renderProfile({ writeLine: (line) => console.error(line) }, comparisonReport, candidate, {
+      namespaceDepth: 2,
+    });
   }
 } else {
   // Compare Chalk primitives directly, independently of gitlode's semantic roles.

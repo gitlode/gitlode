@@ -466,3 +466,13 @@ Earlier entries in this handoff retain historical names. Attribute names now use
 attributeName role (default foreground, no decoration, zero padding); fixed field labels such
 as calls/total/avg remain dim. Other role decorations are unchanged. The source table and
 all presentation callers/tests use the new names; previews inherit them through the renderer.
+
+### Human-selected flat default and compact unit tokens
+
+The human's staged adjustments select namespaceDepth 0 and remove the space between measurement
+numbers and units. These are now the default layout and token formatting. Namespace grouping is
+intentionally retained for future experiments; removing that feature is a later decision, not part
+of this change. Explicit-depth regression tests retain coverage of grouped layouts, while a default
+formatter test covers flat absolute names and compact units. Historical A/C preview fixes depth 2
+so both compared heading levels remain visible; the ordinary preview uses the current defaults.
+Earlier entries retain historical defaults and do not supersede this choice.

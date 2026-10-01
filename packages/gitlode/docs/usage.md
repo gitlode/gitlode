@@ -398,7 +398,8 @@ Conflict rule:
 ### Profiling
 
 `--profile` appends a local diagnostic profile to stderr after a successful run. Spans, counters,
-and histograms share a generic Scope/namespace hierarchy rather than separate kind sections:
+and histograms share Scope groups, with full observation names directly below each Scope.
+Signal kinds are not separate sections.
 
 Collection and lifecycle issues are placed beside the narrowest safely identified target. If report
 construction itself fails, the ordinary Profile block reports whether validated measurements could

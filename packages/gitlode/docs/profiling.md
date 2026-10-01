@@ -14,27 +14,28 @@ sanitized warning and no Profile block.
 ## Generic hierarchy
 
 The view groups every retained Span, counter, and histogram by instrumentation Scope name and
-optional version. Within each Scope, by default the first two dot-separated observation-name segments form
-namespace levels; remaining segments form the observation row. The root namespace begins with `/`.
+optional version. Within each Scope, full observation names appear directly as rows with a `/`
+prefix; namespace grouping is disabled by default. Source-level namespace grouping remains
+available for layout experiments; see [CLI styling guidance](design/cli.md).
 Kinds are not separate sections or badges. Different kinds and repeated metric points with the
 same name remain independent rows, ordered by kind and typed attributes.
 
 For example:
 
+Illustrative plain output (including heading padding):
+
 ```text
-Profile
-  Scope: gitlode.git
-    /gitlode
-      git
-        commit.walk : calls=1, total=6.9 s, avg=6.9 s, max=6.9 s, errors=0
-        object.cache.lookup : 670 objects
-          adapter = isomorphic-git
-          object.purpose = materialize
+ Profile
+   Scope: gitlode.git
+     /gitlode.git.commit.walk  : calls=1, total=6.9s, avg=6.9s, max=6.9s, errors=0
+     /gitlode.git.object.cache.lookup  : 670objects
+      /gitlode.git.adapter = isomorphic-git
+      /gitlode.git.object.purpose = materialize
 ```
 
-Scopes, names, kinds, and typed attributes determine a stable code-unit order. Short names may
-carry measurements on a namespace line. A name that is also a namespace shows its attributes
-before child observations. Malformed-dot names and strings that could be confused with delimiters,
+Scopes, names, kinds, and typed attributes determine a stable code-unit order. If namespace
+grouping is enabled in source, short names may carry measurements on a namespace line, and a
+name that is also a namespace shows its attributes before child observations. Malformed-dot names and strings that could be confused with delimiters,
 booleans, or numbers are quoted and escaped. Unknown admitted names and plugin Scopes use the same
 rules; there is no Plugins or fallback bucket.
 
@@ -47,7 +48,8 @@ Explicit zero is preserved. An unavailable field is `—`, never a synthetic zer
 
 Durations use ns, µs, ms, or s; sizes use B, KiB, MiB, or GiB. Values use at most four significant
 digits, promote when rounding reaches the next unit, and use scientific notation where necessary so
-a nonzero value is never displayed as plain zero. Report values themselves are not rounded.
+a nonzero value is never displayed as plain zero. Measurement numbers and units are adjacent
+without a separating space (for example `6.9s`, `1KiB`, `670objects`). Report values themselves are not rounded.
 
 When collection or lifecycle issues exist, a compact notice follows the Profile title. Structured
 details appear at the narrowest evidenced report, Scope, observation, point, or attribute location.

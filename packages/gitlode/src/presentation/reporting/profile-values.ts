@@ -234,7 +234,7 @@ function exact(value: number, styling: Styling): string {
 
 function unit(value: number, canonicalUnit: string, styling: Styling): string {
   const formatted = formatUnit(value, canonicalUnit);
-  return styling.value(formatted.value) + styling.unit(` ${formatted.unit}`);
+  return styling.value(formatted.value) + styling.unit(`${formatted.unit}`);
 }
 
 function formatUnit(value: number, canonicalUnit: string): { value: string; unit: string } {

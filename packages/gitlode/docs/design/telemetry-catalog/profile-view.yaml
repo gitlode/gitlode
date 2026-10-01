@@ -18,7 +18,7 @@ generic_hierarchy:
   scope_label:
     version_present: "Scope: <scope-name>@<version>"
     version_absent: "Scope: <scope-name>"
-  namespace_segments_default: 2
+  namespace_segments_default: 0
   namespace_segments_source: src/presentation/reporting/profile-layout.ts
   namespace_segments_constraint: nonnegative_safe_integer
   zero_namespace_segments: absolute_observation_rows_under_scope
@@ -109,6 +109,7 @@ measurement_fields:
   average_requires_matching_positive_coverage: true
 
 unit_rendering:
+  number_unit_separator: none
   significant_digits: 4
   trailing_fractional_zeroes: remove
   promotion_after_rounding: true

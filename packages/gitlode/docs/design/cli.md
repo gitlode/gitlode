@@ -193,8 +193,9 @@ styled/plain comparisons must use `createStyling(true)` and `createStyling(false
 theme configuration, background detection or forced color is introduced. Namespace depth is a separate source parameter, outside this role-parameter table.
 
 Edit `profileLayout.namespaceDepth` in `src/presentation/reporting/profile-layout.ts` to set
-how many leading dot-separated segments form namespace levels (nonnegative safe integer, default 2).
-Build and rerun the CLI to apply it. Zero disables namespace grouping and emits absolute entry
+how many leading dot-separated segments form namespace levels (nonnegative safe integer, default 0).
+Namespace grouping remains available for later visual experiments; a flat default does not remove
+the grouping implementation. Build and rerun the CLI to apply it. Zero disables namespace grouping and emits absolute entry
 names directly under Scope. Remaining segments stay together on an observation row;
 names shorter than the limit carry values on their final namespace line. Measurements and
 diagnostic-only identities use the same tree construction. Heading styles depend only on display depth, for both namespace headings and entry names:

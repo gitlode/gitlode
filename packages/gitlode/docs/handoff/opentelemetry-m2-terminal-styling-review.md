@@ -1,5 +1,69 @@
 # M2 terminal styling: independent review
 
+## Bounded supervisor cleanup correction returned for focused review — 2026-10-01
+
+Implementation checkpoint: `97cab518ddd77667e56010ca1d902ded0f309c8d`, normal-pushed on
+`feature/otel-redesign_M2_styling`. Started clean at `c53206a1d480d2fdb47fc8f594923ab01264cce4`;
+HEAD, tracking and actual remote initially matched that checkpoint, so ancestry was equality.
+The implementation checkpoint was also independently read back from the actual remote with
+local/tracking equality and a clean worktree. The delivery commit adds only this continuation note.
+
+**Confirmed contract gap corrected; historical CI cause remains inconclusive.** The previous
+implementation could return after successful KILL/worker close without descendant completion.
+This correction does not establish or close the saved CI post-return `R` cause, instability,
+fixture-lifecycle issues, cumulative M2 acceptance or release acceptance. Independent focused review
+is pending; no self-acceptance, PR, merge, parent-ref update or formal measurement was performed.
+
+The state transition and guarantees are canonical in
+[execution supervision](../design/telemetry-performance.md#execution-supervision). Failure uses
+TERM → unchanged grace → KILL → bounded confirmation; normal protocol completion enters the same
+KILL/confirmation path. The existing cleanup-wait budget starts before KILL and includes signaling
+and observation, never restarting on worker close. Completion requires worker close and no live
+owned group member. `/proc` PID/group/start identities are retained against observed reuse; Z is
+quiescent, other states are live. IPC PIDs are diagnostic only. Errors remain terminal evidence,
+retain the original failure reason, and produce inconclusive/exit 2 with `cleanupConfirmed: false`.
+When close cannot be confirmed, child handles are released so the operator can return finitely;
+this does not claim the remaining process was cleaned. Scans run at launch identity capture and
+cleanup only. Sequential `/proc` observations are not atomic kernel snapshots; group escape,
+observation-to-signal races and uninterruptible kernel I/O remain explicit limits.
+
+Verification: one deterministic fail-before invocation on the original supervisor failed with
+zero group observations instead of the required barrier. Four incremental focused invocations
+followed actual code/test changes (no retry of an unexplained failure); the final two files passed
+**40/40**. Fake-clock cases cover delayed descendant exit, worker-first/last, normal completion,
+the full live-member budget, signal/observation errors, single-budget charging, identity mismatch,
+disappearance/reuse and Z. Terminal tests preserve cleanup errors and the original deadline failure,
+and exercise finite return despite a live worker whose process-table observation is denied.
+Linux OS tests use IPC readiness after grandchild TERM-handler registration, not a fixed startup
+sleep, and check no live owned member at successful supervisor return in all three paths.
+
+The real supervised entrypoint was invoked with isolated temporary protocol workers for normal,
+stall and abnormal failure, twice across implementation changes. Final exits were **0/2/2**;
+all three terminal snapshots confirmed cleanup, retained completed-pilot evidence and had no live
+owned descendants at return. Temporary worker source was restored byte-for-byte. Focused runs
+had 30/45-second outer deadlines; each entrypoint invocation had 15 seconds. The external runner
+tracked PID/start identities and cleaned only owned processes; no outer deadline fired or live
+owned process remained. This is protocol/cleanup verification, not a timed performance workload.
+Linux used the earlier diagnosis's Ubuntu 26.04/WSL2 kernel, Node 22.23.1, Git 2.53.0 and existing
+lockfile-compatible dependencies. Scoped strict TypeScript, build, lint, root format:write/check
+and diff check passed. The first lint identified this change's Promise-executor implicit return;
+it was corrected with the original log retained. No independent new validation failure was found.
+
+Evidence root: `/home/t-wakabayashi/gitlode-performance/m2-cleanup-20261001-c53206a`.
+`fail-before.log`, `focused-verified.log`, their outer-process audits,
+`entrypoint-final-{normal,stall,failure}/`, `entrypoint-final-results.json`, restoration/source audits,
+and `windows-validation/` retain commands, raw terminal artifacts, logs and strict-check config.
+Normalized source hashes match the verified Linux and delivered Windows files. The pre-CI
+`SHA256SUMS` anchor is `ed01f92ffdd4f8b9da96f4aa41d68c0b62223d3250af801d96c805591c56e480`;
+CI evidence is saved separately with its own manifest.
+
+Implementation [CI run 36831779393](https://github.com/gitlode/gitlode/actions/runs/36831779393)
+completed **success, attempt 1**, including source tests and installed-package tests; it was not
+rerun. Delivery-note CI is a separate push and its final observed status is reported on return.
+ENOTEMPTY, Windows timeout/EBUSY, the pre-existing Attributes typing issue and styling/visual gates
+remain separate open issues. Independent focused review must assess this correction and its
+observation limits; passing checks do not constitute acceptance or historical-cause closure.
+
 ## Trunk R1 closure and next assignment ? 2026-10-01
 
 R1 is **accepted** at `0256c71bc3e429c13e0dc0aa938514d87858fd1b`. Trunk inspected the entire

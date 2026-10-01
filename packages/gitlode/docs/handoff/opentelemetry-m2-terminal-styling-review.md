@@ -1,5 +1,44 @@
 # M2 terminal styling: independent review
 
+## Trunk R1 closure and next assignment ? 2026-10-01
+
+R1 is **accepted** at `0256c71bc3e429c13e0dc0aa938514d87858fd1b`. Trunk inspected the entire
+correction: only the two summary-test stubs changed to inherit plainStyling; callback overrides and
+assertions remain intact, with no production changes. The delta to outcome checkpoint
+`1e7d05215de678f7a8a9e0badd6f4008f0ff94a8` is documentation only. Trunk independently ran strict
+TypeScript for summary-formatters/styling tests and those two Vitest files: 8/8 passed. The reported
+first-attempt successful correction/outcome CI runs were not independently fetched during this closure.
+The earlier independent review remains historical evidence; its sole required correction is closed.
+Implementation review is accepted, not visual-environment, instability, cumulative M2 or release acceptance.
+
+Next assign a human-started **bounded supervisor diagnosis**, not a repair session. Stay on
+`feature/otel-redesign_M2_styling` for documentation delivery; use isolated Linux checkouts for probes.
+Compare entry `76486d25870172528ce9af086ace756388b6c8d8` and observed failure source
+`f0558856f018f24b5766d6ed8b5d241f9cb02747`. Begin from the saved attempt-2 failure and the detailed
+hypothesis below. Record available Node/Git/kernel versions and differences from CI; do not provision
+an exact historical environment without a demonstrated need.
+
+Run only the named grandchild test, at most three attempts per source (six total), with a finite
+outer deadline for each diagnostic invocation. Preserve the existing supervisor deadlines. Stop when
+useful evidence is obtained; do not rerun until green. Capture PID/PPID/PGID and process-start identity,
+TERM/KILL errors and timestamps, worker close, supervisor return and bounded post-return state history
+(up to one second). Preserve raw logs and instrumentation patches under a new unique evidence directory
+in D:/gitlode_test and/or the existing Linux evidence workspace; never overwrite previous archives.
+Temporary probes must be identified separately from product source and restored. Own and clean only
+processes/paths created for the probe. Do not run formal performance measurements or broad stress loads.
+
+Distinguish delayed signal observation from a surviving owned descendant, wrong PID/group, or failed
+signaling. Explain the consequence for the documented cleanup contract, not merely test timing.
+Return supported cause or inconclusive, evidence paths/hashes, actual attempt counts, recommended
+minimal correction and regression checks. No production/test fix, timeout relaxation, assertion
+weakening, PR or parent-ref update is authorized. Append a concise outcome here, commit/normal push,
+and return to trunk for a correction decision. Warn before Linux preparation/execution takes time.
+
+Linux ENOTEMPTY, Windows timeout/EBUSY, the entry-existing Attributes typing issue, GNOME and shared
+consumer visual gaps remain open separately. Do not infer harmlessness or closure from passing CI.
+After supervisor triage, trunk assigns fixture-lifecycle diagnosis; the PR remains pending their
+explicit disposition and the visual follow-up decisions. No new full-suite campaign is assigned here.
+
 ## Independent result returned to trunk — 2026-10-01
 
 **Corrections required.** One new validation blocker was independently reproduced (R1 below).

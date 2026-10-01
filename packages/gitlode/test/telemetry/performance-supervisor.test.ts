@@ -2,9 +2,10 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { writeAtomicJson } from "../../scripts/tooling/atomic-json.js";
+import * as processGroup from "../../scripts/tooling/performance-process-group.js";
 import {
   supervisePerformance,
   supervisionOptions,
@@ -14,6 +15,7 @@ import {
 
 const directories: string[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const directory of directories.splice(0))
     await rm(directory, { recursive: true, force: true });
 });
@@ -81,6 +83,106 @@ describe("supervision options", () => {
 });
 
 describe.skipIf(process.platform !== "linux")("Linux process supervision", () => {
+  it("requires group quiescence after normal completion rather than signal success", async () => {
+    let observations = 0;
+    vi.spyOn(processGroup, "observeProcessGroup").mockImplementation((group) => {
+      observations++;
+      return observations < 4 ? [{ pid: group + 1, group, start: "123", state: "S" }] : [];
+    });
+    const result = await run(complete(0));
+    expect(observations).toBeGreaterThanOrEqual(4);
+    expect(result.evidence).toMatchObject({ status: "completed", cleanupConfirmed: true });
+  });
+  it.each(["live", "observation", "identity", "signal"])(
+    "persists cleanup uncertainty on normal completion: %s",
+    async (mode) => {
+      if (mode === "signal") {
+        const kill = process.kill.bind(process);
+        vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+          if (pid < 0 && signal === "SIGKILL")
+            throw Object.assign(new Error("denied"), { code: "EPERM" });
+          return kill(pid, signal);
+        });
+      } else {
+        vi.spyOn(processGroup, "observeProcessGroup").mockImplementation((group) => {
+          if (mode === "observation") throw new Error("unreadable");
+          return [{ pid: group, group, start: "0", state: "S" }];
+        });
+        // A distinct PID supplies a genuinely live member without mismatching the leader.
+        if (mode === "live")
+          vi.mocked(processGroup.observeProcessGroup).mockImplementation((group) => [
+            { pid: group + 1, group, start: "123", state: "S" },
+          ]);
+      }
+      const result = await run(complete(0));
+      expect(result).toMatchObject({
+        exitCode: 2,
+        status: "inconclusive",
+        failure: "process-cleanup-failed",
+      });
+      expect(result.evidence.cleanupConfirmed).toBe(false);
+      expect(result.evidence.cleanupErrors.length).toBeGreaterThan(0);
+      if (mode !== "signal")
+        expect(result.evidence.cleanupErrors).toContain("group-quiescence-not-confirmed");
+    },
+  );
+  it("retains the original deadline failure alongside signal errors", async () => {
+    const kill = process.kill.bind(process);
+    vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+      if (pid < 0 && signal === "SIGKILL")
+        throw Object.assign(new Error("denied"), { code: "EPERM" });
+      return kill(pid, signal);
+    });
+    const result = await run(`${send("execution")}setInterval(()=>{},1000);`);
+    expect(result.evidence).toMatchObject({
+      failure: "execution-deadline-exceeded",
+      cleanupConfirmed: false,
+      cleanupErrors: ["group-SIGKILL-failed"],
+    });
+    expect(result.exitCode).toBe(2);
+  });
+  it("returns finite uncertainty even when observation prevents signaling a live worker", async () => {
+    const identify = processGroup.processIdentity;
+    let identity: processGroup.ProcessIdentity | undefined;
+    vi.spyOn(processGroup, "processIdentity").mockImplementation((pid) => {
+      identity = identify(pid);
+      return identity;
+    });
+    vi.spyOn(processGroup, "observeProcessGroup").mockImplementation(() => {
+      throw new Error("injected unreadable process table");
+    });
+    try {
+      const result = await run(`${send("execution")}setInterval(()=>{},1000);`);
+      expect(result.evidence).toMatchObject({
+        status: "inconclusive",
+        failure: "execution-deadline-exceeded",
+        cleanupConfirmed: false,
+      });
+      expect(result.evidence.cleanupErrors).toContain("worker-close-not-observed");
+      expect(result.evidence.cleanupErrors).toContain("group-quiescence-not-confirmed");
+    } finally {
+      vi.restoreAllMocks();
+      if (identity) {
+        // This test deliberately denies cleanup; reclaim only its captured owned identity.
+        const current = identify(identity.pid);
+        expect(current.start).toBe(identity.start);
+        expect(current.group).toBe(identity.group);
+        const group = new processGroup.GroupCompletion(identity);
+        const errors: string[] = [];
+        expect(
+          await processGroup.completeProcessGroup({
+            budgetMs: limits.cleanupWaitMs,
+            force: () => {
+              process.kill(-current.group, "SIGKILL");
+            },
+            observe: () => group.observe(processGroup.observeProcessGroup(current.group)),
+            closed: () => true,
+            errors,
+          }),
+        ).toBe(true);
+      }
+    }
+  });
   it.each([0, 2])(
     "keeps a completed workflow exit %i distinct from performance acceptance",
     async (code) => {
@@ -205,28 +307,43 @@ describe.skipIf(process.platform !== "linux")("Linux process supervision", () =>
     expect(await readFile(join(result.directory, "completed-pilot.json"), "utf8")).toBe("{}");
     expect(JSON.stringify(result.evidence)).not.toContain(result.directory);
   });
-  it("kills an owned grandchild that ignores TERM when the worker exits first", async () => {
-    const result = await run(
-      `const {spawn}=require('node:child_process');const child=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],{stdio:'ignore'});process.send({type:'performance-child',pid:child.pid});setTimeout(()=>{${send("execution")}while(true){}},100);`,
-    );
-    expect(result.evidence.failure).toBe("execution-deadline-exceeded");
-    const pid =
-      result.evidence.current.pid ??
-      result.evidence.events.findLast((event: { progress: { pid?: number } }) => event.progress.pid)
-        ?.progress.pid;
-    // The PID message precedes the stage here; use the progress output to locate the owned child.
-    const childPid =
-      pid ??
-      Number(result.messages.find((line) => /child=\d+/.test(line))?.match(/child=(\d+)/)?.[1]);
-    expect(childPid).toBeGreaterThan(0);
-    let state = "missing";
-    try {
-      state = (await readFile(`/proc/${childPid}/stat`, "utf8")).split(") ")[1]!.split(" ")[0]!;
-    } catch {
-      /* A reaped process is already gone. */
-    }
-    expect(["missing", "Z"]).toContain(state);
-  });
+  it.each(["worker-first", "worker-last", "normal-completion"])(
+    "cleans a ready TERM-resistant grandchild: %s",
+    async (order) => {
+      const result = await run(
+        `const {spawn}=require('node:child_process');
+      ${order === "worker-last" ? "process.on('SIGTERM',()=>{});" : ""}
+      const child=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});process.send('ready');setInterval(()=>{},1000)"],{stdio:['ignore','ignore','ignore','ipc']});
+      child.once('message',()=>{process.send({type:'performance-child',pid:child.pid});child.disconnect();child.unref();${order === "normal-completion" ? complete(0) : `${send("execution")}setInterval(()=>{},1000);`}});`,
+      );
+      expect(result.evidence.failure).toBe(
+        order === "normal-completion" ? undefined : "execution-deadline-exceeded",
+      );
+      expect(result.evidence.cleanupConfirmed).toBe(true);
+      expect(
+        processGroup
+          .observeProcessGroup(result.evidence.workerPid)
+          .filter((member) => member.state !== "Z"),
+      ).toEqual([]);
+      const pid =
+        result.evidence.current.pid ??
+        result.evidence.events.findLast(
+          (event: { progress: { pid?: number } }) => event.progress.pid,
+        )?.progress.pid;
+      // The PID message precedes the stage here; use the progress output to locate the owned child.
+      const childPid =
+        pid ??
+        Number(result.messages.find((line) => /child=\d+/.test(line))?.match(/child=(\d+)/)?.[1]);
+      expect(childPid).toBeGreaterThan(0);
+      let state = "missing";
+      try {
+        state = (await readFile(`/proc/${childPid}/stat`, "utf8")).split(") ")[1]!.split(" ")[0]!;
+      } catch {
+        /* A reaped process is already gone. */
+      }
+      expect(["missing", "Z"]).toContain(state);
+    },
+  );
   it("rejects malformed stage identity and records an inconclusive result", async () => {
     const result = await run(
       `process.send({type:'performance-stage',progress:{stage:'execution',operation:'/tmp/private-path'}});setInterval(()=>{},1000);`,

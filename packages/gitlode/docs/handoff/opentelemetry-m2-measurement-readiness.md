@@ -486,3 +486,68 @@ residue alongside the existing abrupt-runner limit. Neither is an additional req
 No full suite, package/OS campaign, formal measurement or historical failure reproduction was run.
 No PR, merge, parent-ref update, freeze or acceptance-record update occurred. This is focused review
 only and does not establish F, T13B, M2 or publish acceptance; trunk receives the unresolved R2 report.
+
+## R2 correction outcome (2026-10-02, trunk limited-diff review pending)
+
+Started clean on `feature/otel-redesign_M2_readiness` at
+`f8ef0bda04b5ed4fe41a5029036bbd0af96dab68`. Implementation checkpoint is `93a359d`;
+the final documentation checkpoint and local/tracking/actual-remote equality are recorded in the
+session return, avoiding a self-referential OID here. Changed paths are the workflow test, the harness
+guide's failure-policy paragraph, and this outcome only.
+
+R2 replaces the failure catch's stream write with a small synchronous `writeSync(2, message)` inside
+a local try/catch, followed by rethrow of the original error object. The test-local writer seam adds
+no production abstraction. Notification is best effort: its exception neither replaces the original
+failure nor deletes retained files, and this path enqueues no asynchronous stream error. Unavailable
+stderr does not guarantee a retained-path announcement; partial writes, blocked synchronous I/O and
+host abnormalities do not receive universal notification or exit guarantees. No retries, fallback
+destinations, logging framework or global stream handler were added. Retention registration, cleanup
+barrier, normal/stall assertions and nested Vitest selection/timeouts remain unchanged.
+
+Two local regression cases check the emitted locations on success, deterministic writer failure,
+single invocation, original-error reference identity and unchanged retained file contents. They do
+not break runner stderr. The existing nested before/after-removal probes still establish retention
+after actual failed-test teardown, using healthy captured stderr and the real default synchronous
+write. Ordinary runner/host-loss and storage/removal limitations recorded above remain in effect.
+
+Reported execution used native Linux clone
+`/home/t-wakabayashi/gitlode-performance/m2-r2-f8ef0bd/source`, asserted at the exact starting OID,
+with explicitly copied changed files and the existing Linux node_modules symlink. Node v22.23.1,
+npm 10.9.8, Git 2.53.0, WSL2 Linux 6.18.33.1, ext2/ext3 and 948 GiB available were observed.
+PATH explicitly selected native tools and NODE_OPTIONS was unset. Sandbox WSL access returned
+E_ACCESSDENIED before workloads; authorized elevated execution succeeded. Fresh external-launcher
+preflight preceded clone/validation: 2-second deadline, 2053 ms return, exit 124/SIGKILL, retained
+log/result, no live observed owned processes. Launcher SHA-256 and its bounded disposable-case
+limitations remain those recorded above; this is not performance or environment acceptance.
+
+Exact configurations/logs use `node <root>/tools/run.cjs <root> <stage> <seconds> <command> <args>`
+with owned `TMPDIR=/tmp/gl-r2-f8ef0bd`:
+
+| Validation                                                                                                                                      | Outer seconds | Result                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------: | ------------------------------------------------------- |
+| `npm run format:write`                                                                                                                          |           180 | 0; formatted changed bytes copied back                  |
+| `npx vitest run packages/gitlode/test/telemetry/performance-workflow.test.ts -t 'preserves the original failure when diagnostic writing fails'` |           120 | 0; 2 passed, 18 skipped                                 |
+| `npx vitest run packages/gitlode/test/telemetry/performance-workflow.test.ts packages/gitlode/test/telemetry/performance-supervisor.test.ts`    |           180 | 0; 2 suites / 51 tests, including both retention probes |
+| `npx tsc -p .cache/readiness-tsconfig.json --listFiles --pretty false`                                                                          |           120 | 1; only existing four TS2542 at 385/659/665/671         |
+| `npm run lint`; `npm run format:check`; `git diff --check`                                                                                      |  180; 180; 30 | 0; 0; 0                                                 |
+
+The strict non-emitting config extends tsconfig.base.json and roots at the changed test. Its imported
+closure is 277 files, equal after native-root normalization to the saved fixed-checkpoint R1 review
+closure. Comparison reuses that prior log (not a new baseline execution); the four readonly mutations
+correspond to its 343/617/623/629 diagnostics and remain separate unresolved work. There are no new
+diagnostics; this is not a green whole-test typecheck. No new dependency or architecture boundary
+requires a repeated full build/package/OS campaign. No formal workload was run.
+
+Sealed archive: `.cache/m2-r2-f8ef0bd/evidence/linux`, 40 entries; manifest SHA-256
+`e626bb764ba72231238a761b88d24dca89c2b391eb8597c38f612998b1cd49d1`.
+All returned files and manifest were hash-checked against native originals. Final executed test,
+saved test and workspace bytes share SHA-256
+`5da23fd1c1a10ba90acb82bf4d55045054007aca310ba062ac177343153463dd`.
+These are local copies, not external backup; do not append to the sealed archive. Post-validation
+owned TEMP has runtime caches and no workflow fixture roots; scoped launcher-group observation
+found no live members. Old archives/residue were preserved. Final document formatting and Git return
+records are separate under `.cache/m2-r2-f8ef0bd`.
+
+R2 has limited implementation and regression evidence and awaits trunk's limited-diff review.
+No PR, merge, parent-ref update, freeze, formal measurement or acceptance update was performed.
+This outcome does not establish F, T13B, M2 or publish acceptance.

@@ -775,3 +775,65 @@ Remaining: a corrected, separately verified evidence launcher and separately ass
 installed/outside/inside checks, Linux combined chain, and both consumer identities. Implementation
 review remains acceptable; full system acceptance, T13B/T13C, formal measurement and publication are
 outside this return. Only this handoff document is committed; no PR/merge or parent ref update occurs.
+
+## System evidence recovery continuation (2026-10-02)
+
+Continued on `feature/otel-redesign_M2_system` from `c79ed354c53e60feffc0190a603ee2e59a88aab2`,
+with product fixed at `f024edacff073be4f7438dbb3fb1f31cc0f8ba45`. Only this plan changes.
+Original evidence, sealed manifests and excluded historical hashes remain unchanged; no old-hash
+cause investigation or acceptance-record update occurred.
+
+New aggregate evidence: `.cache/m2-system-recovery-c79ed35/evidence`; Linux execution root:
+`/home/t-wakabayashi/gitlode-performance/m2-system-recovery-c79ed35`.
+The corrected evidence-only spawn wrapper returns the original ChildProcess and synchronizes ESM
+built-in exports. Both OS disposable checks passed ChildProcess return, deferred close, error,
+stdout/stderr, zero/nonzero exit and npm startup. A disposable consumer-shaped child confirmed no
+snapshot before close, synchronous snapshot completion at close and exclusion of unrelated installs.
+The real trigger requires consumer manifest name, unchanged TypeScript request and tarball argument.
+It adds synchronous copies and a bounded tsc --version call on successful install close only.
+Probe bytes, configurations and impacts are preserved; product/runner/fixtures/assertions and
+version policy are unchanged.
+
+Outer launchers have no NODE_OPTIONS; original options are recorded, and probe environment is
+supplied only to target children. Deadline termination uses unpatched outer child_process, Windows
+owned-tree taskkill or Linux detached-group SIGKILL. A Windows disposable deadline killed its owned
+tree (taskkill exit 0, launcher PID absent). The first eval-based disposable setup failed syntax
+through Volta argument handling; the file-backed correction passed. This deadline check occurred
+after product execution, not before; Linux group termination was not exercised by a deadline.
+
+| Execution                                  | Result                                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Windows prior npm ci/build:release/publint | Reused without rerun: clean fixed checkout; all 13 retained packed files equal existing product bytes                       |
+| Windows canonical root test:system:package | One corrected launch, exit 0, 600s deadline; both adapters returned 2 records                                               |
+| Windows actual outside TEMP with spaces    | Passed; sentinel preserved; installed-package fixture removed                                                               |
+| Windows actual inside TEMP with spaces     | One expected rejection, exit 1; sentinel preserved; no runner fixture or consumer snapshot                                  |
+| Linux preparation                          | New genuine clone at fixed OID, 425 tracked files, clean diff/status; fresh npm ci exit 0, 600s timeout with 15s kill-after |
+| Linux validate:release                     | One corrected-condition launch, exit 0, 1200s deadline; complete chain, 96 files / 1312 tests                               |
+
+Linux reused no copied dependencies. After successful disposable checks and ci, a generated shell's
+last-line CR appended to the launcher configuration path caused preparation failure before the chain
+started. Direct invocation of the existing JSON launched the chain once; ci was not repeated.
+Both prior failed Linux chains remain preserved. Full logs/exits/deadlines and post-run snapshots
+are retained. Windows Node/npm remain v22.23.1/11.11.0; Linux v22.23.1/10.9.8.
+
+Both real consumers retain manifest, lockfile, installed TypeScript manifest and tsc --version:
+7.0.2 on both OSes. Each identity.json binds the actual consumer and original pack path to saved
+installed tarball bytes. Windows SHA-256:
+`03185e8b10f01027f0c69125df56464ecea4dc2eb2e36c7f2d65ee0d28ee9bcf`;
+Linux SHA-256: `82020e9acf0c616e08b04341bf157a32c31819bc21b0f2b1c82c1444f334f1d8`.
+
+Windows inside TEMP contains tsx and Node compile caches, distinguished from absent runner fixtures.
+No matching owned product children or installed-package fixture remained on either OS. Linux's TEMP
+listing additionally retains `gitlode-performance-vy7lhL` with repository/config/state/output entries.
+Its disposition is unresolved. It remains unchanged as a stop-boundary observation; no rerun,
+deletion, assertion change or cause investigation followed. Trunk should assess this residual and
+the supervision-preflight ordering limitation before closing evidence completion. No self acceptance,
+T13B/T13C acceptance, formal measurement or publication is claimed.
+
+After all evidence writes, the aggregate manifest sealed 60 entries, SHA-256
+`25efe7790ef39e8a9d4ab332b092eb8269f57caf001a739fd0a68a5933b1466c`.
+All entries verified at generation and at copy destination
+`.cache/m2-system-recovery-return-c79ed35/evidence`. These are local copies, not external backup.
+No sealed log is appended. Later document/checkpoint outputs remain outside the evidence root.
+Document-only formatting/check and diff check precede ordinary system-branch commit/push;
+no PR/merge, parent-ref update, release or acceptance-record change occurs.

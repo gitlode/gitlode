@@ -2,8 +2,10 @@
 
 ## Status and boundaries
 
-Styling implementation and corrections are accepted; the next step is human-approved squash into
-profile, not another styling session. See the [accepted review and remaining observations](opentelemetry-m2-terminal-styling-review.md).
+Styling implementation and corrections are accepted and human squash-integrated by PR #112 at
+`f4d90d1ce1828c2f06abc9684bcc10006b09e7cd`, with exact source-tree correspondence. Source history is
+preserved at `archive/otel-m2-styling-1d97c99`. Next is cumulative profile validation; follow the
+[current packet](instrumentation-opentelemetry-recovery-plan.md#current-assignment-cumulative-profile-functionalpackage-validation). See the [accepted review and remaining observations](opentelemetry-m2-terminal-styling-review.md).
 On 2026-10-02 the human confirmed completed sample/real-repository checks are sufficient to proceed;
 no additional shared-consumer visual sample gates this integration. GNOME light/dark remains M2
 pre-release work. A reusable comprehensive dummy-data sample is future tooling, not a release blocker.

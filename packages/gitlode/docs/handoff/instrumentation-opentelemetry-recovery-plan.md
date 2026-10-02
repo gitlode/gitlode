@@ -83,12 +83,17 @@ Windows Profile evidence is not relabeled as proof of every role/terminal. GNOME
 an explicit M2 pre-release check, preferably before candidate freeze. A reusable dummy-data display
 sample is a useful future maintenance task, not a new integration or release gate.
 
-Current step: prepare human-approved squash from `feature/otel-redesign_M2_styling` into
-`feature/otel-redesign_M2_profile` (base `76486d25870172528ce9af086ace756388b6c8d8`). Before PR creation,
-confirm actual remote source/base and request explicit permission. After human merge, verify source
-content correspondence and record the squash mapping. Then assign cumulative Windows/Linux source
-and installed-package validation for the complete profile candidate, followed by human-approved
-profile-to-M2 squash. Existing successful evidence can be reused only with explicit delta assessment.
+PR #112 was human squash-merged into profile at
+`f4d90d1ce1828c2f06abc9684bcc10006b09e7cd`, parent
+`76486d25870172528ce9af086ace756388b6c8d8`. Trunk verified GitHub merge state and actual remote/local
+profile equality. Its tree `d68714d0b1e4b4c7820f71d12349b2817c190291` exactly matches source
+`1d97c9941f87bff6013ee411800f70ee91b42e5a`. Local/remote archive
+`archive/otel-m2-styling-1d97c99` preserves that source and all reviewed ancestors. The human may
+now delete local/remote `feature/otel-redesign_M2_styling`; preserve the archive. No branch was deleted
+by trunk. Equal trees preserve content attribution, not rewritten measurement ancestry.
+
+Current step: the cumulative profile validation packet below, then human-approved profile-to-M2
+squash. Planning stays on `feature/otel-redesign_M2_profile`. No PR is authorized yet.
 
 Linux ENOTEMPTY and Windows timeout/EBUSY remain unresolved observations; bounded investigations
 ended without supported fixes. Do not launch further reproduction campaigns or retry until green.
@@ -293,3 +298,48 @@ Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementa
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
 chooses squash/merge strategy and performs the merge or branch deletion. Current work is styling-to-profile integration preparation; later sessions need fixed inputs and
 trunk handoff. No PR is authorized until the human approves its explicit source/base.
+
+## Current assignment: cumulative profile functional/package validation
+
+Human starts a separate validation conversation. Fixed candidate:
+`f4d90d1ce1828c2f06abc9684bcc10006b09e7cd`. Verify its tree and source/archive mapping above,
+current planning ancestry and documentation-only delta before work. Do not validate a moving branch.
+Use clean isolated Windows and Linux-native/ext4 checkouts at that OID. Keep Windows TEMP outside
+the checkout, and record Linux fixture filesystem, versions and commands. Do not switch the planning
+worktree away from profile. This is not formal performance candidate freeze or T13B measurement.
+
+Before the potentially lengthy environment/build/test work, inform the human. At each platform:
+
+- Install the pinned dependencies with npm ci. Run canonical `npm run validate:release` from the root;
+  it includes root source tests, architecture/lint/schema/format, release build, publint and the
+  installed-package system test. Do not run `npm run release` or any publish command.
+- Verify checked production TypeScript separately if incremental build/configuration does not prove
+  it; follow the existing build guidance and M1 evidence's production-check method. The existing
+  tooling noCheck boundary is not production evidence and is not a new all-test typing assignment.
+- Capture full logs, exits, test counts/skips, environment and source identity. Windows Linux-only
+  skips are expected but must be enumerated; Linux skips/failures require explicit assessment.
+- Pack and preserve the final release output with hashes and bind it to package checks. Do not
+  silently rebuild development output between successful release validation and package capture.
+  Reuse the existing package-validation mechanism to establish the captured package's correspondence;
+  if it repacks, verify bytes rather than asserting that separate packs must be identical.
+
+Use a unique new evidence root under D:/gitlode_test and the established Linux evidence workspace;
+preserve commands/configs, candidate bundle, logs, package hashes and a verified manifest. Never
+overwrite M0/M1 or diagnostic evidence. This stage need not create another immutable performance
+runtime archive: later F owns that after tests/system and history stabilization. Do not relabel CI or
+old M1 evidence as fresh cumulative candidate evidence.
+
+Stop on product/test failure, retaining the first failure, exact source/dirty state, fixture/process
+ownership and cleanup evidence where safely available. In particular preserve Linux ENOTEMPTY or
+Windows timeout/EBUSY evidence; no retry-until-green or speculative fixes. A demonstrable environment
+permission/setup failure may be repaired and the affected command rerun with both logs retained;
+state why it is not a product assertion failure. No timeout relaxation, code fixes, formal calibration,
+extra stress campaign, GNOME setup or display sample is assigned. Use finite outer run limits based
+on the commands, document them, and safely clean only owned processes if they fire.
+
+Return results in the existing styling return packet as a concise cumulative-validation section,
+including exact candidate, command/evidence mapping, manifest hash, failures/skips and residual gates.
+Update only continuation status as warranted; do not self-accept M2 or unblock the acceptance record.
+Run format:write/check and diff check for documentation, commit/normal push on profile and verify
+local/tracking/actual remote equality and clean status. No parent-ref update, PR, merge, branch deletion
+or release action. Trunk assesses evidence and prepares profile-to-M2 integration afterward.

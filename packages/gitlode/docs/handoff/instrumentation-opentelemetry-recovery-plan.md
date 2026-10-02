@@ -579,3 +579,114 @@ any further Windows execution; decide the bounded follow-up for complete validat
 with Git metadata and exact transient consumer compiler identity. These missing checks are neither
 passes nor release exceptions. ENOTEMPTY/EBUSY/timeout and existing Attributes issues remain outside
 this slice. This implementation is not T13B/T13C acceptance or publish readiness.
+
+## Independent first system review (2026-10-02)
+
+Verdict: **implementation acceptable**, with no mandatory implementation findings. Acceptance of
+the complete system slice remains pending the incomplete evidence below. This review changes only
+this plan; it does not repair implementation, complete missing acceptance runs, update the acceptance
+record, or authorize PR/merge, parent-ref updates, formal measurements or publication.
+
+Reviewed the complete `1b2177bbc9027e990eb32fd243dc306cd67bac79` ->
+`f024edacff073be4f7438dbb3fb1f31cc0f8ba45` diff, including executable checkpoint
+`a3dacf474797874cba58bc1fc63f9d24987686b6` and all canonical documentation changes.
+Each named checkpoint is the direct parent of the next; handoff
+`a32030ffa271d07668a374988000ae386cc32e30` is the direct descendant of f024eda and changes
+only this plan. At review entry, HEAD/tracking/actual remote matched a32030f, the single worktree
+was clean, and the branch was `feature/otel-redesign_M2_system`. Applicable root AGENTS and the
+system proposal/outcome, architecture/domain and build/test/release guidance were read.
+
+### Implementation assessment
+
+- The rename diff preserves the entire fixture/assertion/child execution/finally body. Roots now
+  resolve from the runner location; pack, installation, Git and CLI calls retain explicit cwd,
+  argument arrays and npm_execpath handling. No fixture or consumer API policy changed.
+- Realpath containment checks the existing temp parent before mkdtemp. Equality, descendants and
+  `..prefix` inside the checkout are rejected; sibling prefixes, spaces and Windows drive changes
+  are handled by path.relative/isAbsolute and the platform separator. Finally removes only the
+  newly created fixture root. Cancellation/locks retain the documented existing lifecycle limits.
+- The private workspace declares only its five development tools. No product/internal imports,
+  runtime dependency, product build reference or new packaging input was introduced. The lockfile
+  changes only root workspace membership, its link and manifest entry; no resolved version churn.
+  Saved packed manifest/inventory and the independently hashed tarball confirm 13 product files,
+  no system tooling files and no private runtime dependencies. Hash matches the outcome above.
+- The sole owned TS runner is included in the independently checked project. Effective options are
+  strict NodeNext, noCheck false, noEmit true and composite false, with indexed/unused checks and
+  no references/aliases or type-suppression comments. Inherited skipLibCheck true concerns library
+  declarations; the unchanged generated public consumer separately uses skipLibCheck false.
+- Rev-dep adds a closed local-only system boundary and workspace checks without weakening existing
+  product boundaries. A disposable-copy negative import independently produced the root
+  `[system-tests] ... -> packages/gitlode/src/index.ts (NOT ALLOWED)` violation. Filesystem reads
+  and generated consumer text remain the explicit reviewed exceptions, not static-import guarantees.
+- Root/product/workspace delegation has no cycle or duplicate runner. Explicit early typing plus
+  standalone package-command typing is intentional. Existing development builds precede release
+  bundling; no development build intervenes before publint/pack. CI/validate retain existing checks
+  and add typing; neither routes to formal measurement or publish. C6 canonical ownership and
+  separately reviewed post-release retirement preserve lasting checks and the migration gate.
+
+Optional documentation precision: the no-directory-leak statement describes the runner's fixture
+creation. The tsx launcher can create its own `tsx-1000` cache in an inside-checkout TMPDIR before
+the runner rejects it. Clarifying that distinction would avoid implying launcher-wide no-write
+behavior; it is not a leaked installed-package fixture or unsafe cleanup of existing data.
+
+### Evidence provenance and limitations
+
+Independent executions used the existing isolated Linux source/dependencies at the outcome's path,
+not shared Windows node_modules. Node v22.23.1, npm 10.9.8 and checked-project TypeScript 7.0.2
+were recorded. Core manifest/lock/config/runner bytes matched the fixed shared implementation.
+Strict typing, effective config/file enumeration, the disposable negative import and seven win32
+predicate cases passed. The unchanged runner, executed with Node type stripping from unrelated
+`/tmp` cwd, rejected both inside and symlink-inside space-containing temp parents before fixture
+creation and preserved sentinel data. These are finite probes, not Windows installed-package runs.
+Review logs are local at `.cache/m2-system-review/`; disposable Linux probes remain at the path
+recorded in `probe-path.txt`. The original isolated source and shared dependencies were not repaired.
+
+Probe preparation failures were distinguished from product failures: an incorrect Rev-dep binary
+path failed before analysis; a first tsx probe observed its launcher cache; a subsequent Node probe
+still contained the intentional negative import. After correcting only disposable probe setup and
+restoring the copied runner, the final checks above passed. No npm ci or full suite was rerun.
+
+Saved-log inspection confirms the first Windows npm ci unlink EPERM on the oxlint native module,
+Linux local validate:release stopping at schema's missing-.git prerequisite, successful Linux
+test:package alias/delegation and installed assertions, and the saved strict/negative-import results.
+The Windows process snapshot does not identify the locking process or prove an ACL diagnosis.
+The transient consumer compiler version remains unknown; the workspace compiler version and bundle
+compiler log cannot substitute for it. Historical outside-temp success is saved-log evidence.
+
+Live GitHub job/step and full-log inspection of
+[CI run 36971594821](https://github.com/gitlode/gitlode/actions/runs/36971594821) confirms checkout
+a32030f on Ubuntu 24.04.5, Node v22.23.3/npm 10.9.9, successful dependency/format/lint/type/architecture/
+schema checks, 96 source files / 1312 tests, release build, publint and canonical installed check.
+This descendant has identical implementation to f024eda. CI is independent hosted evidence, not
+local review execution or a successful invocation of the combined validate:release command.
+Outcome-reported claims were not promoted to independently executed results merely by repetition.
+
+The saved `evidence-hashes.json` matches 21 of 24 listed files; `final-ci.json`,
+`preservation-check.cjs` and `preservation-check.log` differ from their listed hashes. Their saved
+bytes are not treated as checksum-attested historical evidence, and the cause is not established.
+Live CI inspection and a fresh Git-base comparison independently confirm the CI/manifest/runner
+claims used in this verdict. Preserve the original hash list and reconcile these three entries in
+the evidence follow-up rather than overwriting the list or inferring historical integrity.
+
+### Minimal separately assigned completion
+
+1. Windows: preserve the first failure and diagnose the native-module lock/permissions without
+   deleting or repairing shared node_modules. Use a fresh isolated checkout at the fixed reviewed
+   source, record Node/npm/Git identities, and perform one clean installation after diagnosis.
+   Then run build:release, validate:publint and the canonical installed-package command once in
+   order, preserving exits, package inventory/hash and cleanup observations. Include a real
+   space-containing outside temp path and bounded inside rejection with existing data preserved.
+   Stop and return any failure; do not retry automatically or add the full suite.
+2. Linux: restore genuine fixed-revision Git metadata to the existing isolated source from the
+   preserved bundle, verify the complete tracked source and clean status against f024eda, and
+   reuse the already installed dependencies only after identity checks. Run validate:release once
+   and retain its full log/exits and package identity. This is the explicitly deferred combined-chain
+   completion; successful CI constituent checks do not erase the original local failure.
+3. For those future consumer executions, use an evidence-only launcher/probe to record the actual
+   installed consumer typescript/package.json version and tsc --version before cleanup, together
+   with its consumer lockfile and tested tarball hash. Do not pin a new version, infer the old
+   consumer's version, or change fixture/assertion semantics to manufacture evidence.
+
+Windows installed execution, Linux combined-chain completion and exact consumer compiler attribution
+remain incomplete. No implementation correction is required by this review; system acceptance,
+T13B/T13C and publish readiness remain separate and unaccepted here.

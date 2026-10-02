@@ -1,5 +1,67 @@
 # M2 terminal styling: independent review
 
+## Bounded existing Windows timeout/EBUSY evidence review — 2026-10-02
+
+**Inconclusive; original Windows failure log not found within the authorized scope.** Entry was
+`ae59da12e4ef155c25e662a1b4c196b6ca4804c5` on `feature/otel-redesign_M2_styling`, clean, with
+local/tracking/actual remote equality. No implementation change or new test invocation was made.
+
+| Classification                  | Evidence and limits                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Confirmed document/source facts | The return packet's “Verification and remaining return steps” reports the event; this review already records that the original Windows failure log was unavailable. The report first appears in the packet rewrite at `f0558856f018f24b5766d6ed8b5d241f9cb02747`. Catalog correction `8123fb5b61f25398e713f4f0c94d71e7f7d5e86f` changes only `test/support/telemetry-catalog.ts`, `test/telemetry/catalog-contract.test.ts` and `test/presentation/reporting/profile-view-drift.test.ts` under `packages/gitlode`. Its diff corrects obsolete fixed-depth validation, not fixture cancellation or cleanup. |
+| Report only                     | At the catalog-fix stage, one preceding Windows run encountered a 5-second repository-fixture timeout and EBUSY cleanup; a subsequent root `npm test` passed 95 files / 1277 tests / 17 skipped. “Transient” and “isolated full rerun” are the packet's descriptions, not independently established lifecycle facts. The packet also reports removal of owned failed-run temporary directories without identifying them.                                                                                                                                                                                   |
+| Unknown                         | Original failing test file/name, execution OID and dirty-tree state, exact command/arguments/cwd, timeout type/configuration, exit code, EBUSY syscall/path/stack, timestamped timeout-to-cleanup order, fixture creator/users, cleanup owner/target, and cancellation/disposal/child completion are unavailable. The successful run's association with `8123fb5` and `npm test` does not establish the failed run's source or command.                                                                                                                                                                    |
+
+### Search boundary and log/source/test correspondence
+
+Read both named styling handoffs, searched `packages/gitlode/docs/handoff/` for the reported event,
+and inspected related styling history from `76486d2` through entry, including packet history and
+the catalog correction diff. Evidence inspection was limited to the explicitly named roots:
+
+- `D:/gitlode_test/m2-fixture-20261002-68daa1f` and
+  `D:/gitlode_test/m2-supervisor-20261001-c6aa33e-7f3b`: inspected artifact filenames and searched
+  saved log/text/JSON/manifest evidence, excluding dependency and retained checkout trees.
+- `/home/t-wakabayashi/gitlode-performance/m2-cleanup-review-20261001` and
+  `/home/t-wakabayashi/gitlode-performance/m2-cleanup-20261001-c53206a`: confirmed both exist and
+  searched saved log/text/JSON files for EBUSY, `8123fb5` and repository-fixture references.
+  The other two Linux roots are the documented mirrors of the inspected Windows roots.
+
+None supplied the original Windows failure log or an identifiable reference to it. No machine-wide
+search or unrelated evidence archive inspection followed. Thus Windows log → source → test mapping
+cannot be established. In particular, no evidence shows a fixture user still running after timeout,
+or attributes a handle, writer or cleanup operation to a specific owner. No test/source file is
+assigned to this failure by guessing from a fixture pattern.
+
+The saved Linux `ci-attempt-1.log` belongs to `f0558856f018f24b5766d6ed8b5d241f9cb02747` and
+`release-acceptance.test.ts` / `rejects unknown and wrong-scope checks` (ENOTEMPTY); the saved
+supervisor `ci-attempt-2.log` belongs to that same source and `performance-supervisor.test.ts` /
+`kills an owned grandchild that ignores TERM when the worker exits first` (observed R). Their
+correspondence is recorded in the preceding diagnoses. Neither is the Windows timeout/EBUSY log.
+The catalog validator correction and accepted supervisor correction remain separate; subsequent
+successful logs supply no missing Windows failure facts.
+
+**No concrete implementation defect or correction is supported by this bounded review.** This
+does not establish harmlessness, pre-existence, cause, resolution or M2/release acceptance. Stop
+the evidence search here and retain the Windows observation as unresolved.
+
+### Preserve if the next ordinary validation encounters the event
+
+Save the complete unedited stdout/stderr from command start through runner exit, with timestamps,
+exact command/arguments/cwd, source OID and dirty diff, test file/full name, runner version/config,
+timeout value/type, exit code, Windows/Node/Git versions and fixture filesystem/path. Preserve both
+the timeout and EBUSY stacks, syscall and target path. Retain existing cancellation/disposal,
+fixture creation/cleanup start/end and child/worker spawn/exit/close records, with PID/PPID and
+identity/timestamps. If available at failure, save handle-owner/process observations and pending
+work after timeout; absence of such records must remain explicit. Preserve the failed fixture and
+its ownership record when safely possible, rather than deleting evidence or killing unrelated
+processes. This is a capture checklist for recurrence during normal verification, not authorization
+for a reproduction campaign, instrumentation change or retry-until-success.
+
+Delivery changes only this review document. Root format:write/check and diff checks are performed
+before its documentation checkpoint and normal push; final OID/ref equality and clean status are
+returned separately. No full suite, load test, formal measurement, PR, merge, parent-ref update or
+closure of unresolved matters is included.
+
 ## Bounded release fixture ENOTEMPTY diagnosis returned to trunk — 2026-10-02
 
 **Inconclusive; ENOTEMPTY was not reproduced.** Started clean at

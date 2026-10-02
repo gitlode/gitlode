@@ -1,5 +1,110 @@
 # M2 terminal styling: independent review
 
+## Bounded release fixture ENOTEMPTY diagnosis returned to trunk — 2026-10-02
+
+**Inconclusive; ENOTEMPTY was not reproduced.** Started clean at
+`68daa1f1656eb02ec8f31c226ce4a274e295371d` on `feature/otel-redesign_M2_styling`, with
+local/tracking/actual remote equality. The accepted supervisor correction remains closed.
+This diagnosis supplies no fixture correction, instability closure, M2 or release acceptance.
+
+Independently retrieved the decoded saved
+[attempt-1 job log](https://github.com/gitlode/gitlode/actions/runs/36805528460/job/110188893375):
+checkout `f0558856f018f24b5766d6ed8b5d241f9cb02747`, Node 22.23.2, Git 2.55.0,
+Ubuntu 24.04.5; the named unknown/wrong-scope test fails with ENOTEMPTY at
+`/tmp/gitlode-release-acceptance-DNM8KB/.git/objects/pack`. The log supplies neither writer
+identity nor process/file timeline. The historical fixture itself is unavailable; no new failed
+fixture existed to preserve. The probe would retain a partially deleted fixture on cleanup failure.
+
+### Lifecycle, bounded runs and environment differences
+
+Fixture creation tracks its `mkdtemp` path, awaits every `promisify(execFile)` Git call, and creates
+five commits including the acceptance-record commit. The two validator calls await `symbolic-ref`
+before rejecting the respective record during parsing; they do not reach revision/status checks.
+`afterEach` restores environment stubs, drains the tracked directory list, and awaits `Promise.all`
+of recursive/force `rm`, without retries. There is one fixture in this selected test. Awaited direct
+Git completion does not establish descendant completion. The selected test and validator are
+byte-identical between the two sources; this does not exclude scheduling effects in the full CI suite.
+
+New detached clones compared entry `76486d25870172528ce9af086ace756388b6c8d8` and failure
+`f0558856f018f24b5766d6ed8b5d241f9cb02747`. **Exactly 3 invocations per source, 6 total**;
+each selected 1 passing test / 49 skipped, with a 45-second outer deadline. Rounds 1/2 were isolated;
+round 3 added exactly one Python SHA-256 loop over a fixed 1 MiB buffer, bounded to 45 seconds and
+terminated after test return plus the one-second process observation. This workload was defined
+before execution; it does not recreate CI's concurrent suites. No deadline fired; outer test
+durations were 0.72–0.79 seconds. No additional invocation or full-suite retry followed.
+
+Available Linux: Ubuntu 26.04, WSL2 kernel `6.18.33.1-microsoft-standard-WSL2`, Node **22.23.1**,
+Git **2.53.0**, Vitest 4.1.10. Checkouts/evidence were on ext4; fixtures were on **tmpfs `/tmp`**.
+Dependencies were reused through temporary symlinks after byte-equal lockfile verification.
+CI's Node/Git/OS differ, and its kernel, fixture filesystem and effective maintenance config are
+unknown from this log. No historical toolchain reconstruction was attempted. Effective local
+system/global Git config was empty; no `maintenance.*`/`gc.*` override or Git-config environment
+override was present. Each fixture's recorded config contains only core defaults and test user
+identity; command arguments add `safe.directory`. Built-in defaults remain operative: absence of
+configuration does not mean maintenance is disabled. No permanent Git configuration was changed.
+
+### Process/file evidence and observation limits
+
+- Every invocation records **five** `git maintenance run --auto --no-quiet --detach` children,
+  following the five commits. Trace2 captures detach regions and launcher `child_exit` PID/code 0.
+  Thus automatic maintenance launch is observed locally, rather than inferred from small fixture
+  size. There are no maintenance task regions or nested task commands in these traces, and no
+  observed pack-file creation. Launch/detach alone does not establish a pack-writing job or explain CI.
+- Git command starts, exit/atexit and maintenance child events are timestamped. Latest recorded Git
+  atexit precedes cleanup start by **1.50–2.53 ms** across the six runs. At cleanup start, each pack
+  directory is empty. Recursive `fs.watch` reports only its initial directory creation and cleanup
+  deletion (ENOENT afterward), with no watcher errors. These observations show no local post-command
+  pack write; filesystem event delivery time is not the mutation syscall time.
+- `/proc` observations record PID/PPID/PGID/start/state/cmdline/cwd for discovered descendants,
+  nominally every 10 ms plus one second after runner return. No observed owned live process remained
+  at the final observation. Short-lived/detached processes can escape discovery; the ledger is not
+  exhaustive. Trace2's launcher PIDs and inherited session IDs do not identify every detached fork.
+  No writer PID was attributable because no pack mutation was reproduced. `strace`, `inotifywait`
+  and `bpftrace` were unavailable; no kernel writer attribution was collected.
+- **Instrumentation gap:** attempted Node command/child-close wrapping was bypassed by `execFile`'s
+  own `util.promisify.custom`, whose captured original function is retained by the wrapper. There
+  are zero Node child-close records; no extra run was used to repair this gap after the six-run cap.
+  Saved Node source confirms the callback resolves from its close-handler path, but that is code
+  evidence, not measured close times. Git Trace2 atexit/child_exit must not be presented as Node close
+  or complete descendant quiescence. The cleanup wrapper/watch instrumentation did operate.
+- Trace2 writes, synchronous JSONL appends/config snapshots, recursive watch registration and process
+  scans can shift scheduling; the fixed CPU worker also shifts scheduling. Watch events may coalesce,
+  scans can miss short-lived/reparented work, and non-observed writers are not excluded. Both CI
+  full-suite concurrency and the Node/Git/filesystem differences remain material uncertainty.
+
+No implementation fix is justified by this evidence. If a future writer trace establishes detached
+automatic maintenance as the owner, the smallest candidate is fixture-local/per-command suppression
+of automatic maintenance, covering every fixture Git entrypoint. If another lifecycle owner is
+identified, await that owner's completion instead. A separately authorized correction must first
+demonstrate the failing order, then verify cleanup after owner completion, no post-close pack writes,
+and preservation of the existing assertions/error paths. An `rm` retry, longer timeout or weakened
+assertion would not resolve ownership. Next useful evidence is a corrected child-close probe and
+kernel-level file/PID attribution under a bounded CI-like workload, with runtime/config/filesystem
+recorded; this session's allowance is exhausted. Same-source rerun success does not close the risk.
+
+### Evidence and documentation delivery
+
+New evidence root: `/home/t-wakabayashi/gitlode-performance/m2-fixture-20261002-68daa1f`, mirrored
+and hash-verified at `D:/gitlode_test/m2-fixture-20261002-68daa1f`. Created with exclusive directory
+creation; previous evidence was untouched. `entry-{1,2,3}/` and `failure-{1,2,3}/` retain exact
+commands/deadlines, Vitest logs, Trace2, fixture/pack/cleanup events, process ledgers and results.
+Root artifacts retain the saved CI log, plan, probes/analysis, environment, source copies, maintenance
+detail, timeline and restoration audit. Manifest covers **58 evidence files**, excluding itself and
+the retained clean detached checkouts.
+
+- `SHA256SUMS`: `c2200a2e067c0b0c3a06ef43ce4c25afed882d4d387c20ba43284c3340505c4e`
+- `ci-attempt-1.log`: `b6f0b19b02e91229c9f2e2389db6c7dfe02dcf1254cef091f93019179889bdf0`
+- `timeline.json`: `2a291c6e722a0acf746d5beecbc25c61b6ae36f433dae9e1557ab02b4f217e62`
+
+Checkout sources were never edited; temporary dependency symlinks were removed and both checkouts
+have empty porcelain status at their pinned OIDs. Successful tests removed their own fixtures;
+the fixed workload was terminated/waited. Main-worktree temporary probes are removed at delivery.
+Only this review document is returned, with documentation-only format:write/check and diff checks,
+a checkpoint commit and normal push. Final local/tracking/actual remote equality and clean status
+are reported with the delivery OID separately. Stay on the styling branch; trunk owns further
+diagnosis/correction decisions. No Windows reproduction, Attributes/styling/display work, formal
+measurement, PR, merge, parent-ref update or acceptance was performed.
+
 ## Independent supervisor cleanup correction review returned to trunk — 2026-10-01
 
 **Accepted for this correction; no required corrections found.** Reviewed all six files in

@@ -81,6 +81,12 @@ Next: history/evidence freeze preparation, full T13B, GNOME pre-release check,
 final combined-candidate validation and T13C. Publish remains blocked. Additional display samples
 are future tooling, not an integration/release prerequisite.
 
+Current assignment: [fixed candidate preparation F](opentelemetry-m2-candidate-freeze.md), with
+product/harness `8fffcc0d8e11bb061d70bf870f262092d559c5f2`. Trunk retains the current coherent
+M2 history without rewriting; the packet records the reviewed ancestry and preservation boundaries.
+Readiness work-branch deletion was reported by the human; its archive remains preserved.
+F preparation and formal measurement are separate conversations. Calibration reuse is not yet decided.
+
 ## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.

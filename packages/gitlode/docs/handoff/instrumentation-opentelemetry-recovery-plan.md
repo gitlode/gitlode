@@ -67,12 +67,15 @@ The human squash-merged system PR #114 into M2 at
 `45944a382f2ce53eb898c73058bfc5dc1028d3bc`. Trunk verified tree
 `9920772155028bb30e008b89848e7e5c999552ec` exactly matches approved source
 `ad5a6e1fd3c6532b911e6a8936dc73cbeb2dc733`; local M2 and actual remote agree.
-Keep the system work branch until source-history preservation is confirmed. The scoped system slice
+System source history is preserved locally and remotely at `archive/otel-m2-system-ad5a6e1`,
+pointing to `ad5a6e1fd3c6532b911e6a8936dc73cbeb2dc733`. The human reports deletion of the
+system work branch. Keep the archive. The scoped system slice
 is complete and integrated, not M2/release acceptance. Existing validation is reused through tree
 identity; no new test execution on the squash commit is claimed.
 ENOTEMPTY and Windows timeout/EBUSY remain open
 observations, not a new reproduction campaign. Existing Attributes fixture typing is separate.
-After system design/migration/review: history/evidence freeze, full T13B, GNOME pre-release check,
+Current assignment is the [bounded pre-measurement readiness packet](opentelemetry-m2-measurement-readiness.md).
+After its review and any required human-approved integration: history/evidence freeze, full T13B, GNOME pre-release check,
 final combined-candidate validation and T13C. Publish remains blocked. Additional display samples
 are future tooling, not an integration/release prerequisite.
 
@@ -370,8 +373,9 @@ verified emergency cleanup on both OSes is not claimed. Future long-running oper
 preflight their deadline mechanism before execution. No retroactive preflight is assigned.
 
 ENOTEMPTY/EBUSY/timeout observations and existing Attributes typing remain separate unresolved items.
-Next, trunk reviews the fixed squash candidate and obtains human approval before PR creation and human
-squash. After squash, verify tree correspondence, source/evidence attribution and archival preservation.
+System squash correspondence and source archival preservation are complete as recorded above.
+The active readiness packet assigns the bounded hygiene/operator work; the original limitations above
+remain historical evidence and are not retroactively relabeled.
 Then follow [M2 obligations](#m2-close-the-v0130-release-obligations),
 [redesign exit criteria](instrumentation-opentelemetry-redesign-plan.md),
 [performance policy](../design/telemetry-performance.md) and the
@@ -380,7 +384,7 @@ questions before measurement, review reachable history, freeze/archive fixed pro
 complete full T13B, GNOME pre-release check, final combined-candidate validation and T13C.
 No acceptance-record update is implied by this slice.
 
-### Fixed integration boundary and proposed PR
+### Completed integration preparation (historical)
 
 Preparation starts from system `f434e6c8726e9e868b2233aa8ebb1bee0f5f3333` against intended M2 base
 `45944a382f2ce53eb898c73058bfc5dc1028d3bc`. Local, tracking and actual remote matched both at entry.
@@ -409,6 +413,6 @@ Proposed description:
 > fault-test residue and emergency-cleanup verification limits require review before formal measurement.
 > This slice does not accept M2, T13B/T13C or publication; the publish record remains blocked.
 
-No PR/merge, parent-ref update, new test/install campaign, source repair, formal measurement or
-acceptance-record update is performed. Push only the document checkpoint normally on the system
-branch and verify clean status plus local/tracking/actual remote equality before returning to trunk.
+That preparation performed no PR/merge, parent-ref update, new test/install campaign, source repair,
+formal measurement or acceptance-record update. PR #114 was subsequently approved and merged by the
+human; the opening status owns the current state. This historical packet is not an active assignment.

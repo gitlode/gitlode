@@ -294,3 +294,89 @@ than only explicit in-body removal, after the required retention policy is resol
 required correction was found in successful containment, launcher-preflight ordering, sealed-file
 correspondence or the checked TypeScript delta. R1 remains a required review correction; passing
 suites do not resolve it. This report changes no acceptance, candidate freeze, PR or merge state.
+
+## R1 correction outcome (2026-10-02, independent focused re-review pending)
+
+Started clean on `feature/otel-redesign_M2_readiness` at
+`8246f950440d17c044c06e7675c509fab1406842`. Implementation checkpoint:
+`0993f21a056dc09b803b56367ac47e75b9f0a7cb`. Only the supervised workflow test and
+harness guide changed there; this appended outcome is the additional documentation change.
+The final documentation OID and remote equality are recorded separately in the session return.
+No production supervisor, acceptance, parent ref, PR, merge, freeze or formal measurement changed.
+
+R1 removes unconditional teardown registration of both diagnostic locations before success.
+Child close, cleanupConfirmed/empty cleanupErrors, realpath containment, normal/stall status,
+completed-run counts, manifest, actual fixture-path checks and remaining-fixture assertions remain.
+Before deleting root, the test copies its entire diagnostic contents to the outside directory,
+including supervision artifacts/logs, fixture mapping, manifest, CLI and counter. Assertion failure
+before removal retains root; verification failure after removal retains the copied diagnostics.
+The catch reports both paths and rethrows the original error without failure-path cleanup.
+Only after all assertions pass are the owned root and outside directory registered for afterEach.
+Copy/storage failures, partially failing removal, abrupt runner/host loss and arbitrary abnormal
+termination do not promise complete preservation. The earlier outcome's stronger registration
+wording is superseded by this correction and the updated harness guide.
+
+Two finite regression cases run the stall test in a separate Vitest process, inject an assertion
+failure after process completion/before removal or after removal, require exit 1 and the intended
+assertion, then inspect retention **after the child Vitest exits and its real afterEach has run**.
+They verify supervision cleanup evidence, completed runs, fixture paths, manifest, CLI/counter and
+unchanged outside sentinel; the post-removal case also verifies copied evidence equality and missing
+root. Only after ownership, containment and process cleanup checks pass do their own afterEach hooks
+dispose these newly created probe fixtures. Retention paths and original assertion output are in the
+suite logs. Successful normal/stall paths still execute their existing evidence assertions and clean
+both locations. This is reported implementation evidence awaiting independent review.
+
+Fresh native Linux clone: `/home/t-wakabayashi/gitlode-performance/m2-r1-8246f95/source`.
+Tool versions remain Node v22.23.1, npm 10.9.8 and Git 2.53.0; exact kernel, filesystem/free-space
+observations and environment are in `environment.txt`. Before clone/build, the reused launcher
+SHA-256 `23b916a0aee69275359527875cd3a9bc6e20fc9759008bddba0d14f6c2e32c8b`
+passed a fresh disposable deadline preflight: 2048 ms, exit 124, SIGKILL, retained log/result,
+no observed live owned processes. This demonstrates the bounded disposable case, with the prior
+close-based launcher/escaped-group/kernel-I/O/host-loss limitations unchanged. Linux toolchain PATH
+is explicit and NODE_OPTIONS unset. Later sessions must establish their own launcher readiness.
+
+Commands use `node <workspace>/.cache/m2-r1-8246f95/run.cjs <root> <stage> <seconds> <command> <args>`;
+exact scripts, per-stage JSON configurations, stdout/stderr and result JSON are archived.
+
+| Validation                                                                                                                                   | Outer seconds | Result                                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------: | -------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run build:dev`                                                                                                                          |           600 | 0; test typechecking remains separate                                                                                            |
+| `npx vitest run packages/gitlode/test/telemetry/performance-workflow.test.ts packages/gitlode/test/telemetry/performance-supervisor.test.ts` |           180 | Corrected setup: 0, 2 suites / 49 tests including both retention probes; final diagnostic-only code correction: 0, same 49 tests |
+| `npx tsc -p .cache/readiness-tsconfig.json --listFiles --pretty false`                                                                       |           120 | Final: 1, only four existing TS2542 at 343/617/623/629                                                                           |
+| Same strict command with test from starting checkpoint, then restored implementation                                                         |           120 | 1, same four readonly assignments at 247/521/527/533                                                                             |
+| `npm run lint`                                                                                                                               |           180 | Final 0                                                                                                                          |
+| `npm run format:write`, `npm run format:check`                                                                                               |      180 each | Final 0 / 0                                                                                                                      |
+| `git diff --check`                                                                                                                           |            30 | 0                                                                                                                                |
+
+The saved strict config matches the prior non-emitting configuration and extends root
+`tsconfig.base.json`, rooted at the changed test. Final and baseline closures are identical,
+277 files, including dependencies and imported scripts/support. First typecheck had four new
+TS2345 diagnostics (capture indexing and inferred array tuples), and first lint had three no-console
+diagnostics. These were corrected using checked capture indexing, readonly tuples and stderr writes;
+first logs remain archived. Existing readonly mutations were not repaired. No architecture boundary
+changed; no full suite, package/OS campaign or formal workload ran.
+
+Two setup failures remain visible: initial shell CRLF made the final node_modules symlink name
+contain CR, causing format exit 127; file-backed LF script and correctly named symlink fixed it.
+First suites then reported 4 failures / 45 passes because the overly long owned TEMP produced a tsx
+Unix socket path beyond Linux's path limit (`listen EADDRINUSE` before supervisor startup). The
+corrected fresh owned TEMP is `/tmp/gitlode-r1-8246f95`; limits and workload assertions were unchanged.
+Initial roots and outside sentinels were preserved, copied into `first-setup-residue` and left intact;
+no historical residue or sealed evidence was modified. Final short TEMP contains runtime caches,
+no workflow fixture roots. Scoped final observation found no live launcher-group members or command
+lines referring to this session's workflow fixture paths; this is not a universal process guarantee.
+
+Sealed new archive: `.cache/m2-r1-8246f95/evidence/linux`, 663 entries (including first setup
+residue/cache copies). Manifest SHA-256:
+`80c21ea8674c6ea0136b7d2d2e3b51c7cb954419895122511f64317ed3d0aff3`.
+All returned files and manifest were hash-checked against native Linux originals before reporting.
+Final Linux test and workspace implementation bytes share SHA-256
+`e411504aa95e28e3fdfbe0337e97638061157a46e8b630ddd479b5f70c2f9efa`.
+Execution used the starting-checkpoint clone with explicitly copied changes; source/hash evidence
+establishes correspondence to the implementation checkpoint. These are local copies, not external
+backup. Do not append to this archive. Final document formatting and Git return records are separate
+under `.cache/m2-r1-8246f95/return`.
+
+R1 now has bounded failure-retention regression evidence and reconciled documentation; readiness
+remains pending independent focused re-review of the fixed branch revision. This does not establish
+F, T13B, M2 or publish acceptance. Return to trunk is this report only, with no trunk ref update.

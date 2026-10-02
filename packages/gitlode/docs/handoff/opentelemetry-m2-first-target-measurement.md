@@ -1,5 +1,61 @@
 # M2 first fixed-candidate target measurement
 
+## Active assignment: one controlled fresh attempt
+
+Trunk accepts the saved-evidence diagnosis at `10540d1a113fabd3a324c5e202f4967de6bba6db`
+as cause-unresolved and authorizes exactly one fresh attempt after that diagnosis. The first attempt
+remains inconclusive; no outlier removal, threshold change, recalibration or acceptance exception is
+authorized. The adjacent M0 quantity discontinuity remains an observation, not a proven recipe defect.
+The older diagnosis-only routing below is completed history and is superseded by this section.
+
+### Starting and execution conditions
+
+The human starts a separate measurement conversation from the documentation checkpoint delivering
+this section. Product/harness stay `8fffcc0d8e11bb061d70bf870f262092d559c5f2`; legacy, copied M0
+manifest, 4,430 quantity, recipes, counts, pair order and thresholds stay as in the first packet.
+Use its verified F inputs and restore instructions in a fresh native Linux execution area; reuse
+immutable bytes without build/install, never resume first-attempt raw runs. Use fresh per-stage
+artifact directories and preserve all new artifacts separately from old sealed archives.
+
+Before workloads, establish a quiet host window with the human: no concurrent builds, tests,
+measurements, large copies or other intentionally heavy work. Starting the session alone is not
+evidence that the Windows host is idle. Do not stop unrelated processes or change host/WSL/power/Git
+settings. If the window cannot be established, return a setup status without consuming a workload
+attempt. Repeat Linux launcher preflight and input/environment/filesystem verification.
+
+Predeclare lightweight external observation for the whole attempt: timestamped Windows aggregate
+CPU activity using available built-in counters and Linux vmstat at a fixed five-second interval.
+Save clock alignment and observer commands/PIDs/start/stop outcomes. Frequency/temperature are
+optional only when already available without new installation/permissions complexity. Counter
+unavailability is recorded, not repaired by inventing values or installing monitoring infrastructure.
+Check observer startup before measurement and disclose any missing host CPU observation to trunk
+before starting. Observations cannot prove isolation and may add cost; keep their configuration
+unchanged through stages and do not inject monitors into timed children.
+
+Do not repeatedly scan repository files or invoke Git during timed runs. Record object-layout or
+maintenance information only if already available or at a clearly observed non-timed boundary without
+editing the harness. Otherwise explicitly retain that diagnostic limitation.
+
+### One-attempt sequence and stopping
+
+Run fresh legacy capture, disabled overhead, then profile overhead, each once, with the same expanded
+command model as the first packet. Keep outer command limit 7,200 seconds and harness stage limits
+1,800,000/300,000/300,000 ms. Long-running stages require progress updates; no limit increases after
+execution starts. Advance only on required formal pass and confirmed supervision/cleanup.
+
+A fail/inconclusive, deadline, runtime drift, unplanned competing workload or missing required evidence
+stops dependent stages. Preserve observations and return. In particular, another disabled inconclusive
+does not authorize a third attempt, a different quantity, longer warmup, disabled sampling or relaxed
+MAD. Do not combine favorable runs from either attempt. A passing second attempt is reported together
+with the first inconclusive, not as proof of its cause or automatic whole-target acceptance.
+
+Use the original packet's sealing/copy verification and final process/fixture observations. Stop only
+owned observer processes and preserve their logs; do not claim outer groups cover detached workers.
+Report paired chronology, MAD, wall/RSS, behavior and profile-sidecar results where executed, plus
+resource observations and their limitations. Append outcome here, keep original diagnosis/attempt
+unchanged, commit/push documentation only on M2 after checking ref movement, and return clean status
+and actual remote OID. No PR/merge, code or acceptance change. Work itself can take substantial time.
+
 ## Current routing: bounded diagnosis, no new measurement
 
 Trunk reviewed outcome `4f42f1184ded2a73ae6f6b950805b2924aaeb5cc` and rehashed the returned

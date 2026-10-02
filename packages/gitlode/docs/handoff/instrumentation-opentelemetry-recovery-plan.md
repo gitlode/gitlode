@@ -94,7 +94,10 @@ separate conversations; the other targets and all remaining M2 obligations stay 
 First target attempt returned at `4f42f1184ded2a73ae6f6b950805b2924aaeb5cc`: capture passed,
 disabled overhead was inconclusive (candidate MAD 6.428 percent), profile was not executed.
 The first-target document's opening diagnosis packet supersedes its execution assignment. Trunk
-verified the returned manifest; no retry is authorized. Next is saved-evidence diagnosis only.
+verified the returned manifest. Saved-evidence diagnosis `10540d1` confirmed classification without
+identifying a cause. The first-target document's newest opening packet now authorizes exactly one
+controlled fresh attempt, with a quiet host window and low-rate external observations; no automatic
+third attempt or recalibration is authorized. Original inconclusive evidence remains unchanged.
 
 ## History and parallel development boundary
 

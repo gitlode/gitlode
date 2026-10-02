@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                                 | Remaining scope                                                            |
-| --------- | -------------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only              | Preserve historical evidence and environment                               |
-| M1        | complete                               | Preserve corrected validation and squash attribution                       |
-| M2        | Profile integrated; system design next | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates              | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                    | Remaining scope                                                            |
+| --------- | ----------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only                 | Preserve historical evidence and environment                               |
+| M1        | complete                                  | Preserve corrected validation and squash attribution                       |
+| M2        | Profile integrated; system slice accepted | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates                 | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -62,8 +62,8 @@ PR #113 was human squash-merged into M2 at
 archive and existing styling archive. Trunk did not delete branches. Saved candidate validation at
 `f4d90d1` is reused on the reviewed handoff-only delta, not claimed as execution on the squash OID.
 
-Current assignment: the bounded private tests/system design packet at the end of this plan.
-No implementation or further PR is authorized yet. ENOTEMPTY and Windows timeout/EBUSY remain open
+Current assignment: document-only system-to-M2 integration preparation at the end of this plan.
+The first system slice is accepted for integration preparation; no PR is authorized yet. ENOTEMPTY and Windows timeout/EBUSY remain open
 observations, not a new reproduction campaign. Existing Attributes fixture typing is separate.
 After system design/migration/review: history/evidence freeze, full T13B, GNOME pre-release check,
 final combined-candidate validation and T13C. Publish remains blocked. Additional display samples
@@ -214,50 +214,170 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Current work is bounded tests/system design; later sessions need fixed inputs and
+chooses squash/merge strategy and performs the merge or branch deletion. Current work is document-only system integration preparation; later sessions need fixed inputs and
 trunk handoff. No PR is authorized until the human approves its explicit source/base.
 
-## Current assignment: first tests/system workspace design
+## Accepted system slice and integration preparation (2026-10-02)
 
-The human starts a new branch conversation for bounded repository design, not implementation.
-Read AGENTS, architecture/domain-design, build-test-release, telemetry verification/performance and
-harness guidance. Inspect current root/workspace manifests, lockfile, TypeScript/Vitest/Rev-dep,
-format/lint/CI configuration and installed-package test dependencies. Do not browse/rewrite unrelated
-plugins or migrate every system-like test.
+### Acceptance and retained history
 
-Base implementation is accepted M2 squash `c29376b0b771efac9d736cb5315ae3d1d303984f`; this planning
-packet advances M2 by documentation only. Verify current planning tip/actual remote and record the
-exact OID. Create `feature/otel-redesign_M2_system` from that verified tip, or inspect/resume an existing
-matching child without resetting it. Commit/normal push meaningful design checkpoints. Do not update
-M2/integration/main refs. Proposed return is human squash into M2 after implementation/review; PR
-creation needs explicit source/base approval and only the human merges/deletes branches.
+[Trunk disposition at f434e6c](https://github.com/gitlode/gitlode/blob/f434e6c8726e9e868b2233aa8ebb1bee0f5f3333/packages/gitlode/docs/handoff/instrumentation-opentelemetry-recovery-plan.md#trunk-system-evidence-disposition-2026-10-02)
+accepts the first system slice for integration preparation only. M2/release acceptance, T13B/T13C,
+formal measurement and publication remain separate; the acceptance record stays blocked.
+Completed packets are historical context, not instructions to repeat installations or tests:
 
-Accepted direction: private workspace at tests/system. First slice is the existing release/installed
-CLI package workflow, currently scripts/test-installed-package.ts. Derive its exact support closure
-from code. Define what remains package-owned (collector/internal-access tests, pure harness planner
-and statistics units, schema/build tooling) and what the system workspace owns. Distinguish lasting
-regression tools from migration-only acceptance/provenance tooling; propose placement and later
-retirement criteria, without moving all performance tooling or retiring the publish gate now.
+| Packet                                                   | Fixed checkpoint / disposition             |
+| -------------------------------------------------------- | ------------------------------------------ |
+| Human-approved design                                    | `1b2177bbc9027e990eb32fd243dc306cd67bac79` |
+| Executable workspace/move/wiring                         | `a3dacf474797874cba58bc1fc63f9d24987686b6` |
+| Accepted implementation and canonical ownership          | `f024edacff073be4f7438dbb3fb1f31cc0f8ba45` |
+| Initial outcome, including first failures                | `a32030ffa271d07668a374988000ae386cc32e30` |
+| Independent implementation review, no mandatory findings | `988815e1e3ba1e8c0b7c35084baa3fd13498e539` |
+| Failed bounded evidence-only completion                  | `c79ed354c53e60feffc0190a603ee2e59a88aab2` |
+| Corrected evidence completion                            | `7bf59245813ec47b8d175419bbec1b19994aca19` |
+| Trunk acceptance and retained-fixture disposition        | `f434e6c8726e9e868b2233aa8ebb1bee0f5f3333` |
 
-Return a concrete minimal proposal with:
+The complete design, implementation, review and recovery packets remain in the plan at those Git
+checkpoints, accessible through the fixed trunk link above or `git show <checkpoint>:<plan-path>`.
+Preserve work refs until post-squash attribution and archive checks; do not delete or rewrite them.
 
-- File ownership/move table and dependency inventory; tests consume the installed package/public
-  contract rather than importing product internals for convenience. Identify genuine exceptions.
-- Private manifest/workspace wiring, checked TypeScript for owned tooling, build/order/config
-  boundaries, fixture/temp/process ownership and Windows/Linux path behavior.
-- Commands before/after, compatibility wrappers if justified, CI/validate:release wiring and package
-  exclusion. Preserve all existing checks; normal CI must not start formal performance measurements.
-- Exact canonical contributor/navigation updates for product vs telemetry and recorder vs collection
-  work. Address C6 ownership/retirement criteria without expanding optional C1-C5 refactors.
-- Small implementation slices and finite acceptance checks including both adapters, plugin, schema,
-  worker/CLI and TypeScript installed consumers. State lockfile/package/evidence impacts before F.
-- Questions requiring human/trunk decision versus routine implementation choices. Do not reopen the
-  accepted tests/system location or style/profile contracts without a concrete conflict.
+### Ownership and candidate delta
 
-Append the proposal to this plan under a clearly labeled system-design section, or compact it there
-if existing material becomes stale. No source/test moves, manifest/lockfile edits, production changes,
-install/release/full test campaigns, formal measurements or gate changes in this design session.
-Read-only inspection is authorized; no new VM or machine-wide setup. Run format:write/check and link/
-diff checks for the documentation, commit/normal push on the child, verify remote equality/clean state,
-and return exact OIDs and the proposed implementation packet to trunk. Design completion does not
-self-authorize implementation. Trunk reviews scope/dependencies before assigning the first slice.
+The first migration moves the installed-package runner to private `tests/system`, with an independently
+checked strict, non-emitting TypeScript project and a closed Rev-dep boundary. Root commands are
+`typecheck:system` and `test:system:package`; product aliases delegate one way without a cycle.
+CI and validate:release retain existing checks and add independent system typing. Root manifest,
+lockfile, Rev-dep and CI wiring change; there is no resolved dependency-version churn.
+
+The runner resolves repository roots from its new location and rejects an inside-checkout realpath
+TEMP parent before fixture creation. The fixture/assertion/child-execution/finally body and consumer
+version policy remain unchanged. Public exports/bin/dependencies and packed product inputs retain
+reviewed equivalence; no product/internal import, runtime dependency or product build reference is
+added. No collector/internal test, Attributes fixture, performance harness or publish gate is moved.
+
+Canonical navigation is already in place:
+
+- [Documentation index](../README.md#contributor-routes) and root [CONTRIBUTING](../../../../CONTRIBUTING.md)
+  route contributors to product and telemetry guidance.
+- [Domain ownership](../design/domain-design.md#private-system-workspace) owns system boundaries and
+  filesystem/generated-consumer exceptions; static import checks do not attest those exceptions.
+- [Build/test/release](../contributing/build-test-release.md#checked-system-tooling-and-commands)
+  owns commands, strict typing, packaging and runner lifecycle. Launcher caches are distinct from
+  runner fixtures; cancellation and locks retain existing lifecycle limits.
+- [Telemetry](../design/telemetry.md) and [verification](../design/telemetry-verification.md)
+  route recorder/collector work to its product owner rather than the installed-package workspace.
+- [Harness ownership](../contributing/telemetry-performance-harness.md#lasting-and-migration-only-ownership)
+  separates lasting regression checks from migration-only provenance/gate tooling. T13C must preserve
+  evidence; gate retirement requires a separately reviewed post-release change.
+
+### Adopted evidence and excluded historical evidence
+
+Trunk combines the independent review at `988815e` and recovery at `7bf5924`, both attributed to
+fixed implementation `f024eda`. Hosted [source CI](https://github.com/gitlode/gitlode/actions/runs/36971362693)
+and independently inspected [descendant CI](https://github.com/gitlode/gitlode/actions/runs/36971594821)
+are separate hosted evidence; they do not relabel local failures as successful combined executions.
+The descendant has identical implementation. Independent strict-config and negative-import probes,
+restored-runner comparison, package boundary and compatibility-alias checks are retained in the review.
+
+Recovery evidence is `.cache/m2-system-recovery-return-c79ed35/evidence` (60 sealed entries), manifest
+SHA-256 `25efe7790ef39e8a9d4ab332b092eb8269f57caf001a739fd0a68a5933b1466c`.
+Trunk rehashed all 60 with no mismatch. Original execution evidence remains at
+`.cache/m2-system-recovery-c79ed35/evidence` and Linux
+`/home/t-wakabayashi/gitlode-performance/m2-system-recovery-c79ed35`.
+These are local artifact copies, not external backup; never append to sealed logs.
+
+| Adopted completion                          | Result and attribution                                                                                                                                          |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows clean install/release/publint       | Prior fixed-clone exit-zero results reused; all 13 packed files match retained product bytes                                                                    |
+| Windows canonical installed check           | One corrected launch, exit 0, 600s deadline; both adapters return 2 records                                                                                     |
+| Windows actual outside TEMP with spaces     | Passed; sentinel preserved; installed-package fixture removed                                                                                                   |
+| Windows actual inside TEMP with spaces      | Expected exit 1; sentinel preserved; no runner fixture or consumer snapshot                                                                                     |
+| Linux genuine fixed clone                   | 425 tracked files, clean source; fresh npm ci exit 0, 600s deadline with 15s kill-after; no copied dependencies                                                 |
+| Linux validate:release                      | One corrected-condition launch, exit 0, 1200s deadline; complete chain, 96 files / 1312 tests                                                                   |
+| Actual consumer/compiler/package identities | Both consumers retain manifests, lockfiles, installed TypeScript manifest and tsc version 7.0.2; identity.json binds original pack path and saved tarball bytes |
+
+Windows Node/npm: v22.23.1/11.11.0; Linux: v22.23.1/10.9.8, Git 2.53.0 on WSL2.
+Environment logs own exact identities. Tested tarball SHA-256 values:
+Windows `03185e8b10f01027f0c69125df56464ecea4dc2eb2e36c7f2d65ee0d28ee9bcf`;
+Linux `82020e9acf0c616e08b04341bf157a32c31819bc21b0f2b1c82c1444f334f1d8`.
+
+Earlier failures remain preserved: shared Windows npm ci unlink EPERM (lock owner/ACL cause unknown),
+Linux source-copy chain missing .git, and the later evidence preload omitting ChildProcess return.
+The latter was agent-created setup failure, not product failure; Windows child exit was unknown.
+Corrected wrapper/disposable checks and bounded successful runs supply completion without erasing
+failed logs. Volta eval syntax and shell CR-path preparation failures are also retained, not product
+failures. Historical consumer compiler identity was unknown; new identities do not retroactively
+identify old consumers. The old separate Linux pack hash
+`148ffe3719aa773e12198df91b7be066e2f99084294c79ba31637e34fba8fb72` is retained, not the recovered tested pack.
+
+Old `.cache/m2-system-evidence/evidence-hashes.json` matches 21/24 entries. `final-ci.json`,
+`preservation-check.cjs` and `preservation-check.log` remain excluded from checksum-attested historical
+evidence. Cause/order is unestablished; neither mtime nor corrected probe bytes establishes it.
+Independent live CI inspection and fresh Git comparisons support adopted claims separately.
+Original hashes/bytes and current copies are retained in completion `evidence/old-current/` and
+`three-mismatches.json`; new hashes attest only copied current bytes. Earlier completion manifests:
+Linux 17 entries / `ca60002d4e20a9bae4f3c76a2bbf25fb9c0a7c0a02deb7603b721d7846b4c71a`;
+Windows 61 entries / `58037d8ea561a58f431480955d71c5c7e7a616227e384f597bc4d30dc596e178`,
+returned under `.cache/m2-system-completion-return-988815e-01/evidence`. Preserve all originals.
+
+### Open risks and formal-measurement prerequisites
+
+No matching owned product children or installed-package fixtures remained after accepted runs.
+Windows inside TEMP contains tsx/Node compile caches; this is not a launcher-wide no-write guarantee.
+Linux TEMP retains `gitlode-performance-vy7lhL`; retain it without deletion or a new campaign.
+Trunk inspected state-0.json (generatedAt `2024-01-01T00:00:00.000Z`), output-0's exactly oid 0..4
+in `performance-20240101T000000Z-000001.jsonl`, and empty output-1. These strongly match
+performance-workflow.test.ts's synthetic CLI / second-child stall fault test. Its supervisor kills
+the worker, preventing executePaired's worker-owned finally from removing its separate TMPDIR root;
+test teardown owns only its gitlode-supervised-workflow root. Record this bounded hygiene issue for
+harness/test ownership review before formal measurement. It does not prove historical ENOTEMPTY/EBUSY
+cause or cleanup on every fault path; no cleanup repair or full-suite rerun is assigned here.
+
+Accepted runs did not fire the outer deadline. Windows emergency-cleanup preflight was late; Linux
+forced outer cleanup was not exercised. Successful exit-zero checks remain valid, but independently
+verified emergency cleanup on both OSes is not claimed. Future long-running operator packets must
+preflight their deadline mechanism before execution. No retroactive preflight is assigned.
+
+ENOTEMPTY/EBUSY/timeout observations and existing Attributes typing remain separate unresolved items.
+Next, trunk reviews the fixed squash candidate and obtains human approval before PR creation and human
+squash. After squash, verify tree correspondence, source/evidence attribution and archival preservation.
+Then follow [M2 obligations](#m2-close-the-v0130-release-obligations),
+[redesign exit criteria](instrumentation-opentelemetry-redesign-plan.md),
+[performance policy](../design/telemetry-performance.md) and the
+[harness guide](../contributing/telemetry-performance-harness.md): resolve assigned hygiene/supervision
+questions before measurement, review reachable history, freeze/archive fixed product and harness,
+complete full T13B, GNOME pre-release check, final combined-candidate validation and T13C.
+No acceptance-record update is implied by this slice.
+
+### Fixed integration boundary and proposed PR
+
+Preparation starts from system `f434e6c8726e9e868b2233aa8ebb1bee0f5f3333` against intended M2 base
+`45944a382f2ce53eb898c73058bfc5dc1028d3bc`. Local, tracking and actual remote matched both at entry.
+The base is the merge-base and an ancestor of source; `f024eda` is an ancestor of source.
+Every subsequent checkpoint changes only this plan. This preparation also changes only this plan.
+For that fixed ancestor base, the squash result tree equals the final source tree. The return packet
+fixes final source/tree OIDs after the document checkpoint; any later ref movement needs reassessment.
+
+Candidate delta: private workspace/runner move, root/lock/Rev-dep/CI wiring, retained product aliases,
+canonical ownership/contributor routes and this consolidated handoff. Functional evidence is reused
+at f024eda on the explicit document-only descendant comparison, not claimed as execution on the new
+checkpoint or future squash OID. Only document formatting, relative links and diff checks run here.
+
+Proposed title: `test: move installed-package validation into a checked private system workspace`
+
+Proposed description:
+
+> Move installed CLI/API/schema validation from product-local tooling into private tests/system with
+> independent strict TypeScript checking and a closed dependency boundary. Keep fixture/assertion and
+> public-package behavior, retain one-way compatibility aliases, and wire canonical commands into CI
+> and release validation. Document lasting versus migration-only ownership and contributor routes.
+>
+> Validation: independent implementation review at 988815e and fixed-f024eda Windows installed/
+> outside/inside checks plus Linux validate:release completion at 7bf5924; consumer TypeScript 7.0.2
+> and tested tarball identities retained. Later source differences are documentation only. Retained
+> fault-test residue and emergency-cleanup verification limits require review before formal measurement.
+> This slice does not accept M2, T13B/T13C or publication; the publish record remains blocked.
+
+No PR/merge, parent-ref update, new test/install campaign, source repair, formal measurement or
+acceptance-record update is performed. Push only the document checkpoint normally on the system
+branch and verify clean status plus local/tracking/actual remote equality before returning to trunk.

@@ -65,3 +65,11 @@ When changing behavior, update the documentation for every affected audience:
   decisions are migrated into durable docs.
 - Agent-specific entrypoints, such as GitHub Copilot instruction files, should route to these docs
   instead of owning separate design contracts.
+
+## Contributor routes
+
+Product work starts with [architecture](design/architecture.md), [domain ownership](design/domain-design.md)
+and [build/test guidance](contributing/build-test-release.md). Telemetry work starts with
+[recording/collection contracts](design/telemetry.md) and [verification](design/telemetry-verification.md).
+Empirical work separately follows [performance policy](design/telemetry-performance.md) and the
+[harness guide](contributing/telemetry-performance-harness.md).

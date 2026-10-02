@@ -245,3 +245,32 @@ guard; branch review and npm Trusted Publishing remain the authority boundary fo
 Use the narrower commands while developing. Assess publish readiness from both `validate:release`
 and an accepted telemetry migration record; do not change a blocked record without the required
 independent review evidence.
+
+## Checked system tooling and commands
+
+`tests/system/tsconfig.json` independently checks all owned `scripts/**/*.ts` with strict NodeNext,
+`noCheck: false` and `noEmit: true`. It is non-composite, outside the solution build, with no product
+references or aliases. Package tooling's deferred noCheck and existing fixture typing are unchanged.
+
+Canonical commands are `npm run typecheck:system` and `npm run test:system:package` from the root.
+The latter delegates to the private workspace's typecheck plus runner and requires existing release
+output. The retained `npm run test:system:package -w gitlode` alias delegates one way to the root;
+its later removal requires a separate change. `npm run test:package` still builds release output,
+runs publint and reaches that alias. Do not run build:dev between bundling and packing: dist is shared.
+CI and validate:release explicitly check system typing and invoke the canonical root package command.
+Neither command starts formal performance measurements or establishes migration acceptance.
+
+Node 22+, npm and Git are host prerequisites. Repository paths resolve from the script, not caller
+cwd. Children use explicit cwd, shell-free argument arrays and sequential execution without retries.
+The real OS temp parent must be outside the real checkout before creation; spaces and different
+drives are supported. Only the newly created temporary root is deleted in finally after awaited
+children. Rejection creates no directory and deletes no existing data. Errors retain stdout/stderr.
+This runner has no harness process-group supervision or timeout framework: stalls require operator
+or CI cancellation, and Windows locks can prevent cleanup. Preserve failure evidence and return
+for diagnosis rather than silently retrying or changing lifecycle policy.
+
+The consumer installs the actual tarball and `typescript@^7.0.2`; registry access and resolved compiler
+version are execution inputs. Public consumer typing uses skipLibCheck false. The private workspace
+has no build/publish script or production entry points. It is outside product `files: [dist, schemas]`;
+exports, bin, bundler inputs and runtime dependencies remain unchanged. Workspace-wide source tests
+do not invoke packaging. Migration publish enforcement remains unchanged.

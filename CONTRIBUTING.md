@@ -81,3 +81,8 @@ for development/release artifact boundaries, package validation, and the complet
 - TypeScript strict mode is enforced
 - All code comments and documentation must be written in **English**
 - Run `npm run format:write` before committing to avoid CI failures on `format:check`
+
+The installed-package runner is owned by the private system workspace. Run `npm run typecheck:system`
+for its independent check and `npm run test:system:package` after a release build, or use
+`npm run test:package` to build and validate. See the
+[canonical build guide](packages/gitlode/docs/contributing/build-test-release.md).

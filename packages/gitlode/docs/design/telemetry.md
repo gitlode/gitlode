@@ -771,3 +771,12 @@ declarations.
 - Implementing external export, its configuration, or shutdown timeout policy.
 - Adding a general telemetry backend or destination extension point in anticipation of export.
 - Recording sensitive or unbounded values for local diagnosis by default.
+
+## Contributor implementation routes
+
+Recorder changes start at the operation owner and observation catalogs. Keep recording calls in the
+owning control flow; update fake Meter/clock tests and actual owner-path tests under
+[verification](telemetry-verification.md). Collection infrastructure changes start at execution's
+session, SDK and report boundaries with real-provider, fault and transport tests. Internal checks
+remain package-owned. Installed public-contract regression belongs to the private system workspace.
+Empirical acceptance follows [performance policy](telemetry-performance.md) separately.

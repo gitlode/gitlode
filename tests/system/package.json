@@ -1,0 +1,24 @@
+{
+  "name": "@gitlode/system-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test:package": "npm run typecheck && tsx ./scripts/test-installed-package.ts",
+    "format:write": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "oxfmt": "^0.62.0",
+    "oxlint": "^1.77.0",
+    "tsx": "^4.23.8",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

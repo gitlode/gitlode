@@ -12,7 +12,8 @@
     "packages/plugin-conventional-commits",
     "packages/plugin-custom-field",
     "packages/plugin-file-type",
-    "packages/plugin-identity-profile"
+    "packages/plugin-identity-profile",
+    "tests/system"
   ],
   "scripts": {
     "architecture:check": "npm run build:dev && rev-dep config run --lint-config",
@@ -38,8 +39,10 @@
     "test:package": "npm run test:package -w gitlode",
     "test:watch": "vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage",
-    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run build:release && npm run validate:publint -w gitlode && npm run test:system:package -w gitlode",
-    "version-packages": "npm run changeset:version && npm run lockfile:sync"
+    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run typecheck:system && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run build:release && npm run validate:publint -w gitlode && npm run test:system:package",
+    "version-packages": "npm run changeset:version && npm run lockfile:sync",
+    "typecheck:system": "npm run typecheck -w @gitlode/system-tests",
+    "test:system:package": "npm run test:package -w @gitlode/system-tests"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",

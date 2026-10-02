@@ -837,3 +837,37 @@ All entries verified at generation and at copy destination
 No sealed log is appended. Later document/checkpoint outputs remain outside the evidence root.
 Document-only formatting/check and diff check precede ordinary system-branch commit/push;
 no PR/merge, parent-ref update, release or acceptance-record change occurs.
+
+## Trunk system evidence disposition (2026-10-02)
+
+The first system slice is accepted for integration preparation, not M2/release acceptance. Combine
+independent implementation review at `988815e` with completion evidence returned at
+`7bf59245813ec47b8d175419bbec1b19994aca19`, all attributed to fixed implementation `f024eda`.
+Trunk rehashed the 60 entries in `.cache/m2-system-recovery-return-c79ed35/evidence`: no mismatch;
+manifest SHA-256 matches `25efe7790ef39e8a9d4ab332b092eb8269f57caf001a739fd0a68a5933b1466c`.
+Windows installed execution, Linux combined chain and both actual consumer/compiler/package identities
+are now supplied. Earlier failed attempts and excluded historical hashes remain unchanged.
+
+Trunk read the retained Linux fixture without deletion or another test invocation. Its state-0.json
+has generatedAt 2024-01-01T00:00:00.000Z, output-0 contains exactly oid 0 through 4 in
+performance-20240101T000000Z-000001.jsonl, and output-1 is empty. These match the synthetic CLI and
+second-child stall case in performance-workflow.test.ts. That test's supervisor terminates the worker;
+executePaired's worker-owned finally cannot then clean its separately created TMPDIR root, while the
+test teardown only owns its gitlode-supervised-workflow root. This strongly attributes the observed
+files to fault-injection residue, not the moved installed-package runner. It is not proof of the
+historical ENOTEMPTY/EBUSY cause or a claim that every fault path cleans files. Keep the retained
+fixture and record this bounded hygiene issue for harness/test ownership review before formal
+measurement; do not expand this migration with a cleanup repair or rerun the successful full suite.
+
+The outer deadline did not fire in accepted product runs. Windows deadline preflight was performed
+late, and Linux forced outer cleanup was not exercised. These limits preclude claiming independently
+verified emergency-cleanup behavior on both OSes, but do not invalidate completed exit-zero product
+checks with preserved logs and package identity. Future long-running operator packets must preflight
+their deadline mechanism before execution. No retroactive preflight or rerun is assigned here.
+
+Next: prepare system-to-M2 squash on the same child: inspect actual source/base and saved verification,
+consolidate completed design/implementation/evidence packets into concise ownership, validation and
+open-risk context, retain source/evidence references, check canonical navigation and relative links,
+and return exact source/base/tree plus candidate delta and PR description. Documentation only; no
+new test/install campaign, source repair, gate update, PR or merge. Human PR approval must precede
+creation and human squash. Preserve work refs until post-squash attribution and archive checks.

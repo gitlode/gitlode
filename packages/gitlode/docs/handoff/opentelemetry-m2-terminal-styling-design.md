@@ -2,12 +2,12 @@
 
 ## Status and boundaries
 
-Human visual tuning is complete for now: the human judged the Profile CLI output acceptable after
-selecting a flat layout and compact unit tokens. The maintenance refactor and subsequent catalog-test
-fix were also explicitly confirmed. Cleanup and validation at f0558856f018f24b5766d6ed8b5d241f9cb02747
-are complete. See the [independent review request](opentelemetry-m2-terminal-styling-review.md)
-for the pinned review range, CI results and unresolved test instability discovered in this session.
-Independent review is assigned by trunk. Do not self-accept the implementation or infer M2/release acceptance.
+Styling implementation and corrections are accepted; the next step is human-approved squash into
+profile, not another styling session. See the [accepted review and remaining observations](opentelemetry-m2-terminal-styling-review.md).
+On 2026-10-02 the human confirmed completed sample/real-repository checks are sufficient to proceed;
+no additional shared-consumer visual sample gates this integration. GNOME light/dark remains M2
+pre-release work. A reusable comprehensive dummy-data sample is future tooling, not a release blocker.
+Cumulative profile/M2 validation and publish acceptance remain open.
 
 Source branch: feature/otel-redesign_M2_styling. Intended return base: feature/otel-redesign_M2_profile.
 Entry source: 76486d25870172528ce9af086ace756388b6c8d8; entry ancestry, clean worktree and actual remote
@@ -121,7 +121,6 @@ their evidence and unresolved attribution are recorded in the linked review requ
 retry is not a fix for that instability. Keep skipped/unobserved evidence explicit. This packet does not waive publish
 or cumulative Windows/Linux/package acceptance gates. No publish command is authorized.
 
-Trunk should assign independent focused review of the entry-to-final diff, shared consumers,
-streaming/error behavior, optional grouping and diagnostic identity/ordering, tests and contracts.
+Independent focused review is complete; see the linked acceptance and risk record.
 After that review and green final CI, request human PR approval with explicit source/base. After human
 squash, verify source/content correspondence before cumulative acceptance. Preserve the styling ref.

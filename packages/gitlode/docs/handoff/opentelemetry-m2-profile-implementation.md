@@ -6,8 +6,9 @@
 > Current styling decisions and return status: [styling handoff](opentelemetry-m2-terminal-styling-design.md).
 
 P1/P2/P3 implementation slices are accepted; P3 fixed target is c694b69, with review at 1a012d5.
-Next assignment: [real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md).
-Human confirmation and cumulative validation remain pending. Earlier packets are historical context.
+Next assignment: [styling integration preparation](opentelemetry-m2-terminal-styling-design.md).
+The human accepted existing display checks for integration. Cumulative validation remains pending.
+Earlier packets are historical context.
 
 ## Assignment, source and branch
 

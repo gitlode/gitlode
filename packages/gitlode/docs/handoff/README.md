@@ -16,15 +16,13 @@ setup and one-target provenance; the [M1 evidence note](opentelemetry-m1-validat
 corrected functional/package validation and squash attribution. These four notes retain unfinished
 work context, not active instructions to repeat M1. Stable contracts live in design/contributing docs.
 
-The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`.
-P1 is [independently accepted](opentelemetry-m2-profile-p1-review.md#correction-round-1-re-review-outcome)
-at `dc6cfbd`. The active next assignment is
-[interactive terminal styling design and trials](opentelemetry-m2-terminal-styling-design.md).
-CI corrections are accepted; human light-background feedback requires shared styling revision before
-fine cosmetic adjustments. The session uses `feature/otel-redesign_M2_styling` for human-guided trials, then returns through
-independent review and human squash into profile. The terminal-check packet retains reproduction commands.
-P1/P2/P3 implementation slices are accepted. Human real-TTY confirmation, cumulative Windows/Linux
-validation and M2 acceptance remain pending.
+P1/P2/P3, styling and the supervisor cleanup correction are accepted. Next is human-approved
+styling-to-profile squash preparation, then complete-profile cumulative validation and integration
+into M2. See the [styling return](opentelemetry-m2-terminal-styling-design.md) and
+[review/remaining risks](opentelemetry-m2-terminal-styling-review.md). Additional sample display is
+not an integration gate; GNOME remains a pre-release check. Full T13B, tests/system organization,
+final-candidate validation and T13C remain open. Earlier profile packets are historical evidence until
+profile integration cleanup; they are not instructions to restart completed sessions.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are
 not automatically additional M2 obligations.

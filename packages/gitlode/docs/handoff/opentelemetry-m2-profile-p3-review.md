@@ -1,8 +1,9 @@
 # P3 independent presentation review
 
 P3 implementation review is complete: accepted at c694b69, recorded at 1a012d5.
-Next: [real-terminal confirmation preparation](opentelemetry-m2-profile-terminal-check.md).
-Human real-TTY and cumulative validation are pending. Earlier packets are historical evidence.
+Next: [styling integration preparation](opentelemetry-m2-terminal-styling-design.md).
+Existing human display checks suffice for integration; GNOME remains pre-release. Cumulative
+validation is pending. Earlier packets are historical evidence.
 
 ## Fixed inputs and authority
 

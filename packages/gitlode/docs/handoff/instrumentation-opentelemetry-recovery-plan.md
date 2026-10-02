@@ -482,3 +482,100 @@ gate retirement. Routine implementation choices: runner typing, manifest alignme
 path guards and documentation wording within the listed scope. Location, profile/style contracts,
 thresholds and publish authority are already settled. A new dependency/internal-access requirement or
 changed fixture/assertion is a scope conflict to return to trunk, not an implied authorization.
+
+## System implementation outcome (2026-10-02)
+
+Implementation is returned for independent review, with incomplete Windows functional evidence.
+The human authorized the fixed proposal at `1b2177bbc9027e990eb32fd243dc306cd67bac79`.
+Initial M2 checkout was clean. System local/tracking/actual remote matched that checkpoint before
+switching. Work remains on `feature/otel-redesign_M2_system`; parent refs are untouched.
+
+Checkpoints: executable workspace/move/wiring `a3dacf474797874cba58bc1fc63f9d24987686b6`,
+canonical ownership/navigation `f024edacff073be4f7438dbb3fb1f31cc0f8ba45`.
+Both were normally pushed. [Source CI](https://github.com/gitlode/gitlode/actions/runs/36971362693)
+passed on f024eda, including independent system typing, source tests and installed-package checks.
+This outcome-only descendant does not change implementation or public package inputs.
+
+Inventory: root manifest/lockfile, Rev-dep and CI wiring; new private system manifest and checked
+project; runner moved with repository-root and pre-creation realpath containment fixes; canonical
+build/domain/telemetry/verification/harness/navigation docs and root CONTRIBUTING. Assertions,
+fixture recipe, child execution and public package files/exports/bin/dependencies are retained.
+No collector/internal test, performance harness, Attributes fixture or publish gate changes.
+
+| Command boundary      | Before                                               | After                                                             |
+| --------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| Installed check       | product-local tsx script                             | root `test:system:package` -> system workspace typecheck + runner |
+| Product compatibility | `test:system:package -w gitlode` owns runner         | retained one-way `npm --prefix ../.. run test:system:package`     |
+| Convenience           | root/product `test:package` build + publint + runner | same sequence through retained alias                              |
+| Independent typing    | unchecked product tooling                            | root `typecheck:system` -> strict non-emitting local project      |
+| Release/CI            | prior source/build/package checks                    | adds independent system typing and canonical installed command    |
+
+### Evidence and finite check correspondence
+
+Evidence paths (local, not external backup): Windows
+`C:\Users\t-wakabayashi\source\gitlode\.cache\m2-system-evidence`, Linux
+`/home/t-wakabayashi/gitlode-performance/m2-system-20261002-pXtjx7/{source,evidence}`.
+Windows copy includes Linux evidence and source bundle through f024eda. Preserve these paths;
+no prior immutable archive was modified. Windows Node v22.23.1/npm 11.11.0; Linux uses the preserved
+M0 Node v22.23.1 toolchain, npm 10.9.8 and Git 2.53.0 (environment log is authoritative).
+
+| Required check                                | Execution / reusable evidence                                                           | Result                                                            |
+| --------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Clean npm ci                                  | Windows first attempt, Linux once                                                       | Windows setup EPERM; Linux pass                                   |
+| syncpack / format check / lint / architecture | Linux validate:release prefix; separate format:write/check and architecture; f024eda CI | pass                                                              |
+| Independent strict typing                     | Windows before ci; Linux standalone and package command; CI                             | pass                                                              |
+| schema / source tests                         | f024eda CI steps, same implementation source                                            | pass in CI; local schema stopped at setup failure                 |
+| Linux release / publint / installed CLI       | retained root test:package once plus CI canonical command                               | pass                                                              |
+| Compatibility alias                           | Linux root -> product -> root canonical -> system                                       | pass                                                              |
+| Windows release / publint / installed CLI     | not started after failed clean installation                                             | incomplete                                                        |
+| validate:release end-to-end                   | once on Linux copy                                                                      | incomplete: schema needs missing .git metadata                    |
+| Package inventory/hash                        | separate pack after successful Linux alias                                              | 13 files; no system/tooling files or private runtime dependencies |
+
+Linux tarball SHA-256:
+`148ffe3719aa773e12198df91b7be066e2f99084294c79ba31637e34fba8fb72`.
+`pack-inventory.json`, `packed-manifest.json`, `package-boundary.txt` and the tarball are saved.
+Installed help/version, schema title, two commits, isomorphic diff additions 2/deletions 1 with
+plugin enrichment, git-cli nonempty output, CLI/worker completion and strict NodeNext consumer plus
+Tracer/Meter/private declaration assertions passed unchanged. Each adapter returned 2 records.
+The transient consumer's resolved compiler version was not retained; consumer compiler command
+success is retained, and its existing registry-selected policy remains unchanged.
+
+Strict evidence: effective config and file list show noCheck false, noEmit true, composite false,
+strict/indexed/unused checks and the one owned runner included; no references/aliases. Rev-dep's
+finite inserted `../../../packages/gitlode/src/index.js` import failed with a root system-tests
+NOT ALLOWED violation. The exact original runner was restored and compared byte-for-byte; allowlists
+were not weakened. Config lint has zero errors and one compact-syntax warning.
+
+Containment evidence: actual implementation predicate checked with Windows win32 paths for a
+different drive, spaces, same directory, descendant and sibling prefix. Linux extracted unchanged
+guard executed with an outside space-containing parent and an inside-checkout TMPDIR. Inside rejection
+preceded creation, leaked no directory and preserved existing sentinel data. Windows sentinel and
+rejection predicate were also checked without deletion. Full Windows installed-path execution is
+still missing; predicate tests are not represented as that evidence.
+
+### First failures, deviations and return boundary
+
+Windows npm ci failed unlinking `node_modules/@oxlint/binding-win32-x64-msvc/oxlint.win32-x64-msvc.node`
+with EPERM before product/tests execution. First npm debug log and command log are saved. Its partial
+installation also left local formatting unavailable. No retry, timeout relaxation, lock cleanup or
+lifecycle change was attempted. Initial owned typecheck diagnostics were unused guard imports while
+edits were incomplete; these were corrected before the executable checkpoint. No product failure
+was observed in the successful Linux package execution.
+
+The Linux isolation was a source copy without .git. The first validate:release reached schema check
+and failed its Git status prerequisite. This agent preparation error is saved in validate-release.log;
+the chain was not rerun. Later checks were independent, previously unexecuted package/alias checks,
+not a retry of that chain. CI independently supplied schema/source-check evidence. Shell setup quoting
+errors occurred before Linux dependency/test execution; saved scripts avoid nested shell interpolation.
+
+Canonical additions use dedicated ownership/contributor subsections rather than modifying every
+proposed subsection in place. Lockfile changes are limited to the workspace/link/devDependencies.
+Formatting was run using Linux tooling after Windows setup failed, and formatted files were returned
+to the main checkout. No new machine/toolchain setup, formal measurement, PR, merge, parent ref update,
+release/publish or acceptance-record edit was performed.
+
+Remaining for trunk: independent implementation review; diagnose Windows setup EPERM before assigning
+any further Windows execution; decide the bounded follow-up for complete validate:release execution
+with Git metadata and exact transient consumer compiler identity. These missing checks are neither
+passes nor release exceptions. ENOTEMPTY/EBUSY/timeout and existing Attributes issues remain outside
+this slice. This implementation is not T13B/T13C acceptance or publish readiness.

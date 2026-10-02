@@ -1,5 +1,24 @@
 # M2 fixed candidate preparation (F)
 
+## Trunk disposition (2026-10-02)
+
+F preparation/preservation is accepted at outcome `70ffe23544f1ef8d848425fef8a54a64aec14c37`.
+Trunk rehashed all 552 Windows archive entries and the sealed manifest with zero mismatches, verified
+both actual remote archive refs at fixed `8fffcc0`, and inspected package binding, installed-validation
+logs and compatibility evidence. No build, restoration or measurement was repeated by trunk.
+Linux copy/restoration checks remain attributed to the preparation session's sealed evidence.
+
+Authorize reuse of M0 calibration for `commit_heavy_repository/isomorphic-git` (4,430 commits) under
+the unchanged recipe and legacy runtime, subject to actual execution environment/filesystem checks
+in the next packet. Recipe hash matches, recorded environment compatibility has no errors, and the
+12,288-byte memory difference is not a catalog incompatibility. This does not reuse old comparisons,
+sidecars or supervision acceptance, establish a globally sealed five-target manifest, or satisfy the
+eventual release record's evidence-specific provenance/review bindings by itself.
+
+Next is the [first fixed-candidate target packet](opentelemetry-m2-first-target-measurement.md).
+Four remaining calibrations, the complete matrix, aggregation and other catalog obligations remain.
+Preserve all old calibration evidence and its original OIDs; no relabeling under the new harness.
+
 ## Assignment
 
 The human starts a separate preparation conversation; trunk reviews its outcome before measurement.

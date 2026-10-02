@@ -19,7 +19,8 @@ work context, not active instructions to repeat M1. Stable contracts live in des
 P1/P2/P3, styling, corrections and cumulative validation are complete. Profile is squash-integrated into M2 by PR #113 at `c29376b`. The private
 `tests/system` workspace is also integrated by PR #114. The
 [readiness slice](opentelemetry-m2-measurement-readiness.md) is integrated by PR #115;
-next is [fixed candidate preparation F](opentelemetry-m2-candidate-freeze.md). See the
+[candidate preparation F](opentelemetry-m2-candidate-freeze.md) is accepted; next is the
+[first fixed-candidate target measurement](opentelemetry-m2-first-target-measurement.md). See the
 [profile integration evidence](opentelemetry-m2-profile-integration.md) for acceptance, OIDs, squash
 mapping and saved validation, and [remaining observations](opentelemetry-m2-profile-observations.md)
 for instability and future Span work. Full T13B, GNOME pre-release checks, final-candidate validation

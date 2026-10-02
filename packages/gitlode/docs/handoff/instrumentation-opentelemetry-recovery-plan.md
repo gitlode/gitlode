@@ -85,7 +85,11 @@ Current assignment: [fixed candidate preparation F](opentelemetry-m2-candidate-f
 product/harness `8fffcc0d8e11bb061d70bf870f262092d559c5f2`. Trunk retains the current coherent
 M2 history without rewriting; the packet records the reviewed ancestry and preservation boundaries.
 Readiness work-branch deletion was reported by the human; its archive remains preserved.
-F preparation and formal measurement are separate conversations. Calibration reuse is not yet decided.
+F preparation is accepted at `70ffe23544f1ef8d848425fef8a54a64aec14c37`.
+The [first fixed-candidate target packet](opentelemetry-m2-first-target-measurement.md) now owns the
+active assignment: conditional reuse of M0 calibration for commit-heavy/isomorphic-git, new legacy
+capture and both new comparisons. No old comparison acceptance is reused. F and measurement remain
+separate conversations; the other targets and all remaining M2 obligations stay open.
 
 ## History and parallel development boundary
 

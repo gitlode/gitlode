@@ -380,3 +380,109 @@ under `.cache/m2-r1-8246f95/return`.
 R1 now has bounded failure-retention regression evidence and reconciled documentation; readiness
 remains pending independent focused re-review of the fixed branch revision. This does not establish
 F, T13B, M2 or publish acceptance. Return to trunk is this report only, with no trunk ref update.
+
+## Independent focused R1 re-review (2026-10-02)
+
+Fixed review target: `7edd62c87384399190c7a5bf89ae4048b155347d`; implementation:
+`0993f21a056dc09b803b56367ac47e75b9f0a7cb`; pre-correction:
+`8246f950440d17c044c06e7675c509fab1406842`. Entry was clean on
+`feature/otel-redesign_M2_readiness`. The implementation-to-target delta is this readiness
+report only. This separate review changes only this document, without implementation repair.
+Return to trunk means the report; the branch stays unchanged in name and no parent ref is updated.
+The documentation checkpoint and remote equality are recorded separately in the session return.
+
+### Decision and required finding R2
+
+**R1's assertion-retention correction is confirmed, but R1 as a complete failure-policy closure
+and the readiness slice are not accepted yet.** Required R2 (medium): reconcile diagnostic-output
+failure with the original-error guarantee. At `performance-workflow.test.ts:212`, the catch calls
+`process.stderr.write(...)` before `throw error`, without a protective catch, callback or stream-error
+policy. Concrete path: an assertion, copy or removal fails, then reporting to a broken stderr fails.
+A synchronous reporting exception bypasses the original rethrow; an asynchronous write failure
+(for example EPIPE on a closed pipe) can introduce a stream error rather than preserve the assertion
+as the sole authoritative failure. Retained files are not intentionally deleted, but the original
+cause and usable path announcement are no longer guaranteed. The correction outcome says the catch
+rethrows the original error, and the guide excludes copy/storage and abrupt termination from complete
+retention while giving no diagnostic-output qualification. This finding is source-path analysis;
+no broken-stderr injection was independently executed. The passing retention probes use healthy
+captured stderr and do not establish this failure case.
+
+Before closure, make reporting best effort with a defined original-error policy and suitable bounded
+verification, or explicitly narrow the documented guarantee for diagnostic-channel failure if that
+policy is accepted by trunk. No implementation change is made in this review. Copy failure already
+stops before root removal; removal failure can leave a partial root but follows a completed copy.
+Successful-path afterEach removal failures remain cleanup failures and can retain owned locations;
+no failed body has these locations registered for cleanup. These limits do not invalidate the two
+ordinary assertion-retention regressions. R2 is required; the optional items below are not blockers.
+
+### Independently confirmed scope
+
+- Before-removal assertion failure leaves root and outside unregistered; after-removal failure
+  leaves the full diagnostic copy outside. Both new regressions passed after a separate Vitest
+  child exited nonzero, so inspection really follows that child's afterEach, rather than an
+  in-body simulation. They inspect supervision cleanup evidence, one completed run, manifest,
+  two actual fixture paths, CLI/counter, sentinel, and post-removal copied evidence equality/root
+  absence. Successful normal/stall paths preserve the existing assertions and clean both regions.
+- Nested Vitest selects the exact workflow file and the stall-true test by `-t`; the regression
+  names do not match that filter, preventing recursive probe execution. Child-specific injection
+  occurs after supervisor completion and before/after root removal. Expected exit 1 and injected
+  assertion text are required. Inner workflow timeout is 25 seconds, test timeout 30 seconds,
+  nested execFile timeout 45 seconds and parent probe timeout 60 seconds. Normal probes wait for
+  child close, validate cleanupConfirmed/empty errors, realpaths and owned temporary-parent/prefix
+  containment before registering their two observed regions for parent afterEach disposal.
+  Timeout/abrupt termination does not prove all nested descendants exited and may retain probe
+  roots; no universal cleanup guarantee is inferred from execFile's timeout.
+- Production supervisor, thresholds and fixture recipe are unchanged in the reviewed delta.
+  The fixture quantities and existing workflow assertions remain; no architecture boundary changed.
+- Saved correction archive was checked before new workloads: all 663 entries match size/hash and
+  manifest `80c21ea8674c6ea0136b7d2d2e3b51c7cb954419895122511f64317ed3d0aff3` matches.
+  Saved `final.test.ts`, independently executed fixed test, and implementation Git bytes all hash
+  to `e411504aa95e28e3fdfbe0337e97638061157a46e8b630ddd479b5f70c2f9efa`.
+  Saved `implementation.test.ts` is an earlier intermediate version, not the final implementation;
+  correspondence relies on `final.test.ts`. Original execution used copied changes on a baseline
+  clone; this review instead checked out the exact fixed target. Saved final suites/typecheck logs
+  corroborate the prior report. Original setup failures, lint and initial corrections are saved-log
+  observations only, not independently rerun historical campaigns.
+
+### Independent execution and evidence
+
+Native clone: `/home/t-wakabayashi/gitlode-performance/m2-r1-review-7edd62c/source`, exact fixed
+HEAD, reusing the prior Linux node_modules through a symlink. Explicit Linux Node v22.23.1 PATH,
+npm 10.9.8, Git 2.53.0 and unset NODE_OPTIONS; kernel/storage/free-space observations are archived.
+Sandbox WSL enumeration returned E_ACCESSDENIED before workloads; elevated authorized WSL access
+succeeded. Per-command safe.directory handles sandbox repository ownership without global config.
+
+Fresh Linux launcher preflight preceded clone/build: 2052 ms, exit 124, SIGKILL, retained logs/result,
+no observed live disposable parent/group members. Launcher hash and close-based/escaped-group/kernel
+I/O/host-loss limits remain those recorded above. Invocation uses
+`node <review-root>/tools/run.cjs <review-root> <stage> <seconds> <command> <args>` with
+`TMPDIR=/tmp/gl-r1-review`. Exact configs and logs are archived.
+
+| Independent validation                                                                                                                       | Outer seconds | Result                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------: | ------------------------------------------------------------ |
+| Local clone of the readiness branch, fixed HEAD assertion                                                                                    |           120 | 0                                                            |
+| `npm run build:dev`                                                                                                                          |           600 | 0                                                            |
+| `npx vitest run packages/gitlode/test/telemetry/performance-workflow.test.ts packages/gitlode/test/telemetry/performance-supervisor.test.ts` |           180 | 0; 2 suites / 49 tests, including both new regressions, once |
+| `npx tsc -p .cache/readiness-tsconfig.json --listFiles --pretty false`                                                                       |           120 | 1; four existing TS2542, no new diagnostics                  |
+| Same strict command with pre-correction test, then restore fixed bytes                                                                       |           120 | 1; same four readonly assignments                            |
+| `npm run format:check`; `git diff --check`                                                                                                   |       180; 30 | 0; 0                                                         |
+
+The saved strict non-emitting configuration extends tsconfig.base.json and roots at the changed test.
+Both imported closures contain the same 277 files. Fixed diagnostics are at 343/617/623/629;
+pre-correction diagnostics at 247/521/527/533 identify the same mutations. Neither exit 1 is a success,
+and build does not typecheck tests or prove a green whole-test/supervisor-test closure.
+Final clone status is clean. The fresh owned TEMP contains runtime caches, no workflow fixture roots;
+recorded launcher groups have no live observed members. This scoped observation does not cover all
+escaped groups. Old residue and sealed archives were preserved.
+
+Review archive: `.cache/m2-r1-review/evidence/linux`, 38 sealed entries, manifest SHA-256
+`021127cdc31eebad0129ba66e3731acbf0e4a02b421644337a5521462535a8b1`.
+Returned copies and manifest were hash-compared with native originals before reporting preservation.
+These are local copies, not external backup. Do not append to this archive. Review scripts and final
+document format/write/check and Git return evidence are separate under `.cache/m2-r1-review`.
+
+Optional improvements: explicitly assert the nested selected-test count, and document nested timeout
+residue alongside the existing abrupt-runner limit. Neither is an additional required correction.
+No full suite, package/OS campaign, formal measurement or historical failure reproduction was run.
+No PR, merge, parent-ref update, freeze or acceptance-record update occurred. This is focused review
+only and does not establish F, T13B, M2 or publish acceptance; trunk receives the unresolved R2 report.

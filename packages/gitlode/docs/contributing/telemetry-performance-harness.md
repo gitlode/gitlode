@@ -36,8 +36,14 @@ The supervised workflow integration test owns a fresh temporary parent beneath i
 passes it only through the spawned child's environment. Its normal and second-child-stall cases
 observe actual fixture realpaths, retain completed-run/status evidence, and verify removal after
 the supervisor's cleanup barrier while preserving an outside sentinel. If completion or containment
-cannot be confirmed, the root is retained for diagnosis. Killing the test runner itself can prevent
-test teardown; this test-only ownership does not promise cleanup after abrupt runner or host loss.
+cannot be confirmed, or an assertion fails before root removal, the root is retained for diagnosis.
+Before removal, the test copies the root's diagnostic materials outside it; a later verification
+failure retains that copy. Both locations are reported on failure and remain outside unconditional
+teardown registration until all assertions succeed. Successful cases clean both owned locations.
+The bounded regression probes check retention after a failing Vitest child's actual teardown, then
+dispose only their verified owned fixtures after confirmed process cleanup. Copy/storage failures
+and abrupt runner or host loss do not carry a complete-retention guarantee; no cleanup is attempted
+on the failure path that could replace the original error.
 
 Run the `performance:*` npm commands in Linux (including WSL2), with Linux-native Node, Git,
 temporary storage, and release snapshots. These commands enter `telemetry-performance-supervised.ts`;

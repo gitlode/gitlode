@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -88,59 +88,164 @@ describe.skipIf(process.platform !== "linux")("supervised workflow integration",
     "preserves completed runs when a later child stalls: %s",
     async (stall) => {
       const root = await mkdtemp(join(tmpdir(), "gitlode-supervised-workflow-"));
-      // Register teardown only after the supervisor confirms process completion.
-      // Killing the test runner itself can still leave this owned root behind.
+      // Neither diagnostic location is registered until every assertion succeeds.
       const fixtureParent = join(root, "workflow-temp");
       await mkdir(fixtureParent);
       const outside = await mkdtemp(join(tmpdir(), "gitlode-workflow-sentinel-"));
-      temporary.push(outside);
-      const sentinel = join(outside, "sentinel");
-      await writeFile(sentinel, "protected outside fixture");
-      const fixtureLog = join(root, "fixture-paths.jsonl");
-      const artifacts = join(root, "artifacts");
-      const manifestPath = join(root, "manifest.json");
-      const cli = join(root, "cli.cjs");
-      await writeFile(manifestPath, JSON.stringify(manifest("complete")));
-      await writeFile(
-        cli,
-        `const fs=require('node:fs'),a=process.argv.slice(2),value=n=>a[a.indexOf(n)+1];
+      try {
+        const sentinel = join(outside, "sentinel");
+        await writeFile(sentinel, "protected outside fixture");
+        const fixtureLog = join(root, "fixture-paths.jsonl");
+        const artifacts = join(root, "artifacts");
+        const manifestPath = join(root, "manifest.json");
+        const cli = join(root, "cli.cjs");
+        await writeFile(manifestPath, JSON.stringify(manifest("complete")));
+        await writeFile(
+          cli,
+          `const fs=require('node:fs'),a=process.argv.slice(2),value=n=>a[a.indexOf(n)+1];
 const counter=${JSON.stringify(join(root, "counter"))};
 fs.appendFileSync(${JSON.stringify(fixtureLog)},JSON.stringify(fs.realpathSync(require('node:path').dirname(value('--output-dir'))))+'\\n');
 const count=fs.existsSync(counter)?Number(fs.readFileSync(counter,'utf8'))+1:1;fs.writeFileSync(counter,String(count));
 if(${stall} && count===2){setInterval(()=>{},1000)}else{
 fs.writeFileSync(value('--output-dir')+'/performance-20240101T000000Z-000001.jsonl',Array.from({length:5},(_,i)=>JSON.stringify({oid:String(i)})).join('\\n')+'\\n');
 fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedAt:'2024-01-01T00:00:00.000Z',refs:[]}));}`,
-      );
+        );
+        const repositoryRoot = resolve(import.meta.dirname, "../../../..");
+        const execution = promisify(execFile)(
+          process.execPath,
+          [
+            resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+            resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance-supervised.ts"),
+            "capture-legacy",
+            "--manifest",
+            manifestPath,
+            "--fixture",
+            "commit_heavy_repository",
+            "--adapter",
+            "isomorphic-git",
+            "--baseline-cli",
+            cli,
+            "--legacy-revision",
+            "legacy-test",
+            "--artifacts",
+            artifacts,
+            "--execution-timeout-ms",
+            "1000",
+          ],
+          {
+            cwd: repositoryRoot,
+            env: { ...process.env, TMPDIR: fixtureParent, TMP: fixtureParent, TEMP: fixtureParent },
+            timeout: 25_000,
+          },
+        );
+        if (stall) await expect(execution).rejects.toMatchObject({ code: 2 });
+        else await execution;
+        const evidence = await Promise.all(
+          (await readdir(artifacts))
+            .filter((name) => name.endsWith(".json"))
+            .map(async (name) => JSON.parse(await readFile(join(artifacts, name), "utf8"))),
+        );
+        const supervision = evidence.find((value) => value.kind === "performance-supervision");
+        expect(supervision.cleanupConfirmed).toBe(true);
+        expect(supervision.cleanupErrors).toEqual([]);
+        const ownedParent = await realpath(fixtureParent);
+        expect(await realpath(root)).toBe(dirname(ownedParent));
+        if (process.env.GITLODE_RETENTION_PROBE === "before-removal") {
+          expect(supervision.status).toBe("injected assertion failure");
+        }
+        expect(supervision.status).toBe(stall ? "inconclusive" : "completed");
+        expect(supervision.failure).toBe(stall ? "execution-deadline-exceeded" : undefined);
+        expect(evidence.filter((value) => value.kind === "completed-performance-run")).toHaveLength(
+          stall ? 1 : 9,
+        );
+        expect(JSON.parse(await readFile(manifestPath, "utf8"))).toEqual(manifest("complete"));
+        const generatedRoots = (await readFile(fixtureLog, "utf8"))
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line) as string);
+        expect(generatedRoots).toHaveLength(stall ? 2 : 9);
+        for (const generatedRoot of generatedRoots) {
+          const contained = relative(ownedParent, generatedRoot);
+          expect(contained).not.toBe("");
+          expect(contained.startsWith("..")).toBe(false);
+          expect(isAbsolute(contained)).toBe(false);
+          expect(dirname(generatedRoot)).toBe(ownedParent);
+        }
+        const remaining = await readdir(fixtureParent);
+        expect(remaining.filter((name) => name.startsWith("gitlode-performance-"))).toHaveLength(
+          stall ? 1 : 0,
+        );
+        // Preserve evidence outside the owned root before exercising outer teardown.
+        const retainedEvidence = join(outside, "completed-evidence.json");
+        await writeFile(retainedEvidence, JSON.stringify(evidence));
+        await cp(root, join(outside, "diagnostics"), { recursive: true });
+        await rm(root, { recursive: true });
+        await expect(realpath(fixtureParent)).rejects.toMatchObject({ code: "ENOENT" });
+        if (process.env.GITLODE_RETENTION_PROBE === "after-removal") {
+          expect(supervision.status).toBe("injected assertion failure");
+        }
+        expect(JSON.parse(await readFile(retainedEvidence, "utf8"))).toEqual(evidence);
+        expect(await readFile(sentinel, "utf8")).toBe("protected outside fixture");
+        temporary.push(root, outside);
+      } catch (error) {
+        process.stderr.write(
+          "Retained supervised workflow diagnostics: " + JSON.stringify({ root, outside }) + "\n",
+        );
+        throw error;
+      }
+    },
+    30_000,
+  );
+  it.each(["before-removal", "after-removal"])(
+    "retains diagnostics after actual failed-test teardown: %s",
+    async (phase) => {
       const repositoryRoot = resolve(import.meta.dirname, "../../../..");
-      const execution = promisify(execFile)(
-        process.execPath,
-        [
-          resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
-          resolve(repositoryRoot, "packages/gitlode/scripts/telemetry-performance-supervised.ts"),
-          "capture-legacy",
-          "--manifest",
-          manifestPath,
-          "--fixture",
-          "commit_heavy_repository",
-          "--adapter",
-          "isomorphic-git",
-          "--baseline-cli",
-          cli,
-          "--legacy-revision",
-          "legacy-test",
-          "--artifacts",
-          artifacts,
-          "--execution-timeout-ms",
-          "1000",
-        ],
-        {
-          cwd: repositoryRoot,
-          env: { ...process.env, TMPDIR: fixtureParent, TMP: fixtureParent, TEMP: fixtureParent },
-          timeout: 25_000,
-        },
+      let output = "";
+      try {
+        await promisify(execFile)(
+          process.execPath,
+          [
+            resolve(repositoryRoot, "node_modules/vitest/vitest.mjs"),
+            "run",
+            "packages/gitlode/test/telemetry/performance-workflow.test.ts",
+            "-t",
+            "preserves completed runs when a later child stalls: true",
+          ],
+          {
+            cwd: repositoryRoot,
+            env: { ...process.env, GITLODE_RETENTION_PROBE: phase },
+            timeout: 45_000,
+          },
+        );
+        throw new Error("Retention probe unexpectedly passed");
+      } catch (error) {
+        const failure = error as { code?: number; stdout?: string; stderr?: string };
+        expect(failure.code).toBe(1);
+        output = `${failure.stdout}\n${failure.stderr}`;
+      }
+      expect(output).toContain("injected assertion failure");
+      process.stderr.write(output + "\n");
+      const match = /Retained supervised workflow diagnostics: (\{[^\n]+\})/.exec(output);
+      expect(match).not.toBeNull();
+      const locations = JSON.parse(match![1]!) as { root: string; outside: string };
+      process.stderr.write(
+        "Observed retention after Vitest teardown: " +
+          JSON.stringify({ phase, ...locations }) +
+          "\n",
       );
-      if (stall) await expect(execution).rejects.toMatchObject({ code: 2 });
-      else await execution;
+      const diagnostics =
+        phase === "before-removal" ? locations.root : join(locations.outside, "diagnostics");
+      expect(await realpath(diagnostics)).toBe(diagnostics);
+      const fixturePaths = (await readFile(join(diagnostics, "fixture-paths.jsonl"), "utf8"))
+        .trim()
+        .split("\n");
+      expect(fixturePaths).toHaveLength(2);
+      expect(JSON.parse(await readFile(join(diagnostics, "manifest.json"), "utf8"))).toEqual(
+        manifest("complete"),
+      );
+      expect(await readFile(join(diagnostics, "counter"), "utf8")).toBe("2");
+      expect(await readFile(join(diagnostics, "cli.cjs"), "utf8")).toContain("setInterval");
+      const artifacts = join(diagnostics, "artifacts");
       const evidence = await Promise.all(
         (await readdir(artifacts))
           .filter((name) => name.endsWith(".json"))
@@ -149,40 +254,31 @@ fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedA
       const supervision = evidence.find((value) => value.kind === "performance-supervision");
       expect(supervision.cleanupConfirmed).toBe(true);
       expect(supervision.cleanupErrors).toEqual([]);
-      const ownedParent = await realpath(fixtureParent);
-      expect(await realpath(root)).toBe(dirname(ownedParent));
-      temporary.push(root);
-      expect(supervision.status).toBe(stall ? "inconclusive" : "completed");
-      expect(supervision.failure).toBe(stall ? "execution-deadline-exceeded" : undefined);
       expect(evidence.filter((value) => value.kind === "completed-performance-run")).toHaveLength(
-        stall ? 1 : 9,
+        1,
       );
-      expect(JSON.parse(await readFile(manifestPath, "utf8"))).toEqual(manifest("complete"));
-      const generatedRoots = (await readFile(fixtureLog, "utf8"))
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line) as string);
-      expect(generatedRoots).toHaveLength(stall ? 2 : 9);
-      for (const generatedRoot of generatedRoots) {
-        const contained = relative(ownedParent, generatedRoot);
-        expect(contained).not.toBe("");
-        expect(contained.startsWith("..")).toBe(false);
-        expect(isAbsolute(contained)).toBe(false);
-        expect(dirname(generatedRoot)).toBe(ownedParent);
+      for (const line of fixturePaths)
+        expect(dirname(JSON.parse(line))).toBe(join(locations.root, "workflow-temp"));
+      expect(await readFile(join(locations.outside, "sentinel"), "utf8")).toBe(
+        "protected outside fixture",
+      );
+      if (phase === "after-removal") {
+        await expect(realpath(locations.root)).rejects.toMatchObject({ code: "ENOENT" });
+        expect(
+          JSON.parse(await readFile(join(locations.outside, "completed-evidence.json"), "utf8")),
+        ).toEqual(evidence);
       }
-      const remaining = await readdir(fixtureParent);
-      expect(remaining.filter((name) => name.startsWith("gitlode-performance-"))).toHaveLength(
-        stall ? 1 : 0,
-      );
-      // Preserve evidence outside the owned root before exercising outer teardown.
-      const retainedEvidence = join(outside, "completed-evidence.json");
-      await writeFile(retainedEvidence, JSON.stringify(evidence));
-      await rm(root, { recursive: true });
-      await expect(realpath(fixtureParent)).rejects.toMatchObject({ code: "ENOENT" });
-      expect(JSON.parse(await readFile(retainedEvidence, "utf8"))).toEqual(evidence);
-      expect(await readFile(sentinel, "utf8")).toBe("protected outside fixture");
+      // Dispose only this probe's observed, contained fixtures after confirmed process cleanup.
+      for (const [path, prefix] of [
+        [locations.root, "gitlode-supervised-workflow-"],
+        [locations.outside, "gitlode-workflow-sentinel-"],
+      ] as const) {
+        expect(dirname(path)).toBe(await realpath(tmpdir()));
+        expect(relative(await realpath(tmpdir()), path).startsWith(prefix)).toBe(true);
+      }
+      temporary.push(locations.root, locations.outside);
     },
-    30_000,
+    60_000,
   );
 });
 describe("performance workflow routing", () => {

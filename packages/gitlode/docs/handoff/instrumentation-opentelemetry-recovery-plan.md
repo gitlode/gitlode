@@ -91,6 +91,11 @@ active assignment: conditional reuse of M0 calibration for commit-heavy/isomorph
 capture and both new comparisons. No old comparison acceptance is reused. F and measurement remain
 separate conversations; the other targets and all remaining M2 obligations stay open.
 
+First target attempt returned at `4f42f1184ded2a73ae6f6b950805b2924aaeb5cc`: capture passed,
+disabled overhead was inconclusive (candidate MAD 6.428 percent), profile was not executed.
+The first-target document's opening diagnosis packet supersedes its execution assignment. Trunk
+verified the returned manifest; no retry is authorized. Next is saved-evidence diagnosis only.
+
 ## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.

@@ -1,5 +1,60 @@
 # M2 first fixed-candidate target measurement
 
+## Current routing: bounded diagnosis, no new measurement
+
+Trunk reviewed outcome `4f42f1184ded2a73ae6f6b950805b2924aaeb5cc` and rehashed the returned
+549 entries plus manifest with no mismatch. Capture pass and disabled inconclusive are retained;
+profile remains unexecuted. This is evidence review, not performance acceptance or a new run.
+Formal candidate MAD is 6.428 percent, over the unchanged 5 percent limit.
+
+Measured baseline/candidate seconds by pair, rounded only for this explanatory table:
+
+| Pair | Order | Legacy | Candidate |
+| ---- | ----- | -----: | --------: |
+| 0    | A-B   | 26.668 |    26.794 |
+| 1    | B-A   | 27.317 |    27.277 |
+| 2    | A-B   | 30.168 |    29.937 |
+| 3    | B-A   | 30.554 |    31.523 |
+| 4    | A-B   | 30.042 |    31.040 |
+| 5    | B-A   | 30.166 |    29.151 |
+| 6    | A-B   | 27.189 |    27.330 |
+
+Both series move together across the attempt. This supports investigating common temporal variation,
+not attributing the failure to Windows/WSL, thermal/power policy, background tasks or the product without
+evidence. Small paired ratios do not override the catalog's absolute stability gate. Historical M0
+and current timing differ; reuse compatibility is not proof of stationarity during this attempt.
+
+### Next session packet: saved-evidence diagnosis only
+
+Start from the M2 documentation checkpoint delivering this section, with outcome `4f42f11` as its
+ancestor. Read the outcome below, performance catalog/evaluator, F compatibility assessment and M0
+calibration evidence. Use fixed harness/product `8fffcc0` for code interpretation, not current tip
+as a replacement source. No child implementation branch is needed; shared checkout stays on M2.
+
+1. Independently recompute median, MAD, paired ratios and reason classification from original numeric
+   runs, separating warmups from measured pairs. Check pair indices/order and timestamps against
+   saved progress; do not sort away chronology, discard samples or invent a different acceptance rule.
+2. Compare capture, disabled warmups/pairs and historical calibration/measurement durations. Inspect
+   actual filesystem/runtime/environment evidence, sampling/launch changes and available resource
+   observations. Verify calibration reuse assumptions and clarify the 10-to-30-second calibration
+   criterion versus comparison-stage duration rules in the existing evaluator. Do not change either.
+3. Rank concrete hypotheses with supporting/contradictory evidence and missing observations. Limit
+   this to saved data and relevant code; no benchmarks, stress tests, calibration, profiling campaigns,
+   OS-setting changes or broad host scans. Unknown cause is an acceptable diagnosis outcome.
+4. Recommend one bounded next action: a specific correction if proven, or one controlled fresh attempt
+   with explicit preconditions and minimally intrusive external observations if justified. Explain
+   what it can establish and what failure would mean. Do not execute it; trunk decides retry authority
+   and dependent-stage routing. Do not make external measurements part of the timed product path.
+
+Append a concise diagnosis here and preserve derived tables/scripts outside sealed archives with
+source artifact identities. Keep original results unchanged. Commit and normally push documentation
+only on M2 after checking ref movement; report exact final OID/remote equality and clean status.
+No full tests, installs/builds, PR/merge, new candidate, threshold/recipe changes or acceptance updates.
+Avoid a generic infrastructure project or attempting to prove every possible cause. Historical
+ENOTEMPTY/EBUSY and existing TypeScript errors are outside this diagnosis.
+
+The measurement instructions below are completed attempt history, not permission to run again.
+
 ## Authority and fixed inputs
 
 This separate human-started session performs formal measurement only, with no implementation repair.

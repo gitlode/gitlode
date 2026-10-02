@@ -44,113 +44,30 @@ T13B/T13C exit criteria. Canonical design, verification, performance and publish
 - Preserve immutable evidence under `D:\gitlode_test`; do not overwrite archives or use them as
   mutable build directories. Old packets remain in recorded commits and bundles, not active instructions.
 
-## Accepted profile design and next assignment
+## Accepted profile and integration boundary
 
-The human-approved [profile design](opentelemetry-m2-profile-design.md), including diagnostic identity
-and whole-report fallback corrections, was accepted by trunk at
-`d87bfd6fb8d4e874bb78424111f21f78fd6c9a6d`. Local and actual remote M2 both contained this checkpoint
-when this plan was prepared. The design conversation is complete. Its examples do not replace
-implemented-output review, functional/package checks or performance acceptance.
+P1/P2/P3, styling, corrections and cumulative functional/package validation are complete.
+[Integration evidence](opentelemetry-m2-profile-integration.md) owns accepted OIDs, styling squash
+correspondence, saved command/package evidence, human display limits and the proposed PR summary.
+[Remaining observations](opentelemetry-m2-profile-observations.md) owns unresolved instability and
+future Span aggregation/retention questions. Completed implementation/review/trial packets are
+retained in Git rather than as live work instructions.
 
-This is a profile **and report-quality** change: schema v2, bounded structured diagnostics,
-measurement availability masks, collector/report propagation, worker fallback, generic presentation
-and shared styling are in scope. Observation admission, recorder ownership and Span aggregation
-identity remain unchanged. The collector changes cannot be attributed to presentation alone.
+Current work is profile-to-M2 integration preparation on profile. Human PR/merge authority remains;
+no PR is authorized. Saved validation applies to fixed candidate `f4d90d1`; reuse for integration is
+based on an explicitly verified documentation-only delta and unchanged base, not a new execution.
+No further product/package campaign or display sample is assigned. ENOTEMPTY and Windows
+timeout/EBUSY remain unresolved; existing Attributes typing is separate. GNOME light/dark remains
+a pre-release check, preferably before freeze. Publish acceptance stays blocked.
 
-P1 is accepted at `dc6cfbd69e99cbf13ba6ef4191a123ef182627b5`, with independent re-review
-recorded at `8ea9cfca2fb0cb7ab6455d9805cc1479ff19e932`. All four corrections and preprocessing
-hardening were accepted; the reviewer independently ran build and 7 files / 112 tests. This is
-primitive acceptance, not runtime or M2 acceptance. P2 is accepted at
-`755e7d34f3d0ea56c7346ce009ec7d7624bab32c`, with independent acceptance recorded at
-`4ba32fad97897f00adafe9275e7fb9bd589f6b8f`. All R1-R4 and actual transport obligations are accepted;
-157 focused tests, build and strict tooling checks were independently verified in the final review.
-This closes the runtime/consumer slice, not the complete profile or M2 acceptance.
+After human integration: private tests/system design/migration/review; history/evidence freeze;
+full T13B; GNOME before release; final combined-candidate validation and T13C/publish evidence.
+Prepare `feature/otel-redesign_M2_system` from the then-accepted M2 tip only after profile returns.
+The packet must preserve commands, checked tooling TypeScript, dependency boundaries and current
+gates, and distinguish migration-only versus lasting checks. No broad test move is pre-authorized.
+Formal operator packets need exact inputs, commands, bounds, archive roots and failure return rules.
 
-P3 implementation is accepted at `c694b69cc964226ccbf07325ee45ab32b6ff2e74`, recorded by independent
-review at `1a012d589604c6e570e155b3aa49a6d31a038f5d`. R1-R4 are closed; build, strict tooling and
-nine suites/75 tests were independently verified. P1/P2 remain accepted. This is implementation
-acceptance, not human terminal/cumulative/M2 acceptance.
-
-The CI/duration correction `d9e994c` is accepted at `aab058e`. Shared styling, flat default layout,
-compact unit tokens and renderer extraction were reviewed at `f055885`; the sole test-stub correction
-`0256c71` was accepted by trunk. Supervisor cleanup correction `97cab518` was independently accepted
-at `68daa1f`. The [styling return](opentelemetry-m2-terminal-styling-design.md) and
-[review/remaining risks](opentelemetry-m2-terminal-styling-review.md) preserve attribution.
-
-On 2026-10-02 the human confirmed that completed sample and real-repository checks are sufficient:
-no additional shared-consumer sample or visual check blocks styling-to-profile integration. Recorded
-Windows Profile evidence is not relabeled as proof of every role/terminal. GNOME light/dark remains
-an explicit M2 pre-release check, preferably before candidate freeze. A reusable dummy-data display
-sample is a useful future maintenance task, not a new integration or release gate.
-
-PR #112 was human squash-merged into profile at
-`f4d90d1ce1828c2f06abc9684bcc10006b09e7cd`, parent
-`76486d25870172528ce9af086ace756388b6c8d8`. Trunk verified GitHub merge state and actual remote/local
-profile equality. Its tree `d68714d0b1e4b4c7820f71d12349b2817c190291` exactly matches source
-`1d97c9941f87bff6013ee411800f70ee91b42e5a`. Local/remote archive
-`archive/otel-m2-styling-1d97c99` preserves that source and all reviewed ancestors. The human may
-now delete local/remote `feature/otel-redesign_M2_styling`; preserve the archive. No branch was deleted
-by trunk. Equal trees preserve content attribution, not rewritten measurement ancestry.
-
-Current step: the cumulative profile validation packet below, then human-approved profile-to-M2
-squash. Planning stays on `feature/otel-redesign_M2_profile`. No PR is authorized yet.
-
-Linux ENOTEMPTY and Windows timeout/EBUSY remain unresolved observations; bounded investigations
-ended without supported fixes. Do not launch further reproduction campaigns or retry until green.
-Preserve complete evidence if ordinary verification fails again, then triage the actual failure.
-The historical supervisor R cause remains uncertain despite the accepted contract correction.
-These facts do not waive required cumulative tests, formal performance checks or publish acceptance.
-The separate existing Attributes fixture typing issue does not expand M2 into wholesale test typing.
-
-After profile integration: first private tests/system migration and review; history/evidence freeze;
-full T13B; GNOME check before release; combined final-candidate validation and T13C/publish evidence.
-Trunk is a conversation role, not a Git ref. Formal performance and PR/merge authority are unchanged.
-
-## Session sequence and dependencies
-
-These are scheduling labels, not replacements for T13B/T13C. Each implementation outcome returns to
-trunk before the next session. Reviews target exact checkpoint OIDs and affected dependencies;
-accepting a preparatory slice does not accept the entire profile feature or publish gate.
-
-| Stage                 | Session responsibility                                                                                                               | Depends on / exit                                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| P1                    | V2 types, safe validation, diagnostic identity/retention, status derivation and fixed fallback primitives with focused tests         | Accepted design; current runtime remains v1 until P2; return explicit wiring/migration inventory                                   |
-| P1-R                  | Independent contract/primitive review                                                                                                | P1 fixed OID; resolve concrete issues before lifecycle wiring                                                                      |
-| P2                    | Collector/report-builder propagation, worker lifecycle/fallback, atomic runtime v2 switch and all report consumers                   | P1 accepted; no mixed-version producer/consumer path; masks never rendered or counted as observed zero                             |
-| P2-R                  | Independent data-integrity/failure-isolation review                                                                                  | Existing detection matrix, actual builder failure, diagnostic failure, overflow and shutdown combinations                          |
-| P3                    | Generic Scope/name display, precision/escaping, shared style and removal of old per-name view policy                                 | P2 accepted; migrate canonical display/catalog contracts together; no transitional v1 support remains                              |
-| P3-R/V                | Independent cumulative review, real commit/file/plugin output and human terminal review, Windows/Linux functional/package validation | Complete profile child branch; runtime output approval and evidence before its integration into M2                                 |
-| P3-style              | Interactive shared-style trials, human feedback, adopted policy and independent focused review                                       | P3/CI correction accepted; styling child returns by human squash into profile before cumulative validation                         |
-| S-D/I/R               | Separate private tests/system boundary design, bounded migration and review                                                          | Profile schema/tooling stable; preserve commands and checked TypeScript for moved tooling; do not combine file moves with P2       |
-| F                     | Trunk history review, candidate/package/harness preservation and measurement-readiness checks                                        | Profile/system slices accepted; no pending source changes affecting timed inputs; exact remotely preserved OIDs and archive hashes |
-| T13B execution/review | Bounded Linux operator sessions, then independent evidence review                                                                    | F; calibration/reuse decision, legacy capture, comparisons and aggregation/volume matrix from canonical contracts                  |
-| Final/T13C            | Combined release-candidate delta, final Windows/Linux/package evidence, durable documentation and acceptance record                  | Full obligations; account for unrelated integration changes and version/lockfile changes before final acceptance                   |
-
-P1-P3 share `feature/otel-redesign_M2_profile`, created from the remote-backed M2 checkpoint containing
-this plan. Use sequential conversations on that branch, not a fresh branch per correction. The
-explicit styling child below is the bounded exception for human-driven visual trials. This keeps
-coupled schema/collector/view work off M2 until coherent. P1 may temporarily stage v2-only primitives
-beside the active v1 contract; that is not permission for a shipped dual-version protocol. P2 completes
-the producer/consumer switch; P3 removes transitional code. Never merge a preparatory checkpoint by
-itself into M2 or integration. Meaningful intermediate commits remain allowed and remotely preserved.
-
-Prepare the S-D/I/R packet only after the profile work returns; intended branch is
-`feature/otel-redesign_M2_system` from the then-accepted M2 tip. Do not pre-authorize a broad test move.
-F and later operator packets must name concrete OIDs, commands, limits, archive roots and failure
-return rules before execution. Independent measurement sessions do not repair the candidate.
-
-Canonical updates accompany their actual implementation: P2 owns telemetry/report/collection and
-verification contracts (including profile-report.yaml); P3 owns profiling and generic view policy
-(including profile-view.yaml and coverage tests). Performance sidecar/aggregation readers and tests
-switch with P2; a ProfileReport version bump does not automatically bump unrelated artifact schemas.
-Preserve the existing formal requirements for valid reports, complete signals and empty diagnostics.
-
-Do not rerun successful full suites at every checkpoint. P1/P2/P3 use meaningful affected tests;
-cumulative Windows/Linux and installed-package validation apply to the complete candidate and relevant
-later deltas. Warn before long builds, environment preparation or measurements. Formal T13B can take
-substantial external execution time; no automatic retries or threshold relaxation.
-
-### History and parallel development boundary
+## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.
 Old pre-squash migration candidates are not automatically ancestors of the M2 branch. The existing
@@ -273,7 +190,7 @@ existing explicit exception process where necessary. Do not silently recalibrate
 
 The accepted profile design identifies Span aggregation/information retention as a concrete early
 priority, not merely optional cosmetic cleanup. Preserve its rationale and investigation questions
-from design section 9 in a future-work home before closing T13C. No target release is assigned and
+in the [remaining observations](opentelemetry-m2-profile-observations.md#future-work-outside-v0130-gates). No target release is assigned and
 it is not a v0.13.0 gate. Expanding currently undetected loss and domain-specific attribute pivots
 remain deferred. Do not silently fold these into P1-P3.
 
@@ -288,58 +205,12 @@ tests and limited M2 responsibility clarification. None is an automatic implemen
 
 ## Session boundaries
 
-Trunk owns overall scope, acceptance, dependency ordering and the next bounded packet. The assigned
-styling conversation works directly with the human on in-scope visual decisions and trials.
+Trunk owns overall scope, acceptance, dependency ordering and the next bounded packet.
 The human launches implementation, review and measurement conversations. Each packet fixes its source,
 scope, exclusions, finite checks and exit evidence. Implementation and formal measurement are separate;
 operators return evidence or a diagnosis request rather than repairing code during a measurement run.
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Current work is styling-to-profile integration preparation; later sessions need fixed inputs and
+chooses squash/merge strategy and performs the merge or branch deletion. Current work is profile-to-M2 integration preparation; later sessions need fixed inputs and
 trunk handoff. No PR is authorized until the human approves its explicit source/base.
-
-## Current assignment: cumulative profile functional/package validation
-
-Human starts a separate validation conversation. Fixed candidate:
-`f4d90d1ce1828c2f06abc9684bcc10006b09e7cd`. Verify its tree and source/archive mapping above,
-current planning ancestry and documentation-only delta before work. Do not validate a moving branch.
-Use clean isolated Windows and Linux-native/ext4 checkouts at that OID. Keep Windows TEMP outside
-the checkout, and record Linux fixture filesystem, versions and commands. Do not switch the planning
-worktree away from profile. This is not formal performance candidate freeze or T13B measurement.
-
-Before the potentially lengthy environment/build/test work, inform the human. At each platform:
-
-- Install the pinned dependencies with npm ci. Run canonical `npm run validate:release` from the root;
-  it includes root source tests, architecture/lint/schema/format, release build, publint and the
-  installed-package system test. Do not run `npm run release` or any publish command.
-- Verify checked production TypeScript separately if incremental build/configuration does not prove
-  it; follow the existing build guidance and M1 evidence's production-check method. The existing
-  tooling noCheck boundary is not production evidence and is not a new all-test typing assignment.
-- Capture full logs, exits, test counts/skips, environment and source identity. Windows Linux-only
-  skips are expected but must be enumerated; Linux skips/failures require explicit assessment.
-- Pack and preserve the final release output with hashes and bind it to package checks. Do not
-  silently rebuild development output between successful release validation and package capture.
-  Reuse the existing package-validation mechanism to establish the captured package's correspondence;
-  if it repacks, verify bytes rather than asserting that separate packs must be identical.
-
-Use a unique new evidence root under D:/gitlode_test and the established Linux evidence workspace;
-preserve commands/configs, candidate bundle, logs, package hashes and a verified manifest. Never
-overwrite M0/M1 or diagnostic evidence. This stage need not create another immutable performance
-runtime archive: later F owns that after tests/system and history stabilization. Do not relabel CI or
-old M1 evidence as fresh cumulative candidate evidence.
-
-Stop on product/test failure, retaining the first failure, exact source/dirty state, fixture/process
-ownership and cleanup evidence where safely available. In particular preserve Linux ENOTEMPTY or
-Windows timeout/EBUSY evidence; no retry-until-green or speculative fixes. A demonstrable environment
-permission/setup failure may be repaired and the affected command rerun with both logs retained;
-state why it is not a product assertion failure. No timeout relaxation, code fixes, formal calibration,
-extra stress campaign, GNOME setup or display sample is assigned. Use finite outer run limits based
-on the commands, document them, and safely clean only owned processes if they fire.
-
-Return results in the existing styling return packet as a concise cumulative-validation section,
-including exact candidate, command/evidence mapping, manifest hash, failures/skips and residual gates.
-Update only continuation status as warranted; do not self-accept M2 or unblock the acceptance record.
-Run format:write/check and diff check for documentation, commit/normal push on profile and verify
-local/tracking/actual remote equality and clean status. No parent-ref update, PR, merge, branch deletion
-or release action. Trunk assesses evidence and prepares profile-to-M2 integration afterward.

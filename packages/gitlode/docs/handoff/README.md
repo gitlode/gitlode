@@ -16,13 +16,13 @@ setup and one-target provenance; the [M1 evidence note](opentelemetry-m1-validat
 corrected functional/package validation and squash attribution. These four notes retain unfinished
 work context, not active instructions to repeat M1. Stable contracts live in design/contributing docs.
 
-P1/P2/P3, styling and the supervisor cleanup correction are accepted. Styling is squash-integrated by PR #112 at `f4d90d1`, with exact source-tree correspondence and
-archived source history. Next is the cumulative profile validation packet in the continuation plan,
-then human-approved integration into M2. See the [styling return](opentelemetry-m2-terminal-styling-design.md) and
-[review/remaining risks](opentelemetry-m2-terminal-styling-review.md). Additional sample display is
-not an integration gate; GNOME remains a pre-release check. Full T13B, tests/system organization,
-final-candidate validation and T13C remain open. Earlier profile packets are historical evidence until
-profile integration cleanup; they are not instructions to restart completed sessions.
+P1/P2/P3, styling, corrections and cumulative validation are complete. Next is human-approved
+profile-to-M2 integration, followed by private tests/system work. See the
+[profile integration evidence](opentelemetry-m2-profile-integration.md) for acceptance, OIDs, squash
+mapping and saved validation, and [remaining observations](opentelemetry-m2-profile-observations.md)
+for instability and future Span work. Full T13B, GNOME pre-release checks, final-candidate validation
+and T13C remain open; publish is blocked. Additional display samples are not an integration gate.
+Completed profile implementation/review/display documents remain in Git history.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are
 not automatically additional M2 obligations.

@@ -1,7 +1,16 @@
 import { spawn } from "node:child_process";
-import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 type CommandResult = {
   stdout: string;
@@ -12,8 +21,8 @@ type PackResult = {
   filename: string;
 };
 
-const packageRoot = resolve(import.meta.dirname, "..");
-const repositoryRoot = resolve(packageRoot, "../..");
+const repositoryRoot = resolve(import.meta.dirname, "../../..");
+const packageRoot = resolve(repositoryRoot, "packages/gitlode");
 const packageManifest = JSON.parse(
   await readFile(resolve(packageRoot, "package.json"), "utf8"),
 ) as { version: string };
@@ -77,11 +86,17 @@ async function readJsonLines(directory: string): Promise<Record<string, unknown>
   return records;
 }
 
-const temporaryRoot = await mkdtemp(join(tmpdir(), "gitlode-installed-package-"));
+// Resolve the existing parent before creation so rejection cannot leak a directory.
+const temporaryParent = await realpath(tmpdir());
+const resolvedRepositoryRoot = await realpath(repositoryRoot);
+const temporaryRelative = relative(resolvedRepositoryRoot, temporaryParent);
 assert(
-  isAbsolute(temporaryRoot) && relative(repositoryRoot, temporaryRoot).startsWith(".."),
-  "Installed-package system test directory must be outside the monorepo",
+  isAbsolute(temporaryRelative) ||
+    temporaryRelative === ".." ||
+    temporaryRelative.startsWith(".." + sep),
+  "Installed-package system test TMP/TEMP directory must be outside the monorepo",
 );
+const temporaryRoot = await mkdtemp(join(temporaryParent, "gitlode-installed-package-"));
 
 try {
   const packDirectory = join(temporaryRoot, "pack");

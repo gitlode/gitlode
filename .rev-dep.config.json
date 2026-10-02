@@ -496,6 +496,11 @@
             "packages/gitlode/dist/plugin-api.d.ts",
             "packages/gitlode/dist/plugin-api.js"
           ]
+        },
+        {
+          "name": "system-tests",
+          "pattern": "tests/system/**",
+          "allow": ["tests/system/scripts/**"]
         }
       ]
     },
@@ -781,6 +786,21 @@
         "ignoreTypeImports": true
       },
       "unresolvedImportsDetection": true
+    },
+    {
+      "path": "tests/system",
+      "followMonorepoPackages": false,
+      "prodEntryPoints": [],
+      "devEntryPoints": ["scripts/**"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false
+      },
+      "unresolvedImportsDetection": true,
+      "missingNodeModulesDetection": true,
+      "unusedNodeModulesDetection": {
+        "excludeModules": ["@types/*"],
+        "pkgJsonFieldsWithBinaries": ["scripts"]
+      }
     }
   ],
   "processIgnoredFiles": ["packages/*/dist/**"]

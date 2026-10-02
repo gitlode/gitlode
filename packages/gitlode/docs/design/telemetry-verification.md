@@ -175,3 +175,12 @@ presentation, and normal repository checks run in CI. Representative large-repos
 memory, trace-volume, and profile on/off comparisons run explicitly during the final consolidation
 phase using the method and thresholds in
 [`telemetry-performance.md`](telemetry-performance.md).
+
+## Contributor routes and test ownership
+
+Recorder work follows operation owners, catalogs, fake Meter/clock tests and actual recording paths.
+Collection work follows execution session/report/SDK boundaries with real-provider, fault-injection
+and transport tests. Collector/internal-access tests remain with implementation owners. The private
+system workspace checks installed CLI/worker/schema/public API through the package contract and grants
+no internal import exception. The [build guide](../contributing/build-test-release.md) owns commands
+and runner typing. Performance checks follow [performance policy](telemetry-performance.md) separately.

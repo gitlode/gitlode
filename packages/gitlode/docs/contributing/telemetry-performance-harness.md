@@ -154,3 +154,19 @@ The checked-in targets remain explicitly incomplete until formal reference calib
 No environment or baseline is considered accepted merely because a local command was run; the
 target-scoped artifacts and manifest entries carry that provenance. T13 remains incomplete until all
 targets are calibrated and the reference legacy artifacts are reviewed.
+
+## Lasting and migration-only ownership
+
+Installed CLI/API/schema regression belongs to private `tests/system`. Recorder, collector, report,
+worker fault and behavioral equivalence checks remain implementation-owned. Reusable fixture,
+statistics, supervision and performance-regression tools stay at existing paths in this slice.
+A later move needs its own support closure and checked project. Planner/statistics units remain
+harness units; internal aggregation seams do not authorize installed-test deep imports.
+
+Legacy/redesigned comparisons, calibration/provenance/ancestry tooling and the migration publish gate
+remain at current package/.release paths through M2 acceptance and initial v0.13.0 publication.
+T13C preserves exact revisions, manifests, runtime/package hashes, external evidence and review
+bindings. Gate retirement requires a separate reviewed post-release change with migration obligations
+closed and replacement lasting ownership/commands documented. Retire wiring, validator/config and
+exclusively migration-owned helpers together; preserve reusable tools and correctness checks.
+The [build guide publish policy](build-test-release.md#ci-and-publish-gates) owns enforcement.

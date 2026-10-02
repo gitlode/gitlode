@@ -796,3 +796,18 @@ compare them in both directions: every accepted dependency must be representable
 configuration must not grant dependencies absent from this document. Reviews must also preserve
 charter constraints that the dependency graph does not express directly, especially that
 `type-utils` has no external dependencies and emits no runtime code.
+
+## Private system workspace
+
+The private `@gitlode/system-tests` workspace at `tests/system` owns installed CLI, worker,
+schema and public API regression tooling outside the production dependency envelope. It has only
+development tooling dependencies, no production exports, and no product build edge. Its checked
+scripts import local helpers and Node built-ins only. They consume the packed installation rather
+than product source, tests, dist modules or private exports.
+
+Filesystem exceptions are reading the product manifest, running npm pack in `packages/gitlode`,
+and inspecting the installed schema and public `dist/plugin-api.d.ts`. Generated consumers import
+only installed `gitlode/plugin-api`. Collector/internal-access tests remain package-owned.
+The root Rev-dep system boundary allows only `tests/system/scripts/**`; the workspace rule checks
+circular/unresolved imports and declared tooling binaries without following product packages.
+Filesystem accesses and generated consumer text require review beyond static import enforcement.

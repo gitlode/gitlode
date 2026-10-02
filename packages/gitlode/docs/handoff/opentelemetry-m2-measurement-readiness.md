@@ -551,3 +551,28 @@ records are separate under `.cache/m2-r2-f8ef0bd`.
 R2 has limited implementation and regression evidence and awaits trunk's limited-diff review.
 No PR, merge, parent-ref update, freeze, formal measurement or acceptance update was performed.
 This outcome does not establish F, T13B, M2 or publish acceptance.
+
+## Trunk limited-diff disposition (2026-10-02)
+
+Accepted R2 at `93a359d1b8afac7eb288758f674ad0be76bef480`, delivered by
+`102296f7e110613c4e097c77126e8893a1c52f55`. Combined with the independent R1 retention
+review, the readiness slice is accepted for integration preparation. No mandatory finding remains
+within this slice; this does not establish formal measurement, F, M2 or release acceptance.
+
+Trunk inspected the correction: the real failure catch invokes the test-local helper, whose protected
+synchronous fd-2 write is followed by rethrow of the unchanged error outside that protected block.
+There is no stream enqueue, deletion, retry or global handler in this path. The injected writer tests
+cover healthy and throwing writes, original-error reference identity and preserved file bytes.
+Prior independently accepted retention/barrier behavior is unchanged. Notification remains best effort.
+
+Trunk rehashed all 40 returned manifest entries without mismatch and confirmed the manifest hash and
+saved/current test hash recorded above. Saved logs confirm two reporting cases, the 51-test suite,
+and four TS2542 diagnostics only. These are inspected execution logs, not a new independent test run;
+the already established baseline diagnostic comparison is reused. Trunk ran diff whitespace checks
+and document formatting checks; no test/build or historical reproduction campaign was repeated.
+
+The four existing readonly diagnostics, launcher/abrupt-exit limits, historical residue and unrelated
+instability observations remain open with their existing scope. Integration should use a human-approved
+PR from this child to `feature/otel-redesign_M2`, followed by human squash. Preserve the source before
+deletion and confirm squash tree identity. Only then assign history review and fixed product/harness
+preservation; no candidate is frozen by this disposition.

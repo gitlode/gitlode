@@ -20,7 +20,10 @@ import type { Context } from "@opentelemetry/api";
 import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 import { FirstAcceptedBoundedMap } from "./bounded-retention.js";
-import type { BoundedDiagnosticAccumulator } from "./diagnostic-accumulator.js";
+import type {
+  BoundedDiagnosticAccumulator,
+  ProfileDiagnosticInput,
+} from "./diagnostic-accumulator.js";
 
 type MutableSummary =
   | {
@@ -51,6 +54,7 @@ interface MutableSpanAggregate {
   errorCount: number;
   totalDurationSeconds: number;
   maxDurationSeconds: number;
+  durationContributionCount: number;
   attributes: Map<string, MutableSummary>;
 }
 
@@ -133,23 +137,68 @@ export class LocalSpanProcessor implements SpanProcessor {
         errorCount: 0,
         totalDurationSeconds: 0,
         maxDurationSeconds: 0,
+        durationContributionCount: 0,
         attributes: new Map(),
       }));
       if (!acceptance.accepted) {
-        this.#markInvalid("span_group_overflow");
+        this.#recordIssue({
+          code: "span_group_overflow",
+          stage: "span_aggregation",
+          target: { type: "observation", scope, kind: "span", name: span.name },
+          signalCoverage: ["span"],
+          effects: ["missing_observations"],
+          extent: "unidentified_subset",
+          lossQuantity: {
+            descriptor: "span_groups",
+            unit: "groups",
+            value: 1,
+            relationship: "overlapping_or_unknown",
+          },
+        });
         return;
       }
       const aggregate = acceptance.value;
       aggregate.callCount += 1;
       if (span.status.code === SpanStatusCode.ERROR) aggregate.errorCount += 1;
       const duration = durationSeconds(span);
-      if (duration === null) this.#markInvalid("invalid_aggregation");
+      if (duration === null)
+        this.#recordIssue({
+          code: "invalid_aggregation",
+          stage: "span_aggregation",
+          target: { type: "observation", scope, kind: "span", name: span.name },
+          signalCoverage: ["span"],
+          effects: ["incomplete_measurement_fields"],
+          extent: "unidentified_subset",
+          affectedFields: [{ kind: "span", fields: ["total", "avg", "max"] }],
+          lossQuantity: {
+            descriptor: "span_duration_contributions",
+            unit: "contributions",
+            value: 1,
+            relationship: "disjoint",
+          },
+        });
       else {
         const total = aggregate.totalDurationSeconds + duration;
-        if (!Number.isFinite(total)) this.#markInvalid("invalid_aggregation");
+        if (!Number.isFinite(total))
+          this.#recordIssue({
+            code: "invalid_aggregation",
+            stage: "span_aggregation",
+            target: { type: "observation", scope, kind: "span", name: span.name },
+            signalCoverage: ["span"],
+            effects: ["incomplete_measurement_fields"],
+            extent: "unidentified_subset",
+            affectedFields: [{ kind: "span", fields: ["total", "avg", "max"] }],
+            lossQuantity: {
+              descriptor: "span_duration_contributions",
+              unit: "contributions",
+              value: 1,
+              relationship: "disjoint",
+            },
+          });
         else {
           aggregate.totalDurationSeconds = Object.is(total, -0) ? 0 : total;
           aggregate.maxDurationSeconds = Math.max(aggregate.maxDurationSeconds, duration);
+          aggregate.durationContributionCount += 1;
         }
       }
       for (const metadata of allowedAttributes(span)) {
@@ -157,19 +206,40 @@ export class LocalSpanProcessor implements SpanProcessor {
         if (input === undefined) continue;
         const value = acceptedAttributeValue(metadata, input);
         if (value === null) {
-          this.#markInvalid("invalid_aggregation");
+          this.#recordIssue({
+            code: "invalid_aggregation",
+            stage: "span_aggregation",
+            target: { type: "observation", scope, kind: "span", name: span.name },
+            signalCoverage: ["span"],
+            effects: ["missing_attribute_detail"],
+            extent: "unidentified_subset",
+            attributeKey: { type: "exact", key: metadata.key },
+            lossQuantity: {
+              descriptor: "span_attribute_values",
+              unit: "values",
+              value: 1,
+              relationship: "disjoint",
+            },
+          });
           continue;
         }
         this.#reduceAttribute(aggregate, metadata, value);
       }
     } catch {
-      this.#markInvalid("invalid_aggregation");
+      this.#recordIssue({
+        code: "invalid_aggregation",
+        stage: "span_aggregation",
+        target: { type: "report" },
+        signalCoverage: ["span"],
+        effects: ["unknown_collection_coverage"],
+        extent: "unidentified_subset",
+      });
     }
   }
 
-  #markInvalid(code: "invalid_aggregation" | "span_group_overflow"): void {
+  #recordIssue(input: ProfileDiagnosticInput): void {
     this.#partial = true;
-    this.#diagnostics.add({ code, stage: "span_aggregation", signal: "spans" });
+    this.#diagnostics.add(input);
   }
 
   #reduceAttribute(
@@ -219,7 +289,22 @@ export class LocalSpanProcessor implements SpanProcessor {
         this.#diagnostics.add({
           code: "attribute_reducer_conflict",
           stage: "span_aggregation",
-          signal: "spans",
+          target: {
+            type: "observation",
+            scope: aggregate.scope,
+            kind: "span",
+            name: aggregate.name,
+          },
+          signalCoverage: ["span"],
+          effects: ["missing_attribute_detail"],
+          extent: "unidentified_subset",
+          attributeKey: { type: "exact", key: metadata.key },
+          lossQuantity: {
+            descriptor: "span_attribute_values",
+            unit: "values",
+            value: 1,
+            relationship: "disjoint",
+          },
         });
       }
       return;
@@ -235,7 +320,22 @@ export class LocalSpanProcessor implements SpanProcessor {
         this.#diagnostics.add({
           code: "span_attribute_value_overflow",
           stage: "span_aggregation",
-          signal: "spans",
+          target: {
+            type: "observation",
+            scope: aggregate.scope,
+            kind: "span",
+            name: aggregate.name,
+          },
+          signalCoverage: ["span"],
+          effects: ["missing_attribute_detail"],
+          extent: "unidentified_subset",
+          attributeKey: { type: "exact", key: metadata.key },
+          lossQuantity: {
+            descriptor: "span_attribute_values",
+            unit: "values",
+            value: 1,
+            relationship: "disjoint",
+          },
         });
       }
       return;
@@ -255,6 +355,8 @@ export class LocalSpanProcessor implements SpanProcessor {
         errorCount: aggregate.errorCount,
         totalDurationSeconds: aggregate.totalDurationSeconds,
         maxDurationSeconds: aggregate.maxDurationSeconds,
+        durationContributionCount: aggregate.durationContributionCount,
+        unavailableFields: [],
         attributes: [...aggregate.attributes.values()]
           .map((summary): ProfileSpanAttributeSummary => {
             if (summary.reducer === "distinct")
@@ -277,7 +379,14 @@ export class LocalSpanProcessor implements SpanProcessor {
       });
       return { status: this.#partial ? "partial" : "complete", spans };
     } catch {
-      this.#markInvalid("invalid_aggregation");
+      this.#recordIssue({
+        code: "invalid_aggregation",
+        stage: "span_aggregation",
+        target: { type: "report" },
+        signalCoverage: ["span"],
+        effects: ["unknown_collection_coverage"],
+        extent: "unidentified_subset",
+      });
       return { status: "partial", spans: [] };
     }
   }

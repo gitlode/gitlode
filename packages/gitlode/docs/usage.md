@@ -5,9 +5,14 @@ gitlode extracts Git commit history from a local repository and writes it as
 ingestion into data warehouses, analytics platforms, or any system that consumes
 newline-delimited JSON.
 
-The `--profile` option collects a local, signal-separated diagnostic profile for successful runs.
+The `--profile` option collects a local diagnostic profile for successful runs and presents all
+retained signal kinds in one Scope/namespace hierarchy.
 It does not select a different extraction path. Use `--quiet` to suppress summary, progress, and
 profile presentation.
+
+On terminals with color support, report headings use background colors; values use the default
+text color. Plain output preserves the heading spacing and information. See the
+[profiling guide](profiling.md) for interpreting the report.
 
 ---
 
@@ -356,10 +361,10 @@ gitlode [options] <repository-path>
 
 ### Control
 
-| Parameter   | Alias | Type    | Default | Description                                                                                                  |
-| ----------- | ----- | ------- | ------- | ------------------------------------------------------------------------------------------------------------ |
-| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.                |
-| `--profile` |       | boolean | `false` | Collect and display a local signal-separated profile after a successful extraction. Suppressed by `--quiet`. |
+| Parameter   | Alias | Type    | Default | Description                                                                                                 |
+| ----------- | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `--quiet`   | `-q`  | boolean | `false` | Suppress progress, summary, and profile output on stderr. Warnings and errors remain visible.               |
+| `--profile` |       | boolean | `false` | Collect and display a local Scope/namespace profile after a successful extraction. Suppressed by `--quiet`. |
 
 ### Configuration File
 
@@ -392,7 +397,13 @@ Conflict rule:
 
 ### Profiling
 
-`--profile` appends a local signal-separated diagnostic profile to stderr after a successful run:
+`--profile` appends a local diagnostic profile to stderr after a successful run. Spans, counters,
+and histograms share Scope groups, with full observation names directly below each Scope.
+Signal kinds are not separate sections.
+
+Collection and lifecycle issues are placed beside the narrowest safely identified target. If report
+construction itself fails, the ordinary Profile block reports whether validated measurements could
+be supplied; this does not change extraction results, JSONL output, or exit classification.
 
 ```bash
 gitlode --profile -r main ./my-repo

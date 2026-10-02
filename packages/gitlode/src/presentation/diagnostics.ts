@@ -11,7 +11,7 @@ export function formatDiagnosticLines(
   message: string,
   styling: Styling = plainStyling,
 ): readonly string[] {
-  const badge = severity === "warn" ? styling.warnBadge("[WARN]") : styling.errorBadge("[ERROR]");
+  const badge = severity === "warn" ? styling.warning("[WARN]") : styling.error("[ERROR]");
   return splitMessageLines(message).map((line) => `${badge} ${line}`);
 }
 

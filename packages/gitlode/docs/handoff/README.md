@@ -16,9 +16,13 @@ setup and one-target provenance; the [M1 evidence note](opentelemetry-m1-validat
 corrected functional/package validation and squash attribution. These four notes retain unfinished
 work context, not active instructions to repeat M1. Stable contracts live in design/contributing docs.
 
-The [profile design](opentelemetry-m2-profile-design.md) is accepted at `d87bfd6`. The active next
-assignment is [P1 profile implementation preparation](opentelemetry-m2-profile-implementation.md):
-v2 contracts and bounded issue primitives, followed by independent review and staged runtime wiring.
+P1/P2/P3, styling, corrections and cumulative validation are complete. Next is human-approved
+profile-to-M2 integration, followed by private tests/system work. See the
+[profile integration evidence](opentelemetry-m2-profile-integration.md) for acceptance, OIDs, squash
+mapping and saved validation, and [remaining observations](opentelemetry-m2-profile-observations.md)
+for instability and future Span work. Full T13B, GNOME pre-release checks, final-candidate validation
+and T13C remain open; publish is blocked. Additional display samples are not an integration gate.
+Completed profile implementation/review/display documents remain in Git history.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams; they are
 not automatically additional M2 obligations.

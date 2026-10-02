@@ -4,6 +4,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { writeAtomicJson } from "./atomic-json.js";
+import {
+  completeProcessGroup,
+  GroupCompletion,
+  observeProcessGroup,
+  processIdentity,
+} from "./performance-process-group.js";
 import type { PerformanceProgress, PerformanceStage } from "./performance-progress.js";
 
 export const SUPERVISION_DEFAULTS = {
@@ -112,7 +118,8 @@ export async function supervisePerformance(input: {
   const owned: { pid?: number; heartbeat?: ReturnType<typeof setInterval> } = {};
   let deadline: ReturnType<typeof setTimeout> | undefined;
   let grace: ReturnType<typeof setTimeout> | undefined;
-  let cleanupDeadline: ReturnType<typeof setTimeout> | undefined;
+  let groupCompletion: GroupCompletion | undefined;
+  let cleanupConfirmed = false;
   let failure: string | undefined;
   let finishedCode: number | undefined;
   let exit: { code: number | null; signal: NodeJS.Signals | null } | undefined;
@@ -152,6 +159,7 @@ export async function supervisePerformance(input: {
       exit,
       finishedCode,
       cleanupErrors: [...cleanupErrors],
+      cleanupConfirmed,
       finalizationErrors: [...finalizationErrors],
       diagnostics: {
         filename: `${id}.diagnostic.log`,
@@ -167,6 +175,8 @@ export async function supervisePerformance(input: {
       .then(() => persistence.writeSnapshot(input.artifacts, `${id}.json`, value))
       .catch(() => {
         persistenceError = true;
+        if (!finalizationErrors.includes("supervision-persistence-failed"))
+          finalizationErrors.push("supervision-persistence-failed");
         terminate("supervision-persistence-failed");
       });
   }
@@ -185,17 +195,45 @@ export async function supervisePerformance(input: {
     clearTimeout(deadline);
     clearInterval(owned.heartbeat);
     clearTimeout(grace);
-    clearTimeout(cleanupDeadline);
+    if (!exit) {
+      // Cleanup uncertainty must not keep the operator entrypoint alive via child handles.
+      worker.stdout?.destroy();
+      worker.stderr?.destroy();
+      if (worker.connected) worker.disconnect();
+      worker.unref();
+    }
     settle();
   }
-  function signalGroup(signal: NodeJS.Signals) {
+  function signalGroup(signal: NodeJS.Signals, until = performance.now() + limits.cleanupWaitMs) {
     if (!owned.pid) return;
     try {
+      if (!groupCompletion) throw new Error("owned identity unavailable");
+      groupCompletion.observe(observeProcessGroup(owned.pid, until));
+      if (performance.now() >= until) throw new Error("group-signal-deadline-exceeded");
       process.kill(-owned.pid, signal);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ESRCH")
         cleanupErrors.push(`group-${signal}-failed`);
     }
+  }
+  function forceCleanup() {
+    if (forceSent || stopped) return;
+    forceSent = true;
+    clearTimeout(deadline);
+    void completeProcessGroup({
+      budgetMs: limits.cleanupWaitMs,
+      force: (until) => signalGroup("SIGKILL", until),
+      observe: (until) => {
+        if (!owned.pid) return true;
+        if (!groupCompletion) throw new Error("owned identity unavailable");
+        return groupCompletion.observe(observeProcessGroup(owned.pid, until));
+      },
+      closed: () => exit !== undefined,
+      errors: cleanupErrors,
+    }).then((confirmed) => {
+      cleanupConfirmed = confirmed;
+      stop();
+    });
   }
   function terminate(reason: string) {
     if (stopped || terminating) return;
@@ -204,16 +242,7 @@ export async function supervisePerformance(input: {
     clearTimeout(deadline);
     // The detached worker is the leader of an owned Linux group. Child PIDs from IPC are never kill targets.
     signalGroup("SIGTERM");
-    grace = setTimeout(() => {
-      signalGroup("SIGKILL");
-      forceSent = true;
-      if (exit) stop();
-      else
-        cleanupDeadline = setTimeout(() => {
-          cleanupErrors.push("worker-close-not-observed");
-          stop();
-        }, limits.cleanupWaitMs);
-    }, limits.terminationGraceMs);
+    grace = setTimeout(forceCleanup, limits.terminationGraceMs);
     persist("inconclusive");
   }
   function diagnostic(chunk: Buffer) {
@@ -255,6 +284,13 @@ export async function supervisePerformance(input: {
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   owned.pid = worker.pid;
+  if (owned.pid) {
+    try {
+      groupCompletion = new GroupCompletion(processIdentity(owned.pid));
+    } catch {
+      cleanupErrors.push("worker-group-identity-unavailable");
+    }
+  }
   const interrupt = () => terminate("operator-interrupted");
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", interrupt);
@@ -304,7 +340,6 @@ export async function supervisePerformance(input: {
   worker.once("close", (code, signal) => {
     exit = { code, signal };
     if (terminating) {
-      if (forceSent) stop();
       return; // Always complete the grace/KILL sequence, including orphaned descendants.
     }
     if (finishedCode === undefined || finishedCode !== code) {
@@ -312,8 +347,7 @@ export async function supervisePerformance(input: {
       return;
     }
     // Also remove any accidentally retained descendants on normal completion.
-    signalGroup("SIGKILL");
-    stop();
+    forceCleanup();
   });
   report();
   armDeadline();
@@ -325,7 +359,7 @@ export async function supervisePerformance(input: {
   process.off("SIGINT", interrupt);
   process.off("SIGTERM", interrupt);
   await writes;
-  if (persistenceError) failure = "supervision-persistence-failed";
+  if (persistenceError) failure ??= "supervision-persistence-failed";
   if (cleanupErrors.length) failure ??= "process-cleanup-failed";
   // Raw bounded diagnostics are a separate local log, never embedded in formal calibration evidence.
   try {

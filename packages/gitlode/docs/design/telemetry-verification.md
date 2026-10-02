@@ -54,6 +54,43 @@ Collector and report tests cover bounded span aggregation, metric conversion, re
 canonical sorting, signal status, structured cloning, and invalid aggregation. Completed span
 objects and raw histogram samples must not be retained.
 
+The active schema-v2 contract and runtime use literal cases for typed target
+canonicalization, independently validated identity components, exact/discarded/not-applicable
+attribute selectors, per-kind fields/effects/coverage, quantity merge uncertainty, safe saturation,
+15+1 issue retention, escaped 4096-code-unit detail broadening, numeric availability, and the fixed
+fallback. Runtime tests inject a real normal builder-body failure after partial work, prove a single
+builder invocation, exercise broken diagnostic snapshots and simultaneous shutdown failures, and
+verify cached finalization, application-result identity, normal worker/application transport and the
+ordinary presentation path. Presentation and repository evaluators separately distinguish observed
+zero from unavailable numeric fields, partial/unavailable status, reserved summaries and fixed
+fallback provenance.
+
+Mixed valid/invalid Span duration tests run both input orders through the real processor, report
+builder and presentation/tooling bridges. They preserve retained total/maximum, suppress the average,
+disclose omitted contributions after diagnostic compaction, reject all-invalid defaults as observed
+zero and retain a genuine zero-duration contribution. Report-builder isolation separately covers
+throwing first/middle values and iterator failure, including honest exact versus unknown loss.
+
+Repository-consumer fixtures include complete normal, partial and fixed-fallback reports plus
+compacted producer output, missing required fields, invalid field masks and malformed reserved
+summaries. Relationship cases reject unavailable signals with values, unexplained partial or
+unavailable status, delivery effect/provenance mismatches, target/coverage/affected-field kind
+contradictions and summary-association bypasses. Legal empty signals, broad or multi-kind targets,
+detail loss, lifecycle-only notices and mixed-duration retained totals remain accepted. Acceptance
+is based on complete shared-contract normalization before measurement extraction. An actual
+worker-thread entry/client test injects an invoked builder-body failure through an internal-only seam
+and verifies fallback serialization, ordinary result routing, application-result equivalence and
+finite cleanup.
+
+Correction coverage also compares lifecycle-only and confirmed whole-signal-loss evidence before and
+after detailed-record compaction, rejects status/value contradictions without discarding retained
+values, distinguishes exact safe-integer boundaries from actual saturation, and routes explicitly
+malformed counts and detail-loss masks to invalid-aggregation evidence. A 100,000-entry duplicate-kind
+probe counts indexed reads before diagnostic identity construction; the normalizer must reject it by
+the fixed kind-universe cardinality without input-proportional traversal. This bounds accumulator
+preprocessing after the caller supplies the array, not the caller's cost to allocate or populate that
+untrusted input.
+
 Repository performance workflow tests use the same development-only sidecar orchestration as the
 formal workflow. They require a `target_on` report, classify missing or malformed reports as
 inconclusive, propagate report-size, prohibited-span, diagnostic, and signal-status outcomes to the
@@ -121,10 +158,12 @@ shape.
 
 ## Presentation verification
 
-Presentation tests primarily assert a structured view model: grouping, labels, preferred order,
-plugin scopes, fallback, signal state, diagnostics, zero semantics, units, and omission of
-percentiles. Formatter smoke tests assert meaningful content without treating padding, borders, or
-column widths as compatibility contracts.
+Presentation tests assert the generic Scope/source-configured namespace tree (flat by default, with explicit multi-level regressions), code-unit/kind/typed-attribute
+ordering, short/group-node collisions, plugin and unknown identities, escaping, attribute bases,
+fixed per-kind fields, masks, zero semantics, unit thresholds and omission of percentiles. Diagnostic
+tests cover report/Scope/observation/point placement, missing-only targets, valid siblings, fixed
+fallback, lifecycle-only notices and reserved detail summaries. Semantic-role spies and ANSI removal
+prove styled/plain text parity without treating padding, wrapping or column widths as contracts.
 
 The successful-run-only profile UX and `--quiet` suppression remain covered until a separate product
 decision changes them.

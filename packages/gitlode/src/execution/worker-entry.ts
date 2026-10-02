@@ -1,10 +1,11 @@
-import { parentPort } from "node:worker_threads";
+import { parentPort, workerData } from "node:worker_threads";
 
 import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
 import { GitAdapterError } from "@gitlode/internal-contracts/git";
 import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
 
 import { executeWorkerRunRequest } from "./execute-run.js";
+import { createWorkerTelemetrySessionForTest } from "./telemetry/worker-telemetry-session.js";
 import type { WorkerRunMessage, WorkerRunRequest, WorkerRunResult } from "./types.js";
 
 function runtimeErrorResult(error: unknown): WorkerRunResult {
@@ -51,10 +52,22 @@ parentPort.once("message", async (request: WorkerRunRequest) => {
   };
 
   try {
-    const result = await executeWorkerRunRequest(request, {
-      progressReporter,
-      diagnosticReporter,
-    });
+    const result = await executeWorkerRunRequest(
+      request,
+      {
+        progressReporter,
+        diagnosticReporter,
+      },
+      workerData?.gitlodeTelemetryTestFailure === "report_builder_body"
+        ? {
+            environment: process.env,
+            createTelemetrySession: async () =>
+              await createWorkerTelemetrySessionForTest({
+                failures: { report_builder_body: new Error("injected builder body failure") },
+              }),
+          }
+        : undefined,
+    );
     postMessage({ type: "result", result });
   } catch (error) {
     const result =

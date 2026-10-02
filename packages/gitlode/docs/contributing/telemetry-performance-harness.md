@@ -32,6 +32,23 @@ the current Windows test environment, therefore produce an inconclusive artifact
 
 ## Reference workflow
 
+The supervised workflow integration test owns a fresh temporary parent beneath its test root and
+passes it only through the spawned child's environment. Its normal and second-child-stall cases
+observe actual fixture realpaths, retain completed-run/status evidence, and verify removal after
+the supervisor's cleanup barrier while preserving an outside sentinel. If completion or containment
+cannot be confirmed, or an assertion fails before root removal, the root is retained for diagnosis.
+Before removal, the test copies the root's diagnostic materials outside it; a later verification
+failure retains that copy. Both locations are reported best effort on failure and remain outside unconditional
+teardown registration until all assertions succeed. Successful cases clean both owned locations.
+The bounded regression probes check retention after a failing Vitest child's actual teardown, then
+dispose only their verified owned fixtures after confirmed process cleanup. Copy/storage failures
+and abrupt runner or host loss do not carry a complete-retention guarantee; no cleanup is attempted
+on the failure path that could replace the original error. A small synchronous stderr write is locally
+protected: a reporting exception preserves the original error object and does not delete retained
+files or enqueue an asynchronous stream error. Unavailable stderr does not guarantee a path announcement.
+There is no retry, fallback destination, or universal notification/exit guarantee for synchronous I/O
+or host abnormalities.
+
 Run the `performance:*` npm commands in Linux (including WSL2), with Linux-native Node, Git,
 temporary storage, and release snapshots. These commands enter `telemetry-performance-supervised.ts`;
 `telemetry-performance.ts` is the internal worker, not the supervised operator entrypoint.

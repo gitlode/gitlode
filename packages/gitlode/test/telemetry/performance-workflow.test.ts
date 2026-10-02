@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { writeSync } from "node:fs";
 import { cp, mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -32,6 +33,19 @@ const quantitiesFor = (key: string) =>
     ? { commits: 5, files: 1, plugins: 2, rotations: 1, scale: 0 }
     : quantities;
 const temporary: string[] = [];
+// Test-local seam: never enqueue a stream error or let reporting replace the failure.
+function rethrowWorkflowFailure(
+  error: unknown,
+  locations: { root: string; outside: string },
+  write: (fd: number, message: string) => number = writeSync,
+): never {
+  try {
+    write(2, "Retained supervised workflow diagnostics: " + JSON.stringify(locations) + "\n");
+  } catch {
+    // Unavailable stderr can leave retained locations unannounced.
+  }
+  throw error;
+}
 afterEach(async () =>
   Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true }))),
 );
@@ -188,10 +202,7 @@ fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedA
         expect(await readFile(sentinel, "utf8")).toBe("protected outside fixture");
         temporary.push(root, outside);
       } catch (error) {
-        process.stderr.write(
-          "Retained supervised workflow diagnostics: " + JSON.stringify({ root, outside }) + "\n",
-        );
-        throw error;
+        rethrowWorkflowFailure(error, { root, outside });
       }
     },
     30_000,
@@ -282,6 +293,37 @@ fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedA
   );
 });
 describe("performance workflow routing", () => {
+  it.each([false, true])(
+    "preserves the original failure when diagnostic writing fails: %s",
+    async (fail) => {
+      const root = await mkdtemp(join(tmpdir(), "gitlode-reporting-probe-"));
+      temporary.push(root);
+      const retained = join(root, "evidence");
+      await writeFile(retained, "retained evidence");
+      const original = new Error("original workflow failure");
+      const locations = { root, outside: join(root, "outside") };
+      let output = "";
+      let caught: unknown;
+      let calls = 0;
+      try {
+        rethrowWorkflowFailure(original, locations, (fd, message) => {
+          calls++;
+          expect(fd).toBe(2);
+          if (fail) throw new Error("diagnostic write failure");
+          output += message;
+          return Buffer.byteLength(message);
+        });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBe(original);
+      expect(calls).toBe(1);
+      expect(output).toBe(
+        fail ? "" : "Retained supervised workflow diagnostics: " + JSON.stringify(locations) + "\n",
+      );
+      expect(await readFile(retained, "utf8")).toBe("retained evidence");
+    },
+  );
   it("validates fixture, adapter, state and preserves aggregation identity", () => {
     expect(parseFixture("aggregation_scale")).toBe("aggregation_scale");
     expect(parseAdapter("git-cli")).toBe("git-cli");

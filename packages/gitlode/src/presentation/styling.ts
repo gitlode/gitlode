@@ -1,51 +1,80 @@
 import chalk from "chalk";
 
 export interface Styling {
-  spinnerGlyph(text: string): string;
-  doneMarker(text: string): string;
-  stageLabel(text: string): string;
-  summaryHeader(text: string): string;
-  sectionHeading(text: string): string;
-  warnBadge(text: string): string;
-  errorBadge(text: string): string;
-  fieldKey(text: string): string;
-  primaryValue(text: string): string;
-  unitSuffix(text: string): string;
-  refsValue(text: string): string;
+  active(text: string): string;
+  success(text: string): string;
+  label(text: string): string;
+  h1(text: string): string;
+  h2(text: string): string;
+  h3(text: string): string;
+  h4(text: string): string;
+  warning(text: string): string;
+  error(text: string): string;
+  fieldLabel(text: string): string;
+  attributeName(text: string): string;
+  value(text: string): string;
+  unit(text: string): string;
+  reference(text: string): string;
   separator(text: string): string;
 }
 
-/** Plain (no-color) styling — used in non-TTY mode and tests. */
+/** Identity baseline for formatter callers that request neither decoration nor padding. */
 export const plainStyling: Styling = {
-  spinnerGlyph: (t) => t,
-  doneMarker: (t) => t,
-  stageLabel: (t) => t,
-  summaryHeader: (t) => t,
-  sectionHeading: (t) => t,
-  warnBadge: (t) => t,
-  errorBadge: (t) => t,
-  fieldKey: (t) => t,
-  primaryValue: (t) => t,
-  unitSuffix: (t) => t,
-  refsValue: (t) => t,
+  active: (t) => t,
+  success: (t) => t,
+  label: (t) => t,
+  h1: (t) => t,
+  h2: (t) => t,
+  h3: (t) => t,
+  h4: (t) => t,
+  warning: (t) => t,
+  error: (t) => t,
+  fieldLabel: (t) => t,
+  attributeName: (t) => t,
+  value: (t) => t,
+  unit: (t) => t,
+  reference: (t) => t,
   separator: (t) => t,
 };
 
-/** TTY-aware styling factory. Returns plain styling for non-TTY contexts. */
-export function createStyling(isTTY: boolean): Styling {
-  if (!isTTY) return plainStyling;
-  return {
-    spinnerGlyph: (t) => chalk.cyan(t),
-    doneMarker: (t) => chalk.green.bold(t),
-    stageLabel: (t) => chalk.bold(t),
-    summaryHeader: (t) => chalk.green.bold(t),
-    sectionHeading: (t) => chalk.bold(t),
-    warnBadge: (t) => chalk.yellow.bold(t),
-    errorBadge: (t) => chalk.red.bold(t),
-    fieldKey: (t) => chalk.dim(t),
-    primaryValue: (t) => chalk.whiteBright(t),
-    unitSuffix: (t) => chalk.dim(t),
-    refsValue: (t) => chalk.cyan(t),
-    separator: (t) => chalk.dim(t),
-  };
+interface StyleRule {
+  readonly decorate: (text: string) => string;
+  readonly padding: number;
+}
+
+type StyleRules = Readonly<Record<keyof Styling, StyleRule>>;
+
+/** Source-editable visual parameters; no theme detection or public configuration is involved. */
+export const styleRules: StyleRules = {
+  active: { decorate: chalk.cyan, padding: 0 },
+  success: { decorate: chalk.green.bold, padding: 0 },
+  label: { decorate: chalk.bold, padding: 0 },
+  h1: { decorate: chalk.black.bgGreen, padding: 1 },
+  h2: { decorate: chalk.white.bgBlue, padding: 1 },
+  h3: { decorate: chalk.black.bgCyan, padding: 1 },
+  h4: { decorate: chalk.black.bgCyanBright, padding: 1 },
+  warning: { decorate: chalk.yellow.bold, padding: 0 },
+  error: { decorate: chalk.red.bold, padding: 0 },
+  fieldLabel: { decorate: chalk.dim, padding: 0 },
+  attributeName: { decorate: plainStyling.attributeName, padding: 0 },
+  value: { decorate: plainStyling.value, padding: 0 },
+  unit: { decorate: chalk.dim, padding: 0 },
+  reference: { decorate: chalk.cyan, padding: 0 },
+  separator: { decorate: chalk.dim, padding: 0 },
+};
+
+/** Preserve layout in every mode; apply decoration only for TTY output. */
+export function createStyling(isTTY: boolean, rules: StyleRules = styleRules): Styling {
+  const styling = { ...plainStyling };
+  for (const role of Object.keys(rules) as (keyof Styling)[]) {
+    const { decorate, padding } = rules[role];
+    if (!Number.isSafeInteger(padding) || padding < 0)
+      throw new RangeError(`Style padding for ${role} must be a nonnegative integer`);
+    const space = " ".repeat(padding);
+    styling[role] = (text) => {
+      const padded = `${space}${text}${space}`;
+      return isTTY ? decorate(padded) : padded;
+    };
+  }
+  return styling;
 }

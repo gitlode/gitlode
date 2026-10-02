@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                                  | Remaining scope                                                            |
-| --------- | --------------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only               | Preserve historical evidence and environment                               |
-| M1        | complete                                | Preserve corrected validation and squash attribution                       |
-| M2        | P1-P3 accepted; styling design revision | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates               | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                   | Remaining scope                                                            |
+| --------- | ---------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only                | Preserve historical evidence and environment                               |
+| M1        | complete                                 | Preserve corrected validation and squash attribution                       |
+| M2        | Profile/style accepted; integration next | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates                | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -71,23 +71,35 @@ review at `1a012d589604c6e570e155b3aa49a6d31a038f5d`. R1-R4 are closed; build, s
 nine suites/75 tests were independently verified. P1/P2 remain accepted. This is implementation
 acceptance, not human terminal/cumulative/M2 acceptance.
 
-The CI/duration correction at `d9e994c` is accepted, recorded at `aab058e`; its implementation
-and outcome CI passed. Human terminal feedback then identified unreadable bright-white primary
-values on a light background. Human readability is changes-requested, not accepted.
+The CI/duration correction `d9e994c` is accepted at `aab058e`. Shared styling, flat default layout,
+compact unit tokens and renderer extraction were reviewed at `f055885`; the sole test-stub correction
+`0256c71` was accepted by trunk. Supervisor cleanup correction `97cab518` was independently accepted
+at `68daa1f`. The [styling return](opentelemetry-m2-terminal-styling-design.md) and
+[review/remaining risks](opentelemetry-m2-terminal-styling-review.md) preserve attribution.
 
-Next is the [interactive styling design/prototype session](opentelemetry-m2-terminal-styling-design.md).
-The human adopted a small implementation -> real-output feedback -> recorded decision loop, not a
-strict design-only/implementation split. Keep useful colors and dim; do not optimize for all conceivable
-themes by removing styling. Settle palette principles through bounded trials before the separate fine
-spacing/style pass. Shared progress and completion styling are included, not only Profile.
+On 2026-10-02 the human confirmed that completed sample and real-repository checks are sufficient:
+no additional shared-consumer sample or visual check blocks styling-to-profile integration. Recorded
+Windows Profile evidence is not relabeled as proof of every role/terminal. GNOME light/dark remains
+an explicit M2 pre-release check, preferably before candidate freeze. A reusable dummy-data display
+sample is a useful future maintenance task, not a new integration or release gate.
 
-Planning remains on `feature/otel-redesign_M2_profile`; the human-started session creates
-`feature/otel-redesign_M2_styling` from the verified remote-backed planning tip. Its packet authorizes
-bounded production/test/sample edits, checkpoints and normal pushes. Independent focused review,
-green final-source CI and human visual approval precede a human-approved squash back into profile.
-After checking post-squash content correspondence, assign cumulative Windows/Linux source and
-installed-package validation at a fixed candidate. Formal performance and other M2 gates are unchanged.
-Trunk is a conversation role, not a Git ref; no automatic parent-ref updates or PR/merge authority.
+Current step: prepare human-approved squash from `feature/otel-redesign_M2_styling` into
+`feature/otel-redesign_M2_profile` (base `76486d25870172528ce9af086ace756388b6c8d8`). Before PR creation,
+confirm actual remote source/base and request explicit permission. After human merge, verify source
+content correspondence and record the squash mapping. Then assign cumulative Windows/Linux source
+and installed-package validation for the complete profile candidate, followed by human-approved
+profile-to-M2 squash. Existing successful evidence can be reused only with explicit delta assessment.
+
+Linux ENOTEMPTY and Windows timeout/EBUSY remain unresolved observations; bounded investigations
+ended without supported fixes. Do not launch further reproduction campaigns or retry until green.
+Preserve complete evidence if ordinary verification fails again, then triage the actual failure.
+The historical supervisor R cause remains uncertain despite the accepted contract correction.
+These facts do not waive required cumulative tests, formal performance checks or publish acceptance.
+The separate existing Attributes fixture typing issue does not expand M2 into wholesale test typing.
+
+After profile integration: first private tests/system migration and review; history/evidence freeze;
+full T13B; GNOME check before release; combined final-candidate validation and T13C/publish evidence.
+Trunk is a conversation role, not a Git ref. Formal performance and PR/merge authority are unchanged.
 
 ## Session sequence and dependencies
 
@@ -279,5 +291,5 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Only the named interactive terminal styling design/prototype session
-is assigned now; later sessions need their own fixed inputs and trunk handoff. No PR is authorized.
+chooses squash/merge strategy and performs the merge or branch deletion. Current work is styling-to-profile integration preparation; later sessions need fixed inputs and
+trunk handoff. No PR is authorized until the human approves its explicit source/base.

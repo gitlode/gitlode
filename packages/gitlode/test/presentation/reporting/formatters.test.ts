@@ -7,8 +7,16 @@ import type {
 } from "@gitlode/internal-contracts/telemetry";
 import { describe, expect, it } from "vitest";
 
-import { formatProfileLines } from "../../../src/presentation/reporting/formatters.js";
+import { formatProfileLines as formatDefaultProfileLines } from "../../../src/presentation/reporting/formatters.js";
+import { renderProfile } from "../../../src/presentation/reporting/profile-renderer.js";
 import { createStyling, plainStyling, type Styling } from "../../../src/presentation/styling.js";
+
+// Keep hierarchy regressions explicit even when the production default is flat.
+function formatProfileLines(report: ProfileReport, styling: Styling = plainStyling): string[] {
+  const lines: string[] = [];
+  renderProfile({ writeLine: (line) => lines.push(line) }, report, styling, { namespaceDepth: 2 });
+  return lines;
+}
 
 type MutableProfileReport = { -readonly [Key in keyof ProfileReport]: ProfileReport[Key] };
 
@@ -153,7 +161,7 @@ describe("generic profile formatting", () => {
       "  Scope: example",
       "    /root",
       "      ns",
-      '        "measured\\n\\"slash/\\\\\\u0085\\u2028\\u202etest:=,()" : 1 operations',
+      '        "measured\\n\\"slash/\\\\\\u0085\\u2028\\u202etest:=,()" : 1operations',
       '        "missing\\n\\"slash/\\\\\\u0085\\u2028\\u202etest:=,()" : unavailable',
       "          ! No valid result retained: invalid aggregation discarded.",
     ];
@@ -201,12 +209,12 @@ describe("generic profile formatting", () => {
       "      ! No valid result retained: invalid aggregation discarded.",
       '    /"alpha..missing" : unavailable',
       "      ! No valid result retained: invalid aggregation discarded.",
-      '    /"measured..bad" : 2 operations',
+      '    /"measured..bad" : 2operations',
       '    /"trailing." : unavailable',
       "      ! No valid result retained: invalid aggregation discarded.",
       "    /alpha",
       "      beta",
-      "        ok : 3 operations",
+      "        ok : 3operations",
       "          mode = ready",
     ]);
   });
@@ -283,13 +291,13 @@ describe("generic profile formatting", () => {
       "      ns",
       "        /root.ns : unavailable",
       "          ! No valid result retained: invalid aggregation discarded.",
-      "        /root.ns : 7 operations",
+      "        /root.ns : 7operations",
       "          mode = kept",
       '          ! Additional attribute combinations omitted: datapoint retention limit reached. Known loss: 1 metric points; unit="{point}".',
       "        /root.ns : unavailable",
       "          mode = missing",
       "          ! No valid result retained: invalid aggregation discarded.",
-      "        long : 8 operations",
+      "        long : 8operations",
       "          id = 1",
       "        long : unavailable",
       "          id = 2",
@@ -350,7 +358,7 @@ describe("generic profile formatting", () => {
       "  Scope: example",
       '    /"bad..name" : unavailable',
       "      ! No valid result retained: invalid aggregation discarded.",
-      '    /"bad..name" : 4 operations',
+      '    /"bad..name" : 4operations',
       "      /bad.mode = false",
       "      ! Additional attribute combinations omitted: datapoint retention limit reached.",
       '    /"bad..name" : unavailable',
@@ -583,15 +591,17 @@ describe("generic profile formatting", () => {
     ) as unknown as Styling;
     const styled = formatProfileLines(report, spy).join("\n");
     expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
-    expect(calls).not.toContain("warnBadge:!");
+    expect(calls).not.toContain("warning:!");
+    expect(calls).toContain("attributeName:/outcome");
+    expect(calls).not.toContain("fieldLabel:/outcome");
     expect(calls).toEqual(
       expect.arrayContaining([
         "separator:(",
-        "primaryValue:3",
+        "value:3",
         "separator:)",
         "separator: (",
-        "fieldKey:observed",
-        "primaryValue:1",
+        "fieldLabel:observed",
+        "value:1",
       ]),
     );
 
@@ -628,7 +638,7 @@ describe("generic profile formatting", () => {
       ]),
     ) as unknown as Styling;
     formatProfileLines(warningSummary, warningSpy);
-    expect(warningCalls.filter((call) => call === "warnBadge:!")).toHaveLength(2);
+    expect(warningCalls.filter((call) => call === "warning:!")).toHaveLength(2);
 
     const infoSummary = emptyReport();
     infoSummary.diagnostics = [
@@ -645,7 +655,7 @@ describe("generic profile formatting", () => {
       ]),
     ) as unknown as Styling;
     formatProfileLines(infoSummary, infoSummarySpy);
-    expect(infoSummaryCalls).not.toContain("warnBadge:!");
+    expect(infoSummaryCalls).not.toContain("warning:!");
 
     const warningDetail = emptyReport();
     warningDetail.diagnostics = [diagnostic()];
@@ -657,7 +667,7 @@ describe("generic profile formatting", () => {
       ]),
     ) as unknown as Styling;
     formatProfileLines(warningDetail, warningDetailSpy);
-    expect(warningDetailCalls.filter((call) => call === "warnBadge:!")).toHaveLength(2);
+    expect(warningDetailCalls.filter((call) => call === "warning:!")).toHaveLength(2);
   });
 
   it("organizes every kind in one Scope and two namespace levels", () => {
@@ -671,9 +681,9 @@ describe("generic profile formatting", () => {
       "  Scope: gitlode.git",
       "    /gitlode",
       "      git",
-      "        blob.read.duration : samples=2, total=3 ms, avg=1.5 ms, min=1 ms, max=2 ms",
-      "        commit.walk : calls=2, total=2 ms, avg=1 ms, max=1.5 ms, errors=0",
-      "        object.read : 0 objects",
+      "        blob.read.duration : samples=2, total=3ms, avg=1.5ms, min=1ms, max=2ms",
+      "        commit.walk : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
+      "        object.read : 0objects",
     ]);
   });
 
@@ -686,11 +696,11 @@ describe("generic profile formatting", () => {
       "Profile",
       "  Scope: example",
       "    /root",
-      "      /root : calls=2, total=2 ms, avg=1 ms, max=1.5 ms, errors=0",
-      "      /root : 3 operations",
+      "      /root : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
+      "      /root : 3operations",
       "      child",
-      "        /root.child : calls=2, total=2 ms, avg=1 ms, max=1.5 ms, errors=0",
-      "        /root.child : 4 operations",
+      "        /root.child : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
+      "        /root.child : 4operations",
     ]);
   });
 
@@ -757,7 +767,7 @@ describe("generic profile formatting", () => {
 
     expect(formatProfileLines(report).join("\n")).toContain(
       [
-        "      projection : calls=2, total=2 ms, avg=1 ms, max=1.5 ms, errors=0",
+        "      projection : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
         '        /gitlode.project = "true" (observed 1)',
         "        mode = ready",
         "        outcome = ok(2)",
@@ -781,7 +791,7 @@ describe("generic profile formatting", () => {
     expect(formatProfileLines(report)).toEqual([
       "Profile",
       '  Scope: "scope name"',
-      '    /"gitlode..read" : 1 operations',
+      '    /"gitlode..read" : 1operations',
       '      /"line\\nkey" = "true"',
       '      /number = "1"',
       '      /slash = "/value"',
@@ -802,10 +812,10 @@ describe("generic profile formatting", () => {
       counter("example", "c", 1023.96, "By"),
       counter("example", "d", 1e-15, "s"),
     ];
-    expect(formatProfileLines(report).join("\n")).toContain("/a : 0 s");
-    expect(formatProfileLines(report).join("\n")).toContain("/b : 1 ms");
-    expect(formatProfileLines(report).join("\n")).toContain("/c : 1 KiB");
-    expect(formatProfileLines(report).join("\n")).toContain("/d : 1e-6 ns");
+    expect(formatProfileLines(report).join("\n")).toContain("/a : 0s");
+    expect(formatProfileLines(report).join("\n")).toContain("/b : 1ms");
+    expect(formatProfileLines(report).join("\n")).toContain("/c : 1KiB");
+    expect(formatProfileLines(report).join("\n")).toContain("/d : 1e-6ns");
   });
 
   it("preserves masks, duration coverage, exact counts and optional extrema", () => {
@@ -822,9 +832,9 @@ describe("generic profile formatting", () => {
       { ...histogram("example", "hist"), minimum: null, maximum: null, unavailableFields: [] },
     ];
     const output = formatProfileLines(report).join("\n");
-    expect(output).toContain("calls=2, total=2 ms, avg=—, max=1.5 ms, errors=—");
+    expect(output).toContain("calls=2, total=2ms, avg=—, max=1.5ms, errors=—");
     expect(output).toContain("/zero : —");
-    expect(output).toContain("samples=2, total=3 ms, avg=1.5 ms, min=—, max=—");
+    expect(output).toContain("samples=2, total=3ms, avg=1.5ms, min=—, max=—");
   });
 
   it("omits a complete empty report", () => {
@@ -883,9 +893,9 @@ describe("generic profile formatting", () => {
       "      cache",
       "        lookup",
       "          ! Additional attribute combinations omitted: datapoint retention limit reached.",
-      "        lookup : 1 operations",
+      "        lookup : 1operations",
       "          /mode = a",
-      "        lookup : 2 operations",
+      "        lookup : 2operations",
       "          /mode = b",
       "          ! Invalid aggregation detail was discarded.",
     ]);
@@ -910,7 +920,7 @@ describe("generic profile formatting", () => {
     const output = formatProfileLines(report).join("\n");
     expect(output).toContain("duration : unavailable");
     expect(output).toContain("! No valid result retained: invalid aggregation discarded.");
-    expect(output).toContain("count : 7 operations");
+    expect(output).toContain("count : 7operations");
   });
 
   it("distinguishes known loss, repetition and unknown omitted diagnostic detail", () => {
@@ -1009,6 +1019,42 @@ describe("generic profile formatting", () => {
     ]);
   });
 
+  it("keeps heading levels structural and excludes fields and notices from heading decoration", () => {
+    const report = emptyReport();
+    report.spans = [span("example", "root"), span("example", "root.child")];
+    report.diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.missing",
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const styling: Styling = {
+      ...plainStyling,
+      h1: (text) => `<h1>${text}</h1>`,
+      h2: (text) => `<h2>${text}</h2>`,
+      h3: (text) => `<h3>${text}</h3>`,
+      h4: (text) => `<h4>${text}</h4>`,
+    };
+    const lines = formatProfileLines(report, styling);
+    expect(lines[0]).toBe("<h1>Profile</h1>");
+    expect(lines).toContain("  <h2>Scope: example</h2>");
+    expect(lines.some((line) => line.startsWith("    <h3>/root</h3> : calls="))).toBe(true);
+    expect(lines.some((line) => line.startsWith("      <h4>child</h4> : calls="))).toBe(true);
+    expect(lines).toContain("      <h4>missing</h4> : unavailable");
+    expect(lines.filter((line) => line.includes("! ")).every((line) => !line.includes("<h"))).toBe(
+      true,
+    );
+    expect(lines.map((line) => line.replace(/<\/?h[1-4]>/gu, ""))).toEqual(
+      formatProfileLines(report),
+    );
+  });
+
   it("uses semantic style roles while preserving styled/plain text parity", () => {
     const report = emptyReport();
     report.spans = [
@@ -1027,19 +1073,164 @@ describe("generic profile formatting", () => {
     expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
     expect(calls).toEqual(
       expect.arrayContaining([
-        "sectionHeading:Profile",
-        "sectionHeading:Scope: example",
-        "fieldKey:calls",
+        "h1:Profile",
+        "h2:Scope: example",
+        "h3:/example",
+        "h4:operation",
+        "fieldLabel:calls",
         "separator: : ",
-        "primaryValue:1",
-        "unitSuffix: operations",
-        "warnBadge:!",
+        "value:1",
+        "unit:operations",
+        "warning:!",
       ]),
     );
 
     const ansi = /\u001b\[[0-9;]*m/gu;
     expect(formatProfileLines(report, createStyling(true)).join("\n").replace(ansi, "")).toBe(
-      formatProfileLines(report).join("\n"),
+      formatProfileLines(report, createStyling(false)).join("\n"),
     );
+  });
+});
+
+describe("streaming Profile rendering", () => {
+  it("writes earlier sections before formatting later sections and preserves completed lines on failure", () => {
+    const report = emptyReport();
+    report.counters = [counter("example", "work.count")];
+    const lines: string[] = [];
+    const failure = new Error("decoration failed");
+    expect(() =>
+      renderProfile({ writeLine: (line) => lines.push(line) }, report, {
+        ...plainStyling,
+        h2: () => {
+          expect(lines).toEqual(["Profile"]);
+          throw failure;
+        },
+      }),
+    ).toThrow(failure);
+    expect(lines).toEqual(["Profile"]);
+  });
+
+  it("propagates a sink failure immediately without rendering or replaying later lines", () => {
+    const report = emptyReport();
+    report.counters = [counter("example", "work.count")];
+    const failure = new Error("sink failed");
+    let writes = 0;
+    let scopeFormatted = false;
+    expect(() =>
+      renderProfile(
+        {
+          writeLine: () => {
+            writes++;
+            throw failure;
+          },
+        },
+        report,
+        {
+          ...plainStyling,
+          h2: (text) => {
+            scopeFormatted = true;
+            return text;
+          },
+        },
+      ),
+    ).toThrow(failure);
+    expect(writes).toBe(1);
+    expect(scopeFormatted).toBe(false);
+  });
+
+  it("does not write an empty report", () => {
+    const lines: string[] = [];
+    renderProfile({ writeLine: (line) => lines.push(line) }, emptyReport());
+    expect(lines).toEqual([]);
+  });
+});
+
+describe("source-configurable namespace depth", () => {
+  it.each([0, 1, 2, 3, 4, 8])(
+    "places measurements and diagnostic-only names at depth %i",
+    (namespaceDepth) => {
+      const report = emptyReport();
+      report.counters = [
+        {
+          ...counter("example", "a.b.c.d.count"),
+          attributes: [{ key: "a.b.c.d.label", value: "ok" }],
+        },
+      ];
+      report.diagnostics = [
+        diagnostic({
+          target: {
+            type: "observation",
+            scope: { name: "example", version: null },
+            kind: "counter",
+            name: "a.b.c.d.missing",
+          },
+          wholeResultUnavailable: true,
+        }),
+      ];
+      const lines: string[] = [];
+      renderProfile(
+        { writeLine: (line) => lines.push(line) },
+        report,
+        {
+          ...plainStyling,
+          h3: (text) => "<h3>" + text + "</h3>",
+          h4: (text) => "<h4>" + text + "</h4>",
+        },
+        { namespaceDepth },
+      );
+      expect(lines.filter((line) => line.includes("<h3>"))).toEqual(
+        namespaceDepth === 0
+          ? [
+              "    <h3>/a.b.c.d.count</h3> : 1operations",
+              "    <h3>/a.b.c.d.missing</h3> : unavailable",
+            ]
+          : ["    <h3>/a</h3>"],
+      );
+      expect(lines.filter((line) => line.includes("<h4>"))).toEqual(
+        namespaceDepth > 1
+          ? ["      <h4>b</h4>"]
+          : namespaceDepth === 1
+            ? [
+                "      <h4>b.c.d.count</h4> : 1operations",
+                "      <h4>b.c.d.missing</h4> : unavailable",
+              ]
+            : [],
+      );
+      const plainLines = lines.map((line) => line.replace(/<\/?h[34]>/gu, ""));
+      if (namespaceDepth >= 3) expect(lines).toContain("        c");
+      if (namespaceDepth >= 4) expect(lines).toContain("          d");
+      const segments = ["a", "b", "c", "d", "count"];
+      const valueDepth = Math.min(namespaceDepth, 4) + 2;
+      const valueName =
+        (namespaceDepth === 0 ? "/" : "") + segments.slice(Math.min(namespaceDepth, 4)).join(".");
+      expect(plainLines).toContain("  ".repeat(valueDepth) + valueName + " : 1operations");
+      const missingName =
+        (namespaceDepth === 0 ? "/" : "") +
+        ["a", "b", "c", "d", "missing"].slice(Math.min(namespaceDepth, 4)).join(".");
+      expect(plainLines.filter((line) => line.endsWith(missingName + " : unavailable"))).toEqual([
+        "  ".repeat(valueDepth) + missingName + " : unavailable",
+      ]);
+      expect(lines.filter((line) => line.includes("!"))).toHaveLength(2);
+      const attributeName =
+        namespaceDepth > 0 && namespaceDepth <= 4
+          ? ["a", "b", "c", "d"].slice(namespaceDepth).concat("label").join(".")
+          : "/a.b.c.d.label";
+      expect(lines).toContain("  ".repeat(valueDepth + 1) + attributeName + " = ok");
+    },
+  );
+});
+
+describe("default Profile layout", () => {
+  it("prints full names directly under Scope and joins values to their units", () => {
+    const report = emptyReport();
+    report.counters = [
+      { ...counter("example", "a.b.count"), attributes: [{ key: "a.b.mode", value: "ok" }] },
+    ];
+    expect(formatDefaultProfileLines(report)).toEqual([
+      "Profile",
+      "  Scope: example",
+      "    /a.b.count : 1operations",
+      "      /a.b.mode = ok",
+    ]);
   });
 });

@@ -154,12 +154,77 @@ When `--quiet` is not set and extraction succeeds, stderr output is fixed as fol
 
 3. An aligned completion summary block.
 4. When `--profile` is set, a Profile block after a single blank line. It uses the generic
-   Scope/two-level namespace hierarchy defined by the telemetry presentation contract.
+   Scope/source-configured namespace hierarchy defined by the telemetry presentation contract.
 
 TTY-aware rendering is a CLI-edge concern. When `process.stderr.isTTY === true`, chalk-based
 color styling is applied (spinner, done marker, stage labels, field keys, values, units, refs, and
 severity badges). When `process.stderr.isTTY === false`, styling is disabled and the same text
 content is emitted with no ANSI escape sequences.
+
+Style roles describe output roles: `active`, `success`, `warning` and `error` for status;
+`label` for labels such as stage names; `h1`?`h4` for headings; `value`, `unit`,
+`reference` and `separator` for their respective tokens. `fieldLabel` is a dim fixed label
+such as calls/total/avg. `attributeName` is a separate role because the name itself carries
+information; it starts with the default foreground, no decoration and zero padding. Attribute
+values continue to use `value`.
+
+Source-level visual parameters live in `src/presentation/styling.ts` as the typed `styleRules`
+table. Each role has a Chalk `decorate` function and a nonnegative integer `padding` count for
+spaces on each side. Padding is applied before decoration, in both styled and plain modes; it is
+layout rather than a color effect. A role's background includes its padding but not surrounding
+indentation or sibling measurement fields. Headings currently use one space per side.
+
+The shared `h1` role serves both application-summary and Profile titles; `h2` serves Scope,
+`h3` the first level below Scope, and `h4` the next, for both namespaces and telemetry entries. Their colors identify structural levels,
+not success or diagnostic severity. `h3` and `h4` start with related cyan/bright-cyan backgrounds.
+Color assignments remain source parameters for whole-output tuning, not a public theme API.
+
+To try a visual change, edit a role's `decorate` chain (for example `chalk.black.bgCyanBright`
+or `chalk.cyan.underline`) or its `padding`, run `npm run build:dev`, then run the built CLI on
+the human's repository with ordinary `--profile`, ref/range and output options. These edits do
+not require formatter logic changes. `npm run build:watch` in a separate terminal can replace
+repeated builds; wait for compilation to finish before rerunning the CLI. Extraction still runs
+normally and writes JSONL to the specified existing output directory. Synthetic previews remain
+useful for individual roles but do not establish the overall balance of a real report.
+
+`createStyling(false)` retains configured padding while suppressing all decoration. The exported
+`plainStyling` object is an identity baseline for isolated formatter callers/tests; actual CLI
+styled/plain comparisons must use `createStyling(true)` and `createStyling(false)`. No runtime
+theme configuration, background detection or forced color is introduced. Namespace depth is a separate source parameter, outside this role-parameter table.
+
+Edit `profileLayout.namespaceDepth` in `src/presentation/reporting/profile-layout.ts` to set
+how many leading dot-separated segments form namespace levels (nonnegative safe integer, default 0).
+Namespace grouping remains available for later visual experiments; a flat default does not remove
+the grouping implementation. Build and rerun the CLI to apply it. Zero disables namespace grouping and emits absolute entry
+names directly under Scope. Remaining segments stay together on an observation row;
+names shorter than the limit carry values on their final namespace line. Measurements and
+diagnostic-only identities use the same tree construction. Heading styles depend only on display depth, for both namespace headings and entry names:
+`[styling.h3, styling.h4]` below Scope, then no decoration or heading padding. With depth 0,
+entries use h3; with depth 1, namespaces use h3 and their child entries use h4. Measurement
+fields, attributes and diagnostic text keep their own roles.
+Indentation and the root slash remain independent of decoration. This is a source-level tuning
+parameter, not a runtime CLI/configuration setting.
+
+Profile layout experiments can also change the rendering functions directly; they need not be
+expressed as configuration parameters. In `src/presentation/reporting/`, `profile-renderer.ts`
+owns the template hierarchy: Profile, Scope, Namespace, Observation, Attribute and Notice.
+`renderScope` owns its heading, scope identity, notices and contents. Namespace rendering separates
+its heading/own measurements, descendant observations and recursive child namespaces. Rendering
+functions take `(sink, context, styling, options)`; local options carry depth, displayed name or
+attribute base as needed. `profile-data.ts` owns grouping, identity ordering and diagnostic matching;
+`profile-values.ts` owns value and diagnostic text formatting. Data preparation shares the
+same-name measurement/diagnostic grouping across flat and nested layouts. Its observation-name
+brand marks raw identity, not validation; escaped display names remain ordinary strings. Rendering
+consumes read-only collections, while tree construction keeps mutable storage internal. Preserve those identity and
+availability contracts when experimenting with layout.
+
+The CLI calls `renderProfile` with a `writeLine` sink (the used subset of `TerminalSink`) and emits
+lines synchronously, without retaining the complete rendered `string[]`. Grouping still allocates
+intermediate data; this is not a measured performance improvement. `formatProfileLines` is a thin
+collecting adapter for previews and tests, using the same renderer. The presenter closes active
+progress and adds its separating newline only on the first emitted line; an empty report does
+neither. Rendering and sink exceptions propagate without replay or rollback, so an error after
+the first write can leave a partial report on the terminal.
 
 When `process.stderr.isTTY === true`, the stage lines are rendered in place using a braille spinner:
 
@@ -179,7 +244,8 @@ removed and the `✓` done marker is placed in the spinner column with a trailin
 ```
 
 Measured values use no-space `number+unit` tokens (e.g. `1.2MB`, `8.5s`, `12.34ms`).
-The numeric part is rendered with primary-value emphasis; the unit suffix is rendered with dim styling.
+The numeric part uses the `value` role with default foreground and no decoration, treating
+values as body text; the unit suffix is rendered with dim styling.
 
 The extracting line always renders fields in this order: spinner/done frame, stage label, branch
 position, `commits traversed`, `records written`, humanized `bytes written`, and elapsed time.

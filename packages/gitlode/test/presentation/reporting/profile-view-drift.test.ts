@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { profileLayout } from "../../../src/presentation/reporting/profile-layout.js";
 import {
   compareAttributeSets,
   compareProfileIdentity,
@@ -33,7 +34,9 @@ describe("generic profile view drift", () => {
     expect((view.generic_hierarchy as Record<string, unknown>).remaining_suffix_escaping).toBe(
       "complete_suffix_before_decoration",
     );
-    expect((view.generic_hierarchy as Record<string, unknown>).namespace_segments).toBe(2);
+    expect((view.generic_hierarchy as Record<string, unknown>).namespace_segments_default).toBe(
+      profileLayout.namespaceDepth,
+    );
   });
 
   it("matches generic kind, diagnostic, unit and style policy", async () => {
@@ -47,15 +50,18 @@ describe("generic profile view drift", () => {
     );
     expect(view.styling).toEqual(
       expect.objectContaining({
-        title_scope_namespace: "sectionHeading",
+        title: "h1",
+        scope: "h2",
+        first_level_below_scope: "h3",
+        second_level_below_scope: "h4",
         separator: "separator",
         profile_uses_application_success_style: false,
         styled_plain_text_parity: true,
         profile_marker_severity: "highest_retained_detailed_or_summary_evidence",
-        distinct_frequency: { digits: "primaryValue", punctuation: "separator" },
+        distinct_frequency: { digits: "value", punctuation: "separator" },
         incomplete_coverage: {
-          label: "fieldKey",
-          count: "primaryValue",
+          label: "fieldLabel",
+          count: "value",
           punctuation: "separator",
         },
       }),

@@ -50,6 +50,11 @@ be stitched into another attempt. Bounded `.diagnostic.log` files may contain lo
 separate from formal evidence. For cleanup and evidence contracts see
 [execution supervision](../design/telemetry-performance.md#execution-supervision).
 
+Inspect `cleanupConfirmed` and `cleanupErrors` in terminal supervision evidence. Signal delivery
+alone does not satisfy the bounded descendant completion barrier; cleanup uncertainty makes the
+attempt inconclusive/nonzero even after normal worker completion. The observation guarantees and
+limits are defined in the execution-supervision contract linked above.
+
 Final evidence persistence is also supervised. A raw diagnostic-log failure produces exit 2 but
 still permits a terminal inconclusive snapshot. If the first terminal snapshot write fails, the
 supervisor makes one recovery write with the persistence failure identified; it does not rerun any

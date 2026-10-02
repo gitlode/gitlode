@@ -158,7 +158,7 @@ shape.
 
 ## Presentation verification
 
-Presentation tests assert the generic Scope/two-level namespace tree, code-unit/kind/typed-attribute
+Presentation tests assert the generic Scope/source-configured namespace tree (flat by default, with explicit multi-level regressions), code-unit/kind/typed-attribute
 ordering, short/group-node collisions, plugin and unknown identities, escaping, attribute bases,
 fixed per-kind fields, masks, zero semantics, unit thresholds and omission of percentiles. Diagnostic
 tests cover report/Scope/observation/point placement, missing-only targets, valid siblings, fixed

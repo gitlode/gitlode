@@ -1,5 +1,10 @@
 # P3 generic profile presentation: small real-output evidence
 
+> Historical evidence: the temporary capture helper and its commands below were retired during
+> styling-session cleanup. They are not current execution instructions. The helper is preserved
+> in commit a4bb707; use the ordinary built CLI with a human-supplied repository for new checks.
+> Current styling decisions and return status: [styling handoff](opentelemetry-m2-terminal-styling-design.md).
+
 These are bounded excerpts from three real CLI runs, not synthetic formatter fixtures and not
 formal performance measurements. They were captured from product source
 `737f36338e45e08fbfed2095dcd2a81c5f09098d` after `npm run build:dev`, using the existing

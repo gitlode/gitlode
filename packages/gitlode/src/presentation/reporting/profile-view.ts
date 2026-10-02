@@ -25,20 +25,15 @@ export const PROFILE_KIND_ORDER: Readonly<Record<ProfileObservationKind, number>
   histogram: 2,
 };
 
-export function compareProfileIdentity(
-  left: {
-    scope: ProfileInstrumentationScope;
-    name: string;
-    kind: ProfileObservationKind;
-    attributes?: readonly ProfileAttribute[];
-  },
-  right: {
-    scope: ProfileInstrumentationScope;
-    name: string;
-    kind: ProfileObservationKind;
-    attributes?: readonly ProfileAttribute[];
-  },
-): number {
+interface ProfileIdentity {
+  readonly scope: ProfileInstrumentationScope;
+  readonly name: string;
+  readonly kind: ProfileObservationKind;
+  readonly attributes?: readonly ProfileAttribute[];
+}
+
+/** Order complete identities by Scope, raw name, signal kind, then typed attributes. */
+export function compareProfileIdentity(left: ProfileIdentity, right: ProfileIdentity): number {
   return (
     compareProfileScopes(left.scope, right.scope) ||
     compareCodeUnits(left.name, right.name) ||
@@ -47,6 +42,7 @@ export function compareProfileIdentity(
   );
 }
 
+/** Inputs must use canonical key order; values compare by type as well as content. */
 export function compareAttributeSets(
   left: readonly ProfileAttribute[],
   right: readonly ProfileAttribute[],

@@ -1,139 +1,126 @@
-# Terminal-aware styling: interactive design and prototype assignment
+# M2 terminal styling: return packet
 
-## Status and authority
+## Status and boundaries
 
-Human terminal feedback requests changes before cosmetic fine tuning. This is a bounded extension
-of M2 profile readability, not a new telemetry architecture workstream. The human starts a separate
-interactive conversation. This packet supersedes the former design-only assignment: small production,
-test and sample changes are authorized to make style decisions from real output. Do not require a
-complete design document before trying a bounded candidate with the human.
+Styling implementation and corrections are accepted; the next step is human-approved squash into
+profile, not another styling session. See the [accepted review and remaining observations](opentelemetry-m2-terminal-styling-review.md).
+On 2026-10-02 the human confirmed completed sample/real-repository checks are sufficient to proceed;
+no additional shared-consumer visual sample gates this integration. GNOME light/dark remains M2
+pre-release work. A reusable comprehensive dummy-data sample is future tooling, not a release blocker.
+Cumulative profile/M2 validation and publish acceptance remain open.
 
-## Branch and checkpoint boundary
+Source branch: feature/otel-redesign_M2_styling. Intended return base: feature/otel-redesign_M2_profile.
+Entry source: 76486d25870172528ce9af086ace756388b6c8d8; entry ancestry, clean worktree and actual remote
+equality were verified before creating the styling child. Trunk is a conversation role, not a Git ref.
+Normal commits/pushes preserve history. No force push, base-ref update, PR, merge or branch deletion.
+PR requires explicit human approval naming source/base; only the human merges and deletes branches.
 
-Planning is on `feature/otel-redesign_M2_profile`, based on clean checkpoint
-`f653688361b430045bbc5bfeb1a3cd7340de114f`; this packet advances that tip. At entry, verify the
-planning commit containing this packet, ancestry, clean worktree and actual remote equality. Record
-its full OID, then create `feature/otel-redesign_M2_styling` from that verified profile tip and normally
-push with upstream tracking. If the styling branch already exists, inspect it and resume only when
-its provenance matches; never reset or overwrite it. Trunk is a conversation role, not a Git ref.
+## R1 bounded correction outcome — 2026-10-01
 
-Commit and normally push meaningful trials, including explicitly unfinished states, before handoff
-or long pauses. Record which OID the human actually viewed and which choices were adopted. Do not
-rewrite pushed checkpoints. Keep trial history on the styling child; the recommended return is a
-human squash into `feature/otel-redesign_M2_profile` after final review/CI and human acceptance.
-The profile child later enters M2 by human squash after cumulative acceptance. Preserve the styling
-source ref until trunk accounts for post-squash content and evidence; only the human deletes branches.
-No formal performance candidate is frozen here. Do not claim a squash OID was the tested source;
-record the mapping and assess its delta before later validation/freezing.
+R1 is corrected; trunk's limited-diff confirmation is pending. The independent review remains
+**Corrections required** as recorded; this correction does not grant M2 acceptance.
 
-Do not create a PR without explicit human approval naming source and base. Only the human merges.
-Do not update profile/M2/integration/main refs, force push, or switch to main at completion.
+- Start: `0d944b3113c481231218f2ca2f4f1cf53995d693`, equal to local/tracking/actual remote,
+  on the requested styling branch with one clean worktree. Checkpoint ancestry was verified.
+- Implementation correction: `0256c71bc3e429c13e0dc0aa938514d87858fd1b`. Only
+  `test/presentation/reporting/summary-formatters.test.ts` changed: both stubs spread
+  `plainStyling` and override their existing observed roles. Callbacks and output assertions are
+  unchanged. No production/interface, palette, layout, collector, schema or unrelated test changes.
+- Before correction, the review's exact summary-only strict command reproduced TS2741 at lines
+  33 and 82. After correction, that command passed. The same flags also passed for all six changed
+  presentation tests: styling, diagnostics, presenter, reporting/formatters, reporting/profile-view-drift
+  and reporting/summary-formatters (with `test/support/js-yaml.d.ts`). No diagnostic suppression.
+- Focused Vitest passed 2 files / 8 tests (summary-formatters and styling). Focused oxlint, root
+  `npm run format:write`, root `npm run format:check` and `git diff --check` passed. No additional
+  local full-suite or package verification was run. The separate `local-collection.test.ts:69`
+  Attributes issue was neither changed nor claimed resolved.
+- Correction push CI: [run 36812819253](https://github.com/gitlode/gitlode/actions/runs/36812819253),
+  exact source `0256c71bc3e429c13e0dc0aa938514d87858fd1b`, attempt 1: success. Job
+  `110211391160` reports successful source tests, release build, packed metadata and installed-package
+  system test steps, as well as the preceding validation steps. No new failure or retry.
+- This outcome is a subsequent documentation-only checkpoint, distinct from the implementation
+  correction OID above. Its own OID and push CI are reported in the final handoff, not attributed
+  to the correction-source CI.
 
-## Confirmed context and principles
+Unresolved instability, unobserved display environments/shared-consumer visual checks, and M2
+acceptance remain open as detailed in the independent review. No CI retry, PR, merge, parent-ref
+update or formal measurement is part of this correction.
 
-- The CI/duration correction at `d9e994cc28bc91b9ca86f3a3e6e798371ec85481` is independently
-  accepted in `aab058e`. Its implementation and outcome CI passed. Do not reopen collector/schema work.
-- The human used the standard Windows 11 terminal application (exact application/version and palette
-  not yet recorded). On a light background `primaryValue: chalk.whiteBright` became unreadable.
-  This is a readability defect, not merely a request for different visual emphasis.
-- Prioritize useful, readable styling in representative environments. Universal compatibility must
-  not become an excuse to render everything in the default foreground or remove useful colors.
-- Preserve terminal palette abstraction. Basic ANSI colors, including white/brightWhite, select
-  configurable palette entries; none guarantees automatic contrast against the background.
-  Default foreground and a named white palette entry are different concepts.
-- Distinguish decoration that becomes less noticeable from decoration that makes text unreadable.
-  The former is acceptable when plain text retains meaning; the latter requires correction.
-- `dim` is not prohibited for keys/units. Evaluate readability in the supported sample environments;
-  weak or unsupported dim alone is not a failure. Dimming can also reduce contrast, so inspect it.
-- Color-free text must retain meaning and structure. Use colors, bold and dim where useful;
-  do not convey essential information through color alone.
-- Do not impose blanket bans on bright colors or backgrounds. Evaluate justified roles and pairs.
-  Default foreground with bold for primary values is a proposal, not a final palette decision.
-- Keep semantic roles centralized in `src/presentation/styling.ts`; do not color by domain attributes.
+## Adopted outcome
 
-## Investigation and trials, with the human
+Canonical contracts: [CLI styling](../design/cli.md), [profiling guide](../profiling.md),
+[profile view catalog](../design/telemetry-catalog/profile-view.yaml).
 
-Read applicable AGENTS instructions, canonical CLI styling and profiling contracts, accepted profile
-sections on styling, and the terminal-check packet. Inspect current shared role consumers, including
-progress and application summaries. Do not restrict the impact inventory to Profile.
+- Shared source-editable role rules own decoration and padding; value and attributeName use default
+  foreground without decoration. fieldLabel, unit and separator remain dim.
+- h1 is shared by completion/Profile; h2 is Scope; h3/h4 follow display depth for namespaces and
+  observation names. Deeper names are undecorated. Headings have one space padding per side.
+- namespaceDepth defaults to 0. Keep grouping and its regression tests for future experiments;
+  deleting grouping is a later human decision. Numbers and measurement units are adjacent.
+- Renderers emit to a writeLine sink; the array formatter is a collecting adapter. Empty reports
+  do not interrupt progress. Failures propagate and already emitted lines can remain visible.
+- Data preparation separates same-name measured and diagnostic-only entries. Render inputs are
+  read-only; a local observation-name brand marks identity rather than validation. No collector,
+  schema, aggregation, background detection or runtime theme configuration change was introduced.
 
-Use official terminal/Chalk documentation and inspect the repository's installed/locked Vitest
-version and relevant formatter/color library source. Vitest is a concrete comparison, not proof of
-universal contrast or a requirement to copy its palette. Record what was actually inspected and
-separate facts from inferred design lessons. Do not install or upgrade tools just for comparison.
+## Evidence and human feedback
 
-References already checked by trunk:
+Inspected locked Vitest 4.1.10 formatters and tinyrainbow 3.1.0, installed Chalk 6.0.0, and official
+Windows Terminal/Chalk documentation. Vitest's padded foreground/background labels informed trials;
+this is implementation comparison, not evidence of universal contrast.
 
-- https://learn.microsoft.com/en-us/windows/terminal/customize-settings/color-schemes
-- https://learn.microsoft.com/en-us/windows/terminal/customize-settings/profile-appearance
-- https://help.gnome.org/gnome-terminal/app-colors.html
-- https://github.com/chalk/chalk
+Human environment: Windows Terminal 1.24.11911.0, Campbell/Tango Light, Cascadia Mono; plain text also
+used. Bold mainly changed brightness, not weight. White/brightWhite values failed on light backgrounds;
+plain values, padded headings and C's related cyan backgrounds were adopted. Yellow on light was
+previously somewhat weak; no isolated final re-evaluation is recorded. Exact widths/intensity settings
+and separate final shared-progress/diagnostic results are not recorded. Overall Profile approval must
+not be expanded into evidence for unobserved roles or terminals.
 
-Propose a finite matrix: Windows Terminal and GNOME Terminal, each with named light/dark palettes,
-plus plain output. This matrix is a recommendation to settle with the human, not an assertion that
-Linux GUI access exists. Record unavailable environments and decide how evidence will be obtained.
-WSL inside Windows Terminal does not test a separate terminal renderer. Distinguish window theme
-from text-area palette. Do not auto-detect or query background colors unless a concrete need emerges;
-a theme-detection subsystem is outside the proposed scope.
+GNOME Tango dark/light remain unobserved. The human authorized Windows/plain-first work and did not
+request a VM. Return this gap to trunk; WSL within Windows Terminal is not a second renderer.
+The human owns real repository preparation/selection; do not prepare or record repository identities.
 
-## Interactive loop and scope
+Key checkpoints (history retains detailed trials):
 
-1. Inspect role consumers and the locked Vitest implementation; summarize a small number of concrete
-   lessons and candidate role assignments. Confirm the finite terminal/palette matrix with the human.
-2. Implement a small reversible styling candidate and a clearly labeled synthetic role sample where
-   ordinary fixtures lack warnings, errors or unavailable values. Reuse the real styling factory and
-   renderer; no second product renderer, permanent theme picker or product failure injection.
-3. Provide exact commands, expected workload and what to compare. The human runs real terminals;
-   do not claim automated ANSI snapshots establish readability. Record palette names separately from
-   window themes, approximate widths, source OID and unobserved environments/roles.
-4. Ask for feedback, adjust the candidate and repeat within this conversation. Ordinary bounded
-   trials do not need a trunk round trip. Keep a short decision table: principle, trial, human result,
-   adopted/rejected/pending. Do not mistake an unreviewed prototype for an accepted policy.
-5. Once palette principles and shared roles are adopted, handle spacing/separators or other fine
-   adjustments as a distinct pass with separate rationale. Do not mix an individual preference into
-   a universal rule. Stop after agreed findings are resolved; do not exhaustively tune arbitrary themes.
+| Source  | Evidence/outcome                                                           |
+| ------- | -------------------------------------------------------------------------- |
+| 70e9e0d | Human explicitly confirmed direct Chalk sample source                      |
+| 5f1aa77 | Plain values/background headings reviewed; font recorded                   |
+| 7178f28 | Shared h1, padding, differentiated backgrounds adopted                     |
+| e8a4216 | A/C sample supplied; C selected, viewed OID not explicitly restated        |
+| a4bb707 | Human-selected flat default and compact units; subsequent Profile approval |
+| 4f7576b | Maintenance refactor explicitly reviewed and accepted by human             |
+| 8123fb5 | Catalog validator fixed; human confirmed correction                        |
 
-Use the existing terminal-check helper for real commit/file/plugin output and check shared progress
-and completion output too. A synthetic sample should cover all styling roles, clearly distinguished
-from observed CLI behavior. Preserve plain/styled text parity except separately agreed textual/layout
-changes. Respect existing color-support and non-TTY behavior; never force colors in the product.
+Do not claim that a later cleanup or squash OID was the human-viewed trial source. Assess visible
+deltas before requesting further visual checks. No visible product changes are intended after these
+checkpoints. No formal performance candidate is frozen.
 
-Escalate to trunk if a fix requires telemetry/schema/aggregation changes, substantial output-structure
-redesign, a new terminal capability/theme subsystem, or a material expansion of supported environments.
-Do not silently broaden into performance, tests/system organization or release acceptance. If context
-becomes too large or the same issue remains after two correction rounds, checkpoint exact state and
-return a bounded diagnosis/continuation request rather than starting another unbounded patch cycle.
+## Temporary artifacts
 
-## Completion and verification
+Removed capture-profile-evidence.ts and preview-terminal-styling.ts, including primitive/padding/A-C
+samples. Historical helpers are available at a4bb707; old handoff commands are marked archival.
+No package scripts or CI depend on them. The one-off refactoring script was already removed.
+The capture helper's owned temporary-directory prefix was checked and no remaining directory found.
+Production renderers, style/layout parameters and regression tests remain maintained code.
 
-The goal is useful colored/weighted output that stays readable in the agreed light/dark matrix, not
-identical appearance on every terminal. Weak/unsupported decoration is acceptable when text remains
-readable; color-free output must retain meaning. Human approval is required for the selected visual
-result. If Linux GUI evidence is unavailable, record the gap and return it to trunk; do not substitute
-WSL inside Windows Terminal or silently waive it.
+## Verification and remaining return steps
 
-During trials run meaningful affected checks, not a full campaign for each color edit. Before return:
+At 8123fb5: root npm test passed 95 files, 1277 tests, 17 skipped. One preceding run had a transient
+5-second repository-fixture timeout and EBUSY cleanup; the isolated full rerun passed. The catalog
+failure was an earlier fixed-two-level validator missed by narrow presentation test selection.
 
-- Verify role use, target-local behavior and plain/styled text parity with affected tests, including
-  collector-to-presentation tests if formatting behavior changes. Avoid tests that merely duplicate
-  a color assignment without checking a contract.
-- Run build, applicable strict tooling checks, lint, format:write, format:check and diff check.
-- Run root source tests and verify final-source CI including release build, packed metadata and
-  installed-package tests; distinguish skipped/unverified checks. Warn before long execution/waits.
-- Update durable policy with the adopted implementation: `docs/design/cli.md`, `docs/profiling.md`
-  and relevant profile-view catalog/tests as affected. Reconcile superseded styling statements in
-  the profile design; do not keep conflicting dim/role rules. Update usage only if its contract changes.
-- Record source OIDs, human environment/results, adopted role table, checks and residual issues here;
-  keep this note compact instead of appending every transcript or duplicating canonical policy.
+Final cleanup tree: root tests passed 95 files / 1277 tests with 17 skipped. Syncpack, full lint,
+format, architecture, schema checks and release build passed. Packed metadata (publint strict)
+and installed-package CLI/worker/both adapters/line diff/dynamic plugin/schema/TypeScript consumer
+checks passed. The first package check encountered sandbox npm-cache EPERM; rerunning only the
+package checks with the required permissions passed. Owned failed-run temp directories were removed.
+Exact-source Linux CI at f055885 passed on its third attempt: 95 files / 1294 tests, release build,
+strict publint and installed-package tests. The two preceding attempts failed in different tests;
+their evidence and unresolved attribution are recorded in the linked review request. A successful
+retry is not a fix for that instability. Keep skipped/unobserved evidence explicit. This packet does not waive publish
+or cumulative Windows/Linux/package acceptance gates. No publish command is authorized.
 
-Return for independent focused review of the final diff, shared-consumer effects, tests and contracts.
-Do not self-accept the implementation. Human trial approval may serve as visual evidence only for the
-recorded content; later visible corrections require another targeted human check. Trunk assigns review
-and, once accepted with green CI and human visual approval, prepares the source/base PR for permission.
-After human squash, trunk verifies content correspondence before cumulative Windows/Linux/package
-validation at a fixed profile candidate. CI does not replace that cumulative acceptance packet.
-
-Existing accepted P1/P2 and unrelated P3 behavior remain accepted. M2 and release acceptance remain
-open; the publish record stays blocked. Formal measurement, freeze, PR and merge are not authorized by
-this packet. Finish on the styling child with committed, remotely preserved work and an explicit
-complete-for-review or continuation-needed outcome.
+Independent focused review is complete; see the linked acceptance and risk record.
+After that review and green final CI, request human PR approval with explicit source/base. After human
+squash, verify source/content correspondence before cumulative acceptance. Preserve the styling ref.

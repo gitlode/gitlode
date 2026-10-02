@@ -46,6 +46,23 @@ Deadline expiry, operator SIGINT/SIGTERM, unexpected workflow termination, or su
 makes the attempt inconclusive and nonzero. Cleanup targets only the supervisor-owned process group,
 including descendants after the workflow exits. A grace period precedes forced termination.
 
+Successful signal delivery is not cleanup completion. At worker launch the supervisor captures the
+detached leader's PID, process group and Linux `/proc` start identity. After forced termination it
+uses the existing cleanup-wait budget, starting before SIGKILL and never renewed by worker close,
+to confirm both worker close and absence of live members of that owned group. Normal protocol
+completion uses the same SIGKILL/confirmation path for retained descendants. Group scans distinguish
+zombies (`Z`) from live states and retain observed PID/start identities across disappearance; reuse,
+unreadable observation, signal failure or budget exhaustion yields cleanup uncertainty, terminal
+`inconclusive` evidence and exit 2. The original failure reason and cleanup errors are retained.
+`cleanupConfirmed` is true only after the barrier succeeds without cleanup errors.
+
+IPC child PIDs remain diagnostic, never signal targets. Observation runs only at leader capture and
+cleanup, outside measured execution. `/proc` scans and identity checks establish observed group
+quiescence, not an atomic kernel snapshot or ownership of processes that leave the group. They
+cannot eliminate the kernel race between observation and signaling or guarantee bounded kernel
+I/O under the abrupt-host/uninterruptible conditions described below. Inaccessible process tables
+are conservatively inconclusive rather than treated as an empty group.
+
 Each invocation writes uniquely named atomic supervision snapshots. Completed raw runs and normalized
 behavior are saved between children, alongside the existing complete-pilot artifacts. The supervisor
 does not invent a pilot result when a child or repository preparation has not completed. Partial

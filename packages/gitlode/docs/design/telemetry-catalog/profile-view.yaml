@@ -18,7 +18,10 @@ generic_hierarchy:
   scope_label:
     version_present: "Scope: <scope-name>@<version>"
     version_absent: "Scope: <scope-name>"
-  namespace_segments: 2
+  namespace_segments_default: 0
+  namespace_segments_source: src/presentation/reporting/profile-layout.ts
+  namespace_segments_constraint: nonnegative_safe_integer
+  zero_namespace_segments: absolute_observation_rows_under_scope
   root_prefix: "/"
   remaining_segments: joined_observation_row
   short_name_values: group_node_line
@@ -106,6 +109,7 @@ measurement_fields:
   average_requires_matching_positive_coverage: true
 
 unit_rendering:
+  number_unit_separator: none
   significant_digits: 4
   trailing_fractional_zeroes: remove
   promotion_after_rounding: true
@@ -155,21 +159,27 @@ diagnostic_rendering:
     diagnostic_overflow: Additional diagnostics omitted
 
 styling:
-  title_scope_namespace: sectionHeading
+  title: h1
+  scope: h2
+  first_level_below_scope: h3
+  second_level_below_scope: h4
+  deeper_levels: unstyled_without_padding
+  heading_style_basis: display_depth_for_namespaces_and_entry_names
   observation_name: default
-  field_and_attribute_key: fieldKey
-  available_value: primaryValue
-  unit: unitSuffix
+  field_label: fieldLabel
+  attribute_name: attributeName
+  available_value: value
+  unit: unit
   separator: separator
-  warning_marker: warnBadge
+  warning_marker: warning
   info_marker_and_explanation: default
   profile_marker_severity: highest_retained_detailed_or_summary_evidence
   distinct_frequency:
-    digits: primaryValue
+    digits: value
     punctuation: separator
   incomplete_coverage:
-    label: fieldKey
-    count: primaryValue
+    label: fieldLabel
+    count: value
     punctuation: separator
   profile_uses_application_success_style: false
   indentation_outside_styled_tokens: true

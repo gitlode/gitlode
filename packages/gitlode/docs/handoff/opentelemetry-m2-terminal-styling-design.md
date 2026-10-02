@@ -126,3 +126,48 @@ or cumulative Windows/Linux/package acceptance gates. No publish command is auth
 Independent focused review is complete; see the linked acceptance and risk record.
 After that review and green final CI, request human PR approval with explicit source/base. After human
 squash, verify source/content correspondence before cumulative acceptance. Preserve the styling ref.
+
+## Cumulative profile functional/package validation — 2026-10-02
+
+Fixed candidate `f4d90d1ce1828c2f06abc9684bcc10006b09e7cd`, tree
+`d68714d0b1e4b4c7820f71d12349b2817c190291`, passed fresh isolated Windows/Linux validation.
+The tree matches styling source and actual remote archive `1d97c9941f87bff6013ee411800f70ee91b42e5a`.
+Candidate is an ancestor of planning checkpoint `bdd62a28daf6db90e320dbfdcdf2bfa349b19f83`;
+their delta contains only three handoff documents. Planning checkout remained on profile.
+
+| Platform | Environment and isolation                                                                                                                                                                                                     | Result                                                                            |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Windows  | Windows 11 Pro 10.0.26200, NTFS; Node 22.23.1, npm 11.11.0, Git 2.45.1.windows.1; `D:/gitlode_work/m2-profile-20261002T-validation-f4d90d1/windows`, separate evidence-root TEMP/cache                                        | 96 files; 1,286 passed, 26 Linux-only skips; `validate:release` exit 0, 108.644 s |
+| Linux    | Ubuntu 26.04 / WSL2 kernel 6.18.33.1, native ext4 `/dev/sdf`; private Node 22.23.1, npm 10.9.8, Git 2.53.0; `/home/t-wakabayashi/gitlode-performance/m2-profile-20261002T-validation-f4d90d1/source`, sibling ext4 temp/cache | 96 files; 1,312 passed, zero skips; `validate:release` exit 0, 37.694 s           |
+
+Both platforms passed pinned `npm ci`, root `npm run validate:release`, and separate
+`npm run typecheck:telemetry-release-acceptance -w gitlode` on their first invocation.
+Fresh checkout with no build cache and the canonical initial `tsc -b` prove checked production
+TypeScript; production configs do not enable `noCheck`. The separate strict gate-tooling check
+does not substitute for that production proof. Windows skips are 23 process-supervision and three
+supervised-workflow cases, all executed on Linux; every case/parameter is enumerated in `windows/skips.txt`.
+
+Evidence root: `D:/gitlode_test/m2-profile-20261002T-validation-f4d90d1`.
+Verified `manifest.json` contains 77 file entries; SHA-256
+`010799ad4296e8406d015ad470d81e1e54e23dfb8de16ba36af11ff92258b6f7`.
+It covers candidate bundle, source/planning mapping, configs, runner commands, full logs, command exits,
+environment, skips, package bytes and transfer binding. Command mapping is in `inputs/windows.ps1`
+and `inputs/linux.py`, with results under `windows/` and `linux/logs/`. Linux native evidence remains
+under the workspace above; logs and packages were copied to the evidence root and hashes checked.
+Outer limits were 600 s for installation, 1,200 s for canonical validation, 180 s for typing/pack/publint,
+and 600 s for preservation installed-package checks. No limit fired; owned test processes exited,
+detached checkouts remained clean, and external temp/cache were retained. Initial shell/toolchain
+discovery errors preceded product commands and did not cause product reruns.
+
+No development build followed successful release validation. Each platform packed release output,
+ran strict publint and the existing installed-package system test, then repacked; pre/post bytes matched.
+Both package-check invocations covered CLI/worker, both adapters, line diff, dynamic plugin, schema
+and NodeNext TypeScript consumer. Preserved `pre/gitlode-0.12.0.tgz` SHA-256:
+
+- Windows: `b0660280274eee4df2ae0d5deb1bea4df7c79f6e3a7882eb30b131a996d7a9f2`.
+- Linux: `0ada39db9502252b7c62eb702aa2691b9c57a0ee71eb19df2cf2c9638f884628`.
+
+No failure, retry, code correction or formal measurement occurred. This first-run success does not
+resolve historical ENOTEMPTY/timeout/EBUSY attribution. Trunk owns evidence assessment and the next
+profile-to-M2 integration packet. Human PR/merge approval, tests/system migration, formal T13B,
+GNOME light/dark, final combined-candidate checks and T13C remain open; publish acceptance stays blocked.

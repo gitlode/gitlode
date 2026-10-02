@@ -1,0 +1,1291 @@
+{
+  "integrity": {
+    "m2EntriesVerified": 549,
+    "m0EntriesVerified": 680,
+    "m0EvidenceManifestSha256": "af7500f45a531f606ef598adfda931a2963d52192e93d21beec943f2fadb8cce"
+  },
+  "m2Capture": {
+    "chronology": [
+      {
+        "phase": "warmup",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 26214.847409999995,
+        "startUtc": "2026-10-02T10:11:21.661Z",
+        "sampleCount": 1301,
+        "medianSampleGapMs": 19.854616000000533,
+        "maximumSampleGapMs": 21.43606799999543
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 25033.747061999995,
+        "startUtc": "2026-10-02T10:11:47.904Z",
+        "sampleCount": 1243,
+        "medianSampleGapMs": 19.82077549999667,
+        "maximumSampleGapMs": 21.88543200001004
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 25327.229852999997,
+        "startUtc": "2026-10-02T10:12:12.965Z",
+        "sampleCount": 1258,
+        "medianSampleGapMs": 19.813787000006414,
+        "maximumSampleGapMs": 21.655094000001554
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 25926.01284899999,
+        "startUtc": "2026-10-02T10:12:38.319Z",
+        "sampleCount": 1288,
+        "medianSampleGapMs": 19.832976999983657,
+        "maximumSampleGapMs": 22.702730000019073
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 2,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 27629.36338299999,
+        "startUtc": "2026-10-02T10:13:04.276Z",
+        "sampleCount": 1371,
+        "medianSampleGapMs": 19.921304000003147,
+        "maximumSampleGapMs": 22.83111299999291
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 3,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 26503.75615999999,
+        "startUtc": "2026-10-02T10:13:31.935Z",
+        "sampleCount": 1317,
+        "medianSampleGapMs": 19.866635500002303,
+        "maximumSampleGapMs": 22.29889999999432
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 4,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 26625.576560999994,
+        "startUtc": "2026-10-02T10:13:58.466Z",
+        "sampleCount": 1323,
+        "medianSampleGapMs": 19.87524450001365,
+        "maximumSampleGapMs": 22.527846999990288
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 5,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 26439.45979500003,
+        "startUtc": "2026-10-02T10:14:25.126Z",
+        "sampleCount": 1312,
+        "medianSampleGapMs": 19.86328400002094,
+        "maximumSampleGapMs": 23.589051000017207
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 6,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 26162.800445,
+        "startUtc": "2026-10-02T10:14:51.592Z",
+        "sampleCount": 1299,
+        "medianSampleGapMs": 19.836755500000436,
+        "maximumSampleGapMs": 22.520168000017293
+      }
+    ],
+    "summary": {
+      "legacy_off": {
+        "medianMs": 26439.45979500003,
+        "madMs": 276.6593500000308,
+        "madPercent": 1.0463880583987948,
+        "minimumMs": 25327.229852999997,
+        "maximumMs": 27629.36338299999
+      }
+    },
+    "pairs": [],
+    "overheadPercent": null
+  },
+  "m2Disabled": {
+    "chronology": [
+      {
+        "phase": "warmup",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 25892.56976,
+        "startUtc": "2026-10-02T10:16:43.275Z",
+        "sampleCount": 1286,
+        "medianSampleGapMs": 19.84620200000063,
+        "maximumSampleGapMs": 23.684055000005173
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 26705.631444,
+        "startUtc": "2026-10-02T10:17:09.195Z",
+        "sampleCount": 1326,
+        "medianSampleGapMs": 19.82615999999689,
+        "maximumSampleGapMs": 23.40995899999689
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 29600.700114000007,
+        "startUtc": "2026-10-02T10:17:35.927Z",
+        "sampleCount": 1470,
+        "medianSampleGapMs": 19.808383000010508,
+        "maximumSampleGapMs": 22.262849999999162
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 26367.927083999995,
+        "startUtc": "2026-10-02T10:18:05.555Z",
+        "sampleCount": 1309,
+        "medianSampleGapMs": 19.81065949999902,
+        "maximumSampleGapMs": 23.10164999999688
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 26667.873676999996,
+        "startUtc": "2026-10-02T10:18:31.949Z",
+        "sampleCount": 1324,
+        "medianSampleGapMs": 19.819668000011006,
+        "maximumSampleGapMs": 21.34888399997726
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 26793.777151999995,
+        "startUtc": "2026-10-02T10:18:58.646Z",
+        "sampleCount": 1330,
+        "medianSampleGapMs": 19.83377699999255,
+        "maximumSampleGapMs": 22.78206600001431
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 27276.819075999985,
+        "startUtc": "2026-10-02T10:19:25.465Z",
+        "sampleCount": 1355,
+        "medianSampleGapMs": 19.819517500000075,
+        "maximumSampleGapMs": 22.69977700000163
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 27316.829954000015,
+        "startUtc": "2026-10-02T10:19:52.768Z",
+        "sampleCount": 1357,
+        "medianSampleGapMs": 19.812978500005556,
+        "maximumSampleGapMs": 21.29383100004634
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 2,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 30168.202545999957,
+        "startUtc": "2026-10-02T10:20:20.112Z",
+        "sampleCount": 1498,
+        "medianSampleGapMs": 19.81567800004268,
+        "maximumSampleGapMs": 21.373772000020836
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 2,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 29937.01888400002,
+        "startUtc": "2026-10-02T10:20:50.307Z",
+        "sampleCount": 1487,
+        "medianSampleGapMs": 19.838513999973657,
+        "maximumSampleGapMs": 21.41609700000845
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 3,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 31522.602990999992,
+        "startUtc": "2026-10-02T10:21:20.272Z",
+        "sampleCount": 1564,
+        "medianSampleGapMs": 19.892044999985956,
+        "maximumSampleGapMs": 22.172482000023592
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 3,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 30554.34749199997,
+        "startUtc": "2026-10-02T10:21:51.824Z",
+        "sampleCount": 1518,
+        "medianSampleGapMs": 19.847720000019763,
+        "maximumSampleGapMs": 21.148772999993525
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 4,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 30042.44290299999,
+        "startUtc": "2026-10-02T10:22:22.407Z",
+        "sampleCount": 1493,
+        "medianSampleGapMs": 19.84481449998566,
+        "maximumSampleGapMs": 21.57991700002458
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 4,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 31039.55567599996,
+        "startUtc": "2026-10-02T10:22:52.476Z",
+        "sampleCount": 1542,
+        "medianSampleGapMs": 19.849986999994144,
+        "maximumSampleGapMs": 21.867276999983005
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 5,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 29150.68574799999,
+        "startUtc": "2026-10-02T10:23:23.544Z",
+        "sampleCount": 1447,
+        "medianSampleGapMs": 19.854722000018228,
+        "maximumSampleGapMs": 21.988481999957003
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 5,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 30166.444920999988,
+        "startUtc": "2026-10-02T10:23:52.722Z",
+        "sampleCount": 1499,
+        "medianSampleGapMs": 19.83323149997159,
+        "maximumSampleGapMs": 23.172032000031322
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 6,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 27189.300702000037,
+        "startUtc": "2026-10-02T10:24:22.916Z",
+        "sampleCount": 1350,
+        "medianSampleGapMs": 19.84029000008013,
+        "maximumSampleGapMs": 21.8214760000119
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 6,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 27330.476916000014,
+        "startUtc": "2026-10-02T10:24:50.132Z",
+        "sampleCount": 1357,
+        "medianSampleGapMs": 19.820426499994937,
+        "maximumSampleGapMs": 22.05183799995575
+      }
+    ],
+    "summary": {
+      "legacy_off": {
+        "medianMs": 30042.44290299999,
+        "madMs": 511.9045889999834,
+        "madPercent": 1.7039379608802234,
+        "minimumMs": 26667.873676999996,
+        "maximumMs": 30554.34749199997
+      },
+      "target_off": {
+        "medianMs": 29150.68574799999,
+        "madMs": 1873.8666720000037,
+        "madPercent": 6.428207858295645,
+        "minimumMs": 26793.777151999995,
+        "maximumMs": 31522.602990999992
+      }
+    },
+    "pairs": [
+      {
+        "pairIndex": 0,
+        "ratio": 1.0047211666188665
+      },
+      {
+        "pairIndex": 1,
+        "ratio": 0.9985353030323282
+      },
+      {
+        "pairIndex": 2,
+        "ratio": 0.9923368433486406
+      },
+      {
+        "pairIndex": 3,
+        "ratio": 1.0316896146858818
+      },
+      {
+        "pairIndex": 4,
+        "ratio": 1.0331901362422296
+      },
+      {
+        "pairIndex": 5,
+        "ratio": 0.966328177693458
+      },
+      {
+        "pairIndex": 6,
+        "ratio": 1.0051923444279534
+      }
+    ],
+    "overheadPercent": 0.4721166618866457
+  },
+  "m0Capture": {
+    "chronology": [
+      {
+        "phase": "warmup",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 23604.09768,
+        "startUtc": "2026-09-10T08:07:44.840Z",
+        "sampleCount": 1173,
+        "medianSampleGapMs": 19.805951999998797,
+        "maximumSampleGapMs": 21.44837700000062
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 23555.278032999995,
+        "startUtc": "2026-09-10T08:08:08.471Z",
+        "sampleCount": 1170,
+        "medianSampleGapMs": 19.815154000010807,
+        "maximumSampleGapMs": 21.436380999992252
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 24280.987685,
+        "startUtc": "2026-09-10T08:08:32.052Z",
+        "sampleCount": 1206,
+        "medianSampleGapMs": 19.80720999999903,
+        "maximumSampleGapMs": 21.852910999994492
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 23608.896972000002,
+        "startUtc": "2026-09-10T08:08:56.358Z",
+        "sampleCount": 1173,
+        "medianSampleGapMs": 19.787065000004077,
+        "maximumSampleGapMs": 21.606205000018235
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 2,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 23891.873831000004,
+        "startUtc": "2026-09-10T08:09:19.995Z",
+        "sampleCount": 1187,
+        "medianSampleGapMs": 19.825746500006062,
+        "maximumSampleGapMs": 22.375345000007655
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 3,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 23867.013087,
+        "startUtc": "2026-09-10T08:09:43.912Z",
+        "sampleCount": 1185,
+        "medianSampleGapMs": 19.8106209999969,
+        "maximumSampleGapMs": 21.335290999995777
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 4,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 23695.63031799998,
+        "startUtc": "2026-09-10T08:10:07.803Z",
+        "sampleCount": 1177,
+        "medianSampleGapMs": 19.808024999991176,
+        "maximumSampleGapMs": 21.329123000003165
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 5,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 23303.202149999997,
+        "startUtc": "2026-09-10T08:10:31.524Z",
+        "sampleCount": 1157,
+        "medianSampleGapMs": 19.822589999996126,
+        "maximumSampleGapMs": 21.346330000000307
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 6,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 24039.55892899999,
+        "startUtc": "2026-09-10T08:10:54.853Z",
+        "sampleCount": 1194,
+        "medianSampleGapMs": 19.824906000023475,
+        "maximumSampleGapMs": 21.315081000007922
+      }
+    ],
+    "summary": {
+      "legacy_off": {
+        "medianMs": 23867.013087,
+        "madMs": 172.54584199999226,
+        "madPercent": 0.7229469451038067,
+        "minimumMs": 23303.202149999997,
+        "maximumMs": 24280.987685
+      }
+    },
+    "pairs": [],
+    "overheadPercent": null
+  },
+  "m0Disabled": {
+    "chronology": [
+      {
+        "phase": "warmup",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 24068.34674500001,
+        "startUtc": "2026-09-10T08:13:17.660Z",
+        "sampleCount": 1195,
+        "medianSampleGapMs": 19.81879100000151,
+        "maximumSampleGapMs": 21.551814999998896
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 24246.343317000006,
+        "startUtc": "2026-09-10T08:13:41.754Z",
+        "sampleCount": 1204,
+        "medianSampleGapMs": 19.82480499999656,
+        "maximumSampleGapMs": 21.316275999997742
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 24158.695878,
+        "startUtc": "2026-09-10T08:14:06.026Z",
+        "sampleCount": 1199,
+        "medianSampleGapMs": 19.8107655000058,
+        "maximumSampleGapMs": 21.7454859999998
+      },
+      {
+        "phase": "warmup",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 23241.16524300001,
+        "startUtc": "2026-09-10T08:14:30.211Z",
+        "sampleCount": 1154,
+        "medianSampleGapMs": 19.804437000013422,
+        "maximumSampleGapMs": 21.35715299998992
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 23456.64306599999,
+        "startUtc": "2026-09-10T08:14:53.477Z",
+        "sampleCount": 1166,
+        "medianSampleGapMs": 19.788799999980256,
+        "maximumSampleGapMs": 21.298161999991862
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 0,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 24657.49678799999,
+        "startUtc": "2026-09-10T08:15:16.958Z",
+        "sampleCount": 1224,
+        "medianSampleGapMs": 19.80374900001334,
+        "maximumSampleGapMs": 21.263159000023734
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 24767.003446999996,
+        "startUtc": "2026-09-10T08:15:41.641Z",
+        "sampleCount": 1230,
+        "medianSampleGapMs": 19.8113139999914,
+        "maximumSampleGapMs": 21.259447999997064
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 1,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 23659.423164999986,
+        "startUtc": "2026-09-10T08:16:06.434Z",
+        "sampleCount": 1175,
+        "medianSampleGapMs": 19.827864999999292,
+        "maximumSampleGapMs": 21.097237999987556
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 2,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 24165.59893700003,
+        "startUtc": "2026-09-10T08:16:30.118Z",
+        "sampleCount": 1200,
+        "medianSampleGapMs": 19.831802000000607,
+        "maximumSampleGapMs": 21.27098199998727
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 2,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 25115.992359999975,
+        "startUtc": "2026-09-10T08:16:54.309Z",
+        "sampleCount": 1247,
+        "medianSampleGapMs": 19.821907000005012,
+        "maximumSampleGapMs": 23.156793000001926
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 3,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 24283.612697000033,
+        "startUtc": "2026-09-10T08:17:19.451Z",
+        "sampleCount": 1206,
+        "medianSampleGapMs": 19.81037899997318,
+        "maximumSampleGapMs": 21.62006200000178
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 3,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 23960.22837200004,
+        "startUtc": "2026-09-10T08:17:43.760Z",
+        "sampleCount": 1190,
+        "medianSampleGapMs": 19.831039000011515,
+        "maximumSampleGapMs": 21.199866000039037
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 4,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 23373.552051999955,
+        "startUtc": "2026-09-10T08:18:07.751Z",
+        "sampleCount": 1161,
+        "medianSampleGapMs": 19.819266499980586,
+        "maximumSampleGapMs": 21.31763000000501
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 4,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 24282.18570999999,
+        "startUtc": "2026-09-10T08:18:31.150Z",
+        "sampleCount": 1206,
+        "medianSampleGapMs": 19.803519000008237,
+        "maximumSampleGapMs": 21.401696000015363
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 5,
+        "order": "B-A",
+        "state": "target_off",
+        "elapsedMs": 24762.57800800004,
+        "startUtc": "2026-09-10T08:18:55.457Z",
+        "sampleCount": 1230,
+        "medianSampleGapMs": 19.815100000007078,
+        "maximumSampleGapMs": 21.30250699998578
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 5,
+        "order": "B-A",
+        "state": "legacy_off",
+        "elapsedMs": 24216.54972499999,
+        "startUtc": "2026-09-10T08:19:20.245Z",
+        "sampleCount": 1202,
+        "medianSampleGapMs": 19.841791999991983,
+        "maximumSampleGapMs": 21.44465499999933
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 6,
+        "order": "A-B",
+        "state": "legacy_off",
+        "elapsedMs": 23735.137214999995,
+        "startUtc": "2026-09-10T08:19:44.486Z",
+        "sampleCount": 1179,
+        "medianSampleGapMs": 19.816040500008967,
+        "maximumSampleGapMs": 22.539018999959808
+      },
+      {
+        "phase": "measured",
+        "pairIndex": 6,
+        "order": "A-B",
+        "state": "target_off",
+        "elapsedMs": 24534.372638,
+        "startUtc": "2026-09-10T08:20:08.245Z",
+        "sampleCount": 1218,
+        "medianSampleGapMs": 19.797856999968644,
+        "maximumSampleGapMs": 22.504824000003282
+      }
+    ],
+    "summary": {
+      "legacy_off": {
+        "medianMs": 23735.137214999995,
+        "madMs": 278.49414900000556,
+        "madPercent": 1.17334122182367,
+        "minimumMs": 23373.552051999955,
+        "maximumMs": 24216.54972499999
+      },
+      "target_off": {
+        "medianMs": 24657.49678799999,
+        "madMs": 123.12414999998873,
+        "madPercent": 0.49933758912587306,
+        "minimumMs": 24282.18570999999,
+        "maximumMs": 25115.992359999975
+      }
+    },
+    "pairs": [
+      {
+        "pairIndex": 0,
+        "ratio": 1.0511946112076291
+      },
+      {
+        "pairIndex": 1,
+        "ratio": 1.046813494744812
+      },
+      {
+        "pairIndex": 2,
+        "ratio": 1.0393283620024327
+      },
+      {
+        "pairIndex": 3,
+        "ratio": 1.0134967129686419
+      },
+      {
+        "pairIndex": 4,
+        "ratio": 1.0388744361994517
+      },
+      {
+        "pairIndex": 5,
+        "ratio": 1.0225477324061718
+      },
+      {
+        "pairIndex": 6,
+        "ratio": 1.0336730904801725
+      }
+    ],
+    "overheadPercent": 3.8874436199451745
+  },
+  "calibration": {
+    "selectedQuantity": 4430,
+    "attempts": [
+      {
+        "ordinal": 1,
+        "quantity": 8,
+        "medianMs": 328.6189180000001,
+        "madMs": 5.1135159999998905,
+        "madPercent": 1.5560625758009126,
+        "minimumMs": 321.57612400000016,
+        "maximumMs": 344.67309799999975
+      },
+      {
+        "ordinal": 2,
+        "quantity": 16,
+        "medianMs": 341.479824,
+        "madMs": 2.3452530000004117,
+        "madPercent": 0.686791088424718,
+        "minimumMs": 333.293412,
+        "maximumMs": 355.2168679999995
+      },
+      {
+        "ordinal": 3,
+        "quantity": 32,
+        "medianMs": 355.5480710000011,
+        "madMs": 5.356268999998065,
+        "madPercent": 1.5064823681740769,
+        "minimumMs": 344.028773,
+        "maximumMs": 368.15513699999974
+      },
+      {
+        "ordinal": 4,
+        "quantity": 64,
+        "medianMs": 379.8049979999996,
+        "madMs": 5.463637999999264,
+        "madPercent": 1.4385376782217252,
+        "minimumMs": 371.5098020000005,
+        "maximumMs": 395.6620980000007
+      },
+      {
+        "ordinal": 5,
+        "quantity": 128,
+        "medianMs": 437.924035,
+        "madMs": 3.4110120000004827,
+        "madPercent": 0.7789049532301835,
+        "minimumMs": 426.1293979999973,
+        "maximumMs": 446.9203689999995
+      },
+      {
+        "ordinal": 6,
+        "quantity": 256,
+        "medianMs": 546.175005000001,
+        "madMs": 2.2444869999962975,
+        "madPercent": 0.4109464877464126,
+        "minimumMs": 539.5022080000017,
+        "maximumMs": 560.9025280000023
+      },
+      {
+        "ordinal": 7,
+        "quantity": 512,
+        "medianMs": 756.6222400000042,
+        "madMs": 10.26384300000791,
+        "madPercent": 1.3565346691379112,
+        "minimumMs": 745.8711610000028,
+        "maximumMs": 792.3743839999952
+      },
+      {
+        "ordinal": 8,
+        "quantity": 1024,
+        "medianMs": 1198.6598680000025,
+        "madMs": 10.168128999997862,
+        "madPercent": 0.8482914354147578,
+        "minimumMs": 1178.111606999999,
+        "maximumMs": 1222.9809309999982
+      },
+      {
+        "ordinal": 9,
+        "quantity": 2048,
+        "medianMs": 7902.224994999997,
+        "madMs": 48.204063000011956,
+        "madPercent": 0.6100062074986765,
+        "minimumMs": 7531.8086350000085,
+        "maximumMs": 8105.985996999996
+      },
+      {
+        "ordinal": 10,
+        "quantity": 4096,
+        "medianMs": 9641.346709000005,
+        "madMs": 66.23548799997661,
+        "madPercent": 0.6869941513268796,
+        "minimumMs": 9431.702251999988,
+        "maximumMs": 9820.722226999991
+      },
+      {
+        "ordinal": 11,
+        "quantity": 8192,
+        "medianMs": 51844.08794,
+        "madMs": 248.04576199990697,
+        "madPercent": 0.47844560846932893,
+        "minimumMs": 51087.17053799995,
+        "maximumMs": 52734.510075
+      },
+      {
+        "ordinal": 12,
+        "quantity": 6144,
+        "medianMs": 29595.25552500016,
+        "madMs": 63.9907279999461,
+        "madPercent": 0.21621954892699227,
+        "minimumMs": 29203.071715000086,
+        "maximumMs": 30457.91112600011
+      },
+      {
+        "ordinal": 13,
+        "quantity": 5120,
+        "medianMs": 28560.281202999875,
+        "madMs": 149.84411799977534,
+        "madPercent": 0.5246591128942953,
+        "minimumMs": 28178.593971000053,
+        "maximumMs": 28832.570810999954
+      },
+      {
+        "ordinal": 14,
+        "quantity": 4608,
+        "medianMs": 28281.555473000044,
+        "madMs": 141.88461999990977,
+        "madPercent": 0.5016860551936926,
+        "minimumMs": 27987.31168600009,
+        "maximumMs": 28729.283510999987
+      },
+      {
+        "ordinal": 15,
+        "quantity": 4352,
+        "medianMs": 9949.518919999944,
+        "madMs": 48.05461200000718,
+        "madPercent": 0.48298427679162054,
+        "minimumMs": 9901.464307999937,
+        "maximumMs": 10091.490143999923
+      },
+      {
+        "ordinal": 16,
+        "quantity": 4480,
+        "medianMs": 28062.562209999654,
+        "madMs": 66.43444900028408,
+        "madPercent": 0.23673693265474954,
+        "minimumMs": 27896.26187200006,
+        "maximumMs": 28412.164716999978
+      },
+      {
+        "ordinal": 17,
+        "quantity": 4416,
+        "medianMs": 9828.813089000061,
+        "madMs": 41.87459599971771,
+        "madPercent": 0.4260391933445328,
+        "minimumMs": 9694.838956000283,
+        "maximumMs": 10158.842149999924
+      },
+      {
+        "ordinal": 18,
+        "quantity": 4448,
+        "medianMs": 27557.650524999946,
+        "madMs": 420.4195879995823,
+        "madPercent": 1.5256002597833334,
+        "minimumMs": 25777.752546000294,
+        "maximumMs": 28096.477983999997
+      },
+      {
+        "ordinal": 19,
+        "quantity": 4432,
+        "medianMs": 24554.670891999733,
+        "madMs": 415.042811000254,
+        "madPercent": 1.690280488082131,
+        "minimumMs": 23810.158058999572,
+        "maximumMs": 25050.90758700017
+      },
+      {
+        "ordinal": 20,
+        "quantity": 4424,
+        "medianMs": 9982.118477999698,
+        "madMs": 25.1324320002459,
+        "madPercent": 0.25177453118430776,
+        "minimumMs": 9934.851687999908,
+        "maximumMs": 10175.58298800001
+      },
+      {
+        "ordinal": 21,
+        "quantity": 4428,
+        "medianMs": 9897.547185000032,
+        "madMs": 91.16055599972606,
+        "madPercent": 0.921041893469142,
+        "minimumMs": 9772.41598900035,
+        "maximumMs": 10182.944455000106
+      },
+      {
+        "ordinal": 22,
+        "quantity": 4430,
+        "medianMs": 24644.732523000333,
+        "madMs": 294.61573999980465,
+        "madPercent": 1.195451156651211,
+        "minimumMs": 24227.981029000133,
+        "maximumMs": 26825.28806200018
+      },
+      {
+        "ordinal": 23,
+        "quantity": 4429,
+        "medianMs": 9877.048099000007,
+        "madMs": 80.4297230001539,
+        "madPercent": 0.8143093178648886,
+        "minimumMs": 9796.618375999853,
+        "maximumMs": 10104.39003999997
+      }
+    ],
+    "selectedWarmupsMs": [22915.66759400023, 27406.6408520001],
+    "selectedMeasuredMs": [
+      24644.732523000333, 24532.189406999853, 24939.348263000138, 25208.690071000252,
+      26825.28806200018, 24529.737433000002, 24227.981029000133
+    ]
+  },
+  "identities": [
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\sealed-manifest.json",
+      "sha256": "383503b7ab78419ed6723f96f8bb3c56f73fb51c8b8f1774a659dfc2e07c6634"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\inputs\\m0\\calibration\\commit_heavy_repository-isomorphic-git-calibration.json",
+      "sha256": "b705cb66dfe08dbad0123d3f8c41fa84ce2c172ab958305477602c3d374b7928"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\commit_heavy_repository-isomorphic-git-measure.json",
+      "sha256": "936f69f0387f779c1ade712ba5137a754151963f7c7d6fb25b92803d81f1df1f"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\evidence\\disabled-progress.jsonl",
+      "sha256": "52f997e046d155f17b08a9c10023595c37042c0aeaa5bf06ef552befe8592ff3"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-measured-0-legacy_off.json",
+      "sha256": "07159b3fcc6587eb9e22162104c8977b3e17a34b6261b35fb08b3e33f93eb47d"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-measured-1-legacy_off.json",
+      "sha256": "b05157cb5a8632384b1913622f52cacb878cb90ca2d3418a9fa576f8ca6db641"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-measured-2-legacy_off.json",
+      "sha256": "af5813b1e25428920476242e439dd99b98f6860177c1282b5e973380481f262c"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-measured-3-legacy_off.json",
+      "sha256": "03c2debceda7b1beda14deb404b6f43f2fb1fb892beea5a923de374c9d42b6fb"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-measured-4-legacy_off.json",
+      "sha256": "e7df70573e14f624ff4cc99154a85b37e7eeb5b0b32845de635128b1f472a099"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-measured-5-legacy_off.json",
+      "sha256": "2b72c119ec4d541aee4a54a18b1fb27078339a27ae556e8b73075f3cad211a86"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-measured-6-legacy_off.json",
+      "sha256": "8e1a9b5eeeb01ce088d56abf1b874199c07defc6b72136db5a3cfdd005b93955"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-warmup-0-legacy_off.json",
+      "sha256": "204226fb6d3d1990bc5bb3428960362598b44802960ccf133ea8ce7be88d8acf"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085-run-commit_heavy_repository-isomorphic-git-4430-warmup-1-legacy_off.json",
+      "sha256": "09cf6c3a85360a93bef8c892e3ffb12a0c654749bb8c98d2b0c59397f0daea23"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085.json",
+      "sha256": "9f865757667b37c146c2d977bce22a064a677c25cfad7ff4efe21a7b832ea30f"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-0-legacy_off.json",
+      "sha256": "8fa32840e998df267d6928cea495455f0844c2e9ac51fc6a2a64499c04e5d6c5"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-0-target_off.json",
+      "sha256": "908a5e8e41892e247c40eb603f9a1cb2b53e8c046516046cdcef3416529b9bdb"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-1-legacy_off.json",
+      "sha256": "7cc2e9b2c6e3a664d4db795fdadcfe59368e1233fb8aad415b77014e1fab2964"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-1-target_off.json",
+      "sha256": "0bf73fe68b8f994751962ff761c5ee7f52603f70e9ab88edaa9b588242cc584b"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-2-legacy_off.json",
+      "sha256": "b589e808bd2146867df724b1cd91bcd34379f654d8c81f72c0a3556f300cd959"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-2-target_off.json",
+      "sha256": "0cccbff7584195e9639d534304f0e15f756c2ff0701b512d531da4a83180028c"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-3-legacy_off.json",
+      "sha256": "f5955c10ed7d9204303b34f64ba8acfb5a030348329fbf0f9ebb9d0a4e4c2ee8"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-3-target_off.json",
+      "sha256": "bf3cef078263b3c3350dec2158826e4b6e7662b60a647e55bfdeafb3693b5a91"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-4-legacy_off.json",
+      "sha256": "98053d63f3623b592020583650b16969c0bdfeb6454e16b6fb11fe43c6bcbc87"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-4-target_off.json",
+      "sha256": "6a5e40f3b6b8cfebad88b5d424a3e1cecb1521d51669a79466969ee88376ec63"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-5-legacy_off.json",
+      "sha256": "3e9732fec830534abce9e0d38d33f3126c23b63d8a547c3cd1b52e5dfc73be8b"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-5-target_off.json",
+      "sha256": "e9bfbf5ca75eac0ed5de3be13ac01ba5558d63ebaf13723a1c5291ae72d2c5e5"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-6-legacy_off.json",
+      "sha256": "feb2a58284936f4562c2eca1942b7cf31b1267992c6ff3e4fec39d75ecb22bc5"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-measured-6-target_off.json",
+      "sha256": "80c21c2b87d27f74a02d922a9d2f11f4123bdedce531dc4bcaafa50222c03710"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-warmup-0-legacy_off.json",
+      "sha256": "4389fad2bbdb8488ae2732f8d856b8058ea82c775588cf4d35e0e4837de8d5e1"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-warmup-0-target_off.json",
+      "sha256": "ce23063c51d7bbca6ba1ca76e4cfe7df1e46e80cfbf39a3813cff8c6677b1fba"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-warmup-1-legacy_off.json",
+      "sha256": "19c36919d681a19ca5f423401840ac15e179d32e20916c139f99c6531fc2006e"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4-run-commit_heavy_repository-isomorphic-git-4430-warmup-1-target_off.json",
+      "sha256": "7d7359ec68c6a55f46c5a3ac68a0aff2f8a3374ca99568707d91078d582806ab"
+    },
+    {
+      "file": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4.json",
+      "sha256": "3911260fa58022d50ab00419f67b0975055f70ed4dc8e19cdd6f97e031c3200d"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-measured-0-legacy_off.json",
+      "sha256": "ea449f31d29b07e87eaa680fb67ccff3b2ce232815503c20d15b760eb6e79b4f"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-measured-1-legacy_off.json",
+      "sha256": "375b55f912b616b0e912d059ae1ec6d2811ad2de2e781d648cc4a7635c68712e"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-measured-2-legacy_off.json",
+      "sha256": "d766b3c06615c5d01f1f61131d30dc6dc72344b76eb60c3981ce45c006b2eb70"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-measured-3-legacy_off.json",
+      "sha256": "e332194c063db5e735a1125f2bc7732d62b3f675d25bc2c74889ae0fe496dd08"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-measured-4-legacy_off.json",
+      "sha256": "ce6a05dd11c0a1c12c9c5bd4c3807ce076aa543eacdeac71ae3dc103795fd2fc"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-measured-5-legacy_off.json",
+      "sha256": "5d75f1520e06d3fe5eaae06f3ac54a99e613aff11f305196eeaa15a0c33cfad9"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-measured-6-legacy_off.json",
+      "sha256": "3e5055f02fb3ae1ef7bf985006119d531ed12829ae865b8ef04dd61efc144fb5"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-warmup-0-legacy_off.json",
+      "sha256": "152f6831f01522f862ebbaf8a886328d34d8651c7d86966df280f520dc2e01ae"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d-run-commit_heavy_repository-isomorphic-git-4430-warmup-1-legacy_off.json",
+      "sha256": "137f361948b622dd55f1282e4e89eb940b320fc629ab264eab9d1e43c7cad5cd"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d.json",
+      "sha256": "8acbeb8ee4bfa6b3fce1fb33c99ebd7befadf6118ced26563bbf7f311e463561"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-0-legacy_off.json",
+      "sha256": "5ff0fc410fba0214f6a9f05df66b967c1a5171dfca64970a8826d0476e50ee87"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-0-target_off.json",
+      "sha256": "f04b0915e606804c812c0110cb42cc530ec333164e6f2d0d8c256b35383ee3c5"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-1-legacy_off.json",
+      "sha256": "f69ae8790bdca44cf1fcd71fec3b78de5cee32c3e2e319de2543beb1cc06c6a4"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-1-target_off.json",
+      "sha256": "5358071bb3b428ee3649ebfb66a6a9399845d273aaaf68f6792cd2d35641c6da"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-2-legacy_off.json",
+      "sha256": "aa99e8b4bc37126350ff673f1ef372d57b1f036cc8d9f136bece1da1ae7b3c1d"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-2-target_off.json",
+      "sha256": "23076d2f32285f06f1f3ac14ac2b715e6a80be23fd17e26755292f1af4f5f5e6"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-3-legacy_off.json",
+      "sha256": "e3fded9c9d68a017c94a22aafd45637ef051a00edf44403d036bedeb00af05c5"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-3-target_off.json",
+      "sha256": "2f4885c6441b21012faac4e2fac5a3c2372d07a7db9cc79f9a5f4f26cb3d603c"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-4-legacy_off.json",
+      "sha256": "fb64d97e30475865db0f91290e4b3f33ed07b2891164695f401765257816dd17"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-4-target_off.json",
+      "sha256": "3afe92d91388453d214af641d745eb6a740ff30dcb3d9e6228756320c63dca26"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-5-legacy_off.json",
+      "sha256": "721a53ce194cc38f641f356a7e097887363c641b96cc64c1967c52000853c63c"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-5-target_off.json",
+      "sha256": "c15099c07da085fcd8c45b0e1b09e3a9fd03b21487f48c674e1defcbc2cce581"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-6-legacy_off.json",
+      "sha256": "6146d6d66dc8c2c94c261191c39b5f79c83b59974e8a4b27bb589a7ab04d622c"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-measured-6-target_off.json",
+      "sha256": "9fd1f20f182fea5e207ac86d4023b8d14fc60799692042a73c735510a40caf74"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-warmup-0-legacy_off.json",
+      "sha256": "979e0f948922a11f55dde2ffac94db33ea1a7f8351c788caee9c19f8c52d577f"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-warmup-0-target_off.json",
+      "sha256": "c54e5c18dc2882952621eaa8a7d2e86c2655b3b70c2f563d38ecc57f9a397745"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-warmup-1-legacy_off.json",
+      "sha256": "624bf3c021e84326d088231e1f5450e1649a169aa97c15396acd4107e7e7bb36"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7-run-commit_heavy_repository-isomorphic-git-4430-warmup-1-target_off.json",
+      "sha256": "63262f10bd527400a2c958fc5d45d1c50cabfcf7ff690b2e1cee6e9b16992e43"
+    },
+    {
+      "file": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7.json",
+      "sha256": "14edf5c86b1112189c199881b4c97adaafc1d6d45fc3c38bf9c981c8145d341a"
+    }
+  ],
+  "formalEvaluation": {
+    "status": "inconclusive",
+    "pairedRatios": [
+      1.0047211666188665, 0.9985353030323282, 0.9923368433486406, 1.0316896146858818,
+      1.0331901362422296, 0.966328177693458, 1.0051923444279534
+    ],
+    "baselineMedian": 30042.44290299999,
+    "candidateMedian": 29150.68574799999,
+    "baselineMad": 511.9045889999834,
+    "candidateMad": 1873.8666720000037,
+    "wallClockOverhead": 0.004721166618866457,
+    "peakRssIncreaseBytes": 8347648,
+    "reasons": ["candidate MAD exceeds 5 percent"]
+  },
+  "progress": [
+    {
+      "observedAt": "2026-10-02T10:20:37.686392+00:00",
+      "current": {
+        "stage": "execution",
+        "operation": "release-cli",
+        "fixture": "commit_heavy_repository",
+        "adapter": "isomorphic-git",
+        "quantity": 4430,
+        "phase": "measured",
+        "state": "legacy_off",
+        "iteration": 3,
+        "pid": 212998
+      },
+      "loadavg": "1.16 0.97 0.62 3/667 213018"
+    },
+    {
+      "observedAt": "2026-10-02T10:21:55.655747+00:00",
+      "current": {
+        "stage": "execution",
+        "operation": "release-cli",
+        "fixture": "commit_heavy_repository",
+        "adapter": "isomorphic-git",
+        "quantity": 4430,
+        "phase": "measured",
+        "state": "legacy_off",
+        "iteration": 4,
+        "pid": 213047
+      },
+      "loadavg": "1.11 0.99 0.66 2/666 213067"
+    },
+    {
+      "observedAt": "2026-10-02T10:22:59.385244+00:00",
+      "current": {
+        "stage": "execution",
+        "operation": "release-cli",
+        "fixture": "commit_heavy_repository",
+        "adapter": "isomorphic-git",
+        "quantity": 4430,
+        "phase": "measured",
+        "state": "target_off",
+        "iteration": 5,
+        "pid": 213084
+      },
+      "loadavg": "1.19 1.04 0.70 2/666 213104"
+    },
+    {
+      "observedAt": "2026-10-02T10:24:07.501983+00:00",
+      "current": {
+        "stage": "execution",
+        "operation": "release-cli",
+        "fixture": "commit_heavy_repository",
+        "adapter": "isomorphic-git",
+        "quantity": 4430,
+        "phase": "measured",
+        "state": "legacy_off",
+        "iteration": 6,
+        "pid": 213121
+      },
+      "loadavg": "1.13 1.04 0.73 2/666 213141"
+    },
+    {
+      "observedAt": "2026-10-02T10:25:18.113608+00:00",
+      "current": {
+        "stage": "processing",
+        "operation": "repository-cleanup",
+        "fixture": "commit_heavy_repository",
+        "adapter": "isomorphic-git",
+        "quantity": 4430,
+        "phase": "measured",
+        "state": "target_off",
+        "iteration": 7
+      },
+      "loadavg": "1.16 1.06 0.76 1/608 213203"
+    }
+  ],
+  "recomputedReasons": ["candidate MAD exceeds 5 percent"]
+}

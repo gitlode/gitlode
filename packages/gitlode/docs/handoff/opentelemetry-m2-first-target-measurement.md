@@ -258,3 +258,114 @@ checkpoint, with no concurrent changes. Only this result document is committed a
 on M2; the final documentation OID and actual remote equality are returned in the session.
 Trunk must review this first attempt and assign any investigation or subsequent measurement;
 profile comparison and the remaining matrix/release obligations remain open.
+
+## Saved-evidence diagnosis (2026-10-02)
+
+**Cause unresolved; common temporal variation is the leading explanation of the shape, not an
+identified mechanism.** Diagnosis started at `98c562021713807d078b38475d914400c513e187` on M2.
+The original inconclusive classification and skipped profile stage remain unchanged.
+No new workload, calibration, profiling, build, installation, product/configuration change or
+acceptance update was performed.
+
+### Reproduction and chronology
+
+[Read-only derivation script](m2-first-target-diagnosis/derive.cjs) and
+[unrounded derived evidence](m2-first-target-diagnosis/derived.json) are outside the sealed archives.
+Reproduce with `node packages/gitlode/docs/handoff/m2-first-target-diagnosis/derive.cjs
+D:/gitlode_test/m2-first-target-8fffcc0-20261002
+D:/gitlode_test/m0-one-target-20260910T065854Z-a53a5b8` (one command).
+The derivation rehashed all 549 M2 and 680 M0 entries without mismatch; M2 manifest identity remains
+`383503b7ab78419ed6723f96f8bb3c56f73fb51c8b8f1774a659dfc2e07c6634`, and M0 `evidence.sha256`
+remains `af7500f45a531f606ef598adfda931a2963d52192e93d21beec943f2fadb8cce`.
+Individual consumed raw/formal/supervision artifacts and their SHA-256 identities are in the derived
+file. Fixed code interpretation used `git show 8fffcc0:<path>` for performance-harness,
+performance-workflow and performance-fixtures, with the M0-to-fixed diff and F compatibility evidence.
+
+Independent raw-run statistics (milliseconds; table rounded only for readability):
+
+| Evidence/state                  |     Median |       MAD | MAD/median |
+| ------------------------------- | ---------: | --------: | ---------: |
+| M0 selected calibration, legacy | 24,644.733 |   294.616 |     1.195% |
+| M0 capture, legacy              | 23,867.013 |   172.546 |     0.723% |
+| M0 disabled, legacy             | 23,735.137 |   278.494 |     1.173% |
+| M0 disabled, old candidate      | 24,657.497 |   123.124 |     0.499% |
+| M2 capture, legacy              | 26,439.460 |   276.659 |     1.046% |
+| M2 disabled, legacy             | 30,042.443 |   511.905 |     1.704% |
+| M2 disabled, candidate          | 29,150.686 | 1,873.867 |     6.428% |
+
+M2 paired candidate/legacy ratios, in pair-index order 0–6, are
+`1.004721166619, 0.998535303032, 0.992336843349, 1.031689614686,
+1.033190136242, 0.966328177693, 1.005192344428`; median overhead is +0.472116662%.
+Raw numeric values/order agree with the formal artifact. Recomputed reason list is exactly
+`candidate MAD exceeds 5 percent`; RSS/behavior/environment evidence supplies no additional reason.
+Passing overhead alone cannot override stability.
+
+Warmups are excluded from every statistic above. Capture warmups were 26.215/25.034 s;
+disabled warmup pair 0 was legacy 25.893 then candidate 26.706 s, pair 1 candidate 29.601 then
+legacy 26.368 s. Saved supervisor events establish all nine capture children and all eighteen
+comparison children in order; zero-based raw pair indices correspond to one-based supervisor
+iterations. Measured comparison starts span 10:18:31.949–10:24:50.132 UTC (19:18–19:24 JST),
+with A-B/B-A alternation intact. Pairs 0/1 and 6 are about 27 s; pairs 2–5 are mostly 29–31.5 s
+in both states. This is a rise and recovery, not monotonic warming or one isolated candidate outlier.
+The five saved progress observations agree with the active state/iteration and event intervals;
+their Linux load averages are about 1.11–1.19 on 24 logical CPUs. They do not measure host contention.
+
+### Calibration and execution conditions
+
+M0 selected 4,430 at pilot ordinal 22; its measured range was 24.228–26.825 s and warmups
+22.916/27.407 s. Final pilot 23 at 4,429 had median 9.877 s, MAD 0.814%, range 9.797–10.104 s.
+The complete 23-pilot history has no above-5% MAD or lower-threshold classification inversion.
+The adjacent-quantity discontinuity is real saved evidence; it does not invalidate the catalog's
+observed integer selection rule. Target hash and quantity, immutable legacy CLI, Node/npm/Git,
+OS/kernel/CPU, two warmups/seven measurements, native ext4 class and release mode support the
+authorized reuse. They do not establish unchanged performance over time. M2 capture is already
+about 10.8% slower than M0 capture with the same legacy; the candidate change cannot explain that.
+
+The catalog's 10–30 s window applies to calibration selection. At fixed `8fffcc0`,
+`classifyCalibrationMedian` enforces both bounds; comparison `evaluateComparison` checks baseline
+median below 10 s, both MAD limits and wall/RSS thresholds, without a 30 s upper-median gate.
+Thus the 30.042 s comparison baseline is not an extra formal failure. Reuse does not waive current
+stability, imply recalibration authority or allow quantity/threshold adjustment.
+
+F's build-only tmpfs was replaced by the recorded external ext4 TMP; M0 and M2 timed roots both
+resolve to `/dev/sdf`. Paths/runtime restoration and supervisor cleanup protocol differ, while
+the fixture recipe, timed spawn-to-close measurement and configured 20 ms RSS sampler are unchanged.
+Observed M2 consecutive RSS sample gaps have medians 19.81–19.92 ms and maxima at most 23.684 ms;
+M0 capture/disabled gaps are similarly near 20 ms (max 23.157 ms). There is no large sampler gap
+explaining seconds of drift, though regular polling does not rule out common harness interference.
+Before-run vmstat was idle with no swap use and ample memory/storage; after-run process observations
+and cleanup passed. There is no continuous CPU-time, frequency, temperature, host-load or I/O-latency
+record during the timed children. RSS samples and Linux load averages cannot reconstruct those.
+
+### Ranked hypotheses and next action
+
+1. **Shared execution/resource variation during the comparison:** strongest support is the paired
+   rise/recovery and slower unchanged legacy versus M0. Sparse low Linux load weakens obvious Linux
+   workload saturation, but neither proves isolation nor identifies scheduling, host load, power,
+   thermal or storage behavior. Missing simultaneous resource observations prevent choosing among them.
+2. **Generated repository representation/cache effects:** the 4,429/4,430 calibration jump and
+   per-command fresh repository generation make this a concrete alternative for historical duration
+   differences. Fixed fixture code repeatedly invokes Git commit and does not explicitly freeze
+   packing/maintenance settings. No preserved object-layout/maintenance record proves a transition.
+   Within-comparison snapshot reuse weakens a static layout explanation for the rise/recovery;
+   dynamic cache/I/O effects remain unmeasured. No Git-maintenance cause is established.
+3. **Candidate-specific cost or variability:** possible contributor to its larger MAD and pair
+   differences (roughly -3.37% to +3.32%), but cannot alone explain the shared temporal shape or slower
+   legacy capture. Disabled runs have no enabled report; saved data cannot localize a product path.
+4. **Launcher/sampler/supervisor disturbance:** sampling cadence and successful deadlines/cleanup
+   contradict gross stalls or timeout failure. Changed supervision may affect shared execution, but
+   no observation ties it to the middle pairs. Its cost was not independently measured.
+
+Recommend **one trunk-authorized fresh target attempt**, preserving this first attempt intact, with
+the same fixed binaries, manifest/4,430 quantity, thresholds, counts, ordering, filesystem class and
+deadlines. Preconditions: repeat input/runtime/compatibility checks, establish a quiet agreed host
+window without changing settings, and predeclare the same stop-on-first-inconclusive dependent-stage
+policy. Add only low-rate, timestamped external observations: host CPU activity and available
+frequency/temperature counters, plus Linux vmstat at a fixed modest interval. Save a read-only
+object-layout/maintenance snapshot after normal fixture preparation if available without modifying
+the harness; absence is a stated limitation, not permission for a code change. Keep observers and
+their logs outside the timed product path; acknowledge observer cost and do not add stress/profiling.
+This can test whether stability recurs and whether shared changes coincide with resource signals;
+it cannot by itself prove causation or transfer M0 acceptance. Another inconclusive result means
+the target remains unaccepted and dependent profile work stops, with evidence returned for a separate
+decision; no automatic retry or recalibration. This recommendation was not executed.

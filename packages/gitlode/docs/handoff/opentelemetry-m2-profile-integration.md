@@ -1,5 +1,16 @@
 # M2 profile integration evidence
 
+## Completed profile integration ? 2026-10-02
+
+PR #113 was human squash-merged at `c29376b0b771efac9d736cb5315ae3d1d303984f`, parent
+`12b43f911ff9d9e1c9ecab09faa0148b3db2dbe6`. Trunk checked GitHub merge state and local/actual remote
+M2 equality. Tree `4b9cfc312944b257799465e6ea77e2103d7fe658` exactly equals reviewed source
+`a2de670213c1791127a63b1ff8c541e512ea743b`; no new product delta requires repeated validation.
+Local/remote `archive/otel-m2-profile-a2de670` preserves all profile review checkpoints. The human may
+now delete the profile work branch; retain that archive and `archive/otel-m2-styling-1d97c99`.
+The preparation records below are historical evidence, not pending PR instructions. M2 and release
+acceptance remain open; continue with system-workspace design in the recovery plan.
+
 ## Disposition and fixed inputs
 
 Profile P1/P2/P3 and styling are complete; cumulative functional/package validation is complete.

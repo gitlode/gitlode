@@ -17,12 +17,12 @@ the base's domain-design link. [Post-merge CI](https://github.com/gitlode/gitlod
 succeeded. Compared with validated `6fd46d3`, only handoff documents differ; existing functional/package
 evidence is reused on that explicit content basis, not relabeled under the squash OID.
 
-| Milestone | Status                                   | Remaining scope                                                            |
-| --------- | ---------------------------------------- | -------------------------------------------------------------------------- |
-| M0        | complete, one target only                | Preserve historical evidence and environment                               |
-| M1        | complete                                 | Preserve corrected validation and squash attribution                       |
-| M2        | Profile/style accepted; integration next | Full T13B, readability, system-test organization, final candidate and T13C |
-| M3        | future, not v0.13.0 gates                | Separately justified capabilities and general refactoring                  |
+| Milestone | Status                                 | Remaining scope                                                            |
+| --------- | -------------------------------------- | -------------------------------------------------------------------------- |
+| M0        | complete, one target only              | Preserve historical evidence and environment                               |
+| M1        | complete                               | Preserve corrected validation and squash attribution                       |
+| M2        | Profile integrated; system design next | Full T13B, readability, system-test organization, final candidate and T13C |
+| M3        | future, not v0.13.0 gates              | Separately justified capabilities and general refactoring                  |
 
 The live publish acceptance record remains `blocked`. Integration is not formal performance or
 release acceptance. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains the
@@ -53,19 +53,21 @@ correspondence, saved command/package evidence, human display limits and the pro
 future Span aggregation/retention questions. Completed implementation/review/trial packets are
 retained in Git rather than as live work instructions.
 
-Current work is profile-to-M2 integration preparation on profile. Human PR/merge authority remains;
-no PR is authorized. Saved validation applies to fixed candidate `f4d90d1`; reuse for integration is
-based on an explicitly verified documentation-only delta and unchanged base, not a new execution.
-No further product/package campaign or display sample is assigned. ENOTEMPTY and Windows
-timeout/EBUSY remain unresolved; existing Attributes typing is separate. GNOME light/dark remains
-a pre-release check, preferably before freeze. Publish acceptance stays blocked.
+PR #113 was human squash-merged into M2 at
+`c29376b0b771efac9d736cb5315ae3d1d303984f`, parent
+`12b43f911ff9d9e1c9ecab09faa0148b3db2dbe6`. Trunk verified actual remote/local M2 equality and tree
+`4b9cfc312944b257799465e6ea77e2103d7fe658`, exactly matching reviewed source
+`a2de670213c1791127a63b1ff8c541e512ea743b`. Source history is preserved locally and remotely at
+`archive/otel-m2-profile-a2de670`. The human may delete local/remote profile work branches; keep the
+archive and existing styling archive. Trunk did not delete branches. Saved candidate validation at
+`f4d90d1` is reused on the reviewed handoff-only delta, not claimed as execution on the squash OID.
 
-After human integration: private tests/system design/migration/review; history/evidence freeze;
-full T13B; GNOME before release; final combined-candidate validation and T13C/publish evidence.
-Prepare `feature/otel-redesign_M2_system` from the then-accepted M2 tip only after profile returns.
-The packet must preserve commands, checked tooling TypeScript, dependency boundaries and current
-gates, and distinguish migration-only versus lasting checks. No broad test move is pre-authorized.
-Formal operator packets need exact inputs, commands, bounds, archive roots and failure return rules.
+Current assignment: the bounded private tests/system design packet at the end of this plan.
+No implementation or further PR is authorized yet. ENOTEMPTY and Windows timeout/EBUSY remain open
+observations, not a new reproduction campaign. Existing Attributes fixture typing is separate.
+After system design/migration/review: history/evidence freeze, full T13B, GNOME pre-release check,
+final combined-candidate validation and T13C. Publish remains blocked. Additional display samples
+are future tooling, not an integration/release prerequisite.
 
 ## History and parallel development boundary
 
@@ -212,5 +214,50 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Current work is profile-to-M2 integration preparation; later sessions need fixed inputs and
+chooses squash/merge strategy and performs the merge or branch deletion. Current work is bounded tests/system design; later sessions need fixed inputs and
 trunk handoff. No PR is authorized until the human approves its explicit source/base.
+
+## Current assignment: first tests/system workspace design
+
+The human starts a new branch conversation for bounded repository design, not implementation.
+Read AGENTS, architecture/domain-design, build-test-release, telemetry verification/performance and
+harness guidance. Inspect current root/workspace manifests, lockfile, TypeScript/Vitest/Rev-dep,
+format/lint/CI configuration and installed-package test dependencies. Do not browse/rewrite unrelated
+plugins or migrate every system-like test.
+
+Base implementation is accepted M2 squash `c29376b0b771efac9d736cb5315ae3d1d303984f`; this planning
+packet advances M2 by documentation only. Verify current planning tip/actual remote and record the
+exact OID. Create `feature/otel-redesign_M2_system` from that verified tip, or inspect/resume an existing
+matching child without resetting it. Commit/normal push meaningful design checkpoints. Do not update
+M2/integration/main refs. Proposed return is human squash into M2 after implementation/review; PR
+creation needs explicit source/base approval and only the human merges/deletes branches.
+
+Accepted direction: private workspace at tests/system. First slice is the existing release/installed
+CLI package workflow, currently scripts/test-installed-package.ts. Derive its exact support closure
+from code. Define what remains package-owned (collector/internal-access tests, pure harness planner
+and statistics units, schema/build tooling) and what the system workspace owns. Distinguish lasting
+regression tools from migration-only acceptance/provenance tooling; propose placement and later
+retirement criteria, without moving all performance tooling or retiring the publish gate now.
+
+Return a concrete minimal proposal with:
+
+- File ownership/move table and dependency inventory; tests consume the installed package/public
+  contract rather than importing product internals for convenience. Identify genuine exceptions.
+- Private manifest/workspace wiring, checked TypeScript for owned tooling, build/order/config
+  boundaries, fixture/temp/process ownership and Windows/Linux path behavior.
+- Commands before/after, compatibility wrappers if justified, CI/validate:release wiring and package
+  exclusion. Preserve all existing checks; normal CI must not start formal performance measurements.
+- Exact canonical contributor/navigation updates for product vs telemetry and recorder vs collection
+  work. Address C6 ownership/retirement criteria without expanding optional C1-C5 refactors.
+- Small implementation slices and finite acceptance checks including both adapters, plugin, schema,
+  worker/CLI and TypeScript installed consumers. State lockfile/package/evidence impacts before F.
+- Questions requiring human/trunk decision versus routine implementation choices. Do not reopen the
+  accepted tests/system location or style/profile contracts without a concrete conflict.
+
+Append the proposal to this plan under a clearly labeled system-design section, or compact it there
+if existing material becomes stale. No source/test moves, manifest/lockfile edits, production changes,
+install/release/full test campaigns, formal measurements or gate changes in this design session.
+Read-only inspection is authorized; no new VM or machine-wide setup. Run format:write/check and link/
+diff checks for the documentation, commit/normal push on the child, verify remote equality/clean state,
+and return exact OIDs and the proposed implementation packet to trunk. Design completion does not
+self-authorize implementation. Trunk reviews scope/dependencies before assigning the first slice.

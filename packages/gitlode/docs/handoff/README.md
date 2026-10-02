@@ -17,8 +17,9 @@ corrected functional/package validation and squash attribution. These four notes
 work context, not active instructions to repeat M1. Stable contracts live in design/contributing docs.
 
 P1/P2/P3, styling, corrections and cumulative validation are complete. Profile is squash-integrated into M2 by PR #113 at `c29376b`. The private
-`tests/system` workspace is also integrated by PR #114. The next assignment is the
-[pre-measurement readiness packet](opentelemetry-m2-measurement-readiness.md). See the
+`tests/system` workspace is also integrated by PR #114. The
+[readiness slice](opentelemetry-m2-measurement-readiness.md) is integrated by PR #115;
+next is history review and candidate-freeze preparation. See the
 [profile integration evidence](opentelemetry-m2-profile-integration.md) for acceptance, OIDs, squash
 mapping and saved validation, and [remaining observations](opentelemetry-m2-profile-observations.md)
 for instability and future Span work. Full T13B, GNOME pre-release checks, final-candidate validation

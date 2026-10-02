@@ -1,5 +1,16 @@
 # M2 pre-measurement readiness packet
 
+## Current status: integrated (2026-10-02)
+
+The human squash-merged PR #115 at `7696c4c1261430f9aa7e84482a976bc44186db45`, parent
+`b325065d9a11b6020b2e043fa4b7a196833a49d4`. Trunk verified local/actual-remote M2 equality
+and tree `17fb822329b0cca874b6370d093b24bb414f7b39`, exactly matching accepted source
+`d494a332764b647811e0df22a9cbda77317622ba`. Source history is preserved locally and remotely
+at `archive/otel-m2-readiness-d494a33`; the human may delete the readiness work branch, not the archive.
+The assignments and reviews below are completed history, not instructions to rerun the slice.
+Saved validation is reused through exact tree correspondence, not claimed as new execution on the
+squash OID. Formal measurement, candidate freeze and M2/release acceptance remain pending.
+
 ## Assignment and authority
 
 The human starts this separate implementation/readiness conversation and returns its outcome to

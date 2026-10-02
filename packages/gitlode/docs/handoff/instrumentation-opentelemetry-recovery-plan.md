@@ -74,8 +74,10 @@ is complete and integrated, not M2/release acceptance. Existing validation is re
 identity; no new test execution on the squash commit is claimed.
 ENOTEMPTY and Windows timeout/EBUSY remain open
 observations, not a new reproduction campaign. Existing Attributes fixture typing is separate.
-Current assignment is the [bounded pre-measurement readiness packet](opentelemetry-m2-measurement-readiness.md).
-After its review and any required human-approved integration: history/evidence freeze, full T13B, GNOME pre-release check,
+The [bounded readiness slice](opentelemetry-m2-measurement-readiness.md) is accepted and integrated
+by human squash PR #115 at `7696c4c1261430f9aa7e84482a976bc44186db45`; its opening status
+records exact tree correspondence and the preserved source archive. No formal candidate is frozen.
+Next: history/evidence freeze preparation, full T13B, GNOME pre-release check,
 final combined-candidate validation and T13C. Publish remains blocked. Additional display samples
 are future tooling, not an integration/release prerequisite.
 

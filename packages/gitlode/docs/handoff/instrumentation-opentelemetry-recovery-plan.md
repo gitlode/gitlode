@@ -62,8 +62,15 @@ PR #113 was human squash-merged into M2 at
 archive and existing styling archive. Trunk did not delete branches. Saved candidate validation at
 `f4d90d1` is reused on the reviewed handoff-only delta, not claimed as execution on the squash OID.
 
-Current assignment: document-only system-to-M2 integration preparation at the end of this plan.
-The first system slice is accepted for integration preparation; no PR is authorized yet. ENOTEMPTY and Windows timeout/EBUSY remain open
+The human squash-merged system PR #114 into M2 at
+`6e69780346b2788886331a4a5e44783c3bd9108e`, with parent
+`45944a382f2ce53eb898c73058bfc5dc1028d3bc`. Trunk verified tree
+`9920772155028bb30e008b89848e7e5c999552ec` exactly matches approved source
+`ad5a6e1fd3c6532b911e6a8936dc73cbeb2dc733`; local M2 and actual remote agree.
+Keep the system work branch until source-history preservation is confirmed. The scoped system slice
+is complete and integrated, not M2/release acceptance. Existing validation is reused through tree
+identity; no new test execution on the squash commit is claimed.
+ENOTEMPTY and Windows timeout/EBUSY remain open
 observations, not a new reproduction campaign. Existing Attributes fixture typing is separate.
 After system design/migration/review: history/evidence freeze, full T13B, GNOME pre-release check,
 final combined-candidate validation and T13C. Publish remains blocked. Additional display samples
@@ -214,8 +221,32 @@ operators return evidence or a diagnosis request rather than repairing code duri
 Use the [collaboration rules](../agents/collaborative-work.md#bounded-implementation-and-measurement-sessions).
 
 Before every PR, present the exact source/base and obtain human permission. Only the human approves,
-chooses squash/merge strategy and performs the merge or branch deletion. Current work is document-only system integration preparation; later sessions need fixed inputs and
-trunk handoff. No PR is authorized until the human approves its explicit source/base.
+chooses squash/merge strategy and performs the merge or branch deletion. System PR #114 is merged;
+later sessions need fixed inputs and trunk handoff. Every new PR requires its own explicit source/base
+approval.
+
+### TODO: Organize remaining product-local scripts
+
+The completed system slice deliberately migrated only installed-package validation. It did not
+complete organization of all code under `packages/gitlode/scripts`. This follow-up is separate from
+the accepted slice and is not a retroactive PR or integration prerequisite.
+
+Remaining scripts mix performance workflows and their process/evidence infrastructure, internal
+collector benchmarks, migration acceptance/provenance and publish controls, and build/schema helpers.
+Their purpose and ownership must be discoverable without reconstructing development history or
+reading PR descriptions. Existing performance guidance covers part of this inventory, not the whole
+directory.
+
+A separately scoped follow-up must inventory every script and helper, document purpose, owner,
+entry commands, dependencies, and lasting versus migration-only lifecycle, and choose directories
+that make those responsibilities apparent. Link the resulting contributor guidance to the relevant
+canonical contracts. Do not indiscriminately move all scripts into `tests/system`: preserve its
+installed-public-package boundary and distinguish internal benchmarks, release controls and build
+tools. Retain required evidence/provenance and the separately reviewed gate-retirement policy.
+
+Trunk must assign timing and a bounded implementation packet before this follow-up starts; its
+release placement is not decided here. Formal measurement readiness and T13C remain existing
+obligations, not substitutes for this broader maintainability TODO.
 
 ## Accepted system slice and integration preparation (2026-10-02)
 

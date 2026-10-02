@@ -690,3 +690,88 @@ the evidence follow-up rather than overwriting the list or inferring historical 
 Windows installed execution, Linux combined-chain completion and exact consumer compiler attribution
 remain incomplete. No implementation correction is required by this review; system acceptance,
 T13B/T13C and publish readiness remain separate and unaccepted here.
+
+## Bounded system evidence completion attempt (2026-10-02)
+
+Returned on `feature/otel-redesign_M2_system`, starting from handoff
+`988815e1e3ba1e8c0b7c35084baa3fd13498e539`. Both new genuine Git clones checked out detached
+`f024edacff073be4f7438dbb3fb1f31cc0f8ba45` and retained clean tracked source. No implementation,
+fixture/assertion, dependency-version policy or acceptance record was changed. **Completion remains
+incomplete because the evidence-only preload introduced a setup failure.** No acceptance is claimed.
+
+### New executions and stop boundary
+
+Windows root: `D:/gitlode_test/m2-system-completion-20261002-988815e-01`; Linux root:
+`/home/t-wakabayashi/gitlode-performance/m2-system-completion-20261002-988815e-01`.
+Windows Node v22.23.1/npm 11.11.0/Git 2.45.1.windows.1; Linux preserved Node v22.23.1/npm 10.9.8/Git 2.53.0
+on WSL2. Environment logs own exact identities. Windows used dedicated cache and an actual existing
+`outside temp` parent with protected sentinel. Root/source/cache/temp writes succeeded before ci.
+
+| OS      | Command and count                                         | Result                                                      |
+| ------- | --------------------------------------------------------- | ----------------------------------------------------------- |
+| Windows | `npm ci`, once in fresh fixed clone                       | exit 0                                                      |
+| Windows | `npm run build:release`, once                             | exit 0                                                      |
+| Windows | `npm run validate:publint -w gitlode`, once after release | exit 0                                                      |
+| Windows | `npm run test:system:package`, one launch attempt         | wrapper exit 1; child exit unknown; empty installed log     |
+| Linux   | `npm run validate:release`, once in genuine fixed clone   | exit 1 after successful syncpack; combined chain incomplete |
+
+Linux copied existing root node_modules only after identical lockfile SHA-256
+`3448b72b870baafda631d83c8d11bcdde7dc1079f8c02587b445efb858449368`, matching toolchain,
+and all installed non-link package versions/integrities against the fixed lockfile were checked.
+Workspace-local nested dependency completeness was not separately attested; reuse validation has
+that limit. No Linux installation or validation retry occurred. The original missing-.git failure
+remains preserved separately; this new failed chain does not replace it or establish a pass.
+
+`evidence/probes/consumer-probe.cjs` intended to synchronously preserve the actual consumer manifest,
+lockfile, installed TypeScript manifest, `tsc --version` and used tarball before cleanup, on successful
+consumer-install close. It added only observation and a compiler-version invocation, but accidentally
+omitted returning ChildProcess from its spawn wrapper. Windows deadline launcher consequently threw
+`TypeError: Cannot read properties of undefined (reading 'on')`; the same faulty preload affected
+Linux npm. This is agent-created probe setup failure, not evidence of product/test failure. Original
+probe bytes, full available command logs, Linux exit and Windows wrapper failure are retained.
+Repair condition is to return the original ChildProcess and verify transparent behavior on disposable
+children before any separately assigned execution. No successful consumer snapshot exists, and no
+workspace compiler identity is substituted. No commands were retried and no Windows full suite added.
+
+Clones/source proof/pack used 120s deadlines, Windows validation commands 600s, and Linux combined
+chain 1200s with 15s kill-after. The Windows installed launcher crashed before installing its deadline
+and exit listeners; a finite process snapshot found no remaining matching child, but does not establish
+its exit. Real outside-temp fixture success, inside rejection and consumer/package correspondence
+therefore remain missing. Sentinel data survived. Runner fixture leakage and tsx's own launcher cache
+are distinct; no launcher-wide no-write guarantee is claimed.
+
+### Historical reconciliation and adopted evidence
+
+The old manifest and three originals were not edited. `evidence/old-current/` preserves their current
+bytes plus the first EPERM and syntax-error logs; `three-mismatches.json` records full old/current
+SHA-256 values. Roles are CI summary (`final-ci.json`), preservation probe (`preservation-check.cjs`)
+and probe output (`preservation-check.log`). The 21 other listed hashes still match. The saved syntax
+failure and corrected current probe make editing plausible, but do not establish generation order
+relative to the hash list. CI summary ordering is unknown. No cause is inferred from mtime. All three
+remain excluded from checksum-attested historical evidence; the new hashes attest only current copies.
+
+Fresh fixed-Git comparison independently passes for public manifest fields and the unchanged
+fixture/assertion/execution/finally body after newline normalization. This is new confirmation, not
+repair of old evidence. Fresh CI acquisition failed (`gh` unavailable; web API inaccessible); the
+previous independent review's live CI attribution remains separate and is not newly attested here.
+Read-only file/parent ACL observation permits the owner; finite module enumeration found no matching
+loaded oxlint module. Neither proves the original EPERM cause or identifies a departed lock owner.
+Shared node_modules was not deleted or repaired, and the historical first failure is retained.
+
+Windows separately saved one release pack, without an intervening development build, SHA-256
+`03185e8b10f01027f0c69125df56464ecea4dc2eb2e36c7f2d65ee0d28ee9bcf`.
+Its pack inventory is retained; it is **not** a tested installed-package tarball. Linux did not reach
+release packing. Consumer identity and tested-tarball identity remain missing on both systems.
+
+After all evidence/probe writes ended, Linux manifest sealed 17 entries, SHA-256
+`ca60002d4e20a9bae4f3c76a2bbf25fb9c0a7c0a02deb7603b721d7846b4c71a`;
+Windows aggregate manifest sealed 61 entries, SHA-256
+`58037d8ea561a58f431480955d71c5c7e7a616227e384f597bc4d30dc596e178`.
+All entries were verified at generation and again at Linux-to-Windows and Windows-to-return-copy
+destinations. Return copy: `.cache/m2-system-completion-return-988815e-01/evidence`.
+These are local artifact copies, not external backup. No sealed log was appended afterward.
+
+Remaining: a corrected, separately verified evidence launcher and separately assigned Windows
+installed/outside/inside checks, Linux combined chain, and both consumer identities. Implementation
+review remains acceptable; full system acceptance, T13B/T13C, formal measurement and publication are
+outside this return. Only this handoff document is committed; no PR/merge or parent ref update occurs.

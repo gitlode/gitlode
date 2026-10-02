@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -88,7 +88,15 @@ describe.skipIf(process.platform !== "linux")("supervised workflow integration",
     "preserves completed runs when a later child stalls: %s",
     async (stall) => {
       const root = await mkdtemp(join(tmpdir(), "gitlode-supervised-workflow-"));
-      temporary.push(root);
+      // Register teardown only after the supervisor confirms process completion.
+      // Killing the test runner itself can still leave this owned root behind.
+      const fixtureParent = join(root, "workflow-temp");
+      await mkdir(fixtureParent);
+      const outside = await mkdtemp(join(tmpdir(), "gitlode-workflow-sentinel-"));
+      temporary.push(outside);
+      const sentinel = join(outside, "sentinel");
+      await writeFile(sentinel, "protected outside fixture");
+      const fixtureLog = join(root, "fixture-paths.jsonl");
       const artifacts = join(root, "artifacts");
       const manifestPath = join(root, "manifest.json");
       const cli = join(root, "cli.cjs");
@@ -97,6 +105,7 @@ describe.skipIf(process.platform !== "linux")("supervised workflow integration",
         cli,
         `const fs=require('node:fs'),a=process.argv.slice(2),value=n=>a[a.indexOf(n)+1];
 const counter=${JSON.stringify(join(root, "counter"))};
+fs.appendFileSync(${JSON.stringify(fixtureLog)},JSON.stringify(fs.realpathSync(require('node:path').dirname(value('--output-dir'))))+'\\n');
 const count=fs.existsSync(counter)?Number(fs.readFileSync(counter,'utf8'))+1:1;fs.writeFileSync(counter,String(count));
 if(${stall} && count===2){setInterval(()=>{},1000)}else{
 fs.writeFileSync(value('--output-dir')+'/performance-20240101T000000Z-000001.jsonl',Array.from({length:5},(_,i)=>JSON.stringify({oid:String(i)})).join('\\n')+'\\n');
@@ -124,7 +133,11 @@ fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedA
           "--execution-timeout-ms",
           "1000",
         ],
-        { cwd: repositoryRoot, timeout: 25_000 },
+        {
+          cwd: repositoryRoot,
+          env: { ...process.env, TMPDIR: fixtureParent, TMP: fixtureParent, TEMP: fixtureParent },
+          timeout: 25_000,
+        },
       );
       if (stall) await expect(execution).rejects.toMatchObject({ code: 2 });
       else await execution;
@@ -134,13 +147,40 @@ fs.writeFileSync(value('--state'),JSON.stringify({repositoryPath:a[0],generatedA
           .map(async (name) => JSON.parse(await readFile(join(artifacts, name), "utf8"))),
       );
       const supervision = evidence.find((value) => value.kind === "performance-supervision");
+      expect(supervision.cleanupConfirmed).toBe(true);
+      expect(supervision.cleanupErrors).toEqual([]);
+      const ownedParent = await realpath(fixtureParent);
+      expect(await realpath(root)).toBe(dirname(ownedParent));
+      temporary.push(root);
       expect(supervision.status).toBe(stall ? "inconclusive" : "completed");
       expect(supervision.failure).toBe(stall ? "execution-deadline-exceeded" : undefined);
       expect(evidence.filter((value) => value.kind === "completed-performance-run")).toHaveLength(
         stall ? 1 : 9,
       );
-      expect(supervision.cleanupErrors).toEqual([]);
       expect(JSON.parse(await readFile(manifestPath, "utf8"))).toEqual(manifest("complete"));
+      const generatedRoots = (await readFile(fixtureLog, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as string);
+      expect(generatedRoots).toHaveLength(stall ? 2 : 9);
+      for (const generatedRoot of generatedRoots) {
+        const contained = relative(ownedParent, generatedRoot);
+        expect(contained).not.toBe("");
+        expect(contained.startsWith("..")).toBe(false);
+        expect(isAbsolute(contained)).toBe(false);
+        expect(dirname(generatedRoot)).toBe(ownedParent);
+      }
+      const remaining = await readdir(fixtureParent);
+      expect(remaining.filter((name) => name.startsWith("gitlode-performance-"))).toHaveLength(
+        stall ? 1 : 0,
+      );
+      // Preserve evidence outside the owned root before exercising outer teardown.
+      const retainedEvidence = join(outside, "completed-evidence.json");
+      await writeFile(retainedEvidence, JSON.stringify(evidence));
+      await rm(root, { recursive: true });
+      await expect(realpath(fixtureParent)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(JSON.parse(await readFile(retainedEvidence, "utf8"))).toEqual(evidence);
+      expect(await readFile(sentinel, "utf8")).toBe("protected outside fixture");
     },
     30_000,
   );

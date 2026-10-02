@@ -32,6 +32,13 @@ the current Windows test environment, therefore produce an inconclusive artifact
 
 ## Reference workflow
 
+The supervised workflow integration test owns a fresh temporary parent beneath its test root and
+passes it only through the spawned child's environment. Its normal and second-child-stall cases
+observe actual fixture realpaths, retain completed-run/status evidence, and verify removal after
+the supervisor's cleanup barrier while preserving an outside sentinel. If completion or containment
+cannot be confirmed, the root is retained for diagnosis. Killing the test runner itself can prevent
+test teardown; this test-only ownership does not promise cleanup after abrupt runner or host loss.
+
 Run the `performance:*` npm commands in Linux (including WSL2), with Linux-native Node, Git,
 temporary storage, and release snapshots. These commands enter `telemetry-performance-supervised.ts`;
 `telemetry-performance.ts` is the internal worker, not the supervised operator entrypoint.

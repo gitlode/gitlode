@@ -425,3 +425,154 @@ This can test whether stability recurs and whether shared changes coincide with 
 it cannot by itself prove causation or transfer M0 acceptance. Another inconclusive result means
 the target remains unaccepted and dependent profile work stops, with evidence returned for a separate
 decision; no automatic retry or recalibration. This recommendation was not executed.
+
+## Controlled fresh attempt outcome (2026-10-05; trunk review pending)
+
+**Fail; stopped after disabled overhead.** Fresh legacy capture passed; disabled comparison failed
+the unchanged peak RSS gate, so profile was never started. Exactly one workload per executed stage
+ran, without retry, resumption or combination with the first attempt. The first attempt remains
+inconclusive (candidate MAD 6.428%) and cause-unresolved. Neither attempt accepts this target, T13B,
+M2 or release; this packet does not authorize a third attempt.
+
+### Setup and fixed inputs
+
+Started clean on M2 at `b0ca2c977f9ea843a3050d5cce04362a4ec49a11`. Before workloads the human
+confirmed exclusive local-machine use for this session from approximately 2026-10-05 17:47 JST
+for 15 hours, through approximately 2026-10-06 08:47 JST. Workloads ran 17:51:23–18:05:11 JST
+within that window. No unrelated process was stopped; host/WSL/power/Git settings were unchanged.
+
+Fresh Linux root (`R`): `/home/t-wakabayashi/gitlode-performance/m2-controlled-8fffcc0-20261005`.
+Product/harness remained `8fffcc0d8e11bb061d70bf870f262092d559c5f2`; legacy remained
+`76b124e23fcc069be1278629cf01b62ae1456c7a`. Historical calibration retained M0 harness
+`a53a5b83d18f9e493ebb39c4db481b762448743f`. Copied selected manifest SHA-256 remained
+`93b3010b76337ea8f3bdc9fc725c2ab4cd98824b33f9c6ab99f3bc34750b7945`, with resolvable calibration/
+environment references, 4,430 commits and unchanged recipe hash
+`6668bd8a9c032a9d2c9ca2a7aca0a1b7e56055c24b3431e561d3fee156ed738f`. Four other targets remain
+incomplete; no global manifest hash was invented.
+
+Both F copies matched all 552 entries before and after execution, with unchanged manifest
+`738b6a16a9c1c08fad90f5993ede2f7b6a872865b9e91c3f37817d423ea3e7ea`. Extracted candidate/harness/
+legacy/Git-support closures matched 4,625/15,619/1,617/251 inventory entries; Node matched immutable
+M0. No install/build/dependency update occurred. Candidate CLI/worker SHA-256 remained
+`f6592528e2ccb7902ddbe96d67c3f27517454b840a3867f98dbf56dfac1f76de` /
+`ec2c6b27ef2bf64a95ba5e46ab59414245dea951756ee195c5064c9dd93c9df5`; legacy CLI remained
+`379ed9dca9c25c2a7715371f3c64631317c98a3c2dd7a55f64bcbbac3cca5779`.
+Final runtime/source/toolchain inventories matched restoration except `.git/index` metadata refreshed
+by initial status; both index hashes are recorded, tracked bytes unchanged and detached status clean.
+
+Ubuntu WSL2/ext4, x64, kernel `6.18.33.1-microsoft-standard-WSL2`, Ryzen 9 3900X / 24 logical CPUs,
+Node `22.23.1`, npm `10.9.8`, Git `2.53.0` matched M0. The existing 12,288-byte memory difference
+remained. M0 timed roots and fresh `TMPDIR=TMP=TEMP=/home/t-wakabayashi/gl-m2t2` resolve to ext4
+on `/dev/sdf`; F's build-only tmpfs was not reused. Explicit Linux-only PATH selected restored
+Node/npm and native Git, NODE_OPTIONS unset, cache `R/npm-cache`. Fixed-harness manifest validation/
+environment compatibility had no errors. Initial vmstat samples were 99–100% idle.
+
+Unchanged launcher SHA-256: `23b916a0aee69275359527875cd3a9bc6e20fc9759008bddba0d14f6c2e32c8b`.
+Fresh disposable preflight returned exit 124 / SIGKILL at 2,044 ms for a 2-second deadline;
+group 248611 and descendant 248618 had no observed live remainder. Every planned outer command
+limit stayed 7,200 seconds; harness limits stayed 1,800,000/300,000/300,000 ms. No deadline fired
+or was increased. Absolute argv, cwd, environment and limits are in
+`evidence/{legacy,disabled,profile}.command.json`; profile is planned only. Executed commands used
+absolute `R/runtime/node/node-v22.23.1-linux-x64/bin/npm` from
+`R/runtime/fixed-harness-and-build/source`:
+
+```bash
+M="$R/inputs/m0/manifest.json"
+B="$R/runtime/legacy-runtime/legacy-0.12.0/dist/index.js"
+C="$R/runtime/candidate-consumer/tested-consumer/node_modules/gitlode/dist/index.js"
+npm run performance:capture-legacy -w gitlode -- --manifest "$M" --fixture commit_heavy_repository --adapter isomorphic-git --preparation-timeout-ms 1800000 --execution-timeout-ms 300000 --processing-timeout-ms 300000 --baseline-cli "$B" --legacy-revision 76b124e23fcc069be1278629cf01b62ae1456c7a --artifacts "$R/legacy"
+npm run performance:measure -w gitlode -- --manifest "$M" --fixture commit_heavy_repository --adapter isomorphic-git --preparation-timeout-ms 1800000 --execution-timeout-ms 300000 --processing-timeout-ms 300000 --comparison disabled_overhead --baseline-cli "$B" --legacy-revision 76b124e23fcc069be1278629cf01b62ae1456c7a --candidate-cli "$C" --candidate-revision 8fffcc0d8e11bb061d70bf870f262092d559c5f2 --artifacts "$R/disabled"
+```
+
+### Results and chronology
+
+| Stage             | Formal result | Metrics and supervision                                                                                                                  |
+| ----------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Legacy capture    | pass          | Median 26,883.397326 ms; MAD 729.562593 ms (2.713804%); median peak RSS 186,593,280 bytes; completed / exit 0; elapsed 284,768.712413 ms |
+| Disabled overhead | fail          | Paired wall overhead +1.277550592%; RSS increase 17,543,168 bytes; completed / exit 2; elapsed 501,408.308360 ms                         |
+| Profile overhead  | skipped       | Dependent stage stopped; no enabled report or profile-overhead result                                                                    |
+
+Disabled baseline/candidate medians were 24,954.091113 / 25,181.073503 ms, MADs
+108.719237 / 313.121993 ms (0.435677% / 1.243482%), median peak RSS 185,655,296 / 203,198,464 bytes.
+Allowed RSS increase is `max(8 * 1024 ** 2, 185655296 * 0.05) = 9,282,764.8` bytes; observed growth
+is 9.449323%. RSS fails while paired wall overhead and stability pass. Fixed evaluator `reasons` is
+empty: it records inconclusive conditions, while numeric threshold failure is expressed by `status=fail`.
+Saved-data recomputation confirms this result without changing evaluation or thresholds.
+
+Measured pairs in original order (seconds rounded only for this table):
+
+| Pair | Order |    Legacy | Candidate | Candidate/legacy |
+| ---- | ----- | --------: | --------: | ---------------: |
+| 0    | A-B   | 24.554258 | 24.867952 |      1.012775506 |
+| 1    | B-A   | 25.077245 | 25.181074 |      1.004140356 |
+| 2    | A-B   | 24.854758 | 25.366762 |      1.020599850 |
+| 3    | B-A   | 24.467494 | 27.775836 |      1.135213767 |
+| 4    | A-B   | 24.975898 | 24.803502 |      0.993097508 |
+| 5    | B-A   | 24.954091 | 28.056769 |      1.124335451 |
+| 6    | A-B   | 25.062810 | 25.088013 |      1.001005573 |
+
+Measured child starts span 08:59:15.321167–09:04:45.651389 UTC (17:59–18:04 JST). Warmups remain
+separate: pair 0 legacy 23.990010 then candidate 25.172292 s; pair 1 candidate 25.140575 then legacy
+24.691998 s. Capture retained two warmups/seven measured runs; comparison two warmup/seven measured
+pairs with prescribed alternation. Slower candidate pairs 3/5 are retained; no sample was discarded.
+Unrounded wall/RSS values, start timestamps, order, sampler gaps and resource overlap are saved in
+`evidence/raw-and-quality-audit.json` and `evidence/resource-observations-summary.json`, with consumed
+formal/supervision identities. All 27 timed CLI children exited 0 without capture errors; supported
+RSS sampling stayed 20 ms. Every run produced 4,430 commits/records, one JSONL file, 1,974,468 bytes
+and zero skipped diffs. Behavior and sidecar evaluations passed with empty reasons. All executed states
+were profile-disabled, sidecars not-applicable; there is no enabled schema-v2 ProfileReport or volume result.
+
+### Observations and cleanup
+
+Both observers were checked healthy before workloads. Windows used built-in
+`Win32_PerfFormattedData_PerfOS_Processor`, `Name=_Total`, `PercentProcessorTime`, on a fixed 5,000 ms
+Stopwatch schedule with UTC timestamps, final PID 6640. Linux observer 248698 ran `/usr/bin/vmstat -t 5`
+in UTC, vmstat PID/group 248700. Configuration stayed unchanged through stages, outside timed children.
+Commands/identities/start/stop/raw logs/clock records are preserved. Windows UTC bracket
+08:51:04.4769903–08:51:04.5864043 enclosed Linux `date -u` 08:51:04.543274850 from the operator call.
+The Python clock record's `windowsBefore` label is actually a Linux-side read, not an independent
+Windows observation. No clocks were changed.
+
+Windows retained 176 samples, median 8% / maximum 22% aggregate CPU. Actual intervals were
+4.110053–5.893863 s, median 5.003316 s, including query/scheduling jitter. Capture/disabled sample
+counts were 57/100, median CPU 8%/8%, maximum 22%/19%. Linux retained 187 interval samples excluding
+its initial since-boot average, idle 92–100%, median 94%, reported iowait and swap-in/out all zero;
+both stages had minimum idle 92%, median 94%. Aggregate counters include workloads/observers and
+cannot prove isolation or explain either failure. No CPU-time, frequency, temperature, process attribution,
+storage latency or object-layout/maintenance evidence was collected. No repository scans/Git calls ran
+during timed children; the harness removes fixtures before the final boundary, so no object-layout
+snapshot was available without intervention. These diagnostic limitations remain.
+
+Stop files gracefully stopped only owned observers at 09:05:31 UTC: Windows exit 0, Linux vmstat
+requested SIGTERM (`-15`); observer processes had exited on final observation. Terminal supervision:
+`legacy/supervision-1791190284531-1abf01d8-4499-41c6-a191-eb5defceb4dd.json` and
+`disabled/supervision-1791190609698-68a874d6-2776-469e-990c-3bda73a6303b.json`.
+Both have `cleanupConfirmed=true`, empty cleanup/finalization errors and persisted diagnostics.
+Exit 2 is completed formal failure, not timeout/abnormal termination. Final scoped observation found
+no live members of groups 248883/248931/267109/267143, no new TMP fixture directories, only tsx/Node
+caches. Supervision cleanup is required separately from outer groups; escaped groups, kernel races
+and host loss are outside these observations. No broad kill or historical-residue cleanup occurred.
+
+Pre-workload operator events are recorded in `evidence/attempt-policy.json`: sandbox counter denial
+then authorized access; shell quoting corrected to absolute Linux observer paths; early Windows cadence
+corrected before workloads with old logs retained; immediate health check before first asynchronous
+sample corrected after sample arrival; self-copy SameFileError before launcher corrected by external
+script invocation. Auxiliary Python error reporting also imported operator `inspect.py` instead of stdlib
+`inspect`. None launched/repeated a workload. Original attempt and diagnosis are unchanged.
+
+### Preservation and return
+
+New Linux archive: `R/archive`; verified Windows copy:
+`D:/gitlode_test/m2-controlled-8fffcc0-20261005`. Sealed manifest SHA-256:
+`c2e2bd856b0ca2578dc347b2b0d31db23e95802d935268060f641d6e52aec0da`.
+All 567 files plus manifest matched in both copies, zero size/hash mismatches. Verification:
+`R/copy-verification.json` and `D:/gitlode_test/m2-controlled-8fffcc0-20261005-copy-verification.json`.
+New raw/formal results, provenance, commands/limits, progress, observer logs, inspections and inventories
+are separate from unchanged F/M0/first-attempt archives. Runtime restoration stays outside this archive;
+F preserves immutable runtime inputs. Two local OS copies are not external backup.
+
+Before writing, shared HEAD and actual remote M2 still matched the starting checkpoint. Only this document
+is committed and normally pushed on M2 after ref-movement checks; final OID/remote equality/clean status
+are returned in the session. No product/configuration/threshold/recipe change, tests/build/install, other
+target, acceptance update, PR or merge occurred. Trunk receives this failed attempt for evidence review
+and a separate next decision; profile and the remaining matrix stay open.

@@ -70,7 +70,10 @@ import {
   validateRepositoryAccess,
 } from "./repository-context.js";
 import { observeRssExperiment } from "./rss-experiment-observation.js";
-import { WorkerTelemetrySession } from "./telemetry/worker-telemetry-session.js";
+import {
+  createRssExperimentSession,
+  type RssExperimentSession as WorkerTelemetrySession,
+} from "./telemetry/rss-experiment-session.js";
 import type {
   ExecutionRunReporters,
   ExecutionRunInput,
@@ -217,7 +220,7 @@ export async function executeWorkerRunRequest(
   const { input, priorCheckpoint } = request;
   const session = telemetry
     ? undefined
-    : await (dependencies.createTelemetrySession ?? WorkerTelemetrySession.create)(input.profile);
+    : await (dependencies.createTelemetrySession ?? createRssExperimentSession)(input.profile);
   const activeTelemetry =
     telemetry ??
     createDefaultWorkerExecutionTelemetry(

@@ -46,8 +46,11 @@ import type { WorkerTelemetrySession } from "./worker-telemetry-session.js";
 export type RssExperimentSession = Pick<WorkerTelemetrySession,
   "getTracer" | "getMeter" | "rootSpan" | "rootContext" | "recordingEnabled" | "runInRootContext" | "finalize">;
 
-const runSpanMetadata = TELEMETRY_SPANS.find(span => span.id === "run");
-if (!runSpanMetadata || runSpanMetadata.scope.type !== "core") throw new Error("Invalid run span telemetry metadata");
+const runSpanMetadata = (() => {
+  const metadata = TELEMETRY_SPANS.find(span => span.id === "run");
+  if (!metadata || metadata.scope.type !== "core") throw new Error("Invalid run span telemetry metadata");
+  return metadata;
+})();
 
 export async function createRssExperimentSession(enabled = true): Promise<RssExperimentSession> {
   if (enabled) {

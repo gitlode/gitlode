@@ -6,7 +6,6 @@ import type { ProgressReporter } from "@gitlode/internal-contracts/progress";
 
 import { executeWorkerRunRequest } from "./execute-run.js";
 import { observeRssExperiment } from "./rss-experiment-observation.js";
-import { createWorkerTelemetrySessionForTest } from "./telemetry/worker-telemetry-session.js";
 import type { WorkerRunMessage, WorkerRunRequest, WorkerRunResult } from "./types.js";
 
 function runtimeErrorResult(error: unknown): WorkerRunResult {
@@ -65,7 +64,9 @@ parentPort.once("message", async (request: WorkerRunRequest) => {
         ? {
             environment: process.env,
             createTelemetrySession: async () =>
-              await createWorkerTelemetrySessionForTest({
+              await (
+                await import("./telemetry/worker-telemetry-session.js")
+              ).createWorkerTelemetrySessionForTest({
                 failures: { report_builder_body: new Error("injected builder body failure") },
               }),
           }

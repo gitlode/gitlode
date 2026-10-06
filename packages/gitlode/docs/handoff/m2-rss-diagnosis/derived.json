@@ -1,0 +1,467 @@
+{
+  "manifests": [
+    {
+      "path": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\evidence.sha256",
+      "sha256": "af7500f45a531f606ef598adfda931a2963d52192e93d21beec943f2fadb8cce"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\sealed-manifest.json",
+      "sha256": "383503b7ab78419ed6723f96f8bb3c56f73fb51c8b8f1774a659dfc2e07c6634"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-controlled-8fffcc0-20261005\\sealed-manifest.json",
+      "sha256": "c2e2bd856b0ca2578dc347b2b0d31db23e95802d935268060f641d6e52aec0da"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\commit_heavy_repository-isomorphic-git-capture-legacy.json",
+      "bytes": 1213783,
+      "sha256": "6b98f5a1d795f4c7380f7a4a15bf9b4d7a2c85caa458f89f5bcfdfd63c4c497d"
+    },
+    {
+      "path": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\legacy\\supervision-1789027620167-4bc591cb-1701-4b21-a99a-cc43709c924d.json",
+      "bytes": 12242,
+      "sha256": "8acbeb8ee4bfa6b3fce1fb33c99ebd7befadf6118ced26563bbf7f311e463561"
+    },
+    {
+      "path": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\commit_heavy_repository-isomorphic-git-measure.json",
+      "bytes": 2466850,
+      "sha256": "27d9ae9a3aadc314ab8706b270ffbc80ebc8e13cb0902e4349166bb1b46245b1"
+    },
+    {
+      "path": "D:\\gitlode_test\\m0-one-target-20260910T065854Z-a53a5b8\\disabled\\supervision-1789027951824-cc25ccaa-463a-4760-b0a3-cd70e567c4a7.json",
+      "bytes": 22574,
+      "sha256": "14edf5c86b1112189c199881b4c97adaafc1d6d45fc3c38bf9c981c8145d341a"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\commit_heavy_repository-isomorphic-git-capture-legacy.json",
+      "bytes": 1335376,
+      "sha256": "99dba1bb4c47a04307666f60ce6ea52d188e6b560f6ba111989df3aa1dd4252b"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\legacy\\supervision-1790935828274-6841b3a7-1da5-4c2d-816f-bc38a7ca8085.json",
+      "bytes": 12228,
+      "sha256": "9f865757667b37c146c2d977bce22a064a677c25cfad7ff4efe21a7b832ea30f"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\commit_heavy_repository-isomorphic-git-measure.json",
+      "bytes": 2905349,
+      "sha256": "936f69f0387f779c1ade712ba5137a754151963f7c7d6fb25b92803d81f1df1f"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-first-target-8fffcc0-20261002\\disabled\\supervision-1790936151301-948fcf61-16d8-4cfc-a9ac-924f67e789a4.json",
+      "bytes": 22677,
+      "sha256": "3911260fa58022d50ab00419f67b0975055f70ed4dc8e19cdd6f97e031c3200d"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-controlled-8fffcc0-20261005\\legacy\\commit_heavy_repository-isomorphic-git-capture-legacy.json",
+      "bytes": 1319441,
+      "sha256": "814584fc55a5b4a80fbfde739f5eb3e1e7056e38dd17fd7c23e4285ad70d53f5"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-controlled-8fffcc0-20261005\\legacy\\supervision-1791190284531-1abf01d8-4499-41c6-a191-eb5defceb4dd.json",
+      "bytes": 12222,
+      "sha256": "49e92e1c9f66ec008dc515c1f5b73c7fa7af2b392258672e3dc2a5894d34525a"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-controlled-8fffcc0-20261005\\disabled\\commit_heavy_repository-isomorphic-git-measure.json",
+      "bytes": 2575574,
+      "sha256": "37046f1347139d3edbcc3c23b54c109260fc136e2bc8c01bb8de7747cdd16cd0"
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-controlled-8fffcc0-20261005\\disabled\\supervision-1791190609698-68a874d6-2776-469e-990c-3bda73a6303b.json",
+      "bytes": 22661,
+      "sha256": "b234b5900d25b1006c188245fd0a3459f0278bb615c52452666806adf3e191d9"
+    }
+  ],
+  "summaries": [
+    {
+      "attempt": "M0",
+      "stage": "legacy",
+      "revisions": {
+        "baseline": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+        "benchmarkScript": "a53a5b83d18f9e493ebb39c4db481b762448743f"
+      },
+      "groups": {
+        "baseline": {
+          "wallMs": {
+            "median": 23867.013087,
+            "mad": 172.54584199999226,
+            "madRatio": 0.007229469451038068
+          },
+          "peakBytes": {
+            "median": 192233472,
+            "mad": 2199552,
+            "madRatio": 0.011442086422909743
+          }
+        }
+      },
+      "savedEvaluation": {
+        "status": "pass",
+        "behavior": {
+          "status": "pass",
+          "reasons": []
+        },
+        "sidecar": {
+          "status": "pass",
+          "reasons": []
+        }
+      }
+    },
+    {
+      "attempt": "M0",
+      "stage": "disabled",
+      "revisions": {
+        "baseline": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+        "candidate": "a97829b5315d42fbfa2212b718258099e7c90498",
+        "benchmarkScript": "a53a5b83d18f9e493ebb39c4db481b762448743f"
+      },
+      "groups": {
+        "baseline": {
+          "wallMs": {
+            "median": 23735.137214999995,
+            "mad": 278.49414900000556,
+            "madRatio": 0.011733412218236702
+          },
+          "peakBytes": {
+            "median": 193216512,
+            "mad": 1085440,
+            "madRatio": 0.005617739336894768
+          }
+        },
+        "candidate": {
+          "wallMs": {
+            "median": 24657.49678799999,
+            "mad": 123.12414999998873,
+            "madRatio": 0.00499337589125873
+          },
+          "peakBytes": {
+            "median": 200642560,
+            "mad": 1441792,
+            "madRatio": 0.007185873226497908
+          }
+        }
+      },
+      "savedEvaluation": {
+        "status": "pass",
+        "pairedRatios": [
+          1.0511946112076291, 1.046813494744812, 1.0393283620024327, 1.0134967129686419,
+          1.0388744361994517, 1.0225477324061718, 1.0336730904801725
+        ],
+        "baselineMedian": 23735.137214999995,
+        "candidateMedian": 24657.49678799999,
+        "baselineMad": 278.49414900000556,
+        "candidateMad": 123.12414999998873,
+        "wallClockOverhead": 0.038874436199451745,
+        "peakRssIncreaseBytes": 7426048,
+        "reasons": []
+      },
+      "pairs": [
+        {
+          "pairIndex": 0,
+          "order": "A-B",
+          "ratio": 1.0511946112076291,
+          "deltaPeakBytes": 5124096
+        },
+        {
+          "pairIndex": 1,
+          "order": "B-A",
+          "ratio": 1.046813494744812,
+          "deltaPeakBytes": 7069696
+        },
+        {
+          "pairIndex": 2,
+          "order": "A-B",
+          "ratio": 1.0393283620024327,
+          "deltaPeakBytes": 9871360
+        },
+        {
+          "pairIndex": 3,
+          "order": "B-A",
+          "ratio": 1.0134967129686419,
+          "deltaPeakBytes": 12107776
+        },
+        {
+          "pairIndex": 4,
+          "order": "A-B",
+          "ratio": 1.0388744361994517,
+          "deltaPeakBytes": 9588736
+        },
+        {
+          "pairIndex": 5,
+          "order": "B-A",
+          "ratio": 1.0225477324061718,
+          "deltaPeakBytes": 7806976
+        },
+        {
+          "pairIndex": 6,
+          "order": "A-B",
+          "ratio": 1.0336730904801725,
+          "deltaPeakBytes": 3751936
+        }
+      ],
+      "allowedBytes": 9660825.6,
+      "deltaBytes": 7426048,
+      "overhead": 0.038874436199451745
+    },
+    {
+      "attempt": "first",
+      "stage": "legacy",
+      "revisions": {
+        "baseline": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+        "benchmarkScript": "8fffcc0d8e11bb061d70bf870f262092d559c5f2"
+      },
+      "groups": {
+        "baseline": {
+          "wallMs": {
+            "median": 26439.45979500003,
+            "mad": 276.6593500000308,
+            "madRatio": 0.010463880583987948
+          },
+          "peakBytes": {
+            "median": 194203648,
+            "mad": 2592768,
+            "madRatio": 0.013350768776495898
+          }
+        }
+      },
+      "savedEvaluation": {
+        "status": "pass",
+        "behavior": {
+          "status": "pass",
+          "reasons": []
+        },
+        "sidecar": {
+          "status": "pass",
+          "reasons": []
+        }
+      }
+    },
+    {
+      "attempt": "first",
+      "stage": "disabled",
+      "revisions": {
+        "baseline": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+        "candidate": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+        "benchmarkScript": "8fffcc0d8e11bb061d70bf870f262092d559c5f2"
+      },
+      "groups": {
+        "baseline": {
+          "wallMs": {
+            "median": 30042.44290299999,
+            "mad": 511.9045889999834,
+            "madRatio": 0.017039379608802235
+          },
+          "peakBytes": {
+            "median": 187838464,
+            "mad": 2961408,
+            "madRatio": 0.01576571665321965
+          }
+        },
+        "candidate": {
+          "wallMs": {
+            "median": 29150.68574799999,
+            "mad": 1873.8666720000037,
+            "madRatio": 0.06428207858295644
+          },
+          "peakBytes": {
+            "median": 196186112,
+            "mad": 1515520,
+            "madRatio": 0.007724909702069023
+          }
+        }
+      },
+      "savedEvaluation": {
+        "status": "inconclusive",
+        "pairedRatios": [
+          1.0047211666188665, 0.9985353030323282, 0.9923368433486406, 1.0316896146858818,
+          1.0331901362422296, 0.966328177693458, 1.0051923444279534
+        ],
+        "baselineMedian": 30042.44290299999,
+        "candidateMedian": 29150.68574799999,
+        "baselineMad": 511.9045889999834,
+        "candidateMad": 1873.8666720000037,
+        "wallClockOverhead": 0.004721166618866457,
+        "peakRssIncreaseBytes": 8347648,
+        "reasons": ["candidate MAD exceeds 5 percent"]
+      },
+      "pairs": [
+        {
+          "pairIndex": 0,
+          "order": "A-B",
+          "ratio": 1.0047211666188665,
+          "deltaPeakBytes": 11386880
+        },
+        {
+          "pairIndex": 1,
+          "order": "B-A",
+          "ratio": 0.9985353030323282,
+          "deltaPeakBytes": 9793536
+        },
+        {
+          "pairIndex": 2,
+          "order": "A-B",
+          "ratio": 0.9923368433486406,
+          "deltaPeakBytes": 8278016
+        },
+        {
+          "pairIndex": 3,
+          "order": "B-A",
+          "ratio": 1.0316896146858818,
+          "deltaPeakBytes": 4190208
+        },
+        {
+          "pairIndex": 4,
+          "order": "A-B",
+          "ratio": 1.0331901362422296,
+          "deltaPeakBytes": 12206080
+        },
+        {
+          "pairIndex": 5,
+          "order": "B-A",
+          "ratio": 0.966328177693458,
+          "deltaPeakBytes": 16834560
+        },
+        {
+          "pairIndex": 6,
+          "order": "A-B",
+          "ratio": 1.0051923444279534,
+          "deltaPeakBytes": 3969024
+        }
+      ],
+      "allowedBytes": 9391923.200000001,
+      "deltaBytes": 8347648,
+      "overhead": 0.004721166618866457
+    },
+    {
+      "attempt": "controlled",
+      "stage": "legacy",
+      "revisions": {
+        "baseline": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+        "benchmarkScript": "8fffcc0d8e11bb061d70bf870f262092d559c5f2"
+      },
+      "groups": {
+        "baseline": {
+          "wallMs": {
+            "median": 26883.39732599999,
+            "mad": 729.5625930000097,
+            "madRatio": 0.02713803557463405
+          },
+          "peakBytes": {
+            "median": 186593280,
+            "mad": 2969600,
+            "madRatio": 0.015914828229612557
+          }
+        }
+      },
+      "savedEvaluation": {
+        "status": "pass",
+        "behavior": {
+          "status": "pass",
+          "reasons": []
+        },
+        "sidecar": {
+          "status": "pass",
+          "reasons": []
+        }
+      }
+    },
+    {
+      "attempt": "controlled",
+      "stage": "disabled",
+      "revisions": {
+        "baseline": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+        "candidate": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+        "benchmarkScript": "8fffcc0d8e11bb061d70bf870f262092d559c5f2"
+      },
+      "groups": {
+        "baseline": {
+          "wallMs": {
+            "median": 24954.091113000002,
+            "mad": 108.71923699998297,
+            "madRatio": 0.004356770058571476
+          },
+          "peakBytes": {
+            "median": 185655296,
+            "mad": 1273856,
+            "madRatio": 0.006861404050655253
+          }
+        },
+        "candidate": {
+          "wallMs": {
+            "median": 25181.073502999992,
+            "mad": 313.12199300000793,
+            "madRatio": 0.012434815098836179
+          },
+          "peakBytes": {
+            "median": 203198464,
+            "mad": 3350528,
+            "madRatio": 0.016488943538470843
+          }
+        }
+      },
+      "savedEvaluation": {
+        "status": "fail",
+        "pairedRatios": [
+          1.0127755059195787, 1.0041403563644997, 1.0205998495090485, 1.1352137665862034,
+          0.9930975082866518, 1.124335451407551, 1.001005573263655
+        ],
+        "baselineMedian": 24954.091113000002,
+        "candidateMedian": 25181.073502999992,
+        "baselineMad": 108.71923699998297,
+        "candidateMad": 313.12199300000793,
+        "wallClockOverhead": 0.012775505919578656,
+        "peakRssIncreaseBytes": 17543168,
+        "reasons": []
+      },
+      "pairs": [
+        {
+          "pairIndex": 0,
+          "order": "A-B",
+          "ratio": 1.0127755059195787,
+          "deltaPeakBytes": 18309120
+        },
+        {
+          "pairIndex": 1,
+          "order": "B-A",
+          "ratio": 1.0041403563644997,
+          "deltaPeakBytes": 25276416
+        },
+        {
+          "pairIndex": 2,
+          "order": "A-B",
+          "ratio": 1.0205998495090485,
+          "deltaPeakBytes": 17543168
+        },
+        {
+          "pairIndex": 3,
+          "order": "B-A",
+          "ratio": 1.1352137665862034,
+          "deltaPeakBytes": 12316672
+        },
+        {
+          "pairIndex": 4,
+          "order": "A-B",
+          "ratio": 0.9930975082866518,
+          "deltaPeakBytes": 18939904
+        },
+        {
+          "pairIndex": 5,
+          "order": "B-A",
+          "ratio": 1.124335451407551,
+          "deltaPeakBytes": 18173952
+        },
+        {
+          "pairIndex": 6,
+          "order": "A-B",
+          "ratio": 1.001005573263655,
+          "deltaPeakBytes": 16158720
+        }
+      ],
+      "allowedBytes": 9282764.8,
+      "deltaBytes": 17543168,
+      "overhead": 0.012775505919578656
+    }
+  ]
+}

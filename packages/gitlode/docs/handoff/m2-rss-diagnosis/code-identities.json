@@ -1,0 +1,258 @@
+{
+  "blobs": [
+    {
+      "revision": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+      "path": "packages/gitlode/src/index.ts",
+      "sha256": "cd930619ac023252fe409d7d23909e29f50967a26ce6420fde44ffafab94ac88",
+      "bytes": 4843
+    },
+    {
+      "revision": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+      "path": "packages/gitlode/src/execution/execute-run.ts",
+      "sha256": "12b05e00e2925fbabdfe92e8d5bd37ad534b615e9d1219eb8f771adaf41c5b80",
+      "bytes": 10491
+    },
+    {
+      "revision": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+      "path": "packages/gitlode/src/execution/worker-client.ts",
+      "sha256": "81a230884cb6e8d4e25fad015e2d3368956c1d6506041e9a31da70b99cdca0a6",
+      "bytes": 2125
+    },
+    {
+      "revision": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+      "path": "packages/gitlode/src/execution/worker-entry.ts",
+      "sha256": "0cda700ba1e78f91cdfc8eb0a6be7aad5992c908e9cd99488dd5c7c987bed5db",
+      "bytes": 1727
+    },
+    {
+      "revision": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+      "path": "packages/gitlode/src/extraction/extraction-pipeline.ts",
+      "sha256": "265a298f8d828ff73aa25b9ad9aea1d13cd17aff4d6325608008f50452c17cea",
+      "bytes": 5653
+    },
+    {
+      "revision": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+      "path": "packages/gitlode/src/output/jsonl-file-writer.ts",
+      "sha256": "93f3f4a183246619eadf19eee7ea4530bea98991e0af6c05fc33c3d55e802312",
+      "bytes": 2079
+    },
+    {
+      "revision": "76b124e23fcc069be1278629cf01b62ae1456c7a",
+      "path": "packages/git-adapters/src/git-impl/isomorphic-git-adapter.ts",
+      "sha256": "88082198439d159672fa60fa95fa6aa18ca1f3fb1b74955c81c8b802d638bdfc",
+      "bytes": 17513
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/test/support/performance-harness.ts",
+      "sha256": "ca6dd3cb701c4c2e6b00c828ea6609febff17d4993efa99a9d04154ed832a23e",
+      "bytes": 39093
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/src/index.ts",
+      "sha256": "518e924b22b4d290b7d4a028d3d7a47c05b72849496dc0729c4bc4dfbaed84a8",
+      "bytes": 4801
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/src/execution/execute-run.ts",
+      "sha256": "e30ea5a66ef53f570643aaed5644eb26c5e39f4ff7c8e57404af326fe3eddf8a",
+      "bytes": 21334
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/src/execution/worker-client.ts",
+      "sha256": "eecfc544582fce192616ecc6b5e954b25088aab5538f16eb37b7604e38dc9a47",
+      "bytes": 2498
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/src/execution/worker-entry.ts",
+      "sha256": "4047e29d962d3c80dc2297337201cf9761f658d0275457aaf5a8ffc982f1a412",
+      "bytes": 2233
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/src/extraction/extraction-pipeline.ts",
+      "sha256": "26b3907493396c68e847ed4dfcad22796a4dc7fa6eae3e4a714898f8b8972a7d",
+      "bytes": 8233
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/src/output/jsonl-file-writer.ts",
+      "sha256": "96a0fc2fbfcc35232203457ee506944b27a6fed5bbc4fae50e005b999b9b4ad5",
+      "bytes": 2496
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/git-adapters/src/git-impl/isomorphic-git-adapter.ts",
+      "sha256": "5ce03d6a52083b2227d88dd5c5f95a02aed3356b169305b6bf7f351e18b6b687",
+      "bytes": 22193
+    },
+    {
+      "revision": "8fffcc0d8e11bb061d70bf870f262092d559c5f2",
+      "path": "packages/gitlode/src/execution/telemetry/worker-telemetry-session.ts",
+      "sha256": "6af8a1ec0890a848c6c5bc13fbd474090401aafa28ca4f599c69902374722007",
+      "bytes": 17393
+    }
+  ],
+  "archives": [
+    {
+      "path": "D:\\gitlode_test\\m2-freeze-8fffcc0-20261002\\inputs\\candidate-consumer.tar.gz",
+      "sha256": "660377a0f2a0428b1e0d5ba847e79a60dfba84b3e9f1c345b53a45b32ce786fa",
+      "bundles": [
+        {
+          "member": "tested-consumer/node_modules/gitlode/dist/execute-run-C-9tXXhg.js",
+          "bytes": 295418,
+          "sha256": "9ae919cabc1acaeece05c4a1b876af9b7f6ba35a7e72c0606931b48e4f89e4c6",
+          "tokens": {
+            "sdk-trace-base": 1,
+            "sdk-metrics": 1,
+            "BasicTracerProvider": 3,
+            "MeterProvider": 3,
+            "AlwaysOffSampler": 2,
+            "createDegradedProviders": 3,
+            "LocalSpanProcessor": 2,
+            "ProfileReportBuilder": 2,
+            "new Worker": 4,
+            "new Worker(": 1,
+            "noopInstrumentation": 0
+          }
+        },
+        {
+          "member": "tested-consumer/node_modules/gitlode/dist/index.js",
+          "bytes": 73064,
+          "sha256": "f6592528e2ccb7902ddbe96d67c3f27517454b840a3867f98dbf56dfac1f76de",
+          "tokens": {
+            "sdk-trace-base": 0,
+            "sdk-metrics": 0,
+            "BasicTracerProvider": 0,
+            "MeterProvider": 0,
+            "AlwaysOffSampler": 0,
+            "createDegradedProviders": 0,
+            "LocalSpanProcessor": 0,
+            "ProfileReportBuilder": 0,
+            "new Worker": 0,
+            "new Worker(": 0,
+            "noopInstrumentation": 0
+          }
+        },
+        {
+          "member": "tested-consumer/node_modules/gitlode/dist/worker-entry.js",
+          "bytes": 1653,
+          "sha256": "ec2c6b27ef2bf64a95ba5e46ab59414245dea951756ee195c5064c9dd93c9df5",
+          "tokens": {
+            "sdk-trace-base": 0,
+            "sdk-metrics": 0,
+            "BasicTracerProvider": 0,
+            "MeterProvider": 0,
+            "AlwaysOffSampler": 0,
+            "createDegradedProviders": 0,
+            "LocalSpanProcessor": 0,
+            "ProfileReportBuilder": 0,
+            "new Worker": 0,
+            "new Worker(": 0,
+            "noopInstrumentation": 0
+          }
+        },
+        {
+          "member": "tested-consumer/node_modules/gitlode/dist/plugin-api.js",
+          "bytes": 12,
+          "sha256": "8bba4d70cb37504b55e608f1e4230a247ab6cea62b216718ac839ceaf88ada01",
+          "tokens": {
+            "sdk-trace-base": 0,
+            "sdk-metrics": 0,
+            "BasicTracerProvider": 0,
+            "MeterProvider": 0,
+            "AlwaysOffSampler": 0,
+            "createDegradedProviders": 0,
+            "LocalSpanProcessor": 0,
+            "ProfileReportBuilder": 0,
+            "new Worker": 0,
+            "new Worker(": 0,
+            "noopInstrumentation": 0
+          }
+        }
+      ]
+    },
+    {
+      "path": "D:\\gitlode_test\\m2-freeze-8fffcc0-20261002\\inputs\\legacy-runtime.tar.gz",
+      "sha256": "cd590dd8ac53e606cde1a1f5ffd11d1f6a6467b355f033025cc146f638cfffc3",
+      "bundles": [
+        {
+          "member": "legacy-0.12.0/dist/index.js",
+          "bytes": 39635,
+          "sha256": "379ed9dca9c25c2a7715371f3c64631317c98a3c2dd7a55f64bcbbac3cca5779",
+          "tokens": {
+            "sdk-trace-base": 0,
+            "sdk-metrics": 0,
+            "BasicTracerProvider": 0,
+            "MeterProvider": 0,
+            "AlwaysOffSampler": 0,
+            "createDegradedProviders": 0,
+            "LocalSpanProcessor": 0,
+            "ProfileReportBuilder": 0,
+            "new Worker": 0,
+            "new Worker(": 0,
+            "noopInstrumentation": 0
+          }
+        },
+        {
+          "member": "legacy-0.12.0/dist/execute-run-BrNedRj5.js",
+          "bytes": 131669,
+          "sha256": "39c0a9d5a5321a96093417aa2975abb0da1de3c43f4568dfec652290badc201c",
+          "tokens": {
+            "sdk-trace-base": 0,
+            "sdk-metrics": 0,
+            "BasicTracerProvider": 0,
+            "MeterProvider": 0,
+            "AlwaysOffSampler": 0,
+            "createDegradedProviders": 0,
+            "LocalSpanProcessor": 0,
+            "ProfileReportBuilder": 0,
+            "new Worker": 1,
+            "new Worker(": 1,
+            "noopInstrumentation": 4
+          }
+        },
+        {
+          "member": "legacy-0.12.0/dist/worker-entry.js",
+          "bytes": 1303,
+          "sha256": "f467c25806644d2590ea470dd671bf2f0b86f579de38d18c8f3cd8d3e2e5ac1e",
+          "tokens": {
+            "sdk-trace-base": 0,
+            "sdk-metrics": 0,
+            "BasicTracerProvider": 0,
+            "MeterProvider": 0,
+            "AlwaysOffSampler": 0,
+            "createDegradedProviders": 0,
+            "LocalSpanProcessor": 0,
+            "ProfileReportBuilder": 0,
+            "new Worker": 0,
+            "new Worker(": 0,
+            "noopInstrumentation": 0
+          }
+        },
+        {
+          "member": "legacy-0.12.0/dist/plugin-api.js",
+          "bytes": 12,
+          "sha256": "8bba4d70cb37504b55e608f1e4230a247ab6cea62b216718ac839ceaf88ada01",
+          "tokens": {
+            "sdk-trace-base": 0,
+            "sdk-metrics": 0,
+            "BasicTracerProvider": 0,
+            "MeterProvider": 0,
+            "AlwaysOffSampler": 0,
+            "createDegradedProviders": 0,
+            "LocalSpanProcessor": 0,
+            "ProfileReportBuilder": 0,
+            "new Worker": 0,
+            "new Worker(": 0,
+            "noopInstrumentation": 0
+          }
+        }
+      ]
+    }
+  ]
+}

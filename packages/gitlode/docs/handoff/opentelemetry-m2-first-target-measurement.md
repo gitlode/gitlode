@@ -633,3 +633,189 @@ is committed and normally pushed on M2 after ref-movement checks; final OID/remo
 are returned in the session. No product/configuration/threshold/recipe change, tests/build/install, other
 target, acceptance update, PR or merge occurred. Trunk receives this failed attempt for evidence review
 and a separate next decision; profile and the remaining matrix stay open.
+
+## Disabled RSS failure diagnosis (2026-10-06)
+
+**Cause unresolved; controlled disabled RSS fail confirmed.** This session started clean at
+`e5ee774932b4309580ee123455164b6f3e6f7a81` on `feature/otel-redesign_M2`. It analyzed saved data
+and fixed code only. No measurement, heap capture, product execution, build/install, tests,
+implementation/configuration/threshold/recipe change, retry, PR/merge or acceptance update occurred.
+First-attempt inconclusive and controlled fail remain unchanged; profile remains unexecuted.
+
+Reproducible derived scripts, full-precision statistics, all-run trajectories and consumed hashes:
+[`m2-rss-diagnosis/`](m2-rss-diagnosis/README.md). Six original formal artifacts and six terminal
+supervision artifacts matched their archive manifests. F candidate/legacy runtime archive hashes
+and inspected CLI/worker hashes match preserved provenance. These checks cover consumed evidence,
+not a fresh verification of every archive file. M0 uses candidate `a97829b` / harness `a53a5b8`;
+both M2 attempts use candidate/harness `8fffcc0`. Legacy is always `76b124e`. Historical M0
+acceptance cannot transfer to M2, and these populations are not combined.
+
+### Recomputed statistics and process scope
+
+Warmups are excluded: seven measured runs per series. RSS medians/MADs are exact bytes; allowed
+growth is the existing `max(8 MiB, baseline median peak * 0.05)`.
+
+| Disabled evidence |     Legacy median / MAD |  Candidate median / MAD | Difference of medians | Allowed growth | Formal status                    |
+| ----------------- | ----------------------: | ----------------------: | --------------------: | -------------: | -------------------------------- |
+| M0, old candidate | 193,216,512 / 1,085,440 | 200,642,560 / 1,441,792 |             7,426,048 |    9,660,825.6 | pass                             |
+| M2 first          | 187,838,464 / 2,961,408 | 196,186,112 / 1,515,520 |             8,347,648 |    9,391,923.2 | inconclusive: candidate wall MAD |
+| M2 controlled     | 185,655,296 / 1,273,856 | 203,198,464 / 3,350,528 |            17,543,168 |    9,282,764.8 | fail: RSS                        |
+
+Capture legacy median peak RSS is 192,233,472 / 194,203,648 / 186,593,280 bytes respectively.
+Controlled wall medians/MADs recompute to 24,954.091113 / 108.719237 ms and
+25,181.073503 / 313.121993 ms (rounded here); paired median overhead is +1.2775505919578656%.
+Wall/stability pass, behavior/sidecar checks pass. `evaluateComparison` at fixed revision
+(`test/support/performance-harness.ts:610-658`) gives numerical RSS fail with empty inconclusive
+`reasons`. RSS MAD above is descriptive; it is not the contract's wall stability criterion.
+
+The sampled maximum equals recorded peak in **all 81 runs**, including all warmups and captures.
+Fixed `runReleaseCli` spawns Node with the release CLI, then `sampleChildRss` reads
+`/proc/<that child.pid>/status` `VmRSS * 1024` immediately and every configured 20 ms until close.
+It does not sum descendants or sample the supervisor/harness. Node worker threads share that
+process address space, so host and worker RSS are included together, without isolate attribution.
+Separate child processes, including any Git CLI helpers, are excluded. Both legacy and candidate
+use one worker thread; this migration did not introduce a second CLI process. Output decoding and
+behavior comparison happen in the harness after close and cannot directly add to sampled child RSS.
+Across consumed runs the largest saved intersample gap is 23.684055 ms. A readable sample can lag
+the actual `/proc` read; missed short peaks, unsampled start/exit intervals and polling overhead
+remain. VmRSS is resident process memory, not heap size, live objects, allocation volume or a leak test.
+
+### Time trajectories and order
+
+The CSV preserves initial/peak/final times and bytes, sample gaps, five elapsed-time-bin medians,
+and durations near each run's own peak for every run, without outlier removal. All 81 runs match
+one saved execution event, and A-B/B-A alternation is intact. These events bound whole CLI execution;
+saved logs do not timestamp worker import, provider initialization, extraction phases or GC. Neither
+elapsed-time bins nor peak timing identifies a product phase. `--quiet` does not supply phase traces.
+
+Controlled measured runs (seconds rounded here; exact values in CSV):
+
+| Pair / order | Legacy peak bytes / first peak s | Candidate peak bytes / first peak s | Delta bytes | Candidate time at >=95% of its peak s |
+| ------------ | -------------------------------: | ----------------------------------: | ----------: | ------------------------------------: |
+| 0 / A-B      |             181,538,816 / 16.106 |                 199,847,936 / 7.831 |  18,309,120 |                                 5.607 |
+| 1 / B-A      |             184,381,440 / 16.209 |                 209,657,856 / 7.826 |  25,276,416 |                                 3.541 |
+| 2 / A-B      |             185,655,296 / 15.206 |                 203,198,464 / 8.156 |  17,543,168 |                                 4.391 |
+| 3 / B-A      |             185,245,696 / 24.145 |                197,562,368 / 27.693 |  12,316,672 |                                 2.760 |
+| 4 / A-B      |             188,657,664 / 24.727 |                207,597,568 / 24.223 |  18,939,904 |                                 4.362 |
+| 5 / B-A      |             186,978,304 / 18.272 |                205,152,256 / 27.586 |  18,173,952 |                                 2.071 |
+| 6 / A-B      |             186,236,928 / 16.089 |                 202,395,648 / 8.110 |  16,158,720 |                                 5.141 |
+
+Every controlled measured pair has higher candidate peak, in both orders; values do not increase
+monotonically with pair index. Slow wall pairs 3/5 are not the two largest RSS peaks. Candidate
+first-peak timing splits between approximately 31-32% and 98-100% of wall duration. Near-peak
+sampled residency is 2.071-5.607 s total, with longest uninterrupted estimates 0.441-1.327 s;
+this is repeated/sustained high residency rather than only a single sampled spike. These estimates
+use left-held intervals at >=95% of the per-run peak and exclude unsampled boundary intervals.
+They are descriptive, not alternative acceptance metrics.
+
+Controlled initial readable samples arrive 0.555-0.831 ms after sampler start, with only
+1,429,504-3,366,912 bytes; they precede any established loaded-module baseline. Measured candidate
+last samples range 65,511,424-138,309,632 bytes versus legacy 88,199,168-171,012,096 bytes.
+Final available samples may catch worker termination/teardown and cannot estimate retained heap.
+The median of each run's last-fifth RSS median is 190,144,512 candidate versus 173,748,224 legacy;
+the analogous first-fifth medians are 174,673,920 versus 170,598,400. Candidate elevation is not
+limited to the maximum, but its changing gap does not isolate an import cost.
+
+Historical M0 candidate peaks first occur at 22.712-24.209 s, legacy at 13.723-16.224 s;
+first M2 candidate at 6.729-30.780 s, legacy at 21.253-23.259 s. M0/first/controlled last-fifth
+series medians are legacy 180,738,048 / 167,149,568 / 173,748,224 and candidate
+191,877,120 / 181,264,384 / 190,144,512 bytes. Warmups remain separately visible in CSV;
+controlled warmup candidate peaks 202,788,864 / 200,085,504 already exceed legacy
+184,602,624 / 184,795,136. Across the two M2 attempts, unchanged candidate median peak rises
+7,012,352 bytes while unchanged legacy falls 2,183,168 bytes. This rules out attributing the
+entire between-attempt difference to a candidate revision change; allocation/GC/native residency
+and execution-condition variability remain unobserved. Aggregate host counters do not resolve them.
+
+### Fixed disabled code and preserved bundles
+
+At `8fffcc0`, `src/index.ts` imports execution; `worker-client.ts` dispatches one
+`node:worker_threads` Worker. F's actual CLI and worker both statically import
+`execute-run-C-9tXXhg.js` (295,418 bytes, SHA-256 in `code-identities.json`). That chunk statically
+imports OTel API, context-async-hooks, sdk-metrics and sdk-trace-base before the profile branch.
+Its module-level telemetry catalogs/metadata and report implementation code are reachable in both
+host and worker module graphs. Worker isolates have separate module evaluation; the bytes/RSS cost
+of that duplication is not measured here. Legacy's analogous chunk is 131,669 bytes and has no SDK
+imports; file-size difference itself is not a resident-memory estimate. CLI/worker hashes exactly
+match F's fixed identities; this conclusion comes from preserved bundles, not just source imports.
+
+`executeWorkerRunRequest` calls `WorkerTelemetrySession.create(input.profile)`. The disabled branch
+(`worker-telemetry-session.ts:158-170, 422-433`) calls `createDegradedProviders`, allocating
+`BasicTracerProvider` with `AlwaysOffSampler`, `MeterProvider`, a nonrecording root span/context
+and session. Default composition still obtains tracer/meter objects for core scopes. This is
+concrete reachable allocation, even though it does not record. It is not proven to account for
+17,543,168 bytes. Disabled does not enable/register `AsyncLocalStorageContextManager`, construct
+`LocalSpanProcessor`, `LocalMetricReader`, `BoundedDiagnosticAccumulator` or `ProfileReportBuilder`,
+collect metrics/build a report, or create enabled sidecar data. Finalization ends the nonrecording
+root and shuts down providers; absence of active resources guards collection/report work.
+
+`recordingEnabled=false` selects singleton no-op Git/DAG/line-diff/expansion/projection/output/
+pipeline recorders, including plugin composition when applicable. Timing helper construction does
+not itself read a clock; no-op starts use shared tokens. Existing direct and production-composition
+tests establish these selections, no instruments and no recorder-clock/per-operation timing-token
+cost. They do not prove zero imports, provider/scope objects, process RSS or all wrapper allocation.
+
+Tracing wrappers still run with the SDK's nonrecording tracer. In particular the async-iterable
+helper keeps iterator lifecycle/serialization, closures/promises and span contexts; default built-in
+projection still instruments its stream. Work proportional to records can therefore remain without
+recorded spans. Compared with legacy's `noopInstrumentation`, this is a concrete allocation-churn
+hypothesis, not demonstrated live retention. Domain diffs also replace per-record output span work
+with no-op recorder calls and remove process-commit spans. The commit fixture uses commit granularity,
+so blob materialization/line-diff and plugin-heavy paths are not exercised just because their modules
+load. Reviewed commit traversal/projection/output data flow retains streamed processing, visited sets,
+topology caches and JSONL writes; no new disabled raw-span/sample/report accumulation was found.
+There are incidental bookkeeping/error-path changes (e.g. output sequence updated after successful
+open and blob read error settlement); they do not prove an explanation for successful commit-only RSS.
+No broad redesign or unrelated cleanup is proposed.
+
+### Ranked hypotheses and one finite next action
+
+1. **Eager module graph plus disabled SDK/provider baseline:** strongest concrete migration difference,
+   present in preserved host/worker bundles and disabled construction. Could raise the resident floor
+   and alter GC behavior; missing post-import/pre-work snapshots prevent quantifying it. Identical
+   candidate binaries with different attempt RSS mean a fixed startup cost alone is not established.
+2. **Nonrecording tracing/iterator churn interacting with GC/native residency:** wrappers execute despite
+   no-op domain recorders; changing within-run gap and multiple peak timings are compatible. No allocation,
+   GC or per-isolate heap observations distinguish this from extraction caches or allocator residency.
+3. **Shared/runtime/fixture variation:** unchanged legacy/candidate shift across attempts, and late
+   teardown drops, support this as a contributor. Both pair orders, all seven positive controlled
+   deltas, regular polling and quiet-window aggregate observations weaken a solely isolated-noise
+   explanation. They cannot identify layout, scheduling, GC or native memory causality.
+
+Active collector/report retention is low priority because disabled construction excludes it; no
+leak or specific faulty extraction cache is demonstrated. Code proves avoidable SDK work, not a
+contract defect sufficient to choose a repair without execution attribution.
+
+Recommend a **single subsequent trunk packet for a three-variant disabled diagnostic**, not a formal
+third attempt or implementation acceptance. Preserve F and both failed/inconclusive records. In an
+isolated diagnostic checkout based on `8fffcc0`, use the same Node/dependency versions, native ext4,
+saved manifest/4,430 snapshot, arguments, no profile and output checks. Any diagnostic build or temporary
+code below needs that new packet; none was performed here.
+
+- V0: fixed logic with only identical boundary observation hooks.
+- V1: V0 except disabled session uses API no-op tracer/meter and nonrecording root/context, constructing
+  no SDK providers; keep eager SDK imports and iterator/application logic unchanged.
+- V2: V1 plus defer enabled SDK/session/collector imports into an enabled-only chunk, ensuring neither
+  host nor disabled worker imports SDKs. Preserve catalogs, API wrappers and application logic; inspect
+  the diagnostic bundles to prove import isolation, or stop before workloads if isolation fails.
+
+Budget: exactly six diagnostic CLI runs, order V0,V1,V2 then V2,V1,V0, no warmups, retries, forced GC,
+heap capture or formal evaluator substitution. Save hashes for each variant and snapshot; use one
+immutable prepared fixture with separate output/state per run. Observe host after imports/before
+worker creation, worker after module load/before request, after disabled session/composition, before
+extraction and after extraction/before finalization, and host after worker termination. At each boundary
+save timestamp/process RSS plus that isolate's heapUsed/heapTotal/external/arrayBuffers; host/worker
+RSS is the same process metric and must not be added. Sample external CLI VmRSS at the unchanged
+20 ms cadence. No per-record logging or extra monitors. Boundary observations are diagnostic overhead.
+
+Discrimination criterion: V0-to-V1 isolates provider construction; V1-to-V2 isolates eager SDK imports.
+Treat an effect as resolved only if both blocked comparisons have the same direction and the smaller
+absolute effect exceeds the largest within-variant replicate spread, at the matching pre-extraction
+boundary and in peak RSS. Report actual bytes rather than assuming the formal threshold is the effect
+size. A startup reduction without peak reduction shows startup cost but does not explain the failure;
+if neither contrast resolves peak RSS, stop with wrapper/GC/native/fixture causes unresolved. Verify
+4,430 records and equivalent normalized JSONL/checkpoint behavior for every variant; any mismatch,
+timeout, cleanup uncertainty or unexpected workload stops dependent runs. Keep existing 300,000 ms
+execution/processing deadlines, owned-process cleanup and a 30-minute total workload budget. Stop
+after six runs even if signals overlap; no expanding variant matrix. This diagnoses allocation scope
+and informs one bounded repair decision, never replaces the controlled formal fail or grants retry,
+profile-stage or release authority.

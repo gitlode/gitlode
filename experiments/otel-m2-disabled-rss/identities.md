@@ -23,3 +23,16 @@ Neither path records spans or metrics.
 Setup corrections retain original logs: V0 span-ID probe correction, one
 shell quoting error before correction, and an uncompleted WSL push followed
 by the successful normal Windows Git push. No CLI run was repeated.
+
+## Preparation stop
+
+Before the first diagnostic CLI spawn, fixture inventory equality failed.
+The preparation snapshot contained .git/gc.pid; objects moved from loose
+to packs (1 to 2), and commit-graph changed before the gate.
+HEAD and 4,430 commits were unchanged. No manual repack or maintenance
+policy change was made. All six CLI rows remain unexecuted; the controller
+invocation stopped before creating any run directory or spawning any CLI.
+No retries or subsequent diagnostic run are authorized by this return.
+Prepared variants and first setup failures remain preserved.
+Trunk should decide one bounded fixture-preparation closure before assigning
+any new experiment; no attribution, acceptance or formal retry is granted.

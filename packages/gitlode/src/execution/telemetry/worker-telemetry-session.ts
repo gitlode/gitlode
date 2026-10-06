@@ -1,6 +1,8 @@
 import { TELEMETRY_SPANS, type ProfileReport } from "@gitlode/internal-contracts/telemetry";
 import {
   ROOT_CONTEXT,
+  ProxyTracerProvider,
+  createNoopMeter,
   context,
   trace,
   type Context,
@@ -79,8 +81,8 @@ interface ActiveSessionResources {
 }
 
 interface SessionConstruction {
-  readonly tracerProvider: BasicTracerProvider;
-  readonly meterProvider: MeterProvider;
+  readonly tracerProvider: Pick<BasicTracerProvider, "getTracer" | "forceFlush" | "shutdown">;
+  readonly meterProvider: Pick<MeterProvider, "getMeter" | "shutdown">;
   readonly rootSpan: Span;
   readonly rootContext: Context;
   readonly ownedContextManager?: AsyncLocalStorageContextManager;
@@ -166,8 +168,8 @@ function createDegradedProviders(): {
 }
 
 export class WorkerTelemetrySession {
-  readonly #tracerProvider: BasicTracerProvider;
-  readonly #meterProvider: MeterProvider;
+  readonly #tracerProvider: Pick<BasicTracerProvider, "getTracer" | "forceFlush" | "shutdown">;
+  readonly #meterProvider: Pick<MeterProvider, "getMeter" | "shutdown">;
   readonly #rootSpan: Span;
   readonly #rootContext: Context;
   readonly #ownedContextManager?: AsyncLocalStorageContextManager;
@@ -424,10 +426,23 @@ async function createSession(
   hooks?: WorkerTelemetryTestHooks,
 ): Promise<WorkerTelemetrySession> {
   if (!enabled) {
-    const degraded = createDegradedProviders();
+    // The private API proxy is never registered and never receives a delegate.
+    // Global provider registration cannot activate this disabled experiment path.
+    const provider = new ProxyTracerProvider();
+    const tracerProvider = {
+      getTracer: provider.getTracer.bind(provider),
+      forceFlush: async () => {},
+      shutdown: async () => {},
+    };
+    const meterProvider = { getMeter: () => createNoopMeter(), shutdown: async () => {} };
+    const rootSpan = tracerProvider
+      .getTracer(runSpanMetadata.scope.name)
+      .startSpan(runSpanMetadata.name, { root: true }, ROOT_CONTEXT);
     return new WorkerTelemetrySession({
-      ...degraded,
-      rootContext: trace.setSpan(ROOT_CONTEXT, degraded.rootSpan),
+      tracerProvider,
+      meterProvider,
+      rootSpan,
+      rootContext: trace.setSpan(ROOT_CONTEXT, rootSpan),
       hooks,
     });
   }

@@ -122,3 +122,110 @@ Proposed next action: trunk obtains an explicit quiet host window and operator d
 the same bounded preparation gate before authorizing workload execution. This return contains setup
 status only, with no allocation attribution. Documentation OID and actual remote equality are reported
 in the session return after preservation.
+
+## Preparation stop after variant preparation (2026-10-06)
+
+**Returned to trunk before the first diagnostic CLI spawn: fixture immutability gate failed.**
+The human established a quiet host window of 11:06–14:06 JST; 14:06 was also the operator hard stop.
+This session used instruction checkpoint `3ed250b4f89b639ff23e25312d5bb81d7d68f4ea` and started
+with shared M2 clean at `903b5a2075de6cee22c1167fee7b705bf71a7f1d`. Actual remote M2 remained at
+that OID immediately before this documentation edit. Shared checkout stayed on
+`feature/otel-redesign_M2`; all experiment source changes were isolated.
+
+### Prepared variants and supervision
+
+The isolated branch starts at the exact fixed base `8fffcc0d8e11bb061d70bf870f262092d559c5f2`.
+Its final preserved OID is `55ab62db4c063516a7fd2de3404a84a437af937f`, confirmed equal to the actual
+remote `experiment/otel-m2-disabled-rss`. Sources, build/probe/driver scripts, identity mapping and
+the stop note were meaningfully committed and normally pushed; no experiment history was merged.
+
+| Variant | Preserved source OID                       | Preparation result                                                     |
+| ------- | ------------------------------------------ | ---------------------------------------------------------------------- |
+| V0      | `6a9edfc4c4624c9efdeef3fcd06402f174809d67` | Release build, typecheck, disabled probe and both import graphs passed |
+| V1      | `bdd4864b76d88ea7f0881ced911118d33ad40ab4` | Release build, typecheck, disabled probe and both import graphs passed |
+| V2      | `26d1f034557d279f9271593b4091eb5424f8d481` | Release build, typecheck, disabled probe and both import graphs passed |
+
+V0's product build is `b487272`; the subsequent V0 commit changes preparation scripts only, verified
+by an empty product diff. Each variant has its own saved dist directory and exact file hashes.
+All use restored Node `22.23.1`, npm `10.9.8`, Git `2.53.0`, unchanged dependencies and release mode.
+Format write/check and architecture checks passed for each product variant; the finite driver and
+supervisor adapter also passed explicit TypeScript checking.
+
+V1 uses an unregistered API `ProxyTracerProvider` whose private instance never receives a delegate,
+plus `createNoopMeter`. Global provider registration cannot activate those objects. V0/V1 retain
+eager SDK imports in both CLI and worker static graphs; V2 has no eager SDK imports in either graph
+and dynamically loads the existing enabled session/test entry only when requested. Direct disabled
+probes confirmed nonrecording roots/tracers, root context behavior, no enabled global providers,
+idempotent finalization and no profile report. No enabled global provider was installed.
+V2's API-only disabled session also omits empty provider finalization calls; that lifecycle/layout
+difference would confound an import-only attribution. API no-op span IDs are invalid, whereas SDK
+AlwaysOff spans have valid non-sampled IDs. Wrappers, catalogs and extraction logic were preserved.
+
+The disposable external deadline preflight returned exit 124/SIGKILL after 2.067984 seconds with no
+live owned group members. A separate disposable child/descendant exercised the fixed supervisor's
+2-second execution deadline and successful cleanup barrier. Fixture preparation also completed
+with `cleanupConfirmed=true` and no cleanup errors. Final scoped observations found no live members
+of the observed operator/supervisor groups. These are scoped observations, not guarantees about
+escaped groups, abrupt host loss or uninterruptible I/O. Intended CLI execution/processing limits
+remained 300,000 ms each and total workload budget 30 minutes; none was used for a diagnostic CLI.
+
+### Fixture gate and zero-run outcome
+
+One freshly generated repository used the unchanged 4,430-commit recipe on native ext4 `/dev/sdf`.
+The preparation and pre-CLI checks both found HEAD `bde84f1caca0e50284005bf96c126728dac4f9d4` and
+4,430 commits. However, the preparation inventory contained `.git/gc.pid`; by the first CLI gate it
+had disappeared, the commit-graph had changed and the object representation differed:
+
+| Inventory point   | Loose objects | Packed objects | Packs | Size-pack (Git-reported KiB) |
+| ----------------- | ------------: | -------------: | ----: | ---------------------------: |
+| After preparation |         7,424 |          5,068 |     1 |                          607 |
+| Before first CLI  |             0 |         12,492 |     2 |                        1,500 |
+
+These observations are consistent with background automatic Git GC finishing after recipe
+generation. The controller failed its full inventory equality assertion before invoking any run
+supervisor, creating any per-run directory or spawning any diagnostic CLI. The `runs-started.json`
+file marks entry into that controller gate, not an executed workload. No manual repack, maintenance
+policy change, fixture regeneration, resnapshot accepted as a replacement input or run retry followed.
+
+| Run | Variant | Outcome      | Peak/boundary contrast |
+| --- | ------- | ------------ | ---------------------- |
+| 1   | V0      | Not executed | Unavailable            |
+| 2   | V1      | Not executed | Unavailable            |
+| 3   | V2      | Not executed | Unavailable            |
+| 4   | V2      | Not executed | Unavailable            |
+| 5   | V1      | Not executed | Unavailable            |
+| 6   | V0      | Not executed | Unavailable            |
+
+Boundary contrasts and six-run normalized JSONL/checkpoint/application-result equivalence remain
+unverified. Prepared disabled probes and graph inspection establish preparation properties only;
+they do not establish production repair, RSS attribution or acceptance. The controlled formal RSS
+failure and cause-unresolved diagnosis remain unchanged. No additional variant, diagnostic retry,
+formal measurement, profile workload, PR, merge or F/T13B/M2 acceptance update occurred.
+
+First setup failures were retained: the V0 probe initially assumed invalid IDs for SDK nonrecording
+spans, one correction command had a quoting error, explicit driver checking initially lacked the
+TypeScript 7 `--ignoreConfig` flag, and a WSL push did not complete before the successful normal
+Windows Git push. Probe/configuration corrections occurred before any diagnostic workload; the
+successful V0 product build was reused rather than rebuilt to correct its probe. Automatic approval
+initially rejected the push destination as unverified; read-only checks established equality with
+shared origin before the subsequent push was approved.
+
+### Evidence preservation and next action
+
+New Linux archive:
+`/home/t-wakabayashi/gitlode-performance/m2-rss-experiment-20261006T1106/archive`.
+Distinct Windows copy: `D:/gitlode_test/m2-rss-experiment-20261006T1106`.
+All 93 archive files and both copies of the sealed manifest were rehashed and matched. Manifest
+SHA-256: `f35802a0f203c6636fd89185a21e611c7276b344a9b6e8ee0a9adfbc62a98ddf`.
+The archive retains failures, fixed runtime/source/dependency/Node inputs, preparation fixture,
+variant hashes, before/at-gate/return inventories, local Git settings, object-layout drift and
+cleanup evidence. The three runtime dependency links retain original absolute paths; RESTORE.md
+explains relinking for an independent restoration, without claiming portable standalone runtimes.
+F archive files were verified unchanged before and after preparation; dependency inventories also
+matched. Existing artifacts/archive refs were not modified. These two copies remain on one host.
+
+Proposed next action: trunk assigns one bounded fixture-preparation diagnosis to establish a stable
+post-generation object-layout boundary without changing the accepted recipe or maintenance policy,
+before deciding whether to assign another finite experiment. This return grants no new experiment
+or formal retry. The M2 documentation OID, actual remote equality and final shared-checkout clean
+state are reported separately after this documentation-only checkpoint is preserved.

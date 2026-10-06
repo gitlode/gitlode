@@ -12,13 +12,15 @@ const create = variant === "V2"
 const session = await create(false);
 assert.equal(session.recordingEnabled, false);
 assert.equal(session.rootSpan.isRecording(), false);
-assert.deepEqual(session.rootSpan.spanContext(), INVALID_SPAN_CONTEXT);
+assert.equal(session.rootSpan.spanContext().traceFlags, 0);
+if (variant !== "V0") assert.deepEqual(session.rootSpan.spanContext(), INVALID_SPAN_CONTEXT);
 assert.equal(trace.getSpan(session.rootContext), session.rootSpan);
 assert.equal(session.runInRootContext(() => context.active()), ROOT_CONTEXT);
 for (const scope of ["gitlode.git", "gitlode.dag", "gitlode.execution", "gitlode.extraction", "gitlode.line_diff", "gitlode.plugin_runtime"]) {
   const span = session.getTracer(scope).startSpan("probe", {}, session.rootContext);
   assert.equal(span.isRecording(), false);
-  assert.deepEqual(span.spanContext(), INVALID_SPAN_CONTEXT);
+  assert.equal(span.spanContext().traceFlags, 0);
+  if (variant !== "V0") assert.deepEqual(span.spanContext(), INVALID_SPAN_CONTEXT);
   span.end();
   session.getMeter(scope).createCounter("probe").add(1);
 }

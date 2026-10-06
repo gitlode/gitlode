@@ -36,3 +36,14 @@ No retries or subsequent diagnostic run are authorized by this return.
 Prepared variants and first setup failures remain preserved.
 Trunk should decide one bounded fixture-preparation closure before assigning
 any new experiment; no attribution, acceptance or formal retry is granted.
+
+## Restored-fixture assignment (2026-10-06)
+
+Instruction checkpoint aa588794 authorizes a single restored-input gate and the
+unexecuted six runs. Quiet window: 2026-10-06 18:43 to 2026-10-07 09:43 JST;
+hard stop is the window end. New root: `/home/t-wakabayashi/gitlode-performance/m2-rss-restored-20261006T1843`.
+Only controller input validation, paths, deadline and start markers change.
+All product variants/builds are reused byte-for-byte. V1 span-ID and V2 empty
+finalization omissions remain attribution confounders. Generation is disabled.
+`controller-entered.json` marks controller entry; per-run invocation and saved
+command/raw/supervision evidence distinguish attempted and completed workloads.

@@ -4,8 +4,9 @@ source = pathlib.Path(__file__).resolve().parents[2]
 root = source.parents[1]
 nodebin = root/'node/node-v22.23.1-linux-x64/bin'
 env = os.environ.copy(); env.pop('NODE_OPTIONS', None)
+env['GIT_OPTIONAL_LOCKS']='0'
 env.update(PATH=str(nodebin)+':/usr/bin:/bin',TMPDIR=str(root/'tmp'),TMP=str(root/'tmp'),TEMP=str(root/'tmp'),npm_config_cache=str(root/'npm-cache'))
-hard_stop = datetime.datetime.fromisoformat('2026-10-06T14:06:00+09:00').timestamp()
+hard_stop = datetime.datetime.fromisoformat('2026-10-07T09:43:00+09:00').timestamp()
 def command(args):
     return [str(nodebin/'node'), str(source/'node_modules/tsx/dist/cli.mjs'), str(source/'experiments/otel-m2-disabled-rss/supervise.mts'), *args]
 def supervised(label, args, limit):
@@ -37,7 +38,7 @@ def inventory(path):
 def fixture_snapshot(label):
     repository=root/'fixture/repository'
     def git(args):return subprocess.check_output(['git','-C',str(repository),*args],text=True,env=env).strip()
-    record={'inventory':inventory(repository),'head':git(['rev-parse','HEAD']),'count':git(['rev-list','--all','--count']),'objectLayout':git(['count-objects','-v']),'localConfig':git(['config','--local','--list']),'filesystem':subprocess.check_output(['findmnt','-T',str(repository),'-o','TARGET,SOURCE,FSTYPE,OPTIONS'],text=True).strip()}
+    record={'inventory':inventory(repository),'head':git(['rev-parse','HEAD']),'count':git(['rev-list','--all','--count']),'objectLayout':git(['count-objects','-v']),'localConfig':git(['config','--local','--list']),'refs':git(['show-ref']),'tree':git(['rev-parse','HEAD^{tree}']),'directories':[str(p.relative_to(repository)) for p in sorted(repository.rglob('*')) if p.is_dir() and not p.is_symlink()],'links':[{'path':str(p.relative_to(repository)),'target':os.readlink(p)} for p in sorted(repository.rglob('*')) if p.is_symlink()],'filesystem':subprocess.check_output(['findmnt','-T',str(repository),'-o','TARGET,SOURCE,FSTYPE,OPTIONS'],text=True).strip()}
     (root/'evidence'/('fixture-'+label+'.json')).write_text(json.dumps(record,indent=2))
     assert record['count']=='4430' and 'ext4' in record['filesystem']
     return record
@@ -45,23 +46,24 @@ mode=sys.argv[1]
 if mode=='preflight':
     supervised('supervision-preflight', ['preflight'], 30)
 elif mode=='prepare':
-    supervised('fixture-prepare', ['prepare'], 1800)
-    fixture_snapshot('before')
-    (root/'evidence/dependency-before.json').write_text(json.dumps(inventory(source/'node_modules'),indent=2))
+    raise RuntimeError('fixture generation is prohibited; use restored-gate.py once')
 elif mode=='runs':
-    assert not (root/'evidence/runs-started.json').exists(), 'no retry'
+    assert not (root/'evidence/controller-entered.json').exists(), 'no retry'
+    assert json.loads((root/'evidence/restored-gate-result.json').read_text())['passed']
     assert (root/'evidence/supervision-preflight.result.json').exists()
     (root/'runs').mkdir()
     order=['V0','V1','V2','V2','V1','V0']; started=time.time()
-    (root/'evidence/runs-started.json').write_text(json.dumps({'started':started,'order':order,'budgetSeconds':1800},indent=2))
+    (root/'evidence/controller-entered.json').write_text(json.dumps({'started':started,'order':order,'budgetSeconds':1800},indent=2))
     before=json.loads((root/'evidence/fixture-before.json').read_text())
     assert fixture_snapshot('workload-start')==before
+    assert sha(root/'evidence/fixture-before.json')==json.loads((root/'evidence/restored-gate-result.json').read_text())['snapshotSha256']
     results=[]
     try:
         for ordinal,variant in enumerate(order,1):
             remaining=1800-(time.time()-started)
             assert remaining>620, 'insufficient remaining workload budget'
             print('Run',ordinal,variant,'start',datetime.datetime.now(datetime.timezone.utc).isoformat(),flush=True)
+            (root/'evidence'/('run-'+str(ordinal)+'-invocation.json')).write_text(json.dumps({'ordinal':ordinal,'variant':variant,'started':time.time()},indent=2))
             result=supervised('run-'+str(ordinal), ['run',str(ordinal),variant], min(610,remaining))
             results.append(result)
             assert fixture_snapshot('after-'+str(ordinal))==before, 'fixture changed'

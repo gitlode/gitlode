@@ -51,6 +51,7 @@ elif mode=='prepare':
 elif mode=='runs':
     assert not (root/'evidence/runs-started.json').exists(), 'no retry'
     assert (root/'evidence/supervision-preflight.result.json').exists()
+    (root/'runs').mkdir()
     order=['V0','V1','V2','V2','V1','V0']; started=time.time()
     (root/'evidence/runs-started.json').write_text(json.dumps({'started':started,'order':order,'budgetSeconds':1800},indent=2))
     before=json.loads((root/'evidence/fixture-before.json').read_text())

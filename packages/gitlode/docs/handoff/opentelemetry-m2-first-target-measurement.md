@@ -1,5 +1,62 @@
 # M2 first fixed-candidate target measurement
 
+## Current routing: disabled RSS failure diagnosis (2026-10-06)
+
+Trunk reviewed controlled outcome `c86140ef8984444aec1eef79f2261b5b3fc6f68b` and verified all
+567 returned files plus manifest, hash `c2e2bd856b0ca2578dc347b2b0d31db23e95802d935268060f641d6e52aec0da`.
+The formal disabled result is **fail**, not inconclusive: median peak RSS is 185,655,296 bytes for
+legacy and 203,198,464 for candidate, a 17,543,168-byte increase against 9,282,764.8 allowed.
+Wall/stability and behavior pass; profile remains unexecuted. The empty reasons array does not
+override fail; the evaluator uses it for inconclusive reasons and applies numerical pass/fail separately.
+
+Candidate peak RSS exceeds legacy in all seven measured pairs (approximately 11.75 to 24.11 MiB).
+These pair differences describe the data; the contract uses difference of medians, not median of
+pair differences. The result is not caused solely by one sampled peak. RSS alone does not identify
+a leak, heap retention, SDK import cost, native allocations or the responsible product path.
+Aggregate host counters cannot establish that causal attribution either.
+
+The two formal attempts are complete records: first inconclusive on candidate MAD, second failed
+on RSS. There is no third-attempt authority. The fresh-attempt instructions below are historical
+and superseded by the diagnosis assignment here; do not resume profile or other formal stages.
+
+### Next session: bounded saved-RSS and disabled-path diagnosis
+
+Start from the M2 document checkpoint delivering this section. Shared checkout remains M2;
+product/harness for interpretation remain fixed `8fffcc0`, legacy `76b124e`, and historical M0
+candidate/harness retain their original identities. Read both outcomes, the prior variability
+diagnosis, F provenance, performance catalog/evaluator, and telemetry design/verification contracts.
+
+1. Recompute measured-run peak statistics and allowed RSS from the original samples/artifacts.
+   Verify warmup exclusion and sampler PID/process scope, including worker-thread versus child-process
+   coverage and whether the sampled maximum equals the recorded peak. Distinguish actual peak
+   sampling from heap/live-object accounting. Do not reinterpret the formal metric.
+2. Summarize per-run RSS trajectories against elapsed time: initial available sample, peak timing,
+   sustained versus brief increases, final available sample, and pair/order dependence. Compare M0,
+   first attempt and controlled attempt with their different candidates explicitly attributed.
+   Keep all runs and numerical precision. Do not infer product phases from time alone: correlate only
+   where saved events support it, and state sampling/phase-resolution limits.
+3. Trace the fixed disabled execution/import path: host/worker creation, telemetry initialization,
+   no-op composition, SDK/module loading, report/collector allocation and any changed non-telemetry
+   extraction/output path versus legacy. Inspect relevant source and preserved bundled artifacts;
+   distinguish code reachability from observed allocation. Existing no-op tests establish their
+   stated behavior, not zero module-loading/process memory cost. No blanket redesign or cleanup.
+4. Return a short ranked set of hypotheses and evidence gaps, then one minimal next action with a
+   concrete success/discrimination criterion. If code proves a defect, propose a bounded correction
+   without implementing it. If allocation attribution needs execution, propose a finite diagnostic
+   experiment with exact variants, observation points, run budget, expected signals and stop rule.
+   Instrumented runs would be diagnostic only, never substitutes for the failed formal result.
+
+This session reads saved artifacts and code and computes derived data only. No CLI workload,
+benchmark, heap capture, full suite, build/install, formal retry, code/config/threshold/recipe changes,
+PR/merge, archive mutation or release acceptance update. Do not introduce a monitoring framework or
+scan unrelated host processes. New diagnostic execution requires a subsequent trunk packet.
+
+Save derived scripts/tables outside sealed archives, recording consumed input hashes. Append concise
+findings and limitations here; preserve original fail/inconclusive outcomes. Commit and normally push
+the documented diagnosis on M2 after checking concurrent ref movement. Report final OID/remote
+equality and clean status. Existing readonly diagnostics and historical ENOTEMPTY/EBUSY are outside
+scope. Unknown cause is acceptable; unbounded hypothesis exploration is not the assignment.
+
 ## Active assignment: one controlled fresh attempt
 
 Trunk accepts the saved-evidence diagnosis at `10540d1a113fabd3a324c5e202f4967de6bba6db`

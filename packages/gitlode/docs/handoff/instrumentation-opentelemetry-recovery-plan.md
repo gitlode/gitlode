@@ -99,6 +99,12 @@ identifying a cause. The first-target document's newest opening packet now autho
 controlled fresh attempt, with a quiet host window and low-rate external observations; no automatic
 third attempt or recalibration is authorized. Original inconclusive evidence remains unchanged.
 
+Controlled attempt outcome `c86140ef8984444aec1eef79f2261b5b3fc6f68b` is **fail** on disabled
+RSS: 17,543,168 bytes growth exceeds 9,282,764.8 allowed. Capture passed, profile was not run.
+Trunk verified the returned 567-file manifest. The newest first-target opening packet assigns
+saved-RSS/source diagnosis only; it supersedes the now-completed fresh-attempt authorization.
+No further formal measurement is assigned until that diagnosis returns and trunk decides the next step.
+
 ## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.

@@ -1,6 +1,6 @@
-import { observeRssExperiment } from "./rss-experiment-observation.js";
 import { Worker } from "node:worker_threads";
 
+import { observeRssExperiment } from "./rss-experiment-observation.js";
 import type {
   ExecutionRunReporters,
   WorkerRunMessage,

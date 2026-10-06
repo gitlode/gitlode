@@ -1,4 +1,3 @@
-import { observeRssExperiment } from "./rss-experiment-observation.js";
 import { performance } from "node:perf_hooks";
 
 import {
@@ -70,6 +69,7 @@ import {
   resolveRepositoryBasics,
   validateRepositoryAccess,
 } from "./repository-context.js";
+import { observeRssExperiment } from "./rss-experiment-observation.js";
 import { WorkerTelemetrySession } from "./telemetry/worker-telemetry-session.js";
 import type {
   ExecutionRunReporters,
@@ -526,7 +526,9 @@ export async function executeWorkerRunRequest(
     runSpan.end();
     return applicationResult;
   }
-  observeRssExperiment("worker-after-extraction-before-finalization", { kind: applicationResult.kind });
+  observeRssExperiment("worker-after-extraction-before-finalization", {
+    kind: applicationResult.kind,
+  });
   const finalized = await session.finalize(applicationResult);
   if (finalized.initializationWarning) {
     reporters.diagnosticReporter.report({

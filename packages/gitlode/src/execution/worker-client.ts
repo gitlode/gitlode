@@ -1,3 +1,4 @@
+import { observeRssExperiment } from "./rss-experiment-observation.js";
 import { Worker } from "node:worker_threads";
 
 import type {
@@ -33,6 +34,7 @@ export async function dispatchWorkerRunRequest(
   } = {},
 ): Promise<WorkerRunResult> {
   return await new Promise<WorkerRunResult>((resolve) => {
+    observeRssExperiment("host-after-imports-before-worker");
     const worker = new Worker(
       internalOptions.workerEntry ?? new URL("./worker-entry.js", import.meta.url),
       {
@@ -71,6 +73,7 @@ export async function dispatchWorkerRunRequest(
         return;
       }
 
+      observeRssExperiment("host-application-result", value.result);
       resultReceived = true;
       settle(value.result);
     });
@@ -80,6 +83,7 @@ export async function dispatchWorkerRunRequest(
     });
 
     worker.on("exit", (code) => {
+      observeRssExperiment("host-after-worker-exit", { code });
       if (!settled && code !== 0) {
         settle(runtimeErrorResult(`Worker exited unexpectedly with code ${String(code)}.`));
         return;

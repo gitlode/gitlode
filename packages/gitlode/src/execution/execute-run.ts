@@ -1,3 +1,4 @@
+import { observeRssExperiment } from "./rss-experiment-observation.js";
 import { performance } from "node:perf_hooks";
 
 import {
@@ -230,6 +231,11 @@ export async function executeWorkerRunRequest(
     );
   const { executionTracer, extractionTracer, extractionMeter } = activeTelemetry;
 
+  observeRssExperiment("worker-after-disabled-composition", {
+    profile: input.profile,
+    recordingEnabled: session?.recordingEnabled,
+    rootRecording: session?.rootSpan.isRecording(),
+  });
   const sessionTimestamp = new Date();
   const startMs = performance.now();
   const resolvedRepoPath: AbsolutePath = input.repositoryPath;
@@ -459,6 +465,7 @@ export async function executeWorkerRunRequest(
         metricRecorder: extractionPipelineMetricRecorder,
       });
 
+      observeRssExperiment("worker-before-extraction");
       const result = await coordinator.run({
         repositoryPath: resolvedRepoPath,
         repoName: resolvedRepoName,
@@ -519,6 +526,7 @@ export async function executeWorkerRunRequest(
     runSpan.end();
     return applicationResult;
   }
+  observeRssExperiment("worker-after-extraction-before-finalization", { kind: applicationResult.kind });
   const finalized = await session.finalize(applicationResult);
   if (finalized.initializationWarning) {
     reporters.diagnosticReporter.report({

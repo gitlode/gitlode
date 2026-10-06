@@ -1,3 +1,4 @@
+import { observeRssExperiment } from "./rss-experiment-observation.js";
 import { parentPort, workerData } from "node:worker_threads";
 
 import type { DiagnosticReporter } from "@gitlode/internal-contracts/diagnostics";
@@ -37,6 +38,8 @@ function postMessage(message: WorkerRunMessage): void {
 if (parentPort === null) {
   throw new Error("worker-entry must run in a worker thread.");
 }
+
+observeRssExperiment("worker-after-imports-before-request");
 
 parentPort.once("message", async (request: WorkerRunRequest) => {
   const progressReporter: ProgressReporter = {

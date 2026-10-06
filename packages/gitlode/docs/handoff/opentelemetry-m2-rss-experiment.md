@@ -1,5 +1,59 @@
 # Bounded disabled RSS attribution experiment
 
+## Current assignment: restored-fixture gate, then the unexecuted six runs
+
+Trunk reviewed outcome `a7ca9e6eead60496f350cc2cd5242ed7f9bc8432` and experiment
+`55ab62db4c063516a7fd2de3404a84a437af937f`. All 93 returned archive entries and manifest matched
+recorded hashes. Zero diagnostic CLI runs occurred. Unchanged HEAD/count with changed packs and
+commit-graph is a real input drift, consistent with completion of automatic GC; it does not prove
+the cause of the historical calibration discontinuity or formal RSS failure.
+
+The next separate session may perform the bounded preparation below and, only if it passes, execute
+the original six-run budget. Do not first run another open-ended diagnosis session. This is explicit
+authority for a new diagnostic fixture identity after the preparation-only stop, not permission to
+replace a fixture in a partially executed experiment. Original archives/outcomes stay unchanged.
+
+### Reuse and gate
+
+- Obtain a new quiet window and hard-stop time from the human; the previous 14:06 deadline expired.
+  Announce preparation/workload time. Inspect existing operator scripts for hard-coded timestamps,
+  paths and run-start markers before reuse. Use a new execution/evidence root, not the old directory.
+- Reuse preserved V0/V1/V2 product builds and dependency closure, with their recorded hashes and
+  OIDs. Restore links only as documented in RESTORE.md and verify identical targets. No variant
+  redesign or product rebuild is assigned. Preserve V1's changed span-ID semantics and V2's omitted
+  empty finalization calls as explicit attribution confounders, not a perfectly isolated import effect.
+- Restore `prepared-fixture-at-return.tar.gz` from the verified preparation archive into a fresh
+  Linux/ext4 path. Never modify the sealed tar or original fixture. This copy is authorized as a
+  diagnostic candidate input only; it is not new formal calibration/fixture acceptance.
+- Verify archive/restored inventory correspondence, HEAD
+  `bde84f1caca0e50284005bf96c126728dac4f9d4`, 4,430 commits, refs/tree and unchanged repository config.
+  Run a bounded read-only connectivity/object check (`git fsck --full`, without lost-found or repair),
+  recording existing dangling-object messages separately from corrupt/missing-object errors.
+  Verify there is no copied active/ambiguous gc.pid or lock and no known writer owns the restored path.
+  Do not delete locks, kill an uncertain process, run repack/gc, regenerate or change maintenance policy.
+- Take three complete content/layout inventories five seconds apart and immediately before run 1.
+  Use unchanged read-only commands with optional Git writes disabled. In a fresh copy with no writers,
+  matching observations support the diagnostic gate, not a universal proof against filesystem races.
+  If integrity, lock/ownership or equality checks fail, stop within this gate, preserve evidence and
+  report the exact failure. No repeated generation, indefinite settling wait or replacement snapshot.
+- If it passes, seal the new pre-run snapshot identity and map it to the preserved post-generation
+  representation. Use that one identity for all six runs; verify after every run. Never reset the
+  comparison baseline to hide drift. This controls a common input across variants but does not claim
+  the object representation equals either formal attempt's unpreserved runtime fixture.
+
+Only small experiment-controller changes to load/validate this restored input, select fresh paths
+and the new deadline are authorized. Commit/push them on `experiment/otel-m2-disabled-rss` as
+descendants of `55ab62d` before runs; record a zero product/variant diff. Inspect dependency/runtime
+hashes and preflight external plus fixed-supervisor deadlines before long work. Keep the existing
+execution/processing limits and 30-minute workload budget. Run V0,V1,V2,V2,V1,V0 once, no warmups,
+retry or extra variant, preserving all original behavior/observation/stop conditions below.
+
+The outcome must distinguish preparation changes, fixture representation and variant semantic
+confounders from measured contrasts. If stable preparation passes but the six-run effects overlap,
+return unresolved rather than expand the experiment. Save a new archive/verified copy, then append
+outcome to this document on M2 without merging experimental commits. No formal retry, production
+repair, PR/merge or release acceptance is authorized.
+
 ## Authority and status
 
 Trunk accepts the saved-data diagnosis at `e051a129487747e9f6680cd47eb7d73ad8e672b7` as

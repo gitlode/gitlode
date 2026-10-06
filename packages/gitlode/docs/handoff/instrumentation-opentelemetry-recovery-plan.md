@@ -110,6 +110,11 @@ The active [six-run diagnostic experiment](opentelemetry-m2-rss-experiment.md) s
 provider construction from eager SDK loading. Experimental code is preserved on a separate branch,
 never merged as a product repair. No formal retry or threshold change is authorized.
 
+Experiment preparation stopped with 0/6 runs at `a7ca9e6`: unchanged HEAD/count but object-layout
+drift after generation. Prepared variants remain preserved at experimental `55ab62d`. The experiment
+packet's newest opening section authorizes one bounded restored-fixture integrity/stability gate,
+then the still-unexecuted six runs only if that gate passes. No regeneration or manual repack is assigned.
+
 ## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.

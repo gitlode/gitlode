@@ -105,6 +105,11 @@ Trunk verified the returned 567-file manifest. The newest first-target opening p
 saved-RSS/source diagnosis only; it supersedes the now-completed fresh-attempt authorization.
 No further formal measurement is assigned until that diagnosis returns and trunk decides the next step.
 
+RSS diagnosis `e051a129487747e9f6680cd47eb7d73ad8e672b7` is complete with cause unresolved.
+The active [six-run diagnostic experiment](opentelemetry-m2-rss-experiment.md) separates disabled
+provider construction from eager SDK loading. Experimental code is preserved on a separate branch,
+never merged as a product repair. No formal retry or threshold change is authorized.
+
 ## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.

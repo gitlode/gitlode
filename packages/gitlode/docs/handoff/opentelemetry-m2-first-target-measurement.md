@@ -1,5 +1,9 @@
 # M2 first fixed-candidate target measurement
 
+Current assignment supersedes the completed diagnosis-only packet below:
+[bounded RSS attribution experiment](opentelemetry-m2-rss-experiment.md). Diagnosis at `e051a129`
+supports three diagnostic variants/six runs, not a production repair or a third formal attempt.
+
 ## Current routing: disabled RSS failure diagnosis (2026-10-06)
 
 Trunk reviewed controlled outcome `c86140ef8984444aec1eef79f2261b5b3fc6f68b` and verified all

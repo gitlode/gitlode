@@ -86,3 +86,39 @@ Append concise results here: six-run table (including unexecuted rows), boundary
 equivalence, limitations and one proposed next action. No self-acceptance of a production fix, F,
 T13B or M2. Report experiment and M2 documentation OIDs and actual remote equality; shared checkout
 must remain clean on M2. Only trunk assigns any subsequent repair/review/formal remeasurement.
+
+## Preparation stop (2026-10-06)
+
+Returned to trunk before long preparation or workloads. Instruction checkpoint and actual remote M2
+were both `3ed250b4f89b639ff23e25312d5bb81d7d68f4ea`; shared checkout was clean on
+`feature/otel-redesign_M2`. No local or remote `experiment/otel-m2-disabled-rss` branch existed.
+The fixed experimental base remains `8fffcc0d8e11bb061d70bf870f262092d559c5f2`.
+
+The required human-established quiet host window and operator deadline were requested but not
+confirmed before this return. Session startup does not establish host quietness. Therefore the
+preparation gate did not pass. Sandbox WSL enumeration initially returned
+`Wsl/EnumerateDistros/Service/E_ACCESSDENIED`; an authorized elevated read succeeded, identifying
+Ubuntu WSL2 and Linux user `t-wakabayashi`. A read-only filesystem probe of the existing performance
+root reported `ext2/ext3`; this does not establish a newly prepared ext4 fixture or runtime. The login
+shell found `/usr/bin/git` but no Node on PATH; no toolchain substitution was attempted.
+
+| Run | Variant | Outcome      |
+| --- | ------- | ------------ |
+| 1   | V0      | Not executed |
+| 2   | V1      | Not executed |
+| 3   | V2      | Not executed |
+| 4   | V2      | Not executed |
+| 5   | V1      | Not executed |
+| 6   | V0      | Not executed |
+
+Zero diagnostic CLI runs, builds, installs or fixture preparations were performed. No owned workload
+process was launched. No experiment checkout, source commit, runtime or evidence archive was created;
+there is no experiment OID or archive hash to report. Boundary contrasts, output equivalence,
+disabled semantics, import isolation and cleanup preflight remain unverified. The controlled formal
+RSS failure and cause-unresolved diagnosis are unchanged. No retries, extra variants, formal
+measurements, PRs, merges or acceptance updates occurred.
+
+Proposed next action: trunk obtains an explicit quiet host window and operator deadline, then assigns
+the same bounded preparation gate before authorizing workload execution. This return contains setup
+status only, with no allocation attribution. Documentation OID and actual remote equality are reported
+in the session return after preservation.

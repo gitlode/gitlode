@@ -283,3 +283,69 @@ post-generation object-layout boundary without changing the accepted recipe or m
 before deciding whether to assign another finite experiment. This return grants no new experiment
 or formal retry. The M2 documentation OID, actual remote equality and final shared-checkout clean
 state are reported separately after this documentation-only checkpoint is preserved.
+
+## Restored-input gate stop (2026-10-06 evening)
+
+**Preparation stopped on a controller inventory-scope error; zero diagnostic CLI runs.**
+Instruction checkpoint and shared M2 were `aa5887941247ed5cbd219505f53073071466eb99`.
+The human established the quiet window from 2026-10-06 18:43 JST for fifteen hours;
+its end, 2026-10-07 09:43 JST, was used as the operator hard stop. Shared checkout
+remained on `feature/otel-redesign_M2`. Actual remote M2 still equaled the starting
+checkpoint immediately before this result was appended.
+
+The prior sealed manifest hash and all 93 archive entries matched before restoration.
+Source/dependencies, Node and the three fixed runtimes were restored into fresh Linux root
+`/home/t-wakabayashi/gitlode-performance/m2-rss-restored-20261006T1843`.
+The runtime dependency links were relinked only as described in the prior RESTORE.md,
+to the restored source dependency directory. No product rebuild or variant edit occurred.
+Controller-only commit `a514034c10eb193304f482bb5783c02d5a200431`, a descendant of `55ab62d`,
+was normally pushed before gate execution. Product/variant diff against `55ab62d` is empty.
+Python compilation, `npm run format:write`, `npm run format:check` and diff whitespace
+checks passed. No CLI workload, formal measurement, PR, merge or acceptance update occurred.
+
+The first runtime comparison asserted full runtime inventory equality against the preserved
+dist-only inventory. V0 contains all nine recorded dist files with identical sizes/hashes,
+plus its existing eighteen-byte `package.json` (SHA-256
+`1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae`).
+The controller incorrectly included this additional file in the comparison. This is an
+agent-introduced comparison-scope error, not evidence of corrupted runtime bytes or fixture drift.
+Read-only post-stop inspection found every recorded dist file matching for V0/V1/V2,
+matching saved dependency inventory and matching Node/Git binary hashes. These observations
+are not a repeated gate or a pass. The failed gate was not repaired or rerun.
+
+The failure preceded external/fixed-supervisor deadline preflights, fixture tar extraction,
+ext4 verification, fsck, lock/ownership checks and the three fixture inventories. Therefore
+no new fixture snapshot identity was accepted, no stability claim is made, and no known
+workload process was launched. No fixture regeneration, repack, maintenance policy change,
+settling wait or retry followed. The operator shell reported exit zero despite the preserved
+Python traceback; the persisted `restored-gate-result.json` explicitly records `passed=false`
+and controlled the stop classification. Shell exit alone must not be treated as a passed gate.
+
+| Run | Variant | Outcome      | Peak/boundary contrast |
+| --- | ------- | ------------ | ---------------------- |
+| 1   | V0      | Not executed | Unavailable            |
+| 2   | V1      | Not executed | Unavailable            |
+| 3   | V2      | Not executed | Unavailable            |
+| 4   | V2      | Not executed | Unavailable            |
+| 5   | V1      | Not executed | Unavailable            |
+| 6   | V0      | Not executed | Unavailable            |
+
+Output equivalence, runtime disabled semantics and boundary/peak contrasts remain unverified
+in this session. V1's span-ID difference and V2's omitted empty finalization calls remain
+explicit semantic confounders of any future contrasts. The formal RSS failure and unresolved
+historical fixture representation remain unchanged.
+
+New archive: `/home/t-wakabayashi/gitlode-performance/m2-rss-restored-20261006T1843/archive`.
+Distinct verified copy: `D:/gitlode_test/m2-rss-restored-20261006T1843`.
+All 33 entries plus both manifest copies matched; manifest SHA-256:
+`c8f93322775eb748747b5d9c6fb6848598d377314aa65c310c732cc727bfed10`.
+The archive preserves the failing controller, patch, logs, comparison details, zero-run outcome
+and unchanged prior input tar files. Its source tar retains `55ab62d`; the controller patch
+and scripts preserve `a514034`. The fixture tar was never extracted in this session.
+The original 93 archive entries and manifest were reverified unchanged after the stop.
+Both copies remain on one host, not an external backup.
+
+Proposed next action: trunk reviews one bounded controller correction to compare the recorded
+dist scope and independently validate runtime package metadata, then decides whether to assign
+a new restored-fixture gate. This stop grants no retry. Experiment and M2 documentation OIDs,
+actual remote equality and clean shared-checkout state are reported in the session return.

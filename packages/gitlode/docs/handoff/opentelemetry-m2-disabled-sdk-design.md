@@ -858,3 +858,156 @@ The first retrieval check showed Git show --output redirects diffs but not raw b
 output file). Corrected to Python subprocess byte capture; restored blob identity matched the
 original before any use. The first documentation edit hit Windows cp932 decoding and stopped before
 writing; subsequent editing explicitly uses UTF-8. No derivation/measurement was launched.
+
+## D2 outcome for independent review (2026-10-07)
+
+**Implementation and bounded functional/package verification complete; independent D2 review pending.**
+No D2/M2 self-acceptance, formal/diagnostic measurement, PR, merge, parent update, candidate freeze,
+archive-ref replacement or acceptance-record change was performed. RSS causality and performance
+acceptance remain unresolved. The child remains `feature/otel-redesign_M2_disabled`.
+
+- Starting checkpoint: `a2a487ed9a01daed6f2564f44595a5996a8cf49d`.
+- Maintenance checkpoint: `dedc5363e3a56de40637481e4b83fc3bd801ee60`; the tested byte-preserving
+  retrieval recipe correction is included in the implementation checkpoint.
+- Fixed implementation: `6e84279819ce50e961ef99dc92ffa5a90219bc34`, tree
+  `507a9cbd7e79f25668c4b4f56f01fdec0842a85a` (14 files beyond maintenance).
+- Accepted D1 source remains `04dc187573a63bd2110c381306b26fd050d53220`: production source diff
+  across all five production workspaces is empty. No repository dependency/lockfile change.
+- Parent M2 remains `57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`.
+- This outcome checkpoint is documentation only: this handoff and canonical verification wording
+  replacing stale pending-check status with its durable requirement. Verified code/build/package
+  configuration is unchanged. The subsequent delivery binding records its
+  exact OID without trying to embed a commit's own hash in itself.
+
+### File and command ownership
+
+| Files relative to repository root                                                                                               | Responsibility / durable execution                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/gitlode/scripts/tooling/release-telemetry-boundary.ts`, `packages/gitlode/tsdown.config.ts`                           | Build module/edge metadata, static shared-chunk and conservative declared external closure, SDK/context/collector/report ownership, private specifier rejection and lazy asset existence. Runs during every release bundle, including existing CI. Graph inventory is emitted into the build log.                                                    |
+| `packages/gitlode/tsconfig.release-boundary.json`, `packages/gitlode/package.json`                                              | Explicit strict checks for config, new product tooling and affected/new tests; `typecheck:release-boundary` precedes bundling. Existing private pkg config behavior is preserved.                                                                                                                                                                    |
+| `tests/system/scripts/installed-load-guard.ts`, `tests/system/scripts/test-installed-package.ts`                                | Packed/public-only real CLI/worker guard, installed dependency inventory/realpaths, result observation, positive report/asset checks, denial and missing-asset sensitivity, JSONL byte/sequence equality, package/runtime/compiler identities and owned child deadlines. Existing `typecheck:system` and `test:system:package` execute these checks. |
+| `packages/gitlode/test/telemetry/sdk-construction-boundary.test.ts`                                                             | Actual SDK constructor interception through the production factory, with positive Enabled activation; independent of import/load and global-provider evidence. Runs in source tests.                                                                                                                                                                 |
+| `packages/gitlode/test/telemetry/aggregation-child.test.ts`, `packages/gitlode/scripts/tooling/aggregation-collector-bundle.ts` | Reconstruct sorted filename/byte inventory, resolve emitted static/dynamic graph, require local modules to belong to inventory and invoke small Enabled/Disabled children. Builder/child deadlines added; bundling and inventory semantics unchanged. Runs in source tests.                                                                          |
+| Canonical build/verification/domain docs                                                                                        | Commands, release proof, strict tooling ownership and installed-files/Node preload inspection boundary.                                                                                                                                                                                                                                              |
+| First-target handoff and this handoff                                                                                           | Historical helper retrieval, first failures, source attribution, evidence and independent-review stopping boundary.                                                                                                                                                                                                                                  |
+
+Development final commands passed: strict release-boundary typing, `npm run typecheck:system`,
+`npm run lint`, `npm run architecture:check`, format write/check and diff check. Focused source command
+was the accepted D1 review's 11-suite command plus `aggregation-child.test.ts` and
+`sdk-construction-boundary.test.ts`: **13 files / 187 passed / 0 skipped**. Initial diagnostics and
+scoped corrections remain recorded above and in the archive; no lint/orphan/typing rule was relaxed.
+
+### Fixed Windows/Linux campaign
+
+Each OS used a fresh detached Git clone at the same fixed implementation, verified clean before
+launch, with its real TEMP outside the checkout. Windows used
+`D:/gitlode_test/m2-d2-work-20261007T173933/windows/source` and sibling `temp`. Linux source and TEMP
+were on native ext4 under `/home/t-wakabayashi/gitlode-performance/m2-d2-work-20261007T173933`.
+The supervisors verified tool paths/versions, Git metadata and OID, used 600 seconds for `npm ci`
+and 1,200 seconds for the canonical chain, and retained first-failure output with no retry.
+Installed children have 180-second deadlines; negative probes used 60 seconds; supplemental report
+normalization used 30 seconds. No global Node/environment installation was changed.
+
+| OS / toolchain                                                   | Commands and actual result                                                                                             |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Windows; Node 22.23.1, npm 11.11.0, Git 2.45.1.windows.1         | `npm ci` exit 0; `npm run validate:release` exit 0, 135.318 seconds. Source: **98 files / 1,314 passed / 28 skipped**. |
+| Ubuntu WSL2 / ext4; private Node 22.23.1, npm 10.9.8, Git 2.53.0 | `npm ci` exit 0; `npm run validate:release` exit 0, 54.181 seconds. Source: **98 files / 1,342 passed / 0 skipped**.   |
+
+The 28 Windows skips are existing Linux-only groups: 23 in performance-supervisor's Linux process
+supervision and 5 in performance-workflow's supervised workflow integration. No D2 graph, guard,
+constructor, aggregation or installed-package assertion was skipped on either OS. Linux logs include
+two deliberately failing nested fixture suites (1 failed / 19 filtered skips each) exercised by the
+passing diagnostic-retention source tests; they are not failed canonical campaigns or retries.
+The existing Rev-dep config warning remains (0 errors / 1 warning); architecture itself passes.
+
+The canonical chain executed dependency/format/lint/strict-system/architecture/schema/source checks,
+release build with strict product tooling and all three graph roots, strict publint and the actual
+installed-package command. Build output was not replaced with development output between bundling
+and packing. Final isolated checkouts still have the fixed OID, clean tracked/untracked status and
+no installed-package temp leftovers. Checkouts are retained for inspection; consumers were cleaned.
+Command durations here are functional execution records, not performance measurements or acceptance.
+
+### Positive and negative boundary evidence
+
+Both OS runs contain 11 installed guard cases, each positively activating ESM and CommonJS mechanisms
+in actual host isolate 0 and worker isolate 2. Guard loader support threads are not mislabeled as
+application isolates. Both adapters' Disabled cases, including SDK denial, have zero forbidden
+resolution/load events, no initialization warning/report, successful extraction and exact JSONL
+byte/sequence equality. The boundary plugin fixture is SDK-free. A separate disabled plugin-owned
+SDK fixture records the SDK importer as that plugin, leaves the session unprofiled and is excluded
+from the product zero-load assertion.
+
+Normal Enabled loads the installed lazy asset and real SDK implementations only in the worker,
+returns successful extraction and a complete schema-2 report with observations. SDK denial records
+three denied dependency requests per enabled invocation, produces exactly one sanitized warning,
+no report and unchanged JSONL. Removing the discovered Enabled-only runtime asset in the disposable
+installation still permits degraded extraction, but the normal positive report assertion rejects it;
+original bytes are restored in finally. It is never counted as successful Enabled telemetry.
+
+The installed inventory follows manifests from SDK/context roots transitively, excludes the permitted
+API package and records seven implementation package owners/versions/realpaths per isolate. Registry
+consumer resolution selected SDK/context/core/resources 2.12.0 and semantic-conventions 1.43.0 on
+both OSes. This is an actual consumer execution input, not a repository dependency upgrade; source
+`npm ci` retains the lockfile's SDK 2.10.0. The consumer compiler is **TypeScript 7.0.2** on both OSes.
+
+A supplemental read-only product-owned probe uses the fixed checkout's official contract export to
+fully normalize the captured installed reports; it adds no private product import to system tooling.
+All four ordinary reports are accepted: isomorphic has 21 span groups / 21 counter points / 9
+histogram points; git-cli has 21 / 12 / 8; all have empty diagnostics. Probe text, cwd, commands,
+deadlines/results and logs are archived. The installed runner's durable assertion separately checks
+schema version, complete signals, observations and lazy loading; canonical source tests retain full
+normalizer ownership.
+
+Development negative evidence is separately attributed: the forbidden eager-enabled import fails
+the graph's owner boundary; an actual extra MeterProvider construction fails the distinct real
+constructor sentinel (1 failed). Both mutations were restored byte-for-byte and their first logs
+retained. The fixed canonical suites exercise the restored positive code. D1 global-provider and
+owned-resource evidence remains attributed to accepted D1; absent profile output is not used as
+constructor evidence. Aggregation's existing builder passes inventory, local static/lazy asset
+closure and small functional Enabled/Disabled checks on both OSes; no missing asset/hoisting issue
+was demonstrated, so no bundler redesign or N/4N workload was performed.
+
+### Package and runtime identities
+
+Tarball SHA-256 (separately identified OS/npm packing artifacts):
+
+- Windows: `b0405d2a753be0aac367e465531aa5d49f172644270dd4fa32cb2e8924e25bc7`.
+- Linux: `e4d37c208cd6e6dba3ab887efa097e9c096ec97c41611a4ff8047732a845af45`.
+
+All six emitted installed JavaScript files have identical bytes/hashes across OSes. Compared release
+files, schemas, package manifest and README bytes also match. Tarball byte equality is not asserted;
+the exact packing-byte difference between OS/npm versions was not diagnosed. Temporary tarballs
+and consumer trees were removed; retained identities and guard traces bind the actual installations.
+
+| Runtime asset in this snapshot (names are evidence, not layout contracts) | SHA-256, identical on both OSes                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `index.js`                                                                | `bd02db6e5746d7a14ab559981b0ce4c5fb16f3fc12ba6728448d34de8f7f0f83` |
+| `worker-entry.js`                                                         | `287b935c6e20cd56103a07c5591bf2605b5660ea3cedc1216bd83142561bff1c` |
+| `plugin-api.js`                                                           | `8bba4d70cb37504b55e608f1e4230a247ab6cea62b216718ac839ceaf88ada01` |
+| `execute-run-BT4z1P12.js`                                                 | `c44a3f42599c6f9d9758b43e333d79ff66e8124ad027c403bf8449f66d3f8b96` |
+| `normalization-uhF4KS5d.js`                                               | `b9543a9a4e3d6193db5398350b173bfba61c2e65c78f59d68cdf9de9665c62e4` |
+| `enabled-worker-telemetry-C2kERK-0.js`                                    | `7d5755b37ad2c19e8d69c00886101be21f9d47882511f27c6dd54c13feb22406` |
+
+### Sealed archive and remaining limits
+
+New Windows archive: `D:/gitlode_test/m2-d2-boundary-20261007T173933`.
+Verified Linux copy:
+`/home/t-wakabayashi/gitlode-performance/m2-d2-boundary-20261007T173933/archive`.
+Both copies contain **155 evidence files / 36,313,274 bytes**, plus identical
+`sealed-manifest.json`, SHA-256
+`ac3d3796276e881e6e7eec0c5652628a83ab4f63b09110fd64c78a24d992a33c`.
+All copied file bytes/hashes and complete inventories matched before sealing. Nothing was appended
+after sealing. Earlier sealed archives, derived.json and historical refs remain untouched.
+
+`source-identity.json`, `implementation.patch`, `handoff-at-fixed.md`, each OS's `preflight.json`,
+`commands.json`, `final.json`, `validate-release.log`, `installed/package-identity.json`, guard
+JSONL/command logs and normalization logs supply source/command/result mapping. `development/`
+retains initial operator/build/type/lint/architecture/package failures, corrected focused evidence,
+negative logs and reproduction supervisors. `runtime-comparison.json` records cross-OS file hashes.
+
+Verification limits are explicit: external closure inspection is conservative declared-dependency
+analysis; runtime guards cover controlled public extraction/plugin fixtures, not every possible
+third-party plugin or unsupported concurrent session. Windows Linux-only supervision scope is
+skipped there and executed on Linux. No D2 functional blocker was found; independent review remains
+required. Cumulative integration, human PR approval, descendant candidate preparation and all formal
+RSS/performance/T13B/T13C acceptance obligations remain outside this session and unresolved.

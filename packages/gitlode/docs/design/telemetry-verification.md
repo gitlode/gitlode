@@ -135,7 +135,8 @@ and collector/report ownership), real host and worker ESM/CommonJS load guards, 
 packed enabled-chunk positive behavior and disposable negative sensitivity. Aggregation-child assets
 must include every dynamic target. Installed disabled behavior must succeed under SDK denial; enabled
 must normally produce a valid report, and removing a required chunk must fail that positive assertion.
-These checks remain pending the separately assigned D2 gate; no performance pass follows from D1.
+These independent checks are required regardless of source-session results; functional boundary
+validation does not establish performance acceptance.
 
 ## Operation-owner integration
 

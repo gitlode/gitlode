@@ -446,3 +446,17 @@ These are finite implementation/review slices, not authority to run all sessions
 Wrapper allocation, span aggregation, script reorganization, fixture redesign and export backends
 remain in their existing deferred homes. No new diagnostic workload is proposed to justify the
 already-approved removal of reachable unnecessary SDK work.
+
+## D1 source implementation checkpoint (2026-10-07)
+
+D1 source/lifecycle work is implemented on `feature/otel-redesign_M2_disabled`, pending independent
+review. Starting HEAD was `8d622af2cfc435c06aac3ab0f8b16b5bbaf5e206`; the worktree was clean.
+Local parent M2, its remote-tracking ref, merge base and actual remote parent all resolve to
+`57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`. Actual remote child initially matched the starting HEAD.
+No parent, integration, archive, frozen artifact or acceptance record is updated.
+
+The source checkpoint contains the type-only contract, SDK-free owner/API no-op backend and lazy
+enabled backend, plus guarded import/partial cleanup, deferred finalization, worker enabled routing,
+execution lifecycle guard, focused regressions and canonical audience documentation. It does not
+establish emitted or installed zero-load proof. The outcome section below records the committed
+source identity, final command evidence and remaining D2 obligations. No D1 self-acceptance is made.

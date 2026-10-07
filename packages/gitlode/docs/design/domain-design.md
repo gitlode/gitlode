@@ -413,7 +413,10 @@ protects a concrete consumer from implementation dependencies.
   finalization.
 - Excludes CLI parsing, extraction policy, concrete presentation, adapter internals, and
   configuration-document schema.
-- Acts as the application composition boundary for one run.
+- Acts as the application composition boundary for one run. Its telemetry owner, API no-op backend
+  and type-only contract remain SDK-free; enabled composition is a guarded lazy same-domain module.
+  Collectors/report builders stay behind that module in product execution. This introduces no domain,
+  package or public backend extension. See [telemetry design](telemetry.md#worker-telemetry-session).
 
 ### 2.22 Allowed domain dependencies
 

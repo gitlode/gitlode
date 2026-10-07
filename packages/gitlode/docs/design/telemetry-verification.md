@@ -121,6 +121,22 @@ callbacks cover normal completion, rejection, and non-settlement (including an u
 metric); the non-settlement case uses a finite outer test deadline and proves bounded collection,
 partial metric signals, continued cleanup, idempotence, and safe late settlement.
 
+Source session tests exercise the production owner/factory: Disabled loader non-invocation, unrelated
+global-provider sentinels, invalid roots and explicit valid parents, propagation with an existing
+manager and its absence without one, import/evaluation rejection, actual owned cleanup and cleanup
+rejection, span snapshot failure, and reentrant/concurrent finalization identity. Finite deadlines
+bound fault tests and globals are restored. Execution tests retain all nine actual no-op composition
+choices and verify disposal before root end, result classification and original unexpected rejection
+preservation. The real development worker builder-failure seam must respect requested profile=false.
+
+Source evidence is not emitted/installed boundary acceptance. Release verification must separately
+check static transitive closures of all three entries (including shared chunks, external SDK closure
+and collector/report ownership), real host and worker ESM/CommonJS load guards, constructor guards,
+packed enabled-chunk positive behavior and disposable negative sensitivity. Aggregation-child assets
+must include every dynamic target. Installed disabled behavior must succeed under SDK denial; enabled
+must normally produce a valid report, and removing a required chunk must fail that positive assertion.
+These checks remain pending the separately assigned D2 gate; no performance pass follows from D1.
+
 ## Operation-owner integration
 
 Migration slices test observations through their actual owners rather than through generic recorder

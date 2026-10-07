@@ -246,6 +246,16 @@ Use the narrower commands while developing. Assess publish readiness from both `
 and an accepted telemetry migration record; do not change a blocked record without the required
 independent review evidence.
 
+### Lazy telemetry release boundary
+
+The [telemetry verification contract](../design/telemetry-verification.md#failure-injection) requires
+independent emitted graph, host/worker runtime load and packed dynamic asset checks for the SDK-free
+disabled path. Shared chunks and external transitive dependencies count toward the static closure of
+all three stable entries. Packed enabled execution must positively produce a report, and aggregation
+child bundles must retain dynamic targets. Source-only D1 tests do not discharge these obligations;
+D2 tooling/package verification remains pending. No bundling or installation success implies formal
+performance acceptance.
+
 ## Checked system tooling and commands
 
 `tests/system/tsconfig.json` independently checks all owned `scripts/**/*.ts` with strict NodeNext,

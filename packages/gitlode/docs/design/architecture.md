@@ -240,7 +240,11 @@ own their phase and work measurements, and concrete adapters report implementati
 adding telemetry to stable product ports. High-frequency work uses metrics rather than creating a
 span per commit, file, record, blob, or diff.
 
-Worker-side execution owns SDK composition, active context, local collection, and finalization.
+Worker-side execution owns an SDK-free session owner and API no-op implementation. Only requested
+enabled profiling crosses its guarded lazy import into SDK composition, context management, local
+collection and shutdown. The internal backend contract uses type-only imports; product entrypoints
+must not eagerly reach SDK/collector/report implementations through barrels or shared chunks.
+See [telemetry design](telemetry.md#worker-telemetry-session) for lifecycle and no-op semantics.
 Profiling results cross the worker boundary only as an SDK-independent report. Presentation owns
 labels, grouping, preferred reading order, and terminal formatting; collectors do not contain
 pipeline-specific display knowledge.

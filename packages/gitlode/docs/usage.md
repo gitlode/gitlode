@@ -625,6 +625,11 @@ export default async function factory(config) {
 }
 ```
 
+Plugins receive OpenTelemetry API tracer and meter values even without profiling. Disabled or
+initialization-degraded telemetry uses no-op instruments; the session root has invalid trace/span
+IDs and cannot supply a correlation identity. Explicit parent contexts and context-manager behavior
+follow the [telemetry contract](design/telemetry.md#worker-telemetry-session).
+
 For the full plugin contract specification, see [Plugin System Design](design/plugins.md).
 
 ### Installing a plugin package

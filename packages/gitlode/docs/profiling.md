@@ -11,6 +11,13 @@ block. Failed runs finalize telemetry but do not display a profile. `--quiet` su
 summary, and profile output. If local initialization degrades, extraction continues with a
 sanitized warning and no Profile block.
 
+With profiling disabled, the source session selects API no-op telemetry without importing its local
+SDK implementation, constructing SDK providers or installing a context manager. Initialization
+failure after an enabled request also falls back to API no-op telemetry, after owned partial cleanup;
+it may already have loaded SDK code. The [telemetry contract](design/telemetry.md#worker-telemetry-session)
+defines no-op root/context semantics. Emitted and installed zero-load proof remains pending D2
+release verification; this source change does not establish performance acceptance.
+
 ## Generic hierarchy
 
 The view groups every retained Span, counter, and histogram by instrumentation Scope name and

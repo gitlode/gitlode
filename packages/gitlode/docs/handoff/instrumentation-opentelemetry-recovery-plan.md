@@ -115,6 +115,12 @@ drift after generation. Prepared variants remain preserved at experimental `55ab
 packet's newest opening section authorizes one bounded restored-fixture integrity/stability gate,
 then the still-unexecuted six runs only if that gate passes. No regeneration or manual repack is assigned.
 
+Continuation `2452b592` again executed 0/6 runs: experimental controller `a514034` compared full
+runtime against dist-only inventory. The newest experiment packet assigns scope/exit-propagation
+correction, disposable positive/negative setup checks and continuation in one session. Deterministic
+pre-workload setup mistakes have a bounded correction allowance; genuine integrity failures and
+started-workload failures still stop. Product/variant bytes and the original six-run limit are unchanged.
+
 ## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.

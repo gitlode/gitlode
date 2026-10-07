@@ -1,5 +1,50 @@
 # Bounded disabled RSS attribution experiment
 
+## Active continuation: correct controller scope, then complete preparation
+
+Outcome `2452b592f7e18d9c4200d546702f4f77905080dc` stopped with 0/6 runs on an agent-created
+inventory-scope error in experimental `a514034c10eb193304f482bb5783c02d5a200431`.
+Trunk inspected the controller: whole-runtime inventory was compared with saved dist-only entries.
+This is not evidence of product corruption or new fixture drift. The previous runtime observations
+are reported evidence, not a substitute for the corrected gate. The old failure and archives remain.
+
+The next session is authorized to make this bounded controller correction and continue through the
+restored-fixture gate and original six runs if all checks pass. Preserve product/variant bytes and
+the existing experiment branch; controller changes descend from `a514034`, with zero product diff.
+
+- Compare the exact recorded dist scope, including path set, sizes and hashes; do not simply ignore
+  every unrecorded file. Validate runtime package.json independently against its bytes in the original
+  sealed runtime archive and validate dependency-link targets/closure against preserved provenance.
+  Reject unexpected runtime files/links outside the explicitly documented layout. Do not derive
+  expected identity solely from the currently failing copy.
+- Correct shell/operator failure propagation: a failed Python/controller or unsuccessful persisted
+  gate must yield a nonzero operator result and block workloads. Success requires both command
+  success and the verified successful gate record, not a stale marker or shell exit alone.
+- Before the real gate, exercise the comparison on disposable small positive/negative inputs:
+  legitimate dist plus separately validated package metadata passes; changed/missing dist,
+  unexpected runtime file or changed package metadata fails. Exercise a synthetic controller failure
+  through the actual shell wrapper and confirm nonzero plus no workload dispatch. No CLI product run
+  is needed for these checks; archive original setup failures and corrections separately.
+
+Clarified stopping policy: a deterministic pre-workload mistake in agent-created setup scripts may
+be corrected and rechecked in the same session, with original logs, exact correction and fresh stage
+records retained. Allow at most two such correction cycles in this continuation; after that return
+a concise blocker instead of repeated local attempts. This does not permit retrying real input/hash
+drift, fixture instability, product failure, unknown failure or any started diagnostic workload.
+Do not overwrite old gate records or erase run-start guards; use a fresh stage directory and preserve
+the chain of attempts. Once a CLI workload starts, original no-retry/stop rules apply unchanged.
+
+Obtain a new quiet window and hard stop; neither previous window is current authorization. Reuse the
+prepared variants and saved fixture, without rebuilding, regenerating, repacking or policy changes.
+All integrity/ownership/stability and per-run checks in the following restored-fixture packet remain.
+Keep execution/processing limits and total six-run budget. If setup passes, finish the assigned six
+runs in this session rather than returning merely because the known setup bug was corrected.
+If time is insufficient before run 1, preserve preparation and report that boundary honestly.
+
+Commit/push controller changes on the experiment branch before workloads. Save new evidence without
+altering sealed archives, and append the outcome here on M2 separately. No experimental merge,
+production repair, formal measurement or release acceptance is authorized.
+
 ## Current assignment: restored-fixture gate, then the unexecuted six runs
 
 Trunk reviewed outcome `a7ca9e6eead60496f350cc2cd5242ed7f9bc8432` and experiment

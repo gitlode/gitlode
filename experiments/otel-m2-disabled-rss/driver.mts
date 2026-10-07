@@ -1,25 +1,41 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, realpath } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import {
+  performanceStage,
+  performanceFinished,
+} from "../../packages/gitlode/scripts/tooling/performance-progress.js";
+import {
+  performanceBehaviorEvidence,
+  comparePerformanceBehavior,
+  type PerformanceBehavior,
+} from "../../packages/gitlode/test/support/performance-equivalence.js";
 import { createPerformanceRepository } from "../../packages/gitlode/test/support/performance-fixtures.js";
 import { launchMeasuredChild } from "../../packages/gitlode/test/support/performance-harness.js";
-import { performanceBehaviorEvidence, comparePerformanceBehavior, type PerformanceBehavior } from "../../packages/gitlode/test/support/performance-equivalence.js";
-import { performanceStage, performanceFinished } from "../../packages/gitlode/scripts/tooling/performance-progress.js";
+import { inspectRun } from "./inspection.mjs";
 
 const source = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const root = resolve(source, "../..");
-const repository = join(root, "fixture/repository");
+const repository = await realpath(join(root, "fixture/repository"));
 const mode = process.argv[2];
 if (mode === "prepare") {
   performanceStage({ stage: "preparation", operation: "repository-generation" });
   const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8"));
-  const quantities = manifest.calibrationTargets["commit_heavy_repository/isomorphic-git"].quantities;
+  const quantities =
+    manifest.calibrationTargets["commit_heavy_repository/isomorphic-git"].quantities;
   assert.equal(quantities.commits, 4430);
   await mkdir(join(root, "fixture"));
   await createPerformanceRepository(repository, "commit_heavy_repository", quantities);
-  await writeFile(join(root, "config.json"), JSON.stringify({ version: 1, runtime: { gitAdapter: "isomorphic-git" } }) + "\n");
-  await writeFile(join(root, "evidence/fixture-preparation.json"), JSON.stringify({ repository, quantities, completed: true }, null, 2));
+  await writeFile(
+    join(root, "config.json"),
+    JSON.stringify({ version: 1, runtime: { gitAdapter: "isomorphic-git" } }) + "\n",
+  );
+  await writeFile(
+    join(root, "evidence/fixture-preparation.json"),
+    JSON.stringify({ repository, quantities, completed: true }, null, 2),
+  );
 } else {
   assert.equal(mode, "run");
   const ordinal = Number(process.argv[3]);
@@ -32,50 +48,56 @@ if (mode === "prepare") {
   await mkdir(output);
   const checkpointPath = join(runDir, "state.json");
   const boundaries = join(runDir, "boundaries.jsonl");
-  const args = [join(root, "runtimes", variant, "dist/index.js"), repository, "--ref", "main", "--output-dir", output, "--output-prefix", "performance", "--state", checkpointPath, "--config", join(root, "config.json")];
-  await writeFile(join(runDir, "command.json"), JSON.stringify({ variant, ordinal, executable: process.execPath, args: [...args, "--quiet"], envObservation: boundaries, state: "target_off" }, null, 2));
-  performanceStage({ stage: "execution", operation: "release-cli", iteration: ordinal, state: "target_off" });
-  const raw = await launchMeasuredChild({ executable: process.execPath, args, outputDirectory: output, checkpointPath, state: "target_off", phase: "measured", order: ordinal <= 3 ? "A-B" : "B-A", env: { ...process.env, GITLODE_RSS_EXPERIMENT_LOG: boundaries } });
+  const args = [
+    join(root, "runtimes", variant, "dist/index.js"),
+    repository,
+    "--ref",
+    "main",
+    "--output-dir",
+    output,
+    "--output-prefix",
+    "performance",
+    "--state",
+    checkpointPath,
+    "--config",
+    join(root, "config.json"),
+  ];
+  await writeFile(
+    join(runDir, "command.json"),
+    JSON.stringify(
+      {
+        variant,
+        ordinal,
+        executable: process.execPath,
+        args: [...args, "--quiet"],
+        envObservation: boundaries,
+        state: "target_off",
+      },
+      null,
+      2,
+    ),
+  );
+  performanceStage({
+    stage: "execution",
+    operation: "release-cli",
+    iteration: ordinal,
+    state: "target_off",
+  });
+  const raw = await launchMeasuredChild({
+    executable: process.execPath,
+    args,
+    outputDirectory: output,
+    checkpointPath,
+    state: "target_off",
+    phase: "measured",
+    order: ordinal <= 3 ? "A-B" : "B-A",
+    env: { ...process.env, GITLODE_RSS_EXPERIMENT_LOG: boundaries },
+  });
   await writeFile(join(runDir, "raw.json"), JSON.stringify(raw, null, 2));
   performanceStage({ stage: "processing", operation: "capture-run" });
-  const checkpoint = JSON.parse(await readFile(checkpointPath, "utf8"));
-  const jsonl = await Promise.all((await readdir(output)).sort().map(async name => ({ name, bytes: await readFile(join(output, name)) })));
-  const value = (item: { status: string; value?: number }) => { assert.equal(item.status, "available"); return item.value as number; };
-  const behavior: PerformanceBehavior = { exit: raw.exit, checkpoint, jsonl, captureErrors: raw.captureErrors, derived: { records: value(raw.records), commits: value(raw.commits), skippedDiffs: value(raw.skippedDiffs), files: raw.outputFiles.length, bytes: raw.outputBytes } };
-  const evidence = performanceBehaviorEvidence(behavior, repository);
-  await writeFile(join(runDir, "behavior.json"), JSON.stringify(evidence, null, 2));
-  const observations = (await readFile(boundaries, "utf8")).trim().split("\n").map(line => JSON.parse(line));
-  const expected = ["host-after-imports-before-worker", "worker-after-imports-before-request", "worker-after-disabled-composition", "worker-before-extraction", "worker-after-extraction-before-finalization", "host-application-result", "host-after-worker-exit"];
-  assert.deepEqual(observations.map(item => item.boundary).sort(), expected.sort());
-  const composition = observations.find(item => item.boundary === "worker-after-disabled-composition").detail;
-  assert.equal(composition.profile, false);
-  assert.equal(composition.recordingEnabled, false);
-  assert.equal(composition.rootRecording, false);
-  assert.equal(raw.exit.code, 0); assert.equal(raw.exit.signal, null);
-  assert.equal(raw.peakRss.status, "supported"); assert.equal(raw.peakRss.intervalMs, 20);
-  assert.equal(behavior.derived.records, 4430); assert.equal(behavior.derived.commits, 4430);
-  assert.equal(behavior.derived.files, 1); assert.deepEqual(evidence.captureErrors, []);
-  const result = observations.find(item => item.boundary === "host-application-result").detail;
-  assert.equal(result.kind, "success");
-  assert.equal(result.success.recordsWritten, 4430); assert.equal(result.success.commitsTraversed, 4430);
-  assert.equal(result.success.profileReport, undefined);
-  const normalizedResult = { ...result, success: { ...result.success } };
-  delete normalizedResult.success.elapsedMs;
-  normalizedResult.checkpoint = { ...result.checkpoint, repositoryPath: "<repository>", refs: result.checkpoint.refs.map((ref: { updatedAt?: unknown }) => ({ ...ref, ...(ref.updatedAt === undefined ? {} : { updatedAt: "<session>" }) })) };
-  await writeFile(join(runDir, "application-result.json"), JSON.stringify(normalizedResult, null, 2));
-  let errors: string[] = [];
-  if (ordinal > 1) {
-    const baselineDir = join(root, "runs/1");
-    const baselineCheckpoint = JSON.parse(await readFile(join(baselineDir, "state.json"), "utf8"));
-    const baselineEvidence = JSON.parse(await readFile(join(baselineDir, "behavior.json"), "utf8"));
-    const baselineOutput = join(baselineDir, "output");
-    const baselineJsonl = await Promise.all((await readdir(baselineOutput)).sort().map(async name => ({ name, bytes: await readFile(join(baselineOutput, name)) })));
-    const baseline: PerformanceBehavior = { exit: baselineEvidence.exit, checkpoint: baselineCheckpoint, jsonl: baselineJsonl, derived: baselineEvidence.derived, captureErrors: baselineEvidence.captureErrors };
-    errors = comparePerformanceBehavior(baseline, behavior, { repositoryPath: repository, baselineGeneratedAt: baselineCheckpoint.generatedAt, candidateGeneratedAt: checkpoint.generatedAt });
-    assert.deepEqual(normalizedResult, JSON.parse(await readFile(join(baselineDir, "application-result.json"), "utf8")));
-  }
-  await writeFile(join(runDir, "inspection.json"), JSON.stringify({ variant, ordinal, errors, outputEquivalent: errors.length === 0, telemetryDisabled: true, boundaries: observations, elapsedMs: raw.elapsedMs, peakBytes: raw.peakRss.peakBytes }, null, 2));
-  assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ordinal, variant, elapsedMs: raw.elapsedMs, peakBytes: raw.peakRss.peakBytes, outputEquivalent: true }));
+  const baselineDir =
+    ordinal > 1 ? (process.env.GITLODE_RSS_BASELINE ?? join(root, "runs/1")) : undefined;
+  const inspection = await inspectRun(runDir, repository, ordinal, variant, runDir, baselineDir);
+  console.log(JSON.stringify(inspection));
 }
 await performanceFinished();

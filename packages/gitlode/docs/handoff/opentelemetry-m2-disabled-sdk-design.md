@@ -1093,3 +1093,107 @@ Markdown target verification (28 relative links across the five affected documen
 is a final handoff-only delivery commit; its actual remote/clean/unchanged-parent check and OID are
 returned to trunk with the final message, avoiding a self-referential hash. **Stop for independent
 D2 review.** No formal measurement, PR, merge, parent update, freeze or acceptance update follows.
+
+## Independent D2 review (2026-10-07)
+
+**Disposition: accepted for D2 only; mandatory corrections: none.** Reviewed fixed implementation
+`6e84279819ce50e961ef99dc92ffa5a90219bc34` against
+`a2a487ed9a01daed6f2564f44595a5996a8cf49d`, the approved design, accepted D1 review, complete D2
+change/outcome and canonical architecture/domain, telemetry/verification and build/release contracts.
+D1 remains accepted. This functional boundary review does not resolve RSS causality or performance
+acceptance, accept M2 integration, freeze a candidate or update an acceptance record.
+
+### Identity and review scope
+
+Started clean at `21556b2baaf5d77313e0073cf39920b84664cc1e` on
+`feature/otel-redesign_M2_disabled`. Base -> fixed implementation -> start ancestry passes.
+Base-to-fixed inventory is 15 files including maintenance; maintenance-to-fixed is 14 files.
+Current implementation/config/tests equal the fixed implementation: subsequent changes are only
+four Markdown files. Production source across the five production workspaces equals accepted D1;
+dependencies, lockfile, public exports and lint/architecture configuration are unchanged.
+The sealed `implementation.patch` and source-identity inventory describe **maintenance-to-fixed**,
+not base-to-fixed: byte comparison against that exact Git diff passes (48,177 bytes). The retired
+helper is the additional base-to-fixed deletion, not an omitted implementation change.
+
+Initial actual remote child equaled the starting checkpoint. Local parent, tracking parent,
+merge base and actual remote parent all equal `57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`.
+Git used per-command safe.directory only. Initial sandbox remote access failed; authorized network
+execution read the actual remote successfully. No persistent Git/global environment change was made.
+
+### Independent assessment
+
+| Concern / repository location                                                                                  | Assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/gitlode/scripts/tooling/release-telemetry-boundary.ts:55`, `packages/gitlode/tsdown.config.ts:81`    | Rolldown emitted imports, dynamicImports and moduleIds are inspected during generateBundle. Each of index, worker-entry and plugin-api recursively follows static shared chunks; lazy edges do not become eager edges. All emitted local lazy targets are checked for existence. Source ownership covers the current enabled/collector/report implementation files, including retained module ownership after tree shaking. External manifests are followed transitively by resolved package directory with cycle protection; API is permitted, SDK/context/core/resources/semantic-conventions and private workspace specifiers are rejected. No blanket third-party dependency exception is present. Actual emitted graph has the enabled implementation solely behind a lazy edge; independently rebuilt eager closures pass with 3/2/1 chunks. Those counts/names are snapshot evidence, not assertions. |
+| `tests/system/scripts/installed-load-guard.ts:6`, `:128`, `tests/system/scripts/test-installed-package.ts:320` | Inherited preload registers ESM hooks and CJS load/resolve interception in the real CLI and request worker. Each positively exercises all three probe events; worker-result success additionally proves real extraction ran. Inventory follows actual SDK/context manifests, including sdk-trace-base's sdk-trace owner and transitive core/resources/semantic-conventions, recording names, versions and realpaths. Denial checks both requests and resolved identities. The Node Worker observer attaches before product request dispatch; loader support threads are not counted as application isolates. Both saved campaigns and independent run show host 0/worker 2 activation.                                                                                                                                                                                                                       |
+| `tests/system/scripts/test-installed-package.ts:375`                                                           | Controlled plugin-owned SDK import is positively attributed to its plugin importer and leaves the session without a report; finally restores the SDK-free fixture before product zero-load cases. Both adapters independently pass Disabled with and without denial, zero SDK events, no initialization warning/report and exact output byte/sequence equality. Enabled actually loads SDK only in worker 2 and produces complete schema-2 observations. Denial records three denied requests, exactly one sanitized warning, no report and unchanged output.                                                                                                                                                                                                                                                                                                                                                |
+| `tests/system/scripts/test-installed-package.ts:446`                                                           | Enabled-only installed JS asset is discovered from positive versus disabled loads, removed only in the disposable installation and restored in finally. Missing asset permits degraded application success, but the ordinary assertEnabledReport rejects it. This is sensitivity of the positive telemetry assertion, not acceptance of degraded output as telemetry success. Child commands own 180-second deadlines and process-tree cleanup; consumers are outside the checkout and removed in finally.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `packages/gitlode/test/telemetry/sdk-construction-boundary.test.ts:46`                                         | Real SDK exports are wrapped at their constructors and invoked through the production session factory. Disabled/import-degraded counts remain zero; Enabled positively constructs trace/meter/context once each. This independent constructor check does not infer construction from import traces or absent output. Saved extra-MeterProvider mutation fails the zero-count assertion; independently executed restored test passes. Accepted D1 resource/global-sentinel evidence remains separately attributed.                                                                                                                                                                                                                                                                                                                                                                                            |
+| `packages/gitlode/test/telemetry/aggregation-child.test.ts:17`                                                 | Existing builder's sorted filename-plus-byte inventory is reconstructed exactly. Bundler resolution traverses static/dynamic local assets and requires each resolved local module to belong to inventory; a dynamic edge is positively required. Small scale-4 Enabled/Disabled invocations pass with bounded build/child deadlines. Inventory/bundling semantics are preserved; no N/4N or measurement is needed or performed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `packages/gitlode/tsconfig.release-boundary.json`, `tests/system/tsconfig.json`, package commands              | Explicit strict projects include new product tooling/config/tests and all system scripts respectively. Root validate:release and release bundle commands durably reach the checks. Existing installed CLI/help/version, adapters, line diff, plugin, schema and strict public TypeScript consumer assertions remain. System scripts import local helpers/Node only; installed asset inspection and Node preload observation fit the documented public package boundary. Supplemental saved full report normalization belongs to product tooling, not a system private-source exception.                                                                                                                                                                                                                                                                                                                      |
+| `packages/gitlode/docs/handoff/opentelemetry-m2-first-target-measurement.md:389`                               | Historical helper retrieval from D1 review commit returns blob `f6a8f88772b1a96cc0624c24f578ee4d9751819f` (independently reconstructed/hashed exact Git bytes). Recipe preserves bytes through Python and restores outside checkout before read-only use against saved archives. derived.json remains unchanged; no active automated consumer was found. Retirement introduces no ignore/allowlist/lint/orphan-rule change. The derivation was not executed and sealed archives were not modified.                                                                                                                                                                                                                                                                                                                                                                                                           |
+
+No concrete D2 regression or mandatory remedy was found. Optional future hardening: associate
+activation explicitly with the observed Worker's threadId if the CLI later creates additional
+application workers; current single-request worker wiring and captured traces establish the actual
+worker today. Declared-dependency closure is conservative rather than a parser of every external
+package's conditional execution. Controlled plugin coverage is intentionally finite, as approved.
+
+### Independently executed finite verification
+
+Windows, Node 22.23.1 / npm 11.11.0, current source equal to the fixed implementation:
+
+- `npm run build:dev`: exit 0.
+- `npm run typecheck:release-boundary -w gitlode`: exit 0, explicit strict tooling/config/new-test typing.
+- `npm run typecheck:system`: exit 0.
+- `npx vitest run packages/gitlode/test/telemetry/sdk-construction-boundary.test.ts packages/gitlode/test/telemetry/aggregation-child.test.ts`:
+  exit 0, **2 files / 3 passed / 0 skipped**.
+- `npm run build:release`: exit 0, strict boundary typing and all three emitted graph roots executed.
+- `npm run test:system:package`: exit 0, one installed campaign, all 11 guard cases plus existing
+  package assertions. No development rebuild occurred between release bundle and packing.
+
+Logs and independent guard JSONL/identities are retained separately under
+`%TEMP%/gitlode-d2-independent-21556b2` (outside checkout); installed commands retain their owned
+180-second deadlines and first-failure facility. No independent command failed, no dependency was
+changed, and no extra mutation or package retry was performed. Installed tarball SHA-256 is
+`b0405d2a753be0aac367e465531aa5d49f172644270dd4fa32cb2e8924e25bc7`; all six installed runtime
+hashes and compiler Version 7.0.2 match saved Windows package-identity.json exactly. Independent
+consumer SDK closure again resolves 2.12.0 (semantic-conventions 1.43.0), separately from repository
+lockfile SDK 2.10.0. Installed consumer cleanup completed. This is not a repeated full release chain.
+
+### Saved evidence inspected, not independently rerun
+
+Read-only rehash of the Windows archive verifies **155 files / 36,313,274 bytes**, zero size/hash
+mismatches, and manifest SHA-256
+`ac3d3796276e881e6e7eec0c5652628a83ab4f63b09110fd64c78a24d992a33c`.
+Inspected source identity/patch, both OS preflight/commands/final records, full validate-release logs,
+installed identities and all 22 guard traces, normalization evidence, development first failures
+and negative supervisor/logs. The Linux evidence inspected is the sealed Windows archive's Linux
+campaign copy; no independent Linux execution or rehash of the separate ext4 archive is claimed.
+
+Saved Windows full chain: 98 files / 1,314 passed / 28 existing Linux-only skips.
+Saved Linux/ext4 full chain: 98 files / 1,342 passed / 0 skipped. Both execute strict checks, graph,
+constructor, aggregation, publint and installed assertions with exit 0. Linux's two nested intentional
+fixture failures belong to passing diagnostic-retention tests, not failed/retried campaigns.
+Preflight/final bind clean detached fixed OID, external TEMP, toolchain/executable hashes and cleanup;
+command order places packing after release bundling. Saved forbidden-eager mutation fails at actual
+collector ownership; saved extra MeterProvider construction fails the separate sentinel. Neither
+negative mutation was independently replayed. Development operator failures remain retained and
+separate from the fixed successful campaigns.
+
+Saved Linux tarball hash is `e4d37c208cd6e6dba3ab887efa097e9c096ec97c41611a4ff8047732a845af45`;
+all six runtime JS hashes agree across OSes and with this independent build. Removed tarballs and
+consumer trees cannot now be rehashed or reconstructed as the original complete dependency closure.
+Recorded hashes/installed traces and command logs establish the tested D2 package/runtime inputs;
+they do not provide a retained frozen consumer. No concrete missing evidence blocks this functional
+D2 review. A later formal freeze must retain and independently verify its actual package, runtime
+and dependency closure; this review does not transfer historical runtime identity into that freeze.
+
+### Return boundary
+
+Only this review document is changed. Root format write/check and Git diff-check are required before
+the documentation-only commit. Normal push and actual remote/clean/unchanged-parent verification
+follow; final commit OID is returned outside this document to avoid a self-referential hash.
+Remain on the child and return to trunk for assignment. No implementation repair, PR, merge, parent
+update, formal/diagnostic measurement, freeze or acceptance-record edit was performed. Cumulative
+integration and all descendant RSS/performance/T13B/T13C obligations remain separate and unresolved.

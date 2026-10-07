@@ -619,3 +619,97 @@ measurement, PR, merge, parent update, candidate freeze or acceptance-record upd
 RSS failure and all remaining cumulative review/integration/candidate/T13B/T13C obligations remain.
 Return on the child with normal pushes, actual remote equality and clean status; wait for independent
 review without starting D2 or accepting D1.
+
+## D1 independent review (2026-10-07)
+
+**Disposition: accepted for D1 only.** Reviewed implementation
+`04dc187573a63bd2110c381306b26fd050d53220` against base
+`8d622af2cfc435c06aac3ab0f8b16b5bbaf5e206`, approved design, D1 outcome and changed canonical
+contracts. No mandatory source/lifecycle correction was found. This does not accept D2, release
+isolation, cumulative integration or performance. No acceptance record is updated.
+
+### Independently established scope and findings
+
+Review began at clean `93b8e8c7ec207f124b4745cca6343a9590e680c2` on the assigned child.
+Ancestry checks passed for base -> implementation -> starting checkpoint. The fixed diff has 18
+files, matching the outcome inventory. Post-implementation changes through the starting checkpoint
+are only three handoff documents; current production/test source equals the fixed implementation.
+Local parent, parent tracking ref, merge base and actual remote parent are
+`57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`; actual remote child initially equaled the starting
+checkpoint. Git used per-command safe.directory, with no persistent configuration change.
+
+The complete fixed change was inspected, including ordinary and whitespace-insensitive execution
+comparison and a whitespace-normalized comparison of the old finalization body with the moved enabled
+body. Enabled lifecycle differences are the guarded unavailable span snapshot/status and backend
+report return; flush, metric timeout/collection, report fallback and post-shutdown enrichment retain
+the old flow. Execute-run's indentation is not an application rewrite: the substantive new boundary
+finalizes an acquired session on unexpected rejection. Worker-entry forwards the requested enabled
+state. Changed architecture/domain, telemetry/verification, plugin, usage, profiling and build guidance
+agree with the approved source contract and explicitly retain pending release evidence.
+
+| Concern and location (relative to `packages/gitlode`)                                     | Independent assessment                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/execution/telemetry/worker-telemetry-session.ts:77` and `noop-worker-telemetry.ts:7` | Disabled returns before loader and hooks. The no-op provider is private, never registered/delegated, with API no-op meter. Installed API 1.9.0 ProxyTracerProvider/ProxyTracer source confirms fallback uses that private provider, not global lookup. Root explicitly uses root=true/ROOT_CONTEXT; explicit valid children preserve parent context without recording. Existing-manager and absent-manager behavior is tested separately. |
+| `src/execution/telemetry/enabled-worker-telemetry.ts:365`                                 | Real production enabled factory acquires processor/reader before providers, transfers cleanup only after successful constructors, distinguishes candidate/owned manager and ends an acquired root on failure. Each cleanup rejection is contained before the next resource. Disabled/Degraded never construct fallback SDK providers. Tests spy on actual owned shutdown/disable/end, not just attempt names.                             |
+| `src/execution/telemetry/enabled-worker-telemetry.ts:157`                                 | Root end, flush, snapshot, collect, builder/fixed fallback and individual shutdown fault paths retain result delivery. Actual asynchronous observable rejection/non-settlement and actual root/snapshot failures are covered. Unavailable span snapshot still permits metric collection and shutdown. Supported factory backends contain lifecycle rejection.                                                                             |
+| `src/execution/telemetry/worker-telemetry-session.ts:57`                                  | Promise is stored before the deferred backend call. Reentrant/concurrent/repeated calls preserve exact promise, resolved object and first result reference across all three states; root end occurs once.                                                                                                                                                                                                                                 |
+| `src/execution/execute-run.ts:541`                                                        | With the supported production factory, cleanup faults do not replace the original unexpected application rejection. The independently run combined-fault probe below exercised actual SDK shutdown rejection and later meter cleanup. A deliberately rejecting arbitrary custom backend would reject the owner promise and this await, but that is not a supported production backend/fault path and is not classified as a D1 defect.    |
+| `test/execution/execute-run.test.ts:412` and `:1305`                                      | Actual composition retains all nine recorder/DAG selections, including both built-in projection paths and plugin projection, with identity/timing checks. Success/user-error/runtime-error disposal stays before root end in Enabled/Disabled/Degraded. Real development worker fallback test retains enabled report transport and verifies profile=false through the same hook.                                                          |
+
+Mandatory defects: none. Optional hardening: an outer last-resort owner rejection guard could protect
+against future backend bugs, but it would need explicit report/cleanup semantics and is not required
+to accept the supported D1 paths. No implementation change is requested by this review.
+
+### Independent commands and bounded probe
+
+Commands ran at the repository root against source equal to the fixed implementation:
+
+- `npm run build:dev`: exit 0.
+- `npx tsc -p packages/gitlode/tsconfig.json --noEmit --incremental false --composite false --noCheck false`:
+  exit 0, strict product-source typing, not full test-source typing.
+- The command below: exit 0, **11 files / 184 tests passed / 0 skipped**. This combines the reported
+  affected suites (10 files / 172 tests) and behavioral-baseline (1 file / 12 tests); neither
+  nonexistent selector was included.
+
+```text
+npx vitest run packages/gitlode/test/execution packages/gitlode/test/telemetry/worker-telemetry-boundary.test.ts packages/gitlode/test/telemetry/worker-telemetry-session.test.ts packages/gitlode/test/telemetry/local-collection.test.ts packages/gitlode/test/telemetry/profile-report-primitives.test.ts packages/gitlode/test/telemetry/behavioral-baseline.test.ts
+```
+
+One disposable combined-fault probe extended the existing acquired-session unexpected-rejection test:
+real BasicTracerProvider.shutdown completed its original cleanup then rejected; the test also asserted
+one trace shutdown and one later MeterProvider.shutdown, original thrown-object identity and one root
+end. `npx vitest run packages/gitlode/test/execution/execute-run.test.ts -t "finalizes an acquired session" --testTimeout 5000`
+passed **1 test / 26 filtered skips**, with no unhandled errors. The probe used the production factory,
+not a fabricated backend. Original bytes were restored in finally; subsequent source/test diff against
+`04dc187` was empty. No disposable test or implementation edit is committed.
+
+### Existing diagnostics, reported evidence and remaining gates
+
+Independently rerun broad checks remain failing, not waived or represented as passing:
+
+- `npm run lint`: exit 1, only the three derive.cjs no-commonjs diagnostics at lines 2/3/4.
+- `npm run architecture:check`: build passes, exit 1 only for that derive.cjs orphan; other displayed
+  checks pass. The existing config warning remains (0 errors / 1 warning).
+- Git blob comparison proves derive.cjs is byte-identical at base and current HEAD:
+  `f6a8f88772b1a96cc0624c24f578ee4d9751819f`. These diagnostics predate this slice and remain tracked.
+  D2/release planning must explicitly resolve or disposition this validation obstruction before
+  claiming a successful cumulative chain. This review does not authorize its repair or exception.
+
+The outcome's three disposable negative mutations and their exact fail/skip/unhandled-error counts
+remain **reported evidence**, not independently repeated sensitivity runs. Inspection confirms the
+positive tests observe the production factory and meaningful global/owned-resource sentinels; the
+revised bounded reentry test passed independently. The previous targeted oxlint, Markdown-link checks
+and operator correction history likewise remain attributed to the outcome, not new independent runs.
+This review's combined-fault probe is positive fault-isolation evidence, not a negative mutation.
+
+D2 is deliberately unperformed: emitted three-entry/shared/transitive SDK closure, real host/worker
+ESM/CommonJS import/load and constructor guards, packed enabled positive/missing-chunk sensitivity,
+aggregation dynamic asset closure and bounded release/package identities remain open. Their absence
+is not a D1 defect and D1 acceptance cannot close them. The old formal RSS failure, cumulative review,
+human integration approval, candidate preservation and T13B/T13C obligations remain unchanged.
+No installation, release campaign, measurement, PR, merge, parent change or formal acceptance update
+was performed. Trunk receives this D1-only review while the worktree remains on the child.
+
+Review document verification: `npm run format:write`, `npm run format:check` and `git diff --check`
+pass. The checkpoint changes only this handoff. Normal push and final actual remote/clean/parent
+verification are returned with the checkpoint OID, avoiding a self-referential document hash.

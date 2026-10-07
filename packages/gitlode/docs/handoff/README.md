@@ -8,7 +8,8 @@ documents.
 
 ## Active OpenTelemetry work
 
-Current assignment: [disabled SDK boundary D1 independent review](opentelemetry-m2-disabled-sdk-design.md).
+Current assignment: [disabled SDK boundary D2 release-boundary implementation](opentelemetry-m2-disabled-sdk-design.md).
+D1 is independently accepted at implementation `04dc187`; D2 and performance acceptance remain open.
 Trunk accepted the design with the human-approved invalid no-op root identity. D1 covers source
 session/lifecycle changes; separate D2 emitted/installed boundary verification remains required.
 The bounded RSS experiment is closed with unresolved attribution; further formal measurement is not

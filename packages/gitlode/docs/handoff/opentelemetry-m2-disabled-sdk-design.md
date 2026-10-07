@@ -1,5 +1,92 @@
 # M2 disabled SDK boundary: detailed design assignment
 
+## Active routing: D2 implementation and release-boundary verification
+
+Trunk accepts the independent D1 review recorded at
+`f35e0e11654574be72868c380c8b58a145bea36e` for implementation
+`04dc187573a63bd2110c381306b26fd050d53220`. D1 has no mandatory correction. This section
+supersedes the previous D1 assignment/review routing; those sections retain scope and evidence.
+D2 is now assigned on the same `feature/otel-redesign_M2_disabled` child. Record the exact starting
+checkpoint and verify the delta from the review is documentation only. Parent M2 must remain
+`57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`; inspect unexpected changes rather than resetting refs.
+
+### Bounded implementation
+
+Read the approved detailed design, D1 review, canonical telemetry verification, architecture and
+build-test-release guidance plus tests/system instructions. Implement the following checks in their
+existing owners; do not create a general observability or bundler framework.
+
+1. Product-owned emitted-graph verification covers index, worker-entry and plugin-api, recursively
+   following static shared-chunk edges and external dependency identities. Distinguish lazy edges
+   from eager edges and recognize transitive SDK/context/collector/report ownership. Use parsed
+   imports/build metadata or source-map ownership where appropriate; string search or fixed chunk
+   names/counts are insufficient. Fail on forbidden eager reachability and private workspace leakage.
+2. Installed-package verification uses only packed/public behavior and installed files, not private
+   product-source imports. Observe ESM and CommonJS resolution/loading in both actual CLI host and
+   worker, with positive guard-activation evidence per isolate. Disabled extraction must complete
+   without SDK/context implementation loads. Denying those loads must leave Disabled successful and
+   make Enabled degrade with its single sanitized warning while preserving application output.
+   Separate plugins' own loads from gitlode's boundary using controlled fixtures.
+3. The normal installed Enabled case must positively load lazy assets and produce a valid schema-2
+   report/observations. Check representative adapters and plugins through existing package assertions.
+   A missing enabled chunk in a disposable installation must be detected by that positive assertion;
+   do not mistake a successful degraded application exit for successful enabled telemetry.
+4. Prove aggregation-child lazy asset completeness and identity inventory using its existing builder
+   and a small functional invocation, not N/4N or any formal/diagnostic workload. Preserve its existing
+   inventory semantics when adequate. Bundler changes are allowed only for a demonstrated missing
+   asset/hoisting problem. Do not redesign performance protocols or historical artifacts.
+5. Demonstrate finite negative sensitivity: one forbidden eager edge must fail the graph/load boundary,
+   and an SDK provider-construction regression must fail a distinct check. Reuse accepted D1 actual
+   constructor/global-sentinel evidence where it proves the required claim, recording attribution;
+   do not count absence of profile output as construction evidence. Restore all disposable mutations.
+
+Keep guards and children bounded with explicit deadlines, owned cleanup and retained first-failure
+logs. Do not modify global environment/Node installation or weaken checks to accommodate a guard.
+Preserve the system workspace's strict typing, containment, consumer and package boundaries. Update
+canonical verification/build guidance and applicable CI/command wiring so the new checks have a
+durable execution path, not just a one-time probe. No dependency upgrades, public export changes,
+telemetry semantics changes, threshold changes or broad scripts reorganization.
+
+### Historical diagnosis helper disposition
+
+The completed read-only `docs/handoff/m2-first-target-diagnosis/derive.cjs` is the known pre-existing
+lint/architecture obstruction. In a separate maintenance checkpoint, retire this one helper from the
+working tree and replace its live link/reproduction command in the first-target handoff with an exact
+Git retrieval recipe using D1 review commit `f35e0e11654574be72868c380c8b58a145bea36e` and original
+path. Verify its blob is `f6a8f88772b1a96cc0624c24f578ee4d9751819f` before removal. Preserve derived.json,
+historical diagnosis and every external sealed archive. Explain that reproduction uses a restored
+copy outside the working tree against saved artifacts; it must not launch measurements. This is
+retirement of a completed temporary script, not a lint exclusion or evidence invalidation. Stop if
+inspection reveals an active automated consumer. Do not relax lint, orphan detection or allowlists.
+
+### Finite validation and evidence
+
+Develop with focused graph/guard/package tests and strict checks for changed tooling (including
+product tooling outside production tsc coverage); run format write/check and diff check. Save a
+meaningful implementation checkpoint before cumulative verification. Preserve D1 behavior through
+its existing regressions rather than reimplementing the accepted session design.
+
+Against one fixed implementation OID, use isolated Windows and Linux/ext4 Git checkouts with TEMP
+outside the checkout. Verify paths, toolchain, Git metadata, deadlines and cleanup before launching
+the campaign. Run npm ci and the canonical `npm run validate:release` chain once per OS; this includes
+source tests, release build, publint and installed-package checks. Do not run `npm run release` or
+changeset publish. Ensure the new graph/load checks actually execute, and record any platform scope
+or skipped assertions explicitly. Do not rebuild development output between release bundling and
+packing. Retain package/runtime hashes, consumer compiler version and source/command/result mapping.
+
+Store logs and manifests in a new uniquely named archive under D:/gitlode_test with a Linux copy;
+verify copied hashes before sealing and never append after sealing. Document operator failures,
+unresolved checks and exact verification limits. For an understood setup error, preserve the failure
+and make a scoped correction; unexplained product/integrity failures stop the campaign. No repeated
+runs to obtain green results, and no additional performance attempt.
+
+Return implementation/maintenance/outcome OIDs, file/command inventory, positive and negative boundary
+evidence, Windows/Linux counts/skips, package identities, archive manifest/hash and remaining issues
+in this document. Normally push checkpoints to the child and verify actual remote equality, clean
+status and unchanged parent. Remain on the child, stop for independent D2 review, and do not self-accept
+D2/M2. No PR, merge, parent update, archive-ref replacement, freeze or acceptance-record update.
+RSS causality and performance acceptance remain unresolved even if every D2 check passes.
+
 ## Trunk disposition and active implementation packet (2026-10-07)
 
 ### Active routing: D1 independent review

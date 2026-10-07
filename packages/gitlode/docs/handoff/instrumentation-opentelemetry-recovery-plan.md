@@ -1,5 +1,14 @@
 # OpenTelemetry M2 continuation plan
 
+## Current assignment (2026-10-07)
+
+The six-run RSS diagnostic is closed, cause unresolved, at outcome `85526d2`; no more diagnostic
+runs are authorized. The human approved product detailed design to avoid disabled SDK loading and
+provider construction. The [disabled SDK design packet](opentelemetry-m2-disabled-sdk-design.md)
+supersedes older measurement/experiment assignments below. It is documentation-only on a separate
+child, followed by trunk design review and a separately assigned implementation. Formal disabled
+RSS fail, fixed F inputs and the remaining T13B/M2/release gates remain unchanged.
+
 ## Authority and current status
 
 The human accepted staged convergence, Linux/WSL2 reference measurement, private `tests/system`

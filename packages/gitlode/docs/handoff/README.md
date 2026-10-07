@@ -8,6 +8,10 @@ documents.
 
 ## Active OpenTelemetry work
 
+Current assignment: [disabled SDK boundary detailed design](opentelemetry-m2-disabled-sdk-design.md).
+The bounded RSS experiment is closed with unresolved attribution; further formal measurement is not
+assigned. The human approved this product design direction, not an experimental-code merge.
+
 Start with the [M2 continuation plan](instrumentation-opentelemetry-recovery-plan.md) for milestones,
 remaining decisions, branch/evidence preservation and session routing. M1 is integrated; M2 proceeds
 on `feature/otel-redesign_M2`. The [redesign plan](instrumentation-opentelemetry-redesign-plan.md)

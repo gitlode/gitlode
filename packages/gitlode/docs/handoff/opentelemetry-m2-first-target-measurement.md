@@ -392,11 +392,11 @@ historical source remains at D1 review commit `f35e0e11654574be72868c380c8b58a14
 `f6a8f88772b1a96cc0624c24f578ee4d9751819f`. No automated consumer was found.
 [Unrounded derived evidence](m2-first-target-diagnosis/derived.json) remains unchanged.
 
-Restore outside the checkout, for example from PowerShell (Git writes the exact blob bytes):
+Restore outside the checkout, for example from PowerShell (Python preserves Git stdout as exact blob bytes):
 
 ```powershell
 $restoredHelper = Join-Path $env:TEMP 'gitlode-historical-derive.cjs'
-git show --output=$restoredHelper f35e0e11654574be72868c380c8b58a145bea36e:packages/gitlode/docs/handoff/m2-first-target-diagnosis/derive.cjs
+python -c "import pathlib,subprocess,sys; pathlib.Path(sys.argv[1]).write_bytes(subprocess.check_output(['git','show','f35e0e11654574be72868c380c8b58a145bea36e:packages/gitlode/docs/handoff/m2-first-target-diagnosis/derive.cjs']))" $restoredHelper
 git hash-object $restoredHelper
 node $restoredHelper D:/gitlode_test/m2-first-target-8fffcc0-20261002 D:/gitlode_test/m0-one-target-20260910T065854Z-a53a5b8
 ```

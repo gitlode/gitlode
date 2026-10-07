@@ -200,3 +200,19 @@ and transport tests. Collector/internal-access tests remain with implementation 
 system workspace checks installed CLI/worker/schema/public API through the package contract and grants
 no internal import exception. The [build guide](../contributing/build-test-release.md) owns commands
 and runner typing. Performance checks follow [performance policy](telemetry-performance.md) separately.
+
+## Release SDK boundary execution
+
+Release bundling validates all three stable entries using emitted module/edge metadata, including
+shared chunks and conservative external dependency closure. The installed-package command checks
+actual CLI/worker ESM and CommonJS guards, SDK denial, positive Enabled observations, lazy asset
+loading and missing-asset sensitivity. See the [build guide](../contributing/build-test-release.md#lazy-telemetry-release-boundary)
+for commands and evidence ownership. These checks do not infer construction from absent output:
+`sdk-construction-boundary.test.ts` intercepts actual SDK constructor calls through the production
+factory and positively activates the same sentinels in Enabled. Existing D1 global-provider and
+lifecycle regressions remain independent evidence.
+
+`aggregation-child.test.ts` uses the existing builder, reconstructs its sorted filename/byte identity
+inventory, resolves the emitted static/lazy graph with the existing bundler, and invokes a small
+Enabled/Disabled child. Every resolved local module must belong to that inventory. This functional
+asset check is separate from N/4N and starts no performance campaign.

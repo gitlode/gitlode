@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noCheck": false,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "sourceMap": false
+  },
+  "include": [
+    "tsdown.config.ts",
+    "scripts/tooling/release-telemetry-boundary.ts",
+    "scripts/tooling/aggregation-collector-bundle.ts",
+    "test/telemetry/aggregation-child.test.ts",
+    "test/telemetry/sdk-construction-boundary.test.ts"
+  ]
+}

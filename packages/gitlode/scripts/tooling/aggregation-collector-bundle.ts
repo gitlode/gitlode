@@ -27,7 +27,7 @@ export async function buildAggregationCollectorBundle(outputDirectory: string) {
       "false",
       "--clean",
     ],
-    { cwd: resolve(dirname(sourcePath), "../.."), windowsHide: true },
+    { cwd: resolve(dirname(sourcePath), "../.."), windowsHide: true, timeout: 60_000 },
   );
   const files = (await readdir(outputDirectory, { recursive: true })).filter((file) =>
     /\.(?:js|mjs)$/.test(file),

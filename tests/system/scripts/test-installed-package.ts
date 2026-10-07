@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   access,
   mkdir,
@@ -8,9 +9,19 @@ import {
   realpath,
   rm,
   writeFile,
+  copyFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { pathToFileURL } from "node:url";
+
+import {
+  assertEnabledReport,
+  assertGuardActivation,
+  sdkEvents,
+  writeInstalledLoadGuard,
+  type LoadEvent,
+} from "./installed-load-guard.js";
 
 type CommandResult = {
   stdout: string;
@@ -45,14 +56,37 @@ function run(
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, ...environment, NO_COLOR: "1" },
+      detached: process.platform !== "win32",
+      windowsHide: true,
     });
     let stdout = "";
     let stderr = "";
+    let timedOut = false;
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      stderr += "\nOwned command exceeded 180-second deadline.\n";
+      if (process.platform === "win32" && child.pid) {
+        spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+          windowsHide: true,
+          stdio: "ignore",
+        });
+      } else if (child.pid) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          child.kill("SIGKILL");
+        }
+      }
+    }, 180_000);
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
-    child.on("error", reject);
+    child.on("error", (error) => {
+      clearTimeout(deadline);
+      reject(error);
+    });
     child.on("close", (code) => {
-      if (code === 0) {
+      clearTimeout(deadline);
+      if (code === 0 && !timedOut) {
         resolveResult({ stdout, stderr });
         return;
       }
@@ -86,6 +120,14 @@ async function readJsonLines(directory: string): Promise<Record<string, unknown>
   return records;
 }
 
+async function readOutputBytes(directory: string): Promise<string[]> {
+  const files = (await readdir(directory)).filter((file) => file.endsWith(".jsonl")).sort();
+  assert(files.length > 0, `No JSONL output was produced in ${directory}`);
+  return await Promise.all(
+    files.map(async (file) => (await readFile(join(directory, file))).toString("base64")),
+  );
+}
+
 // Resolve the existing parent before creation so rejection cannot leak a directory.
 const temporaryParent = await realpath(tmpdir());
 const resolvedRepositoryRoot = await realpath(repositoryRoot);
@@ -97,6 +139,8 @@ assert(
   "Installed-package system test TMP/TEMP directory must be outside the monorepo",
 );
 const temporaryRoot = await mkdtemp(join(temporaryParent, "gitlode-installed-package-"));
+const evidenceDirectory = process.env["GITLODE_PACKAGE_EVIDENCE"];
+if (evidenceDirectory) await mkdir(evidenceDirectory, { recursive: true });
 
 try {
   const packDirectory = join(temporaryRoot, "pack");
@@ -130,6 +174,38 @@ try {
     ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarballPath, "typescript@^7.0.2"],
     consumerDirectory,
   );
+  const installedDist = join(consumerDirectory, "node_modules", "gitlode", "dist");
+  const identities = [];
+  for (const file of (await readdir(installedDist, { recursive: true }))
+    .filter((file) => /\.[cm]?js$/.test(file))
+    .sort()) {
+    identities.push({
+      path: file,
+      sha256: createHash("sha256")
+        .update(await readFile(join(installedDist, file)))
+        .digest("hex"),
+    });
+  }
+  const compilerVersion = await run(
+    "node",
+    [join(consumerDirectory, "node_modules", "typescript", "bin", "tsc"), "--version"],
+    consumerDirectory,
+  );
+  const packageIdentity = {
+    tarball: basename(tarballPath),
+    sha256: createHash("sha256")
+      .update(await readFile(tarballPath))
+      .digest("hex"),
+    node: process.version,
+    compiler: compilerVersion.stdout.trim(),
+    runtime: identities,
+  };
+  process.stdout.write(`${JSON.stringify(packageIdentity)}\n`);
+  if (evidenceDirectory)
+    await writeFile(
+      join(evidenceDirectory, "package-identity.json"),
+      JSON.stringify(packageIdentity, null, 2),
+    );
 
   const help = await runInstalledGitlode(["--help"], consumerDirectory);
   assert(help.stdout.includes("Extract Git commit history"), "Installed CLI help failed");
@@ -240,6 +316,174 @@ try {
   const gitCliRecords = await readJsonLines(cliOutputDirectory);
   assert(gitCliRecords.length > 0, "Git CLI adapter extraction produced no records");
 
+  const preload = await writeInstalledLoadGuard(consumerDirectory);
+  async function guarded(name: string, enabled: boolean, deny: boolean, config: string) {
+    const output = config === isomorphicConfig ? isomorphicOutputDirectory : cliOutputDirectory;
+    // Each invocation owns a fresh output directory; timestamped files from earlier runs
+    // otherwise accumulate and make an output-equivalence assertion compare multiple runs.
+    await rm(output, { recursive: true, force: true });
+    await mkdir(output);
+    const log = join(temporaryRoot, `${name}.jsonl`);
+    await writeFile(log, "");
+    let command: CommandResult;
+    try {
+      command = await run(
+        process.execPath,
+        [
+          "--import",
+          pathToFileURL(preload).href,
+          join(installedDist, "index.js"),
+          "--config",
+          config,
+          "--per-file",
+          ...(enabled ? ["--profile"] : []),
+          repositoryDirectory,
+        ],
+        consumerDirectory,
+        { GITLODE_LOAD_LOG: log, GITLODE_DENY_SDK: deny ? "1" : "0" },
+      );
+    } finally {
+      if (evidenceDirectory) await copyFile(log, join(evidenceDirectory, `${name}.jsonl`));
+    }
+    const events = (await readFile(log, "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as LoadEvent);
+    assertGuardActivation(events);
+    assert(
+      events.find((event) => event.type === "worker-result")?.result?.kind === "success",
+      `${name}: actual worker extraction failed`,
+    );
+    if (evidenceDirectory)
+      await writeFile(
+        join(evidenceDirectory, `${name}-command.json`),
+        JSON.stringify(command, null, 2),
+      );
+    return { events, command };
+  }
+
+  // The boundary fixture is SDK-free. Separately prove plugin-owned SDK loading is observed
+  // and attributed to its importer rather than counted as gitlode session construction.
+  const pluginPath = join(pluginDirectory, "index.js");
+  const pluginBytes = await readFile(pluginPath, "utf8");
+  try {
+    await writeFile(pluginPath, 'import "@opentelemetry/sdk-metrics";\n' + pluginBytes);
+    const pluginOwned = await guarded("plugin-owned-sdk", false, false, isomorphicConfig);
+    assert(
+      sdkEvents(pluginOwned.events).some(
+        (event) => event.type === "esm-resolve" && event.parent === pathToFileURL(pluginPath).href,
+      ),
+      "Plugin SDK import was not attributed to the controlled plugin",
+    );
+    assert(
+      pluginOwned.events.find((event) => event.type === "worker-result")?.result?.success
+        ?.profileReport === undefined,
+      "Plugin-owned SDK load enabled the gitlode session",
+    );
+  } finally {
+    await writeFile(pluginPath, pluginBytes);
+  }
+  for (const [adapter, config, output] of [
+    ["isomorphic", isomorphicConfig, isomorphicOutputDirectory],
+    ["git-cli", gitCliConfig, cliOutputDirectory],
+  ] as const) {
+    const baseline = await readOutputBytes(output);
+    for (const deny of [false, true]) {
+      const disabled = await guarded(`${adapter}-disabled-${deny}`, false, deny, config);
+      assert(
+        sdkEvents(disabled.events).length === 0,
+        "Disabled resolved/loaded SDK implementation",
+      );
+      assert(
+        !disabled.events.some(
+          (event) =>
+            event.type === "worker-diagnostic" &&
+            event.diagnostic?.message?.includes("Telemetry initialization"),
+        ),
+        "Disabled warned about initialization",
+      );
+      assert(
+        disabled.events.find((event) => event.type === "worker-result")?.result?.success
+          ?.profileReport === undefined,
+        "Disabled returned a profile report",
+      );
+      assert(
+        JSON.stringify(await readOutputBytes(output)) === JSON.stringify(baseline),
+        "Disabled extraction output changed",
+      );
+    }
+    const enabled = await guarded(`${adapter}-enabled`, true, false, config);
+    assertEnabledReport(enabled.events);
+    assert(
+      sdkEvents(enabled.events).every((event) => event.isolate > 0),
+      "CLI host eagerly reached SDK implementation",
+    );
+    assert(
+      sdkEvents(enabled.events).some(
+        (event) => event.type === "cjs-load" || event.type === "esm-load",
+      ),
+      "Enabled did not positively load SDK implementation",
+    );
+    assert(
+      JSON.stringify(await readOutputBytes(output)) === JSON.stringify(baseline),
+      "Enabled extraction output changed",
+    );
+    const degraded = await guarded(`${adapter}-denied`, true, true, config);
+    assert(
+      degraded.events.some((event) => event.type === "denied"),
+      "SDK denial did not activate",
+    );
+    const warnings = degraded.events.filter(
+      (event) =>
+        event.type === "worker-diagnostic" &&
+        event.diagnostic?.message ===
+          "Telemetry initialization degraded; profile data is unavailable.",
+    );
+    assert(warnings.length === 1, "Degraded must issue one sanitized initialization warning");
+    assert(
+      degraded.events.find((event) => event.type === "worker-result")?.result?.success
+        ?.profileReport === undefined,
+      "Degraded returned a report",
+    );
+    assert(
+      JSON.stringify(await readOutputBytes(output)) === JSON.stringify(baseline),
+      "Degraded extraction output changed",
+    );
+    if (adapter === "isomorphic") {
+      const disabled = await guarded("missing-chunk-baseline", false, false, config);
+      const loadedPaths = (events: LoadEvent[]) =>
+        new Set(
+          events
+            .filter(
+              (event) =>
+                event.type === "esm-load" && event.realpath?.startsWith(installedDist + sep),
+            )
+            .map((event) => event.realpath ?? ""),
+        );
+      const eager = loadedPaths(disabled.events);
+      const lazy = [...loadedPaths(enabled.events)].find((path) => !eager.has(path));
+      assert(lazy, "Enabled did not load an installed lazy runtime asset");
+      const bytes = await readFile(lazy);
+      try {
+        await rm(lazy);
+        const missing = await guarded("missing-enabled-chunk", true, false, config);
+        let detected = false;
+        try {
+          assertEnabledReport(missing.events);
+        } catch {
+          detected = true;
+        }
+        assert(detected, "Missing enabled chunk escaped positive report assertion");
+        process.stdout.write(
+          `Missing enabled asset sensitivity passed: ${relative(installedDist, lazy)}\n`,
+        );
+      } finally {
+        await writeFile(lazy, bytes);
+      }
+    }
+  }
+
   await writeFile(
     join(consumerDirectory, "consumer.ts"),
     [
@@ -301,6 +545,13 @@ try {
       "",
     ].join("\n"),
   );
+} catch (error) {
+  if (evidenceDirectory)
+    await writeFile(
+      join(evidenceDirectory, "first-failure.txt"),
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+    );
+  throw error;
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }

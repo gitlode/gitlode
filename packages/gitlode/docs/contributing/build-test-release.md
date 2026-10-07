@@ -253,7 +253,21 @@ independent emitted graph, host/worker runtime load and packed dynamic asset che
 disabled path. Shared chunks and external transitive dependencies count toward the static closure of
 all three stable entries. Packed enabled execution must positively produce a report, and aggregation
 child bundles must retain dynamic targets. Source-only D1 tests do not discharge these obligations;
-D2 tooling/package verification remains pending. No bundling or installation success implies formal
+The release build runs `typecheck:release-boundary` and a product-owned tsdown metadata verifier
+(`scripts/tooling/release-telemetry-boundary.ts`). It follows static chunk edges for each stable entry,
+checks module ownership and conservatively follows declared external dependency identities. Lazy
+edges remain distinct and must name emitted assets. A forbidden eager owner or private workspace
+specifier fails the build; names and chunk counts are not fixed.
+
+The installed runner observes ESM resolve/load and CommonJS resolution/load in the actual CLI and
+worker via inherited Node preloads. Each isolate positively exercises both guard mechanisms.
+SDK-free plugin fixtures keep product evidence separate; a separate plugin-owned SDK fixture proves
+importer attribution. Both adapters run Disabled, Enabled and denied SDK cases with JSONL equality.
+Enabled must return a complete schema-2 report with observations and positively load SDK/lazy assets;
+a disposable missing asset must fail that assertion despite successful degraded extraction.
+The package identity output includes the tarball/runtime SHA-256 values and consumer compiler version.
+Optional `GITLODE_PACKAGE_EVIDENCE` retains guard traces, identities and first failures outside the
+consumer; these are verification artifacts, not formal measurement evidence. No bundling or installation success implies formal
 performance acceptance.
 
 ## Checked system tooling and commands
@@ -275,9 +289,9 @@ cwd. Children use explicit cwd, shell-free argument arrays and sequential execut
 The real OS temp parent must be outside the real checkout before creation; spaces and different
 drives are supported. Only the newly created temporary root is deleted in finally after awaited
 children. Rejection creates no directory and deletes no existing data. Errors retain stdout/stderr.
-This runner has no harness process-group supervision or timeout framework: stalls require operator
-or CI cancellation, and Windows locks can prevent cleanup. Preserve failure evidence and return
-for diagnosis rather than silently retrying or changing lifecycle policy.
+Each child has a 180-second deadline. Timeout kills the owned child (and its Windows process tree);
+Windows locks can still prevent cleanup. There is no retry. Preserve failure evidence and return for
+diagnosis. Package runs are sequential; an outer campaign deadline still bounds the entire chain.
 
 The consumer installs the actual tarball and `typescript@^7.0.2`; registry access and resolved compiler
 version are execution inputs. Public consumer typing uses skipLibCheck false. The private workspace

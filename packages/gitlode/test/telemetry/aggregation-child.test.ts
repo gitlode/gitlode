@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { Rolldown } from "tsdown";
 import { describe, expect, it } from "vitest";
 
 import { buildAggregationCollectorBundle } from "../../scripts/tooling/aggregation-collector-bundle.js";
@@ -15,9 +16,49 @@ async function run(...args: string[]) {
   const outputDirectory = await mkdtemp(join(tmpdir(), "gitlode-aggregation-test-"));
   try {
     const bundle = await buildAggregationCollectorBundle(outputDirectory);
+    const files = (await readdir(outputDirectory, { recursive: true }))
+      .filter((file) => /\.(?:js|mjs)$/.test(file))
+      .sort();
+    const inventory = Buffer.concat(
+      await Promise.all(
+        files.map(async (file) =>
+          Buffer.concat([Buffer.from(file), await readFile(join(outputDirectory, file))]),
+        ),
+      ),
+    );
+    expect(bundle.bytesContent.equals(inventory)).toBe(true);
+    expect(bundle.bytes).toBe(inventory.byteLength);
+    const graph = await Rolldown.rolldown({
+      input: bundle.path,
+      plugins: [
+        {
+          name: "aggregation-asset-inspection",
+          resolveId(source) {
+            if (!source.startsWith(".") && !isAbsolute(source))
+              return { id: source, external: true };
+            return null;
+          },
+        },
+      ],
+    });
+    try {
+      const emitted = await graph.generate({ format: "esm" });
+      const chunks = emitted.output.filter((item) => item.type === "chunk");
+      expect(
+        chunks.reduce((count, chunk) => count + chunk.dynamicImports.length, 0),
+      ).toBeGreaterThan(0);
+      for (const chunk of chunks) {
+        for (const id of chunk.moduleIds.filter((id) => isAbsolute(id))) {
+          expect(files.map((file) => resolve(outputDirectory, file))).toContain(resolve(id));
+        }
+      }
+    } finally {
+      await graph.close();
+    }
     const result = await execFileAsync(process.execPath, [bundle.path, ...args], {
       cwd: fileURLToPath(new URL("../../../..", import.meta.url)),
       windowsHide: true,
+      timeout: 30_000,
     });
     return JSON.parse(result.stdout) as {
       scale: number;

@@ -817,3 +817,44 @@ that without global configuration. Optional instruction-file probes found no tes
 tests/system/README.md or tests/README.md; canonical system instructions are in domain/build guides.
 WSL enumeration in the sandbox failed E_ACCESSDENIED; host access must be checked before Linux work.
 No release or performance result is inferred from these setup probes.
+
+### D2 implementation checkpoint preparation
+
+Maintenance checkpoint: `dedc536` (normal push completed). New implementation remains tooling/tests
+only: emitted metadata verifier in tsdown config; strict release-boundary project/command; installed
+ESM/CJS guard and actual worker-result observation; independent constructor sentinel; aggregation
+inventory/graph/functional assertions and deadlines; canonical build/verification/system-boundary docs.
+No dependency, public export, product session semantics or performance protocol changed. Existing
+aggregation filename/byte inventory semantics and bundling are retained.
+
+Development evidence (not the fixed release campaign): strict system and release-boundary checks,
+full lint and architecture pass; focused D1 plus new suites: 13 files / 187 passed / 0 skipped.
+Actual eager-owner mutation failed release graph at Forbidden eager owner; actual extra MeterProvider
+construction failed the separate constructor sentinel (1 failed). Both used 60-second subprocess
+deadlines, finally byte restoration and archived logs. D1 global-provider evidence remains attributed
+to the accepted D1 implementation/review, not reclassified as installed load evidence.
+
+Initial/corrected development logs are retained under
+`D:/gitlode_test/m2-d2-boundary-20261007T173933/development`. Initial new build/config failures were
+native TS config import resolving .js instead of .ts, pre-existing internal pkg field absent from
+public tsdown config types, and dependency packages without root exports (dunder-proto). Corrected
+with native .ts import, preservation of existing pkg through object spread, and manifest lookup via
+Node package search paths. No checks were waived. Initial aggregation inspection assumed the TS 7
+package exposed the compiler API; it does not. Inspection now uses existing tsdown/Rolldown metadata
+and resolution, without adding dependencies. Initial strict/lint diagnostics were fixed. Initial
+architecture after release packing found leftover generated hashed chunks; development output was
+restored before the final architecture pass. An attempted cleanup found dist already absent after
+the negative build and stopped before deletion. No product source remained mutated.
+
+First installed run failed output comparison because multiple timestamped output files accumulated
+in the reused directory. Corrected each owned output directory to start empty. Corrected installed
+run passed both adapters and plugin attribution, actual host/worker guards, Disabled SDK absence,
+Enabled SDK/report presence, denial degradation and missing lazy asset sensitivity. Package identity
+was f7378758e1d016a8f789f375984be5adb81ea6b2e6e46b235c526e4ee6f77956 (development tarball;
+fixed-campaign identities follow separately). Comparison now retains byte/sequence equality rather
+than parsed-record equality. This checkpoint precedes cumulative validation; D2 is not self-accepted.
+
+The first retrieval check showed Git show --output redirects diffs but not raw blob stdout (empty
+output file). Corrected to Python subprocess byte capture; restored blob identity matched the
+original before any use. The first documentation edit hit Windows cp932 decoding and stopped before
+writing; subsequent editing explicitly uses UTF-8. No derivation/measurement was launched.

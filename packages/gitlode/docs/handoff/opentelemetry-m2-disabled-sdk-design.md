@@ -1011,3 +1011,19 @@ third-party plugin or unsupported concurrent session. Windows Linux-only supervi
 skipped there and executed on Linux. No D2 functional blocker was found; independent review remains
 required. Cumulative integration, human PR approval, descendant candidate preparation and all formal
 RSS/performance/T13B/T13C acceptance obligations remain outside this session and unresolved.
+
+### D2 delivery binding
+
+Outcome checkpoint: `6c8b3a4ea96ed2b61855777f220183ffbdababa2` (documentation only), normally
+pushed after implementation `6e84279819ce50e961ef99dc92ffa5a90219bc34` and maintenance
+`dedc5363e3a56de40637481e4b83fc3bd801ee60`. At that outcome, actual remote child matched exactly,
+status was clean and the child remained checked out. Local parent, parent tracking ref, merge base
+and actual remote parent all matched `57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`. Read-only
+post-seal verification rehashed all 155 files without mismatch and confirmed the manifest hash.
+No sealed archive was appended to.
+
+Outcome documentation verification passed root format write/check, diff check and UTF-8/local
+Markdown target verification (28 relative links across the five affected documents). This binding
+is a final handoff-only delivery commit; its actual remote/clean/unchanged-parent check and OID are
+returned to trunk with the final message, avoiding a self-referential hash. **Stop for independent
+D2 review.** No formal measurement, PR, merge, parent update, freeze or acceptance update follows.

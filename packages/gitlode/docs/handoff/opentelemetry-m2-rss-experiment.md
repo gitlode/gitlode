@@ -394,3 +394,119 @@ Proposed next action: trunk reviews one bounded controller correction to compare
 dist scope and independently validate runtime package metadata, then decides whether to assign
 a new restored-fixture gate. This stop grants no retry. Experiment and M2 documentation OIDs,
 actual remote equality and clean shared-checkout state are reported in the session return.
+
+## Corrected setup passed; stopped after run 2 processing (2026-10-07)
+
+**Preparation passed; two diagnostic CLI invocations occurred, then processing failed. No retry.**
+Instruction checkpoint and shared M2 were `1f65e95c076c0b106ce7111a47011f6f314b9a1f`.
+The human established a quiet window of 14:06–17:06 JST; its end was the hard stop.
+Workloads ran from 14:11:14 to approximately 14:12:10 JST, within that window.
+Actual remote M2 still matched the checkpoint immediately before this documentation edit.
+Shared checkout remained on `feature/otel-redesign_M2`; experiment changes were isolated.
+
+### Controller correction and preparation evidence
+
+Controller commit `4ed4184faf9d97d949afeda369857d4da58c3e2b` descends directly from
+`a514034c10eb193304f482bb5783c02d5a200431` and was normally pushed before the gate/workloads.
+Actual experiment remote equality was verified before workloads and again before this edit.
+Product/variant diff against `a514034` is empty. Preserved V0/V1/V2 OIDs and runtime bytes were
+reused without rebuilding, regenerating, repacking or changing maintenance policy.
+
+The correction compares the exact recorded dist path set, sizes and SHA-256 hashes, validates
+package.json independently against the original sealed runtime tar, and permits only the documented
+dist directories, package metadata and node_modules link. It checks original link targets against
+the sealed tar, restored targets against the restored source closure, and full dependency inventory
+against preserved provenance. Unexpected files, directories and links are rejected.
+
+The checked-in bash operator propagates Python/controller failures and requires both command success
+and matching persisted successful gate/snapshot records before dispatch. The PowerShell invocation
+immediately propagates WSL's exit code. Thirteen disposable checks passed, including valid dist plus
+sealed metadata, changed/missing dist, unexpected file/link/directory, changed metadata/dependency
+target, synthetic controller failure through the actual wrapper, failed persisted gate despite exit
+zero, and missing/stale gate records blocking workload dispatch. No product CLI was used for tests.
+`npm run format:write`, `npm run format:check` and diff whitespace checks passed.
+
+Fresh execution root: `/home/t-wakabayashi/gitlode-performance/m2-rss-corrected-20261007T1406`.
+Both prior archives and their manifests were verified before restoration. The saved fixture tar
+restored byte-for-byte correspondence on native ext4. HEAD was
+`bde84f1caca0e50284005bf96c126728dac4f9d4`, with 4,430 commits, preserved refs/tree/config,
+no locks/gc.pid and no known path owner. Read-only fsck exited zero without dangling or other
+messages. External deadline and fixed-supervisor deadline/cleanup preflights passed.
+Three complete inventories five seconds apart matched, as did the immediate pre-run inventory.
+Snapshot SHA-256: `5fe46369dacd20839c083f9b70c351e69febf367a571bc824f18875e796ddc7c`.
+This maps to the preserved post-generation representation, not either formal runtime fixture.
+The real gate and operator both succeeded; no correction or repeated gate followed.
+
+### Partial workload outcome and stopping boundary
+
+| Run | Variant | Outcome                          | CLI elapsed ms | Sampled peak RSS bytes |
+| --- | ------- | -------------------------------- | -------------: | ---------------------: |
+| 1   | V0      | Completed                        |   27048.184712 |              206204928 |
+| 2   | V1      | CLI completed; processing failed |   26165.981369 |              205799424 |
+| 3   | V2      | Not executed                     |              — |                      — |
+| 4   | V2      | Not executed                     |              — |                      — |
+| 5   | V1      | Not executed                     |              — |                      — |
+| 6   | V0      | Not executed                     |              — |                      — |
+
+Run 2's unchanged experimental driver failed at `driver.mts:75`: its additional application-result
+comparison normalized elapsed time, repository path and ref updatedAt, but left checkpoint.generatedAt
+literal. The two actual session timestamps differ, triggering deep-equality assertion. The supervisor
+returned exit 2 / `worker-exited-without-completion` in processing/capture-run; the operator returned
+exit 1. This is an experimental comparison defect, not evidence of a product failure. Because a CLI
+workload had started, it was not repaired or retried and the remaining four runs were stopped.
+
+Both saved CLI exits are zero, with 4,430 records/commits, one 1,974,468-byte JSONL file and successful
+application results. Their existing normalized behavior evidence (JSONL hashes, checkpoint, derived
+counts and capture errors) matches exactly. Saved application results differ only in generatedAt;
+read-only post-stop comparison confirms equality after excluding that field. This observation does
+not retroactively pass run 2 or establish six-run equivalence. Both saved boundary streams show
+profiling/recording/root recording disabled and no profile report.
+
+Only one V1-minus-V0 contrast is available. These RSS differences in bytes are descriptive:
+
+| Boundary/metric                          | V1 minus V0 |
+| ---------------------------------------- | ----------: |
+| Host after imports, before worker        |      -28672 |
+| Worker after imports, before request     |    -7229440 |
+| Worker after disabled composition        |    -7032832 |
+| Worker before extraction                 |    -7032832 |
+| Worker after extraction, before finalize |   -11132928 |
+| Host after worker exit                   |     4349952 |
+| External sampled peak                    |     -405504 |
+
+No opposing-order block, within-variant replicate spread or V1/V2 comparison exists, so the assigned
+criterion cannot be evaluated and allocation attribution remains unresolved. Raw isolate heapUsed,
+heapTotal, external and arrayBuffers are retained with timestamps; process RSS is not summed across
+isolates and arrayBuffers is not added to external. V1's changed span-ID semantics and V2's omitted
+empty finalization calls remain confounders, together with bundle/layout, order/cache and observation
+effects. The partial startup contrast cannot explain the formal RSS failure. No formal measurement,
+product repair, PR, merge, extra run/variant or acceptance update occurred.
+
+### Preservation and next action
+
+Fixture inventories after run 1 and at final return matched the single sealed pre-run identity;
+the final complete inventory, dependency closure and all fixed runtimes also matched. Run 2's
+failure prevented its normal per-run controller check, but the finally-path full snapshot matched.
+Both run supervisors and the preflight confirmed cleanup with no cleanup/finalization errors;
+final scoped observations found no live members of recorded operator/external/supervisor groups.
+This is not a universal guarantee against escaped groups or filesystem races.
+
+New Linux archive: `/home/t-wakabayashi/gitlode-performance/m2-rss-corrected-20261007T1406/archive`.
+Distinct Windows copy: `D:/gitlode_test/m2-rss-corrected-20261007T1406`.
+All 102 archive entries and both sealed manifest copies were rehashed and matched.
+Manifest SHA-256: `7a738d42dcdb048a49be41d728506fae141dbfc9572c2853459464b89076559f`.
+The archive includes failures, controller scripts/patch/bundle, original input tars, all raw runs,
+boundary samples, fixture inventories, derived partial comparisons and cleanup evidence.
+The original 93-entry preparation archive, 33-entry failed-gate archive and 552-entry F archive
+were reverified unchanged after workloads. Copies remain on one host, not an external backup.
+
+A non-gate archive listing piped to head returned SIGPIPE/141 after tests/format had passed.
+One post-stop preservation command lost its shell path variable through PowerShell expansion and
+failed before copying; it was corrected to explicit paths. Neither caused another gate or workload.
+Original setup/gate failures remain in their sealed archives; the new workload failure is preserved.
+
+Proposed next action: trunk reviews a bounded correction of the application-result timestamp
+comparison and decides whether to authorize a new finite diagnostic packet. This partial stop
+does not authorize resuming runs 3–6 or repeating runs 1–2. The formal RSS fail remains unchanged.
+Experiment and separate M2 documentation OIDs, final actual remote equality and clean shared-checkout
+state are reported in the session return.

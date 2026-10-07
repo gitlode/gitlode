@@ -1,5 +1,71 @@
 # M2 disabled SDK boundary: detailed design assignment
 
+## Active routing: independent D2 review
+
+D2 is delivered, not accepted. This review-only packet supersedes the implementation assignment
+below. Stay on `feature/otel-redesign_M2_disabled`; the human starts the independent session.
+
+- Base: `a2a487ed9a01daed6f2564f44595a5996a8cf49d`.
+- Maintenance: `dedc5363e3a56de40637481e4b83fc3bd801ee60`.
+- Fixed implementation: `6e84279819ce50e961ef99dc92ffa5a90219bc34`.
+- Outcome: `6c8b3a4ea96ed2b61855777f220183ffbdababa2`.
+- Delivery: `e3fa36631e4dffbe4e85f5aae470ffd75cbcddb8`.
+- Parent M2: `57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`, unchanged.
+
+Trunk verified the base-to-implementation inventory (15 files including maintenance), documentation-only
+post-implementation delta (this handoff and telemetry-verification.md), clean status and local parent.
+Trunk independently rehashed the Windows archive's 155 listed files: no missing/size/hash mismatch;
+manifest SHA-256 matches `ac3d3796276e881e6e7eec0c5652628a83ab4f63b09110fd64c78a24d992a33c`.
+This verifies saved-byte integrity, not the correctness of each assertion or acceptance of D2.
+
+### Review scope and decisive questions
+
+Read the approved design, D1 acceptance, full D2 diff and outcome, and relevant canonical system,
+release and telemetry verification contracts. Verify ancestry, current source equality, maintenance
+retrieval identity and actual parent/child refs. D1 remains accepted unless a concrete regression
+from D2 is demonstrated; do not reopen approved root semantics or repeat the whole source review.
+
+1. Does emitted metadata inspection distinguish static/lazy edges, follow shared chunks and external
+   package ownership, and reject eager SDK/context/collector/report code for all three roots? Look
+   for omitted edges, false negatives from tree-shaking/metadata handling, missing lazy assets and
+   overly broad dependency exceptions. Do not demand fixed chunk names or arbitrary plugin coverage.
+2. Do ESM/CommonJS guards positively activate in the real host and worker, observe/deny actual resolved
+   package identities and preserve extraction behavior? Check worker attribution, plugin-owned SDK
+   attribution, meaningful Enabled positives, exactly one degradation warning and no report under
+   denial. Ensure absence assertions cannot pass because the guard or workload did not execute.
+3. Does removing the enabled asset fail the normal positive assertion rather than count successful
+   degradation as telemetry success? Are disposable mutations restored, child deadlines/cleanup
+   adequate and fixtures contained? Confirm independent constructor sensitivity and aggregation
+   static/lazy inventory coverage without running N/4N workloads.
+4. Do commands durably execute all checks with strict tooling/system typing and retain existing package
+   assertions? Check scope of new Node preload observation and public-only system boundary. Verify
+   historical helper retirement retains reproducibility without weakening lint/orphan rules.
+5. Do saved Windows/Linux command chains bind to the fixed source and actual package/runtime inputs,
+   including first failures, skips and post-build packing? Consumer SDK 2.12.0 differs from repository
+   lockfile SDK 2.10.0; distinguish those inputs explicitly, not a dependency upgrade or frozen-runtime
+   acceptance. Tarballs/consumer directories were removed: assess what recorded hashes/logs and retained
+   runtime data establish, and identify any concrete missing evidence needed for D2. A later formal
+   freeze must independently retain its actual package/runtime/dependency closure.
+
+### Finite independent verification and return
+
+Inspect saved sealed logs/manifests and source correspondence rather than rerunning both full OS
+campaigns. Run build and relevant explicit strict typing, new constructor/aggregation tests, and one
+bounded release bundle plus installed-package execution to independently exercise graph/guard wiring
+on one supported OS. Preserve release output until packing; use outside-checkout TEMP, owned deadlines
+and retained first-failure logs. Inspect the other OS's stored full-chain evidence and name it as saved
+evidence, not an independent rerun. Run format/check and diff check. Use at most one small probe per
+concrete unresolved concern; avoid replaying all negative mutations or repeated package campaigns.
+If tooling is unavailable, report that limitation rather than changing dependencies or accepting a
+check not performed. Restore probes and do not modify sealed archives.
+
+Return accepted or corrections required for D2, with concrete failure paths/file locations and minimal
+remedies for mandatory findings. Separate optional improvements, reported/saved/independently executed
+evidence and later candidate/performance obligations. Append the review here; documentation-only
+commit and normal push are authorized. Confirm actual remote equality, clean status, unchanged parent
+and remain on the child. No implementation repair, PR, merge, parent update, formal/diagnostic
+measurement, candidate freeze or acceptance-record edit. Return to trunk for the next assignment.
+
 ## Active routing: D2 implementation and release-boundary verification
 
 Trunk accepts the independent D1 review recorded at

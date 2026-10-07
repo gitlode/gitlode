@@ -9,9 +9,10 @@ supersedes older measurement/experiment assignments below. Trunk accepted design
 `4adfe248e95deba40ea70e33f707eb4a0ddc091c` with the human-approved invalid no-op root identity.
 D1 source/lifecycle implementation `04dc187` is delivered on `feature/otel-redesign_M2_disabled`;
 independent D1 review `f35e0e1` accepted it. D2 emitted/installed boundary and package verification
-is now assigned on the same child, including scoped retirement of the completed diagnosis helper.
-Full lint/architecture still report pre-existing derive.cjs diagnostics; these are not a D1 success
-claim and require disposition before a successful cumulative validation claim. The active packet records
+was delivered at `6e84279` with successful reported Windows/Linux validate:release chains. Independent
+D2 review is now assigned on the same child; D2 acceptance remains pending. The completed diagnosis
+helper was retired with a Git retrieval recipe; D2 reports full lint/architecture passing.
+Historical D1 lint/architecture failures remain recorded without relabeling. The active packet records
 the exact scope, checkpoints and human-approved squash integration boundary. Formal disabled
 RSS fail, fixed F inputs and the remaining T13B/M2/release gates remain unchanged.
 

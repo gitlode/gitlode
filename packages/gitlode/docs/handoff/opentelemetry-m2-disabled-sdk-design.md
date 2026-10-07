@@ -2,6 +2,48 @@
 
 ## Trunk disposition and active implementation packet (2026-10-07)
 
+### Active routing: D1 independent review
+
+D1 was delivered; implementation is not yet accepted. The active assignment is now independent
+review only on `feature/otel-redesign_M2_disabled`. The D1 implementation instructions below are
+historical scope, not authority to modify code in the review session.
+
+- Base: `8d622af2cfc435c06aac3ab0f8b16b5bbaf5e206`.
+- Fixed implementation: `04dc187573a63bd2110c381306b26fd050d53220` (18 changed files).
+- Outcome: `e34b81429492c7246b4e19c5b1257bf762c986a2`; its delta is this handoff only.
+- Parent M2 remains `57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`.
+
+Read the design and D1 outcome below, canonical changed contracts and the complete fixed diff.
+Verify ancestry, inventory and current implementation equality. Review the enabled move with
+whitespace-insensitive comparison against the old session, as well as ordinary diff; do not mistake
+execute-run indentation for a broad application rewrite or overlook the new exception boundary.
+
+Check API no-op isolation/root/explicit-parent semantics; disabled selection before loader/hooks;
+real enabled initialization and partial-resource ownership; independent cleanup after failures;
+unchanged enabled collection/report/fallback/worker behavior; all nine actual no-op composition
+choices; and memoized concurrent/reentrant finalization. Specifically trace whether a backend or
+cleanup rejection can replace the original application result/exception, using supported production
+and fault paths rather than only an invented unsupported backend. Check tests observe actual owned
+resources and the production factory, and canonical claims distinguish source from release evidence.
+
+Run build, explicit strict product-source typing and the reported affected source suites (use existing
+paths; omit the two nonexistent selectors noted in the outcome), plus behavioral-baseline. Report
+actual counts/skips. One bounded probe per concrete unresolved concern is sufficient; avoid replaying
+all mutations or broadening into D2. Restore disposable probes before return. Review existing
+negative-sensitivity evidence as reported unless independently repeated. Confirm the derive.cjs
+lint/orphan diagnostics predate this slice and remain tracked; do not fix them, waive them or call
+the full lint/architecture checks passing. D2/release planning must explicitly resolve or disposition
+that pre-existing validation obstruction before claiming a successful cumulative chain.
+
+Record findings with concrete trigger, expected/actual behavior, file/line and minimal remedy.
+Separate mandatory defects from optional improvements and D2's deliberately pending obligations.
+The absence of installed/emitted load proof is not a D1 defect, nor can D1 acceptance close it.
+Finish with accepted or corrections required for D1 only, exact reviewed OID, independent versus
+reported evidence and remaining gates. Append the review here, format/check and diff-check, make a
+documentation-only checkpoint and normally push it to the child. Verify actual remote equality,
+clean status and unchanged parent; remain on the child. No implementation edits, D2, installations,
+release/package campaign, workload measurement, PR, merge, freeze or acceptance-record updates.
+
 Design checkpoint `4adfe248e95deba40ea70e33f707eb4a0ddc091c` is accepted with the
 clarifications below. The human approved invalid root IDs for Disabled/Degraded. This is design
 acceptance only; the formal RSS failure remains unresolved. This section supersedes the earlier

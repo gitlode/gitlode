@@ -7,8 +7,10 @@ runs are authorized. The human approved product detailed design to avoid disable
 provider construction. The [disabled SDK design packet](opentelemetry-m2-disabled-sdk-design.md)
 supersedes older measurement/experiment assignments below. Trunk accepted design checkpoint
 `4adfe248e95deba40ea70e33f707eb4a0ddc091c` with the human-approved invalid no-op root identity.
-D1 source/lifecycle implementation is assigned on `feature/otel-redesign_M2_disabled`; independent
-D1 review precedes D2 emitted/installed boundary and package verification. The active packet records
+D1 source/lifecycle implementation `04dc187` is delivered on `feature/otel-redesign_M2_disabled`;
+independent D1 review is now assigned before D2 emitted/installed boundary and package verification.
+Full lint/architecture still report pre-existing derive.cjs diagnostics; these are not a D1 success
+claim and require disposition before a successful cumulative validation claim. The active packet records
 the exact scope, checkpoints and human-approved squash integration boundary. Formal disabled
 RSS fail, fixed F inputs and the remaining T13B/M2/release gates remain unchanged.
 

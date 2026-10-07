@@ -1,5 +1,77 @@
 # M2 disabled SDK boundary: detailed design assignment
 
+## Trunk disposition and active implementation packet (2026-10-07)
+
+Design checkpoint `4adfe248e95deba40ea70e33f707eb4a0ddc091c` is accepted with the
+clarifications below. The human approved invalid root IDs for Disabled/Degraded. This is design
+acceptance only; the formal RSS failure remains unresolved. This section supersedes the earlier
+documentation-only assignment and the proposed single implementation session below.
+
+Use a private instance of the public API `ProxyTracerProvider`, never registered globally and never
+given a delegate, plus public `createNoopMeter`. Installed API 1.9.0 confirms that this provider's
+tracers fall back to API no-op tracers without consulting the global tracer provider. Keep the
+provider private; expose only API tracer/meter interfaces. This avoids an SDK provider, not every
+object whose API name includes Provider. No private dependency imports or custom tracer are needed.
+Construct the root using `{ root: true }` and `ROOT_CONTEXT`. API no-op child spans may preserve an
+explicit valid parent context while remaining nonrecording; do not assert universally invalid child
+IDs. With no registered context manager, API context-scoped callbacks do not acquire async propagation
+automatically. Preserve this existing limitation; Disabled/Degraded must not install a manager to
+remove it. Test explicit contexts and an existing compatible manager separately.
+
+### Session sequence
+
+1. **D1: source session boundary and lifecycle implementation**, assigned now on
+   `feature/otel-redesign_M2_disabled`. Implement and checkpoint the coherent source change and
+   focused regression evidence described below. Return for independent D1 review.
+2. **D2: emitted/installed boundary and tooling verification**, assigned after D1 review. Add the
+   release graph and real host/worker import guards, packed enabled-chunk positive checks, negative
+   sensitivity and aggregation asset-closure verification from the detailed design. Run the bounded
+   release/package validation chain and record exact package/source identities. Source-only D1
+   evidence cannot substitute for this gate. Do not run formal performance workloads.
+3. Independent cumulative review, then trunk prepares integration and requests explicit human PR
+   approval. Human squash-merges the child into M2; preserve child history before deletion. Only
+   after integration can a separately assigned descendant freeze and measurement follow.
+
+### D1 scope and stopping point
+
+- Read this entire design, canonical telemetry/verification and architecture/domain-design guidance,
+  plus repository instructions. Record starting OID, clean status and parent M2 OID. Work on the
+  existing child; do not reset it or copy experimental variants into production.
+- Introduce the type-only contract, SDK-free owner/no-op backend and lazy enabled implementation.
+  Move the existing enabled behavior with minimal changes. Preserve public signatures and hook
+  compatibility; route worker hooks through the actual requested enabled state. Update affected
+  direct consumers only where required by this split.
+- Implement guarded import failure and ownership-aware partial cleanup, original application result
+  preservation, memoized finalization and the approved root semantics. Preserve enabled collection,
+  report fallback and all nine actual no-op composition choices. Avoid unrelated wrapper changes.
+- Add source-level tests for disabled loader non-invocation, global-provider isolation, root/parent
+  semantics, enabled recording/context, partial acquisition/cleanup failures, import rejection,
+  concurrent/reentrant finalization and application disposal/result preservation. Exercise the real
+  production factory, not an alternative test implementation. Preserve existing real worker fallback
+  and recorder-identity regressions. Fault tests must have finite deadlines and restore globals.
+- Update affected canonical telemetry, architecture and developer/plugin-facing semantic guidance
+  with the implementation. Clearly leave emitted/installed zero-load proof pending D2; do not claim
+  a release validation or performance pass. No CLI/schema/dependency/export/threshold changes.
+- Run build, affected session/execution/collector/worker suites, applicable production strict typing,
+  architecture, lint, format write/check and diff check. Report exact commands, counts and skips;
+  do not describe a build as full test-source typechecking. Record pre-existing diagnostics separately.
+  Keep one meaningful fail-before/sensitivity demonstration per new boundary, not a large mutation
+  campaign. Do not run installations or full Windows/Linux package campaigns under D1.
+- Make meaningful implementation and outcome checkpoints, normally push to this child, and verify
+  actual remote OID and clean worktree. Do not update M2, integration, main, archive refs or frozen
+  artifacts. No PR, merge, freeze, formal/diagnostic measurement or acceptance-record edits.
+- Return exact implementation/outcome OIDs, changed-file responsibilities, verification evidence and
+  remaining D2 obligations here. Remain on the child. Do not self-accept D1 or start D2.
+
+If a deterministic operator/test setup error is understood, preserve the first failure and correct
+it within scope. Stop and report a product-contract conflict or an unexplained integrity/workload
+failure. Never repeat tests merely to obtain green evidence or broaden into another RSS experiment.
+
+The trunk API/source review required no new human semantic decision. Package graph and runtime load
+properties are deliberately left as implementation evidence, not inferred from the design. The
+existing aggregation helper already inventories emitted JS files recursively; D2 must verify dynamic
+asset completeness before deciding whether any change is necessary.
+
 ## Approved direction and session boundary (2026-10-07)
 
 The human approved detailed design for removing SDK loading and provider construction from the

@@ -460,3 +460,120 @@ enabled backend, plus guarded import/partial cleanup, deferred finalization, wor
 execution lifecycle guard, focused regressions and canonical audience documentation. It does not
 establish emitted or installed zero-load proof. The outcome section below records the committed
 source identity, final command evidence and remaining D2 obligations. No D1 self-acceptance is made.
+
+## D1 outcome for independent review (2026-10-07)
+
+Implementation checkpoint: `04dc187573a63bd2110c381306b26fd050d53220`, normally pushed to the
+assigned child. This outcome-only documentation checkpoint follows it; its exact OID is returned
+with the final remote/worktree verification rather than attempting a self-referential commit hash.
+D1 is ready for independent review, not self-accepted. No product-contract conflict was found.
+
+### Changed-file responsibilities
+
+All paths below are relative to `packages/gitlode`.
+
+| Files                                                               | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/execution/telemetry/worker-telemetry-contract.ts`              | Type-only API/backend, finalization, warning and internal hook contract; no SDK types/runtime imports.                                                                                                                                                                                                                                                                                                                                       |
+| `src/execution/telemetry/worker-telemetry-session.ts`               | SDK-free owner, disabled selection before loader/hooks, guarded dynamic import, one sanitized degradation warning and deferred promise/result memoization. Existing factory/method defaults and type-only compatibility exports remain.                                                                                                                                                                                                      |
+| `src/execution/telemetry/noop-worker-telemetry.ts`                  | Private never-delegated API ProxyTracerProvider plus API no-op meter, explicit invalid root, API context and root-only finalization. No global provider lookup or SDK construction.                                                                                                                                                                                                                                                          |
+| `src/execution/telemetry/enabled-worker-telemetry.ts`               | Moved existing enabled providers/collection/report/shutdown with minimal lifecycle changes; partial resource ownership/cleanup including a started root, and unavailable span snapshot on failure before continued collection/shutdown.                                                                                                                                                                                                      |
+| `src/execution/execute-run.ts`                                      | Acquired-session lifecycle guard preserves unexpected rejection after cleanup. Existing application classification, disposal, nine actual no-op composition choices and report transport remain. Most diff lines are indentation under this guard.                                                                                                                                                                                           |
+| `src/execution/worker-entry.ts`                                     | Existing internal builder-failure hook forwards actual requested enabled state.                                                                                                                                                                                                                                                                                                                                                              |
+| `test/telemetry/worker-telemetry-boundary.test.ts`                  | 21 source-factory regressions: no loader/provider/context hooks when disabled, global isolation, invalid root/explicit parent/context semantics, rejected import/evaluation/hook, owned partial cleanup and actual cleanup rejection, reentrant finalization, broken span snapshot. Fault promises have finite deadlines; globals/spies are restored. SDKs deliberately imported by this test are sentinels, not process zero-load evidence. |
+| `test/execution/execute-run.test.ts`                                | Success/user/runtime classification and disposal before root end in all three states; retained application-result identity; original composition rejection after finalization. Existing nine recorder/DAG identity regressions remain.                                                                                                                                                                                                       |
+| `test/execution/worker-profile-fallback-transport.test.ts`          | Preserves real enabled worker fallback; adds profile=false through the same hook and application-result comparison. This uses development output, not an installed package.                                                                                                                                                                                                                                                                  |
+| `docs/design/telemetry.md`, `docs/design/telemetry-verification.md` | Canonical no-op/root/context, lazy boundary, degradation/ownership/finalization contracts and separate source versus release evidence.                                                                                                                                                                                                                                                                                                       |
+| `docs/design/architecture.md`, `docs/design/domain-design.md`       | Same-domain lazy implementation and SDK-free owner/type contract; no new domain/package/export.                                                                                                                                                                                                                                                                                                                                              |
+| `docs/design/plugins.md`, `docs/usage.md`, `docs/profiling.md`      | Developer/plugin/user guidance for invalid no-op root identity, context limitation and initialization degradation.                                                                                                                                                                                                                                                                                                                           |
+| `docs/contributing/build-test-release.md`                           | Records independent lazy asset/release boundary obligations as pending D2.                                                                                                                                                                                                                                                                                                                                                                   |
+| This handoff                                                        | Starting identities, implementation/outcome attribution, verification and stopping boundary.                                                                                                                                                                                                                                                                                                                                                 |
+
+No dependency, lockfile, CLI/config/schema, public package export, observation catalog, threshold or
+fixture contract changed. No experimental production variant was copied into this implementation.
+
+### Verification evidence
+
+Commands ran from the repository root. Git commands used per-invocation
+`-c safe.directory=C:/Users/t-wakabayashi/source/gitlode`; no persistent Git configuration change
+was made. Development build/architecture and source tests do not establish release/package proof.
+
+- `npm run build:dev`: pass (production composite solution; tooling retains its existing noCheck).
+- `npx tsc -p packages/gitlode/tsconfig.json --noEmit --incremental false --composite false --noCheck false`:
+  pass, explicit strict product-source check. This is not full test-source typechecking.
+- Final source suite command below: **10 files, 172 tests passed, 0 skipped**. Two supplied selectors
+  (`profile-report-builder.test.ts` and `diagnostic-accumulator.test.ts`) match no standalone files;
+  their actual collector/report/diagnostic cases are in `local-collection.test.ts` and session tests.
+  No separate nonexistent suite is claimed.
+
+```text
+npx vitest run packages/gitlode/test/execution packages/gitlode/test/telemetry/worker-telemetry-boundary.test.ts packages/gitlode/test/telemetry/worker-telemetry-session.test.ts packages/gitlode/test/telemetry/local-collection.test.ts packages/gitlode/test/telemetry/profile-report-builder.test.ts packages/gitlode/test/telemetry/diagnostic-accumulator.test.ts packages/gitlode/test/telemetry/profile-report-primitives.test.ts
+```
+
+- `npx vitest run packages/gitlode/test/telemetry/behavioral-baseline.test.ts`: **1 file, 12 tests passed,
+  0 skipped**. Frozen pre-migration behavior and same-adapter disabled/enabled equivalence remain.
+- `npx oxlint packages/gitlode/src/execution packages/gitlode/test/execution packages/gitlode/test/telemetry/worker-telemetry-boundary.test.ts`:
+  pass for the affected source/test scope.
+- `npm run format:write` followed by `npm run format:check`: pass across workspaces.
+- `git diff --check`: pass. UTF-8 reading and relative local target checks covered **69 Markdown links**
+  across changed documents; linked lifecycle/verification anchors were inspected.
+
+Broad checks retain pre-existing diagnostics, separately from implementation evidence:
+
+- `npm run lint`: exit 1, only `docs/handoff/m2-first-target-diagnosis/derive.cjs` lines 2/3/4,
+  `import(no-commonjs)` (three existing require calls). The exact file/calls exist at starting
+  `8d622af`; no edit or policy exception was applied.
+- `npm run architecture:check`: development build passes; architecture exit 1 only for the same
+  existing `derive.cjs` orphan. All module boundaries, circular/dependency/export/import checks pass.
+- `npx rev-dep config lint`: exit 0, existing compact detector declaration warning (0 errors,
+  1 warning); configuration is unchanged.
+
+First diagnostics/corrections are retained rather than relabeled as green runs: initial full lint
+also found a new prefer-const in the boundary test, corrected before the final targeted/broad checks.
+Initial architecture also interpreted a literal evaluation-test data URL as an unresolved package;
+the test now constructs its URL in a local variable and asserts the actual module-evaluation error.
+No product import is hidden by this test-only adjustment. One documentation editing command failed
+on Python's Windows default cp932 decoding before reaching architecture docs; remaining edits use
+explicit UTF-8, and all changed Markdown is valid UTF-8. Initial sandbox Git calls needed a
+per-command safe.directory; sandbox network access failed, then authorized normal push/read-only
+remote verification succeeded outside the network sandbox. These are operator/tool setup failures,
+not application/workload failures.
+
+### Bounded negative sensitivity
+
+Three disposable source mutations, each restored byte-for-byte in a finally block, ran only the
+named production-factory test filter. Each Vitest invocation exited 1 as required; a 30-second outer
+process deadline bounded each invocation. No frozen/experimental evidence was modified.
+
+| Mutation                                                      | Command suffix on `npx vitest run packages/gitlode/test/telemetry/worker-telemetry-boundary.test.ts` | Result                                                                                                                                               |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bypass `if (!enabled)` early no-op selection                  | `-t "disabled never calls a rejected"`                                                               | 1 failed / 20 filtered skips: rejected loader produced an inappropriate initialization warning.                                                      |
+| Route no-op `getTracer` through `trace.getTracer`             | `-t "no-op root/explicit parent"`                                                                    | 2 failed / 19 filtered skips: external SDK sentinel recorded the child.                                                                              |
+| Execute backend finalization before storing the owner promise | `-t "memoizes reentrant, concurrent and repeated enabled"`                                           | 1 failed / 20 filtered skips, plus 54 expected negative-variant unhandled stack errors from repeated reentry; process completed in under one second. |
+
+The reentry test was subsequently limited to one deliberate reentry to keep future failure output
+bounded as well; the final 172-test positive suite includes that revision. The negative run is not
+relabeled. Global tracer/meter sentinel tests also positively call the unrelated global APIs and
+assert that those sentinels detect recording, so absence through the session is meaningful.
+These are source boundary sensitivities only, not D2 import/load guard sensitivity.
+
+### Remaining D2 and stopping boundary
+
+After independent D1 review, a separately assigned D2 must:
+
+1. Add emitted graph checks for all three stable entries, shared/dynamic chunks, external SDK and
+   transitive SDK closure, collector/report ownership and private workspace specifier leakage.
+2. Add real host and worker ESM/CommonJS resolution/load guards and independent constructor checks;
+   SDK denial must allow Disabled and cleanly degrade Enabled with one warning. Attribute fixture
+   plugin loads separately. Demonstrate disposable negative sensitivity.
+3. Positively validate packed installed Enabled chunk/report behavior and negative missing-chunk
+   detection, representative adapters/plugins, plus aggregation-child dynamic asset completeness.
+   Existing recursive aggregation inventory alone is not this proof. Change bundling only if needed.
+4. Run the assigned bounded release/package validation chain and record exact source/package/runtime
+   identities and any blocked publish gate. Source-only tests cannot substitute for that chain.
+
+This D1 session ran no installation, release bundling/package campaign, formal or diagnostic
+measurement, PR, merge, parent update, candidate freeze or acceptance-record update. The old formal
+RSS failure and all remaining cumulative review/integration/candidate/T13B/T13C obligations remain.
+Return on the child with normal pushes, actual remote equality and clean status; wait for independent
+review without starting D2 or accepting D1.

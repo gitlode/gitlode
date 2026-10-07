@@ -553,3 +553,125 @@ comparison and decides whether to authorize a new finite diagnostic packet. This
 does not authorize resuming runs 3–6 or repeating runs 1–2. The formal RSS fail remains unchanged.
 Experiment and separate M2 documentation OIDs, final actual remote equality and clean shared-checkout
 state are reported in the session return.
+
+## Offline comparison corrected; four-run continuation completed (2026-10-07)
+
+**Four remaining diagnostic invocations completed once; attribution remains unresolved.**
+Instruction checkpoint and starting shared M2 were `6dc7c3d08def06cf76f99c3612a24ed856586101`.
+Controller-only experiment commit `8d9996bbc7d35f537967057faa37c9d9e6075980` descends directly
+from `4ed4184faf9d97d949afeda369857d4da58c3e2b`; packages/product/variant diff is empty.
+Its normal push and actual remote equality were verified before workloads. Shared checkout
+remained on `feature/otel-redesign_M2`; both actual remotes still matched their respective
+starting/documented OIDs immediately before this outcome edit. No experimental merge occurred.
+
+### Offline correction and new execution gate
+
+The shared experimental inspection path validates generatedAt presence, string type, timestamp
+parseability and exact application-checkpoint equality to the persisted version-2 payload before
+using existing performance normalization. Disk version 2 is independently required. JSONL bytes,
+checkpoint semantic fields, application outcomes, counts, disabled observations and cleanup remain
+subject to the original checks. Baseline application data is re-read from raw boundaries rather
+than trusting its previously normalized application-result file.
+
+All 102 source-archive entries and its known manifest hash matched. Full saved run 1/2 inspection
+passed as new derived evidence; original application-result mismatch was only generatedAt.
+Twelve positive/negative checks passed: saved differing session times, another valid session time,
+missing/wrong-type/inconsistent/malformed timestamps, both timestamps missing, changed ref/count/
+JSONL, enabled profiling and missing boundary. Original and corrected logic, mismatch diagnostics,
+source hashes and disposable cases are retained outside the original sealed archive. **Run 2's
+original processing/supervision failure remains unchanged; offline validation does not pass it
+retroactively.** No product CLI was used for this validation.
+
+The first offline assertion incorrectly expected the application checkpoint to include the disk
+version field. Existing ExtractionCheckpoint and saveStateFile implementation confirmed the
+documented payload adaptation; that agent assertion was corrected, with the failed stage retained.
+No additional substantive run-output mismatch was found. TypeScript checking, Python compilation,
+`npm run format:write`, `npm run format:check`, experiment TypeScript formatting and whitespace
+checks passed. No product or runtime rebuild was performed.
+
+After offline success, the human established **14:25–17:25 JST**, with **17:25 JST hard stop**.
+Fresh evidence/run root:
+`/home/t-wakabayashi/gitlode-performance/m2-rss-continuation-20261007T1422`.
+The original fixture was reused through a new-root symlink; CLI/checkpoints retained its canonical
+old absolute path. No replacement snapshot was accepted. Exact runtime dist/layout/package metadata,
+original and restored dependency-link provenance, full dependency closure, Node/Git hashes and
+fixture content/layout matched. Read-only fsck exited zero with no messages; no lock/gc.pid or known
+path owner was found. Three inventories five seconds apart and immediate/per-run checks matched
+original snapshot `5fe46369dacd20839c083f9b70c351e69febf367a571bc824f18875e796ddc7c`.
+Fresh external and fixed-supervisor deadline/cleanup preflights passed. These remain scoped
+observations, not universal race/escaped-process guarantees.
+
+The explicit continuation controller dispatched only original ordinals 3,4,5,6 as V2,V2,V1,V0.
+Old started markers and sealed evidence were untouched. Execution/processing deadlines remained
+300,000 ms each, sampling 20 ms and new workload budget 30 minutes. New workloads ran approximately
+14:32:15–14:34:11 JST. Four new plus two old CLI invocations exhaust the six-run budget; no retry,
+warmup, additional variant, forced GC, fixture regeneration/repack or maintenance-policy change.
+
+### Separate temporal blocks and descriptive contrasts
+
+| Block | Original run | Variant | Historical outcome                        | CLI elapsed ms | Sampled peak RSS bytes |
+| ----- | -----------: | ------- | ----------------------------------------- | -------------: | ---------------------: |
+| Old   |            1 | V0      | Completed                                 |   27048.184712 |              206204928 |
+| Old   |            2 | V1      | CLI completed; original processing failed |   26165.981369 |              205799424 |
+| New   |            3 | V2      | Completed                                 |   26293.292445 |              186318848 |
+| New   |            4 | V2      | Completed                                 |   27136.618107 |              191053824 |
+| New   |            5 | V1      | Completed                                 |   28217.889830 |              206839808 |
+| New   |            6 | V0      | Completed                                 |   30192.258190 |              199987200 |
+
+All six saved outputs are equivalent under the corrected derived comparison: 4,430 records/commits,
+one 1,974,468-byte JSONL, matching normalized checkpoint/application outcomes, telemetry disabled
+and no profile report. All four new processing/supervision paths passed, with confirmed cleanup and
+empty cleanup/finalization errors. This is diagnostic equivalence, not formal partial-attempt reuse.
+
+RSS contrasts below are bytes. Forward provider compares old runs 2−1; reverse provider compares
+new runs 5−6. Forward import compares runs 3−2 **across windows**; reverse import compares new runs
+4−5. Maximum spread is across the three variant replicate pairs; V0/V1 pairs also cross windows.
+
+| Boundary/metric                          | Old V1−V0 | New V1−V0 | Cross-window V2−V1 | New V2−V1 | Maximum spread |
+| ---------------------------------------- | --------: | --------: | -----------------: | --------: | -------------: |
+| Host after imports, before worker        |    -28672 |    176128 |           -6791168 |  -5222400 |        3596288 |
+| Worker after imports, before request     |  -7229440 |   1323008 |          -10252288 |  -5246976 |        7376896 |
+| Worker after disabled composition        |  -7032832 |    733184 |          -11038720 |  -5836800 |        7180288 |
+| Worker before extraction                 |  -7032832 |   1126400 |           -8286208 |  -3477504 |        6983680 |
+| Worker after extraction, before finalize | -11132928 |   3764224 |           -6049792 | -14598144 |        8507392 |
+| Host after worker exit                   |   4349952 |  14475264 |           -8359936 |   1216512 |       10645504 |
+| External sampled peak                    |   -405504 |   6852608 |          -19480576 | -15785984 |        6217728 |
+
+Provider contrast fails the original descriptive criterion at every listed metric, including a
+peak direction reversal. Import contrast numerically satisfies it only at host-after-imports and
+peak; worker pre-extraction contrasts overlap the maximum spread. Thus matched pre-extraction
+boundaries plus peak do not jointly resolve attribution. Per-metric criteria and individual variant
+spreads are retained in `evidence/derived-results.json`.
+
+**These are two temporal blocks, not six uninterrupted runs.** New V2,V1,V0 reverse contrasts
+supply within-window observations; cross-window comparisons provide supporting observations only.
+Original block/spread arithmetic cannot remove time-window confounding or establish causation.
+V1's changed span-ID semantics, V2's omitted empty finalization calls and bundle/layout differences,
+order/cache, observation effects, GC/native residency and two replicates remain limitations.
+Process RSS is not summed across host/worker; arrayBuffers is not added to external. The lower
+new V2 peak is diagnostic evidence, not an explanation or repair of the formal RSS failure.
+Attribution remains unresolved; no further runs, formal measurement or acceptance change occurred.
+
+### Preservation and next action
+
+New Linux archive:
+`/home/t-wakabayashi/gitlode-performance/m2-rss-continuation-20261007T1422/archive`.
+Distinct verified Windows copy: `D:/gitlode_test/m2-rss-continuation-20261007T1422`.
+All **380 entries** and both manifest copies matched; manifest SHA-256:
+`b834759ca61983c484f7af9733741b52a07a5c7e22f6813f49b0ed5a489f0cc6`.
+This includes raw new runs, selected unchanged old-block evidence/failure, corrected and original
+comparison logic, offline diagnostics/source hashes, input tars, controller patch/bundle, identity
+checks, before/after inventories and cleanup evidence. Original 93-, 33-, 102-entry archives and
+552-entry F archive were reverified unchanged. Copies remain on one host, not an external backup.
+
+Pre-workload setup history is preserved separately: shell-variable quoting failed the first mkdir
+before creating a root; explicit absolute paths succeeded. New checkout initially lacked commit
+identity; the existing experiment identity was used. Automatic review initially rejected push as
+unverified destination/payload; shared-origin equality and controller-only scope checks allowed the
+subsequent push. WSL push stayed silent about 90 seconds, so only its owned processes were stopped;
+the identical commit was normally pushed with Windows Git. None caused another gate or workload.
+
+Proposed next action: trunk reviews this cause-unresolved diagnostic evidence and assigns any
+subsequent work. No product repair, PR/merge, formal retry or F/T13B/M2 acceptance is assigned here.
+Experiment and separate M2 documentation OIDs, actual remote equality and clean shared-checkout
+state are reported in the session return.

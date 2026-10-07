@@ -1,5 +1,6 @@
 """One bounded restored-input gate; failure never regenerates or retries."""
 import pathlib, json, subprocess, os, time, hashlib, datetime
+from runtime_validation import validate_runtime
 
 source=pathlib.Path(__file__).resolve().parents[2]
 root=source.parents[1]
@@ -29,8 +30,10 @@ try:
     assert not (evidence/'gate-started.json').exists(), 'no gate retry'
     record('gate-started',{'utc':datetime.datetime.now(datetime.timezone.utc).isoformat()})
     ids=json.loads((old/'evidence/variant-identities.json').read_text())
+    runtime_records=[]
     for item in ids['identities']:
-        assert inventory(root/'runtimes'/item['variant'])==item['inventory'], item['variant']
+        runtime_records.append(validate_runtime(root/'runtimes'/item['variant'], item, old/'fixed-variant-runtimes.tar.gz', source/'node_modules', '/home/t-wakabayashi/gitlode-performance/m2-rss-experiment-20261006T1106/checkout/source/node_modules'))
+    record('runtime-layout-verification',runtime_records)
     dependencies=inventory(source/'node_modules')
     assert dependencies==json.loads((old/'evidence/dependency-before.json').read_text()), 'dependency bytes'
     record('dependency-before',dependencies)

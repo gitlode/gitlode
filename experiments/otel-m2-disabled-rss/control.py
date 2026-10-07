@@ -6,7 +6,7 @@ nodebin = root/'node/node-v22.23.1-linux-x64/bin'
 env = os.environ.copy(); env.pop('NODE_OPTIONS', None)
 env['GIT_OPTIONAL_LOCKS']='0'
 env.update(PATH=str(nodebin)+':/usr/bin:/bin',TMPDIR=str(root/'tmp'),TMP=str(root/'tmp'),TEMP=str(root/'tmp'),npm_config_cache=str(root/'npm-cache'))
-hard_stop = datetime.datetime.fromisoformat('2026-10-07T09:43:00+09:00').timestamp()
+hard_stop = datetime.datetime.fromisoformat('2026-10-07T17:06:00+09:00').timestamp()
 def command(args):
     return [str(nodebin/'node'), str(source/'node_modules/tsx/dist/cli.mjs'), str(source/'experiments/otel-m2-disabled-rss/supervise.mts'), *args]
 def supervised(label, args, limit):
@@ -49,7 +49,10 @@ elif mode=='prepare':
     raise RuntimeError('fixture generation is prohibited; use restored-gate.py once')
 elif mode=='runs':
     assert not (root/'evidence/controller-entered.json').exists(), 'no retry'
-    assert json.loads((root/'evidence/restored-gate-result.json').read_text())['passed']
+    gate=json.loads((root/'evidence/restored-gate-result.json').read_text())
+    operator=json.loads((root/'evidence/gate-command-success.json').read_text())
+    assert gate['passed'] is True and operator['exit']==0
+    assert operator['gateSha256']==sha(root/'evidence/restored-gate-result.json')
     assert (root/'evidence/supervision-preflight.result.json').exists()
     (root/'runs').mkdir()
     order=['V0','V1','V2','V2','V1','V0']; started=time.time()

@@ -1,5 +1,48 @@
 # Bounded disabled RSS attribution experiment
 
+## Active continuation: offline comparison correction, at most four remaining runs
+
+Trunk reviewed outcome `5d5ac4fd61bcf6fdefa20bac45de1c6d28119808` and driver at experimental
+`4ed4184faf9d97d949afeda369857d4da58c3e2b`. Its additional application-result comparison leaves
+checkpoint.generatedAt literal while the existing performance equivalence normalizes session time.
+This explains the experimental processing failure, not a failed CLI or a demonstrated product defect.
+Run 2 retains its original processing/supervision failure. Never rewrite that artifact as passed.
+
+Authorize a bounded driver/comparison correction on the experiment branch, preserving variant/runtime
+bytes, then offline re-evaluation of saved runs 1 and 2. Validate generatedAt presence/type and its
+consistency with the actual run checkpoint before normalizing it; do not blindly delete timestamps
+or accept missing/incorrect checkpoint fields. Reuse existing normalization contracts where possible.
+Keep semantic fields and JSONL/checkpoint/application outcomes subject to equality.
+
+Before more workloads, replay the entire comparison/inspection path against saved output and boundary
+streams from both runs, writing new derived results outside sealed evidence. Exercise a positive
+session-time difference and negative missing/wrong timestamp, changed ref/count/JSONL cases with
+disposable copies. No product CLI is needed. Confirm the only application-result mismatch is the
+per-session timestamp and all existing normalized behavior/disabled/cleanup conditions still hold.
+Save original and corrected logic/diagnostics and exact source artifact hashes. If another substantive
+output mismatch or input uncertainty appears, stop and return; do not repair expectations to fit it.
+
+If offline verification succeeds, the human establishes a new quiet window and hard stop. Reverify
+the exact fixture/content/layout, runtime/variant/dependency identities and deadline/cleanup readiness.
+New execution is limited to original ordinals 3,4,5,6: V2,V2,V1,V0, each once. Do not repeat V0/V1
+runs 1/2, reset old started markers, append to old sealed archives or silently renumber results.
+Use an explicit continuation controller with original-run identities and a fresh evidence/run root.
+Keep the same observations, 20 ms sampling, per-run deadlines and a maximum 30-minute new workload
+budget. Any workload/processing/cleanup failure stops the remainder with no retry. The original
+total experimental budget remains six CLI invocations, including the two already completed.
+
+This is a diagnostic-only continuation, explicitly different from formal partial-attempt reuse.
+The interruption creates a new temporal block: never present it as six uninterrupted runs or claim
+that original block/spread criteria remove cross-window confounding. Present old/new blocks separately;
+the new V2,V1,V0 reverse block supplies within-window contrasts, while cross-window comparisons are
+supporting observations only. Retain V1 span-ID and V2 finalization/layout confounders. The original
+descriptive criterion can be tabulated with these qualifications, not used to establish causation.
+If results overlap or timing differences prevent attribution, finish as unresolved; no further runs.
+
+Preserve new code and diagnostic evidence separately, then append outcome on M2. Controller-only
+changes are normally pushed on the experiment branch; no merge transfers them. This packet authorizes
+no product repair, formal retry, PR/merge or acceptance change. Earlier stopping outcomes remain history.
+
 ## Active continuation: correct controller scope, then complete preparation
 
 Outcome `2452b592f7e18d9c4200d546702f4f77905080dc` stopped with 0/6 runs on an agent-created

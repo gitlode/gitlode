@@ -121,6 +121,12 @@ correction, disposable positive/negative setup checks and continuation in one se
 pre-workload setup mistakes have a bounded correction allowance; genuine integrity failures and
 started-workload failures still stop. Product/variant bytes and the original six-run limit are unchanged.
 
+Outcome `5d5ac4fd` completed V0 and V1 CLI execution, then stopped on the experimental application
+comparison's unnormalized generatedAt. The latest experiment packet authorizes offline comparator
+correction/replay first, then at most the remaining four CLI invocations. Original processing failure
+is retained; temporal blocks must be reported separately. No completed run is repeated and no formal
+partial-attempt reuse or performance acceptance follows from this diagnostic continuation.
+
 ## History and parallel development boundary
 
 The current legacy baseline `76b124e23fcc069be1278629cf01b62ae1456c7a` is an ancestor of `7e0055a`.

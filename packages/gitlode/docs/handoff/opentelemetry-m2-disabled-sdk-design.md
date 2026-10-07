@@ -800,3 +800,20 @@ was performed. Trunk receives this D1-only review while the worktree remains on 
 Review document verification: `npm run format:write`, `npm run format:check` and `git diff --check`
 pass. The checkpoint changes only this handoff. Normal push and final actual remote/clean/parent
 verification are returned with the checkpoint OID, avoiding a self-referential document hash.
+
+## D2 work record (2026-10-07)
+
+Started at `a2a487ed9a01daed6f2564f44595a5996a8cf49d` on the assigned child with clean
+status. Delta from accepted D1 review `f35e0e1` is documentation only (three handoffs).
+Local parent M2 is `57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`.
+
+Maintenance: verified derive.cjs blob `f6a8f88772b1a96cc0624c24f578ee4d9751819f`, searched
+repository references and found no active automated consumer. Retired only that helper and replaced
+the live first-target link/command with exact retrieval and outside-checkout reproduction instructions.
+Derived JSON and sealed archives are unchanged. This is a separate maintenance checkpoint.
+
+Initial setup evidence: sandbox Git rejected repository ownership; per-command safe.directory fixes
+that without global configuration. Optional instruction-file probes found no tests/system/AGENTS.md,
+tests/system/README.md or tests/README.md; canonical system instructions are in domain/build guides.
+WSL enumeration in the sandbox failed E_ACCESSDENIED; host access must be checked before Linux work.
+No release or performance result is inferred from these setup probes.

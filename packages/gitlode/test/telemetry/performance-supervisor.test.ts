@@ -83,14 +83,14 @@ describe("supervision options", () => {
 });
 
 describe.skipIf(process.platform !== "linux")("Linux process supervision", () => {
-  it.each(["success", "persistence", "uncertain"])(
+  it.each(["success", "persistence", "uncertain", "unsafe"])(
     "disposes registered fixture roots only after persisted confirmed cleanup: %s",
     async (mode) => {
       if (mode === "uncertain")
         vi.spyOn(processGroup, "observeProcessGroup").mockImplementation((group) => [
           { pid: group + 1, group, start: "123", state: "S" },
         ]);
-      const worker = `const fs=require('node:fs'),p=require('node:path'),os=require('node:os');const root=fs.mkdtempSync(p.join(os.tmpdir(),'gitlode-performance-owned-test-'));fs.writeFileSync(p.join(root,'.gitlode-fixture-owner'),process.env.GITLODE_PERFORMANCE_SUPERVISION_ID);fs.writeFileSync(p.join(process.env.GITLODE_PERFORMANCE_ARTIFACTS,'registered-root.txt'),root);process.send({type:'performance-fixture-root',root});${complete(0)}`;
+      const worker = `const fs=require('node:fs'),p=require('node:path'),os=require('node:os');const root=fs.mkdtempSync(p.join(os.tmpdir(),'${mode === "unsafe" ? "gitlode-outside-sentinel-" : "gitlode-performance-owned-test-"}'));fs.writeFileSync(p.join(root,'.gitlode-fixture-owner'),process.env.GITLODE_PERFORMANCE_SUPERVISION_ID);fs.writeFileSync(p.join(process.env.GITLODE_PERFORMANCE_ARTIFACTS,'registered-root.txt'),root);process.send({type:'performance-fixture-root',root});${complete(0)}`;
       const result = await run(
         worker,
         {},

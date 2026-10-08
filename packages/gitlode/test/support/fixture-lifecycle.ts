@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { cp, lstat, mkdir, readFile, readdir } from "node:fs/promises";
+import { cp, lstat, mkdir, readFile, readdir, statfs } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -17,6 +17,7 @@ export type FixtureInventoryEntry = {
   readonly sha256?: string;
 };
 export type FixtureIdentity = {
+  readonly filesystem: { readonly type: number; readonly device: number };
   readonly inventory: readonly FixtureInventoryEntry[];
   readonly layoutDigest: string;
   readonly logical: Readonly<Record<string, string>>;
@@ -103,7 +104,12 @@ export async function fixtureIdentity(directory: string): Promise<FixtureIdentit
     )
   )
     throw new Error("fixture configuration redirects ownership");
-  return { inventory, layoutDigest: digest(JSON.stringify(inventory)), logical };
+  return {
+    inventory,
+    layoutDigest: digest(JSON.stringify(inventory)),
+    logical,
+    filesystem: { type: (await statfs(directory)).type, device: (await lstat(directory)).dev },
+  };
 }
 
 export class FixtureLifecycle {
@@ -149,22 +155,28 @@ export class FixtureLifecycle {
       if (
         !this.prepared ||
         identity.layoutDigest !== this.prepared.layoutDigest ||
-        JSON.stringify(identity.logical) !== JSON.stringify(this.prepared.logical)
+        JSON.stringify(identity.logical) !== JSON.stringify(this.prepared.logical) ||
+        JSON.stringify(identity.filesystem) !== JSON.stringify(this.prepared.filesystem)
       )
         throw new Error(`fixture drift at ${label}`);
       return boundary;
     } catch (error) {
-      this.failed = true;
-      await writeAtomicJson(this.evidenceDirectory, "failure.json", {
-        protocol: this.protocol,
-        instanceId: this.instanceId,
-        status: "inconclusive",
-        label,
-        error: error instanceof Error ? error.message : String(error),
-        retainedRepository: this.repository,
-      }).catch(() => undefined);
+      await this.fail(label, error);
       throw error;
     }
+  }
+
+  private async fail(label: string, error: unknown): Promise<void> {
+    if (this.failed) return;
+    this.failed = true;
+    await writeAtomicJson(this.evidenceDirectory, "failure.json", {
+      protocol: this.protocol,
+      instanceId: this.instanceId,
+      status: "inconclusive",
+      label,
+      error: error instanceof Error ? error.message : String(error),
+      retainedRepository: this.repository,
+    }).catch(() => undefined);
   }
 
   async capture<T>(
@@ -172,7 +184,13 @@ export class FixtureLifecycle {
     child: () => Promise<T>,
   ): Promise<{ value: T; fixtureLink: FixtureLink }> {
     const pre = await this.boundary(`${label}-pre`);
-    const value = await child();
+    let value: T;
+    try {
+      value = await child();
+    } catch (error) {
+      await this.fail(label, error);
+      throw error;
+    }
     const post = await this.boundary(`${label}-post`);
     return {
       value,
@@ -188,7 +206,12 @@ export class FixtureLifecycle {
 
   async finalize(): Promise<void> {
     await this.boundary("final-pre-destruction");
-    await writeAtomicJson(this.evidenceDirectory, "lifecycle.json", this.evidence());
+    try {
+      await writeAtomicJson(this.evidenceDirectory, "lifecycle.json", this.evidence());
+    } catch (error) {
+      await this.fail("final-evidence-persistence", error);
+      throw error;
+    }
   }
 
   evidence() {

@@ -1,10 +1,11 @@
 import { cp, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { validateRequalification } from "../../scripts/tooling/fixture-requalification.js";
+import { supervisePerformance } from "../../scripts/tooling/performance-supervisor.js";
 import { fixtureGitEnvironment } from "../support/fixture-git.js";
 import {
   FixtureLifecycle,
@@ -69,11 +70,12 @@ describe("controlled fixture lifecycle", () => {
   it.each([
     ".git/refs/heads/main",
     ".git/objects/pack/injected.pack",
+    ".git/objects/01/injected-object",
     ".git/objects/info/commit-graph",
     "alpha.txt",
   ])("stops dependent children and retains first drift evidence for %s", async (path) => {
     const lifecycle = await prepared();
-    await mkdir(join(lifecycle.repository, ".git/objects/pack"), { recursive: true });
+    await mkdir(dirname(join(lifecycle.repository, path)), { recursive: true });
     await writeFile(join(lifecycle.repository, path), "changed bytes\n");
     let called = false;
     await expect(
@@ -149,16 +151,19 @@ describe("controlled fixture lifecycle", () => {
       await fixtureGit(directory, ["commit", "-m", "reachable low threshold test input"]);
       await fixtureGit(directory, ["repack", "-d"]);
       expect(await fixtureGit(directory, ["count-objects", "-v"])).toContain("packs: 2");
-      await fixtureGit(directory, [
-        "-c",
-        "gc.autoPackLimit=1",
-        "-c",
-        "gc.auto=1",
-        "commit",
-        "--allow-empty",
-        "-m",
-        "bounded maintenance test",
-      ]);
+      const worker = join(root, `maintenance-worker-${index}.cjs`);
+      await writeFile(
+        worker,
+        `const {execFileSync}=require('node:child_process');const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GIT_')));env.GIT_CONFIG_NOSYSTEM='1';env.GIT_CONFIG_GLOBAL='/dev/null';execFileSync('git',['-c','maintenance.autoDetach=false','-c','gc.autoDetach=false','-c','gc.autoPackLimit=1','-c','gc.auto=1','commit','--allow-empty','-m','bounded maintenance test'],{cwd:${JSON.stringify(directory)},env});process.send({type:'performance-finished',exitCode:0},()=>process.disconnect());`,
+      );
+      const supervised = await supervisePerformance({
+        executable: process.execPath,
+        args: [worker],
+        artifacts: join(root, `maintenance-supervision-${index}`),
+      });
+      expect(supervised.exitCode).toBe(0);
+      const evidence = JSON.parse(await readFile(supervised.artifactPath, "utf8"));
+      expect(evidence.cleanupConfirmed).toBe(true);
       expect(await fixtureGit(directory, ["count-objects", "-v"])).toContain("packs: 1");
       expect((await fixtureIdentity(directory)).logical.count).toBe("8");
     },
@@ -191,7 +196,23 @@ describe("controlled fixture lifecycle", () => {
       quantity: 6,
       legacyRevision: "c".repeat(40),
       runtimeSha256: "d".repeat(64),
-      environment: { node: "synthetic" },
+      environment: {
+        os: { name: "linux", version: "synthetic" },
+        architecture: "x64",
+        cpu: { model: "synthetic", logicalCount: 1 },
+        totalMemoryBytes: 1024,
+        nodeVersion: "22.23.1",
+        npmVersion: "10.9.8",
+        gitVersion: "2.53.0",
+        gitAdapter: "git-cli",
+        buildMode: "release-bundled",
+        repositoryRevision: "c".repeat(40),
+        calibrationTargetRecipeHash: "e".repeat(64),
+        benchmarkScriptRevision: "f".repeat(40),
+        profileState: "legacy_off",
+        warmupCount: 2,
+        measuredPairCount: 7,
+      },
       runs,
       behaviorErrors: [],
       lifecycle: lifecycle.evidence(),
@@ -211,6 +232,29 @@ describe("controlled fixture lifecycle", () => {
       validateRequalification({
         ...input,
         lifecycle: { ...input.lifecycle, status: "inconclusive" },
+      }).exitCode,
+    ).toBe(2);
+    expect(validateRequalification({ ...input, environment: {} }).exitCode).toBe(2);
+    expect(
+      validateRequalification({
+        ...input,
+        selection: { ...input.selection, calibrationSha256: "missing" },
+      }).exitCode,
+    ).toBe(2);
+    expect(
+      validateRequalification({ ...input, lifecycle: { ...input.lifecycle, protocol: "wrong" } })
+        .exitCode,
+    ).toBe(2);
+    expect(
+      validateRequalification({
+        ...input,
+        runs: runs.map((run) => ({ ...run, elapsedMs: 31_000 })),
+      }).exitCode,
+    ).toBe(2);
+    expect(
+      validateRequalification({
+        ...input,
+        runs: runs.map((run) => ({ ...run, state: "target_off" })),
       }).exitCode,
     ).toBe(2);
     const zero = validateRequalification({

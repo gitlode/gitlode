@@ -353,6 +353,20 @@ describe("performance workflow routing", () => {
       requireTarget(manifest("complete"), "commit_heavy_repository", "isomorphic-git", true).status,
     ).toBe("complete");
   });
+  it("keeps historical targets readable but rejects them for new-protocol comparisons", () => {
+    const value = manifest("complete");
+    const key = "commit_heavy_repository/isomorphic-git";
+    value.calibrationTargets[key] = {
+      ...value.calibrationTargets[key]!,
+      fixtureLifecycleProtocol: undefined,
+    };
+    expect(requireTarget(value, "commit_heavy_repository", "isomorphic-git", true).status).toBe(
+      "complete",
+    );
+    expect(() =>
+      requireTarget(value, "commit_heavy_repository", "isomorphic-git", true, true),
+    ).toThrow(/new-protocol/);
+  });
   it("fixes plugin projection routing to isomorphic-git", () => {
     const value = manifest("complete");
     const plugin = {

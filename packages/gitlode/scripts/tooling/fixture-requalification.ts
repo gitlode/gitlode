@@ -2,8 +2,14 @@ import {
   validateFixtureLinks,
   type FixtureLifecycle,
   type FixtureLink,
+  FIXTURE_LIFECYCLE_PROTOCOL,
 } from "../../test/support/fixture-lifecycle.js";
-import { mad, median, type RawRun } from "../../test/support/performance-harness.js";
+import {
+  mad,
+  median,
+  type RawRun,
+  type EnvironmentFingerprint,
+} from "../../test/support/performance-harness.js";
 
 export type HistoricalSelection = {
   readonly quantity: number;
@@ -12,6 +18,26 @@ export type HistoricalSelection = {
   readonly protocol: string;
   readonly legacyRevision: string;
 };
+
+export function validateHistoricalSelection(
+  selection: HistoricalSelection,
+  quantity: number,
+  legacyRevision: string,
+): string[] {
+  const sha = /^[a-f0-9]{64}$/;
+  return !selection ||
+    selection.quantity !== quantity ||
+    !Number.isSafeInteger(quantity) ||
+    quantity < 5 ||
+    !sha.test(selection.calibrationSha256) ||
+    !sha.test(selection.manifestSha256) ||
+    !selection.protocol ||
+    selection.protocol === FIXTURE_LIFECYCLE_PROTOCOL ||
+    selection.legacyRevision !== legacyRevision ||
+    !/^[a-f0-9]{40}$/.test(legacyRevision)
+    ? ["historical selection provenance is missing or mismatched"]
+    : [];
+}
 
 /** Eligibility only: never searches, changes the manifest, retries, or adopts the quantity. */
 export function validateRequalification(input: {
@@ -26,23 +52,32 @@ export function validateRequalification(input: {
 }) {
   const errors = [...input.behaviorErrors];
   const sha = /^[a-f0-9]{64}$/;
-  if (
-    !input.selection ||
-    input.selection.quantity !== input.quantity ||
-    !Number.isSafeInteger(input.quantity) ||
-    input.quantity < 5 ||
-    !sha.test(input.selection.calibrationSha256) ||
-    !sha.test(input.selection.manifestSha256) ||
-    !input.selection.protocol ||
-    input.selection.legacyRevision !== input.legacyRevision
-  )
-    errors.push("historical selection provenance is missing or mismatched");
+  errors.push(
+    ...validateHistoricalSelection(input.selection, input.quantity, input.legacyRevision),
+  );
+  const env = input.environment as Partial<EnvironmentFingerprint> | null;
   if (
     !sha.test(input.runtimeSha256) ||
-    !input.environment ||
-    !/^[a-f0-9]{40}$/.test(input.legacyRevision)
+    !env ||
+    !env.os?.name ||
+    !env.os.version ||
+    !env.architecture ||
+    !env.cpu?.model ||
+    !(env.cpu.logicalCount > 0) ||
+    !(typeof env.totalMemoryBytes === "number" && env.totalMemoryBytes > 0) ||
+    !env.nodeVersion ||
+    !env.npmVersion ||
+    !env.gitVersion ||
+    !["isomorphic-git", "git-cli"].includes(env.gitAdapter ?? "") ||
+    !["release-bundled", "release-installed"].includes(env.buildMode ?? "") ||
+    env.repositoryRevision !== input.legacyRevision ||
+    !sha.test(env.calibrationTargetRecipeHash ?? "") ||
+    !/^[a-f0-9]{40}$/.test(env.benchmarkScriptRevision ?? "") ||
+    env.profileState !== "legacy_off" ||
+    env.warmupCount !== 2 ||
+    env.measuredPairCount !== 7
   )
-    errors.push("new runtime/environment identity is missing");
+    errors.push("new runtime/environment identity is missing or mismatched");
   const warmups = input.runs.filter((run) => run.phase === "warmup");
   const measured = input.runs.filter((run) => run.phase === "measured");
   if (warmups.length !== 2 || measured.length !== 7 || input.runs.length !== 9)

@@ -225,6 +225,7 @@ describe("production calibration artifact adapter", () => {
     expect(inputManifest).toEqual({
       target: { quantity: 8, status: "pending", thresholdMs: 10_000 },
       rawRepositoryPath: "C:/sentinel/repository",
+      calibration: { status: "pending", selectedQuantity: 8 },
     });
 
     const eventNames = events.map(({ name }) => name);

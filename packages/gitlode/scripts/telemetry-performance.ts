@@ -71,6 +71,7 @@ import { projectCalibrationPilot } from "./tooling/calibration-pilot-projection.
 import { runCalibrationWorkflow } from "./tooling/calibration-workflow.js";
 import {
   validateRequalification,
+  validateHistoricalSelection,
   type HistoricalSelection,
 } from "./tooling/fixture-requalification.js";
 import { registerFixtureRoot } from "./tooling/fixture-root-cleanup.js";
@@ -283,11 +284,12 @@ async function main() {
       const selection = JSON.parse(
         await readFile(resolve(option("historical-selection")), "utf8"),
       ) as HistoricalSelection;
-      if (
-        selection.quantity !== target.quantities.commits ||
-        selection.legacyRevision !== legacyRevision
-      )
-        throw new Error("historical selection differs from fixed target");
+      const provenanceErrors = validateHistoricalSelection(
+        selection,
+        target.quantities.commits,
+        legacyRevision as string,
+      );
+      if (provenanceErrors.length) throw new Error(provenanceErrors.join("; "));
       const workflow = await executePaired(manifest, fixture, adapter, {
         cli: legacyCli as string,
         state: "legacy_off",
@@ -1034,6 +1036,12 @@ async function executePaired(
       join(evidenceParent, `fixture-${basename(root)}`),
     );
     await lifecycle.prepare();
+    const preparedIdentity = lifecycle.boundaries[0]?.identity;
+    if (
+      preparedIdentity?.logical.count !== String(quantities.commits) ||
+      preparedIdentity.logical.format !== "sha1"
+    )
+      throw new Error("finished fixture count or object format differs from the selected recipe");
     const changedFiles =
       fixture === "file_heavy_repository"
         ? (await fixtureGit(repository, ["log", "--format=", "--name-only", "main"]))

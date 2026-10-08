@@ -300,3 +300,219 @@ F2 finite preparation/preservation is complete; calibration adoption and the nex
 packet return to trunk. No formal calibration/capture/comparison, N/4N aggregation, RSS experiment,
 implementation change, PR/merge, integration/main update or acceptance-record edit occurred. Full
 T13B, GNOME, final combined candidate, external backup, T13C and release acceptance remain open.
+
+## Bounded fixture lifecycle diagnosis/design (2026-10-08)
+
+### Scope, identities and inspected sources
+
+Started clean on `feature/otel-redesign_M2` at
+`c9dc0b3e8d145d0033ff3e48c9d78f261a13f46d`; actual remote matched. This is a documentation-only
+proposal. F2 product/runtime preservation remains accepted, with product and original harness
+`4ea24d53afc57778addf3f47752e0fe73a7011ea`. No fixture generation/restoration, extraction,
+experiment, benchmark, calibration, tests/install/build campaign, process search, acceptance change
+or production/harness edit occurred. Reading compressed local manuals is not fixture extraction.
+Final documentation OID and post-push remote/clean checks are returned with this session: an OID
+cannot be embedded in the commit that defines it.
+
+Inspected sources:
+
+- This document's F2 compatibility/preservation sections, the closed
+  [RSS experiment](opentelemetry-m2-rss-experiment.md), both
+  [first-target attempts and diagnosis](opentelemetry-m2-first-target-measurement.md), and
+  [M0 result](opentelemetry-m0-result.md).
+- Canonical [performance design](../design/telemetry-performance.md),
+  [performance catalog](../design/telemetry-catalog/performance.yaml),
+  [harness guide](../contributing/telemetry-performance-harness.md), and telemetry verification.
+- `test/support/performance-fixtures.ts`, `deterministic-repository.ts`, `performance-workflow.ts`,
+  `performance-harness.ts`; `scripts/telemetry-performance.ts`, its supervised entrypoint,
+  `tooling/performance-supervisor.ts` and `performance-process-group.ts`; Git CLI adapter command
+  construction and `.github/workflows/ci.yml`. The two generators and workflow script have no diff
+  between fixed F2 and the starting checkpoint. CI does not provide reference calibration evidence.
+- Saved Windows mirror `D:/gitlode_test/m2-freeze-4ea24d5-20261008-f2`: `RESTORE.md`,
+  `evidence/compatibility.json`, `evidence/m0-to-fixed-harness.diff`; original diagnostic mirror
+  `m2-rss-experiment-20261006T1106/evidence/fixture-preparation.json` and
+  `fixture-preparation-drift.json`; continuation mirror
+  `m2-rss-continuation-20261007T1422/evidence/fixture-continuation-gate-1.json`,
+  `fixture-before-3.json`, `fixture-after-6.json`. These are reads of saved evidence, not a new
+  all-archive rehash or fresh runtime observation; F2/trunk inventory verification remains attributed
+  above. No sealed archive was modified.
+- Native Ubuntu `/usr/bin/git --version` reports `2.53.0`, matching F2. Local
+  `/usr/share/man/man1/git-config.1.gz`, `git-gc.1.gz`, `git-maintenance.1.gz` identify Git 2.53.0
+  (manual date 2026-03-02). Read their auto-maintenance, detach, task and registration sections.
+  Windows Git's older manual was located but was not used as the pinned Linux specification.
+  Initial sandbox Git ownership/network and WSL access failures were resolved with command-scoped
+  safe.directory and owner-context read/network access; no global Git setting was changed.
+  Linux `rg` was unavailable; repeated only the manual read using `grep`, not any workload.
+
+### Actual creation, sharing, timing and destruction
+
+`createPerformanceRepository` first creates the five-commit SHA-1 base, then adds exactly
+`quantities.commits - 5` commits. It returns the base recipe descriptor: its cached `refs`/`graph`
+are not a post-extension identity. Any future identity gate must query the finished repository.
+Both helpers isolate system/global config, signing, hooks, CRLF and file mode for their Git
+commands, but inherit other process environment and leave auto-maintenance/detach defaults enabled.
+The base performs init/config/add/commit/switch/merge/tag/branch and read-only identity queries;
+the extension repeats add/commit. Global-config isolation does not disable Git defaults.
+
+| Workflow scope      | Physical repository lifetime and consumers                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Calibration         | Every `executePilot(quantity)` calls `executeSingle` -> `executePaired`, generating a fresh mkdtemp repository. Two warmups and seven legacy measured children reuse that one repository. Pilot validation precedes `pilot.cleanup()` in finally. The next pilot, even at a previously visited quantity, has another repository. Selection artifacts preserve recipe/quantity/results, not an executable repository. |
+| Legacy capture      | One new repository for the command; two warmups and seven measured legacy children share it. It is not the selected calibration pilot's repository.                                                                                                                                                                                                                                                                  |
+| Disabled comparison | One new repository for the command, shared by legacy and candidate across two warmup pairs and seven alternating measured pairs. Separate output/checkpoint paths per child. It does not use the capture command's repository.                                                                                                                                                                                       |
+| Profile comparison  | Another new repository, shared by target-off/target-on CLI children and every target-on sidecar. Each sidecar has a fresh output/checkpoint/request root but reads the same repository, after its timed CLI and before the next child. Sidecar cleanup removes its own root.                                                                                                                                         |
+| Other targets       | Each adapter/command gets its own repository. Plugin-heavy uses the file-heavy repository generator plus plugin/config files in the owned parent. Aggregation uses Git-independent generated data; its temporary collector bundle is separately removed, not a repository lifecycle.                                                                                                                                 |
+
+`executePaired` generates under the preparation stage, derives file-heavy rotation using read-only
+`git log`, then enters per-child execution. Timed CLI wall/RSS excludes generation, post-child behavior
+capture, sidecar work, inventories and final cleanup. These operations can still warm filesystem/page
+caches for subsequent children. Existing warmups/order remain the only deliberate warming protocol;
+there is no cold-cache guarantee or cache reset between sides, sidecars, pilots or commands.
+
+After successful execution, capture/comparison validation and artifact persistence run before
+`workflow.cleanup()` removes the entire owned parent. Generator/run exceptions remove it in the
+internal catch. Calibration removes each completed pilot in finally. A supervisor kill can bypass
+these JS cleanup paths and leave residue. Current process cleanup confirms its owned group, not
+filesystem deletion. Evidence retention must happen before deletion; historical deleted formal
+fixtures cannot now be inspected or reconstructed as physical layouts from their recipe hashes.
+
+### Background writers and what evidence establishes
+
+Repeated porcelain commit/merge operations are the relevant reachable auto-maintenance path in the
+generators. Read-only rev-parse/show/ls-tree/rev-list/cat-file/config-get/log/diff-tree calls used for
+identity, rotation and extraction are not a deliberate maintenance preparation step. No fixture
+workflow invokes maintenance start/register, fetch, explicit gc or repack. Git CLI extraction reads
+objects; isomorphic-git extraction does not invoke native Git maintenance. Do not interpret every
+object-writing command, including each add, as proof that it launches maintenance on every invocation.
+
+Pinned `git-config` specifies `maintenance.auto=true`; automatic maintenance may detach, with
+`maintenance.autoDetach` falling back to `gc.autoDetach`, both defaulting to true. `gc.auto` defaults
+to approximately 6,700 loose objects, and autoPackLimit to 50 packs; these are heuristics, not a
+fixture-count boundary. `gc.auto=0` disables gc auto heuristics but is not a general disable switch
+for every enabled maintenance task. `maintenance run` defaults to the gc task; gc may rewrite
+commit-graph, refs and packs. Scheduled maintenance registration is a separate mechanism;
+`maintenance.auto=false` does not stop a registered scheduler or an already running writer.
+
+The workflow leader is detached intentionally into a supervisor-owned Linux process group. Ordinary
+execFile Git children inherit that group. The supervisor signals the negative leader PID and confirms
+observed group quiescence, including retained descendants after normal completion. Git maintenance
+that detaches/leaves that group is outside that barrier. The manuals establish background detachment,
+not a saved PID/PGID trace for the historical gc; no such trace was collected here. Therefore command
+close, cleanupConfirmed, absence of gc.pid, or three stable snapshots cannot prove the absence of
+an escaped/future writer. Prevention is preferable to a broad process search or killing uncertain PIDs.
+
+Saved drift includes removal of `.git/gc.pid`, loose object removal, changed commit-graph/info refs,
+and a new pack/idx/rev. The closed diagnostic records 7,424 loose / 5,068 packed / one pack changing
+to zero loose / 12,492 packed / two packs with unchanged HEAD and 4,430 commits. Continuation gate,
+before run 3 and after run 6 report HEAD `bde84f1caca0e50284005bf96c126728dac4f9d4`, tree
+`ee9b0d7d2e0d7a0951573fe439299161d34850a2`, 4,430 commits and the latter two-pack layout.
+The saved local config has no explicit maintenance controls. Those facts support a reachable
+maintenance explanation for representation drift, not causation of old RSS failure. Later stability
+is bounded observation of that diagnostic input. Neither formal attempt's deleted layout is known.
+
+Recipe hash preserves tracked-content instructions/selected quantities; refs/tree/commit graph
+identify logical history; pack/idx/rev/commit-graph/loose-object bytes identify physical representation.
+None identifies RAM/page-cache state. F2 archives preserve product/harness/dependencies/toolchain and
+historical evidence; they do not preserve the physical repository for each deleted formal run.
+
+### Recommended controlled lifecycle (proposal, not adopted)
+
+Recommend **foreground automatic preparation during generation**, retaining the normal pinned Git
+heuristics, with `maintenance.autoDetach=false` and `gc.autoDetach=false` supplied to every generator
+Git command from init onward in both helpers. Persist these two settings in the new repository before
+its first commit and retain them through readers/cleanup. Isolate inherited Git config injection and
+repository/object/index overrides for owned fixture commands; record effective origins/config and
+pinned executable. Use a unique unregistered repository with no alternates/shared object directory;
+never register it with scheduled maintenance or share it with another workflow. This preserves the
+logical recipe and normal automatic packing opportunity while making preparation wait for its writers.
+No explicit final gc/repack, prune, aggressive optimization, or post-generation wait-until-stable loop.
+
+Alternatives considered: disabling automatic maintenance from init (`maintenance.auto=false` plus
+`gc.auto=0`) is simpler but intentionally selects an essentially loose-object workload; a deliberate
+foreground final gc/repack selects another packing/index preparation policy. Both can be valid future
+choices, but neither should silently replace this migration's workload. Foreground automatic preparation
+also changes scheduling and may yield different packing from historical asynchronous generation;
+its tradeoff is longer bounded preparation and per-fixture attributed representation, without promising
+identical pack bytes across generations or OSes. Human/trunk must adopt this preparation choice.
+
+Keep the existing fresh-repository-per-pilot/command model and shared-repository-within-pairs model.
+Preparation, identity checks and preservation remain outside CLI timing. Use existing 1,800,000 ms
+preparation and 300,000 ms execution/processing deadlines; do not renew them for repeated checks or
+raise them after a stall. Foreground Git children remain subject to owned-group cleanup. A preparation
+failure launches no CLI; uncertain cleanup retains the owned repository/evidence and returns inconclusive.
+
+Before warmups, capture final refs (including tag objects), HEAD/tree, SHA-1 format, reachable count,
+effective config, filesystem class and full relative path/type/size/hash inventory of worktree plus
+Git objects/refs/indexes. Reject locks/gc.pid, alternates, external links or identity mismatch. Preserve
+that prepared repository once outside the disposable run root with a verified inventory. Assign an
+attempt-local fixture instance ID and layout digest, distinct from the existing semantic recipe hash.
+Capture pre/post inventories for each timed child and each sidecar, and final pre-destruction identity;
+link every raw run, pilot and formal artifact to those boundaries. Hash outside execution only; inventory
+reads warm caches and must be consistently placed/recorded before the existing two warmups and between
+children. Do not describe the resulting cache state as historical or cold.
+
+Any unexpected content/layout change invalidates the whole affected attempt, even after successful
+children; preserve diagnostics and return nonzero without regeneration, re-baselining or retries.
+Compare representation bytes/path sets, not atime. Treat index stat-cache separately and explicitly if
+any verifying command refreshes it; avoid git status in the gate. Save failure identity before cleanup;
+remove only the verified owned root after child completion/cleanup certainty and successful evidence
+persistence. No deletion of historical residue, shared roots or uncertain live repositories.
+
+### Old calibration disposition and finite next packets
+
+**Bounded validity check required before reuse; no automatic invalidation or adoption.** F2 supports
+unchanged tracked-content recipe, final-total semantics, exact 4,430 selection and matching reference
+environment; it does not prove layout/cache/protocol equivalence. Old M0 calibration remains valid
+historical evidence for its original protocol. A new foreground-preparation protocol needs separately
+attributed legacy evidence, not relabeling of M0 or combining its runs with a new sample.
+
+Recommend retaining frozen 4,430 provisionally, with one separately assigned legacy-only check after
+harness review: one fresh controlled repository, exactly two warmups and seven measured children,
+unchanged legacy/runtime/arguments/20 ms RSS sampling, behavior and supervision checks, median within
+10–30 seconds and wall MAD <=5%, plus all new identity boundaries. No quantity search, candidate run,
+retry or manifest mutation. Passing supports explicit trunk adoption of the frozen quantity for the
+new operational protocol; it does **not** prove that 4,430 is still the smallest acceptable quantity.
+If trunk requires that smallest-quantity claim under changed preparation, it must assign a new complete
+doubling/binary calibration under a versioned protocol instead of calling the check recalibration.
+A failed/out-of-window/unstable check stops and returns for that decision; do not automatically resize
+or weaken thresholds. A deliberate loose-only/full-repack recipe choice also requires new protocol
+review and calibration disposition rather than inherited acceptance. This is the unresolved human
+judgment: accept fixed-size requalification with its limited claim, or require renewed minimality.
+Recommend the former to preserve the migration's frozen workload quantity and bound the next work.
+
+Implementation packet, only after that preparation/provenance choice is approved:
+
+1. Base harness work on F2 `4ea24d53afc57778addf3f47752e0fe73a7011ea`, preserving its product/runtime
+   bytes. Change only both generator helpers, workflow lifecycle/provenance and focused harness tests.
+   Introduce a fixture-lifecycle protocol identity independent of the unchanged content recipe hash;
+   artifacts without it remain historical/unqualified for the new protocol, not rewritten in place.
+2. Exact affected contracts/files: `test/support/deterministic-repository.ts`,
+   `test/support/performance-fixtures.ts`, `scripts/telemetry-performance.ts`,
+   `test/support/performance-harness.ts` and `performance-workflow.ts` for artifact types/propagation;
+   focused `test/telemetry/performance-harness.test.ts` and `performance-workflow.test.ts`.
+   Extend existing progress/failure evidence plumbing only as needed; no new supervision framework
+   or production adapter change. Update `docs/design/telemetry-performance.md`, catalog
+   `telemetry-catalog/performance.yaml` for protocol/required fields and
+   `docs/contributing/telemetry-performance-harness.md` for operational ownership and commands.
+   Keep end-user usage/profile semantics and acceptance thresholds unchanged.
+3. Finite positive checks: one small generated base-plus-extension fixture retains expected semantic
+   identity; one bounded Linux forced-low-threshold maintenance case confirms foreground completion
+   under the owned group with no writer after command return; one small workflow checks shared realpath
+   within warmups/pairs/sidecars, distinct pilot/command roots and persisted layout links before removal.
+   These are proposed future tests, not tests executed in this diagnosis or calibrated workloads.
+4. Finite negative cases using disposable small inputs: altered ref/blob/pack/commit-graph;
+   missing inventory/link; lock/gc.pid/alternate/external link/config injection; preparation deadline;
+   failed evidence persistence; unconfirmed cleanup. Each must prevent dependent children or mark the
+   attempt inconclusive/nonzero, preserve first failure, and never retry/delete an uncertain root.
+   Verify out-of-root sentinel survival and a deliberately retained same-group descendant at cleanup.
+   Keep existing escaped-group limits explicit; do not add a real escaping maintenance experiment.
+5. Run only focused meaningful harness checks plus required format/write/check and diff-check; record
+   a new harness OID, dependency/runtime closure and compatibility review against immutable F2/M0.
+   Do not use the old F2 harness archive with unrecorded new code. A new reviewed harness preservation
+   packet precedes the separately authorized nine-child validity check. Long fixture/measurement work
+   has substantial execution time beyond reasoning; announce it in that future packet.
+
+After a successful check and trunk adoption, a separate target-specific measurement packet must
+attribute each newly generated capture/disabled/profile repository to its own preserved inventory;
+recipe equality across stages does not mean physical sharing. F2 product remains preserved even if
+the harness changes. No RSS fix, performance acceptance, external backup completion, further target,
+PR/merge, new ref or implementation is authorized by this proposal.

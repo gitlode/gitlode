@@ -1,5 +1,16 @@
 # M2 disabled SDK boundary integration evidence
 
+## Integration verified (2026-10-08)
+
+Human squash merge PR #116 produced `4ea24d53afc57778addf3f47752e0fe73a7011ea`, parent
+`57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`, tree `715387bc01edac4792909b9faf5cd63ce53e7da1`.
+Trunk verified exact tree equality to source `14ee38b61a61f0f68bdb326d5a4474285d779d46` and
+local/actual-remote M2 equality. The preparation authority/proposal below is historical.
+Source is preserved locally/remotely at archive/otel-m2-disabled-14ee38b; the closed experiment
+`8d9996bbc7d35f537967057faa37c9d9e6075980` at archive/otel-m2-disabled-rss-8d9996b.
+The human deleted both original work branches. Next is separately assigned
+[F2 preparation](opentelemetry-m2-repaired-candidate-freeze.md), not performance acceptance.
+
 ## Status and authority (2026-10-08)
 
 D1 and D2 are independently accepted for source/lifecycle and release boundary only. Integration

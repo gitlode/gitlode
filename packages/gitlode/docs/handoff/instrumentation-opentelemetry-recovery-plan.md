@@ -2,6 +2,14 @@
 
 ## Current assignment (2026-10-08)
 
+PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
+tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.
+Trunk verified local/remote M2 and old-F ancestry. Child and experiment histories are preserved
+locally/remotely as archive/otel-m2-disabled-14ee38b and archive/otel-m2-disabled-rss-8d9996b;
+the human deleted the original work branches. Next assignment is
+[repaired candidate preparation F2](opentelemetry-m2-repaired-candidate-freeze.md), fixed at the squash
+OID. No measurement is yet assigned. F2 supersedes previous preparation/measurement routing.
+
 The six-run RSS diagnostic is closed, cause unresolved, at outcome `85526d2`; no more diagnostic
 runs are authorized. The human approved product detailed design to avoid disabled SDK loading and
 provider construction. The [disabled SDK integration evidence](opentelemetry-m2-disabled-sdk-integration.md)
@@ -10,8 +18,7 @@ supersedes older measurement/experiment assignments below. Trunk accepted design
 D1 source/lifecycle implementation `04dc187` is delivered on `feature/otel-redesign_M2_disabled`;
 independent D1 review `f35e0e1` accepted it. D2 emitted/installed boundary and package verification
 was delivered at `6e84279` with successful reported Windows/Linux validate:release chains. Independent
-D2 review `0b10f30` accepted it. Documentation consolidation and integration preparation are now
-assigned on the same child; PR creation still requires explicit human source/base approval.
+D2 review `0b10f30` accepted it. Documentation consolidation and integration are complete.
 The completed diagnosis
 helper was retired with a Git retrieval recipe; D2 reports full lint/architecture passing.
 Historical D1 lint/architecture failures remain recorded without relabeling. The active packet records

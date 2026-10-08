@@ -8,8 +8,9 @@ documents.
 
 ## Active OpenTelemetry work
 
-Current assignment: [bounded fixture lifecycle diagnosis/design](opentelemetry-m2-repaired-candidate-freeze.md).
-F2 runtime preservation is accepted; calibration reuse and timing await fixture-lifecycle disposition.
+Current assignment: [controlled fixture lifecycle implementation](opentelemetry-m2-fixture-lifecycle.md).
+The human approved foreground maintenance and bounded fixed-quantity requalification. F2 runtime
+preservation is accepted; timing awaits reviewed implementation and a new preserved harness.
 The disabled SDK boundary is squash-integrated into M2 at `4ea24d5` by PR #116; its
 [integration evidence](opentelemetry-m2-disabled-sdk-integration.md) retains acceptance attribution.
 D1 `04dc187` and D2 `6e84279` are independently accepted; performance acceptance remains open.

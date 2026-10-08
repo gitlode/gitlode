@@ -1,5 +1,15 @@
 # M2 repaired candidate preparation (F2)
 
+## Current routing after human decision (2026-10-08)
+
+The human approved foreground automatic maintenance, explicit identity/layout/cache protocol, and
+bounded fixed-quantity requalification without a renewed smallest-quantity claim. The diagnosis below
+is retained with that decision; its request for a human choice is resolved. The active assignment is
+[controlled fixture lifecycle implementation](opentelemetry-m2-fixture-lifecycle.md) on a child branch.
+F2 runtime preservation remains accepted; neither old calibration adoption nor timing is authorized.
+Implementation, independent review and a new preserved harness must precede the separately assigned
+two-warmup/seven-measured legacy requalification. No new candidate/RSS pass is inferred.
+
 ## Trunk disposition and next assignment (2026-10-08)
 
 F2 runtime preparation/preservation is accepted at outcome

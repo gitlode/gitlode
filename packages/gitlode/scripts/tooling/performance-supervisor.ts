@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { writeAtomicJson } from "./atomic-json.js";
+import { disposeFixtureRoot } from "./fixture-root-cleanup.js";
 import {
   completeProcessGroup,
   GroupCompletion,
@@ -134,6 +135,7 @@ export async function supervisePerformance(input: {
   let diagnosticSaved: boolean | undefined;
   let terminating = false;
   let stopped = false;
+  const fixtureRoots = new Set<string>();
   let forceSent = false;
   let settle: () => void = () => {};
   const completion = new Promise<void>((resolve) => {
@@ -327,6 +329,8 @@ export async function supervisePerformance(input: {
       report();
       // PID updates and heartbeats never extend the stage deadline.
       persist("running");
+    } else if (item.type === "performance-fixture-root" && typeof item.root === "string") {
+      fixtureRoots.add(item.root);
     } else if (item.type === "performance-diagnostic" && typeof item.chunk === "string") {
       diagnostic(Buffer.from(item.chunk));
     } else if (
@@ -392,6 +396,26 @@ export async function supervisePerformance(input: {
         "terminal supervision snapshot recovery failed; no terminal artifact saved",
       );
     }
+  }
+  if (terminalEvidenceSaved && cleanupConfirmed && !failure && exit?.code === 0) {
+    for (const root of fixtureRoots) {
+      try {
+        await disposeFixtureRoot(root, id);
+      } catch {
+        failure ??= "fixture-root-cleanup-failed";
+        reportFinalizationFailure(`retained fixture root: ${root}`);
+      }
+    }
+    if (failure) {
+      try {
+        await persistence.writeSnapshot(input.artifacts, `${id}.json`, snapshot("inconclusive"));
+      } catch {
+        terminalEvidenceSaved = false;
+        reportFinalizationFailure("fixture cleanup failure snapshot unavailable");
+      }
+    }
+  } else {
+    for (const root of fixtureRoots) reportFinalizationFailure(`retained fixture root: ${root}`);
   }
   return {
     exitCode: failure ? 2 : (exit?.code ?? 2),

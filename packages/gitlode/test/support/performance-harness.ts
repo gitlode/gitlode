@@ -13,6 +13,7 @@ import {
   performanceStage,
 } from "../../scripts/tooling/performance-progress.js";
 import { requiredTelemetryPerformanceTargets } from "../../scripts/tooling/telemetry-performance-targets.js";
+import type { FixtureLink } from "./fixture-lifecycle.js";
 import { compareBehavioralArtifacts, type BehavioralArtifacts } from "./profile-equivalence.js";
 export { resolveSourceRevision } from "../../scripts/tooling/source-revision.js";
 
@@ -40,6 +41,7 @@ export interface FixtureManifest {
   };
 }
 export interface CalibrationTarget {
+  readonly fixtureLifecycleProtocol?: string;
   readonly status: "complete" | "incomplete";
   readonly quantities: FixtureQuantities;
   readonly environmentRef?: string;
@@ -336,6 +338,7 @@ export const unavailableTargetTelemetry = (state: ProfileState): TargetTelemetry
 };
 
 export interface RawRun {
+  readonly fixtureLink?: FixtureLink;
   readonly state: ProfileState;
   readonly phase: "warmup" | "measured";
   readonly pairIndex?: number;

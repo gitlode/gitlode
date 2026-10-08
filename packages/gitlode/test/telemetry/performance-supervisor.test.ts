@@ -83,6 +83,42 @@ describe("supervision options", () => {
 });
 
 describe.skipIf(process.platform !== "linux")("Linux process supervision", () => {
+  it.each(["success", "persistence", "uncertain"])(
+    "disposes registered fixture roots only after persisted confirmed cleanup: %s",
+    async (mode) => {
+      if (mode === "uncertain")
+        vi.spyOn(processGroup, "observeProcessGroup").mockImplementation((group) => [
+          { pid: group + 1, group, start: "123", state: "S" },
+        ]);
+      const worker = `const fs=require('node:fs'),p=require('node:path'),os=require('node:os');const root=fs.mkdtempSync(p.join(os.tmpdir(),'gitlode-performance-owned-test-'));fs.writeFileSync(p.join(root,'.gitlode-fixture-owner'),process.env.GITLODE_PERFORMANCE_SUPERVISION_ID);fs.writeFileSync(p.join(process.env.GITLODE_PERFORMANCE_ARTIFACTS,'registered-root.txt'),root);process.send({type:'performance-fixture-root',root});${complete(0)}`;
+      const result = await run(
+        worker,
+        {},
+        mode === "persistence"
+          ? {
+              writeDiagnostic: async () => {
+                throw new Error("injected persistence failure");
+              },
+            }
+          : {},
+      );
+      const root = await readFile(join(result.directory, "registered-root.txt"), "utf8");
+      directories.push(root);
+      if (mode === "success") {
+        await expect(readFile(join(root, ".gitlode-fixture-owner"), "utf8")).rejects.toMatchObject({
+          code: "ENOENT",
+        });
+        expect(result.exitCode).toBe(0);
+      } else {
+        expect(await readFile(join(root, ".gitlode-fixture-owner"), "utf8")).toBe(
+          result.evidence.id,
+        );
+        expect(result.exitCode).toBe(2);
+        expect(result.failures.join("\n")).toContain(root);
+      }
+    },
+  );
+
   it("requires group quiescence after normal completion rather than signal success", async () => {
     let observations = 0;
     vi.spyOn(processGroup, "observeProcessGroup").mockImplementation((group) => {

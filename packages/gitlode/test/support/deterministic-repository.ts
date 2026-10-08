@@ -1,12 +1,14 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
+
+import { fixtureGitEnvironment, foregroundMaintenanceConfig } from "./fixture-git.js";
 
 const execFileAsync = promisify(execFile);
 export const FIXED_SESSION_TIMESTAMP = "2024-02-03T04:05:06.000Z";
 const identityEnvironment = {
-  ...process.env,
+  ...fixtureGitEnvironment(),
   GIT_AUTHOR_NAME: "Gitlode Fixture",
   GIT_AUTHOR_EMAIL: "fixture@gitlode.invalid",
   GIT_COMMITTER_NAME: "Gitlode Fixture",
@@ -16,6 +18,7 @@ const identityEnvironment = {
   GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
 };
 const isolatedConfig = [
+  ...foregroundMaintenanceConfig,
   "-c",
   "commit.gpgSign=false",
   "-c",
@@ -60,6 +63,8 @@ export async function createDeterministicRepository(
 ): Promise<DeterministicRepository> {
   await mkdir(directory, { recursive: true });
   await git(directory, ["init", "--initial-branch=main", "--object-format=sha1", "--template="]);
+  await git(directory, ["config", "maintenance.autoDetach", "false"]);
+  await git(directory, ["config", "gc.autoDetach", "false"]);
   await git(directory, ["config", "user.name", "Gitlode Fixture"]);
   await git(directory, ["config", "user.email", "fixture@gitlode.invalid"]);
 

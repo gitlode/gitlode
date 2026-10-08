@@ -6,7 +6,17 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { resolveFilePath } from "@gitlode/internal-foundation/support";
+
 import { createEmptyCheckpoint } from "../src/state/index.js";
+import { fixtureGitEnvironment } from "../test/support/fixture-git.js";
+import {
+  FIXTURE_LIFECYCLE_PROTOCOL,
+  FixtureLifecycle,
+  fixtureGit,
+  validateFixtureLinks,
+  type FixtureLink,
+} from "../test/support/fixture-lifecycle.js";
 import {
   comparePerformanceBehavior,
   performanceBehaviorEvidence,
@@ -60,6 +70,11 @@ import { writeAtomicJson, writeAtomicText } from "./tooling/atomic-json.js";
 import { projectCalibrationPilot } from "./tooling/calibration-pilot-projection.js";
 import { runCalibrationWorkflow } from "./tooling/calibration-workflow.js";
 import {
+  validateRequalification,
+  type HistoricalSelection,
+} from "./tooling/fixture-requalification.js";
+import { registerFixtureRoot } from "./tooling/fixture-root-cleanup.js";
+import {
   performanceChild,
   performanceEvidence,
   performanceFinished,
@@ -87,12 +102,13 @@ async function main() {
   performanceStage({ stage: "preparation", operation: "validate-inputs" });
   const mode = process.argv[2];
   if (
+    mode !== "requalify" &&
     mode !== "calibrate" &&
     mode !== "capture-legacy" &&
     mode !== "measure" &&
     mode !== "aggregate"
   )
-    throw new Error("mode must be calibrate, capture-legacy, measure, or aggregate");
+    throw new Error("mode must be requalify, calibrate, capture-legacy, measure, or aggregate");
   const manifestPath = resolve(
     option("manifest", join(packageDirectory, "test/fixtures/performance/manifest.json")),
   );
@@ -130,8 +146,8 @@ async function main() {
     const rssReady = runs.every(
       (run) => run.rss.status === "supported" && run.rss.peakBytes !== undefined,
     );
-    const peak = (run: (typeof runs)[number]) => {
-      if (run.rss.peakBytes === undefined) throw new Error("RSS peak is missing");
+    const peak = (run: (typeof runs)[number] | undefined) => {
+      if (!run || run.rss.peakBytes === undefined) throw new Error("RSS peak is missing");
       return run.rss.peakBytes;
     };
     const nDelta = rssReady ? peak(enabled[0]) - peak(disabled[0]) : undefined;
@@ -154,7 +170,7 @@ async function main() {
           run.output.report.diagnostics.length !== 0)
       )
         inconclusiveReasons.push("enabled collector report is invalid");
-      if (!run?.enabled && run.output?.report !== null)
+      if (run && !run.enabled && run.output?.report !== null)
         inconclusiveReasons.push("disabled collector unexpectedly returned a report");
     }
     const volume =
@@ -242,7 +258,13 @@ async function main() {
   }
   if (fixture === "aggregation_scale") throw new Error("use aggregate mode for aggregation_scale");
   const adapter = parseAdapter(option("adapter"));
-  const target = requireTarget(manifest, fixture, adapter, mode !== "calibrate");
+  const target = requireTarget(
+    manifest,
+    fixture,
+    adapter,
+    mode !== "calibrate",
+    mode !== "calibrate" && mode !== "requalify",
+  );
   const comparison = mode === "measure" ? parseComparison(option("comparison")) : undefined;
   const legacyCli =
     mode !== "measure" || comparison === "disabled_overhead"
@@ -256,6 +278,76 @@ async function main() {
   const candidateRevision = mode === "measure" ? option("candidate-revision") : undefined;
   const artifacts = resolve(option("artifacts", join(packageDirectory, ".benchmark-artifacts")));
   const originalManifest = await readFile(manifestPath);
+  if (mode === "requalify") {
+    try {
+      const selection = JSON.parse(
+        await readFile(resolve(option("historical-selection")), "utf8"),
+      ) as HistoricalSelection;
+      if (
+        selection.quantity !== target.quantities.commits ||
+        selection.legacyRevision !== legacyRevision
+      )
+        throw new Error("historical selection differs from fixed target");
+      const workflow = await executePaired(manifest, fixture, adapter, {
+        cli: legacyCli as string,
+        state: "legacy_off",
+        revision: legacyRevision as string,
+      });
+      try {
+        const script = await resolveSourceRevision(resolve(packageDirectory, "../.."));
+        const environment = await makeFingerprint(
+          manifest,
+          adapter,
+          "legacy_off",
+          legacyRevision as string,
+          script,
+          calibrationTargetRecipeHash(manifest, calibrationKey(fixture, adapter)),
+        );
+        await workflow.lifecycle.finalize();
+        const validation = validateRequalification({
+          selection,
+          quantity: target.quantities.commits,
+          legacyRevision: legacyRevision as string,
+          runtimeSha256: createHash("sha256")
+            .update(await readFile(legacyCli as string))
+            .digest("hex"),
+          environment,
+          runs: workflow.baseline,
+          behaviorErrors: await validateLegacy(workflow, target.quantities, fixture),
+          lifecycle: workflow.lifecycle.evidence(),
+        });
+        await writeAtomicJson(artifacts, `${fixture}-${adapter}-requalification.json`, {
+          schemaVersion: 4,
+          kind: "fixture-requalification",
+          selection,
+          environment,
+          validation,
+          fixtureLifecycle: workflow.lifecycle.evidence(),
+          runs: workflow.baseline.map(artifactRun),
+          manifestSha256: createHash("sha256").update(originalManifest).digest("hex"),
+        });
+        if (validation.exitCode) process.exitCode = 2;
+        if (!Buffer.from(await readFile(manifestPath)).equals(originalManifest))
+          throw new Error("requalification changed manifest");
+      } finally {
+        await workflow.cleanup();
+      }
+    } catch (error) {
+      await writeWorkflowFailureArtifact(
+        artifacts,
+        `${fixture}-${adapter}-requalification-failure.json`,
+        {
+          kind: "fixture-requalification-failure",
+          status: "inconclusive",
+          fixture,
+          adapter,
+          error,
+        },
+      );
+      process.exitCode = 2;
+    }
+    return;
+  }
   if (mode === "calibrate") {
     await runProductionCalibration({
       manifest,
@@ -344,13 +436,32 @@ async function main() {
         )
       : undefined;
     const behaviorErrors = [
+      ...[...workflow.baseline, ...workflow.candidate].flatMap((run) =>
+        run.exit.code !== 0 || run.exit.signal !== null
+          ? ["warmup or measured child failed"]
+          : [...run.captureErrors],
+      ),
       ...new Set([
         ...(candidate
           ? await compareAll(workflow, target.quantities, fixture)
           : await validateLegacy(workflow, target.quantities, fixture)),
       ]),
     ].sort();
-    const sidecarCompletenessErrors = validateSidecarCompleteness(workflow);
+    await workflow.lifecycle.finalize();
+    const lifecycleErrors = validateFixtureLinks(
+      [...workflow.baseline, ...workflow.candidate]
+        .map((run) => run.fixtureLink)
+        .concat(
+          [...workflow.sidecars.values()]
+            .filter((sidecar) => sidecar.status !== "not-applicable")
+            .map((sidecar) => sidecar.fixtureLink),
+        ),
+      workflow.lifecycle.evidence(),
+    );
+    const sidecarCompletenessErrors = [
+      ...validateSidecarCompleteness(workflow),
+      ...lifecycleErrors,
+    ];
     const sidecarEvaluations = [...workflow.sidecars.values()]
       .filter((sidecar) => sidecar.status !== "not-applicable")
       .map((sidecar) =>
@@ -376,7 +487,7 @@ async function main() {
           ),
         })
       : undefined;
-    if (evaluation) evaluation.reasons = [...new Set(evaluation.reasons)].sort();
+
     const behavioralStatus = behaviorErrors.length ? "inconclusive" : "pass";
     const finalStatus = composeFormalStatus([
       evaluation?.status ?? "pass",
@@ -392,7 +503,8 @@ async function main() {
         ),
       );
     const artifact = {
-      schemaVersion: 2,
+      schemaVersion: 4,
+      fixtureLifecycle: workflow.lifecycle.evidence(),
       kind: mode === "capture-legacy" ? "legacy-baseline" : "comparison",
       fixture,
       adapter,
@@ -514,6 +626,7 @@ async function runProductionCalibration(input: {
       ...input.manifest.calibrationTargets,
       [key]: {
         status: "complete",
+        fixtureLifecycleProtocol: FIXTURE_LIFECYCLE_PROTOCOL,
         quantities: { ...input.target.quantities, commits: selectedQuantity },
         environmentRef: `${safeKey}-environment.json`,
         artifactRef: `${safeKey}-calibration.json`,
@@ -548,12 +661,23 @@ async function runProductionCalibration(input: {
             { ...input.target.quantities, commits: quantity },
             input.fixture,
           );
-          return projectCalibrationPilot({
+          await pilot.lifecycle.finalize();
+          behaviorErrors.push(
+            ...validateFixtureLinks(
+              pilot.baseline.map((run) => run.fixtureLink),
+              pilot.lifecycle.evidence(),
+            ),
+          );
+          const projected = projectCalibrationPilot({
             runs: pilot.baseline,
             behavioralValidation: behaviorErrors,
             behavior: pilot.behavior,
             repositoryPath: pilot.repositoryPath,
           });
+          return {
+            ...projected,
+            evidence: { ...projected.evidence, fixtureLifecycle: pilot.lifecycle.evidence() },
+          };
         } finally {
           performanceStage({
             stage: "processing",
@@ -575,7 +699,7 @@ async function runProductionCalibration(input: {
         updateManifest,
         recipeHash: (updated) => calibrationTargetRecipeHash(updated, key),
         sealedManifestHash,
-        makeEnvironment: async (updated, artifact) =>
+        makeEnvironment: async (updated, _artifact) =>
           await makeFingerprint(
             updated,
             input.adapter,
@@ -713,10 +837,12 @@ type Execution = {
   candidate: RawRun[];
   behavior: Map<string, PerformanceBehavior>;
   sidecars: Map<string, RepositorySidecarCapture>;
+  lifecycle: FixtureLifecycle;
   repositoryPath: string;
   cleanup(): Promise<void>;
 };
 type RepositorySidecarCapture = {
+  readonly fixtureLink?: FixtureLink;
   readonly status: "available" | "inconclusive" | "not-applicable";
   readonly report?: unknown;
   readonly resultKind?: string;
@@ -815,7 +941,7 @@ export async function runRepositoryProfileSidecar(input: {
             pluginBaseDirectory: config.extensions ? dirname(input.config) : undefined,
             pluginDeclarations,
           },
-          priorCheckpoint: createEmptyCheckpoint(input.repository),
+          priorCheckpoint: createEmptyCheckpoint(resolveFilePath(input.repository)),
         },
       }),
     );
@@ -823,7 +949,9 @@ export async function runRepositoryProfileSidecar(input: {
       new URL("./telemetry-repository-sidecar.mjs", import.meta.url),
     );
     performanceStage({ stage: "execution", operation: "repository-sidecar", ...context });
-    const pending = exec(process.execPath, [sidecarScript, requestPath]);
+    const pending = exec(process.execPath, [sidecarScript, requestPath], {
+      env: fixtureGitEnvironment(),
+    });
     performanceChild(pending.child.pid);
     const response = await pending;
     performanceStage({ stage: "processing", operation: "read-sidecar", ...context });
@@ -882,6 +1010,7 @@ async function executePaired(
   performanceStage({ stage: "preparation", operation: "repository-generation", ...context });
   const root = await mkdtemp(join(tmpdir(), "gitlode-performance-"));
   try {
+    await registerFixtureRoot(root);
     const repository = join(root, "repository");
     await createPerformanceRepository(
       repository,
@@ -896,9 +1025,18 @@ async function executePaired(
         config,
         `${JSON.stringify({ version: 1, runtime: { gitAdapter: adapter } })}\n`,
       );
+    const evidenceParent = resolve(
+      option("artifacts", join(packageDirectory, ".benchmark-artifacts")),
+    );
+    await mkdir(evidenceParent, { recursive: true });
+    const lifecycle = new FixtureLifecycle(
+      repository,
+      join(evidenceParent, `fixture-${basename(root)}`),
+    );
+    await lifecycle.prepare();
     const changedFiles =
       fixture === "file_heavy_repository"
-        ? (await exec("git", ["-C", repository, "log", "--format=", "--name-only", "main"])).stdout
+        ? (await fixtureGit(repository, ["log", "--format=", "--name-only", "main"]))
             .split("\n")
             .filter(Boolean).length
         : 0;
@@ -935,31 +1073,37 @@ async function executePaired(
           checkpoint = join(root, `state-${ordinal}.json`);
         await mkdir(output);
         performanceStage({ stage: "execution", operation: "release-cli", ...runContext });
-        const raw = await launchMeasuredChild({
-          executable: process.execPath,
-          args: [
-            cli,
-            repository,
-            "--ref",
-            "main",
-            "--output-dir",
-            output,
-            "--output-prefix",
-            "performance",
-            "--state",
-            checkpoint,
-            "--config",
-            config,
-            ...(fixture !== "commit_heavy_repository" ? ["--per-file"] : []),
-            ...(fixture === "file_heavy_repository"
-              ? ["--rotate-lines", String(rotationLines), "--max-diff-size", "16"]
-              : []),
-          ],
-          outputDirectory: output,
-          checkpointPath: checkpoint,
-          state,
-          ...planned,
-        });
+        const captured = await lifecycle.capture(
+          `cli-${ordinal}`,
+          async () =>
+            await launchMeasuredChild({
+              executable: process.execPath,
+              args: [
+                cli,
+                repository,
+                "--ref",
+                "main",
+                "--output-dir",
+                output,
+                "--output-prefix",
+                "performance",
+                "--state",
+                checkpoint,
+                "--config",
+                config,
+                ...(fixture !== "commit_heavy_repository" ? ["--per-file"] : []),
+                ...(fixture === "file_heavy_repository"
+                  ? ["--rotate-lines", String(rotationLines), "--max-diff-size", "16"]
+                  : []),
+              ],
+              outputDirectory: output,
+              checkpointPath: checkpoint,
+              state,
+              env: fixtureGitEnvironment(),
+              ...planned,
+            }),
+        );
+        const raw = { ...captured.value, fixtureLink: captured.fixtureLink };
         destination.push(raw);
         performanceStage({ stage: "processing", operation: "capture-run", ...runContext });
         const capturedBehavior = await behaviorFor(raw, output, checkpoint);
@@ -982,18 +1126,24 @@ async function executePaired(
         sidecars.set(
           raw.runId,
           state === "target_on"
-            ? await runRepositoryProfileSidecar({
-                cli,
-                runId: raw.runId,
-                repository,
-                config,
-                fixture,
-                adapter,
-                revision: candidate?.state === state ? candidate.revision : baselineSpec.revision,
-                recipeHash: fixtureRecipeHash(manifest),
-                quantities,
-                rotationLines,
-              })
+            ? await (async () => {
+                const captured = await lifecycle.capture(`sidecar-${ordinal}`, () =>
+                  runRepositoryProfileSidecar({
+                    cli,
+                    runId: raw.runId,
+                    repository,
+                    config,
+                    fixture,
+                    adapter,
+                    revision:
+                      candidate?.state === state ? candidate.revision : baselineSpec.revision,
+                    recipeHash: fixtureRecipeHash(manifest),
+                    quantities,
+                    rotationLines,
+                  }),
+                );
+                return { ...captured.value, fixtureLink: captured.fixtureLink };
+              })()
             : {
                 status: "not-applicable",
                 provenance: {
@@ -1016,15 +1166,22 @@ async function executePaired(
       candidate: candidates,
       behavior,
       sidecars,
+      lifecycle,
       repositoryPath: repository,
       cleanup: async () => {
         performanceStage({ stage: "processing", operation: "repository-cleanup", ...context });
-        await rm(root, { recursive: true, force: true });
+        if (lifecycle.boundaries.at(-1)?.label !== "final-pre-destruction")
+          await lifecycle.finalize();
+        // The worker cannot confirm supervisor-owned group cleanup before it exits.
+        // Retain the root for post-supervision disposal rather than deleting on child close.
+        process.stderr.write(
+          `Retained fixture root pending confirmed supervision cleanup: ${root}\n`,
+        );
       },
     };
   } catch (error) {
     performanceStage({ stage: "processing", operation: "repository-failure-cleanup", ...context });
-    await rm(root, { recursive: true, force: true });
+    process.stderr.write(`Retained failed fixture root: ${root}\n`);
     throw error;
   }
 }

@@ -315,3 +315,59 @@ failure_process:
     - impact
     - reevaluation condition
   catalog_reduction: requires an explicit design update
+
+fixture_lifecycle:
+  protocol: foreground-maintenance-inventory-v1
+  repository_artifact_schema_version: 4
+  generation:
+    maintenance_auto_detach: false
+    gc_auto_detach: false
+    persisted_before_first_commit: true
+    automatic_maintenance_heuristics: pinned_git_defaults
+    inherited_git_overrides: removed_from_owned_commands_and_readers
+    final_forced_gc_or_repack: prohibited
+  identity:
+    logical:
+      [
+        refs_including_tag_objects,
+        HEAD,
+        tree,
+        object_format,
+        reachable_count,
+        effective_config_with_origins,
+      ]
+    physical: [relative_path, type, size, sha256]
+    bindings: [protocol, instance_id, prepared_digest, pre_boundary, post_boundary]
+    reject:
+      [locks, gc_pid, alternates, shared_files, links, unowned_entries, configuration_redirects]
+  boundaries:
+    [
+      prepared_before_warmups,
+      child_pre,
+      child_post,
+      sidecar_pre,
+      sidecar_post,
+      final_pre_destruction,
+    ]
+  preservation: verified_prepared_copy_outside_disposable_root
+  drift: inconclusive_nonzero_stop_dependents_no_retry
+  disposal: successful_attempt_only_after_confirmed_group_cleanup_and_persisted_terminal_evidence
+  uncertain_or_failed_root: retained_with_location_diagnostics
+  cache: inventory_reads_outside_timing_warm_caches_no_cold_or_historical_equivalence_claim
+  historical_artifacts: readable_but_unqualified_for_new_protocol
+
+fixture_requalification:
+  purpose: fixed_historical_quantity_eligibility_only
+  historical_selection_provenance:
+    [quantity, calibration_sha256, manifest_sha256, protocol, legacy_revision]
+  new_identity:
+    [runtime_sha256, environment, lifecycle_protocol, fixture_boundaries, harness_revision]
+  legacy_only: true
+  warmups: 2
+  measured_children: 7
+  median_window_ms: [10000, 30000]
+  maximum_wall_mad_ratio: 0.05
+  behavior_and_supervision: required
+  search_retry_resize_candidate_or_historical_manifest_rewrite: prohibited
+  passing_status: eligible_pending_explicit_trunk_adoption
+  renewed_minimality: false

@@ -187,3 +187,37 @@ bindings. Gate retirement requires a separate reviewed post-release change with 
 closed and replacement lasting ownership/commands documented. Retire wiring, validator/config and
 exclusively migration-owned helpers together; preserve reusable tools and correctness checks.
 The [build guide publish policy](build-test-release.md#ci-and-publish-gates) owns enforcement.
+
+## Controlled fixture evidence and fixed-quantity eligibility
+
+Follow the [lifecycle contract](../design/telemetry-performance.md#controlled-repository-fixture-lifecycle)
+and its catalog. Repository schema-4 artifacts bind raw runs and sidecars to instance IDs and byte
+inventory boundaries; schema-3 calibration history remains historical. The content recipe is separate
+from protocol/layout identity. The `fixture-<owned-root-name>` artifact directory retains the verified
+prepared repository, boundaries and final lifecycle ledger. Do not overlay this implementation onto
+F2's preserved harness: review and preserve a new source/dependency/toolchain closure first.
+
+The supervised workflow accepts `requalify` with the same legacy/fixture/adapter/manifest/artifacts
+options as capture and an additional `--historical-selection /abs/selection.json`. That JSON names
+`quantity`, `calibrationSha256`, `manifestSha256`, original `protocol` and `legacyRevision`. Supply
+reviewed selection provenance from preserved historical bytes. The command performs one fixed-size
+legacy pilot, records the new CLI entry hash and environment, and returns eligibility pending trunk
+adoption. The CLI hash supplements, not replaces, the independently preserved full runtime closure.
+The completed supervisor snapshot with confirmed cleanup is mandatory external evidence; eligibility
+is inadmissible if supervision is inconclusive. No manifest is changed by this command.
+
+After independent review and explicit trunk adoption, use a new working manifest whose selected target
+records `fixtureLifecycleProtocol: "foreground-maintenance-inventory-v1"` and whose artifact/environment
+references identify the adopted new evidence. Keep the historical manifest and M0 evidence unchanged.
+The protocol field is a routing check, not an acceptance attestation. Capture/comparison fail closed
+without it. Fresh calibration writes it with the new evidence automatically. The migration release
+gate continues to require its existing reviewed evidence chain; it does not parse external lifecycle
+inventories. A separate release compatibility review must define the reviewed adoption binding before
+any formal packet, without inventing strings to waive release acceptance.
+
+Inventories consistently precede warmups and surround each timed CLI/sidecar, then precede final
+validation/destruction. Their I/O warms caches and is excluded from measured wall/RSS time. Keep the
+existing two warmups and timing deadlines; never claim cold-cache or equivalence to older layout/cache
+protocols. Successful supervised roots are removed only after group cleanup and terminal persistence.
+Failures and direct unsupervised invocations retain roots; inspect the raw diagnostic location before
+manual disposal. Do not delete uncertain or historical residue. Prepared copies are retained evidence.

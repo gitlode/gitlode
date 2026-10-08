@@ -164,3 +164,38 @@ are not relaxed automatically.
 Any accepted exception records the affected fixture and adapter, raw result, cause, rationale,
 impact, and reevaluation condition. Removing an observation to meet performance criteria is a design
 change and cannot occur silently inside an implementation branch.
+
+## Controlled repository fixture lifecycle
+
+Repository workflows use the versioned lifecycle in the performance catalog independently of the
+content recipe hash. Foreground automatic maintenance retains pinned Git heuristics while bounding
+preparation under the existing supervisor. Each pilot and each capture/comparison creates a fresh
+physical repository; all warmups, pairs and sidecars within that invocation share it. Finished refs,
+tag object identities, HEAD/tree, object format and reachable count are queried after extension.
+A verified prepared copy and byte inventories outside the disposable run root attribute the layout
+of each individual attempt. Equal recipes do not assert equal physical packing across attempts or OSes.
+
+Inventory reads run before existing warmups, before/after every timed child and sidecar, and at the
+final pre-destruction boundary. They are outside CLI wall/RSS timing and warm filesystem/page caches.
+This protocol provides no cold-cache claim or physical/cache equivalence to historical runs. It
+compares bytes and path sets, ignoring access times, and does not invoke status/index refresh.
+Missing links, unsafe ownership/configuration/links, writer markers or any content/layout drift make
+the whole attempt inconclusive and nonzero, preventing subsequent dependent children. No regeneration,
+rebaseline, retry, forced final gc/repack or wait-for-stability is permitted.
+
+The worker retains roots until the existing supervisor confirms group cleanup and persists terminal
+evidence. Only successful attempts are automatically disposed after that barrier; failed, uncertain,
+or unsupervised roots are retained with location diagnostics. The preserved prepared copy remains.
+Observed cleanup and inventory boundaries cannot prove immunity to external writers, escaped process
+groups, kernel races, host loss or uninterruptible I/O.
+
+Historical selected quantities may undergo one bounded legacy-only eligibility check under the new
+protocol, with explicit original selection provenance and new runtime/environment identity. This
+uses the unchanged catalog counts, window, stability, behavior and supervision requirements, performs
+no search and never rewrites the historical manifest. Passing is pending explicit trunk adoption;
+it does not renew minimum-quantity proof. Fresh-target doubling/binary calibration remains unchanged.
+Historical artifacts remain historical evidence and cannot qualify a new-protocol comparison.
+The release gate still requires independent reviewed evidence; lifecycle strings do not establish
+acceptance. Before any formal packet, its reviewer must bind the separately preserved new harness,
+new lifecycle evidence and adopted selection to the release evidence chain. Live acceptance stays
+blocked until that compatibility review and all existing obligations are satisfied.

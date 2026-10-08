@@ -4,11 +4,12 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { createDeterministicRepository } from "./deterministic-repository.js";
+import { fixtureGitEnvironment, foregroundMaintenanceConfig } from "./fixture-git.js";
 import type { FixtureQuantities } from "./performance-harness.js";
 
 const execute = promisify(execFile);
 const env = {
-  ...process.env,
+  ...fixtureGitEnvironment(),
   GIT_AUTHOR_NAME: "Gitlode Performance",
   GIT_AUTHOR_EMAIL: "performance@gitlode.invalid",
   GIT_COMMITTER_NAME: "Gitlode Performance",
@@ -18,6 +19,7 @@ const env = {
   GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
 };
 const isolated = [
+  ...foregroundMaintenanceConfig,
   "-c",
   "commit.gpgSign=false",
   "-c",

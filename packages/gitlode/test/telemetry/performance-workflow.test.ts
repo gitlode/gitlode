@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { FIXTURE_LIFECYCLE_PROTOCOL } from "../support/fixture-lifecycle.js";
 import {
   calibrationComplete,
   calibrationTargetRecipeHash,
@@ -14,6 +15,7 @@ import {
   sealedManifestHash,
   validateCalibrationMatrix,
   type FixtureManifest,
+  type CalibrationTarget,
   type RawRun,
 } from "../support/performance-harness.js";
 import {
@@ -49,7 +51,11 @@ function rethrowWorkflowFailure(
 afterEach(async () =>
   Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true }))),
 );
-const manifest = (status: "complete" | "incomplete"): FixtureManifest => ({
+const manifest = (
+  status: "complete" | "incomplete",
+): Omit<FixtureManifest, "calibrationTargets"> & {
+  calibrationTargets: Record<string, CalibrationTarget>;
+} => ({
   schemaVersion: 2,
   recipeRevision: "test",
   aggregationScale: {
@@ -62,13 +68,14 @@ const manifest = (status: "complete" | "incomplete"): FixtureManifest => ({
       key,
       {
         status,
+        fixtureLifecycleProtocol: FIXTURE_LIFECYCLE_PROTOCOL,
         quantities: quantitiesFor(key),
         ...(status === "incomplete"
           ? { reason: "pending" }
           : { environmentRef: "environment.json", artifactRef: "calibration.json" }),
       },
     ]),
-  ) as FixtureManifest["calibrationTargets"],
+  ) as Record<string, CalibrationTarget>,
 });
 describe.skipIf(process.platform !== "linux")("supervised workflow integration", () => {
   it("reports entrypoint setup failures as bounded supervision failures", async () => {
@@ -384,6 +391,7 @@ describe("performance workflow routing", () => {
     const complete = manifest("complete");
     complete.calibrationTargets["file_heavy_repository/isomorphic-git"] = {
       status: "complete",
+      fixtureLifecycleProtocol: FIXTURE_LIFECYCLE_PROTOCOL,
       quantities: { ...quantities, files: 4, rotations: 2 },
       environmentRef: "environment.json",
       artifactRef: "calibration.json",
@@ -658,18 +666,21 @@ describe("performance workflow routing", () => {
     const invalid = manifest("complete");
     invalid.calibrationTargets["commit_heavy_repository/isomorphic-git"] = {
       status: "complete",
+      fixtureLifecycleProtocol: FIXTURE_LIFECYCLE_PROTOCOL,
       quantities: { commits: 4, files: 2, plugins: 1, rotations: 2, scale: 1 },
       environmentRef: "e",
       artifactRef: "a",
     };
     invalid.calibrationTargets["file_heavy_repository/git-cli"] = {
       status: "complete",
+      fixtureLifecycleProtocol: FIXTURE_LIFECYCLE_PROTOCOL,
       quantities: { commits: 5, files: 0, plugins: 1, rotations: 11, scale: 1 },
       environmentRef: "e",
       artifactRef: "a",
     };
     invalid.calibrationTargets["plugin_heavy_projection/isomorphic-git"] = {
       status: "complete",
+      fixtureLifecycleProtocol: FIXTURE_LIFECYCLE_PROTOCOL,
       quantities: { commits: 5, files: 0, plugins: 1, rotations: 1, scale: 1 },
       environmentRef: "e",
       artifactRef: "a",
@@ -812,5 +823,5 @@ describe("performance workflow routing", () => {
     ).toBe(true);
     expect(JSON.stringify(profile)).not.toContain("gitlode-performance-");
     expect(JSON.stringify(profile)).not.toContain("gitlode-profile-sidecar-");
-  }, 30_000);
+  }, 60_000);
 });

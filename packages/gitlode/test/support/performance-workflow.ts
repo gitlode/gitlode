@@ -1,3 +1,4 @@
+import { FIXTURE_LIFECYCLE_PROTOCOL } from "./fixture-lifecycle.js";
 import {
   validateCalibrationMatrix,
   type CalibrationTarget,
@@ -35,6 +36,7 @@ export function requireTarget(
   fixture: RepositoryFixture,
   adapter: "isomorphic-git" | "git-cli",
   complete = false,
+  qualifiedLifecycle = false,
 ): CalibrationTarget {
   if (fixture === "plugin_heavy_projection" && adapter !== "isomorphic-git")
     throw new Error("plugin_heavy_projection requires isomorphic-git");
@@ -43,6 +45,10 @@ export function requireTarget(
   if (complete && target.status !== "complete")
     throw new Error(
       `formal measurement requires completed calibration: ${calibrationKey(fixture, adapter)}`,
+    );
+  if (qualifiedLifecycle && target.fixtureLifecycleProtocol !== FIXTURE_LIFECYCLE_PROTOCOL)
+    throw new Error(
+      "formal measurement requires reviewed new-protocol calibration or trunk-adopted requalification",
     );
   return target;
 }

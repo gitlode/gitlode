@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.release-boundary.json",
+  "include": [
+    "scripts/telemetry-performance.ts",
+    "scripts/tooling/fixture-requalification.ts",
+    "scripts/tooling/calibration-workflow.ts",
+    "test/support/fixture-git.ts",
+    "test/support/fixture-lifecycle.ts",
+    "test/support/deterministic-repository.ts",
+    "test/support/performance-fixtures.ts",
+    "test/support/performance-harness.ts",
+    "test/telemetry/fixture-lifecycle.test.ts",
+    "test/telemetry/performance-supervisor.test.ts",
+    "test/telemetry/performance-workflow.test.ts",
+    "test/telemetry/production-calibration-artifacts.test.ts"
+  ]
+}

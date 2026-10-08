@@ -17,11 +17,12 @@ export type CalibrationFailureReason =
   | "environment-persistence-failed"
   | "success-persistence-failed"
   | "manifest-persistence-failed"
-  | CalibrationPlannerAction["code"];
+  | Extract<CalibrationPlannerAction, { readonly code: string }>["code"];
 export type CalibrationArtifactAction =
   | CalibrationPlannerAction
   | { readonly kind: "planner-initialization-unavailable" };
 export type CalibrationPilotEvidence = {
+  readonly fixtureLifecycle?: unknown;
   readonly warmupRuns: readonly unknown[];
   readonly measuredRuns: readonly unknown[];
   readonly behaviorEvidence: readonly unknown[];
@@ -34,6 +35,7 @@ export type CalibrationPilot = {
 };
 export type CalibrationFailedPilotEvidence = {
   readonly quantity: number;
+  readonly fixtureLifecycle?: unknown;
   readonly warmupRuns: readonly unknown[];
   readonly measuredRuns: readonly unknown[];
   readonly childValidation: readonly string[];
@@ -44,6 +46,7 @@ export type CalibrationWorkflowAttempt = CalibrationPlannerAttempt & {
   readonly ordinal: number;
   readonly madMs: number;
   readonly classification: ReturnType<typeof classifyCalibrationMedian>;
+  readonly fixtureLifecycle?: unknown;
   readonly warmupRuns: readonly unknown[];
   readonly measuredRuns: readonly unknown[];
   readonly childValidation: readonly string[];
@@ -52,7 +55,7 @@ export type CalibrationWorkflowAttempt = CalibrationPlannerAttempt & {
   readonly calibrationTargetRecipeHash: string;
 };
 type ArtifactBase = {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
   readonly fixture: string;
   readonly adapter: string;
   readonly legacyRevision: string;
@@ -146,7 +149,7 @@ export async function runCalibrationWorkflow<Manifest>(
   }
   for (;;) {
     if (action.kind === "complete") break;
-    if (action.kind.startsWith("fail-") || action.kind.startsWith("inconclusive-"))
+    if ("code" in action)
       return persistTerminal(
         action.kind.startsWith("inconclusive-") ? "inconclusive" : "failed",
         "planner",
@@ -185,6 +188,7 @@ export async function runCalibrationWorkflow<Manifest>(
         classification: classifyCalibrationMedian(medianMs),
         childValidation,
         behavioralValidation,
+        fixtureLifecycle: pilot.evidence.fixtureLifecycle,
         warmupRuns: pilot.evidence.warmupRuns,
         measuredRuns: pilot.evidence.measuredRuns,
         behaviorEvidence: pilot.evidence.behaviorEvidence,
@@ -265,7 +269,7 @@ export async function runCalibrationWorkflow<Manifest>(
 
   function base(current: CalibrationArtifactAction, quantity?: number): ArtifactBase {
     return {
-      schemaVersion: 3,
+      schemaVersion: 4,
       fixture: input.fixture,
       adapter: input.adapter,
       legacyRevision: revisions.legacyRevision,
@@ -284,7 +288,9 @@ export async function runCalibrationWorkflow<Manifest>(
   ): CalibrationProgressArtifact {
     return { ...base(current, quantity), kind: "calibration-progress", status };
   }
-  function environment(current: CalibrationPlannerAction): CalibrationEnvironmentArtifact {
+  function environment(
+    current: Extract<CalibrationPlannerAction, { readonly kind: "complete" }>,
+  ): CalibrationEnvironmentArtifact {
     return {
       ...base(current, current.quantity),
       kind: "calibration-environment",
@@ -292,7 +298,9 @@ export async function runCalibrationWorkflow<Manifest>(
       selectedQuantity: current.quantity,
     };
   }
-  function success(current: CalibrationPlannerAction): CalibrationSuccessArtifact {
+  function success(
+    current: Extract<CalibrationPlannerAction, { readonly kind: "complete" }>,
+  ): CalibrationSuccessArtifact {
     return {
       ...base(current, current.quantity),
       kind: "calibration",

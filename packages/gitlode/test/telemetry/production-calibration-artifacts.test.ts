@@ -24,6 +24,7 @@ describe("production calibration artifact adapter", () => {
     const inputManifest = {
       target: { quantity: 8, status: "pending", thresholdMs: 10_000 },
       rawRepositoryPath: "C:/sentinel/repository",
+      calibration: { status: "pending", selectedQuantity: 8 },
     };
     const updateManifest = (commits: number) => ({
       target: inputManifest.target,
@@ -49,8 +50,12 @@ describe("production calibration artifact adapter", () => {
           },
         };
       },
-      writeJson: async (name, value) => events.push({ name, value: value as JsonRecord }),
-      writeManifest: async (manifest) => events.push({ name: "manifest", value: manifest }),
+      writeJson: async (name, value) => {
+        events.push({ name, value: value as JsonRecord });
+      },
+      writeManifest: async (manifest) => {
+        events.push({ name: "manifest", value: manifest });
+      },
     });
     const values = new Map([
       [8, 9_000],
@@ -112,7 +117,7 @@ describe("production calibration artifact adapter", () => {
       attempt(5, 13, 9_999, "lower"),
     ];
     const base = (currentAttempts: readonly JsonRecord[], action: JsonRecord, hash: string) => ({
-      schemaVersion: 3,
+      schemaVersion: 4,
       fixture: "fixture",
       adapter: "git-cli",
       legacyRevision: "legacy",

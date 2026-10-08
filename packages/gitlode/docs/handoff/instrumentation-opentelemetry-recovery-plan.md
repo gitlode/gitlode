@@ -10,7 +10,9 @@ supersedes older measurement/experiment assignments below. Trunk accepted design
 D1 source/lifecycle implementation `04dc187` is delivered on `feature/otel-redesign_M2_disabled`;
 independent D1 review `f35e0e1` accepted it. D2 emitted/installed boundary and package verification
 was delivered at `6e84279` with successful reported Windows/Linux validate:release chains. Independent
-D2 review is now assigned on the same child; D2 acceptance remains pending. The completed diagnosis
+D2 review `0b10f30` accepted it. Documentation consolidation and integration preparation are now
+assigned on the same child; PR creation still requires explicit human source/base approval.
+The completed diagnosis
 helper was retired with a Git retrieval recipe; D2 reports full lint/architecture passing.
 Historical D1 lint/architecture failures remain recorded without relabeling. The active packet records
 the exact scope, checkpoints and human-approved squash integration boundary. Formal disabled

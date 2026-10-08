@@ -1,5 +1,51 @@
 # M2 disabled SDK boundary: detailed design assignment
 
+## Active routing: integration preparation (2026-10-08)
+
+Trunk accepts D1 implementation `04dc187573a63bd2110c381306b26fd050d53220` and D2
+implementation `6e84279819ce50e961ef99dc92ffa5a90219bc34`, based on independent reviews
+`f35e0e11654574be72868c380c8b58a145bea36e` and `0b10f3057ddfa321c79a05951d27df9ec2c6cdee`.
+This closes the source/release-boundary implementation review only. RSS failure, formal performance,
+M2 and release acceptance remain unresolved. This section supersedes earlier session assignments.
+
+Assign a documentation/integration-preparation session on `feature/otel-redesign_M2_disabled`.
+Expected parent M2 is `57fbfdaf11761cf39ce0b403a497ad5cc5fa7395`. Verify local and actual remote
+source/base identities before work. Do not reset unexpected refs. No PR creation or merge is assigned.
+
+1. Consolidate this completed design/implementation/review history into a concise
+   `opentelemetry-m2-disabled-sdk-integration.md`, then remove this superseded handoff. Preserve full
+   history by exact review OIDs and Git paths. Keep accepted semantic decisions in canonical docs;
+   check that the integration note links there rather than creating another normative specification.
+   Retain D1/D2 acceptance targets, maintenance/retrieval provenance, reviewed limits, first failures,
+   archive path/manifest hash, tested dependency versions and separate evidence attribution.
+2. Update README/recovery routing and stale links. Retain the unresolved formal failure, closed RSS
+   experiment, old immutable freeze and all remaining T13B/GNOME/final-candidate/T13C gates. Do not
+   delete other evidence or expand into broad scripts cleanup. Verify current canonical wording is
+   consistent with completed D1/D2, without claiming empirical RSS improvement.
+3. Independently check saved source/patch and sealed evidence identity using existing artifacts.
+   If independent review logs remain only in temporary storage, preserve available logs in a new
+   separately manifested archive under D:/gitlode_test; never append to the existing sealed archive.
+   If unavailable, record that limit and retain committed review attribution; do not rerun a campaign
+   just to recreate those logs. Tested registry-consumer SDK 2.12.0 and repository-lock SDK 2.10.0
+   remain distinct inputs. The removed consumer/tarballs are not a retained frozen runtime.
+4. Prepare a non-mutating merge-tree or isolated squash rehearsal against the actual remote M2 base.
+   Record source/base full OIDs, ancestry, intended squash tree and exact delta from validated
+   `6e84279`. Documentation-only deltas justify reuse of the accepted Windows/Linux validation;
+   do not repeat full tests or package builds without a concrete new concern. Stop if there is an
+   unexpected implementation/package delta, conflict or moving base that invalidates this mapping.
+5. Run documentation format write/check, local link and diff checks. Normally commit/push the
+   documentation checkpoint to the child; bind the final source OID/tree after that checkpoint so
+   the PR proposal includes all prepared documentation. Return a concise PR title/body proposal,
+   source/base/tree identities, evidence/reuse limits and clean/actual-remote checks. Leave shared
+   parent refs unchanged and remain on the child. Trunk will request explicit human source/base PR
+   approval; the human alone merges. Preserve child history before any later deletion.
+
+After human squash integration, trunk must verify the resulting tree and map it to the accepted
+implementation, then assign a new descendant freeze separately. That freeze must retain the actual
+package, all dynamic assets and runtime dependency closure, record deltas against `8fffcc0`, and
+preserve old failed evidence. No new measurement is authorized by this packet, and no old performance
+acceptance transfers merely because functional D1/D2 checks pass.
+
 ## Active routing: independent D2 review
 
 D2 is delivered, not accepted. This review-only packet supersedes the implementation assignment

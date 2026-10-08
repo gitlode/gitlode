@@ -8,7 +8,7 @@ documents.
 
 ## Active OpenTelemetry work
 
-Current assignment: [disabled SDK boundary integration preparation](opentelemetry-m2-disabled-sdk-design.md).
+Current assignment: [disabled SDK boundary integration preparation](opentelemetry-m2-disabled-sdk-integration.md).
 D1 `04dc187` and D2 `6e84279` are independently accepted; performance acceptance remains open.
 Trunk accepted the design with the human-approved invalid no-op root identity. D1 covers source
 session/lifecycle changes; D2 covers emitted/installed boundary verification.

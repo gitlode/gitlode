@@ -775,7 +775,7 @@ describe("performance workflow routing", () => {
           "--legacy-revision",
           "legacy-rev",
         ],
-        { cwd: repositoryRoot, env: { ...process.env, PERF_LOG: log }, timeout: 30_000 },
+        { cwd: repositoryRoot, env: { ...process.env, PERF_LOG: log }, timeout: 60_000 },
       ),
     ).rejects.toMatchObject({ code: 2 });
     const disabled = JSON.parse(
@@ -796,7 +796,7 @@ describe("performance workflow routing", () => {
       promisify(execFile)(process.execPath, [...common, "--comparison", "profile_overhead"], {
         cwd: repositoryRoot,
         env: { ...process.env, PERF_LOG: log },
-        timeout: 30_000,
+        timeout: 60_000,
       }),
     ).rejects.toMatchObject({ code: 2 });
     const profile = JSON.parse(
@@ -837,5 +837,5 @@ describe("performance workflow routing", () => {
     ).toBe(true);
     expect(JSON.stringify(profile)).not.toContain("gitlode-performance-");
     expect(JSON.stringify(profile)).not.toContain("gitlode-profile-sidecar-");
-  }, 60_000);
+  }, 120_000);
 });

@@ -413,7 +413,10 @@ protects a concrete consumer from implementation dependencies.
   finalization.
 - Excludes CLI parsing, extraction policy, concrete presentation, adapter internals, and
   configuration-document schema.
-- Acts as the application composition boundary for one run.
+- Acts as the application composition boundary for one run. Its telemetry owner, API no-op backend
+  and type-only contract remain SDK-free; enabled composition is a guarded lazy same-domain module.
+  Collectors/report builders stay behind that module in product execution. This introduces no domain,
+  package or public backend extension. See [telemetry design](telemetry.md#worker-telemetry-session).
 
 ### 2.22 Allowed domain dependencies
 
@@ -806,7 +809,9 @@ scripts import local helpers and Node built-ins only. They consume the packed in
 than product source, tests, dist modules or private exports.
 
 Filesystem exceptions are reading the product manifest, running npm pack in `packages/gitlode`,
-and inspecting the installed schema and public `dist/plugin-api.d.ts`. Generated consumers import
+and inspecting installed schemas, runtime assets, package identities, guard traces, worker result messages
+and public `dist/plugin-api.d.ts`. Preloads observe built-in Node loader/worker boundaries and never
+import private product modules. Generated consumers import
 only installed `gitlode/plugin-api`. Collector/internal-access tests remain package-owned.
 The root Rev-dep system boundary allows only `tests/system/scripts/**`; the workspace rule checks
 circular/unresolved imports and declared tooling binaries without following product packages.

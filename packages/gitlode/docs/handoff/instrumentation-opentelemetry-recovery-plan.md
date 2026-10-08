@@ -1,12 +1,21 @@
 # OpenTelemetry M2 continuation plan
 
-## Current assignment (2026-10-07)
+## Current assignment (2026-10-08)
 
 The six-run RSS diagnostic is closed, cause unresolved, at outcome `85526d2`; no more diagnostic
 runs are authorized. The human approved product detailed design to avoid disabled SDK loading and
-provider construction. The [disabled SDK design packet](opentelemetry-m2-disabled-sdk-design.md)
-supersedes older measurement/experiment assignments below. It is documentation-only on a separate
-child, followed by trunk design review and a separately assigned implementation. Formal disabled
+provider construction. The [disabled SDK integration evidence](opentelemetry-m2-disabled-sdk-integration.md)
+supersedes older measurement/experiment assignments below. Trunk accepted design checkpoint
+`4adfe248e95deba40ea70e33f707eb4a0ddc091c` with the human-approved invalid no-op root identity.
+D1 source/lifecycle implementation `04dc187` is delivered on `feature/otel-redesign_M2_disabled`;
+independent D1 review `f35e0e1` accepted it. D2 emitted/installed boundary and package verification
+was delivered at `6e84279` with successful reported Windows/Linux validate:release chains. Independent
+D2 review `0b10f30` accepted it. Documentation consolidation and integration preparation are now
+assigned on the same child; PR creation still requires explicit human source/base approval.
+The completed diagnosis
+helper was retired with a Git retrieval recipe; D2 reports full lint/architecture passing.
+Historical D1 lint/architecture failures remain recorded without relabeling. The active packet records
+the exact scope, checkpoints and human-approved squash integration boundary. Formal disabled
 RSS fail, fixed F inputs and the remaining T13B/M2/release gates remain unchanged.
 
 ## Authority and current status

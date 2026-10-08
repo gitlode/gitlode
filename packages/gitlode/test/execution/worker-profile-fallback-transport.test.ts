@@ -86,6 +86,21 @@ describe("profile fallback worker transport", () => {
           telemetryTestFailure: "report_builder_body",
         }),
       );
+      const disabledRequest = request(normalOutput);
+      const disabled = await withTimeout(
+        dispatchWorkerRunRequest(
+          {
+            ...disabledRequest,
+            input: { ...disabledRequest.input, profile: false },
+          },
+          reporters(),
+          { workerEntry, telemetryTestFailure: "report_builder_body" },
+        ),
+      );
+      expect(disabled.kind).toBe("success");
+      if (disabled.kind !== "success") throw new Error(disabled.message);
+      expect(disabled.success.profileReport).toBeUndefined();
+      expect(applicationResult(disabled)).toEqual(applicationResult(normal));
       expect(fallback.kind).toBe("success");
       if (fallback.kind !== "success") throw new Error(fallback.message);
       expect(fallback.success.profileReport).toMatchObject({

@@ -121,6 +121,23 @@ callbacks cover normal completion, rejection, and non-settlement (including an u
 metric); the non-settlement case uses a finite outer test deadline and proves bounded collection,
 partial metric signals, continued cleanup, idempotence, and safe late settlement.
 
+Source session tests exercise the production owner/factory: Disabled loader non-invocation, unrelated
+global-provider sentinels, invalid roots and explicit valid parents, propagation with an existing
+manager and its absence without one, import/evaluation rejection, actual owned cleanup and cleanup
+rejection, span snapshot failure, and reentrant/concurrent finalization identity. Finite deadlines
+bound fault tests and globals are restored. Execution tests retain all nine actual no-op composition
+choices and verify disposal before root end, result classification and original unexpected rejection
+preservation. The real development worker builder-failure seam must respect requested profile=false.
+
+Source evidence is not emitted/installed boundary acceptance. Release verification must separately
+check static transitive closures of all three entries (including shared chunks, external SDK closure
+and collector/report ownership), real host and worker ESM/CommonJS load guards, constructor guards,
+packed enabled-chunk positive behavior and disposable negative sensitivity. Aggregation-child assets
+must include every dynamic target. Installed disabled behavior must succeed under SDK denial; enabled
+must normally produce a valid report, and removing a required chunk must fail that positive assertion.
+These independent checks are required regardless of source-session results; functional boundary
+validation does not establish performance acceptance.
+
 ## Operation-owner integration
 
 Migration slices test observations through their actual owners rather than through generic recorder
@@ -184,3 +201,19 @@ and transport tests. Collector/internal-access tests remain with implementation 
 system workspace checks installed CLI/worker/schema/public API through the package contract and grants
 no internal import exception. The [build guide](../contributing/build-test-release.md) owns commands
 and runner typing. Performance checks follow [performance policy](telemetry-performance.md) separately.
+
+## Release SDK boundary execution
+
+Release bundling validates all three stable entries using emitted module/edge metadata, including
+shared chunks and conservative external dependency closure. The installed-package command checks
+actual CLI/worker ESM and CommonJS guards, SDK denial, positive Enabled observations, lazy asset
+loading and missing-asset sensitivity. See the [build guide](../contributing/build-test-release.md#lazy-telemetry-release-boundary)
+for commands and evidence ownership. These checks do not infer construction from absent output:
+`sdk-construction-boundary.test.ts` intercepts actual SDK constructor calls through the production
+factory and positively activates the same sentinels in Enabled. Existing D1 global-provider and
+lifecycle regressions remain independent evidence.
+
+`aggregation-child.test.ts` uses the existing builder, reconstructs its sorted filename/byte identity
+inventory, resolves the emitted static/lazy graph with the existing bundler, and invokes a small
+Enabled/Disabled child. Every resolved local module must belong to that inventory. This functional
+asset check is separate from N/4N and starts no performance campaign.

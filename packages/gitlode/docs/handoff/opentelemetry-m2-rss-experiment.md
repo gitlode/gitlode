@@ -4,7 +4,7 @@
 
 All six authorized CLI invocations are exhausted at outcome `85526d2`; attribution remains unresolved.
 Earlier continuation instructions below are historical, not active authority. The human approved
-[product detailed design](opentelemetry-m2-disabled-sdk-design.md) for the disabled SDK boundary.
+[product integration evidence](opentelemetry-m2-disabled-sdk-integration.md) for the disabled SDK boundary.
 Do not merge this experiment as the product repair or treat its lower V2 peaks as formal acceptance.
 
 ## Active continuation: offline comparison correction, at most four remaining runs

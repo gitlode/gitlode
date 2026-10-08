@@ -61,10 +61,13 @@ parentPort.once("message", async (request: WorkerRunRequest) => {
       workerData?.gitlodeTelemetryTestFailure === "report_builder_body"
         ? {
             environment: process.env,
-            createTelemetrySession: async () =>
-              await createWorkerTelemetrySessionForTest({
-                failures: { report_builder_body: new Error("injected builder body failure") },
-              }),
+            createTelemetrySession: async (enabled) =>
+              await createWorkerTelemetrySessionForTest(
+                {
+                  failures: { report_builder_body: new Error("injected builder body failure") },
+                },
+                enabled,
+              ),
           }
         : undefined,
     );

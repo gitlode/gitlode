@@ -39,7 +39,7 @@
     "build:dev": "tsc -b",
     "build:release": "npm run build:dev && npm run bundle:release",
     "build:watch": "tsc -b -w",
-    "bundle:release": "node ./scripts/invalidate-development-cache.js && tsdown",
+    "bundle:release": "npm run typecheck:release-boundary && node ./scripts/invalidate-development-cache.js && tsdown",
     "schema:check": "tsx ./scripts/check-generated-config-schema.ts",
     "schema:generate": "tsx ./scripts/generate-config-schema.ts",
     "format:check": "oxfmt --check",
@@ -57,7 +57,8 @@
     "test:system:package": "npm --prefix ../.. run test:system:package",
     "typecheck:telemetry-release-acceptance": "tsc -p ./tsconfig.telemetry-release-acceptance.json",
     "validate:telemetry-release-acceptance": "npm run typecheck:telemetry-release-acceptance && tsx ./scripts/check-telemetry-release-acceptance.ts",
-    "validate:publint": "publint --strict --pack npm"
+    "validate:publint": "publint --strict --pack npm",
+    "typecheck:release-boundary": "tsc -p ./tsconfig.release-boundary.json"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

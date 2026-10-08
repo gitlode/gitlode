@@ -479,16 +479,35 @@ successful completion without that value is not representable by the recorder in
 
 ## Worker telemetry session
 
-One `WorkerTelemetrySession` owns telemetry for one worker run. It owns providers, context-manager
-registration when needed, local processors/readers, profile snapshot, flush, and shutdown.
+One `WorkerTelemetrySession` owns telemetry for one worker run. The owner and its type-only backend
+contract are SDK-free. Requested Disabled selects API no-op telemetry before any enabled loader,
+provider or context-manager hook. Requested Enabled imports `enabled-worker-telemetry` inside the
+initialization guard; this implementation owns providers, context-manager registration when needed,
+local processors/readers, profile snapshot, flush, and shutdown. Product entrypoints import the owner
+directly, without a collector barrel. Emitted/installed zero-load and dynamic asset closure evidence
+remain a separate release verification gate; source-level lazy loading alone does not prove them.
 
-gitlode-owned providers are used explicitly through `provider.getTracer()` and
-`provider.getMeter()` rather than being registered globally. Context management is initialized
+gitlode-owned enabled providers are used explicitly through `provider.getTracer()` and
+`provider.getMeter()` rather than being registered globally. Enabled context management is initialized
 early enough for worker async propagation. An existing compatible global context manager is not
-replaced, and gitlode shuts down only the manager it owns.
+replaced, and gitlode shuts down only the manager it owns. Concurrent enabled sessions in one isolate
+and external replacement of an owned manager during a run are unsupported.
 
-The `gitlode.run` root span remains active through application work and application resource
-disposal. Finalization order is:
+Disabled and initialization-Degraded use a private public-API `ProxyTracerProvider`, never globally
+registered and never delegated, plus `createNoopMeter`. Only API tracer/meter interfaces escape.
+Unrelated global providers cannot record this session's instrumentation. The nonrecording root is
+created with `{ root: true }` and `ROOT_CONTEXT` and has standard API invalid trace/span IDs, rather
+than SDK-generated valid unsampled IDs. Plugins must not rely on disabled root IDs for correlation.
+No-op children with an explicit valid parent can preserve that parent's span context while remaining
+nonrecording; the invalid-root rule does not apply universally to children.
+
+Both states preserve API context-scoped callbacks and explicit contexts. They install no context
+manager: without an existing manager, callbacks do not automatically acquire async active context.
+An existing compatible manager provides propagation and remains untouched. Disabled/Degraded end
+the root once and perform no flush, collect, report build or provider shutdown at finalization.
+
+The `gitlode.run` root lifetime includes application work and application resource disposal.
+Enabled finalization order is:
 
 1. complete application work;
 2. dispose application resources;
@@ -499,12 +518,16 @@ disposal. Finalization order is:
 7. shut down telemetry resources; and
 8. return the worker result for presentation.
 
-`finalize()` is idempotent, shuts resources down exactly once, never changes the already-determined
-application result, and does not reject because of telemetry lifecycle failures.
+`finalize()` stores a deferred promise before any lifecycle work or reentrant hooks. Concurrent,
+reentrant and repeated calls return that same promise and resolved object, retaining the first
+application result by reference. Callers must use a consistent result type. It shuts resources down
+exactly once and does not reject because of telemetry lifecycle failures. Execution also finalizes
+an acquired session before rethrowing an unexpected rejection outside application classification;
+the original thrown value is preserved. Getters do not reopen a finalized session.
 
 ## Local profile mode
 
-The implemented target has only two effective states:
+The two requested modes are:
 
 - profiling disabled, using no-op OpenTelemetry behavior and no-op domain recorders; and
 - `--profile` enabled, using gitlode-owned local providers, processor, and reader.
@@ -682,9 +705,16 @@ overflow stays in the Profile block and does not become an application warning.
 
 ## Failure isolation
 
-If local SDK initialization fails, execution injects no-op telemetry, emits one structured warning,
-continues extraction, and produces no profile report. An absent report is distinct from a valid
-empty report.
+Enabled import resolution/evaluation, hook or local SDK initialization failure selects Degraded
+API no-op telemetry. Execution emits one sanitized structured warning, continues extraction, and
+produces no profile report. An absent report is distinct from a valid empty report. Degraded may
+already have evaluated SDK modules; it does not claim zero prior SDK loading.
+
+Before returning Degraded, initialization independently cleans all owned partial acquisitions.
+Processor/reader cleanup transfers to their provider only after successful provider construction;
+otherwise they are shut down directly. Candidate context managers are disabled separately from
+registered owned managers. A started root ends before trace shutdown. Cleanup faults do not skip
+later resources, retry initialization or construct fallback SDK providers.
 
 Finalization stages are best-effort and independently guarded. Failure of one stage does not prevent
 later collection or shutdown attempts. A report may contain only the successfully collected signal

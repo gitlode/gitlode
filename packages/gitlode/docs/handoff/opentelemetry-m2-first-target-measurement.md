@@ -386,11 +386,25 @@ acceptance update was performed.
 
 ### Reproduction and chronology
 
-[Read-only derivation script](m2-first-target-diagnosis/derive.cjs) and
-[unrounded derived evidence](m2-first-target-diagnosis/derived.json) are outside the sealed archives.
-Reproduce with `node packages/gitlode/docs/handoff/m2-first-target-diagnosis/derive.cjs
-D:/gitlode_test/m2-first-target-8fffcc0-20261002
-D:/gitlode_test/m0-one-target-20260910T065854Z-a53a5b8` (one command).
+The completed read-only derivation helper was retired from the working tree in D2. Its exact
+historical source remains at D1 review commit `f35e0e11654574be72868c380c8b58a145bea36e`, path
+`packages/gitlode/docs/handoff/m2-first-target-diagnosis/derive.cjs`, Git blob
+`f6a8f88772b1a96cc0624c24f578ee4d9751819f`. No automated consumer was found.
+[Unrounded derived evidence](m2-first-target-diagnosis/derived.json) remains unchanged.
+
+Restore outside the checkout, for example from PowerShell (Python preserves Git stdout as exact blob bytes):
+
+```powershell
+$restoredHelper = Join-Path $env:TEMP 'gitlode-historical-derive.cjs'
+python -c "import pathlib,subprocess,sys; pathlib.Path(sys.argv[1]).write_bytes(subprocess.check_output(['git','show','f35e0e11654574be72868c380c8b58a145bea36e:packages/gitlode/docs/handoff/m2-first-target-diagnosis/derive.cjs']))" $restoredHelper
+git hash-object $restoredHelper
+node $restoredHelper D:/gitlode_test/m2-first-target-8fffcc0-20261002 D:/gitlode_test/m0-one-target-20260910T065854Z-a53a5b8
+```
+
+Confirm the blob identity above before invocation. This reads saved artifacts only; it must not
+launch measurements or alter the sealed archives. Retirement removes a completed temporary script,
+not evidence or a lint/architecture policy exception.
+
 The derivation rehashed all 549 M2 and 680 M0 entries without mismatch; M2 manifest identity remains
 `383503b7ab78419ed6723f96f8bb3c56f73fb51c8b8f1774a659dfc2e07c6634`, and M0 `evidence.sha256`
 remains `af7500f45a531f606ef598adfda931a2963d52192e93d21beec943f2fadb8cce`.

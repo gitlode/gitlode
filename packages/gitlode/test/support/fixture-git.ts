@@ -8,7 +8,6 @@ export function fixtureGitEnvironment(source: NodeJS.ProcessEnv = process.env): 
     TZ: "UTC",
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
-    GIT_OPTIONAL_LOCKS: "0",
   };
 }
 

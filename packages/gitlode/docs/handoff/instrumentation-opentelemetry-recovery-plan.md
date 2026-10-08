@@ -8,7 +8,10 @@ Trunk verified local/remote M2 and old-F ancestry. Child and experiment historie
 locally/remotely as archive/otel-m2-disabled-14ee38b and archive/otel-m2-disabled-rss-8d9996b;
 the human deleted the original work branches. Next assignment is
 [repaired candidate preparation F2](opentelemetry-m2-repaired-candidate-freeze.md), fixed at the squash
-OID. No measurement is yet assigned. F2 supersedes previous preparation/measurement routing.
+OID. F2 outcome `d40775f` is accepted for runtime preservation. Its current packet assigns bounded
+fixture-lifecycle diagnosis/design before calibration adoption; no measurement is yet assigned.
+Previously observed background object-layout mutation remains distinct from unresolved RSS causality.
+F2 supersedes previous preparation/measurement routing.
 
 The six-run RSS diagnostic is closed, cause unresolved, at outcome `85526d2`; no more diagnostic
 runs are authorized. The human approved product detailed design to avoid disabled SDK loading and

@@ -1,5 +1,50 @@
 # M2 repaired candidate preparation (F2)
 
+## Trunk disposition and next assignment (2026-10-08)
+
+F2 runtime preparation/preservation is accepted at outcome
+`d40775f7d4fb14fe51bb6c221775e6ceef7895ed`. Trunk rehashed all 628 Windows manifest entries with
+zero missing/size/hash mismatches; manifest hash matches
+`20ee1498e139e27d9044468e541f2d68251c8a5e9df3d99e958f608795305fee`. Both actual remote
+product/harness archive refs match fixed `4ea24d53afc57778addf3f47752e0fe73a7011ea`.
+Linux restoration/execution remains attributed to the saved F2 evidence, not rerun by trunk.
+
+Calibration reuse and new timing remain unassigned. Semantic recipe/environment compatibility is
+supported, but previously observed post-generation Git object-layout changes require an explicit
+fixture-lifecycle disposition. Current generator invokes repeated Git commits without explicit
+auto-maintenance suppression; this is a reachable mechanism, not proof of the prior RSS failure.
+Do not declare the calibrated quantity invalid solely from that observation or treat repeated stable
+snapshots as proof that no future maintenance can occur.
+
+The next human-started session is a **bounded fixture lifecycle diagnosis/design**, documentation only:
+
+1. Read the F2 compatibility section, closed RSS experiment, first-target attempts, canonical fixture/
+   calibration contracts and actual performance-fixtures, deterministic-repository, telemetry-performance,
+   workflow/supervision code. Trace every fixture creation/reuse/destruction point for calibration,
+   capture and paired comparisons; determine whether separate stages/runs share a physical repository.
+2. Inspect saved evidence and actual pinned Git behavior/configuration documentation locally. Identify
+   which commands can launch background maintenance, whether its descendants remain under supervision,
+   and what identity/layout is actually preserved. Do not infer the deleted formal fixtures' layout.
+   No fixture generation, extraction, benchmark, broad process search or new reproduction is assigned.
+3. Recommend one minimal controlled lifecycle: prevent unintended background writers, explicitly
+   choose preparation/layout semantics, bound preparation and verify pre/post identity. Distinguish
+   tracked-content recipe, physical layout, cache warming and formal timing boundaries. Consider
+   disabling automatic maintenance during generation versus completing deliberate foreground
+   preparation; do not silently pick a new workload or require identical physical packing across OSes.
+4. State whether old calibration can be reused, needs a bounded validity check or must be redone under
+   a changed recipe/protocol. Give evidence and uncertainty, exact affected files/contracts, finite
+   positive/negative tests and how fixture layout will be attributed to each measurement. If a new
+   semantic choice requires human judgment, present one recommendation and its practical tradeoff.
+5. Return a bounded implementation/validation packet proposal, not implementation. If harness changes
+   are necessary, F2 product remains preserved; a new harness identity and compatibility review must
+   precede measurement. Do not edit frozen inputs, change thresholds or promise that this fixes RSS.
+
+Work on shared M2, append the diagnosis here and normally commit/push documentation only. Record
+starting/final OIDs, sources inspected, conclusions and unresolved decisions; format/check and diff-check.
+Remain on M2 and confirm actual remote equality/clean status. No tests/install campaigns, production/
+harness edits, PR, merge, new refs, recalibration, formal measurement or acceptance-record changes.
+Do not restart historical packets or automatically begin implementation after writing the proposal.
+
 ## Assignment (2026-10-08)
 
 The human squash-merged PR #116. Fixed product and harness OID for this preparation:

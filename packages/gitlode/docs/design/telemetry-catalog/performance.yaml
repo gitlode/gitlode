@@ -337,6 +337,7 @@ fixture_lifecycle:
         effective_config_with_origins,
       ]
     physical: [relative_path, type, size, sha256]
+    filesystem: [type, device]
     bindings: [protocol, instance_id, prepared_digest, pre_boundary, post_boundary]
     reject:
       [locks, gc_pid, alternates, shared_files, links, unowned_entries, configuration_redirects]

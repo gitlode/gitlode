@@ -1,5 +1,65 @@
 # M2 controlled fixture lifecycle implementation
 
+## Active assignment: bounded correction round 1 (2026-10-09)
+
+Trunk confirmed the three reviewed failure paths against current source. Review
+`0ae8079a5a5c469dd39b7addf5e5a207acfb0798` is corrections required; the slice remains unaccepted.
+This packet supersedes earlier assignments and authorizes only the corrections below on the existing
+feature/otel-redesign_M2_fixture child. Record starting OID and verify intervening changes are docs only.
+Parent M2 remains `4f09265791c82452a5800cc6d9855938bf88a46e`; F2 refs/runtime remain untouched.
+
+Use stable finding IDs C1 (review P1), C2 (first P2), C3 (second P2). Do not reopen the approved
+foreground/fixed-quantity policy or expand this into release-adoption implementation.
+
+- **C1 — durable disposal barrier:** no saved completed success may precede successful required root
+  disposal. Persist a non-success intent/barrier before destructive cleanup; if it cannot be saved,
+  retain roots and return inconclusive/nonzero. Track disposal versus intentional retention explicitly,
+  separately from process-group cleanup. Publish completed only after required disposal succeeds.
+  If deletion/refusal and any later snapshot write fail, prior persisted evidence must remain
+  non-success. Preserve bounded stderr, original/secondary errors and per-root outcomes, including
+  multiple roots with partial disposal. Avoid increasing deadlines or retrying the worker. Retain
+  existing diagnostic/final snapshot recovery guarantees without making a barrier count as a saved
+  terminal success. Add combined refusal/write-failure, barrier-write-failure and final-write-failure
+  regressions and a successful path; use real owned temporary roots and an outside sentinel.
+- **C2 — complete evidence binding:** validate filesystem type/device against prepared identity,
+  consistent embedded/layout/prepared digests, unique boundary IDs and matching operation plus ordinal
+  for each pre/post pair. Bind every child/sidecar link to its actual expected operation; a different
+  valid pair is not a substitute. Inspect real raw-run/pilot/sidecar projection consumers, not only
+  the validator's unit fixtures. Preserve historical/aggregation read behavior without requiring live
+  Git for stored evidence. Negative cases: device/type mismatch, mismatched operation pair, duplicate
+  ID, inconsistent embedded digest and another child's valid pair. Retain positive real workflow,
+  calibration and synthetic requalification paths. Update types/canonical contract only as needed.
+- **C3 — primary failure preservation:** do not finalize an already failed lifecycle a second time.
+  Cleanup and diagnostic notification failures must not replace the original exception or primary
+  failure-artifact cause. Record secondary cleanup errors separately; preserve retained-root behavior.
+  Exercise final-boundary failure through actual workflow failure-artifact handling, with both usable
+  and unusable lifecycle failure-evidence storage. Use small fixtures and finite hooks, not the
+  4,430-commit workload. Do not limit proof to calling the lifecycle API twice. Preserve original error
+  identity where in-process and meaningful primary cause across serialized artifacts. If all storage
+  is unavailable, report honestly via bounded best-effort operator diagnostics/nonzero status.
+
+Expected edits are supervisor/root-cleanup, fixture lifecycle validation/types and its actual workflow
+consumers/finalization, plus focused regressions and affected canonical docs. No product runtime,
+dependency/threshold, live acceptance, frozen artifact or branch-strategy change is authorized.
+Show fail-before/pass-after for the three concrete defects using bounded regressions; preserve first
+results. Run the established ten-suite Linux batch, explicit fixture-lifecycle strict typing, build,
+lint, architecture, format write/check and diff check. On Windows run affected path/validator/workflow
+tests with existing bounded test limits; attribute platform skips. Do not repeat full package campaigns
+or grow a mutation campaign. Newly discovered unrelated issues return to trunk with evidence.
+
+Checkpoint implementation and outcome separately, normally push to this child, and report exact OIDs,
+C1/C2/C3 mapping, finite commands/results and remaining limitations here. Verify actual remote equality,
+clean status and unchanged parent/F2 refs; remain on child. Stop for independent focused re-review.
+No PR, merge, new preservation refs, freeze, selected-workload generation, requalification execution,
+measurement or acceptance edit. If the same obligation remains after review, return to bounded
+diagnosis rather than automatically broadening correction scope.
+
+Release-adoption follow-up from the review is retained as a separate pre-formal gate: historical
+selection bytes -> new-protocol legacy result/runtime/harness/environment -> fixture/run inventories
+-> completed disposal/group supervision -> explicit reviewed adoption -> comparison/acceptance chain.
+Trunk must specify the concrete record and validator/external-review binding before formal work; the
+blocked live record alone does not establish enforcement. These corrections do not close that gate.
+
 ## Active assignment: independent review (2026-10-09)
 
 Implementation is delivered, not accepted. This review-only packet supersedes the implementation

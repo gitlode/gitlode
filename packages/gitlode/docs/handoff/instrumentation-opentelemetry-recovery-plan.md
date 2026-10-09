@@ -12,7 +12,9 @@ OID. F2 outcome `d40775f` is accepted for runtime preservation. Its current pack
 fixture-lifecycle diagnosis/design before calibration adoption; diagnosis `686ef2c` is complete.
 The human approved foreground automatic maintenance and bounded requalification of the historically
 selected quantity without renewed minimality. Harness implementation was delivered at `59e9131`;
-[independent review](opentelemetry-m2-fixture-lifecycle.md) is now assigned on the fixture child.
+[independent review](opentelemetry-m2-fixture-lifecycle.md) returned three mandatory findings at
+`0ae8079`: disposal success ordering, stored boundary binding and primary exception preservation.
+Bounded C1/C2/C3 correction round 1 is assigned on the fixture child; acceptance remains pending.
 Release-adoption binding remains an explicit review/follow-up gate before formal work. New harness
 preservation follows acceptance and integration. No measurement is yet assigned.
 Previously observed background object-layout mutation remains distinct from unresolved RSS causality.

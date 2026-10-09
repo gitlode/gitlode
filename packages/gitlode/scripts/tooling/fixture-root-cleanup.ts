@@ -14,7 +14,7 @@ export async function registerFixtureRoot(root: string): Promise<void> {
   });
 }
 
-/** Called only after group cleanup and successful terminal evidence persistence. */
+/** Called only after group cleanup and a durable non-success disposal barrier. */
 export async function disposeFixtureRoot(root: string, owner: string): Promise<void> {
   const parent = await realpath(tmpdir());
   const physical = await realpath(root);

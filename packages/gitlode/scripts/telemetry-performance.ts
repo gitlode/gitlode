@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { writeSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -45,6 +46,7 @@ import {
   volumeObservationFromProfileReport,
   pathIsolationEvidence,
   pairPlan,
+  fixtureOperationFor,
   sealedManifestHash,
   type CalibrationTarget,
   type EnvironmentFingerprint,
@@ -295,6 +297,7 @@ async function main() {
         state: "legacy_off",
         revision: legacyRevision as string,
       });
+      let primaryFailure: { error: unknown } | undefined;
       try {
         const script = await resolveSourceRevision(resolve(packageDirectory, "../.."));
         const environment = await makeFingerprint(
@@ -331,8 +334,11 @@ async function main() {
         if (validation.exitCode) process.exitCode = 2;
         if (!Buffer.from(await readFile(manifestPath)).equals(originalManifest))
           throw new Error("requalification changed manifest");
+      } catch (error) {
+        primaryFailure = { error };
+        throw error;
       } finally {
-        await workflow.cleanup();
+        await workflow.cleanup(primaryFailure);
       }
     } catch (error) {
       await writeWorkflowFailureArtifact(
@@ -414,6 +420,7 @@ async function main() {
     process.exitCode = 2;
     return;
   }
+  let primaryFailure: { error: unknown } | undefined;
   try {
     const formalTargetRecipeHash = calibrationTargetRecipeHash(
       manifest,
@@ -454,11 +461,20 @@ async function main() {
       [...workflow.baseline, ...workflow.candidate]
         .map((run) => run.fixtureLink)
         .concat(
-          [...workflow.sidecars.values()]
-            .filter((sidecar) => sidecar.status !== "not-applicable")
-            .map((sidecar) => sidecar.fixtureLink),
+          [...workflow.baseline, ...workflow.candidate]
+            .filter((run) => workflow.sidecars.get(run.runId)?.status !== "not-applicable")
+            .map((run) => workflow.sidecars.get(run.runId)?.fixtureLink),
         ),
       workflow.lifecycle.evidence(),
+      [...workflow.baseline, ...workflow.candidate]
+        .map((run) => fixtureOperationFor(run, baselineSpec.state, candidate?.state))
+        .concat(
+          [...workflow.baseline, ...workflow.candidate]
+            .filter((run) => workflow.sidecars.get(run.runId)?.status !== "not-applicable")
+            .map((run) =>
+              fixtureOperationFor(run, baselineSpec.state, candidate?.state, "sidecar"),
+            ),
+        ),
     );
     const sidecarCompletenessErrors = [
       ...validateSidecarCompleteness(workflow),
@@ -591,9 +607,21 @@ async function main() {
     if (!Buffer.from(await readFile(manifestPath)).equals(originalManifest))
       throw new Error("formal workflow changed manifest");
     if (finalStatus !== "pass") process.exitCode = 2;
+  } catch (error) {
+    primaryFailure = { error };
+    throw error;
   } finally {
-    await workflow.cleanup();
+    await workflow.cleanup(primaryFailure);
   }
+}
+
+function retainedDiagnostic(message: string): unknown {
+  try {
+    writeSync(2, `${message.slice(0, 2048)}\n`);
+  } catch (error) {
+    return error;
+  }
+  return undefined;
 }
 
 async function writeWorkflowFailureArtifact(
@@ -601,12 +629,19 @@ async function writeWorkflowFailureArtifact(
   name: string,
   value: Record<string, unknown>,
 ) {
-  await mkdir(directory, { recursive: true });
   const error = value.error;
-  await writeFile(
-    join(directory, name),
-    `${JSON.stringify({ schemaVersion: 2, ...value, error: error instanceof Error ? error.message : String(error) }, undefined, 2)}\n`,
-  );
+  try {
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      join(directory, name),
+      `${JSON.stringify({ schemaVersion: 2, ...value, error: error instanceof Error ? error.message : String(error) }, undefined, 2)}\n`,
+    );
+  } catch (storageError) {
+    retainedDiagnostic(
+      `Workflow failure: ${error instanceof Error ? error.message : String(error)}; failure artifact unavailable: ${String(storageError)}`,
+    );
+    throw error;
+  }
 }
 
 async function runProductionCalibration(input: {
@@ -650,6 +685,7 @@ async function runProductionCalibration(input: {
           "legacy_off",
           quantity,
         );
+        let primaryFailure: { error: unknown } | undefined;
         try {
           performanceStage({
             stage: "processing",
@@ -668,6 +704,7 @@ async function runProductionCalibration(input: {
             ...validateFixtureLinks(
               pilot.baseline.map((run) => run.fixtureLink),
               pilot.lifecycle.evidence(),
+              pilot.baseline.map((run) => fixtureOperationFor(run, "legacy_off")),
             ),
           );
           const projected = projectCalibrationPilot({
@@ -680,15 +717,11 @@ async function runProductionCalibration(input: {
             ...projected,
             evidence: { ...projected.evidence, fixtureLifecycle: pilot.lifecycle.evidence() },
           };
+        } catch (error) {
+          primaryFailure = { error };
+          throw error;
         } finally {
-          performanceStage({
-            stage: "processing",
-            operation: "pilot-cleanup",
-            fixture: input.fixture,
-            adapter: input.adapter,
-            quantity,
-          });
-          await pilot.cleanup();
+          await pilot.cleanup(primaryFailure);
         }
       },
       ...createProductionCalibrationArtifactAdapter({
@@ -841,7 +874,7 @@ type Execution = {
   sidecars: Map<string, RepositorySidecarCapture>;
   lifecycle: FixtureLifecycle;
   repositoryPath: string;
-  cleanup(): Promise<void>;
+  cleanup(primaryFailure?: { error: unknown }): Promise<void>;
 };
 type RepositorySidecarCapture = {
   readonly fixtureLink?: FixtureLink;
@@ -1176,20 +1209,27 @@ async function executePaired(
       sidecars,
       lifecycle,
       repositoryPath: repository,
-      cleanup: async () => {
-        performanceStage({ stage: "processing", operation: "repository-cleanup", ...context });
-        if (lifecycle.boundaries.at(-1)?.label !== "final-pre-destruction")
-          await lifecycle.finalize();
-        // The worker cannot confirm supervisor-owned group cleanup before it exits.
-        // Retain the root for post-supervision disposal rather than deleting on child close.
-        process.stderr.write(
-          `Retained fixture root pending confirmed supervision cleanup: ${root}\n`,
-        );
+      cleanup: async (primaryFailure) => {
+        try {
+          performanceStage({ stage: "processing", operation: "repository-cleanup", ...context });
+          if (
+            lifecycle.evidence().status !== "inconclusive" &&
+            lifecycle.boundaries.at(-1)?.label !== "final-pre-destruction"
+          )
+            await lifecycle.finalize();
+        } catch (error) {
+          await lifecycle.recordCleanupError(error);
+          if (!primaryFailure) throw error;
+        } finally {
+          const diagnosticError = retainedDiagnostic(
+            `Retained fixture root pending confirmed supervision cleanup: ${root}`,
+          );
+          if (diagnosticError !== undefined) await lifecycle.recordCleanupError(diagnosticError);
+        }
       },
     };
   } catch (error) {
-    performanceStage({ stage: "processing", operation: "repository-failure-cleanup", ...context });
-    process.stderr.write(`Retained failed fixture root: ${root}\n`);
+    retainedDiagnostic(`Retained failed fixture root: ${root}`);
     throw error;
   }
 }

@@ -357,6 +357,19 @@ export interface RawRun {
   readonly checkpointPath?: string;
   readonly captureErrors: readonly string[];
 }
+
+/** Reconstruct the actual child ordinal from the fixed execution plan, independently of its link. */
+export function fixtureOperationFor(
+  run: Pick<RawRun, "phase" | "pairIndex" | "order" | "state">,
+  baseline: ProfileState,
+  candidate?: ProfileState,
+  kind = "cli",
+): string {
+  const pair = (run.phase === "measured" ? 2 : 0) + (run.pairIndex ?? 0);
+  const first = run.order === "A-B" ? baseline : candidate;
+  const ordinal = candidate ? pair * 2 + (run.state === first ? 0 : 1) : pair;
+  return `${kind}-${ordinal}`;
+}
 export async function launchMeasuredChild(input: {
   readonly executable: string;
   readonly args: readonly string[];

@@ -218,6 +218,12 @@ any formal packet, without inventing strings to waive release acceptance.
 Inventories consistently precede warmups and surround each timed CLI/sidecar, then precede final
 validation/destruction. Their I/O warms caches and is excluded from measured wall/RSS time. Keep the
 existing two warmups and timing deadlines; never claim cold-cache or equivalence to older layout/cache
-protocols. Successful supervised roots are removed only after group cleanup and terminal persistence.
+protocols. Successful supervised roots are removed only after group cleanup and a saved non-success
+disposal barrier; completed success is published after required disposal succeeds. Inspect `disposal`
+alongside process-group `cleanupConfirmed`, including per-root failure/retention and partial disposal.
+An earlier barrier remains non-success when subsequent terminal writes are unavailable. It does not
+count as a saved terminal success. Stored links must match the actual CLI/sidecar operation and ordinal,
+not merely any valid adjacent pair. Cleanup preserves the primary failure and records secondary errors
+where storage permits; bounded synchronous notification is best effort when evidence storage fails.
 Failures and direct unsupervised invocations retain roots; inspect the raw diagnostic location before
 manual disposal. Do not delete uncertain or historical residue. Prepared copies are retained evidence.

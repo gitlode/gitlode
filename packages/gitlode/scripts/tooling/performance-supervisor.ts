@@ -136,6 +136,14 @@ export async function supervisePerformance(input: {
   let terminating = false;
   let stopped = false;
   const fixtureRoots = new Set<string>();
+  const disposal: {
+    phase: "retained" | "pending" | "disposed" | "partial";
+    roots: {
+      root: string;
+      status: "retained" | "pending" | "disposed" | "failed";
+      error?: string;
+    }[];
+  } = { phase: "retained", roots: [] };
   let forceSent = false;
   let settle: () => void = () => {};
   const completion = new Promise<void>((resolve) => {
@@ -162,6 +170,7 @@ export async function supervisePerformance(input: {
       finishedCode,
       cleanupErrors: [...cleanupErrors],
       cleanupConfirmed,
+      disposal: structuredClone(disposal),
       finalizationErrors: [...finalizationErrors],
       diagnostics: {
         filename: `${id}.diagnostic.log`,
@@ -256,7 +265,7 @@ export async function supervisePerformance(input: {
   }
   function reportFinalizationFailure(reason: string) {
     try {
-      input.onFailure?.(`[performance] ${reason}`);
+      input.onFailure?.(`[performance] ${reason.slice(0, 2048)}`);
     } catch {
       // Operator diagnostics are best-effort and must not disrupt bounded finalization.
     }
@@ -376,6 +385,44 @@ export async function supervisePerformance(input: {
     reportFinalizationFailure("final diagnostic log write failed");
   }
   let terminalEvidenceSaved = false;
+  disposal.roots = [...fixtureRoots].map((root) => ({ root, status: "retained" }));
+  if (cleanupConfirmed && !failure && exit?.code === 0 && fixtureRoots.size) {
+    disposal.phase = "pending";
+    for (const entry of disposal.roots) entry.status = "pending";
+    let barrierSaved = false;
+    try {
+      // A durable non-success record must precede every destructive operation.
+      await persistence.writeSnapshot(input.artifacts, `${id}.json`, snapshot("inconclusive"));
+      barrierSaved = true;
+    } catch {
+      failure ??= "fixture-disposal-barrier-write-failed";
+      finalizationErrors.push("fixture-disposal-barrier-write-failed");
+      reportFinalizationFailure("fixture disposal barrier unavailable; retaining roots");
+    }
+    if (barrierSaved) {
+      for (const entry of disposal.roots) {
+        try {
+          await disposeFixtureRoot(entry.root, id);
+          entry.status = "disposed";
+        } catch (error) {
+          entry.status = "failed";
+          entry.error = error instanceof Error ? error.message : String(error);
+          failure ??= "fixture-root-cleanup-failed";
+          finalizationErrors.push("fixture-root-cleanup-failed");
+          reportFinalizationFailure(
+            `retained fixture root: ${entry.root}; ${entry.error.slice(0, 512)}`,
+          );
+        }
+      }
+      disposal.phase = failure ? "partial" : "disposed";
+    } else {
+      disposal.phase = "retained";
+      for (const entry of disposal.roots) entry.status = "retained";
+    }
+  }
+  for (const entry of disposal.roots)
+    if (entry.status === "retained")
+      reportFinalizationFailure(`retained fixture root: ${entry.root}`);
   try {
     await persistence.writeSnapshot(
       input.artifacts,
@@ -395,27 +442,11 @@ export async function supervisePerformance(input: {
       reportFinalizationFailure(
         "terminal supervision snapshot recovery failed; no terminal artifact saved",
       );
+      for (const entry of disposal.roots)
+        reportFinalizationFailure(
+          `fixture root outcome: ${entry.status} ${entry.root}${entry.error ? `; ${entry.error.slice(0, 512)}` : ""}`,
+        );
     }
-  }
-  if (terminalEvidenceSaved && cleanupConfirmed && !failure && exit?.code === 0) {
-    for (const root of fixtureRoots) {
-      try {
-        await disposeFixtureRoot(root, id);
-      } catch {
-        failure ??= "fixture-root-cleanup-failed";
-        reportFinalizationFailure(`retained fixture root: ${root}`);
-      }
-    }
-    if (failure) {
-      try {
-        await persistence.writeSnapshot(input.artifacts, `${id}.json`, snapshot("inconclusive"));
-      } catch {
-        terminalEvidenceSaved = false;
-        reportFinalizationFailure("fixture cleanup failure snapshot unavailable");
-      }
-    }
-  } else {
-    for (const root of fixtureRoots) reportFinalizationFailure(`retained fixture root: ${root}`);
   }
   return {
     exitCode: failure ? 2 : (exit?.code ?? 2),
@@ -423,5 +454,7 @@ export async function supervisePerformance(input: {
     failure,
     artifactPath: join(input.artifacts, `${id}.json`),
     terminalEvidenceSaved,
+    disposal,
+    finalizationErrors: [...finalizationErrors],
   };
 }

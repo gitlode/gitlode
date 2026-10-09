@@ -83,6 +83,71 @@ describe("supervision options", () => {
 });
 
 describe.skipIf(process.platform !== "linux")("Linux process supervision", () => {
+  it.each(["refusal-write", "barrier-write", "final-write", "success"])(
+    "C1 persists a non-success disposal barrier: %s",
+    async (mode) => {
+      const script = `const fs=require('node:fs'),p=require('node:path'),os=require('node:os');
+const roots=['gitlode-performance-c1-',${JSON.stringify(mode === "refusal-write" ? "outside-c1-" : "gitlode-performance-c1-")}].map(prefix=>{const root=fs.mkdtempSync(p.join(os.tmpdir(),prefix));fs.writeFileSync(p.join(root,'.gitlode-fixture-owner'),process.env.GITLODE_PERFORMANCE_SUPERVISION_ID);process.send({type:'performance-fixture-root',root});return root});
+fs.writeFileSync(p.join(process.env.GITLODE_PERFORMANCE_ARTIFACTS,'roots.json'),JSON.stringify(roots));fs.writeFileSync(p.join(process.env.GITLODE_PERFORMANCE_ARTIFACTS,'outside-sentinel'),'outside');${complete(0)}`;
+      let barrierSaved = false;
+      const saved: Record<string, unknown>[] = [];
+      const result = await run(
+        script,
+        {},
+        {
+          writeSnapshot: async (directory, name, value) => {
+            const item = value as {
+              status: string;
+              disposal?: { phase: string };
+              failure?: string;
+            };
+            if (
+              (mode === "barrier-write" && item.disposal?.phase === "pending") ||
+              (mode === "refusal-write" && item.failure === "fixture-root-cleanup-failed") ||
+              (mode === "final-write" &&
+                (item.status === "completed" || item.failure === "final-snapshot-write-failed"))
+            )
+              throw new Error("C1 injected snapshot failure");
+            if (item.disposal?.phase === "pending") barrierSaved = true;
+            saved.push(structuredClone(value) as Record<string, unknown>);
+            await writeAtomicJson(directory, name, value);
+          },
+        },
+      );
+      const roots: string[] = JSON.parse(
+        await readFile(join(result.directory, "roots.json"), "utf8"),
+      );
+      directories.push(...roots);
+      const sentinel = join(result.directory, "outside-sentinel");
+      if (mode === "success") {
+        expect(result.exitCode).toBe(0);
+        expect(result.evidence.disposal.phase).toBe("disposed");
+      } else {
+        expect(result.exitCode).toBe(2);
+        expect(result.evidence.status).not.toBe("completed");
+        expect(saved.some((item) => item.status === "completed")).toBe(false);
+      }
+      expect(barrierSaved).toBe(mode !== "barrier-write");
+      if (mode === "refusal-write") {
+        expect(result.terminalEvidenceSaved).toBe(false);
+        expect(result.disposal?.roots.map((entry) => entry.status)).toEqual(["disposed", "failed"]);
+        expect(result.disposal?.roots[1]?.error).toContain("ownership check failed");
+        expect(result.failure).toBe("fixture-root-cleanup-failed");
+        expect(result.failures.join("\n")).toContain("fixture root outcome: disposed");
+        expect(result.failures.join("\n")).toContain("fixture root outcome: failed");
+      }
+      if (mode === "final-write") {
+        expect(result.terminalEvidenceSaved).toBe(false);
+        expect(result.evidence.disposal.phase).toBe("pending");
+      }
+      for (const [index, owned] of roots.entries()) {
+        if (mode === "barrier-write" || (mode === "refusal-write" && index === 1))
+          expect(await readFile(join(owned, ".gitlode-fixture-owner"), "utf8")).toBeTruthy();
+        else await expect(readFile(join(owned, ".gitlode-fixture-owner"))).rejects.toThrow();
+      }
+      expect(await readFile(sentinel, "utf8")).toBe("outside");
+    },
+  );
   it.each(["success", "persistence", "uncertain", "unsafe"])(
     "disposes registered fixture roots only after persisted confirmed cleanup: %s",
     async (mode) => {

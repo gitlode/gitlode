@@ -7,6 +7,7 @@ import {
 import {
   mad,
   median,
+  fixtureOperationFor,
   type RawRun,
   type EnvironmentFingerprint,
 } from "../../test/support/performance-harness.js";
@@ -96,6 +97,7 @@ export function validateRequalification(input: {
     ...validateFixtureLinks(
       input.runs.map((run): FixtureLink | undefined => run.fixtureLink),
       input.lifecycle,
+      input.runs.map((run) => fixtureOperationFor(run, "legacy_off")),
     ),
   );
   const values = measured.map((run) => run.elapsedMs);

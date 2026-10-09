@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { FIXTURE_LIFECYCLE_PROTOCOL } from "../support/fixture-lifecycle.js";
+import { FIXTURE_LIFECYCLE_PROTOCOL, validateFixtureLinks } from "../support/fixture-lifecycle.js";
 import {
   calibrationComplete,
   calibrationTargetRecipeHash,
@@ -17,6 +17,7 @@ import {
   type FixtureManifest,
   type CalibrationTarget,
   type RawRun,
+  fixtureOperationFor,
 } from "../support/performance-harness.js";
 import {
   calibrationKey,
@@ -76,6 +77,123 @@ const manifest = (
       },
     ]),
   ) as Record<string, CalibrationTarget>,
+});
+describe("C3 workflow primary failure", () => {
+  it.each([
+    "usable",
+    "lifecycle-unavailable",
+    "all-unavailable",
+    "secondary-cleanup",
+    "notification",
+  ])(
+    "preserves final-boundary cause: %s",
+    async (mode) => {
+      const unavailable = mode === "lifecycle-unavailable" || mode === "all-unavailable";
+      const root = await mkdtemp(join(tmpdir(), "gitlode-c3-"));
+      temporary.push(root);
+      const repositoryRoot = resolve(import.meta.dirname, "../../../..");
+      const artifacts = join(root, "artifacts"),
+        cli = join(root, "cli.cjs"),
+        manifestPath = join(root, "manifest.json");
+      await mkdir(artifacts);
+      await writeFile(manifestPath, JSON.stringify(manifest("complete")));
+      await writeFile(
+        cli,
+        `const fs=require('node:fs'),a=process.argv.slice(2),v=n=>a[a.indexOf(n)+1];fs.writeFileSync(v('--output-dir')+'/performance-20240101T000000Z-000001.jsonl','{}\\n');fs.writeFileSync(v('--state'),JSON.stringify({repositoryPath:a[0],generatedAt:'2024-01-01T00:00:00.000Z',refs:[]}));`,
+      );
+      const selection = join(root, "selection.json");
+      await writeFile(
+        selection,
+        JSON.stringify({
+          quantity: 5,
+          calibrationSha256: "a".repeat(64),
+          manifestSha256: "b".repeat(64),
+          protocol: "historical",
+          legacyRevision: "c".repeat(40),
+        }),
+      );
+      const wrapper = join(
+        repositoryRoot,
+        "packages/gitlode/test",
+        `c3-hook-${Date.now()}-${mode}.mts`,
+      );
+      try {
+        await writeFile(
+          wrapper,
+          `import {FixtureLifecycle} from './support/fixture-lifecycle.ts';
+import {writeFile,rm} from 'node:fs/promises';import {join} from 'node:path';import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+const boundary=FixtureLifecycle.prototype.boundary;let finals=0,primaryError;
+FixtureLifecycle.prototype.boundary=async function(label){if(label==='final-pre-destruction'){finals++;await writeFile(join(this.repository,'.git/index.lock'),'C3');${unavailable ? "await rm(this.evidenceDirectory,{recursive:true,force:true});await writeFile(this.evidenceDirectory,'unavailable');" : ""}}
+try{return await boundary.call(this,label)}catch(error){primaryError=error;if(label==='final-pre-destruction'){${mode === "all-unavailable" ? `await rm(${JSON.stringify(artifacts)},{recursive:true});await writeFile(${JSON.stringify(artifacts)},'unavailable');` : ""}${mode === "secondary-cleanup" ? `process.env.GITLODE_PERFORMANCE_SUPERVISED='1';Object.defineProperty(process,'connected',{value:true,configurable:true});process.send=()=>{throw new Error('C3 secondary cleanup notification')};` : ""}${mode === "notification" ? `fs.writeSync=()=>{throw new Error('C3 secondary stderr')};syncBuiltinESMExports();` : ""}await writeFile(${JSON.stringify(join(root, "primary.json"))},JSON.stringify({message:error.message,finals,repository:this.repository,evidence:this.evidenceDirectory}));}throw error}};
+process.argv[1]=${JSON.stringify(join(repositoryRoot, "packages/gitlode/scripts/telemetry-performance.ts"))};try{await import('../scripts/telemetry-performance.ts')}catch(error){await writeFile(${JSON.stringify(join(root, "identity.json"))},JSON.stringify({same:error===primaryError}));process.exitCode=2;}`,
+        );
+        const execution = promisify(execFile)(
+          process.execPath,
+          [
+            resolve(repositoryRoot, "node_modules/tsx/dist/cli.mjs"),
+            wrapper,
+            "requalify",
+            "--manifest",
+            manifestPath,
+            "--fixture",
+            "commit_heavy_repository",
+            "--adapter",
+            "isomorphic-git",
+            "--baseline-cli",
+            cli,
+            "--legacy-revision",
+            "c".repeat(40),
+            "--artifacts",
+            artifacts,
+            "--historical-selection",
+            selection,
+          ],
+          { cwd: repositoryRoot, timeout: 60_000 },
+        );
+        await expect(execution).rejects.toMatchObject({ code: 2 });
+        if (mode === "all-unavailable") {
+          const stderr = await execution.then(
+            () => "",
+            (error: { stderr: string }) => error.stderr,
+          );
+          expect(stderr).toContain("fixture writer marker: .git/index.lock");
+          expect(stderr).toContain("failure artifact unavailable");
+          expect(stderr.length).toBeLessThan(3000);
+        }
+        const primary = JSON.parse(await readFile(join(root, "primary.json"), "utf8"));
+        temporary.push(dirname(primary.repository));
+        const failure =
+          mode === "all-unavailable"
+            ? undefined
+            : JSON.parse(
+                await readFile(
+                  join(
+                    artifacts,
+                    "commit_heavy_repository-isomorphic-git-requalification-failure.json",
+                  ),
+                  "utf8",
+                ),
+              );
+        if (failure) expect(failure.error).toBe("fixture writer marker: .git/index.lock");
+        else
+          expect(JSON.parse(await readFile(join(root, "identity.json"), "utf8")).same).toBe(true);
+        if (mode === "secondary-cleanup" || mode === "notification")
+          expect(
+            JSON.parse(await readFile(join(primary.evidence, "cleanup-failure.json"), "utf8"))
+              .cleanupErrors[0],
+          ).toContain("C3 secondary");
+        expect(primary.finals).toBe(1);
+        expect(await readFile(join(primary.repository, ".git/index.lock"), "utf8")).toBe("C3");
+        if (!unavailable)
+          expect(
+            JSON.parse(await readFile(join(primary.evidence, "failure.json"), "utf8")).error,
+          ).toBe(failure.error);
+      } finally {
+        await rm(wrapper, { force: true });
+      }
+    },
+    90_000,
+  );
 });
 describe.skipIf(process.platform !== "linux")("supervised workflow integration", () => {
   it("reports entrypoint setup failures as bounded supervision failures", async () => {
@@ -446,6 +564,20 @@ describe("performance workflow routing", () => {
     );
     const artifact = JSON.parse(artifactText);
     expect(artifact.revisions.baseline).toBe("legacy-test");
+    const storedRuns = artifact.runs.baseline as RawRun[];
+    const operations = storedRuns.map((run) => fixtureOperationFor(run, "legacy_off"));
+    expect(
+      validateFixtureLinks(
+        storedRuns.map((run) => run.fixtureLink),
+        artifact.fixtureLifecycle,
+        operations,
+      ),
+    ).toEqual([]);
+    const substituted = storedRuns.map((run) => run.fixtureLink);
+    substituted[0] = substituted[1];
+    expect(validateFixtureLinks(substituted, artifact.fixtureLifecycle, operations)).toContain(
+      "fixture child boundary order is invalid",
+    );
     expect(artifact.behavioralValidation.passed).toBe(true);
     expect(artifact.behaviorEvidence.baseline[0].derived).toMatchObject({
       files: 2,
@@ -821,6 +953,19 @@ describe("performance workflow routing", () => {
     expect(profile.sidecarEvaluation.status).toBe("inconclusive");
     expect(profile.formalEvaluation.status).toBe(profile.sidecarEvaluation.status);
     expect(profile.sidecars.candidate).toHaveLength(9);
+    const sidecarLinks = profile.sidecars.candidate.map(
+      (sidecar: { fixtureLink?: RawRun["fixtureLink"] }) => sidecar.fixtureLink,
+    );
+    const sidecarOperations = (profile.runs.candidate as RawRun[]).map((run) =>
+      fixtureOperationFor(run, "target_off", "target_on", "sidecar"),
+    );
+    expect(validateFixtureLinks(sidecarLinks, profile.fixtureLifecycle, sidecarOperations)).toEqual(
+      [],
+    );
+    sidecarLinks[0] = sidecarLinks[1];
+    expect(
+      validateFixtureLinks(sidecarLinks, profile.fixtureLifecycle, sidecarOperations),
+    ).toContain("fixture child boundary order is invalid");
     expect(
       profile.sidecars.candidate.every(
         (sidecar: { provenance: { runId: string } }, index: number) =>

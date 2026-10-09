@@ -12,6 +12,7 @@ import {
   fixtureGit,
   fixtureIdentity,
   validateFixtureLinks,
+  type FixtureLink,
 } from "../support/fixture-lifecycle.js";
 import { createPerformanceRepository } from "../support/performance-fixtures.js";
 import type { RawRun } from "../support/performance-harness.js";
@@ -43,6 +44,29 @@ async function prepared() {
 }
 
 describe("controlled fixture lifecycle", () => {
+  it.each(["device", "type", "operation", "duplicate", "embedded", "substitution"])(
+    "C2 rejects inconsistent stored evidence: %s",
+    async (mode) => {
+      const lifecycle = await prepared();
+      const first = await lifecycle.capture("cli-0", async () => null);
+      const second = await lifecycle.capture("cli-1", async () => null);
+      await lifecycle.finalize();
+      const evidence = structuredClone(lifecycle.evidence());
+      const post = evidence.boundaries[2]!;
+      if (mode === "device" || mode === "type")
+        Object.assign(post.identity.filesystem, { [mode]: 999 });
+      if (mode === "operation") Object.assign(post, { label: "sidecar-99-post" });
+      if (mode === "duplicate") Object.assign(evidence.boundaries[3]!, { id: post.id });
+      if (mode === "embedded") Object.assign(post.identity, { layoutDigest: "wrong" });
+      expect(
+        validateFixtureLinks(
+          [mode === "substitution" ? second.fixtureLink : first.fixtureLink],
+          evidence,
+          ["cli-0"],
+        ).length,
+      ).toBeGreaterThan(0);
+    },
+  );
   it("queries finished history, persists foreground config and preserves a verified independent copy", async () => {
     const identity = await fixtureIdentity(repository);
     expect(identity.logical.count).toBe("6");
@@ -171,8 +195,23 @@ describe("controlled fixture lifecycle", () => {
 
   it("validates bounded requalification without renewed minimality", async () => {
     const lifecycle = await prepared();
-    const capture = await lifecycle.capture("synthetic", async () => null);
+    const capture = await lifecycle.capture("cli-0", async () => null);
     await lifecycle.finalize();
+    // Requalify synthetic timings with distinct bindings derived from one real observed pair.
+    const observed = lifecycle.evidence();
+    const boundaries = [observed.boundaries[0]!];
+    const captures: { fixtureLink: FixtureLink }[] = [];
+    for (let index = 0; index < 9; index++) {
+      const pre = `${observed.instanceId}-${index * 2 + 1}`;
+      const post = `${observed.instanceId}-${index * 2 + 2}`;
+      boundaries.push(
+        { ...observed.boundaries[1]!, id: pre, label: `cli-${index}-pre` },
+        { ...observed.boundaries[2]!, id: post, label: `cli-${index}-post` },
+      );
+      captures.push({ fixtureLink: { ...capture.fixtureLink, pre, post } });
+    }
+    boundaries.push({ ...observed.boundaries[3]!, id: `${observed.instanceId}-19` });
+    const syntheticEvidence = { ...observed, boundaries };
     const runs = Array.from(
       { length: 9 },
       (_, index) =>
@@ -182,7 +221,9 @@ describe("controlled fixture lifecycle", () => {
           exit: { code: 0, signal: null },
           captureErrors: [],
           elapsedMs: 12_000,
-          fixtureLink: capture.fixtureLink,
+          fixtureLink: captures[index]!.fixtureLink,
+          pairIndex: index < 2 ? index : index - 2,
+          order: "A-B",
         }) as unknown as RawRun,
     );
     const input = {
@@ -215,7 +256,7 @@ describe("controlled fixture lifecycle", () => {
       },
       runs,
       behaviorErrors: [],
-      lifecycle: lifecycle.evidence(),
+      lifecycle: syntheticEvidence,
     };
     expect(validateRequalification(input)).toMatchObject({
       status: "eligible-pending-trunk-adoption",
@@ -224,6 +265,14 @@ describe("controlled fixture lifecycle", () => {
       madMs: 0,
     });
     expect(validateRequalification({ ...input, runs: runs.slice(1) }).exitCode).toBe(2);
+    expect(
+      validateRequalification({
+        ...input,
+        runs: runs.map((run, index) =>
+          index === 0 ? { ...run, fixtureLink: runs[1]!.fixtureLink } : run,
+        ),
+      }).exitCode,
+    ).toBe(2);
     expect(
       validateRequalification({ ...input, selection: { ...input.selection, quantity: 7 } })
         .exitCode,

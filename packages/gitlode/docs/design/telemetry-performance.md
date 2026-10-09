@@ -81,7 +81,7 @@ the supervisor from recording a structured terminal failure when snapshot storag
 After cleanup, a failed terminal snapshot receives one bounded recovery write as inconclusive
 evidence; the measured workflow is never repeated to repair evidence. If persistent storage failure
 also prevents that recovery, the operator receives bounded stderr diagnostics and no claim that the
-last on-disk `running` snapshot is terminal. No software path can guarantee replacement of that
+last on-disk `running` snapshot or pending disposal barrier is terminal success. No software path can guarantee replacement of that
 snapshot while its storage remains unwritable.
 
 ## Fixtures
@@ -183,9 +183,28 @@ Missing links, unsafe ownership/configuration/links, writer markers or any conte
 the whole attempt inconclusive and nonzero, preventing subsequent dependent children. No regeneration,
 rebaseline, retry, forced final gc/repack or wait-for-stability is permitted.
 
-The worker retains roots until the existing supervisor confirms group cleanup and persists terminal
-evidence. Only successful attempts are automatically disposed after that barrier; failed, uncertain,
+The worker retains roots until the existing supervisor confirms group cleanup and persists a
+non-success disposal barrier. A barrier is not saved terminal success. Required root disposal precedes
+publication of completed success; barrier-write failure retains every root and returns inconclusive.
+If disposal or the final snapshot fails, earlier persisted evidence remains non-success, including
+when the bounded recovery write also fails. `cleanupConfirmed` describes process-group completion;
+the separate `disposal` phase and per-root status/error describe disposal or intentional retention,
+including partial disposal. Only successful attempts are automatically disposed; failed, uncertain,
 or unsupervised roots are retained with location diagnostics. The preserved prepared copy remains.
+Failure of terminal persistence after successful disposal cannot restore removed roots: the saved
+barrier remains non-success, and available return values/bounded diagnostics report per-root outcomes.
+
+Stored lifecycle validation checks filesystem type/device against the prepared identity, embedded,
+boundary and prepared digests, unique instance-owned boundary IDs and matching pre/post operation and
+ordinal. Repository workflow consumers bind CLI and sidecar links to the child's ordinal reconstructed
+from the fixed execution plan, rather than accepting another child's valid pair. Pilot and raw-run
+projections preserve those links. Historical reads and Git-independent aggregation remain separate.
+
+Cleanup does not finalize an already inconclusive lifecycle. An active primary exception survives
+cleanup, notification and failure-artifact storage failures; secondary cleanup errors are recorded
+separately where storage permits. Retained-root notification is bounded synchronous best effort.
+If all evidence storage is unavailable, operator diagnostics identify the primary cause and missing
+artifact best effort and the workflow remains nonzero; notification itself cannot guarantee delivery.
 Observed cleanup and inventory boundaries cannot prove immunity to external writers, escaped process
 groups, kernel races, host loss or uninterruptible I/O.
 

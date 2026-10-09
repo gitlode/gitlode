@@ -118,6 +118,7 @@ export class FixtureLifecycle {
   readonly boundaries: FixtureBoundary[] = [];
   private prepared?: FixtureIdentity;
   private failed = false;
+  private readonly cleanupErrors: string[] = [];
   readonly repository: string;
   readonly evidenceDirectory: string;
   constructor(repository: string, evidenceDirectory: string) {
@@ -214,6 +215,15 @@ export class FixtureLifecycle {
     }
   }
 
+  async recordCleanupError(error: unknown): Promise<void> {
+    this.cleanupErrors.push(error instanceof Error ? error.message : String(error));
+    await writeAtomicJson(this.evidenceDirectory, "cleanup-failure.json", {
+      instanceId: this.instanceId,
+      cleanupErrors: this.cleanupErrors,
+      retainedRepository: this.repository,
+    }).catch(() => undefined);
+  }
+
   evidence() {
     return {
       protocol: this.protocol,
@@ -221,6 +231,7 @@ export class FixtureLifecycle {
       preparedDigest: this.prepared?.layoutDigest,
       boundaries: this.boundaries,
       status: this.failed ? "inconclusive" : "verified",
+      cleanupErrors: [...this.cleanupErrors],
     };
   }
 }
@@ -228,6 +239,7 @@ export class FixtureLifecycle {
 export function validateFixtureLinks(
   links: readonly (FixtureLink | undefined)[],
   evidence: ReturnType<FixtureLifecycle["evidence"]>,
+  expectedOperations?: readonly string[],
 ): string[] {
   const errors: string[] = [];
   if (
@@ -243,16 +255,28 @@ export function validateFixtureLinks(
   )
     errors.push("fixture lifecycle final boundary is missing");
   const logical = JSON.stringify(evidence.boundaries[0]?.identity.logical);
-  for (const boundary of evidence.boundaries) {
+  const filesystem = JSON.stringify(evidence.boundaries[0]?.identity.filesystem);
+  const preparedFilesystem = evidence.boundaries[0]?.identity.filesystem;
+  if (!Number.isFinite(preparedFilesystem?.type) || !Number.isFinite(preparedFilesystem?.device))
+    errors.push("fixture filesystem identity is missing or mismatched");
+  const ids = new Set<string>();
+  for (const [index, boundary] of evidence.boundaries.entries()) {
+    if (ids.has(boundary.id) || boundary.id !== `${evidence.instanceId}-${index}`)
+      errors.push("fixture boundary ID is duplicate or mismatched");
+    ids.add(boundary.id);
     if (
       boundary.layoutDigest !== evidence.preparedDigest ||
+      boundary.identity.layoutDigest !== boundary.layoutDigest ||
+      JSON.stringify(boundary.identity.filesystem) !== filesystem ||
       !boundary.identity.inventory.length ||
       digest(JSON.stringify(boundary.identity.inventory)) !== boundary.layoutDigest ||
       JSON.stringify(boundary.identity.logical) !== logical
     )
       errors.push("fixture boundary inventory is missing or mismatched");
   }
-  for (const link of links) {
+  if (expectedOperations && expectedOperations.length !== links.length)
+    errors.push("fixture operation count is mismatched");
+  for (const [index, link] of links.entries()) {
     if (
       !link ||
       link.protocol !== evidence.protocol ||
@@ -263,11 +287,13 @@ export function validateFixtureLinks(
       continue;
     }
     const preIndex = evidence.boundaries.findIndex((entry) => entry.id === link.pre);
+    const operation = evidence.boundaries[preIndex]?.label.replace(/-pre$/, "");
     if (
       preIndex < 0 ||
       evidence.boundaries[preIndex + 1]?.id !== link.post ||
       !evidence.boundaries[preIndex]?.label.endsWith("-pre") ||
-      !evidence.boundaries[preIndex + 1]?.label.endsWith("-post")
+      evidence.boundaries[preIndex + 1]?.label !== `${operation}-post` ||
+      (expectedOperations !== undefined && operation !== expectedOperations[index])
     )
       errors.push("fixture child boundary order is invalid");
     for (const id of [link.pre, link.post]) {

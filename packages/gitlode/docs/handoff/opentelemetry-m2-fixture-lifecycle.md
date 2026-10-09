@@ -762,3 +762,137 @@ no retry or universal delivery guarantee is added. No 4,430-commit generation, l
 calibration/measurement, PR, merge, new preservation ref, freeze or acceptance update was performed.
 The small synthetic failure-workflow tests above are regression evidence only. This slice is returned
 for independent focused re-review, without self-acceptance or automatic expansion into another round.
+
+## Independent focused re-review of C1/C2/C3 (2026-10-09)
+
+### Identity and separate verdicts
+
+Reviewed fixed implementation `503112984d9a524cbfab286a59927f8234545f52` against
+`ccdc5bf801d7d2aba724875916ab71b704813a7b`; started clean on the child at
+`6fd1dff5b2c4cb9279e0f41129abf3f7e6367a86`, matching actual remote. Both ancestry checks passed.
+The complete 12-file correction diff was inspected, including tests and canonical contracts.
+Fixed implementation -> starting HEAD changes only three handoff documents; current implementation
+is equal to the fixed target. Original findings, bounded packet and outcome were read separately.
+No unrelated accepted policy or previously reviewed product path was reopened.
+
+- **C1: accepted.** `performance-supervisor.ts:388` persists the inconclusive pending-disposal
+  snapshot before entering the root loop; completed publication follows that loop. Queued progress
+  writes are drained first, so an older running write cannot overwrite terminal ordering. Barrier
+  failure skips every deletion and returns exit 2. The two-root refusal case disposes the first root,
+  retains the refused second root, preserves its ownership error and the original cleanup failure,
+  and leaves non-success barrier evidence when both terminal writes fail. Final-write failure after
+  successful disposal similarly leaves pending evidence, returns inconclusive and reports outcomes;
+  removed roots cannot be restored. `cleanupConfirmed`, disposal phase/per-root outcomes and
+  `terminalEvidenceSaved` remain distinct: a saved barrier does not set the latter. Earlier process,
+  persistence or diagnostic failures prevent disposal; `failure ??=` preserves their primary reason.
+  Terminal recovery remains exactly one write without worker retry. Independently executed C1 cases
+  cover barrier failure, combined refusal/write failure, final/recovery failure and success with real
+  roots and an outside sentinel. Source ordering establishes the deletion barrier; the lifecycle
+  suite independently verifies the prepared copy outside the disposable root. No new mandatory
+  counterexample was found within the existing supported filesystem/host limits.
+- **C2: accepted.** `fixture-lifecycle.ts:239` validates filesystem type/device against the first
+  prepared boundary, embedded/boundary/prepared digests, actual inventory hash, logical equality,
+  sequential unique instance-owned IDs and exact adjacent pre/post operation labels. Links bind
+  protocol, instance and prepared digest. The actual writer loop at `telemetry-performance.ts:1092`
+  increments one ordinal per CLI, with sidecars using that same ordinal. This was traced against
+  `pairPlan` and `fixtureOperationFor`, independently of supplied links. A literal probe checks all
+  nine positions for single legacy execution and both alternating paired states, including sidecars
+  (45 assertions); it does not call pairPlan to derive its expected numbers. Capture/comparison,
+  pilot and requalification consumers supply their own run-derived expected operations. Raw-run
+  serialization, calibrationArtifactRun/projectCalibrationPilot and sidecarEvidence retain links;
+  validation errors propagate before pilot/search or formal evaluation. Real serialized capture and
+  paired sidecar tests reject another child's otherwise valid pair. Six negative stored-evidence
+  cases pass independently. The reduced synthetic requalification setup retains sensitivity to
+  missing child, substituted pair, selection mismatch and unchanged timing gates while deriving nine
+  distinct pairs from one real observed pair. It proves stored-evidence validation, not nine live
+  observations or selected-workload eligibility. Historical and Git-independent paths are unchanged
+  by this diff; stored validation performs no live Git lookup. No mandatory C2 defect remains.
+- **C3: accepted.** All three workflow owners preserve primary-failure presence through finally.
+  Cleanup at `telemetry-performance.ts:1212` skips an inconclusive lifecycle, catches secondary
+  cleanup-stage/IPC errors separately, and protects synchronous retained-root stderr notification.
+  `recordCleanupError` best-effort storage does not rewrite failure.json. Actual failure-artifact
+  handling retains the serialized lock cause; unavailable workflow storage rethrows the original
+  in-process object after protected bounded diagnostics. Independent Linux and Windows executions
+  exercise the five actual workflow cases: usable storage, unusable lifecycle storage, all workflow
+  and lifecycle storage unavailable, throwing cleanup IPC, and throwing stderr. Assertions check
+  one finalization, retained unsafe root, primary lock cause, secondary cleanup evidence where
+  writable, and original object identity/all-unavailable diagnostics. No second failed finalization,
+  unsafe deletion or universal artifact-delivery promise remains. No mandatory C3 defect was found.
+
+**Overall correction slice: accepted** at the fixed OID above, independently of each finding verdict.
+This accepts the bounded corrections only. It neither updates a live acceptance record nor closes
+release-adoption, new harness preservation, selected-workload eligibility or performance acceptance.
+No implementation repair or optional scope expansion is requested by this review.
+
+### Independent execution evidence versus prior reports
+
+**Executed independently in this session:**
+
+- Native WSL Ubuntu, Node 22.23.1/Git 2.53.0, detached `--no-hardlinks` clone at
+  `/tmp/gitlode-focused-review-mlfcPd/source`, exactly `503112984d9a524cbfab286a59927f8234545f52`.
+  Dependencies and generated package dist directories were copied from the prior disposable
+  `/tmp/gitlode-fixture-round1/source`. These are reused setup inputs, not a fresh dependency install,
+  preserved harness or freeze. `npm run build:dev` and explicit
+  `node node_modules/typescript/bin/tsc -p packages/gitlode/tsconfig.fixture-lifecycle.json` passed.
+- Linux `node node_modules/vitest/vitest.mjs run` on six paths under
+  `packages/gitlode/test/telemetry/`: `fixture-lifecycle.test.ts`, `performance-supervisor.test.ts`,
+  `performance-workflow.test.ts`, `calibration-workflow.test.ts`,
+  `production-calibration-artifacts.test.ts`, `performance-harness.test.ts`:
+  **6 files / 139 passed / zero skips / zero outer failures, 47.13 seconds**. Nested sensitivity
+  probe failures printed inside passing outer tests are expected. This executes final fixed source,
+  including C1 disposal and C3 failure artifacts, real paired workflow and pilot/projection consumers.
+- Linux temporary literal ordinal probe: **45 assertions passed**. Probe removed; detached clone
+  status subsequently clean. No production source or sealed archive was changed.
+- Windows Node 22.23.1: direct local Vitest lifecycle/workflow command filtered by C3:
+  **5 passed / 41 skipped, 55.41 seconds** (one selected workflow file; lifecycle file unselected).
+  Full affected lifecycle suite: **18 passed / 2 Linux-only skips, 40.64 seconds**. Windows root
+  disposal is not claimed. Implementation equality to the fixed target was checked before execution.
+- Documentation format write/check and diff check are run before the documentation-only checkpoint;
+  their final results and commit/remote checks accompany delivery.
+
+Linux logs are temporary saved execution evidence outside the clone:
+
+| Log           | SHA-256                                                            |
+| ------------- | ------------------------------------------------------------------ |
+| `build.log`   | `8e2c8f643a1705a61981fbccc7ef3d8924013a588247252b6a458a1afff6660f` |
+| `strict.log`  | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `suites.log`  | `333a5580ff363cb41a77e5775a6a3813f6880c9acd644b13a57b0ccb4a42de02` |
+| `ordinal.log` | `e0d19e9823f12a9bd19f79704b23b54a53a72443bf1f6d993e49a8e0dae618fd` |
+
+**Saved earlier evidence inspected, not independently rerun fail-before:** Linux before-c1.log
+and Windows gitlode-round1-before-c2.log / before-c3.log were available and read; hashes match the
+outcome table. They retain 4 C1 failures, 6 C2 failures and 2 C3 failures respectively. Their assertions
+show the original missing barrier/outcomes, acceptance of inconsistent evidence and replacement of
+lock cause. Temporary logs are neither sealed evidence nor an external backup.
+
+**Reported-only evidence retained:** the correction outcome's Linux 226-pass ten-suite batch predates
+final edits and is not an exact final-target campaign. Its later Linux 59-pass lifecycle/supervisor,
+4-case C1 and one all-unavailable workflow runs remain separately attributed implementation evidence.
+The initial Windows 38-pass/7-skip/one timeout plus teardown EBUSY remains a failed first batch; the
+subsequent one-case synthetic setup correction, final lifecycle and diagnostic runs retain their
+separate results. Faster synthetic setup is not product or eligibility success. Release build,
+lint and architecture results from that outcome were read, not independently re-executed here.
+No full dual-OS/package campaign was required or claimed.
+
+Initial sandbox Git ownership/network and WSL access failures were resolved using command-scoped
+safe.directory and authorized owner-context execution, without global configuration changes.
+A Linux command with inline variables failed before cloning/testing due to argument expansion;
+its replacement script ran the checks above. A CR at the replacement script's final status command
+caused that status command alone to fail after all tests passed; a separate clean-status command
+succeeded. Neither setup failure is treated as a test failure or hidden successful test execution.
+Temporary workspace helpers were removed.
+
+### Release-adoption gate and return boundary
+
+The separate pre-formal release-adoption gate above remains unchanged and unsatisfied: hash-bound
+historical selection -> new runtime/environment/harness -> instance/inventory/child links -> completed
+disposal/group supervision -> explicit reviewed trunk adoption -> comparison/acceptance chain.
+Trunk must define the concrete adoption record and validator or archived external-review binding
+before formal work. Neither a blocked live record nor these correction regressions enforce that gate.
+
+Initial actual remote and local parent M2 are `4f09265791c82452a5800cc6d9855938bf88a46e`;
+both F2 preservation refs are `4ea24d53afc57778addf3f47752e0fe73a7011ea`. Final documentation OID,
+normal push actual remote equality, clean status and unchanged parent/F2 checks are returned with
+this delivery because the commit cannot embed its own OID. Remain on the child and return to trunk.
+No repairs, PR, merge, new preservation refs, freeze, 4,430-commit generation, live eligibility,
+formal/diagnostic measurement or acceptance-record update was performed.

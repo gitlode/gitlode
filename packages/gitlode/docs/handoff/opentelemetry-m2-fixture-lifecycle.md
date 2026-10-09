@@ -1,5 +1,72 @@
 # M2 controlled fixture lifecycle implementation
 
+## Active assignment: independent review (2026-10-09)
+
+Implementation is delivered, not accepted. This review-only packet supersedes the implementation
+assignment below. The human starts an independent session on feature/otel-redesign_M2_fixture.
+
+- Base/unchanged parent M2: `4f09265791c82452a5800cc6d9855938bf88a46e`.
+- Fixed review target: `59e9131ed505843bf4b9a2b7a74147838a13cc5a` (entire delivered slice).
+- Linux full-suite implementation: `741f951b34195b5ba332a688cb9c1950cdbd0baa`.
+- Subsequent test-bound correction: `c9a1e15c94bb557cd8bed99a4d07d09018bbeae2`.
+- Both F2 preservation refs remain `4ea24d53afc57778addf3f47752e0fe73a7011ea`.
+
+Trunk inspected the 20-file base-to-delivery inventory. The post-741f951 delta includes the workflow
+test limits, catalog addition and handoff; do not call that delta documentation only or claim Linux
+executed the final target verbatim. Inspect exact changes and determine evidence applicability.
+
+Read approved policy, diagnosis, full implementation/outcome, canonical design/catalog/harness guide
+and affected consumers. Verify ancestry, actual local/remote identities, source equality and no product
+runtime/dependency/acceptance changes. Do not reopen approved foreground or fixed-quantity policy.
+
+### Review priorities
+
+1. Foreground configuration must cover both generators from init and survive readers; injected Git
+   configuration/repository/index/object paths must not redirect owned operations. Preserve normal
+   auto-maintenance heuristics and deterministic logical history. Evaluate observed foreground/group
+   behavior without claiming proof against every external/escaped writer.
+2. Finished logical identity and physical inventories must match the actual repository. Check unsafe
+   links/alternates/hardlinks/locks, Windows aliases, config origins, preserved copy verification and
+   stable boundaries around every warmup/CLI/sidecar. Check layout drift propagation invalidates the
+   whole attempt and stops dependents without replacing the reference inventory or retrying.
+3. Prioritize new supervisor root deletion: ownership, registration authenticity, completion/final
+   evidence ordering, symlink/path races and out-of-root sentinels. Failure, deadline, unconfirmed
+   cleanup or evidence-write failure must retain necessary material. Cleanup failures must not mask
+   original results or leave success evidence claiming cleanup that did not occur. Evaluate concrete
+   supported paths, not an unbounded adversarial filesystem/security redesign.
+4. Trace schema-4/protocol links end-to-end through real writers, pilot projections, progress/failure
+   artifacts, validators and formal consumers. Missing/wrong-instance/wrong-boundary/inconsistent
+   inventories must not become accepted new-protocol evidence. Preserve historical reading and
+   Git-independent aggregation as distinct paths. Check data persistence before root deletion.
+5. Requalification must bind historical selection, new runtime/harness/environment and lifecycle
+   evidence; exactly two warmups/seven legacy children, unchanged 10–30 second/MAD/behavior gates,
+   completed cleanup-confirmed supervision, and pending explicit trunk adoption. No minimum-search
+   claim or automatic comparison eligibility. Examine whether described release-validator follow-up
+   is an acceptable later gate or a concrete current contract defect; record the exact missing binding
+   and bounded remedy if necessary. A blocked live record alone is not proof a validator is correct.
+
+### Finite validation and reporting
+
+Run build and explicit tsconfig.fixture-lifecycle strict typing, plus the ten actual suites named in
+the outcome on Linux against the fixed target. This includes Linux-only small maintenance/cleanup
+cases; do not generate 4,430 commits or run requalification/calibration/measurements. On Windows,
+independently verify the changed timeout case and path/ownership cases if available; reuse other
+reported passing evidence with explicit attribution rather than rerunning both full campaigns.
+Inspect that test-only limits changed, not catalog formal limits. Preserve original failed batch and
+targeted corrected results as separate evidence. Use only bounded probes for concrete uncertainties;
+restore them and do not mutate sealed archives or production implementation.
+
+Inspect strict typing/build/lint/architecture/format evidence, rerun relevant checks for actual gaps,
+and run format write/check plus diff check for review documentation. Distinguish copied Linux build
+outputs/dependencies and temporary logs from a preserved new harness; no freeze is implied.
+
+Append accepted or corrections required with fixed reviewed OID, concrete mandatory failure paths,
+file locations/minimal remedies, optional findings and evidence attribution. Record release-adoption
+follow-up explicitly so it cannot be lost before the next formal packet. Documentation-only commit
+and normal push to the child are authorized; verify actual remote equality, clean status, parent and
+F2 refs unchanged, and remain on the child. No repairs, PR, merge, new refs, freeze, acceptance edits
+or selected-workload execution. Return to trunk; do not automatically start a correction round.
+
 ## Approved decision and current assignment (2026-10-08)
 
 The human adopted trunk's recommendation after the diagnosis at

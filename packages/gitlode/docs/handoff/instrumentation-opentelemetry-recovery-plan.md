@@ -11,8 +11,10 @@ the human deleted the original work branches. Next assignment is
 OID. F2 outcome `d40775f` is accepted for runtime preservation. Its current packet assigns bounded
 fixture-lifecycle diagnosis/design before calibration adoption; diagnosis `686ef2c` is complete.
 The human approved foreground automatic maintenance and bounded requalification of the historically
-selected quantity without renewed minimality. Next is [limited harness implementation](opentelemetry-m2-fixture-lifecycle.md),
-then independent review and new harness preservation. No measurement is yet assigned.
+selected quantity without renewed minimality. Harness implementation was delivered at `59e9131`;
+[independent review](opentelemetry-m2-fixture-lifecycle.md) is now assigned on the fixture child.
+Release-adoption binding remains an explicit review/follow-up gate before formal work. New harness
+preservation follows acceptance and integration. No measurement is yet assigned.
 Previously observed background object-layout mutation remains distinct from unresolved RSS causality.
 F2 supersedes previous preparation/measurement routing.
 

@@ -355,3 +355,161 @@ of every external/escaped writer. Failed/uncertain/unsupervised root retention i
 copies are retained evidence. The temporary Linux validation copy is not a new archive or external
 backup. No 4,430-commit generation, selected-workload eligibility check, formal/diagnostic measurement,
 PR, merge, freeze, archive-ref update, integration/main change or acceptance-record update was performed.
+
+## Independent review result (2026-10-09): corrections required
+
+Reviewed fixed delivery `59e9131ed505843bf4b9a2b7a74147838a13cc5a` against
+`4f09265791c82452a5800cc6d9855938bf88a46e`, starting clean on the child at
+`72c7495032bd143635b112d6b64763c2a52eff94`. This is an independent review, not implementation
+acceptance. No implementation repair or correction round was started.
+
+### Mandatory corrections
+
+1. **P1: root disposal can leave saved success after disposal failed.** In
+   `scripts/tooling/performance-supervisor.ts:378-415`, the supervisor persists `completed` before
+   attempting disposal. If ownership rejection or removal failure is followed by failure of the
+   inconclusive rewrite, the saved snapshot still says `completed` and `cleanupConfirmed: true`.
+   The return value correctly says inconclusive/exit 2 and `terminalEvidenceSaved: false`, but an
+   external consumer reading the required saved supervisor evidence sees success. `cleanupConfirmed`
+   proves group cleanup only; it cannot rescue the misleading terminal status for the failed
+   invocation. Independent Linux probe reproduced this with a registered same-owner root with the
+   wrong prefix, followed by injected failure only for the cleanup-failure snapshot. The root and
+   its outside sentinel survived; disk retained completed success. This is a supported refusal/write
+   failure combination, not an escaped-writer attack. Minimal remedy: persist a non-success disposal
+   intent/barrier before deletion, track root disposal/retention explicitly, and publish completed
+   success only after disposal succeeds. If the final write fails, the prior saved record must remain
+   non-success. Preserve original failure and retained-root diagnostics; add this combined regression.
+2. **P2: saved lifecycle validation omits filesystem and operation boundary consistency.**
+   `test/support/fixture-lifecycle.ts:228-283` recomputes inventory hashes and checks logical equality,
+   but does not compare filesystem type/device across boundaries. It only tests `-pre`/`-post` suffixes,
+   accepting an adjacent `cli-0-pre` / `sidecar-99-post` pair. An independent synthetic evidence probe
+   changed the post-boundary device to 999 and used those mismatched labels; `validateFixtureLinks`
+   returned no errors. Live `boundary()` does check filesystem equality, so this finding concerns
+   acceptance of inconsistent stored/projected evidence, not an observed live repository migration.
+   The same validator serves calibration, capture/comparison and requalification. Minimal remedy:
+   validate filesystem equality with the prepared boundary, internal identity/layout digest agreement,
+   unique boundary IDs belonging to the instance, and matching operation/ordinal for each pre/post
+   pair; bind child/sidecar links to their expected operation so another valid child's pair cannot be
+   substituted. Add bounded negative cases without requiring Git during historical aggregation reads.
+3. **P2: failed finalization can be replaced by cleanup's second finalization error.**
+   `scripts/telemetry-performance.ts:1179-1182` finalizes again when no final boundary exists;
+   callers await cleanup in `finally` at lines 335, 595 and 691. If the original final boundary fails before appending its boundary
+   (for example, an unsafe lock/link or an unreadable/missing entry), state is inconclusive and the
+   second call throws `fixture attempt already inconclusive` from
+   `test/support/fixture-lifecycle.ts:144`, replacing the original exception. Requalification's outer
+   failure artifact can consequently record the generic replacement. `failure.json` preserves the
+   first error only when its storage remains writable. Independent API sequencing probe observed the
+   original filesystem ENOENT followed by that generic finalization error; the workflow connection is
+   source tracing, not a claim of an independently executed requalification. Minimal remedy: skip
+   finalization on an already failed lifecycle and preserve the primary exception when cleanup also
+   fails; retain secondary cleanup diagnostics separately. Exercise an unsafe/unreadable final boundary through the actual workflow failure artifact,
+   including unavailable failure-evidence storage. No retry or reference replacement.
+
+### Source and contract assessment
+
+Both generators apply foreground settings from init and persist them before the first commit.
+Owned generator, inventory, timed CLI and sidecar environments remove inherited `GIT_*` overrides.
+Normal maintenance heuristics remain; no product forced gc/repack was introduced. Finished history is
+queried rather than using cached base refs. Prepared copies and boundary ledgers live outside the run
+root; byte drift stops dependent capture without rebaselining. Linux small maintenance, retention,
+unsafe-root, deadline and evidence-write cases passed. This supports the observed owned-group paths,
+not immunity to every external writer, escaped group or filesystem race.
+
+Source tracing covered raw-run projection, production pilot projection/adapter, schema-4 progress,
+success/failure artifacts, formal capture/comparison, fixed-quantity validation and supervision.
+`calibrationArtifactRun` preserves fixture links and production pilot evidence carries the ledger.
+Historical manifest reading stays separate from `requireTarget`'s new-protocol routing; aggregation
+retains its Git-independent schema-2 path. Routing strings do not validate external evidence by
+themselves. The validator deficiencies above prevent acceptance of the delivered slice.
+
+Base-to-delivery inventory is 20 files. Product `src`, private runtime packages, dependency lock and
+`.release` have no changes against F2; the implementation/test closure at the starting checkpoint
+matches the fixed target. Base is an ancestor of delivery. The `741f951` to delivery delta includes
+synthetic test caps (30 to 60 seconds; outer 60 to 120 seconds), the filesystem catalog field and
+handoff documentation. Formal catalog deadlines/counts/windows are unchanged. The earlier Linux
+campaign did not execute the final delivery verbatim; the independent campaign below did.
+
+### Evidence attribution and finite validation
+
+**Independent executions in this review:**
+
+- Linux native WSL Ubuntu, Node 22.23.1/npm 10.9.8/Git 2.53.0. New `--no-hardlinks` detached clone at
+  `/tmp/gitlode-independent-m2-2oo_wxxr/source`, exact fixed target. Dependencies and generated `dist`
+  were copied from the prior disposable `/tmp/gitlode-fixture-final-h8c2MI/source`, then
+  `npm run build:dev` and explicit `node node_modules/typescript/bin/tsc -p
+packages/gitlode/tsconfig.fixture-lifecycle.json` passed. These are reused setup inputs, not a new
+  preserved harness or independent dependency installation; no sealed archive was overlaid.
+- `node node_modules/vitest/vitest.mjs run` with the ten exact outcome paths above: **10 files,
+  211 passed, zero skips, zero outer failures, 34.46 seconds**, at `59e9131`. Printed failures from
+  nested retention sensitivity probes are expected; their outer tests passed. Includes Linux-only
+  foreground maintenance, owned cleanup and outside sentinel checks.
+- Windows Node 22.23.1/npm 11.11.0/Git 2.45.1.windows.1: `npm run build:dev` and
+  `npx tsc -p packages/gitlode/tsconfig.fixture-lifecycle.json` passed. `npx vitest run` on
+  `fixture-lifecycle.test.ts` and `performance-workflow.test.ts`, filtered by
+  `controlled fixture lifecycle|executes disabled and profile comparison matrices`: **13 passed,
+  22 skipped, zero failures, 42.76 seconds**. The skips comprise two Linux-only lifecycle cases
+  and 20 unselected workflow cases. This independently exercises
+  the corrected timeout and Windows small path/marker/config/copy/drift checks. Linux-only root
+  disposal cannot be claimed as a Windows execution.
+- Three temporary Linux probe assertions across two files passed, demonstrating the defects above,
+  rather than validating their desired behavior. Probe files were removed; fixed clone status was
+  clean afterward. No production implementation was mutated.
+- Root `npm run lint` and `npm run architecture:check` passed independently; rev-dep retained its
+  existing zero-error/one-warning config report. Format write/check and diff check apply to the review
+  documentation before commit. Release build/strict release graph evidence remains implementation
+  reported below, not a new independent release build.
+
+Temporary Linux logs are retained outside the source at `/tmp/gitlode-independent-m2-2oo_wxxr`:
+
+| Log                 | SHA-256                                                            |
+| ------------------- | ------------------------------------------------------------------ |
+| `build.log`         | `353533507df69a47edd30dbec8a3fd7ba14a400b176a4dfb63b799938c42bd9b` |
+| `strict.log`        | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `suites.log`        | `5cf068051aaa99a4815de4393be192086e9cef08c72fb56dc70b2cb766adc958` |
+| `probes.log`        | `e5dfb3d52cceb6b34a767c415deb4fb2763b7213213b7fddd79727910eb6602f` |
+| `cleanup-probe.log` | `0233c2df79dad34fdb85de013946580d1c48c788abbd0323e3bd2a0f132e0710` |
+
+These temporary logs are saved independent execution evidence, not a freeze or external backup.
+Windows and repository check outcomes are recorded from this session's tool results in this review.
+
+**Saved historical evidence read, not rerun:** the Windows F2 mirror's
+`evidence/compatibility.json` reports the historical 4,430 selection, schema-3 calibration and
+compatible recipe/environment while leaving physical stationarity unresolved. The diagnostic mirror's
+`evidence/fixture-preparation-drift.json` records removed gc.pid/loose objects and changed info/refs.
+Those saved facts support the approved policy and do not establish causation of historical RSS failure
+or new-protocol eligibility. No archive-wide rehash or selected-workload execution occurred.
+
+**Implementation report reused with attribution:** Windows at `741f951` was **176 passed / 34 skips /
+one failed**; the subsequent corrected single comparison case was **one passed / 20 unselected
+skips**. Neither is rewritten as an initially successful full batch. The other 176 were not independently
+rerun here. Earlier `7bba56c` Windows success, Linux `741f951` 211-pass campaign, release build and its
+graph check remain implementation-reported evidence; the Linux fixed-target campaign above is separate.
+
+### Required release-adoption follow-up and return boundary
+
+The existing schema-1 release validator validates attestation/hash/revision and recipe/evidence-ID
+chains, but does not read external lifecycle inventories, fixed-quantity selection bytes or a trunk
+adoption record. `requireTarget` checks the routing string only; `validateHistoricalSelection` checks
+hash syntax/quantity/revision, not the referenced historical bytes. Thus the missing binding is:
+historical calibration/manifest hashes and selected target -> reviewed fixed-quantity result and its
+new runtime/environment/harness -> instance/inventory/child links -> completed cleanup-confirmed
+supervision -> explicit trunk adoption -> new manifest/capture/comparison evidence chain.
+
+This is an acceptable separately gated release compatibility follow-up only because this packet
+produces no adoption or release acceptance and the canonical docs explicitly require that independent
+review before formal work. The blocked live record and fifty passing release regressions are not proof
+that the new protocol is enforced. Before the next formal packet, trunk must define a concrete reviewed,
+hash-bound adoption record covering that chain and decide whether the release validator must consume
+it; if relying on external review, require its exact archived bytes and reviewer binding in existing
+attestations. Extend validation with missing/wrong selection, lifecycle, supervision and adoption
+negative cases if automated enforcement is required. No arbitrary attestation string may waive this.
+This follow-up must survive integration and new harness preservation; renewed minimality is not claimed.
+
+Initial actual `ls-remote` matched child `72c7495`, parent M2 `4f09265791c82452a5800cc6d9855938bf88a46e`
+and both F2 refs `4ea24d53afc57778addf3f47752e0fe73a7011ea`. Command-scoped safe.directory and
+owner-context WSL/network access resolved initial sandbox ownership/access failures without global
+Git changes. This review changes this document only. The documentation commit OID and post-push
+actual remote equality/clean status/unchanged parent and F2 checks are returned with the commit,
+since it cannot embed its own OID. Remain on the child and return these corrections to trunk; no
+automatic correction round, PR, merge, new preservation refs, freeze, acceptance edits, 4,430-commit
+generation, eligibility execution, calibration or formal/diagnostic measurement was performed.

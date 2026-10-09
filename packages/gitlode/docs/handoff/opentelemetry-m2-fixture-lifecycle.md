@@ -1,5 +1,51 @@
 # M2 controlled fixture lifecycle implementation
 
+## Active assignment: focused re-review of C1/C2/C3 (2026-10-09)
+
+Correction round 1 is delivered, not accepted. This review-only assignment supersedes earlier packets.
+Use feature/otel-redesign_M2_fixture; no implementation edits are assigned.
+
+- Correction base: `ccdc5bf801d7d2aba724875916ab71b704813a7b`.
+- Fixed implementation: `503112984d9a524cbfab286a59927f8234545f52` (12 changed files).
+- Outcome: `98f109e4b49b045759f851c750b3bfcb8e2e4546` (this handoff only).
+- Parent M2 remains `4f09265791c82452a5800cc6d9855938bf88a46e`; F2 refs remain `4ea24d5`.
+
+Verify full identities, ancestry, current implementation equality and actual remote refs. Read the
+original findings, bounded correction packet and outcome, then inspect the complete correction diff.
+Keep accepted policy and unrelated previously reviewed paths closed unless this diff causes a
+concrete regression. Decide C1/C2/C3 separately and overall slice acceptance.
+
+1. C1: prove saved non-success barrier precedes deletion and saved success follows all required
+   disposal. Check barrier-write failure, refusal after partial multi-root disposal, terminal/recovery
+   write failure, preserved copies/outside sentinel and return/operator semantics. Distinguish group
+   cleanup, disposal and terminal evidence flags. Preserve earlier failures and exactly bounded recovery.
+2. C2: trace filesystem/digest/instance/unique ID/operation consistency through real raw-run, pilot,
+   sidecar and requalification consumers. Expected operation must derive from actual run identity,
+   not the supplied link. Check another valid pair cannot substitute and historical/aggregation paths
+   retain intended behavior. Do not rely on a validator and fixture sharing the same erroneous oracle.
+3. C3: inspect actual workflow failure artifacts for failed final boundary, unusable lifecycle storage,
+   unusable workflow storage and throwing cleanup IPC/stderr. Verify original exception identity or
+   serialized cause is retained and secondary diagnostics are separate. No second failed finalization,
+   no unsafe deletion, no false promise of artifact delivery when all storage is unavailable.
+
+Run build and explicit fixture-lifecycle strict typing, then the affected lifecycle/supervisor/workflow
+suites on Linux at the fixed implementation, plus narrowly affected calibration/projection consumers
+as needed to verify C2. On Windows exercise affected path/validator/C3 cases if available. Full dual-OS
+or package campaigns are not required. The reported Linux 226-pass batch predates final edits; use
+the outcome's later focused runs as separately attributed evidence, not an exact final full-suite run.
+Preserve Windows initial timeout/EBUSY and synthetic-setup correction as separate results. Evaluate
+final reduced fixture setup's sensitivity rather than inferring product success from a faster test.
+
+Inspect saved fail-before logs where available; label unavailable temporary evidence honestly. Use
+only bounded probes for concrete remaining questions and restore them. Run format write/check and
+diff check for documentation. No selected-workload generation, empirical requalification or measurement.
+
+Append findings, exact OID, independently run versus reported evidence and accepted/corrections-required
+verdict per finding here. Retain the separate pre-formal release-adoption gate unchanged. If an obligation
+still fails, report its precise counterexample for trunk bounded diagnosis; do not start another repair
+round. Documentation-only commit/normal push are authorized. Verify clean/actual remote equality,
+unchanged parent/F2 refs and remain on child. No repairs, PR, merge, freeze or acceptance-record edit.
+
 ## Active assignment: bounded correction round 1 (2026-10-09)
 
 Trunk confirmed the three reviewed failure paths against current source. Review

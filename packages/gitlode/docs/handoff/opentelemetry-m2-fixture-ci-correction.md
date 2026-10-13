@@ -88,7 +88,9 @@ Local evidence is retained under `.cache/fixture-ci-correction/` pending outcome
   (`strict-final.log`, `linux255-final.log`). Linux copy is `/tmp/gitlode-fixture-ci-correction`,
   with actual starting commit fetched into its private Git database. Earlier archive-only full run
   lacked `.git` and failed source-resolution tests; `linux-before.log` retains this setup error and
-  the separate pre-existing adapter flake, and is not valid fixed-source qualification.
+  a separate adapter assertion (fake duration samples 0.1/0.3 instead of 0.2/0.2), and is not valid
+  fixed-source qualification. That assertion is unrelated to maintenance dispatch; its underlying
+  scheduling cause was not established, and no adapter change or workaround was made.
 - Disposable independent mutations on 2.55: selecting geometric fails GC activation; overriding
   `maintenance.auto=false` only on the commit fails the positive maintenance-child assertion;
   overriding both detach flags to true fails `gc successful completion before command return`.
@@ -106,3 +108,62 @@ format-write/check have run. Architecture reports its existing one configuration
 errors. No release build is mixed into these source checks. Source identity, final Windows scope,
 normal push and implementation-OID CI results must be recorded in the outcome checkpoint below.
 Independent focused review remains required; this implementation session does not self-accept.
+
+## Outcome checkpoint (2026-10-13): pending independent focused review
+
+Implementation OID: **`b00258475004a8d7edb1c00bfa5f3f4d69039a5b`**; tree:
+`fbcb568fcfbbdfd0ed44a6d9120699edaa65dff6`. The only changed paths from the starting checkpoint are
+the lifecycle test, its contributor explanation and this handoff. Final test Git blob:
+`822b55c25d46c4793a2a175c540535e495222be6`; file SHA-256:
+`32e0e3d460ab20f90d95af7f684aba5ee4a4baa3b52714f20bee2ef0826882b7`.
+Local final Linux testing used the starting commit's actual Git database with that exact test overlay;
+the Windows final run started on the final implementation working tree, and its commit was created
+while the run was active. These are explicitly content-bound local results, not claims that the
+entire local campaign started at a clean implementation OID. CI below checked out that actual OID.
+
+Final Windows command `npm test -- --maxWorkers=2` exits 0: **99 files passed, 1,338 tests passed,
+39 skipped**, 219.26 seconds (`windows-final-workers2.log`). The skip set is the existing platform
+conditions, including the original Linux lifecycle/supervisor cases and the added Linux negative
+control. No existing test was disabled. On this 24-available-processor host, the original/default
+concurrency executions failed deadline assertions: initial baseline timeout/EBUSY, then corrected
+default run with baseline, sidecar and three C2 cases (5 failed/1,333 passed/39 skipped).
+The unchanged baseline passed focused, and all test files passed with two workers at unchanged
+five-second test deadlines. This establishes the observed association with concurrency/load;
+the host's precise latency cause remains unproven. Default-concurrency Windows is **not** claimed
+green or repaired by this GC-test correction. The user's unspecified earlier local log was not
+provided, so correspondence is limited to these newly captured exact local failure identities.
+
+Normal implementation push produced
+[CI run 38346438746](https://github.com/gitlode/gitlode/actions/runs/38346438746), attempt 1,
+job **115128858071**, source **`b00258475004a8d7edb1c00bfa5f3f4d69039a5b`**. Completed **success**:
+source tests **99 files/1,377 tests passed**, release build, packed metadata/publint and installed
+package test all executed successfully. No required step was skipped, and no CI rerun was requested.
+Runner inputs: Git 2.55.0, Node 22.23.3, npm 10.9.9. Full before/after job logs, final run metadata
+and job/step conclusions are preserved; expected nested retention failures remain nested evidence.
+The installed package's reported tarball SHA-256 is
+`e4d37c208cd6e6dba3ab887efa097e9c096ec97c41611a4ff8047732a845af45`.
+This is ordinary CI functional evidence, not a frozen runtime or formal measurement.
+
+New regression evidence archive:
+**`D:/gitlode_test/m2-fixture-ci-correction-20261013-b002584`**, **38 members**.
+Every copied member was verified against its source SHA-256; `manifest.json` records byte counts,
+original paths, local source bindings and CI identities. Manifest SHA-256:
+**`ac05e59f2c5e0ed9c10875ebf35246b81e68a7e9204778c20631ab5eb1dc2ded`**;
+`manifest.sha256` pins those bytes. Build setup failures for missing OpenSSL/Rust are preserved;
+the isolated Git 2.55 reproduction build disables optional TLS/HTTP/XML/gettext/Tcl/Rust features.
+Source tarball SHA-256 is `457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357`.
+This archive preserves regression logs, not a new frozen harness, eligibility or acceptance record.
+Prior sealed archives were not modified.
+
+After the implementation push, actual remote child matched the implementation OID, parent M2
+remained `4f09265791c82452a5800cc6d9855938bf88a46e`, and actual local/remote F2 product/harness
+preservation refs remained `4ea24d53afc57778addf3f47752e0fe73a7011ea`. Test-created hooks were removed
+by normal teardown and Git status was clean. This outcome checkpoint changes only this handoff;
+verify its normal push and clean local/remote equality before returning.
+
+Stop for an independent focused review of strategy selection, positive automatic dispatch,
+return-time completion/negative sensitivity, unchanged pack/history/cleanup proof, local failure
+classification and CI provenance. No independent review has been performed in this correction
+session. No PR, merge, formal measurement, 4,430-commit generation, freeze, eligibility, parent or
+acceptance update was performed or authorized. Review must refresh latest source/tree and CI before
+any later integration/PR approval request.

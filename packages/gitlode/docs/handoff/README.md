@@ -8,7 +8,8 @@ documents.
 
 ## Active OpenTelemetry work
 
-Current assignment: [controlled fixture lifecycle focused re-review](opentelemetry-m2-fixture-lifecycle.md).
+Current assignment: [fixture requalification/adoption binding design](opentelemetry-m2-fixture-lifecycle.md).
+Fixture corrections are independently accepted; the separate pre-formal adoption contract is pending.
 The human approved foreground maintenance and bounded fixed-quantity requalification. F2 runtime
 preservation is accepted; timing awaits reviewed implementation and a new preserved harness.
 The disabled SDK boundary is squash-integrated into M2 at `4ea24d5` by PR #116; its

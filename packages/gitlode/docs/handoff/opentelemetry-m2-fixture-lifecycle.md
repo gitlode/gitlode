@@ -1,5 +1,50 @@
 # M2 controlled fixture lifecycle implementation
 
+## Active assignment: adoption binding design (2026-10-13)
+
+Trunk accepts C1/C2/C3 and the correction slice at implementation
+`503112984d9a524cbfab286a59927f8234545f52`, based on independent review
+`a53ade4cac96338a5274d3270694a69248ba4d4c`. Earlier correction/re-review assignments are closed.
+The remaining release-adoption gate is not satisfied by that acceptance. No eligibility run is assigned.
+
+Next is a bounded documentation-only design session on the existing fixture child. Record starting
+OID and verify source equals the accepted implementation; parent M2 remains `4f09265`, F2 refs `4ea24d5`.
+Do not reopen accepted cleanup/validator behavior without a concrete new contradiction.
+
+Produce one concrete minimal adoption contract and integration recommendation, appended here:
+
+1. Inspect actual requalification output/selection inputs, supervision artifacts, schema-4 lifecycle
+   evidence, manifest routing and existing release validator evidence/reviewer structures. Map which
+   bytes and identities each currently verifies, versus merely requiring a syntactically valid hash.
+2. Define a reviewable, versioned adoption record for target/adapter/quantity/content recipe/lifecycle
+   protocol, historical calibration+manifest exact bytes, legacy runtime/dependency closure, new
+   harness/environment, requalification artifact, fixture inventory/run links, and completed
+   process cleanup/root-disposal supervision. Include exact hashes/locations and reviewer/decision
+   attribution. No circular hashes: keep sealed execution evidence separate from subsequent adoption.
+   Never treat an eligible result or a routing string as adoption. New comparison fixtures have their
+   own instance/layout identities; adoption must not imply they reuse the eligibility repository.
+3. Separate temporal gates explicitly: before the legacy check verify historical selection bytes,
+   fixed inputs and new harness; after it verify actual result/lifecycle/supervision and record trunk
+   adoption; only then authorize comparisons. Release review later binds those adopted inputs and
+   comparison evidence to the final candidate. Do not require a successful result before it can run.
+4. Recommend the least additional machinery that enforces the chain. First assess use of archived
+   external evidence review and existing release attestations with exact reviewer/hash bindings;
+   do not expand the release schema merely for symmetry. If current consumers would accept missing
+   or substituted adoption despite that contract, identify the exact failure path and minimal necessary
+   validator/command change with finite positive/negative tests. A blocked live record is no substitute.
+   Avoid signatures/services/general provenance frameworks or a second acceptance engine.
+5. Explain remaining source/release authority decisions and exact implementation scope, if any.
+   Record whether that work belongs before child integration or can be a separately gated follow-up.
+   Trunk reviews this design before assigning code changes, integration preparation or harness freeze.
+   Preserve the user's approved fixed-quantity policy and no renewed-minimality claim; no threshold,
+   sampling or product-runtime changes. Synthetic examples must be clearly non-acceptance examples.
+
+Use code and saved evidence inspection, no new fixtures, tests/install campaigns, workload execution,
+freeze or implementation. Format/check and diff-check documentation, normally commit/push to the
+fixture child, verify actual remote equality/clean status and unchanged parent/F2 refs, and remain
+on the child. Return exact proposal and bounded next action, not self-acceptance. No PR/merge or live
+acceptance/adoption record mutation. Historical failures and frozen inputs remain unchanged.
+
 ## Active assignment: focused re-review of C1/C2/C3 (2026-10-09)
 
 Correction round 1 is delivered, not accepted. This review-only assignment supersedes earlier packets.

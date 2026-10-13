@@ -733,3 +733,144 @@ and both F2 preservation refs remain `4ea24d53afc57778addf3f47752e0fe73a7011ea`.
 documentation-only normal commit/push on the fixture child, with format write/check, diff check and
 post-push actual remote/clean/ref checks. Return this disposition to trunk while remaining on the
 child as assigned; no PR, merge, freeze, eligibility or formal workload execution is authorized.
+
+## Independent Windows ownership/policy review (2026-10-13)
+
+Reviewer: independent Codex session starting at clean `7fb495847d3ab05ff34f954f89a33f747af5142a`
+on `feature/otel-redesign_M2_fixture`. Reviewed the complete 15-file
+`4d985d5ddded8312f687dc4588f8b1470a218075..b98bbe5fd5e17417ab610781d0c8f893a628aea9`
+change, including `f0cb785`, rather than only the Unix correction. **Disposition:
+corrections-required for ownership; Windows resource policy accepted. Windows PR-readiness
+obligation is not satisfied.** GC acceptance and parent/F2 identities are unchanged.
+
+### Blocking findings
+
+1. **P1: leader close can authorize deletion while an owned descendant remains alive.**
+   `test/support/test-fixture-owner.ts:116` returns immediately for a closed leader. The disposal
+   barrier at line 188 waits for leader close, and line 198 declares quiescence without requiring
+   a process-group/tree observation when termination was never started. If the leader exits before
+   cancellation, an inherited-group descendant with independent/ignored stdio can survive that
+   close; cancellation skips the leader and teardown deletes every registered root. This also
+   affects ordinary completion with such a descendant. On Windows the same closed-state shortcut
+   bypasses the stated conservative retention for an exited root whose tree cannot be established.
+   Windows tree snapshots in the active-leader path do not cover this shortcut.
+
+   Independently reproduced on Linux at fixed `b98bbe5` using the actual `fixtureExec`,
+   `TestFixtureOwner.run` and disposal. A finite Node leader launched a same-group Node descendant
+   with ignored stdio, printed its PID and unref'd it. After leader close, the controller aborted.
+   Leader PID 512148 closed at 35.08 ms; cancellation occurred at 35.36 ms; root
+   `/tmp/gitlode-review-leader-close-74o2F1` was removed at 36.51 ms, with `removed: true`, no
+   diagnostics and no termination-confirmed event. Descendant PID 512155 remained alive and
+   recorded `rootExists: false` after its 1,500 ms delay. It then exited naturally. No implementation
+   mutation was used. Require group/tree quiescence or conservative retention on this path, with
+   a finite regression that checks leader exit before abort; fixing only kill success or promise
+   rejection does not close it. This is a concrete owner boundary failure, not a claim that the
+   existing foreground Git recipe always leaves descendants.
+
+2. **P2: supported Windows executable setup is not described in contributor guidance.**
+   `docs/contributing/build-test-release.md:84` declares ordinary root `npm test` supported but
+   contains no Volta executable PATH prerequisite or reproducible correction. The successful
+   implementation campaigns explicitly used an invocation-local `npm.exe` PATH directory; the
+   unmodified environment failed ten unchanged workflow tests with `spawn npm ENOENT`.
+   The handoff/archive explains the diagnosis, but is temporary continuation evidence rather than
+   contributor setup guidance. Document the supported executable setup and a worker/child npm
+   resolution check, or resolve the default-command defect in separately authorized work. Do not
+   describe the unmodified Volta environment as passing. No full campaign repeat is requested here.
+
+### Scope and remaining correctness observations
+
+Root Windows `maxWorkers: 2` applies through the root Vitest config to all ten projects; saved
+resolved-config probes show 2 and explicit CLI override 3 for every project. Linux has no added cap.
+These are configuration observations, not measured simultaneous worker counts. Existing assertions,
+5,000 ms test deadlines and platform skips are retained. Product code, recipes, timed sampling,
+formal thresholds and acceptance records are unchanged.
+
+The three assigned paths register their whole bodies. Individual filesystem/Git work remains
+registered across parallel rejection; checks before starting and after completing owned work gate
+subsequent operations. Newly created roots register before cancellation checks, including pending
+creation. Sidecar owner mode registers its private root and delegates disposal to outer teardown;
+its inner finally never awaits its own registered body, avoiding a circular wait. C2 has individual
+roots and retains the shared source if body settlement is unconfirmed. Registration failures retain
+roots and consume rejected child promises. Normal cleanup failure becomes an outer failure, while
+primary test errors survive owner reporting failure.
+
+For active leaders, Windows observes process identities/descendants, requests tree termination,
+waits for close and observes absence again; observation failure/uncertain close retains roots.
+Unix owner-only spawn creates private groups and requires disappearance after termination. The
+new capture accumulates bounded Buffer chunks, decodes after concatenation, records spawn error
+and rejects on close; overflow marks uncertainty rather than authorizing disposal. These protections
+are useful but do not repair finding 1. The actual timeout regressions keep leaders alive until abort,
+so all passing outer assertions miss that path. Their driver now requires real-child close and
+termination-confirmed events before deleting retained probe roots, unlike the preserved first Linux
+driver defect. No broad process-framework redesign is requested.
+
+No-owner sidecar calls retain execFile, shared capture/provenance parsing, supervisor PID notification
+and inner removal; formal call sites omit the owner. Independent suites exercise no-owner success,
+protocol/error cleanup and explicit-owner disposal with the real shared sidecar, not a replacement
+implementation. Supervisor/diagnostic behavior is best effort; none of this establishes formal
+supervisor acceptance or abrupt-host-loss guarantees.
+
+### Evidence attribution and independent execution
+
+New review evidence is under workspace `.cache/ownership-review/`; the sealed archive was read only.
+Windows normal-user independent execution: `npm run build:dev`, explicit
+`node node_modules/typescript/bin/tsc -p packages/gitlode/tsconfig.fixture-lifecycle.json`, and direct
+root Vitest execution of behavioral-baseline, repository-sidecar, fixture-lifecycle and
+fixture-timeout-ownership all exited 0: **4 files, 44 passed/3 existing skips, 52.44 seconds**.
+Used the existing invocation-local executable PATH correction; this was a focused run, not another
+plain full-root campaign. Initial Git sandbox ownership and WSL access restrictions were handled
+with command-local safe.directory and normal-user execution, without global configuration changes.
+
+Linux independent execution used existing clean fixed-OID checkout
+`/tmp/gitlode-windows-ownership-f0cb785`, actually `b98bbe5`/tree
+`24f62e65df37dd13f784f8fe113a47fb3c85b663`, Node 22.23.1/npm 10.9.8. Build, explicit fixture strict
+typing and the same four suites passed: **47 tests, 16.22 seconds**, clean before/after.
+The first inline WSL command failed before execution because of argument expansion; the script
+execution recorded all three exit codes as 0. Its UTF-8 BOM/CRLF shell diagnostics do not represent
+test failures and are preserved in the review log. No complete OS/package campaign was repeated.
+The finite leader-close probe above is additional independent failure evidence. Two Windows variants
+failed to produce the descendant observation file and are inconclusive, not a Windows reproduction.
+Their freshly created already-removed roots were not broadly cleaned; historical residue was untouched.
+
+Rehashed all **160** manifest-listed members and their byte counts: zero mismatches. Manifest hash
+is `452cf60d1d536d8887148c30c6008be8901c7a738599eb635ff9844746cf730b`.
+Read complete first/final Windows and Linux logs, source/clean bindings, policy probes, first/final
+CI logs and old-behavior sensitivity/restoration receipts. Those are saved implementation-session
+executions, not independent reruns. The three mutations exit 1 with meaningful outer assertions;
+restoration hashes agree with their recorded original bytes. Initial Windows ENOENT, Unix ESRCH/
+private-group defect, invalid first Linux driver cleanup and historic unrestricted Windows
+latency/EBUSY remain separate failures. The unrelated earlier fake-duration observation is not closed.
+
+Saved final Windows plain `npm test` is clean fixed-source 100 files/1,349 passed/39 skips at
+206.03 seconds. Its executable copy hash
+`7b648c48ba1473baa724d1cecf9df16e36ca12c768977d72745032349368953f` matches the installed Volta shim;
+worker/tsx-child diagnostics bind Node 22.23.1/npm 11.11.0 and explain PATH sanitation. The correction
+is invocation-local, reproducible from the receipts, and not a toolchain/source change. It is not
+proof of an unmodified Volta pass or resolution of historical unrestricted-concurrency failures.
+
+Saved [CI 38367236232](https://github.com/gitlode/gitlode/actions/runs/38367236232) metadata binds
+attempt 1 to fixed `b98bbe5`; the complete hash-verified job log records actual checkout,
+100 files/1,388 source tests, release build, packed metadata/publint and installed-package execution,
+including tarball `e4d37c208cd6e6dba3ab887efa097e9c096ec97c41611a4ff8047732a845af45`.
+Live connected job metadata independently confirms job 115195172971 completed success and every
+listed step succeeded, with none skipped. The connected commit-run lookup returned an empty list;
+live run SHA/attempt could therefore not be independently refreshed through that lookup. Exact
+SHA/attempt attribution here rests on the verified saved metadata plus checkout log, not a claim
+of fresh live run identity. CI was not rerun. First CI failure/skipped release steps remain preserved.
+
+Principal new SHA-256 receipts:
+
+- `windows-focused.log`: `a3f865363e8bc1ebf8c4609b1e507f9f952505458db265bb8aacd6fd6520657c`
+- `linux-independent.log`: `b40730093310e81ac3b0807cccfD0130057928327ca57a205d2cdf3d28610a63`
+- `linux-leader-close-probe.json`: `abce76b035e519b9bdcd76e625a3a5bcc76684dde194a71d67392f7880fb4ce4`
+
+### Delivery and trunk disposition
+
+Return corrections-required without implementation changes. The supported-policy campaign evidence
+is credible within its corrected environment, but finding 1 and the contributor setup gap prevent
+Windows PR-readiness approval. Trunk decides a subsequent bounded correction assignment; this review
+does not update acceptance. Pre-delivery actual remote child equals starting `7fb4958`; local/remote
+parent remains `4f09265791c82452a5800cc6d9855938bf88a46e` and both F2 preservation refs remain
+`4ea24d53afc57778addf3f47752e0fe73a7011ea`. Delivery is this document only, format write/check and
+diff check, normal commit/push, followed by actual remote/clean/ref verification. No implementation
+repair, PR, merge, freeze, formal measurement, qualification or acceptance update was performed.

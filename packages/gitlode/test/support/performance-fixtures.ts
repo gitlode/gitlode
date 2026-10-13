@@ -1,13 +1,16 @@
-import { execFile } from "node:child_process";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { createDeterministicRepository } from "./deterministic-repository.js";
-import { fixtureGitEnvironment, foregroundMaintenanceConfig } from "./fixture-git.js";
+import {
+  fixtureExec,
+  fixtureWork,
+  type FixtureWorkOwner,
+  fixtureGitEnvironment,
+  foregroundMaintenanceConfig,
+} from "./fixture-git.js";
 import type { FixtureQuantities } from "./performance-harness.js";
 
-const execute = promisify(execFile);
 const env = {
   ...fixtureGitEnvironment(),
   GIT_AUTHOR_NAME: "Gitlode Performance",
@@ -31,8 +34,9 @@ const isolated = [
   "-c",
   "core.fileMode=false",
 ];
-async function git(directory: string, args: string[], index: number) {
-  await execute("git", [...isolated, ...args], {
+async function git(directory: string, args: string[], index: number, owner?: FixtureWorkOwner) {
+  await fixtureExec(owner, "git", [...isolated, ...args], {
+    encoding: "utf8",
     cwd: directory,
     env: {
       ...env,
@@ -46,41 +50,51 @@ export async function createPerformanceRepository(
   directory: string,
   family: "commit_heavy_repository" | "file_heavy_repository",
   quantities: FixtureQuantities,
+  owner?: FixtureWorkOwner,
 ) {
-  const repository = await createDeterministicRepository(directory);
+  const repository = await createDeterministicRepository(directory, owner);
   if (quantities.commits < 5)
     throw new Error("final total commits cannot be below the five-commit base recipe");
   for (let commit = 0; commit < quantities.commits - 5; commit++) {
     const fileCount = family === "file_heavy_repository" ? quantities.files : 1;
     for (let file = 0; file < fileCount; file++) {
       const path = join(directory, `perf-${String(file).padStart(5, "0")}.txt`);
-      if (commit > 0 && (commit + file) % 11 === 0) await rm(path, { force: true });
-      else await writeFile(path, `recipe=performance-v1\ncommit=${commit}\nfile=${file}\n雪\n`);
+      if (commit > 0 && (commit + file) % 11 === 0)
+        await fixtureWork(owner, () => rm(path, { force: true }));
+      else
+        await fixtureWork(owner, () =>
+          writeFile(path, `recipe=performance-v1\ncommit=${commit}\nfile=${file}\n雪\n`),
+        );
     }
-    await git(directory, ["add", "-A"], commit);
-    await git(directory, ["commit", "-m", `performance ${family} ${commit}`], commit);
+    await git(directory, ["add", "-A"], commit, owner);
+    await git(directory, ["commit", "-m", `performance ${family} ${commit}`], commit, owner);
   }
   return repository;
 }
 export async function createPluginProjectionFixture(
   directory: string,
   quantities: FixtureQuantities,
+  owner?: FixtureWorkOwner,
 ) {
-  await mkdir(directory, { recursive: true });
+  await fixtureWork(owner, () => mkdir(directory, { recursive: true }));
   const registrations = Array.from({ length: quantities.plugins }, (_, index) => ({
     namespace: `plugin-${index}`,
     package: `deterministic-${index % 2}`,
     outcome: index % 3 === 0 ? "skip" : "success",
   }));
   const packageDirectory = join(directory, "deterministic-plugin");
-  await mkdir(packageDirectory);
-  await writeFile(
-    join(packageDirectory, "package.json"),
-    `${JSON.stringify({ name: "@gitlode/performance-fixture-plugin", version: "1.0.0", type: "module" }, undefined, 2)}\n`,
+  await fixtureWork(owner, () => mkdir(packageDirectory));
+  await fixtureWork(owner, () =>
+    writeFile(
+      join(packageDirectory, "package.json"),
+      `${JSON.stringify({ name: "@gitlode/performance-fixture-plugin", version: "1.0.0", type: "module" }, undefined, 2)}\n`,
+    ),
   );
-  await writeFile(
-    join(packageDirectory, "index.js"),
-    `export default async (config) => ({\n  async init() { return { type: "ready" }; },\n  async project(context) {\n    if (config.outcome === "skip" || context.fact.type !== "file-change") return { type: "skip" };\n    return { type: "success", data: { fixture: "performance-v2", namespaceOrdinal: config.ordinal } };\n  }\n});\n`,
+  await fixtureWork(owner, () =>
+    writeFile(
+      join(packageDirectory, "index.js"),
+      `export default async (config) => ({\n  async init() { return { type: "ready" }; },\n  async project(context) {\n    if (config.outcome === "skip" || context.fact.type !== "file-change") return { type: "skip" };\n    return { type: "success", data: { fixture: "performance-v2", namespaceOrdinal: config.ordinal } };\n  }\n});\n`,
+    ),
   );
   const extensions = Object.fromEntries(
     registrations.map((registration, ordinal) => [
@@ -93,13 +107,14 @@ export async function createPluginProjectionFixture(
     ]),
   );
   const config = { version: 1, runtime: { gitAdapter: "isomorphic-git" }, extensions };
-  await writeFile(
-    join(directory, "plugin-input.json"),
-    `${JSON.stringify({ recipeRevision: "performance-v2", package: { name: "@gitlode/performance-fixture-plugin", version: "1.0.0" }, registrations }, undefined, 2)}\n`,
+  await fixtureWork(owner, () =>
+    writeFile(
+      join(directory, "plugin-input.json"),
+      `${JSON.stringify({ recipeRevision: "performance-v2", package: { name: "@gitlode/performance-fixture-plugin", version: "1.0.0" }, registrations }, undefined, 2)}\n`,
+    ),
   );
-  await writeFile(
-    join(directory, "gitlode.config.json"),
-    `${JSON.stringify(config, undefined, 2)}\n`,
+  await fixtureWork(owner, () =>
+    writeFile(join(directory, "gitlode.config.json"), `${JSON.stringify(config, undefined, 2)}\n`),
   );
   return { registrations, configPath: join(directory, "gitlode.config.json") };
 }

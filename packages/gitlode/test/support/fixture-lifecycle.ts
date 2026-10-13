@@ -1,14 +1,17 @@
-import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { cp, lstat, mkdir, readFile, readdir, statfs } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { promisify } from "node:util";
 
 import { writeAtomicJson } from "../../scripts/tooling/atomic-json.js";
-import { fixtureGitEnvironment, foregroundMaintenanceConfig } from "./fixture-git.js";
+import {
+  fixtureExec,
+  fixtureWork,
+  type FixtureWorkOwner,
+  fixtureGitEnvironment,
+  foregroundMaintenanceConfig,
+} from "./fixture-git.js";
 
 export const FIXTURE_LIFECYCLE_PROTOCOL = "foreground-maintenance-inventory-v1";
-const execute = promisify(execFile);
 const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 export type FixtureInventoryEntry = {
   readonly path: string;
@@ -36,9 +39,14 @@ export type FixtureLink = {
   readonly post: string;
 };
 
-export async function fixtureGit(directory: string, args: readonly string[]): Promise<string> {
+export async function fixtureGit(
+  directory: string,
+  args: readonly string[],
+  owner?: FixtureWorkOwner,
+): Promise<string> {
   return (
-    await execute("git", [...foregroundMaintenanceConfig, ...args], {
+    await fixtureExec(owner, "git", [...foregroundMaintenanceConfig, ...args], {
+      encoding: "utf8",
       cwd: directory,
       env: fixtureGitEnvironment(),
       maxBuffer: 16 * 1024 * 1024,
@@ -47,16 +55,19 @@ export async function fixtureGit(directory: string, args: readonly string[]): Pr
 }
 
 /** No status/index refresh. Byte inventories deliberately warm caches outside child timing. */
-export async function fixtureIdentity(directory: string): Promise<FixtureIdentity> {
+export async function fixtureIdentity(
+  directory: string,
+  owner?: FixtureWorkOwner,
+): Promise<FixtureIdentity> {
   for (let ancestor = resolve(directory); ; ancestor = dirname(ancestor)) {
-    if ((await lstat(ancestor)).isSymbolicLink())
+    if ((await fixtureWork(owner, () => lstat(ancestor))).isSymbolicLink())
       throw new Error("fixture root has a linked ancestor");
     if (dirname(ancestor) === ancestor) break;
   }
   const inventory: FixtureInventoryEntry[] = [];
   async function walk(relative: string): Promise<void> {
     const path = join(directory, relative);
-    const stat = await lstat(path);
+    const stat = await fixtureWork(owner, () => lstat(path));
     if (stat.isSymbolicLink() || (!stat.isDirectory() && !stat.isFile()))
       throw new Error(`unsafe fixture entry: ${relative}`);
     if (typeof process.getuid === "function" && stat.uid !== process.getuid())
@@ -74,14 +85,16 @@ export async function fixtureIdentity(directory: string): Promise<FixtureIdentit
         path: relative,
         type: stat.isDirectory() ? "directory" : "file",
         bytes: stat.isFile() ? stat.size : 0,
-        ...(stat.isFile() ? { sha256: digest(await readFile(path)) } : {}),
+        ...(stat.isFile()
+          ? { sha256: digest(await fixtureWork(owner, () => readFile(path))) }
+          : {}),
       });
     if (stat.isDirectory())
-      for (const name of (await readdir(path)).sort())
+      for (const name of (await fixtureWork(owner, () => readdir(path))).sort())
         await walk(relative ? `${relative}/${name}` : name);
   }
   await walk("");
-  if (!(await lstat(join(directory, ".git"))).isDirectory())
+  if (!(await fixtureWork(owner, () => lstat(join(directory, ".git")))).isDirectory())
     throw new Error("fixture requires a private .git directory");
   const logical: Record<string, string> = {};
   for (const [key, args] of Object.entries({
@@ -93,9 +106,9 @@ export async function fixtureIdentity(directory: string): Promise<FixtureIdentit
     count: ["rev-list", "--all", "--count"],
     configuration: ["config", "--show-origin", "--show-scope", "--list"],
   }))
-    logical[key] = await fixtureGit(directory, args);
+    logical[key] = await fixtureGit(directory, args, owner);
   for (const key of ["maintenance.autoDetach", "gc.autoDetach"])
-    if ((await fixtureGit(directory, ["config", "--local", "--get", key])) !== "false")
+    if ((await fixtureGit(directory, ["config", "--local", "--get", key], owner)) !== "false")
       throw new Error(`fixture requires persisted ${key}=false`);
   // Includes can redirect readers into unowned configuration even when inherited overrides are removed.
   if (
@@ -108,7 +121,10 @@ export async function fixtureIdentity(directory: string): Promise<FixtureIdentit
     inventory,
     layoutDigest: digest(JSON.stringify(inventory)),
     logical,
-    filesystem: { type: (await statfs(directory)).type, device: (await lstat(directory)).dev },
+    filesystem: {
+      type: (await fixtureWork(owner, () => statfs(directory))).type,
+      device: (await fixtureWork(owner, () => lstat(directory))).dev,
+    },
   };
 }
 
@@ -121,18 +137,22 @@ export class FixtureLifecycle {
   private readonly cleanupErrors: string[] = [];
   readonly repository: string;
   readonly evidenceDirectory: string;
-  constructor(repository: string, evidenceDirectory: string) {
+  private readonly owner?: FixtureWorkOwner;
+  constructor(repository: string, evidenceDirectory: string, owner?: FixtureWorkOwner) {
+    this.owner = owner;
     this.repository = repository;
     this.evidenceDirectory = evidenceDirectory;
   }
 
   async prepare(): Promise<void> {
-    await mkdir(this.evidenceDirectory, { recursive: false });
-    const identity = await fixtureIdentity(this.repository);
+    await fixtureWork(this.owner, () => mkdir(this.evidenceDirectory, { recursive: false }));
+    const identity = await fixtureIdentity(this.repository, this.owner);
     this.prepared = identity;
     const preserved = join(this.evidenceDirectory, "prepared-repository");
-    await cp(this.repository, preserved, { recursive: true, dereference: false });
-    const copied = await fixtureIdentity(preserved);
+    await fixtureWork(this.owner, () =>
+      cp(this.repository, preserved, { recursive: true, dereference: false }),
+    );
+    const copied = await fixtureIdentity(preserved, this.owner);
     if (
       copied.layoutDigest !== identity.layoutDigest ||
       JSON.stringify(copied.logical) !== JSON.stringify(identity.logical)
@@ -144,7 +164,7 @@ export class FixtureLifecycle {
   async boundary(label: string): Promise<FixtureBoundary> {
     if (this.failed) throw new Error("fixture attempt already inconclusive");
     try {
-      const identity = await fixtureIdentity(this.repository);
+      const identity = await fixtureIdentity(this.repository, this.owner);
       const boundary = {
         id: `${this.instanceId}-${this.boundaries.length}`,
         label,
@@ -152,7 +172,9 @@ export class FixtureLifecycle {
         identity,
       };
       this.boundaries.push(boundary);
-      await writeAtomicJson(this.evidenceDirectory, `${boundary.id}.json`, boundary);
+      await fixtureWork(this.owner, () =>
+        writeAtomicJson(this.evidenceDirectory, `${boundary.id}.json`, boundary),
+      );
       if (
         !this.prepared ||
         identity.layoutDigest !== this.prepared.layoutDigest ||
@@ -162,7 +184,7 @@ export class FixtureLifecycle {
         throw new Error(`fixture drift at ${label}`);
       return boundary;
     } catch (error) {
-      await this.fail(label, error);
+      await this.fail(label, error).catch(() => undefined);
       throw error;
     }
   }
@@ -170,14 +192,16 @@ export class FixtureLifecycle {
   private async fail(label: string, error: unknown): Promise<void> {
     if (this.failed) return;
     this.failed = true;
-    await writeAtomicJson(this.evidenceDirectory, "failure.json", {
-      protocol: this.protocol,
-      instanceId: this.instanceId,
-      status: "inconclusive",
-      label,
-      error: error instanceof Error ? error.message : String(error),
-      retainedRepository: this.repository,
-    }).catch(() => undefined);
+    await fixtureWork(this.owner, () =>
+      writeAtomicJson(this.evidenceDirectory, "failure.json", {
+        protocol: this.protocol,
+        instanceId: this.instanceId,
+        status: "inconclusive",
+        label,
+        error: error instanceof Error ? error.message : String(error),
+        retainedRepository: this.repository,
+      }),
+    ).catch(() => undefined);
   }
 
   async capture<T>(
@@ -187,7 +211,7 @@ export class FixtureLifecycle {
     const pre = await this.boundary(`${label}-pre`);
     let value: T;
     try {
-      value = await child();
+      value = await fixtureWork(this.owner, child);
     } catch (error) {
       await this.fail(label, error);
       throw error;
@@ -208,20 +232,24 @@ export class FixtureLifecycle {
   async finalize(): Promise<void> {
     await this.boundary("final-pre-destruction");
     try {
-      await writeAtomicJson(this.evidenceDirectory, "lifecycle.json", this.evidence());
+      await fixtureWork(this.owner, () =>
+        writeAtomicJson(this.evidenceDirectory, "lifecycle.json", this.evidence()),
+      );
     } catch (error) {
-      await this.fail("final-evidence-persistence", error);
+      await this.fail("final-evidence-persistence", error).catch(() => undefined);
       throw error;
     }
   }
 
   async recordCleanupError(error: unknown): Promise<void> {
     this.cleanupErrors.push(error instanceof Error ? error.message : String(error));
-    await writeAtomicJson(this.evidenceDirectory, "cleanup-failure.json", {
-      instanceId: this.instanceId,
-      cleanupErrors: this.cleanupErrors,
-      retainedRepository: this.repository,
-    }).catch(() => undefined);
+    await fixtureWork(this.owner, () =>
+      writeAtomicJson(this.evidenceDirectory, "cleanup-failure.json", {
+        instanceId: this.instanceId,
+        cleanupErrors: this.cleanupErrors,
+        retainedRepository: this.repository,
+      }),
+    ).catch(() => undefined);
   }
 
   evidence() {

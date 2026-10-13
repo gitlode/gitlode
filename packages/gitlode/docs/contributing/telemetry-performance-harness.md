@@ -190,6 +190,38 @@ The [build guide publish policy](build-test-release.md#ci-and-publish-gates) own
 
 ## Controlled fixture evidence and fixed-quantity eligibility
 
+### Optional test fixture ownership
+
+The behavioral baseline, repository sidecar and C2 inconsistency tests explicitly supply an
+invocation-local `FixtureWorkOwner`. It is tooling support, with no product API, Vitest dependency
+in shared tooling, environment switch or global registry. Omitting it preserves the existing
+fixture and sidecar execution, result/provenance parsing, supervisor PID reporting and inner
+cleanup contracts; formal call sites omit it. It does not change recipes, timed sampling,
+thresholds, qualification or acceptance.
+
+The test consumes its Vitest cancellation signal and registers the whole body, filesystem work,
+new roots and children at launch. Cancellation gates subsequent fixture preparation, Git/CLI
+launch and result I/O. Root registration precedes cancellation checks, including cancellation
+while `mkdtemp` is pending. The optional sidecar mode delegates final disposal to the supplied
+owner, including its private root; its inner `finally` does not wait for its own outer body.
+Registration failure retains the newly created private root without deleting it.
+
+The test owner's bounded teardown waits for body/I/O settlement and child `close`, in addition
+to termination observation. Windows cancellation observes the owned process tree while its
+root is alive, uses `taskkill /T /F`, then requires close and a second process snapshot showing
+the observed identities and descendants absent. A successful kill request alone is insufficient.
+Failed/denied observation, an exited root before tree termination or an unconfirmed bounded wait
+retains all invocation roots and reports secondary diagnostics. Linux owned launches use private
+process groups and additionally require the group to disappear. These are bounded fixture-test
+observations, not a general repair of the formal supervisor or a guarantee across abrupt host loss.
+
+Teardown never deletes historical unknown residue. It preserves a primary test failure when
+cleanup or diagnostic reporting also fails; cleanup failure on an otherwise successful test is
+an outer failure. The finite regression uses an actual nested Vitest timeout and teardown,
+controlled descendants and outstanding I/O, and distinguishes the expected nested timeout from
+outer assertion or hook failures. Retention probes without an actual PID can be disposed by
+their outer test only after the nested runner exits.
+
 Follow the [lifecycle contract](../design/telemetry-performance.md#controlled-repository-fixture-lifecycle)
 and its catalog. Repository schema-4 artifacts bind raw runs and sidecars to instance IDs and byte
 inventory boundaries; schema-3 calibration history remains historical. The content recipe is separate

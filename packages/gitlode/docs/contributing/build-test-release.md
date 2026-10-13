@@ -81,6 +81,14 @@ Normal test commands perform an incremental development build first. The root wa
 not rebuild cross-workspace output continuously; run `npm run build:watch` alongside it when the
 code under test spans workspace boundaries.
 
+On Windows, the root Vitest configuration sets `maxWorkers: 2` for the workspace projects. This is
+the supported resource policy for the ordinary root `npm test`, including its unchanged test
+deadlines and assertions. Linux retains Vitest's existing defaults. Explicit CLI `--maxWorkers`
+overrides still take precedence; running a workspace independently uses that workspace's own config.
+The Windows cap does not establish that unrestricted concurrency or historical timeout/EBUSY
+failures were repaired. Test cancellation and disposal ownership are checked separately through
+the [fixture tooling boundary](telemetry-performance-harness.md#optional-test-fixture-ownership).
+
 ### Optional coverage
 
 ```bash

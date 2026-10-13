@@ -10,7 +10,11 @@ import { promisify } from "node:util";
 import { resolveFilePath } from "@gitlode/internal-foundation/support";
 
 import { createEmptyCheckpoint } from "../src/state/index.js";
-import { fixtureGitEnvironment } from "../test/support/fixture-git.js";
+import {
+  fixtureWork,
+  type FixtureWorkOwner,
+  fixtureGitEnvironment,
+} from "../test/support/fixture-git.js";
 import {
   FIXTURE_LIFECYCLE_PROTOCOL,
   FixtureLifecycle,
@@ -909,129 +913,173 @@ export async function runRepositoryProfileSidecar(input: {
   readonly recipeHash: string;
   readonly quantities: FixtureQuantities;
   readonly rotationLines?: number;
+  readonly owner?: FixtureWorkOwner;
 }): Promise<RepositorySidecarCapture> {
-  const context = {
-    fixture: input.fixture,
-    adapter: input.adapter,
-    quantity: input.quantities.commits,
-  };
-  performanceStage({ stage: "processing", operation: "prepare-sidecar", ...context });
-  const provenance = {
-    workerBundle: "worker-entry.js" as const,
-    workerBundleSha256: "",
-    configSha256: "",
-    fixture: input.fixture,
-    adapter: input.adapter,
-    revision: input.revision,
-    recipeHash: input.recipeHash,
-    quantities: input.quantities,
-    runId: input.runId,
-  };
-  const root = await mkdtemp(join(tmpdir(), "gitlode-profile-sidecar-"));
-  const outputDir = join(root, "output");
-  const checkpointPath = join(root, "checkpoint.json");
-  try {
-    const requestPath = join(root, "request.json");
-    await mkdir(outputDir);
-    const configBytes = await readFile(input.config);
-    const config = JSON.parse(await readFile(input.config, "utf8")) as {
-      extensions?: Record<string, { entrypoint: string; config?: unknown; failurePolicy?: string }>;
+  return await fixtureWork(input.owner, async () => {
+    const owner = input.owner;
+    owner?.check();
+    const context = {
+      fixture: input.fixture,
+      adapter: input.adapter,
+      quantity: input.quantities.commits,
     };
-    const pluginDeclarations = config.extensions
-      ? Object.fromEntries(
-          Object.entries(config.extensions).map(([namespace, declaration]) => [
-            namespace,
-            {
-              ...declaration,
-              entrypoint: declaration.entrypoint.startsWith(".")
-                ? resolve(dirname(input.config), declaration.entrypoint)
-                : declaration.entrypoint,
-            },
-          ]),
-        )
-      : undefined;
-    const workerEntryPath = input.workerEntryPath ?? resolve(dirname(input.cli), "worker-entry.js");
-    const resolvedProvenance = {
-      ...provenance,
-      workerBundleSha256: createHash("sha256")
-        .update(await readFile(workerEntryPath))
-        .digest("hex"),
-      configSha256: createHash("sha256").update(configBytes).digest("hex"),
+    performanceStage({ stage: "processing", operation: "prepare-sidecar", ...context });
+    const provenance = {
+      workerBundle: "worker-entry.js" as const,
+      workerBundleSha256: "",
+      configSha256: "",
+      fixture: input.fixture,
+      adapter: input.adapter,
+      revision: input.revision,
+      recipeHash: input.recipeHash,
+      quantities: input.quantities,
+      runId: input.runId,
     };
-    await writeFile(
-      requestPath,
-      JSON.stringify({
-        workerEntryPath,
-        request: {
-          input: {
-            repositoryPath: input.repository,
-            refs: ["main"],
-            outputDir,
-            outputPrefix: "sidecar",
-            rotation: { maxLines: input.rotationLines },
-            granularity: input.fixture === "commit_heavy_repository" ? "commit" : "file",
-            maxDiffSize: input.fixture === "file_heavy_repository" ? 16 : undefined,
-            profile: true,
-            gitAdapter: input.adapter,
-            pluginBaseDirectory: config.extensions ? dirname(input.config) : undefined,
-            pluginDeclarations,
-          },
-          priorCheckpoint: createEmptyCheckpoint(resolveFilePath(input.repository)),
-        },
-      }),
-    );
-    const sidecarScript = fileURLToPath(
-      new URL("./telemetry-repository-sidecar.mjs", import.meta.url),
-    );
-    performanceStage({ stage: "execution", operation: "repository-sidecar", ...context });
-    const pending = exec(process.execPath, [sidecarScript, requestPath], {
-      env: fixtureGitEnvironment(),
-    });
-    performanceChild(pending.child.pid);
-    const response = await pending;
-    performanceStage({ stage: "processing", operation: "read-sidecar", ...context });
-    const result = JSON.parse(response.stdout) as {
-      result?: {
-        kind?: string;
-        message?: string;
-        success?: { profileReport?: unknown };
-        profileReport?: unknown;
-        checkpoint?: unknown;
+    const root = await mkdtemp(join(tmpdir(), "gitlode-profile-sidecar-"));
+    try {
+      owner?.root(root);
+    } catch (error) {
+      try {
+        owner?.diagnostic(`sidecar root registration failed; retained ${root}`);
+      } catch {
+        /* Preserve registration failure. */
+      }
+      throw error;
+    }
+    const outputDir = join(root, "output");
+    const checkpointPath = join(root, "checkpoint.json");
+    try {
+      const requestPath = join(root, "request.json");
+      await fixtureWork(owner, () => mkdir(outputDir));
+      const configBytes = await fixtureWork(owner, () => readFile(input.config));
+      const config = JSON.parse(await fixtureWork(owner, () => readFile(input.config, "utf8"))) as {
+        extensions?: Record<
+          string,
+          { entrypoint: string; config?: unknown; failurePolicy?: string }
+        >;
       };
-    };
-    const workerResult = result.result;
-    if (workerResult?.checkpoint)
-      await writeFile(checkpointPath, `${JSON.stringify(workerResult.checkpoint)}\n`);
-    const report = workerResult?.success?.profileReport ?? workerResult?.profileReport;
-    if (!workerResult || workerResult.kind !== "success" || !report)
+      const pluginDeclarations = config.extensions
+        ? Object.fromEntries(
+            Object.entries(config.extensions).map(([namespace, declaration]) => [
+              namespace,
+              {
+                ...declaration,
+                entrypoint: declaration.entrypoint.startsWith(".")
+                  ? resolve(dirname(input.config), declaration.entrypoint)
+                  : declaration.entrypoint,
+              },
+            ]),
+          )
+        : undefined;
+      const workerEntryPath =
+        input.workerEntryPath ?? resolve(dirname(input.cli), "worker-entry.js");
+      const resolvedProvenance = {
+        ...provenance,
+        workerBundleSha256: createHash("sha256")
+          .update(await fixtureWork(owner, () => readFile(workerEntryPath)))
+          .digest("hex"),
+        configSha256: createHash("sha256").update(configBytes).digest("hex"),
+      };
+      await fixtureWork(owner, () =>
+        writeFile(
+          requestPath,
+          JSON.stringify({
+            workerEntryPath,
+            request: {
+              input: {
+                repositoryPath: input.repository,
+                refs: ["main"],
+                outputDir,
+                outputPrefix: "sidecar",
+                rotation: { maxLines: input.rotationLines },
+                granularity: input.fixture === "commit_heavy_repository" ? "commit" : "file",
+                maxDiffSize: input.fixture === "file_heavy_repository" ? 16 : undefined,
+                profile: true,
+                gitAdapter: input.adapter,
+                pluginBaseDirectory: config.extensions ? dirname(input.config) : undefined,
+                pluginDeclarations,
+              },
+              priorCheckpoint: createEmptyCheckpoint(resolveFilePath(input.repository)),
+            },
+          }),
+        ),
+      );
+      const sidecarScript = fileURLToPath(
+        new URL("./telemetry-repository-sidecar.mjs", import.meta.url),
+      );
+      performanceStage({ stage: "execution", operation: "repository-sidecar", ...context });
+      owner?.check();
+      const pending = exec(process.execPath, [sidecarScript, requestPath], {
+        env: fixtureGitEnvironment(),
+        ...(owner && process.platform !== "win32" ? { detached: true } : {}),
+      });
+      try {
+        owner?.child(pending.child);
+      } catch (error) {
+        try {
+          owner?.diagnostic(
+            `sidecar child registration failed; retained ${root}, PID ${pending.child.pid}`,
+          );
+        } catch {
+          /* Preserve registration failure. */
+        }
+        void pending.catch(() => undefined);
+        throw error;
+      }
+      performanceChild(pending.child.pid);
+      const response = await pending;
+      owner?.check();
+      performanceStage({ stage: "processing", operation: "read-sidecar", ...context });
+      const result = JSON.parse(response.stdout) as {
+        result?: {
+          kind?: string;
+          message?: string;
+          success?: { profileReport?: unknown };
+          profileReport?: unknown;
+          checkpoint?: unknown;
+        };
+      };
+      const workerResult = result.result;
+      if (workerResult?.checkpoint)
+        await fixtureWork(owner, () =>
+          writeFile(checkpointPath, `${JSON.stringify(workerResult.checkpoint)}\n`),
+        );
+      const report = workerResult?.success?.profileReport ?? workerResult?.profileReport;
+      if (!workerResult || workerResult.kind !== "success" || !report)
+        return {
+          status: "inconclusive",
+          resultKind: workerResult?.kind,
+          error: workerResult?.message ?? "sidecar result has no ProfileReport",
+          outputPath: outputDir,
+          checkpointPath,
+          provenance: resolvedProvenance,
+        };
       return {
-        status: "inconclusive",
-        resultKind: workerResult?.kind,
-        error: workerResult?.message ?? "sidecar result has no ProfileReport",
+        status: "available",
+        resultKind: workerResult.kind,
+        report,
         outputPath: outputDir,
         checkpointPath,
         provenance: resolvedProvenance,
       };
-    return {
-      status: "available",
-      resultKind: workerResult.kind,
-      report,
-      outputPath: outputDir,
-      checkpointPath,
-      provenance: resolvedProvenance,
-    };
-  } catch (error) {
-    return {
-      status: "inconclusive",
-      error: error instanceof Error ? error.message : String(error),
-      outputPath: outputDir,
-      checkpointPath,
-      provenance,
-    };
-  } finally {
-    performanceStage({ stage: "processing", operation: "sidecar-cleanup", ...context });
-    await rm(root, { recursive: true, force: true });
-  }
+    } catch (error) {
+      return {
+        status: "inconclusive",
+        error: error instanceof Error ? error.message : String(error),
+        outputPath: outputDir,
+        checkpointPath,
+        provenance,
+      };
+    } finally {
+      try {
+        performanceStage({ stage: "processing", operation: "sidecar-cleanup", ...context });
+      } catch (error) {
+        if (owner) owner.diagnostic(error);
+        else throw error;
+      }
+      if (!owner) await rm(root, { recursive: true, force: true });
+    }
+  });
 }
 async function executePaired(
   manifest: FixtureManifest,

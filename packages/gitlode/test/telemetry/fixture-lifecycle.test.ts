@@ -1,8 +1,9 @@
+import { writeSync } from "node:fs";
 import { cp, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { validateRequalification } from "../../scripts/tooling/fixture-requalification.js";
 import { supervisePerformance } from "../../scripts/tooling/performance-supervisor.js";
@@ -16,55 +17,94 @@ import {
 } from "../support/fixture-lifecycle.js";
 import { createPerformanceRepository } from "../support/performance-fixtures.js";
 import type { RawRun } from "../support/performance-harness.js";
+import { TestFixtureOwner, disposeTestFixtures } from "../support/test-fixture-owner.js";
+const owners: TestFixtureOwner[] = [];
+const c2Lifetimes: TestFixtureOwner[] = [];
+let sourceOwner: TestFixtureOwner;
+let suiteHadFailure = false;
+afterEach(async (context) => {
+  suiteHadFailure ||= !!context.task.result?.errors?.length;
+  await disposeTestFixtures(owners, !!context.task.result?.errors?.length);
+});
 
 let root: string;
 let repository: string;
 let ordinal = 0;
 beforeAll(async () => {
-  root = await mkdtemp(join(tmpdir(), "gitlode-fixture-lifecycle-test-"));
-  repository = join(root, "source");
-  await createPerformanceRepository(repository, "commit_heavy_repository", {
-    commits: 6,
-    files: 1,
-    rotations: 1,
-    plugins: 0,
-    scale: 0,
+  sourceOwner = new TestFixtureOwner(new AbortController().signal);
+  await sourceOwner.run(async () => {
+    root = await mkdtemp(join(tmpdir(), "gitlode-fixture-lifecycle-test-"));
+    sourceOwner.root(root);
+    repository = join(root, "source");
+    await createPerformanceRepository(
+      repository,
+      "commit_heavy_repository",
+      {
+        commits: 6,
+        files: 1,
+        rotations: 1,
+        plugins: 0,
+        scale: 0,
+      },
+      sourceOwner,
+    );
   });
 });
 afterAll(async () => {
-  if (root) await rm(root, { recursive: true, force: true });
+  if (c2Lifetimes.some((owner) => !owner.quiescent)) {
+    try {
+      writeSync(2, `Retained C2 source root after unconfirmed body settlement: ${root}\n`);
+    } catch {
+      /* Preserve primary error. */
+    }
+    return;
+  }
+  if (sourceOwner) await disposeTestFixtures([sourceOwner], suiteHadFailure);
 });
-async function prepared() {
+async function prepared(owner?: TestFixtureOwner) {
+  let parent = root;
+  if (owner) {
+    owner.check();
+    parent = await mkdtemp(join(tmpdir(), "gitlode-c2-owned-"));
+    owner.root(parent);
+    owner.check();
+  }
   const index = ordinal++;
-  const directory = join(root, `repository-${index}`);
-  await cp(repository, directory, { recursive: true });
-  const lifecycle = new FixtureLifecycle(directory, join(root, `evidence-${index}`));
+  const directory = join(parent, `repository-${index}`);
+  if (owner) await owner.work(() => cp(repository, directory, { recursive: true }));
+  else await cp(repository, directory, { recursive: true });
+  const lifecycle = new FixtureLifecycle(directory, join(parent, `evidence-${index}`), owner);
   await lifecycle.prepare();
   return lifecycle;
 }
 
 describe("controlled fixture lifecycle", () => {
-  it.each(["device", "type", "operation", "duplicate", "embedded", "substitution"])(
+  it.for(["device", "type", "operation", "duplicate", "embedded", "substitution"])(
     "C2 rejects inconsistent stored evidence: %s",
-    async (mode) => {
-      const lifecycle = await prepared();
-      const first = await lifecycle.capture("cli-0", async () => null);
-      const second = await lifecycle.capture("cli-1", async () => null);
-      await lifecycle.finalize();
-      const evidence = structuredClone(lifecycle.evidence());
-      const post = evidence.boundaries[2]!;
-      if (mode === "device" || mode === "type")
-        Object.assign(post.identity.filesystem, { [mode]: 999 });
-      if (mode === "operation") Object.assign(post, { label: "sidecar-99-post" });
-      if (mode === "duplicate") Object.assign(evidence.boundaries[3]!, { id: post.id });
-      if (mode === "embedded") Object.assign(post.identity, { layoutDigest: "wrong" });
-      expect(
-        validateFixtureLinks(
-          [mode === "substitution" ? second.fixtureLink : first.fixtureLink],
-          evidence,
-          ["cli-0"],
-        ).length,
-      ).toBeGreaterThan(0);
+    async (mode, context) => {
+      const owner = new TestFixtureOwner(context.signal);
+      owners.push(owner);
+      c2Lifetimes.push(owner);
+      return await owner.run(async () => {
+        const lifecycle = await prepared(owner);
+        const first = await lifecycle.capture("cli-0", async () => null);
+        const second = await lifecycle.capture("cli-1", async () => null);
+        await lifecycle.finalize();
+        const evidence = structuredClone(lifecycle.evidence());
+        const post = evidence.boundaries[2]!;
+        if (mode === "device" || mode === "type")
+          Object.assign(post.identity.filesystem, { [mode]: 999 });
+        if (mode === "operation") Object.assign(post, { label: "sidecar-99-post" });
+        if (mode === "duplicate") Object.assign(evidence.boundaries[3]!, { id: post.id });
+        if (mode === "embedded") Object.assign(post.identity, { layoutDigest: "wrong" });
+        expect(
+          validateFixtureLinks(
+            [mode === "substitution" ? second.fixtureLink : first.fixtureLink],
+            evidence,
+            ["cli-0"],
+          ).length,
+        ).toBeGreaterThan(0);
+      });
     },
   );
   it("queries finished history, persists foreground config and preserves a verified independent copy", async () => {

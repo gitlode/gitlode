@@ -102,6 +102,59 @@ All previous stop/validation/delivery rules remain. Complete the Windows policy 
 test lifetimes in this bounded session, then return for independent focused review. Windows default
 tests, EBUSY and PR readiness remain unresolved until that evidence is available.
 
+## Windows ownership implementation (2026-10-13; pending independent focused review)
+
+Resumed from clean `4d985d5ddded8312f687dc4588f8b1470a218075` on the assigned child. The root
+Windows policy is `maxWorkers: 2`; Linux configuration, CLI overrides, existing tests/assertions
+and deadlines remain unchanged. A resolved Vitest 4.1.10 configuration probe observes all ten
+workspace projects falling back to root 2 on this 24-available-processor host, and an explicit
+option override resolving all ten to 3. This probe is configuration evidence, not a claim about
+simultaneously active workers. The fixed-source ordinary Windows campaign is recorded below after
+execution; the historical unrestricted Windows failures remain historical evidence.
+
+Ownership path: the actual test context signal cancels an invocation-local `TestFixtureOwner`.
+The owner registers the whole body, each fixture I/O operation, temporary roots and each Git/Node
+child before awaiting its result. The three test paths use it explicitly. Gates prevent later
+fixture operations after cancellation; already-started body and I/O promises remain registered
+even if another parallel operation rejects. Git helpers retain their environment, foreground
+flags and recipe. The sidecar retains shared capture/provenance parsing and supervisor PID
+notification, registering its private root even when creation overlaps cancellation. Only explicit
+owner mode delegates final disposal to outer teardown; the inner finally does not await its body.
+No-owner normal/error cleanup remains covered, including an actual successful built worker capture.
+
+Cancellation observes and terminates only owned active Windows trees, then requires child close,
+post-termination identity/descendant observation and body/I/O settlement before removal. Linux owned
+launches use private groups and require their disappearance. Missing observation/close, registration
+failure or the bounded barrier retaining uncertainty prevents disposal and reports secondary
+diagnostics without replacing the primary error. C2 uses separate invocation roots; an unconfirmed
+C2 body also retains the shared source root. Normal teardown cleanup failure is an outer failure.
+This narrow tooling seam is not a formal supervisor repair or a frozen harness revision.
+
+Finite regressions use actual nested Vitest 1,500 ms timeouts with controlled descendants, pending
+I/O and the real shared sidecar, including both-root retention under a controlled unavailable close.
+Expected nested timeout errors are required; outer assertions and hook failures remain failures.
+Additional checks cover actual baseline/C2 helper cancellation, parallel rejection settlement,
+normal owner/no-owner disposal, creation cancellation and primary-error preservation during failed
+registration/reporting. Sensitivity mutations restore the prior unsafe deletion order, omit the
+cancellation gate, and restore unconditional inner sidecar removal: each fails its outer regression
+with the relevant premature-deletion, post-cancellation-operation or internal-root-retention
+assertion. Mutation bytes and restoration hashes are recorded in `sensitivity.json`. These are
+finite old-behavior controls, not full campaigns at the original checkpoint.
+
+The first sandbox timeout regression is retained in `timeout-first.log`: Windows CIM process
+observation was denied to `CodexSandboxOffline`, correctly causing retention rather than deletion.
+This is a deterministic operator setup limitation, not supported-default campaign evidence. A
+read-only probe confirms CIM observation is available to the ordinary user; the subsequent Windows
+regressions run there. Read-only exact-path inspection after runner exit found no process referring
+to the two newly retained test roots/private sidecar root. Those roots are not broadly deleted.
+Earlier historical residue, Windows latency attribution and the unrelated Linux fake-duration
+observation are not reclassified or repaired here.
+
+Implementation/checkpoint, finite validation, first complete default-command log, Linux fixed-source
+CI, archive hashes and delivery identity are recorded in the outcome section below. No independent
+review, PR, merge, freeze, formal workload, qualification, eligibility, adoption or acceptance update
+has occurred in this implementation session. Parent M2 and F2 refs/artifacts remain immutable.
+
 ## Historical scope return before shared sidecar changes (2026-10-13)
 
 Inspected on the requested child at clean source

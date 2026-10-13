@@ -1,6 +1,52 @@
 # Fixture CI correction before PR
 
-## Active assignment: Windows concurrency and timeout ownership (2026-10-13)
+## Active assignment: independent Windows ownership review (2026-10-13)
+
+Implementation is delivered, not yet accepted. Review the COMPLETE change from
+`4d985d5ddded8312f687dc4588f8b1470a218075` to fixed implementation
+`b98bbe5fd5e17417ab610781d0c8f893a628aea9`, including first implementation `f0cb785`;
+do not review only the final Unix correction. Outcome `1b97f90` is documentation-only.
+Remain on `feature/otel-redesign_M2_fixture`, starting at this review packet's checkpoint.
+Parent M2 `4f09265` and F2 refs `4ea24d5` remain fixed. GC acceptance is maintained.
+
+1. Inspect the full 15-file diff against the authorized scope below. Verify Windows root worker
+   policy applies to all projects, CLI overrides remain possible, and Linux defaults, existing
+   assertions/deadlines/skips and product/formal measurement semantics are unchanged. Review the
+   no-owner sidecar path, capture/provenance and supervisor notifications, not only injected tests.
+2. Trace real cancellation through registered bodies, parallel I/O, child launch and both roots.
+   Check creation/registration/abort races, no subsequent work after abort, absence of circular
+   waits, bounded teardown, uncertain-close retention, normal cleanup failures and primary-error
+   preservation. Confirm controlled regressions exercise actual Vitest timeout/teardown and the
+   real shared sidecar. Expected nested failures must have meaningful passing outer assertions.
+3. Review Windows process identity/tree observations and Unix private-group creation/termination.
+   Kill success, promise rejection and leader close alone must not authorize unsafe disposal.
+   Inspect the new owner-only spawn capture's error/close ordering, output bounds, decoding and
+   rejection handling. Verify it cannot affect no-owner formal execution. Review the outer probe
+   driver's own cleanup as well as the implementation, including the documented first-driver defect.
+4. Independently run build, explicit fixture strict typing and the four affected suites on Windows
+   and Linux where available: behavioral-baseline, repository-sidecar, fixture-lifecycle and
+   fixture-timeout-ownership. Use bounded probes only for concrete uncovered concerns; restore
+   mutations. Inspect saved old-behavior sensitivity/restoration evidence. Do not repeat complete
+   OS/package campaigns without a new concrete reason. Failures must retain first evidence.
+5. Rehash the 160-member archive and manifest against the outcome's identities. Inspect complete
+   first/final Windows and Linux logs, source/clean bindings, policy probes and CI at fixed SHA.
+   Check final CI 38367236232 attempt 1 and actual source/release/package execution; distinguish
+   independent execution, saved logs, live metadata and reported-only evidence.
+6. Assess Volta PATH correction explicitly: binary identity, resolved Node/npm versions, scope and
+   reproducibility. Plain npm test succeeded in a corrected invocation environment; do not imply
+   an unmodified Volta environment passed. Determine whether contributor guidance sufficiently
+   describes a supported executable setup or a concrete unresolved default-command issue remains.
+   Preserve initial ENOENT, Unix ESRCH and historic unrestricted Windows failures separately.
+
+Return accepted/corrections-required for this ownership/policy slice, concrete failure paths and
+remaining operational limits, plus whether the Windows PR-readiness obligation is satisfied.
+One passing supported-policy campaign does not prove all historical flakiness resolved. No broad
+process-framework redesign or speculative hardening is requested. Append review here, update only
+necessary routing, format write/check and diff check, documentation-only commit/normal push and
+actual remote/clean/parent/F2 checks. Do not repair implementation, create PR, merge, freeze, qualify,
+measure formally or update acceptance. Trunk decides subsequent integration preparation.
+
+## Historical assignment: Windows concurrency and timeout ownership (2026-10-13)
 
 Trunk accepts the GC correction at `b002584` on the independent review delivered at
 `6559570896f04a3df6074637fc579d124541ff81`. PR readiness remains blocked. The assignments below

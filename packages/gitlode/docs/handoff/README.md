@@ -12,7 +12,9 @@ PR preparation remains blocked by Windows default source-test failures. GC-strat
 independently accepted. Trunk assigned a Windows two-worker default and separate timeout ownership
 correction, followed by plain Windows npm test and independent review.
 The shared sidecar's optional invocation-local ownership seam is authorized after scope review;
-implementation and Windows validation remain pending. Current assignment:
+implementation `b98bbe5` reports successful supported-policy Windows tests and fixed-SHA CI.
+Independent review of the full ownership/policy change and Volta setup qualification is pending.
+Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.
 

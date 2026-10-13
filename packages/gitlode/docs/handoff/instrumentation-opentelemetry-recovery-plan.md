@@ -16,6 +16,11 @@ Scope return `46ce720` identified unconditional private-root disposal inside the
 Trunk authorizes an optional invocation-local test ownership seam, preserving no-owner formal
 behavior and immutable F2 artifacts. Resume the active correction packet; no implementation or
 Windows acceptance is inferred from this scope decision.
+Implementation `b98bbe5`, outcome `1b97f90`, reports Windows 1,349 passed/39 skipped after a
+documented Volta PATH setup correction, Linux focused 47 passed and complete fixed-SHA CI success.
+Assign independent review of the complete change, ownership/cleanup barriers, no-owner compatibility
+and environment qualification. PR readiness remains pending that review; historical failures remain
+distinct from successful supported-policy execution.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

@@ -8,7 +8,8 @@ documents.
 
 ## Active OpenTelemetry work
 
-PR preparation is blocked by source-test failure. Current assignment:
+PR preparation remains blocked by Windows default source-test failures. GC-strategy correction has
+green CI but awaits focused review and separate Windows disposition. Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.
 

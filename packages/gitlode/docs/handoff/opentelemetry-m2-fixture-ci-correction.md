@@ -1,5 +1,52 @@
 # Fixture CI correction before PR
 
+## Active assignment: focused CI review and Windows disposition (2026-10-13)
+
+The Git-strategy correction is delivered, not independently accepted. PR remains blocked: Windows
+default npm test still fails, even though maxWorkers=2 passes. Do not reclassify the reduced-concurrency
+run as a repaired default command. Trunk verified final CI 38346905386 is attempt 1/success at
+`1ece6d12cff1d1d836f10554c4ce96c3013f3af4`; local source is clean on the fixture child.
+
+Review-only assignment on feature/otel-redesign_M2_fixture:
+
+- Fixed implementation: `b00258475004a8d7edb1c00bfa5f3f4d69039a5b`.
+- Base: `28078f639cd18d39bf895ef56a7192ba1afe869a`.
+- Outcome: `1ece6d12cff1d1d836f10554c4ce96c3013f3af4` (handoff only).
+- Parent M2 `4f09265` and F2 refs `4ea24d5` remain unchanged.
+
+1. Verify complete three-file correction, source/remote identities and Git 2.54/2.55 primary evidence.
+   Confirm maintenance.strategy=gc is test-local and that shared foreground flags and production
+   fixture heuristics are unchanged. Review Trace2 parsing: automatic invocation, correct parent/child
+   association, successful exits captured before commit return, and a meaningful negative control.
+   Keep real pack-count/history/owned-cleanup assertions. Check portability across tested Git versions
+   without weakening activation/completion proof or treating a skipped Linux test as Windows evidence.
+2. Run build/explicit fixture strict typing and the focused lifecycle suite on available Linux Git
+   2.55 (reuse preserved isolated executable if available) and 2.53 where practical. Do not rebuild Git
+   or rerun complete OS/package campaigns without a concrete need. Inspect preserved fail-before and
+   three sensitivity logs with hashes/source bindings; use a bounded independent probe only for an
+   unresolved concrete concern. Restore all temporary changes. Verify CI SHA, first attempt and actual
+   source/release/package step execution from live metadata/saved logs. Report execution versus read
+   evidence separately. Corrected-source local campaigns are content-bound as documented, not clean
+   fixed-OID campaigns; CI provides that separate fixed-checkout evidence.
+3. Separately inspect preserved Windows default failure logs and the 2-worker success. Identify exact
+   failing tests, deadline/cleanup order and resource ownership; determine what supports concurrency
+   attribution and what remains uncertain. Inspect root/workspace worker configuration and test
+   cancellation/teardown. Do not treat EBUSY as harmless merely because a later run passes. Record
+   any leftover roots/process uncertainty without broad cleanup. Keep the earlier Linux adapter timing
+   assertion in invalid setup evidence visible; do not silently mark it repaired.
+4. Return a bounded recommended Windows follow-up: configuration of supported test concurrency,
+   focused test lifetime/cancellation correction, or further diagnosis, according to actual evidence.
+   Distinguish an intentional supported default-policy change from a temporary CLI workaround. Do not
+   unilaterally waive default npm test failures, raise deadlines, skip tests, change config or run more
+   full campaigns in this review. A concrete proposed fix must keep all tests/assertions and unchanged
+   formal measurement policy. Trunk assigns any follow-up implementation separately.
+
+Append accepted/corrections-required for the GC-strategy correction only, findings with precise
+failure paths, evidence attribution and Windows follow-up here. PR readiness remains pending until
+the Windows obligation is explicitly resolved. Format write/check and diff check; documentation-only
+commit/normal push, actual remote/clean/parent/F2 checks, remain on child. No implementation repair,
+PR, merge, freeze, eligibility or formal workload/acceptance changes. Do not rerun CI merely for green.
+
 ## Active assignment (2026-10-13)
 
 The human blocked PR creation after observing local and GitHub source-test failures. The previous

@@ -170,6 +170,7 @@ export class TestFixtureOwner implements FixtureWorkOwner {
           if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
         }
       }
+      this.event("termination-confirmed", { pid: child.pid });
     })().catch((error) => {
       this.uncertain = true;
       this.diagnostic(error);

@@ -188,9 +188,7 @@ closed and replacement lasting ownership/commands documented. Retire wiring, val
 exclusively migration-owned helpers together; preserve reusable tools and correctness checks.
 The [build guide publish policy](build-test-release.md#ci-and-publish-gates) owns enforcement.
 
-## Controlled fixture evidence and fixed-quantity eligibility
-
-### Optional test fixture ownership
+## Optional test fixture ownership
 
 The behavioral baseline, repository sidecar and C2 inconsistency tests explicitly supply an
 invocation-local `FixtureWorkOwner`. It is tooling support, with no product API, Vitest dependency
@@ -212,7 +210,8 @@ root is alive, uses `taskkill /T /F`, then requires close and a second process s
 the observed identities and descendants absent. A successful kill request alone is insufficient.
 Failed/denied observation, an exited root before tree termination or an unconfirmed bounded wait
 retains all invocation roots and reports secondary diagnostics. Linux owned launches use private
-process groups and additionally require the group to disappear. These are bounded fixture-test
+process groups through `spawn` (`execFile` does not forward `detached` in Node 22), and additionally
+require the group to disappear. These are bounded fixture-test
 observations, not a general repair of the formal supervisor or a guarantee across abrupt host loss.
 
 Teardown never deletes historical unknown residue. It preserves a primary test failure when
@@ -221,6 +220,8 @@ an outer failure. The finite regression uses an actual nested Vitest timeout and
 controlled descendants and outstanding I/O, and distinguishes the expected nested timeout from
 outer assertion or hook failures. Retention probes without an actual PID can be disposed by
 their outer test only after the nested runner exits.
+
+## Controlled fixture evidence and fixed-quantity eligibility
 
 Follow the [lifecycle contract](../design/telemetry-performance.md#controlled-repository-fixture-lifecycle)
 and its catalog. Repository schema-4 artifacts bind raw runs and sidecars to instance IDs and byte

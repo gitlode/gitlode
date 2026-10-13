@@ -276,6 +276,7 @@ if (probe) {
           events: string[];
           errors: string[];
           diagnostics: string[];
+          timeline: { event: string; pid?: number }[];
         };
         process.stderr.write(`Observed timeout ownership (${mode}): ${JSON.stringify(result)}\n`);
         expect(result.errors).toHaveLength(1);
@@ -284,10 +285,21 @@ if (probe) {
         expect(result.events).not.toContain("new-operation");
         expect(result.removed).toBe(!mode.includes("unconfirmed"));
         expect(result.roots).toHaveLength(mode.startsWith("sidecar") ? 2 : 1);
+        const realChildren = result.timeline.filter(
+          (event) => event.event === "child-registered" && event.pid !== undefined,
+        );
+        for (const child of realChildren) {
+          expect(result.timeline).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ event: "child-close", pid: child.pid }),
+              expect.objectContaining({ event: "termination-confirmed", pid: child.pid }),
+            ]),
+          );
+        }
         for (const root of result.roots) {
           expect(dirname(root)).toBe(tmpdir());
           expect(await exists(root)).toBe(mode.includes("unconfirmed"));
-          // The unconfirmed probe has no actual PID/work outside its now-exited runner.
+          // No-PID stubs have ended with the runner; every real owned tree must be confirmed above.
           if (mode.includes("unconfirmed")) await rm(root, { recursive: true, force: true });
         }
       } finally {

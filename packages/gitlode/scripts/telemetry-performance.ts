@@ -11,6 +11,7 @@ import { resolveFilePath } from "@gitlode/internal-foundation/support";
 
 import { createEmptyCheckpoint } from "../src/state/index.js";
 import {
+  fixtureExec,
   fixtureWork,
   type FixtureWorkOwner,
   fixtureGitEnvironment,
@@ -1009,25 +1010,36 @@ export async function runRepositoryProfileSidecar(input: {
       );
       performanceStage({ stage: "execution", operation: "repository-sidecar", ...context });
       owner?.check();
-      const pending = exec(process.execPath, [sidecarScript, requestPath], {
-        env: fixtureGitEnvironment(),
-        ...(owner && process.platform !== "win32" ? { detached: true } : {}),
-      });
-      try {
-        owner?.child(pending.child);
-      } catch (error) {
+      const launch = async () => {
+        const pending = exec(process.execPath, [sidecarScript, requestPath], {
+          env: fixtureGitEnvironment(),
+        });
         try {
-          owner?.diagnostic(
-            `sidecar child registration failed; retained ${root}, PID ${pending.child.pid}`,
-          );
-        } catch {
-          /* Preserve registration failure. */
+          owner?.child(pending.child);
+        } catch (error) {
+          try {
+            owner?.diagnostic(
+              `sidecar child registration failed; retained ${root}, PID ${pending.child.pid}`,
+            );
+          } catch {
+            /* Preserve registration failure. */
+          }
+          void pending.catch(() => undefined);
+          throw error;
         }
-        void pending.catch(() => undefined);
-        throw error;
-      }
-      performanceChild(pending.child.pid);
-      const response = await pending;
+        performanceChild(pending.child.pid);
+        return await pending;
+      };
+      const response =
+        owner && process.platform !== "win32"
+          ? await fixtureExec(
+              owner,
+              process.execPath,
+              [sidecarScript, requestPath],
+              { encoding: "utf8", env: fixtureGitEnvironment() },
+              performanceChild,
+            )
+          : await launch();
       owner?.check();
       performanceStage({ stage: "processing", operation: "read-sidecar", ...context });
       const result = JSON.parse(response.stdout) as {

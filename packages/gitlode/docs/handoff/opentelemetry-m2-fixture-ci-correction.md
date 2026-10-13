@@ -155,6 +155,62 @@ CI, archive hashes and delivery identity are recorded in the outcome section bel
 review, PR, merge, freeze, formal workload, qualification, eligibility, adoption or acceptance update
 has occurred in this implementation session. Parent M2 and F2 refs/artifacts remain immutable.
 
+### First implementation validation and Unix owned-launch correction
+
+First implementation checkpoint: `f0cb78550f48583853adb12f84efd9c514ef65ab`, tree
+`f19639734dda138779804506dee3cb52dee62d91`. Focused Windows: 4 files, 44 passed/3 existing skips;
+strict typing, development build, lint, format write/check and diff check passed.
+
+The first fixed-source plain root `npm test` returned 10 failures, all in the unchanged
+`performance-workflow.test.ts` paths, with `spawn npm ENOENT` during npm-version fingerprinting.
+It had 99 passed files, 1,339 passed/39 skipped tests, no deadline or EBUSY failure, and unchanged
+clean source before/after (189.44 seconds). The complete log/binding are `windows-default-first.log`
+and `windows-default-binding.json`; this failed execution is retained, not reclassified as success.
+
+A finite diagnostic test through the same npm lifecycle reproduces the environment defect: Volta
+removes its standard shim directories from worker PATH, leaving only `npm.cmd`; direct `execFile`
+cannot launch it. A byte-identical existing Volta `npm.exe` copied into an invocation-local PATH
+directory survives that sanitation and resolves npm 11.11.0 under the same Node 22.23.1. Saved
+uncorrected/corrected worker and tsx-child PATH/result JSONs and `operator-path.json` establish this
+operator setup correction. Source, deadlines, worker settings and toolchain versions did not change.
+An earlier `npm exec node` diagnostic resolved a different cached Node and is explicitly excluded
+from validation evidence; its JSON is retained as invalid diagnostic setup, not used by campaigns.
+
+Under the packet's deterministic-operator-setup exception, one corrected fixed-source plain
+`npm test` at clean `f0cb785` passed **100 files, 1,349 tests/39 existing skips**, 209.29 seconds.
+It has no CLI worker override. Its complete log/binding are `windows-default-corrected.log` and
+`windows-default-corrected-binding.json`. Expected nested timeouts have passing outer regressions;
+confirmed body/I/O/child cleanup and controlled both-root retention are visible in their timelines.
+Historical unrestricted Windows failures and unknown historical residue remain unresolved.
+
+Linux fixed-source affected suites then exposed an implementation defect in the new explicit-owner
+Unix launch: 45 passed/2 failed, namely the child and sidecar cancellation/disposal probes. Installed
+Node 22's `execFile` implementation does not forward `detached` to `spawn`, so no private group was
+created; cancellation got `kill ESRCH`, the child/body did not settle, and roots were retained rather
+than unsafely removed. This is a real implementation failure, not an operator setup error or an
+expected nested timeout. `linux-focused.log` preserves the first complete execution and PID/phase
+timelines. The failing child/sidecar probes retain their uncertain roots. Inspection also found the
+first sidecar-unconfirmed outer driver removed its roots after runner exit despite unconfirmed real
+child termination. Its Linux retention/disposal result is invalid and is not claimed as success.
+The final driver requires a recorded real child close AND positive tree/group termination confirmation
+before disposing retained probe roots; no-PID stubs alone are settled by runner exit. Earlier logs
+remain attributed to the original behavior, including this cleanup limitation.
+
+The normal implementation push also ran [CI 38364609223](https://github.com/gitlode/gitlode/actions/runs/38364609223),
+attempt 1/job 115186624497, at the exact first OID/tree: source tests had 99 passed files,
+1,386 passed/2 failed tests with the same two `ESRCH` paths. Release build, publint, installed-package
+test and post-Node step were skipped; checkout post-step executed. Full decoded job log and live
+run/attempt-one job metadata are saved as `ci-first-*`; no rerun of that attempt is requested.
+
+The direct correction uses a private, bounded UTF-8 `spawn` capture only for explicit Unix fixture
+owners, where `detached: true` actually establishes the owned group. Sidecar owner calls share that
+launch while retaining shared result/provenance parsing and the existing supervisor PID notification.
+Windows and no-owner calls retain `execFile`; formal call sites still omit the seam. No thresholds,
+test deadlines, formal sampling or supervisor behavior changes. A two-file Linux overlay at the
+first Git OID passes the 11 timeout/ownership tests; its exact overlay hashes and log are saved as
+`linux-unix-fix-overlay.*`. This is content-bound finite evidence, not a clean final-OID campaign.
+The corrected clean checkpoint and final fixed-source validation are recorded below.
+
 ## Historical scope return before shared sidecar changes (2026-10-13)
 
 Inspected on the requested child at clean source

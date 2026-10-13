@@ -211,6 +211,90 @@ first Git OID passes the 11 timeout/ownership tests; its exact overlay hashes an
 `linux-unix-fix-overlay.*`. This is content-bound finite evidence, not a clean final-OID campaign.
 The corrected clean checkpoint and final fixed-source validation are recorded below.
 
+### Final outcome checkpoint: independent focused review pending (2026-10-13)
+
+Final implementation: **`b98bbe5fd5e17417ab610781d0c8f893a628aea9`**, tree
+**`24f62e65df37dd13f784f8fe113a47fb3c85b663`**. The first implementation/failure checkpoint
+`f0cb785` remains preserved. The Unix correction and stronger real-child disposal assertions are
+new source, which justified final validation at this new checkpoint; no worker-policy reduction,
+deadline increase, skip or automatic until-green retry was used.
+
+Executed local validation:
+
+- Windows final clean fixed-OID **plain root `npm test`**, no CLI worker override: **100 files,
+  1,349 passed/39 existing skips**, exit 0, **206.03 seconds**. Node 22.23.1, npm 11.11.0,
+  Git 2.45.1.windows.1, Windows 10.0.26200, 24 available processors. The documented invocation-local
+  Volta executable PATH correction is retained; its binary SHA-256 is
+  `7b648c48ba1473baa724d1cecf9df16e36ca12c768977d72745032349368953f`, identical to the installed shim.
+  `windows-default-final-binding.json` records the exact command, environment correction, version,
+  OID/tree and clean status before AND after execution. Root policy is Windows 2; the all-ten-project
+  resolved configuration and explicit-option override probes are saved as `policy*.json`.
+- Linux final clean fixed-OID checkout `/tmp/gitlode-windows-ownership-f0cb785` now actually holds
+  `b98bbe5`/the final tree: **4 affected files/47 tests passed**, **15.93 seconds**, exit 0.
+  `linux-final-fixed.log` includes exact commands, before/after OID/tree/clean checks, development
+  build and explicit fixture strict typing. It uses existing Linux-native Node 22.23.1/npm 10.9.8,
+  Git 2.53.0 and copied installed dependencies; the reusable preserved Node bytes were not modified.
+  Linux root concurrency defaults remain unchanged. The earlier two-/four-file overlays remain
+  separately content-bound evidence; they are not substituted for this fixed-OID execution.
+- Windows affected suites at the first checkpoint passed 44/3 existing skips, and the corrected
+  actual-timeout suite passed all 11 tests, including real close/tree confirmation before outer
+  disposal. Final root Windows and CI execution also cover all these assertions. Strict fixture
+  typing, development build, root lint, format write/check and diff check passed; CI independently
+  executes the broader repository checks. Nested intentional timeout failures are distinct from
+  their passing outer regressions. Three earlier finite old-behavior mutations each failed and
+  restored their exact original bytes, as recorded in `sensitivity.json`.
+
+Normal final implementation push ran
+[CI 38367236232](https://github.com/gitlode/gitlode/actions/runs/38367236232), **attempt 1**,
+job **115195172971**, at the exact final OID/tree. Live run and attempt-one job metadata report
+**success**. The complete decoded job log shows the actual checkout, Git 2.55.0,
+Node 22.23.3/npm 10.9.9, **100 files/1,388 source tests passed**, then actual successful release
+build, strict publint/packed metadata and installed-package system test execution. Every recorded
+step, including post steps, completed successfully; none was skipped. No CI rerun was requested.
+The installed tarball SHA-256 is unchanged:
+`e4d37c208cd6e6dba3ab887efa097e9c096ec97c41611a4ff8047732a845af45`.
+This is ordinary functional CI/package evidence, not formal measurement or acceptance.
+
+Archived evidence: **`D:/gitlode_test/windows-ownership-20261013-b98bbe5`**, **160 members**,
+each copy byte-counted and SHA-256 verified against its original. Manifest SHA-256:
+**`452cf60d1d536d8887148c30c6008be8901c7a738599eb635ff9844746cf730b`**;
+`manifest.sha256` pins those exact manifest bytes. The archive includes complete first and final
+logs, failed first CI plus its skipped-step metadata, both fixed-source tar archives, mutation
+source/restoration hashes, command/exit/source bindings and the invocation-local operator shim.
+It is a new regression evidence archive, not a newly frozen harness/runtime. Earlier sealed
+archives and F2 artifacts were not modified. Principal archived SHA-256 receipts:
+
+| Member                      | SHA-256                                                            |
+| --------------------------- | ------------------------------------------------------------------ |
+| `windows-default-first.log` | `599fe258a497b855e38fa34ce8879752a27abd9f0543718f75935bb9488ac31a` |
+| `windows-default-final.log` | `863b0f2d146fab9ba322c8fd9005bce4ac8687726837e4e87b63a6687fd557c1` |
+| `linux-final-fixed.log`     | `6251d936cbba32c24e1dd496ea72134bd94ce6d77e73a6f3d2a679554a5da4c0` |
+| `ci-first-job.log`          | `77db1b3bad949be7db4c5ff6b31331a8ecc46701b7f8b45d6de19b32040ba935` |
+| `ci-final-job.log`          | `bb50f0990fec952f6541ec0cf070ab5f0f15355c007327ab15e4bec749287cf2` |
+| `source-b98bbe5.tar`        | `4b63af0b3d8def64653ec86aee6cd5a56469f670c51fa2a6324ae92fda8450eb` |
+
+Attribution: local commands above were executed by this implementation session; CI execution was
+read through live metadata/full decoded logs and archived, not rerun locally. Initial sandbox CIM
+denial, first Windows operator setup failure, first Linux/CI implementation failure, invalid
+diagnostic Node resolution and the first Linux driver's disposal limitation remain separately
+visible. Final controlled uncertain-close cases retain evidence until actual real-child termination
+is confirmed; otherwise the outer test fails and keeps the roots. No historical unknown residue is
+deleted. Historical unrestricted Windows latency/EBUSY and the unrelated earlier Linux fake-duration
+observation remain unresolved; supported default-policy success does not repair or explain them.
+
+Actual remote final implementation child was verified equal to `b98bbe5`; local/remote parent M2
+remained **`4f09265791c82452a5800cc6d9855938bf88a46e`** and both F2 preservation refs remained
+**`4ea24d53afc57778addf3f47752e0fe73a7011ea`**. These implementation delivery checks are archived.
+This outcome is a documentation-only checkpoint; its normal push and actual remote/clean/ref checks
+are reported separately and retained under workspace `.cache/windows-ownership/`, after the archive
+was sealed. Its automatic documentation-push CI is not substituted for the implementation CI above.
+
+Return on the child for **independent focused review** of the complete ownership/policy change,
+actual timeout boundaries, registration/primary-error paths, Windows tree and Unix group barriers,
+retention and evidence/CI attribution. No independent review or self-acceptance is claimed here.
+PR readiness remains for trunk disposition after review. No PR, merge, freeze, formal measurement,
+qualification, eligibility, adoption, parent or acceptance record update was performed.
+
 ## Historical scope return before shared sidecar changes (2026-10-13)
 
 Inspected on the requested child at clean source

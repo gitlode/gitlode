@@ -8,6 +8,10 @@ documents.
 
 ## Active OpenTelemetry work
 
+PR preparation is blocked by source-test failure. Current assignment:
+[fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
+historical until corrected-source full tests, CI and focused review pass.
+
 Current packet: [fixture integration evidence and human source/base review](opentelemetry-m2-fixture-integration.md).
 Fixture corrections and the external-review adoption contract are accepted and canonical docs updated; actual qualification,
 adoption and comparison authorization remain pending and require separate reviewed packets.

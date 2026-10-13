@@ -2,6 +2,11 @@
 
 ## Current assignment (2026-10-08)
 
+2026-10-13: human blocked fixture PR creation on local/CI test failures. Run 38335718829 at `74fd692`
+fails the automatic foreground-maintenance pack-count assertion (Git 2.55.0); release/package steps
+were skipped. [Bounded CI correction](opentelemetry-m2-fixture-ci-correction.md) supersedes integration
+preparation. Require corrected-source full tests, CI success and focused review before a new PR request.
+
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.
 Trunk verified local/remote M2 and old-F ancestry. Child and experiment histories are preserved

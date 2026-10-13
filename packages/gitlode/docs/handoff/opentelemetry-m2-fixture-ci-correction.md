@@ -60,6 +60,61 @@ verify actual remote identity, clean status and unchanged parent/F2 refs. Remain
 return for independent focused review. No PR, merge, freeze, qualification, formal measurement or
 acceptance record update. Warn the human before the full test campaign that execution itself takes time.
 
+## Scope return before shared sidecar changes (2026-10-13)
+
+Inspected on the requested child at clean source
+`8b29d4dce7437b20767c69ca94411ece14ba7760`. Implementation is **not complete**; Windows
+concurrency and EBUSY obligations remain open. This return follows the active assignment's instruction:
+"If shared formal sidecar behavior must change, stop and return the proposed scope first."
+No implementation, policy change, timeout regression, full campaign or acceptance update was made.
+
+### Ownership findings and proposed bounded scope
+
+- Baseline: `temporary()` registers roots; `afterEach` removes them, independently of the still
+  pending test body. Deterministic fixture Git uses promisified `execFile` without a signal or an
+  owned close registry. Root registration and body settlement need a test-owned lifetime wrapper;
+  fixture generation needs cancellation checks between awaited operations and owned Git close tracking.
+- C2: `prepared()` copies into the file-level root; `FixtureLifecycle` performs awaited inventory,
+  Git identity, copy and atomic evidence work. `afterAll` deletes that root without a body registry.
+  Cancellation must stop subsequent inventory/Git/evidence operations and teardown must await the
+  active body and any filesystem operation already started. Optional fixture-support cancellation
+  seams must preserve the behavior of formal callers that do not supply them.
+- Sidecar: the test owns its repository root, but shared
+  `scripts/telemetry-performance.ts:runRepositoryProfileSidecar` independently creates a second
+  private root, launches the Node sidecar through a module-private promisified `execFile`, catches
+  errors into an inconclusive capture, and unconditionally deletes its private root in `finally`.
+  Neither the child nor that private root's disposal is exposed to a test wrapper. Waiting for the
+  outer test body cannot control this inner deletion when termination is unconfirmed. A rejection
+  or abort callback does not prove that the child and its Windows descendants have closed.
+
+Recommend authorizing an optional, invocation-local sidecar ownership seam in this shared function:
+accept a cancellation signal plus a narrow child execution/disposal owner supplied by these tests.
+Expose the private root to that owner immediately after creation; gate later preparation/read/write
+operations on cancellation; let the owner await confirmed child close and body/filesystem settlement
+before root disposal. Retain both roots with secondary diagnostics on an unconfirmed bounded wait.
+Keep the original failure separately from cleanup/diagnostic errors. Calls without the seam must
+retain existing capture/provenance and formal timing/measurement semantics. The test owner must
+terminate only children it launched, including Windows descendants, and must distinguish confirmed
+close from merely successful `taskkill`. Do not introduce a global process registry or mock all Node
+filesystem/process APIs to reach the private sidecar lifetime.
+
+This is a proposed scope for trunk disposition, **not authorization inferred by this session**.
+The shared sidecar's unconditional inner disposal is the reason for returning before implementation.
+After scope disposition, resume the active assignment's Windows `maxWorkers: 2`, real Vitest
+timeout-boundary regressions, fail-before/pass-after evidence and fixed-source validation/delivery.
+Installed Vitest 4.1.10 `resolveMaxWorkers(project)` checks project configuration and then root
+configuration; all current workspace configs omit worker caps. That inspection supports the root
+policy route but is not an executed effective-concurrency verification.
+
+### Evidence and delivery attribution
+
+This session performed source inspection only. Earlier archived Windows/Linux logs remain attributed
+to their original sessions and were not rerun or reclassified. No historical temporary root was
+deleted. No CI or formal measurement was started. No independent review is claimed; the next gate
+is sidecar scope disposition, followed by implementation and then independent focused review.
+The documentation checkpoint records this proposal on the child; delivery/check results are reported
+by the session separately. Parent M2/F2 and all GC/C1/C2/C3 acceptance remain unchanged.
+
 ## Historical assignment: focused CI review and Windows disposition (2026-10-13)
 
 The Git-strategy correction is delivered, not independently accepted. PR remains blocked: Windows

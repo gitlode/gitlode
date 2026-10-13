@@ -214,3 +214,126 @@ classification and CI provenance. No independent review has been performed in th
 session. No PR, merge, formal measurement, 4,430-commit generation, freeze, eligibility, parent or
 acceptance update was performed or authorized. Review must refresh latest source/tree and CI before
 any later integration/PR approval request.
+
+## Independent focused review and Windows disposition (2026-10-13)
+
+Reviewer: independent Codex review session, starting at
+`9ba262c08337bba82f15076bb55a8a3d80a98918`. **GC-strategy correction: accepted** at fixed
+implementation `b00258475004a8d7edb1c00bfa5f3f4d69039a5b`. **PR readiness: pending/blocked** by
+the unresolved Windows default-command obligation. This acceptance does not waive Windows failures,
+authorize integration, or establish formal performance acceptance.
+
+### Correction scope and proof
+
+Reviewed the complete `28078f6..b002584` three-file diff: lifecycle test, contributor harness
+explanation and handoff. Shared `fixture-git.ts`, fixture generation, production heuristics and
+foreground flags are unchanged. Strategy selection is command-local to the Linux GC threshold probe.
+The worker additionally sanitizes Git variables case-insensitively and fixes TZ, consistent with the
+shared environment helper. No explicit GC replaces automatic commit dispatch.
+
+Primary evidence agrees with the diagnosis: the
+[Git 2.54 release note](https://github.com/git/git/blob/v2.54.0/Documentation/RelNotes/2.54.0.adoc)
+announces geometric as the default; the preserved 2.55 tarball's `builtin/gc.c:1970-1979` and the
+[tagged upstream source](https://github.com/git/git/blob/v2.55.0/builtin/gc.c#L1970-L1979)
+select geometric for unscheduled maintenance and allow the explicit strategy override. The earlier
+handoff's `#L1858-L1866` source anchor is inaccurate; use the corrected anchor above. Git 2.54 itself
+was not executed in this review.
+
+Trace2 is enabled only for the triggering empty commit, after setup and configuration inspection.
+Its immediate post-return snapshot precedes the supervisor finished notification; the subsequent
+count-objects command disables tracing. Successful `child_exit` is matched to its preceding start
+by BOTH parent session SID and child_id, so another parent's reused child number cannot satisfy it.
+One `maintenance --auto` start is required, plus GC and repack starts and zero exits. The parser
+does not independently assert every ancestry edge between those three commands, but this isolated
+single-command trace, sanitized environment and exact operation tokens leave no unrelated setup
+operation available to satisfy them. No blocking association defect was found in this bounded probe.
+Completion is observed in the snapshot taken after synchronous commit return, not inferred from
+later cleanup. Exact two-pack setup, one-pack positive result, two-pack disabled control, eight
+reachable commits and separately confirmed owned-group cleanup all remain required.
+
+### Evidence attribution and independent execution
+
+Rehashed the archive manifest to the recorded
+`ac05e59f2c5e0ed9c10875ebf35246b81e68a7e9204778c20631ab5eb1dc2ded`; all 38 archived members
+match their listed SHA-256 values. Read the preserved 2.55 fail-before log and sensitivity script/logs:
+geometric fails GC activation at test line 241; disabled commit maintenance fails the positive child
+count at line 234; detach=true fails GC successful completion at line 251. Each sensitivity run
+exits 1. Those are attributed implementation-session executions, not newly executed mutations.
+The script restores corrected bytes in finally; the reused Linux test SHA-256 independently matches
+the implementation hash `32e0e3d460ab20f90d95af7f684aba5ee4a4baa3b52714f20bee2ef0826882b7`.
+
+New review execution used existing `/tmp/gitlode-fixture-ci-correction`, its starting Git database
+and corrected test overlay, Node 22.23.1, and preserved isolated Git without rebuilding Git:
+`npm run build:dev` and `npx tsc -p packages/gitlode/tsconfig.fixture-lifecycle.json` pass;
+`npx vitest run packages/gitlode/test/telemetry/fixture-lifecycle.test.ts` passes 21/21 with system
+Git 2.53 (9.31 seconds) and isolated Git 2.55 (9.87 seconds). The shell chain exits 0. These remain
+content-bound executions, not clean fixed-OID campaigns. No source mutation was needed. The prior
+Linux full runs and Windows runs were read evidence only; no complete campaign was repeated.
+The archive-only invalid Linux setup still contains the separate
+`test/git-impl/git-adapter-multi-change-matrix.test.ts:223` fake-duration assertion, 0.1/0.3 against
+0.2/0.2. Its scheduling cause remains unestablished; this review does not mark it repaired.
+
+Live GitHub metadata confirms [implementation CI 38346438746](https://github.com/gitlode/gitlode/actions/runs/38346438746)
+is attempt 1/success at the exact fixed OID/tree. Live job 115128858071 step summaries show source
+tests, release build, packed metadata and installed-package system tests all completed successfully.
+The hash-verified complete saved log shows the actual checkout SHA, Git 2.55, 99 files/1,377 source
+tests passed and installed tarball hash `e4d37c208cd6e6dba3ab887efa097e9c096ec97c41611a4ff8047732a845af45`.
+Live status and saved execution logs are complementary evidence; this review did not rerun CI.
+
+### Windows failure paths and bounded follow-up recommendation
+
+The preserved default runs identify these exact failures at unchanged 5,000 ms deadlines:
+
+- Both runs: `behavioral-baseline.test.ts:58`, regeneration of two isolated SHA-1 repositories.
+  Timeout precedes afterEach's recursive removal; removal reports EBUSY on fixture-b-Y5GSIV before
+  correction and fixture-b-uTara9 after correction. This is a second real cleanup failure, not noise.
+- Corrected default run: `repository-sidecar.test.ts:20`, isomorphic-git commit sidecar; plus
+  `fixture-lifecycle.test.ts:47`, C2 device, type and operation cases. Total: 3 failed files,
+  5 failed/1,333 passed/39 skipped tests. C2 performs copy, repeated byte inventories and sequential
+  Git identity queries before checking deliberately inconsistent evidence.
+- The preserved two-worker run passes 99 files/1,338 tests with 39 platform skips; the focused
+  unchanged baseline passes in 3.68 seconds. Linux-only maintenance skips are not Windows GC proof.
+
+Root and workspace Vitest configs have no worker cap or timeout override. Installed Vitest 4.1.10
+`resolveMaxWorkers` uses root/project maxWorkers if set, otherwise availableParallelism minus one
+for a non-watch run: this 24-processor host therefore has a default ceiling of 23, not evidence that
+exactly 23 workers were simultaneously active. Multiple deadline failures, focused success and
+two-worker success support a concurrency/load association. No CPU, I/O, antivirus or process timeline
+was captured to identify the precise latency cause or prove that lower concurrency alone is stable.
+
+Vitest's timeout wrapper rejects and aborts the test context signal, but cannot stop an async body
+that ignores it. These tests do not consume that signal. Deterministic/performance fixture Git
+execFile calls and lifecycle identity queries have no cancellation signal; baseline afterEach removes
+registered roots without awaiting an owned outstanding-body registry. Thus timeout can overlap
+ongoing Git/filesystem work with deletion and later tests. C2 shares a file-level root removed in
+afterAll. Sidecar has awaited child/finally ordering on normal completion, but its test body and child
+exec are not cancelled by the outer deadline; its own finally does not establish timeout-time quiescence.
+This is a concrete lifetime gap, consistent with EBUSY; the log does not identify the actual lock holder.
+Read-only inspection found BOTH named Windows fixture-b roots still present. Their remaining handles
+or processes were not established. No broad cleanup or deletion was attempted.
+
+Recommend a separately assigned, bounded follow-up with two explicit responsibilities:
+
+1. Propose a supported Windows root test policy of maxWorkers=2 in the root config, preserving Linux
+   policy and all suites/assertions. Document it in contributor build/test guidance and validate
+   plain `npm test` at the final clean follow-up OID. This is an intentional default-policy change
+   requiring disposition by trunk, not proof that the old default parallelism was repaired. The
+   existing CLI override remains diagnostic evidence only; one passing run does not prove stability.
+2. Correct timeout ownership in the affected test paths: consume the context cancellation signal,
+   stop launching further fixture work, terminate only owned active children (including the Windows
+   child tree where applicable), await child close AND outstanding filesystem/body settlement before
+   deleting owned roots. Keep first failure and cleanup diagnostics; retain an owned root when
+   quiescence cannot be confirmed. Add a bounded cancellation regression that detects post-timeout
+   writes and premature deletion. Prefer test-owned wrappers/seams; any shared sidecar lifetime
+   change needs a separate scope review and must preserve formal measurement policy.
+
+Do not raise deadlines, skip assertions or silently waive EBUSY. If the chosen supported default
+still fails, preserve its first failure and capture owned child/phase timings before changing the
+policy further. No implementation/configuration repair or new Windows full campaign is performed
+here. Trunk must explicitly resolve this obligation before a PR readiness decision.
+
+Actual remote pre-review child equals `9ba262c`; local/remote parent remains `4f09265791c82452a5800cc6d9855938bf88a46e`
+and both F2 preservation refs remain `4ea24d53afc57778addf3f47752e0fe73a7011ea`. Delivery is a
+documentation-only normal commit/push on the fixture child, with format write/check, diff check and
+post-push actual remote/clean/ref checks. Return this disposition to trunk while remaining on the
+child as assigned; no PR, merge, freeze, eligibility or formal workload execution is authorized.

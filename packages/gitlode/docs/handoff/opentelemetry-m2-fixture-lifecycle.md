@@ -941,3 +941,232 @@ normal push actual remote equality, clean status and unchanged parent/F2 checks 
 this delivery because the commit cannot embed its own OID. Remain on the child and return to trunk.
 No repairs, PR, merge, new preservation refs, freeze, 4,430-commit generation, live eligibility,
 formal/diagnostic measurement or acceptance-record update was performed.
+
+## Adoption binding design proposal (2026-10-13)
+
+### Scope, inspection and authority
+
+Started clean on `feature/otel-redesign_M2_fixture` at
+`12fda93565dd0b83f49d4be252d4ee86978fddcd`, equal to actual remote. Accepted implementation
+`503112984d9a524cbfab286a59927f8234545f52` is an ancestor; its delta to the starting checkpoint
+contains only three handoff documents. Source therefore equals the accepted implementation.
+Local and actual remote parent M2 are `4f09265791c82452a5800cc6d9855938bf88a46e`; both F2
+product/harness preservation refs are `4ea24d53afc57778addf3f47752e0fe73a7011ea`.
+C1/C2/C3 stay accepted. This section proposes a contract for trunk review, not adoption or a new
+durable source of truth. On approval, the lifecycle contract belongs in
+[`telemetry-performance.md`](../design/telemetry-performance.md), operator gates in the
+[harness guide](../contributing/telemetry-performance-harness.md), and attestation responsibilities
+in the [publish policy](../contributing/build-test-release.md#ci-and-publish-gates).
+
+Inspected actual `requalify` serialization, `validateHistoricalSelection`, `validateRequalification`,
+`requireTarget`, manifest validation, schema-4 raw-run/lifecycle projection, lifecycle inventories,
+supervisor finalization and the entire schema-1 release validator. Read saved F2 `RESTORE.md`,
+`evidence/compatibility.json`, historical selected manifest, schema-3 calibration and environment.
+Rehashed only the six files below, not the full archive/runtime or a restored dependency closure.
+No new execution, fixture, test campaign, installation, freeze or live record mutation occurred.
+
+### What existing evidence actually establishes
+
+| Consumer/evidence                         | Verified now                                                                                                                                                                                                                              | Still external review responsibility                                                                                                                                                                                                                                                                  |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Historical selection input                | Safe fixed commit count, matching legacy OID, nonempty old protocol distinct from new protocol, hash syntax                                                                                                                               | Read historical calibration/manifest bytes; derive target, full quantities, successful selected pilot and actual historical protocol. Neither hash is dereferenced by the command.                                                                                                                    |
+| Requalification schema 4                  | Nine legacy children (two warmups/seven measured), child/behavior gates, unchanged median/MAD gates, run-derived lifecycle operations and stored inventory consistency                                                                    | CLI entry SHA-256 is computed, but full runtime/dependency closure is not. Environment fields and harness OID have structural checks, not archive verification. The output embeds selection, environment, validation, runs, lifecycle and exact execution-manifest hash; it has no adoption decision. |
+| Lifecycle ledger/boundaries/prepared copy | Instance, prepared digest, inventory/logical/filesystem consistency, unique paired operation IDs, final pre-destruction boundary                                                                                                          | Reviewer rehashes archived inventories/copy and ties the actual run root to supervision. Verified lifecycle does not assert group cleanup or successful disposal.                                                                                                                                     |
+| Terminal supervision schema 1             | Accepted C1 ordering: group cleanup, durable non-success barrier, required disposal, then saved terminal completion                                                                                                                       | Snapshot does not hash the requalification artifact. Bind snapshot ID/root registration/events, invocation and instance mapping from the same archived execution, not filenames alone. Inspect completed status, worker/finished exit, cleanup, disposal and persistence together.                    |
+| Working manifest / `requireTarget`        | Complete target, required reference strings and new protocol routing                                                                                                                                                                      | References are not opened here. A manually populated protocol string is not reviewed adoption. Fresh calibration also writes this string before later supervisor completion.                                                                                                                          |
+| Release schema 1                          | Required target/comparison matrix, pass/exception rules, matching target recipes and calibration/capture evidence IDs, candidate/source/harness OIDs, ancestry, evidence-specific reuse, reviewer/date/hash syntax and clean publish tree | Validator never opens external archives, compares their SHA-256 to bytes, checks adoption, or authenticates reviewers. Its checks cannot alone establish this chain.                                                                                                                                  |
+
+The saved compatibility report supports recipe/environment compatibility only. It has no new-protocol
+eligibility result or completed disposal evidence. Historical failure and layout-drift findings remain
+unchanged; nine synthetic validator runs are regression evidence, not acceptance.
+
+### Concrete minimal record and byte references
+
+Use one external immutable `fixture-adoption.json` per target, version 1, with
+`kind: fixture-adoption`, and a separate pre-execution `qualification-input-review.json`.
+These are proposed archived review documents, not additions to release schema 1. Every file reference
+is `{archiveId, path, bytes, sha256}`: path is an exact relative archive member, SHA-256 is over exact
+file bytes, and archiveId resolves through a retained location/copy index. Archive inventories include
+symlink targets and dependency/runtime closure; a Git OID or a location alone cannot replace them.
+Hash the final record bytes externally; do not put its own hash inside it. Reject unresolved references,
+duplicate/conflicting target identities and absent review attribution.
+
+The following are actual inspected historical bindings under archive location
+`D:/gitlode_test/m2-freeze-4ea24d5-20261008-f2`; Linux archive location is
+`/home/t-wakabayashi/gitlode-performance/m2-freeze-4ea24d5-20261008-f2/archive`.
+They are inputs to a future review, not an adopted record:
+
+| Exact member                                                                    |    Bytes | SHA-256                                                            |
+| ------------------------------------------------------------------------------- | -------: | ------------------------------------------------------------------ |
+| `sealed-manifest.json`                                                          |   160075 | `20ee1498e139e27d9044468e541f2d68251c8a5e9df3d99e958f608795305fee` |
+| `evidence/compatibility.json`                                                   |     2757 | `d25e9815420f1c0d06ca937bd8d1348fcd799dfc735f03718caa8a0d3e750bbb` |
+| `inputs/m0/manifest-after.json`                                                 |     1825 | `93b3010b76337ea8f3bdc9fc725c2ab4cd98824b33f9c6ab99f3bc34750b7945` |
+| `inputs/m0/manifest.json` (identical selected bytes)                            |     1825 | `93b3010b76337ea8f3bdc9fc725c2ab4cd98824b33f9c6ab99f3bc34750b7945` |
+| `inputs/m0/calibration/commit_heavy_repository-isomorphic-git-calibration.json` | 17435079 | `b705cb66dfe08dbad0123d3f8c41fa84ce2c172ab958305477602c3d374b7928` |
+| `inputs/m0/calibration/commit_heavy_repository-isomorphic-git-environment.json` |      722 | `36d4634c595deb6b508961422dd99cb6b7d65f9b9b8a7c2d33fac6299c790bce` |
+
+Required record fields and meanings:
+
+1. `target`, `adapter`, `quantities`, `contentRecipeSha256`, `lifecycleProtocol`,
+   `renewedMinimality: false`. For this assignment the target is
+   `commit_heavy_repository/isomorphic-git`, quantities are commits=4430/files=1/plugins=0/
+   rotations=1/scale=0, content recipe hash is
+   `6668bd8a9c032a9d2c9ca2a7aca0a1b7e56055c24b3431e561d3fee156ed738f`, and new protocol is
+   `foreground-maintenance-inventory-v1`. Quantity means final total including five base commits.
+   No target-wide or five-target adoption is implied.
+2. `historical`: calibration, selected manifest and environment byte references above, historical
+   schema/protocol description, original product/harness OIDs and
+   `legacyRevision: 76b124e23fcc069be1278629cf01b62ae1456c7a`. Archive the exact supplied
+   `HistoricalSelection` JSON separately. Its old protocol string must describe the reviewed old
+   procedure; merely differing from the new string is insufficient. Record the selected pilot identity
+   and successful selection/behavior/statistics reviewed from the complete history.
+3. `inputs`: reference the completed input review and exact execution manifest; reference legacy
+   closure inventory/archive, CLI entry, worker/shared assets, dependencies/lock, toolchain and system
+   support. F2's legacy archive `inputs/legacy-runtime.tar.gz` has reported SHA-256
+   `cd590dd8ac53e606cde1a1f5ffd11d1f6a6467b355f033025cc146f638cfffc3`; this session did not rehash it.
+   Future input review verifies its inventory/restored bytes. Name separately the new integrated
+   harness source OID, clean source/dependency/build/toolchain inventory, restoration verification,
+   catalog/command/limits and environment reference. F2 harness is not the new harness. Do not invent
+   missing new harness OIDs/hashes; they are future preparation exit evidence.
+4. `execution`: exact `<fixture>-<adapter>-requalification.json` reference and execution archive
+   inventory; schema 4, embedded input/environment/CLI hash equality, eligible-pending-trunk-adoption
+   status, empty validation errors, unchanged statistics and behavior, all nine raw run identities.
+   Include each run's phase/iteration/state and complete fixture link, ledger/boundary file references,
+   instance ID, prepared digest, logical identity, filesystem type/device, prepared-copy inventory and
+   final pre-destruction boundary. Rehash actual archived bytes and invoke existing stored validators
+   during future review; no live Git lookup or new measurement is needed for stored validation.
+5. `supervision`: exact terminal `supervision-<id>.json` reference, supervisor ID, archived invocation/
+   root-registration-to-instance mapping and saved operator exit evidence. Require status completed,
+   exit code 0/no signal and finishedCode 0, cleanupConfirmed true, no cleanup/finalization errors,
+   diagnostics saved, disposal phase disposed and every required registered root disposed. Absence of
+   required roots or an incomplete mapping fails review. Prepared copies remain outside those roots.
+   `terminalEvidenceSaved` is a supervisor return flag, not a serialized snapshot field; reference
+   saved return/operator evidence if present and independently verify the terminal file. A barrier,
+   running snapshot, recovery inconclusive snapshot or lifecycle verified flag cannot substitute.
+6. `review`: reviewer identity/date, exact input/execution review document references, inspected
+   reference set and disposition; `decision`: trunk authority identity/date, explicit adopted/rejected
+   outcome, rationale, target-scoped authorization and decision evidence reference. Adoption requires
+   independently reviewed successful execution and a separate explicit trunk decision. Bind reviewer
+   and authority attribution to retained review/decision bytes; nonempty strings alone do not suffice.
+7. `authorizedUse`: exact new working-manifest byte reference, selected target quantities/recipe/
+   protocol, resolved artifactRef/environmentRef equality to the reviewed eligibility evidence,
+   allowed runtime/harness/environment identities and comparison types. Unrelated later target edits
+   require a new reviewed manifest authorization referencing the same adoption; never silently replace
+   the original authorized manifest hash. Future capture/comparison instance IDs/layouts are their own.
+
+Build the new working manifest from sealed execution evidence before finalizing adoption. It points
+to eligibility/environment artifacts, not back to adoption. Seal execution first; the adoption record
+then references it and the working manifest; a later comparison authorization references adoption's
+external hash. Comparison archives and final release review point backward to these records. No
+execution inventory includes a future adoption hash, and no mutually hashing record pair is required.
+
+### Temporal gates and existing release-attestation mapping
+
+**Before eligibility:** trunk assigns only one fixed legacy check after independent input review
+verifies historical bytes/selection, fixed quantities/recipe, legacy closure and the separately
+preserved new harness/environment/limits. Archive that review with attribution and the exact command
+input set. This gate has no successful-result requirement: that result does not exist yet.
+
+**After eligibility:** seal the complete attempt including terminal supervision, independently review
+actual result/lifecycle/inventories/disposal, and return failed/inconclusive evidence to trunk without
+adoption or comparison authorization. If eligible, trunk may issue the scoped adoption record above.
+Eligibility alone never updates authority, historical manifests or acceptance. No renewed minimum
+search, threshold change, favorable-sample retry or cold-cache claim is permitted.
+
+**Before comparisons:** an archived trunk packet identifies exact adoption bytes/hash, resolved
+working manifest, runtimes, new harness and environment. Reviewer checks those inputs before launch.
+Capture and each comparison create fresh repositories; their own prepared identities/inventories/run
+links and completed supervision are later reviewed. Require recipe/protocol/quantity compatibility,
+not equality to the eligibility repository's instance ID, packing digest or filesystem device number.
+Each attempt's device/type must remain internally consistent; cross-attempt environment compatibility
+uses the existing policy. Preserve unsuccessful attempts separately.
+
+**At release:** retain schema 1. For the adopted target, `performance.calibrations[*].attestation`
+references a sealed target qualification review dossier (unique evidenceId, exact archiveId/hash,
+reviewer/date, final candidateOid, legacy sourceProductOid and the new evidence-generating harnessOid).
+That dossier contains the historical calibration, input review, eligibility, adoption and manifest
+bindings; reviewed fixed-size eligibility is explicitly distinguished from historical minimality.
+`childStatus`/`behavioralStatus` reflect the new eligible evidence. Captures and comparisons retain
+their own attestations and existing calibrationEvidenceId/legacyCaptureEvidenceId/target recipe
+cross-links; their archived review dossiers name the exact adoption hash and their execution evidence.
+Candidate attestation reviews final bundle/runtime and fixtureManifestSha256 against actual bytes.
+T13C and releaseAuthority attestations reference final closure review bytes enumerating all dossiers,
+adoption hashes, candidate and evidence-specific delta/reuse decisions. Required fresh-target and
+aggregation evidence stays required; this one target does not fill the remaining matrix.
+
+Old baseline/harness and redesigned-evidence reuse keep their actual provenance and existing rules.
+Changing the final candidate requires new destination-candidate review and, where required, explicit
+evidence-specific reuse approval. Do not relabel historical comparisons as current acceptance.
+Future release authority must explicitly approve treating the target qualification dossier as this
+schema-1 calibration attestation; syntax acceptance by the validator is not that semantic approval.
+
+### Least machinery, concrete bypasses and bounded implementation alternative
+
+**Recommendation:** archived external review plus the existing candidate-bound attestations are
+sufficient for the repository's documented reviewer authority boundary, provided trunk adopts the
+exact dossier and temporal gates above. No release-schema expansion is needed for symmetry. This is
+human enforcement: supported publish validation checks committed review claims, not archive content
+or reviewer honesty. It is not an automated proof that comparison launch was authorized. The live
+blocked record establishes neither binding nor enforcement.
+
+There are two precise present bypasses. First, copy a historical complete target, set
+`fixtureLifecycleProtocol` to the new constant and provide nonempty artifactRef/environmentRef.
+`validateFixtureManifest` and `requireTarget` accept it, and capture/measure starts without opening
+selection, eligibility, supervision or adoption. Second, build an otherwise internally valid accepted
+release record with the required IDs/recipes/OIDs and arbitrary syntactically valid archive hashes
+and reviewer strings: `validateAttestationDetails` and `validateRevisionProvenance` can pass even if
+adoption is absent or replaced. External review under the proposed contract rejects both, but neither
+code path detects them. These are existing authority limits, not new C1/C2/C3 contradictions.
+
+If trunk requires automatic rejection through supported commands, the smallest additional slice is
+a development-only input preflight shared by supervised requalify/capture/measure, before any fixture
+creation. Require an explicit local reviewed authorization plus a separately pinned expected SHA-256
+in the assigned command packet. Requalify uses input-review authorization only; capture/measure uses
+post-result adoption authorization. Rehash locally materialized reference bytes; bind target, full
+quantities/recipe/protocol, actual CLI/runtime and harness inventories, manifest/environment, and
+review attribution. Post-result verification reuses existing requalification/lifecycle validation
+and reads completed supervision/disposal evidence; it does not add a second performance evaluator.
+Require fresh-calibration targets to supply their own reviewed completed qualification authorization,
+so fixed-quantity adoption cannot bypass or disable the fresh path. Preserve aggregation/historical
+read paths. Persist consumed authorization hash with workflow artifacts for later external review.
+This requires bounded CLI plumbing, one checked helper and artifact/type/docs updates; no product
+runtime or release schema change. A passed hash check cannot authenticate an authority: the trusted
+packet's expected hash and reviewed branch remain the trust anchor, not a self-supplied hash.
+
+Finite future tests, if assigned: positive input-only authorization permits one small synthetic
+eligibility workflow without preexisting result; positive adopted authorization permits fresh-instance
+capture/comparison; positive fresh calibration authorization and untouched aggregation/historical
+paths. Negative pre-launch cases: absent/pinned-hash mismatch; substituted historical bytes/selection;
+wrong adapter/quantity/recipe/manifest/runtime/harness/environment; eligible-only or rejected adoption;
+missing/substituted result or lifecycle instance/operation link; running/inconclusive supervision,
+cleanup uncertainty, partial/retained disposal or missing required root mapping; changing a manifest
+reference while keeping the routing string. Assert no fixture/child starts on rejection. Release
+record tests continue to check existing dossier attestation ID/recipe/candidate/reuse consistency;
+external-review checklist explicitly rejects an archive missing adoption or pointing to different
+bytes. None of these cases requires the 4,430-commit workload or new empirical samples.
+
+If automatic _publish-time_ archive verification is also required, command preflight alone is
+insufficient. A separate bounded resolver would have to materialize the existing attested dossier
+archive and rehash/validate its referenced adoption graph before publish; unavailable archives fail
+closed. That is additional archive availability/ownership policy, not justified by the current
+external-review contract. Do not hide it in a schema string, signature service or a new acceptance
+engine. Trunk must decide this stronger requirement before authorizing such code.
+
+### Return and next bounded action
+
+Trunk owns acceptance of this design, manual versus automatic launch enforcement, source integration,
+new harness preservation, eligibility assignment, target adoption and eventual release approval.
+The release authority owns schema-1 dossier semantics and final candidate/reuse decisions. This
+session accepts none of them. Existing external review permits document-only child integration after
+trunk review, with the pre-formal gate carried forward. Any selected preflight implementation can be
+a separately gated follow-up; it must be accepted before harness freeze and any automatically gated
+qualification/comparison command. Under the recommended manual path, approved durable docs and a
+reviewed input packet must precede eligibility, and actual adoption must precede comparisons.
+
+Next action is trunk review of this proposal and assignment of either durable documentation plus
+new-harness preservation preparation, or the exact preflight slice above. Neither option authorizes
+eligibility in this session. Documentation format write/check and diff check precede the normal
+documentation-only commit/push. Final commit OID, actual remote equality, clean child status and
+unchanged local/remote parent/F2 identities are reported with delivery, outside this self-referencing
+document. Initial sandbox Git ownership/network failures were resolved with command-scoped
+safe.directory and authorized owner-context remote access, without global configuration changes.

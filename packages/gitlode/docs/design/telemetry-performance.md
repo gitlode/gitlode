@@ -214,7 +214,102 @@ uses the unchanged catalog counts, window, stability, behavior and supervision r
 no search and never rewrites the historical manifest. Passing is pending explicit trunk adoption;
 it does not renew minimum-quantity proof. Fresh-target doubling/binary calibration remains unchanged.
 Historical artifacts remain historical evidence and cannot qualify a new-protocol comparison.
-The release gate still requires independent reviewed evidence; lifecycle strings do not establish
-acceptance. Before any formal packet, its reviewer must bind the separately preserved new harness,
-new lifecycle evidence and adopted selection to the release evidence chain. Live acceptance stays
-blocked until that compatibility review and all existing obligations are satisfied.
+The external review contract below binds eligibility and adoption. Release attestations follow the
+[build/release guide](../contributing/build-test-release.md#fixture-qualification-release-review).
+
+## Fixture qualification and adoption review
+
+This contract uses archived independent review and an explicit trunk decision with exact byte hashes.
+It does not add automatic launch preflight, a publish archive resolver or release-schema fields.
+Eligibility is a result, not authority to compare or release. A manually populated lifecycle routing
+string is not approval. Fresh calibration and the remaining target matrix retain their obligations.
+
+### Exact references and authority
+
+Retain a version-1 `qualification-input-review.json` before execution and a separate version-1
+`fixture-adoption.json` with `kind: fixture-adoption` after execution. These are external review
+documents, not new workflow output or release schema. Every referenced file uses
+`{archiveId, path, bytes, sha256}`: an exact relative archive member, byte count and SHA-256 of exact
+bytes. The retained location/copy index resolves archiveId. Inventory runtime/dependency closure and
+symlink targets; an entry-point hash, Git OID or location alone does not establish restored closure.
+Rehash materialized members and compare sizes, hashes and inventory against their attributed sources.
+Reject unresolved references, conflicting target identities and absent review attribution. Hash final
+review/decision record bytes externally; no record contains its own hash.
+
+Input review names the independent reviewer/date, inspected reference set, disposition and trunk's
+assigned command/input packet. Adoption separately names the execution reviewer/date and reviewed
+bytes, then trunk authority/date, adopted or rejected decision, rationale and target-scoped decision
+evidence. Reviewer/authority strings must resolve to retained review and decision bytes; nonempty
+strings and syntactically valid hashes do not authenticate them. Only explicit reviewed trunk adoption
+authorizes the selected target. Final release authority remains a separate human decision.
+
+### Required adoption bindings
+
+The adoption record retains these distinct groups, with exact references and source attribution:
+
+1. Target, adapter, all quantities, content recipe hash, lifecycle protocol and
+   `renewedMinimality: false`. Fixed quantity includes base commits. Scope is one target, never an
+   implicit adoption of the whole matrix.
+2. `historical`: calibration, selected manifest, environment and separately archived exact
+   `HistoricalSelection` JSON; original product/harness OIDs and legacy revision; selected pilot and
+   successful selection/behavior/statistics from the complete history. The old protocol describes the
+   reviewed historical procedure, not merely a string differing from the new protocol.
+3. `inputs`: completed input-review reference and execution-manifest bytes; restored legacy closure inventory,
+   CLI/worker/shared assets, dependencies/lock, toolchain/system support; separately preserved new
+   integrated harness OID, clean source/dependency/build/toolchain inventory, restoration verification,
+   catalog/command/limits and environment. F2's old harness or disposable validation copies cannot
+   stand in for this new harness.
+4. `execution`: sealed schema-4 requalification artifact and execution inventory. Require
+   `eligible-pending-trunk-adoption`, empty validation errors, unchanged statistical/behavior gates,
+   embedded selection/environment/CLI/execution-manifest hash equality and all nine raw run
+   identities. For every phase/iteration/state retain complete fixture links, ledger/boundary member
+   references, instance/prepared digest, logical/filesystem identity, prepared-copy inventory and final
+   pre-destruction boundary. Rehash archived bytes and use existing stored validators; no live Git
+   lookup is required to review stored lifecycle evidence.
+5. `supervision`: terminal `supervision-<id>.json`, supervisor ID, archived invocation and complete registered-root
+   to instance mapping, and saved operator exit evidence from the same execution. Require completed
+   status, worker exit 0/no signal, finishedCode 0, cleanupConfirmed true, no cleanup/finalization
+   errors, saved diagnostics, disposal phase disposed and all required registered roots disposed.
+   Missing required roots or incomplete mappings fail review. Prepared copies remain outside disposed
+   roots. `terminalEvidenceSaved` is a return flag, not a serialized snapshot field: review the actual
+   terminal file and any saved return/operator evidence. A barrier, running/recovery-inconclusive
+   snapshot or lifecycle verified flag cannot substitute. Supervision does not itself hash the result;
+   bind invocation, registration/events and instances, rather than assuming filenames establish it.
+6. `review` and `decision`: independent input/execution review references and separate explicit trunk decision as above.
+7. `authorizedUse`: working-manifest bytes with selected quantities/recipe/protocol and resolved
+   artifactRef/environmentRef equal to reviewed eligibility/environment evidence; allowed
+   runtime/harness/environment identities and comparison types. Later unrelated target edits need
+   separately reviewed manifest authorization referencing the same adoption; do not replace the
+   original authorized hash silently.
+
+Seal execution before adoption. Construct the new working manifest from that sealed execution; it
+points to eligibility/environment, not adoption. Adoption references execution and manifest, and a
+later launch authorization references adoption's externally computed hash. Comparison archives and
+release review point backward. Neither execution inventories nor mutually hashing records refer to
+future adoption. New comparison instances/layouts have their own identities: compatible
+quantity/recipe/protocol does not mean reusing the eligibility repository or filesystem device.
+
+### Temporal gates
+
+| Gate               | Required review and authority                                                                                                                                                                                                                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Before eligibility | Independent input review verifies historical bytes/selection, fixed quantity/recipe, restored legacy closure and newly preserved harness/environment/limits; trunk assigns one exact hash-bound command packet. No successful result is required before it exists.                                             |
+| After eligibility  | Seal the entire attempt including terminal supervision; independently review actual result, lifecycle, inventories and disposal. Return failed/inconclusive evidence without adoption. An eligible result permits a separate explicit scoped trunk adoption decision.                                          |
+| Before comparisons | A separately reviewed trunk launch packet pins exact adoption bytes/hash, resolved working manifest, runtimes, harness and environment. Review these inputs before launch; each capture/comparison produces fresh-instance evidence and completed supervision. Preserve every unsuccessful attempt separately. |
+| At release         | Bind adoption and execution to final-candidate dossiers through existing attestations under the build/release guide, including explicit release-authority approval of the qualification dossier's calibration role.                                                                                            |
+
+No renewed minimum search, threshold change, favorable-sample retry, cold-cache claim, historical
+manifest rewrite or automatic acceptance update follows eligibility. Future empirical work requires
+its own assigned packet; implementation acceptance is not empirical acceptance.
+
+### Manual enforcement limits
+
+Supported commands do not authenticate external evidence or prevent unauthorized launch. For example,
+copying a complete historical target and supplying the new protocol string plus nonempty artifact/
+environment references can pass manifest routing without opening eligibility, supervision or adoption.
+Similarly, internally consistent release IDs/OIDs/recipes with arbitrary syntactically valid archive
+hashes and reviewer strings can pass schema-1 structural checks. External review must reject missing
+or substituted adoption/bytes in both cases. These are the accepted reviewer-authority limits, not
+proof of authorization by commands or by the blocked acceptance record. Do not imply automatic
+preflight or archive verification exists. A concrete contract contradiction returns to trunk with its
+failure path rather than silently introducing new enforcement machinery.

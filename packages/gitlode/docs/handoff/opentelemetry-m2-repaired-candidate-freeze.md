@@ -4,10 +4,12 @@
 
 The human approved foreground automatic maintenance, explicit identity/layout/cache protocol, and
 bounded fixed-quantity requalification without a renewed smallest-quantity claim. The diagnosis below
-is retained with that decision; its request for a human choice is resolved. The active assignment is
-[controlled fixture lifecycle implementation](opentelemetry-m2-fixture-lifecycle.md) on a child branch.
+is retained with that decision; its request for a human choice is resolved. The current
+[fixture integration evidence](opentelemetry-m2-fixture-integration.md) replaces completed child
+implementation/review assignments. C1/C2/C3 and the external-review contract are accepted;
+canonical docs and integration preparation are complete, pending human exact source/base approval.
 F2 runtime preservation remains accepted; neither old calibration adoption nor timing is authorized.
-Implementation, independent review and a new preserved harness must precede the separately assigned
+Human integration, new harness preservation and independent input review must precede the separately assigned
 two-warmup/seven-measured legacy requalification. No new candidate/RSS pass is inferred.
 
 ## Trunk disposition and next assignment (2026-10-08)

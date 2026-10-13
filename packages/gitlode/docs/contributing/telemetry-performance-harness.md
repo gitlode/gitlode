@@ -210,10 +210,10 @@ After independent review and explicit trunk adoption, use a new working manifest
 records `fixtureLifecycleProtocol: "foreground-maintenance-inventory-v1"` and whose artifact/environment
 references identify the adopted new evidence. Keep the historical manifest and M0 evidence unchanged.
 The protocol field is a routing check, not an acceptance attestation. Capture/comparison fail closed
-without it. Fresh calibration writes it with the new evidence automatically. The migration release
-gate continues to require its existing reviewed evidence chain; it does not parse external lifecycle
-inventories. A separate release compatibility review must define the reviewed adoption binding before
-any formal packet, without inventing strings to waive release acceptance.
+without it, but a manually supplied string does not authenticate adoption. Fresh calibration writes it
+before supervisor completion. Follow the accepted
+[external review contract](../design/telemetry-performance.md#fixture-qualification-and-adoption-review)
+and [release dossier mapping](build-test-release.md#fixture-qualification-release-review).
 
 Inventories consistently precede warmups and surround each timed CLI/sidecar, then precede final
 validation/destruction. Their I/O warms caches and is excluded from measured wall/RSS time. Keep the
@@ -227,3 +227,33 @@ not merely any valid adjacent pair. Cleanup preserves the primary failure and re
 where storage permits; bounded synchronous notification is best effort when evidence storage fails.
 Failures and direct unsupervised invocations retain roots; inspect the raw diagnostic location before
 manual disposal. Do not delete uncertain or historical residue. Prepared copies are retained evidence.
+
+### Operator review packets
+
+Before eligibility, materialize the historical selection/calibration/manifest/environment members and
+legacy runtime closure from the retained archive index. Compare exact byte counts and SHA-256 values
+with the assigned references and verify restored inventory, including dependencies and symlink targets.
+Check the original selection/pilot/protocol and fixed quantities/recipe, then separately verify the
+new integrated harness source, clean build/dependency/toolchain closure, restoration, environment,
+catalog limits and exact invocation. Archive the attributed independent `qualification-input-review.json`
+and trunk command packet before launch. Do not invent a future harness identity or successful result.
+
+After the one assigned legacy check, preserve the complete attempt without appending to an older
+sealed archive. Inspect schema-4 result, all nine runs and their actual operation/ordinal links,
+prepared-copy/boundary inventories and terminal supervision/root mapping against exact archived bytes.
+Use stored validators for their supported checks, then externally review the remaining byte bindings
+and operator exit/disposal. Keep primary failures, secondary diagnostics and unavailable-storage limits
+visible. An eligible artifact alone does not authorize another workflow: return review to trunk for a
+separate target-scoped `fixture-adoption.json` decision. Failed/inconclusive attempts stay distinct.
+
+Before capture/comparison, independently review the trunk launch packet's pinned adoption hash and
+resolved working manifest/runtime/harness/environment bytes. Later manifest edits need a new reviewed
+authorization. Create fresh fixture instances and retain their own run links and supervision; do not
+require equality to the eligibility instance/layout/device. Carry the exact adoption reference into
+the external comparison dossier and final release review. The canonical design owns the full record
+graph; these steps do not add CLI arguments or generated adoption fields.
+
+These are manual review gates. Commands neither open all referenced review archives nor authenticate
+reviewer/trunk authority. A passed routing/validator check cannot substitute for the assigned reviewed
+packet. Temporary validation dependency/build copies and saved regression logs are not a newly frozen
+harness, and successful small synthetic tests are not selected-workload eligibility or acceptance.

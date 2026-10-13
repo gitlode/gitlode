@@ -246,6 +246,34 @@ Use the narrower commands while developing. Assess publish readiness from both `
 and an accepted telemetry migration record; do not change a blocked record without the required
 independent review evidence.
 
+### Fixture qualification release review
+
+Keep migration release schema 1. The
+[fixture adoption contract](../design/telemetry-performance.md#fixture-qualification-and-adoption-review)
+owns exact reference semantics, adoption bindings and temporal gates. For an adopted fixed-quantity
+target, `performance.calibrations[*].attestation` references a sealed target qualification review
+dossier: unique evidenceId, exact archiveId/hash, reviewer/date, final candidateOid, actual legacy
+sourceProductOid and new evidence-generating harnessOid. Its reviewed members bind historical
+calibration, input review, eligibility, adoption and authorized manifest. Distinguish historical
+minimality from new fixed-size eligibility; childStatus/behavioralStatus describe the new eligible
+evidence. Final release authority must explicitly approve this dossier's role as the schema-1
+calibration attestation. Validator syntax acceptance is not semantic approval.
+
+Captures/comparisons retain their own attestations and calibrationEvidenceId/legacyCaptureEvidenceId/
+target recipe cross-links. Their archived dossiers name the exact adoption hash and their own
+execution evidence. Candidate review verifies final bundle/runtime and fixtureManifestSha256 against
+actual bytes. T13C and releaseAuthority attestations reference final closure-review bytes enumerating
+every dossier, adoption hash, candidate and evidence-specific delta/reuse decision. A changed final
+candidate requires destination-candidate review and applicable evidence-specific reuse approval.
+Preserve old baseline/harness provenance; do not relabel historical comparisons as current acceptance.
+One target dossier does not satisfy remaining fresh-target or aggregation requirements.
+
+Reviewers resolve and rehash the dossier's actual members and verify review/authority attribution.
+The supported publish validator checks committed completeness/consistency and hash syntax; it does
+not open external archives, verify their bytes, inspect adoption or authenticate reviewers. The
+accepted policy relies on external review, without automatic preflight, a publish archive resolver or
+schema expansion. Live acceptance remains blocked until all applicable reviews and gates are met.
+
 ### Lazy telemetry release boundary
 
 The [telemetry verification contract](../design/telemetry-verification.md#failure-injection) requires

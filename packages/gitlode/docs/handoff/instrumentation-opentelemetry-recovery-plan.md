@@ -12,15 +12,17 @@ OID. F2 outcome `d40775f` is accepted for runtime preservation. Its current pack
 fixture-lifecycle diagnosis/design before calibration adoption; diagnosis `686ef2c` is complete.
 The human approved foreground automatic maintenance and bounded requalification of the historically
 selected quantity without renewed minimality. Harness implementation was delivered at `59e9131`;
-[independent review](opentelemetry-m2-fixture-lifecycle.md) returned three mandatory findings at
+[integration evidence](opentelemetry-m2-fixture-integration.md) retains independent review's three mandatory findings at
 `0ae8079`: disposal success ordering, stored boundary binding and primary exception preservation.
 C1/C2/C3 correction `5031129` is accepted by independent review `a53ade4`. The fixture child next
 completed adoption design `29572fe`; trunk adopts existing external review with exact hash/reviewer
-bindings, without new automatic preflight. Durable documentation and integration preparation are
-assigned next. Actual input review, eligibility, trunk adoption and comparison authorization remain
+bindings, without new automatic preflight or release-schema expansion. Canonical documentation and
+integration preparation are complete; human exact source/base review and squash are next.
+Actual input review, eligibility, trunk adoption and comparison authorization remain
 separate pending gates; final release approval is human-owned. No timing is assigned.
 Reported full/targeted validation retains its exact source attribution.
-Release-adoption binding remains an explicit review/follow-up gate before formal work. New harness
+The [canonical adoption contract](../design/telemetry-performance.md#fixture-qualification-and-adoption-review)
+now owns the binding and manual enforcement limits; actual temporal gates remain pending. New harness
 preservation follows acceptance and integration. No measurement is yet assigned.
 Previously observed background object-layout mutation remains distinct from unresolved RSS causality.
 F2 supersedes previous preparation/measurement routing.

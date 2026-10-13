@@ -8,11 +8,11 @@ documents.
 
 ## Active OpenTelemetry work
 
-Current assignment: [fixture adoption documentation and integration preparation](opentelemetry-m2-fixture-lifecycle.md).
-Fixture corrections and the external-review adoption contract are accepted; actual qualification,
+Current packet: [fixture integration evidence and human source/base review](opentelemetry-m2-fixture-integration.md).
+Fixture corrections and the external-review adoption contract are accepted and canonical docs updated; actual qualification,
 adoption and comparison authorization remain pending and require separate reviewed packets.
 The human approved foreground maintenance and bounded fixed-quantity requalification. F2 runtime
-preservation is accepted; timing awaits reviewed implementation and a new preserved harness.
+preservation is accepted; timing awaits human integration, a new preserved harness and reviewed inputs.
 The disabled SDK boundary is squash-integrated into M2 at `4ea24d5` by PR #116; its
 [integration evidence](opentelemetry-m2-disabled-sdk-integration.md) retains acceptance attribution.
 D1 `04dc187` and D2 `6e84279` are independently accepted; performance acceptance remains open.

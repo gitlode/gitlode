@@ -15,8 +15,11 @@ selected quantity without renewed minimality. Harness implementation was deliver
 [independent review](opentelemetry-m2-fixture-lifecycle.md) returned three mandatory findings at
 `0ae8079`: disposal success ordering, stored boundary binding and primary exception preservation.
 C1/C2/C3 correction `5031129` is accepted by independent review `a53ade4`. The fixture child next
-defines the minimal concrete adoption/evidence binding in a documentation-only session; no timing
-is assigned. Reported full/targeted validation retains its exact source attribution.
+completed adoption design `29572fe`; trunk adopts existing external review with exact hash/reviewer
+bindings, without new automatic preflight. Durable documentation and integration preparation are
+assigned next. Actual input review, eligibility, trunk adoption and comparison authorization remain
+separate pending gates; final release approval is human-owned. No timing is assigned.
+Reported full/targeted validation retains its exact source attribution.
 Release-adoption binding remains an explicit review/follow-up gate before formal work. New harness
 preservation follows acceptance and integration. No measurement is yet assigned.
 Previously observed background object-layout mutation remains distinct from unresolved RSS causality.

@@ -1,5 +1,54 @@
 # M2 controlled fixture lifecycle implementation
 
+## Active assignment: durable adoption contract and integration preparation (2026-10-13)
+
+Trunk accepts design `29572fe1373410f7903848b7f747ef7ed53b08bc` using archived external review
+and existing release attestations. No automatic launch preflight or publish archive resolver is
+assigned. This choice retains the documented reviewer-authority model rather than claiming commands
+authenticate adoption. C1/C2/C3 remain accepted at `5031129`. The actual target is NOT adopted;
+eligibility evidence does not yet exist. Final release-authority approval remains human-owned.
+
+The design closes the choice of adoption contract; it does not satisfy its future temporal gates.
+Before eligibility require a reviewed, hash-bound input packet and newly preserved harness. After
+eligibility require independent evidence review and explicit trunk adoption. Before comparisons pin
+adoption/manifest/runtime/harness hashes in a separately reviewed launch packet. At release review
+the target dossier through existing attestations with final candidate/reuse and release-authority
+approval. Retain schema 1 and no renewed-minimality claim. A manually set routing string is not approval;
+supported commands do not themselves prevent unauthorized launch or authenticate external evidence.
+
+The next human-started session is documentation/integration preparation on the existing fixture child:
+
+1. Migrate the accepted contract from the proposal into canonical performance design, harness guide
+   and build/release guidance. Keep one owner for each normative fact and link rather than duplicating
+   the full record graph. Define concrete required input-review/adoption references, authority and
+   temporal gates, exact-byte verification and source attribution. Explicitly state manual enforcement
+   limits and that final release authority must approve the qualification dossier's calibration role.
+   Do not populate live adoption/acceptance records or imply pending empirical gates have passed.
+2. Consolidate this long completed assignment/design/review history into
+   `opentelemetry-m2-fixture-integration.md`, then remove this superseded handoff. Preserve exact
+   implementation/review OIDs and historical Git path, approved policy, unresolved operational gates,
+   first-failure attribution, Windows/Linux validation limits and optional findings. Update README,
+   recovery and F2 links/routing. Old artifacts, F2, experiment and formal failure remain intact.
+3. Preserve available temporary implementation/independent-review logs in a new uniquely named archive
+   under D:/gitlode_test with source/path attribution and verified manifest. Never append to old sealed
+   archives. Record missing logs honestly; do not recreate them by rerunning campaigns. Existing
+   temporary dependency/build copies are not a new frozen harness.
+4. Verify actual remote source/base and no implementation change since accepted `5031129`. Expected
+   parent M2 is `4f09265791c82452a5800cc6d9855938bf88a46e`. Inspect unexpected movement rather than
+   resetting. Perform non-mutating merge-tree or isolated squash rehearsal, record exact source/base/
+   expected tree and delta from accepted implementation. Documentation-only deltas can reuse attributed
+   validation; do not rerun full tests/package campaigns absent a concrete concern.
+5. Run format write/check, local-link and diff checks; checkpoint and normally push documentation to
+   child. Bind final source/tree after that checkpoint and return PR title/body, identities, archived
+   evidence and remaining gates. Stay on child, verify actual remote/clean status and unchanged parent/
+   F2 refs. Do not create PR, merge, update parent, freeze, run eligibility/calibration/measurement or
+   edit acceptance. Trunk requests explicit human source/base PR approval after reviewing this packet.
+
+After human squash, trunk verifies tree equivalence, preserves child history, then assigns new harness
+preservation/compatibility and pre-eligibility input review. F2 product/runtime remains fixed. This
+packet authorizes neither extra machinery nor performance work; an actual contract contradiction
+returns to trunk with its concrete failure path instead of silently changing the chosen policy.
+
 ## Active assignment: adoption binding design (2026-10-13)
 
 Trunk accepts C1/C2/C3 and the correction slice at implementation

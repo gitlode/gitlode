@@ -7,9 +7,11 @@ fails the automatic foreground-maintenance pack-count assertion (Git 2.55.0); re
 were skipped. [Bounded CI correction](opentelemetry-m2-fixture-ci-correction.md) supersedes integration
 preparation. Require corrected-source full tests, CI success and focused review before a new PR request.
 
-GC-strategy correction `b002584` is delivered; final `1ece6d1` CI 38346905386 succeeded on attempt 1.
-Focused independent review is assigned. Windows default concurrency still fails; maxWorkers=2 success
-is separate evidence, not default-command repair. PR remains blocked pending its bounded disposition.
+GC-strategy correction `b002584` is independently accepted in review `6559570`; final `1ece6d1`
+CI 38346905386 succeeded on attempt 1. Windows default concurrency still fails. Trunk adopts a
+Windows-only two-worker supported default and assigns a separate timeout ownership/cleanup repair
+in the active correction packet. Existing reduced-concurrency success does not close either obligation;
+require corrected-source plain Windows npm test and independent review. PR remains blocked.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

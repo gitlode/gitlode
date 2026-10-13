@@ -1,6 +1,66 @@
 # Fixture CI correction before PR
 
-## Active assignment: focused CI review and Windows disposition (2026-10-13)
+## Active assignment: Windows concurrency and timeout ownership (2026-10-13)
+
+Trunk accepts the GC correction at `b002584` on the independent review delivered at
+`6559570896f04a3df6074637fc579d124541ff81`. PR readiness remains blocked. The assignments below
+this section are historical. This packet authorizes implementation, not PR creation or integration.
+
+### Decision and boundaries
+
+- Adopt Windows root Vitest `maxWorkers: 2` as the supported default, retaining Linux defaults,
+  existing explicit CLI overrides, all suites/assertions and existing test deadlines. This is an
+  intentional resource policy, not proof that unrestricted concurrency was repaired. Confirm the
+  setting actually applies to the workspace projects and document it in build/test contributor guidance.
+- Separately fix cancellation/cleanup ownership in the three affected test paths: behavioral baseline,
+  repository sidecar and fixture lifecycle C2. Lower concurrency alone does not close the lifetime gap.
+- Work on `feature/otel-redesign_M2_fixture`, starting at this packet's documentation checkpoint.
+  Parent M2 stays `4f09265791c82452a5800cc6d9855938bf88a46e`; F2 refs stay `4ea24d5`.
+  Keep GC/C1/C2/C3 acceptance and formal fixture/measurement semantics unchanged.
+
+### Bounded implementation
+
+1. Read the independent review below and affected test/support code. Record the ownership path from
+   Vitest cancellation through Git/CLI child close, outstanding filesystem work and root disposal.
+   Prefer narrow test-owned wrappers and optional cancellation seams. Do not build a general process
+   framework. If shared formal sidecar behavior must change, stop and return the proposed scope first.
+2. Consume the test cancellation signal; prevent subsequent fixture operations after cancellation.
+   Terminate only demonstrably owned active children, including descendants where applicable on
+   Windows. Await child close and outstanding async body/filesystem settlement before deleting roots.
+   An abort request or successful kill call alone does not establish quiescence. Use a bounded wait;
+   if quiescence cannot be established, retain the owned root and report the limitation without deleting
+   it. Preserve the primary failure and secondary cleanup diagnostics; diagnostic failure must not
+   replace the primary exception. Do not delete historical leftover roots whose ownership is unknown.
+3. Add finite regressions using the actual Vitest timeout/teardown boundary and controlled owned
+   work. Demonstrate failure before correction and success afterward: no premature root deletion,
+   no new work after cancellation, child/body settlement before successful cleanup, and retained
+   evidence when termination cannot be confirmed. Cover Windows behavior, normal completion and
+   primary-error preservation. Expected nested timeout failures must be distinguished from outer failures.
+4. Apply the Windows concurrency policy and contributor documentation. Keep timeout values, skips,
+   product code, measurement thresholds, fixture recipe and release acceptance unchanged.
+
+### Validation and delivery
+
+Run focused affected suites, fixture strict typing, build, lint, format write/check and diff check.
+After focused success, checkpoint the implementation and run plain root `npm test` once on Windows
+at that fixed source with no CLI worker override. Record effective concurrency, toolchain, exact
+command, source identity, complete first log and cleanup outcome. Run the affected Linux regression
+suites; use ordinary fixed-SHA CI for the full Linux/release/package chain, without redundant package
+campaigns. Preserve CI source identity and step execution, including skipped steps if any.
+
+If the supported Windows default still fails, preserve the first failure with test/phase/owned-child
+timings and stop for trunk disposition. Do not reduce concurrency again, raise deadlines, hide EBUSY,
+or repeat the campaign until green. Correcting a deterministic operator setup error requires retaining
+the first evidence and explaining the correction; unexplained product/integrity failures stop work.
+
+Record outcome and evidence hashes here, distinguishing executed, archived and reported evidence.
+Keep the historical Windows failures and separate Linux fake-duration observation unresolved unless
+direct evidence closes them. Use implementation and documentation checkpoints, normal push, then
+verify actual remote identity, clean status and unchanged parent/F2 refs. Remain on the child and
+return for independent focused review. No PR, merge, freeze, qualification, formal measurement or
+acceptance record update. Warn the human before the full test campaign that execution itself takes time.
+
+## Historical assignment: focused CI review and Windows disposition (2026-10-13)
 
 The Git-strategy correction is delivered, not independently accepted. PR remains blocked: Windows
 default npm test still fails, even though maxWorkers=2 passes. Do not reclassify the reduced-concurrency

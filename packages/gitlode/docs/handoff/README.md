@@ -8,8 +8,9 @@ documents.
 
 ## Active OpenTelemetry work
 
-PR preparation remains blocked by Windows default source-test failures. GC-strategy correction has
-green CI but awaits focused review and separate Windows disposition. Current assignment:
+PR preparation remains blocked by Windows default source-test failures. GC-strategy correction is
+independently accepted. Trunk assigned a Windows two-worker default and separate timeout ownership
+correction, followed by plain Windows npm test and independent review. Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.
 

@@ -197,6 +197,14 @@ from protocol/layout identity. The `fixture-<owned-root-name>` artifact director
 prepared repository, boundaries and final lifecycle ledger. Do not overlay this implementation onto
 F2's preserved harness: review and preserve a new source/dependency/toolchain closure first.
 
+The Linux lifecycle regression explicitly selects the `gc` maintenance strategy only for its
+low-threshold automatic-maintenance probe: Git 2.54 changed the default to `geometric`, whose
+activation is not controlled by `gc.autoPackLimit`. The probe keeps its two-pack setup and one-pack
+completion assertions, snapshots Trace2 child activation and successful completion immediately after
+the triggering commit returns, and checks supervisor cleanup and reachable history independently.
+A matching `maintenance.auto=false` control must retain two packs and dispatch no maintenance child.
+This test configuration does not change generated workload recipes or production Git heuristics.
+
 The supervised workflow accepts `requalify` with the same legacy/fixture/adapter/manifest/artifacts
 options as capture and an additional `--historical-selection /abs/selection.json`. That JSON names
 `quantity`, `calibrationSha256`, `manifestSha256`, original `protocol` and `legacyRevision`. Supply

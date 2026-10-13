@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { validateRequalification } from "../../scripts/tooling/fixture-requalification.js";
 import { supervisePerformance } from "../../scripts/tooling/performance-supervisor.js";
-import { fixtureGitEnvironment } from "../support/fixture-git.js";
+import { fixtureGitEnvironment, foregroundMaintenanceConfig } from "../support/fixture-git.js";
 import {
   FixtureLifecycle,
   fixtureGit,
@@ -163,9 +163,9 @@ describe("controlled fixture lifecycle", () => {
     },
   );
 
-  it.skipIf(process.platform !== "linux")(
-    "completes forced low-threshold automatic maintenance in the foreground",
-    async () => {
+  it.skipIf(process.platform !== "linux").each([true, false])(
+    "completes forced low-threshold automatic maintenance in the foreground: enabled=%s",
+    async (enabled) => {
       const index = ordinal++;
       const directory = join(root, `maintenance-${index}`);
       await cp(repository, directory, { recursive: true });
@@ -175,10 +175,36 @@ describe("controlled fixture lifecycle", () => {
       await fixtureGit(directory, ["commit", "-m", "reachable low threshold test input"]);
       await fixtureGit(directory, ["repack", "-d"]);
       expect(await fixtureGit(directory, ["count-objects", "-v"])).toContain("packs: 2");
+      const trace = join(root, `maintenance-trace-${index}.jsonl`);
+      const snapshot = join(root, `maintenance-return-${index}.json`);
+      // Git 2.54 changed the default strategy to geometric. This gc-specific threshold
+      // probe must select gc explicitly without changing the production fixture recipe.
+      const config = [
+        ...foregroundMaintenanceConfig,
+        "-c",
+        "maintenance.strategy=gc",
+        "-c",
+        `maintenance.auto=${enabled}`,
+        "-c",
+        "gc.autoPackLimit=1",
+        "-c",
+        "gc.auto=1",
+      ];
       const worker = join(root, `maintenance-worker-${index}.cjs`);
       await writeFile(
         worker,
-        `const {execFileSync}=require('node:child_process');const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GIT_')));env.GIT_CONFIG_NOSYSTEM='1';env.GIT_CONFIG_GLOBAL='/dev/null';execFileSync('git',['-c','maintenance.autoDetach=false','-c','gc.autoDetach=false','-c','gc.autoPackLimit=1','-c','gc.auto=1','commit','--allow-empty','-m','bounded maintenance test'],{cwd:${JSON.stringify(directory)},env});process.send({type:'performance-finished',exitCode:0},()=>process.disconnect());`,
+        `const {execFileSync}=require('node:child_process');
+const {readFileSync,writeFileSync}=require('node:fs');
+const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.toUpperCase().startsWith('GIT_')));
+Object.assign(env,{TZ:'UTC',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null'});
+const options={cwd:${JSON.stringify(directory)},env,encoding:'utf8'};
+const config=${JSON.stringify(config)};
+const configuration=execFileSync('git',[...config,'config','--show-origin','--show-scope','--list'],options);
+options.env.GIT_TRACE2_EVENT=${JSON.stringify(trace)};
+execFileSync('git',[...config,'commit','--allow-empty','-m','bounded maintenance test'],options);
+// Freeze completion evidence immediately on command return, before supervisor cleanup.
+writeFileSync(${JSON.stringify(snapshot)},JSON.stringify({configuration,trace:readFileSync(${JSON.stringify(trace)},'utf8'),objects:execFileSync('git',['count-objects','-v'],{...options,env:{...options.env,GIT_TRACE2_EVENT:'0'}})}));
+process.send({type:'performance-finished',exitCode:0},()=>process.disconnect());`,
       );
       const supervised = await supervisePerformance({
         executable: process.execPath,
@@ -188,7 +214,49 @@ describe("controlled fixture lifecycle", () => {
       expect(supervised.exitCode).toBe(0);
       const evidence = JSON.parse(await readFile(supervised.artifactPath, "utf8"));
       expect(evidence.cleanupConfirmed).toBe(true);
-      expect(await fixtureGit(directory, ["count-objects", "-v"])).toContain("packs: 1");
+      const returned = JSON.parse(await readFile(snapshot, "utf8"));
+      for (const setting of [
+        "maintenance.autodetach=false",
+        "gc.autodetach=false",
+        "maintenance.strategy=gc",
+        `maintenance.auto=${enabled}`,
+        "gc.autopacklimit=1",
+        "gc.auto=1",
+      ])
+        expect(returned.configuration).toContain(setting);
+      const events = (returned.trace as string)
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+      const maintenance = events.filter(
+        (event) => event.event === "child_start" && event.argv?.includes("maintenance"),
+      );
+      expect(maintenance).toHaveLength(enabled ? 1 : 0);
+      if (enabled) {
+        expect(maintenance[0].argv).toContain("--auto");
+        for (const command of ["maintenance", "gc", "repack"]) {
+          const start = events.findIndex(
+            (event) => event.event === "child_start" && event.argv?.includes(command),
+          );
+          expect(start, `${command} activation before command return`).toBeGreaterThanOrEqual(0);
+          const child = events[start];
+          const end = events.findIndex(
+            (event, position) =>
+              position > start &&
+              event.event === "child_exit" &&
+              event.sid === child.sid &&
+              event.child_id === child.child_id &&
+              event.code === 0,
+          );
+          expect(end, `${command} successful completion before command return`).toBeGreaterThan(
+            start,
+          );
+        }
+      }
+      expect(returned.objects).toContain(`packs: ${enabled ? 1 : 2}`);
+      expect(await fixtureGit(directory, ["count-objects", "-v"])).toContain(
+        `packs: ${enabled ? 1 : 2}`,
+      );
       expect((await fixtureIdentity(directory)).logical.count).toBe("8");
     },
   );

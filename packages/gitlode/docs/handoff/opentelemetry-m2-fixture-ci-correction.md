@@ -23,7 +23,8 @@ this section are historical. This packet authorizes implementation, not PR creat
 1. Read the independent review below and affected test/support code. Record the ownership path from
    Vitest cancellation through Git/CLI child close, outstanding filesystem work and root disposal.
    Prefer narrow test-owned wrappers and optional cancellation seams. Do not build a general process
-   framework. If shared formal sidecar behavior must change, stop and return the proposed scope first.
+   framework. The invocation-local sidecar seam below is now authorized; return before broadening
+   shared formal behavior beyond that scope.
 2. Consume the test cancellation signal; prevent subsequent fixture operations after cancellation.
    Terminate only demonstrably owned active children, including descendants where applicable on
    Windows. Await child close and outstanding async body/filesystem settlement before deleting roots.
@@ -60,7 +61,48 @@ verify actual remote identity, clean status and unchanged parent/F2 refs. Remain
 return for independent focused review. No PR, merge, freeze, qualification, formal measurement or
 acceptance record update. Warn the human before the full test campaign that execution itself takes time.
 
-## Scope return before shared sidecar changes (2026-10-13)
+## Trunk scope disposition and resumed implementation (2026-10-13)
+
+Reviewed the source and the scope return at `46ce72009a66fdf37c9fbc30c4b4a795439b9e5a`.
+The stop was correct: runRepositoryProfileSidecar owns a private root and unconditionally removes
+it in finally, beyond an outer test wrapper's control. Authorize the proposed optional invocation-local
+ownership seam in `scripts/telemetry-performance.ts`, and narrow optional cancellation support in
+fixture helpers required by the three assigned test paths. Resume the existing implementation packet
+on the same child from this disposition's documentation checkpoint; this is not implementation acceptance.
+
+Scope and required invariants:
+
+- The owner is supplied explicitly by tests, with no global registry, environment switch, dependency
+  on Vitest in shared tooling, or public product API. Register the private root immediately after
+  creation, including the cancellation-during-creation case. Register child ownership at launch,
+  before awaiting completion; keep the existing supervisor PID notification.
+- Cancellation gates subsequent preparation, process launch and result I/O. Already-started I/O
+  must settle before disposal. Keep result/capture parsing and provenance shared; do not substitute
+  fake successful captures or duplicate the sidecar implementation in tests.
+- Specify which layer owns final disposal. Avoid a circular wait: an inner finally must not await
+  the outer operation whose completion depends on that finally. If disposal is delegated to the test
+  owner, suppress inner removal only for that explicit ownership mode, and let outer teardown await
+  registered work before removing both roots. Handle registration failure without unsafe deletion.
+- Child abort/rejection and successful kill requests are not proof of process-tree quiescence.
+  Bounded unconfirmed termination retains both roots and secondary diagnostics; cancellation cannot
+  become an accepted capture. Preserve primary errors even if cleanup or reporting fails.
+- Calls omitting the seam retain their existing execution, capture/provenance, supervisor reporting
+  and cleanup contract. No changes to timed sampling, fixture recipe, formal thresholds, eligibility,
+  adoption or release acceptance. No general repair of the formal supervisor is authorized here.
+  The changed shared file is a new harness revision to review and preserve later, not the old frozen
+  harness; existing F2 refs/artifacts remain immutable.
+
+In addition to the active packet's tests, verify no-owner normal and error paths, owner normal disposal,
+real timeout cancellation with internal-root retention/disposal, and bounded completion without a
+cyclic wait. Keep existing repository-sidecar assertions and prove the real shared function uses the
+owner (not only a standalone helper test). Check that formal call sites omit the seam. Document the
+optional tooling ownership boundary in the contributor harness guide. No formal workload is needed.
+
+All previous stop/validation/delivery rules remain. Complete the Windows policy and other affected
+test lifetimes in this bounded session, then return for independent focused review. Windows default
+tests, EBUSY and PR readiness remain unresolved until that evidence is available.
+
+## Historical scope return before shared sidecar changes (2026-10-13)
 
 Inspected on the requested child at clean source
 `8b29d4dce7437b20767c69ca94411ece14ba7760`. Implementation is **not complete**; Windows

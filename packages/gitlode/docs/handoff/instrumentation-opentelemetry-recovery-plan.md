@@ -12,6 +12,10 @@ CI 38346905386 succeeded on attempt 1. Windows default concurrency still fails. 
 Windows-only two-worker supported default and assigns a separate timeout ownership/cleanup repair
 in the active correction packet. Existing reduced-concurrency success does not close either obligation;
 require corrected-source plain Windows npm test and independent review. PR remains blocked.
+Scope return `46ce720` identified unconditional private-root disposal inside the shared sidecar.
+Trunk authorizes an optional invocation-local test ownership seam, preserving no-owner formal
+behavior and immutable F2 artifacts. Resume the active correction packet; no implementation or
+Windows acceptance is inferred from this scope decision.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

@@ -10,7 +10,9 @@ documents.
 
 PR preparation remains blocked by Windows default source-test failures. GC-strategy correction is
 independently accepted. Trunk assigned a Windows two-worker default and separate timeout ownership
-correction, followed by plain Windows npm test and independent review. Current assignment:
+correction, followed by plain Windows npm test and independent review.
+The shared sidecar's optional invocation-local ownership seam is authorized after scope review;
+implementation and Windows validation remain pending. Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.
 

@@ -2,6 +2,10 @@
   "extends": "./tsconfig.release-boundary.json",
   "include": [
     "test/support/windows-launcher/launcher.ts",
-    "test/telemetry/windows-launcher.test.ts"
+    "test/support/windows-launcher/protocol.ts",
+    "test/support/windows-launcher/deadlines.ts",
+    "test/support/windows-launcher/case.ts",
+    "test/telemetry/windows-launcher.test.ts",
+    "test/telemetry/windows-launcher-protocol.test.ts"
   ]
 }

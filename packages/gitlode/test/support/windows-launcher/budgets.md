@@ -1,37 +1,48 @@
-# Stage B provisional finite validation budgets
+﻿# Stage B correction round 1 finite validation budgets
 
-Fixed before the first runtime validation. All eight Windows cases have a 30,000 ms test
-deadline. Fresh outer and inner hosts compile once each; ordinary mkdir, host startup and
-workload setup are inside the case timer. There is no prewarm or Stage A rerun.
+These ceilings remain unchanged and are hang detection, not performance thresholds. The original
+first failures and diagnosis are immutable; this correction awaits independent review. Existing
+fixture helpers, default five-second unit timeout and Windows two-worker cap are unchanged.
 
-**First execution failed and is stopped pending diagnosis/review.** The table is the planned
-provisional policy, not proof that the implementation meets it. The shell runner did not enforce
-the 260,000 ms matrix bound. `dispose()` applies 4,000 ms separately to shutdown and close,
-so its actual maximum is 8,000 ms rather than the intended shared 4,000 ms cleanup phase;
-the worst-case phase sum can exceed the test deadline. Receipt polling also keeps running
-after its Promise.race deadline. These are unresolved finite-driver/settlement findings.
-No deadline was extended and there was no second runtime execution. Do not run these cases
-again until disposition authorizes correcting these concrete defects.
+| Boundary                                   |                           Maximum ms | Implemented cutoff                                                                                                                                                                             |
+| ------------------------------------------ | -----------------------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fresh host ready                           |                                6,000 | Clip to enclosing work cutoff; compilation/startup are inside it.                                                                                                                              |
+| Native entry                               |                               15,000 | Clock starts before native launch; work cutoff at 11,000 reserves 4,000 for cleanup.                                                                                                           |
+| Outer scenario operation                   |                               16,000 | Starts at launch, including scenario bootstrap, inner ready, abandonment setup and inner cleanup.                                                                                              |
+| Inner work                                 | Remaining outer interval minus 4,000 | Ready and every local phase clip to this cutoff; no new work after it.                                                                                                                         |
+| Normal Node/output/Git or smallest Unicode |                                4,000 | Clip to inner work cutoff.                                                                                                                                                                     |
+| Orphan receipt / cancel / fault            |                                2,000 | Each poll/wait clips to inner cutoff. Poll timeout aborts and joins its read/delay.                                                                                                            |
+| Normal orphan completion                   |                                3,000 | Clip to inner cutoff; includes actual absence and both EOF drain tasks.                                                                                                                        |
+| Abandonment setup                          |                               10,000 | Inside outer operation, clipped to operation end minus inner cleanup.                                                                                                                          |
+| Controlled runner timeout                  |                                  100 | After proven live orphan and armed receipt; independent outer owner cancels and observes completion.                                                                                           |
+| Cleanup                                    |                         4,000 shared | One cached disposal promise, enclosing deadline; shutdown failure still attempts close. Outer cancel and disposal share one cutoff. Native fatal send and cleanup share one cutoff too.        |
+| Case watchdog                              |                               30,000 | Work stops by case start + 26,000; setup/mkdir and both hosts are included. Outer ready 6,000 + operation 16,000 fits before that cutoff; actual remaining time clips both.                    |
+| Runtime campaign                           |                              260,000 | Driver starts before tsx runner bootstrap; admission stops on first unexplained failure or insufficient remaining case time. Work cutoff at 256,000 reserves 4,000 for cleanup/log settlement. |
 
-| Phase                              |                  Budget ms | Basis and allowance                                                                                                                                                           |
-| ---------------------------------- | -------------------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fresh host readiness               |                 6,000 each | Prior compilation 385–457 ms and aggregate other host overhead about 820–1,283 ms; allow 2,000 ms startup/compile plus 4,000 ms scheduling. Not a proven cold bound.          |
-| Native job operation               |                     15,000 | At most four launches per inner transport/race case, three real generations per orphan; short work plus protocol/output settlement and scheduling. Host detects hanging jobs. |
-| Outer caller operation             |                     16,000 | Covers scenario bootstrap, inner startup, work and inner shutdown; 1,000 ms beyond native host bound for fault notification.                                                  |
-| Individual normal work/output/Git  |                      4,000 | Small Node/Git command, 200,000 output bytes; 1,000 ms work and pipe settlement plus 3,000 ms scheduling.                                                                     |
-| Orphan setup receipt               |          2,000 per receipt | Three tiny Node startups; includes polling and scheduling.                                                                                                                    |
-| Normal orphan completion           |                      3,000 | Deliberate 800 ms lifetime plus pipe/absence settlement and 2,200 ms scheduling.                                                                                              |
-| Controlled cancel/fault settlement |                      2,000 | Fault after established orphan plus 100 ms delay, or immediately after registration; short bound detects broken cancellation independent of outer timeout.                    |
-| Shutdown/host close                | 4,000 shared cleanup phase | Termination, observed zero, pipe and control close, scheduling. Never authorize deletion from leader close alone.                                                             |
-| Driver abandonment setup           |                     10,000 | Outer startup excluded from this phase but included in case; inner compilation + three generations + 100 ms fault delay + scheduling.                                         |
-| Each Vitest case                   |                     30,000 | 6,000 readiness + 16,000 operation + 4,000 cleanup + 4,000 setup/receipt/scheduling.                                                                                          |
-| Matrix driver                      |                    260,000 | Eight serial cases at 30,000 ms plus 20,000 ms Vitest bootstrap/log settlement; worker cap stays two.                                                                         |
+Arithmetic: inner cutoff = outer launch + min(16,000, case work remaining) - 4,000.
+Inner readiness consumes that same interval. The three transport waits, orphan polls and deliberate
+100 ms delay have local maxima, never additive entitlement. Native creation/launch work uses the
+entry's clock; 11,000 work + at most 4,000 cleanup stays within its 15,000 enclosing ceiling. Slow
+clipped cases fail and retain roots. Sequential admission requires 30,000 remaining before the
+campaign reserve; nine maximum-length cases are not promised to fit the campaign. If remaining
+time cannot admit a case, report incomplete with all later entries unreached, without extension.
 
-Transport: argument/cwd/environment identity, nonzero exit, 200,000-byte drain with 65,536-byte
-retention per stream, real Git. Launch-races: missing executable and three immediate repeated
-cancellations. Orphan-normal/cancel: leader and intermediate exit with an established descendant.
-Observation-loss/host-death/malformed: uncertainty must reject and retain roots. Driver-cleanup:
-abandoned inner driver leaves real processes; independent outer job cancels and observes absence.
-Fault roots and first failures are retained. An unexplained deadline failure stops this matrix
-for diagnosis; no timeout extension or automatic redesign. These are hang-detection budgets,
-not performance thresholds or acceptance.
+The process driver is separate from compilation/lint and finite in-memory vector checks. Its
+watchdog cancels the runner at the work cutoff and bounds runner/pipe settlement by the final
+cutoff. If the independent owner is unavailable, runner death authorizes no deletion. Every
+runtime root is retained for this correction review, including successful roots. No PID-based
+cleanup or deletion of historical roots occurs.
+
+Disposal joins bounded control writes, shutdown receipts and host/output close under one deadline.
+A native fatal path requests termination, tries observed job zero and drain-task settlement, then
+closes handles; unavailable observation/faulted drains remain uncertainty. Handle disposal and
+termination are never absence receipts. Case failure requests outer cancellation and joins its
+completion within cleanup before attempting disposal. The independent outer job's complete
+receipt is the only outer absence/output oracle. Main and secondary cleanup errors are separate.
+
+Validation order: finite typing/lint/format/diff and protocol/deadline vectors, source checkpoint,
+then unicode, transport, launch-races, orphan-normal, orphan-cancel, observation-loss, host-death,
+malformed, driver-cleanup. At most one execution per entry; no later admission after unexplained
+failure. Fault cases require established ancestry/parent-exit/live-descendant receipts, a real body
+Error and reached injection receipts. Controlled runner loss is established by an armed receipt,
+actual timeout rejection and independent outer cancellation/completion. No run is acceptance.

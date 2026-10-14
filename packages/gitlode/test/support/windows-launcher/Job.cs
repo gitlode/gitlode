@@ -107,6 +107,11 @@ public sealed class JobProbe : IDisposable {
     finally { Marshal.FreeHGlobal(data); }
   }
   public void Cancel() { Check(TerminateJobObject(job,123)); }
-  public void CloseJob() { if(job!=IntPtr.Zero) { CloseHandle(job); job=IntPtr.Zero; } }
-  public void Dispose() { CloseJob(); if(leader!=IntPtr.Zero) {CloseHandle(leader); leader=IntPtr.Zero;} }
+  public void ObservePipeFailures() {
+    // Observe faulted tasks explicitly; IsCompleted alone is not successful pipe settlement.
+    if(Stdout!=null && Stdout.IsFaulted) { var error=Stdout.Exception; }
+    if(Stderr!=null && Stderr.IsFaulted) { var error=Stderr.Exception; }
+  }
+  public void CloseJob() { if(job!=IntPtr.Zero) { IntPtr h=job; job=IntPtr.Zero; Check(CloseHandle(h)); } }
+  public void Dispose() { try { CloseJob(); } finally { if(leader!=IntPtr.Zero) { IntPtr h=leader; leader=IntPtr.Zero; Check(CloseHandle(h)); } } }
 }

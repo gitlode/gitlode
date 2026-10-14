@@ -1,12 +1,16 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
+import { now, cutoff, until, settleCleanup } from "./deadlines.ts";
+import { Frames, frameLimit, output } from "./protocol.ts";
+
 type Completion = { code: number; stdout: Buffer; stderr: Buffer; absent: true };
 type Pending = {
   resolve: (value: Completion) => void;
   reject: (error: Error) => void;
   code?: number;
   started: boolean;
+  observationDenied?: boolean;
 };
 
 // These are hang-detection budgets, including fresh host compilation, not performance thresholds.
@@ -21,8 +25,11 @@ export class WindowsLauncher {
   private sequence = 0;
   private failure?: Error;
   private sealed = false;
-  private text = "";
-  private stderr = "";
+  private frames = new Frames();
+  private readyObserved = false;
+  private disposal?: Promise<void>;
+  private queuedBytes = 0;
+  private writes = new Set<Promise<void>>();
   private readyResolve!: () => void;
   private readyReject!: (error: Error) => void;
   private shutdownResolve!: () => void;
@@ -38,38 +45,39 @@ export class WindowsLauncher {
   });
   readonly closed = new Promise<void>((resolve) => {
     this.host.once("close", () => {
-      if (!this.shutdownObserved) this.fail(new Error(`host lost; retain root: ${this.stderr}`));
+      if (!this.shutdownObserved) this.fail(new Error("host lost; retain root"));
       resolve();
     });
   });
   compileMs = 0;
   hostInJob = false;
+  readonly faultReceipts: Array<{ kind: string; phase: string }> = [];
+  readonly exits = new Map<string, number>();
+  readonly events: Array<{ kind: string; id?: string; at: number }> = [];
+  private readonly splitControl: boolean;
 
-  constructor() {
+  constructor(splitControl = false) {
+    this.splitControl = splitControl;
     // Consumers may not yet be awaiting these barriers when host startup fails.
     void this.ready.catch(() => {});
     void this.shutdown.catch(() => {});
-    this.host.on("error", (error) => this.fail(error));
-    this.host.stdin.on("error", (error) => this.fail(error));
-    this.host.stderr.on("data", (data: Buffer) => {
-      this.stderr = (this.stderr + data.toString()).slice(-65536);
-    });
-    this.host.stdout.setEncoding("utf8");
-    this.host.stdout.on("data", (data: string) => {
-      this.text += data;
-      if (this.text.length > 1048576) {
-        this.fail(new Error("oversized protocol; retain root"));
-        return;
+    this.host.on("error", () => this.fail(new Error("host spawn failure; retain root")));
+    this.host.stdin.on("error", () => this.fail(new Error("control write failure; retain root")));
+    // Drain diagnostic output without retaining exception text or inherited request values.
+    this.host.stderr.resume();
+    this.host.stdout.on("data", (data: Buffer) => {
+      if (this.failure) return;
+      try {
+        this.frames.push(data, (message) => this.message(message));
+      } catch {
+        this.fail(new Error("invalid control receipt; retain root"));
       }
-      let end: number;
-      while ((end = this.text.indexOf("\n")) >= 0) {
-        const line = this.text.slice(0, end);
-        this.text = this.text.slice(end + 1);
-        try {
-          this.message(JSON.parse(line) as Record<string, unknown>);
-        } catch (error) {
-          this.fail(error instanceof Error ? error : new Error(String(error)));
-        }
+    });
+    this.host.stdout.once("end", () => {
+      try {
+        this.frames.end();
+      } catch {
+        this.fail(new Error("truncated control receipt; retain root"));
       }
     });
   }
@@ -85,19 +93,46 @@ export class WindowsLauncher {
   }
   private message(message: Record<string, unknown>) {
     if (this.failure) return;
+    if (this.events.length < 100)
+      this.events.push({
+        kind: String(message.kind).slice(0, 32),
+        ...(typeof message.id === "string" && /^\d{1,16}$/.test(message.id)
+          ? { id: message.id }
+          : {}),
+        at: now(),
+      });
     if (
       message.kind === "ready" &&
+      !this.readyObserved &&
+      !this.sealed &&
       message.version === 1 &&
-      typeof message.compileMs === "number"
+      typeof message.compileMs === "number" &&
+      Number.isFinite(message.compileMs) &&
+      message.compileMs >= 0 &&
+      typeof message.hostInJob === "boolean"
     ) {
       this.compileMs = message.compileMs;
+      this.readyObserved = true;
       this.hostInJob = message.hostInJob === true;
       this.readyResolve();
       return;
     }
-    if (message.kind === "fatal")
-      throw new Error(`host uncertainty; retain root: ${String(message.error)}`);
-    if (message.kind === "shutdown" && this.sealed && this.pending.size === 0) {
+    if (message.kind === "fatal") {
+      this.faultReceipts.push({
+        kind: "fatal",
+        phase:
+          typeof message.phase === "string" && /^[a-z-]{1,32}$/.test(message.phase)
+            ? message.phase
+            : "unknown",
+      });
+      throw new Error("host uncertainty; retain root");
+    }
+    if (
+      message.kind === "shutdown" &&
+      !this.shutdownObserved &&
+      this.sealed &&
+      this.pending.size === 0
+    ) {
       this.shutdownObserved = true;
       this.shutdownResolve();
       return;
@@ -105,22 +140,40 @@ export class WindowsLauncher {
     const id = message.id;
     const item = typeof id === "string" ? this.pending.get(id) : undefined;
     if (!item) throw new Error("unknown launch receipt; retain root");
-    if (message.kind === "started" && !item.started && typeof message.pid === "number") {
+    if (
+      message.kind === "faultInjected" &&
+      message.fault === "observation-loss" &&
+      item.started &&
+      !item.observationDenied
+    ) {
+      item.observationDenied = true;
+      this.faultReceipts.push({ kind: "injected", phase: "observation-loss" });
+      return;
+    }
+    if (
+      message.kind === "started" &&
+      !item.started &&
+      Number.isSafeInteger(message.pid) &&
+      (message.pid as number) > 0
+    ) {
       item.started = true;
       return;
     }
     if (message.kind === "launchError" && !item.started) {
       this.pending.delete(id as string);
-      item.reject(new Error(String(message.error)));
+      const identity = message.error === "Win32Exception" ? "Win32Exception" : "LaunchError";
+      item.reject(new Error(`native launch failure: ${identity}`));
       return;
     }
     if (
       message.kind === "exit" &&
       item.started &&
       item.code === undefined &&
-      typeof message.code === "number"
+      Number.isSafeInteger(message.code) &&
+      (message.code as number) >= 0
     ) {
-      item.code = message.code;
+      item.code = message.code as number;
+      this.exits.set(id as string, item.code);
       return;
     }
     if (
@@ -130,9 +183,8 @@ export class WindowsLauncher {
       typeof message.stdout === "string" &&
       typeof message.stderr === "string"
     ) {
-      const stdout = Buffer.from(message.stdout, "base64"),
-        stderr = Buffer.from(message.stderr, "base64");
-      if (stdout.length > 65536 || stderr.length > 65536) throw new Error("output exceeds bound");
+      const stdout = output(message.stdout),
+        stderr = output(message.stderr);
       this.pending.delete(id as string);
       item.resolve({ code: item.code, stdout, stderr, absent: true });
       return;
@@ -141,12 +193,39 @@ export class WindowsLauncher {
   }
   private send(message: object) {
     if (this.failure) throw this.failure;
-    const text = JSON.stringify(message);
-    if (text.length > 1048576) throw new Error("launch request exceeds bound");
-    this.host.stdin.write(text + "\n");
+    let bytes = Buffer.from(JSON.stringify(message) + "\n", "utf8");
+    const byteCount = bytes.length;
+    if (bytes.length - 1 > frameLimit || this.queuedBytes + bytes.length > frameLimit + 1) {
+      this.fail(new Error("control write exceeds bound; retain root"));
+      throw this.failure;
+    }
+    this.queuedBytes += bytes.length;
+    const written = new Promise<void>((resolve, reject) => {
+      // The smallest Unicode oracle splits the request within its first Japanese code point.
+      if (this.splitControl) {
+        const index = bytes.indexOf(Buffer.from("日本語", "utf8"));
+        if (index >= 0) {
+          this.host.stdin.write(bytes.subarray(0, index + 1));
+          bytes = bytes.subarray(index + 1);
+        }
+      }
+      this.host.stdin.write(bytes, (error) => {
+        this.queuedBytes -= byteCount;
+        if (error) {
+          this.fail(new Error("control write failure; retain root"));
+          reject(this.failure);
+        } else resolve();
+      });
+    });
+    this.writes.add(written);
+    void written.then(
+      () => this.writes.delete(written),
+      () => this.writes.delete(written),
+    );
   }
   launch(exe: string, args: string[], cwd: string, environment: NodeJS.ProcessEnv = process.env) {
-    if (this.sealed) throw this.failure ?? new Error("admission sealed");
+    if (this.sealed || !this.readyObserved)
+      throw this.failure ?? new Error("admission sealed/not ready");
     const id = String(++this.sequence);
     const entries = Object.entries(environment).filter(
       (entry): entry is [string, string] => entry[1] !== undefined,
@@ -177,25 +256,32 @@ export class WindowsLauncher {
       denyObservation: () => this.send({ kind: "denyObservation", id }),
     };
   }
-  async dispose() {
+  dispose(enclosingEnd = Infinity) {
+    return (this.disposal ??= this.cleanup(cutoff(enclosingEnd, bounds.cleanup)));
+  }
+  private async cleanup(end: number) {
+    let sendError: unknown;
     if (!this.sealed) {
       this.sealed = true;
-      this.send({ kind: "shutdown" });
+      try {
+        this.send({ kind: "shutdown" });
+      } catch (error) {
+        sendError = error;
+      }
     }
-    await finite(this.shutdown, bounds.cleanup, "shutdown observation");
-    await finite(this.closed, bounds.cleanup, "host/output settlement");
+    await settleCleanup(end, [
+      {
+        name: "control writes",
+        run: async () => {
+          await Promise.all([...this.writes]);
+          if (sendError) throw sendError;
+        },
+      },
+      { name: "shutdown observation", run: () => this.shutdown },
+      { name: "host/output settlement", run: () => this.closed },
+    ]);
   }
 }
 export async function finite<T>(body: Promise<T>, ms: number, phase: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      body,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${phase} deadline; retain root`)), ms);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
+  return until(body, now() + ms, phase);
 }

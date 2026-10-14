@@ -89,6 +89,99 @@ The Windows cap does not establish that unrestricted concurrency or historical t
 failures were repaired. Test cancellation and disposal ownership are checked separately through
 the [fixture tooling boundary](telemetry-performance-harness.md#optional-test-fixture-ownership).
 
+### Windows with Volta: invocation-local executable setup
+
+Some Volta installations remove their standard shim directories from the PATH passed into an npm
+lifecycle. The interactive shell can resolve npm while a Vitest worker or its tsx child sees only
+`npm.cmd` and fails with `spawn npm ENOENT`. The tooling launches `npm` directly through Node's
+`execFile`, without a command shell; `npm.cmd` alone does not satisfy that executable launch.
+
+For this supported setup, use the installed `npm.exe`, verify a byte-identical local copy, and prepend
+its new directory only for the current invocation. No global PATH, toolchain installation or
+repository npm-resolution code change is needed. Run the following PowerShell procedure from the
+repository root after dependencies are installed. It records installed executable identity and
+versions, checks direct npm execution in both an actual npm lifecycle Vitest worker and its tsx
+child, and restores PATH even if validation fails. It uses installed dependencies in offline mode.
+The preflight is a resolution check, not the repository test campaign.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$originalPath = $env:PATH
+$npmExecutable = (Get-Command npm.exe -CommandType Application -ErrorAction Stop).Source
+$nodeVersion = (& node --version).Trim()
+$npmVersion = (& $npmExecutable --version).Trim()
+$nodeExecutable = (& volta which node).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the installed Volta Node' }
+$setupRoot = Join-Path (Get-Location) ('.cache/windows-npm-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $setupRoot | Out-Null
+$localNpm = Join-Path $setupRoot 'npm.exe'
+Copy-Item -LiteralPath $npmExecutable -Destination $localNpm
+$sourceHash = (Get-FileHash -LiteralPath $npmExecutable -Algorithm SHA256).Hash
+if ((Get-FileHash -LiteralPath $localNpm -Algorithm SHA256).Hash -ne $sourceHash) {
+    throw 'Installed npm executable copy differs'
+}
+@{ npmSource = $npmExecutable; npmCopy = $localNpm; sha256 = $sourceHash
+   nodeExecutable = $nodeExecutable; node = $nodeVersion; npm = $npmVersion } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $setupRoot 'binding.json') -Encoding utf8
+@'
+import { execFileSync } from 'node:child_process';
+console.log(JSON.stringify({
+  node: process.version,
+  execPath: process.execPath,
+  npm: execFileSync('npm', ['--version'], { encoding: 'utf8', timeout: 3000 }).trim(),
+  path: process.env.PATH,
+}));
+'@ | Set-Content -LiteralPath (Join-Path $setupRoot 'child.mjs') -Encoding utf8
+@'
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { expect, it } from 'vitest';
+it('resolves installed npm through the lifecycle worker and tsx child', () => {
+  const binding = JSON.parse(readFileSync(join(import.meta.dirname, 'binding.json'), 'utf8').replace(/^\uFEFF/, ''));
+  const worker = {
+    node: process.version, execPath: process.execPath, path: process.env.PATH,
+    npm: execFileSync('npm', ['--version'], { encoding: 'utf8', timeout: 3000 }).trim(),
+  };
+  const child = JSON.parse(execFileSync(process.execPath, [
+    resolve('node_modules/tsx/dist/cli.mjs'), join(import.meta.dirname, 'child.mjs'),
+  ], { encoding: 'utf8', timeout: 10000 }));
+  writeFileSync(join(import.meta.dirname, 'resolution.json'), JSON.stringify({ binding, worker, child }, null, 2));
+  for (const result of [worker, child]) {
+    expect(result.node).toBe(binding.node);
+    expect(result.npm).toBe(binding.npm);
+    expect(result.execPath.toLowerCase()).toBe(binding.nodeExecutable.toLowerCase());
+  }
+});
+'@ | Set-Content -LiteralPath (Join-Path $setupRoot 'resolution.test.mjs') -Encoding utf8
+$testPath = (Join-Path $setupRoot 'resolution.test.mjs').Replace('\', '/')
+"export default { test: { include: ['$testPath'], maxWorkers: 2 } };" |
+    Set-Content -LiteralPath (Join-Path $setupRoot 'vitest.config.mjs') -Encoding utf8
+try {
+    $env:PATH = $setupRoot + ';' + $originalPath
+    if ((& node --version).Trim() -ne $nodeVersion -or
+        (& $localNpm --version).Trim() -ne $npmVersion) { throw 'Toolchain version changed' }
+    & $npmExecutable exec --offline -- vitest run --config (Join-Path $setupRoot 'vitest.config.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'npm lifecycle worker/child resolution failed' }
+    # Run the required repository commands here, before PATH is restored.
+} finally {
+    $env:PATH = $originalPath
+    Write-Output "Setup receipts retained at $setupRoot; original PATH restored"
+}
+```
+
+At the marked location inside `try`, run `npm test` or the required build/test commands; those commands
+inherit the corrected environment. Running them after `finally` uses the restored environment.
+Retain `binding.json`, `resolution.json` and the complete command logs with the source commit when
+reporting results. The unique `.cache/windows-npm-*` directory keeps receipts and the executable copy
+without deleting other invocations' evidence. Do not download a replacement executable or use an
+agent-specific cache location as the installed source.
+
+The verified correction preserves the installed versions rather than prescribing a replacement
+version. A successful campaign with this procedure is evidence for the corrected invocation only;
+it does not establish that the unmodified Volta environment works. If executable resolution or the
+version assertions fail, preserve the first log and resolve the setup before running the campaign.
+
 ### Optional coverage
 
 ```bash

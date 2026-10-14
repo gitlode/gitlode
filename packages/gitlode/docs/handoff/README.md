@@ -26,6 +26,9 @@ deadline/cleanup accounting; no complete matrix rerun or deadline extension is a
 Diagnosis `ee1dc83` confirms encoding/accounting defects and establishes the detached orphan setup.
 The active packet now assigns their minimal correction with clipped enclosing deadlines and ordered,
 stop-on-first-unexplained-failure validation. Standalone acceptance and helper integration remain pending.
+Correction `f45062d`, outcome `ef6d171`, reports finite checks and all nine process entries passed.
+Current assignment is independent review of the complete standalone launcher, not only the correction;
+normal-user transport and inherited-handle audit evidence must be explicitly assessed.
 Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.

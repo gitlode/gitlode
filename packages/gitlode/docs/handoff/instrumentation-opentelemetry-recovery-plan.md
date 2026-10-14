@@ -49,6 +49,10 @@ Stage B correction round 1, explicitly accepting clipped phase ceilings within e
 a shared four-second cleanup budget and enforced driver admission/limits. Process validation proceeds
 once per entry in dependency order, stopping unexplained failure; no automatic retry or deadline
 extension. Successful standalone completion still requires independent review before integration.
+Round-1 implementation `f45062d`, outcome `ef6d171`, reports eight unit tests, native vectors and
+nine source-bound process entries passed once (35.82 seconds). Assign independent complete Stage B
+review with bounded probes for concrete gaps, particularly normal-user transport/handle inheritance.
+No standalone acceptance, helper integration, Unix P1 completion or PR readiness is inferred.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

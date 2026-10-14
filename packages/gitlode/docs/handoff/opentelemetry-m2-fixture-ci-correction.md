@@ -9,7 +9,58 @@ unaccepted; existing helpers are not integrated. Original diagnosis/first-failur
 preserved in the [diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: Stage B diagnosed correction round 1 (2026-10-14)
+## Active assignment: independent standalone Stage B review (2026-10-14)
+
+Correction outcome `ef6d17131c7f907a168781f3352f1a5409814e66` reports all finite checks passed.
+Review fixed implementation `f45062df73561ea563b5b0ad078bd92694bc910f`, including the COMPLETE
+standalone launcher introduced since `52683613481a89b92a51a364f5b1c19ded8cd484`, not only round-1
+changes from `baee244`. Read [round-1 outcome](opentelemetry-m2-stage-b-correction-round1.md),
+[diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md) and the original execution record.
+The outcome commit adds evidence/docs; check for any unreported runtime changes after the fixed OID.
+P2 remains accepted; Stage B/P1/PR readiness are not yet accepted. No helper integration is authorized.
+
+Use a fresh independent session on the same child from this packet checkpoint. Review:
+
+1. Authorized standalone boundary, real Node/Git launch semantics, argument/env/cwd and output/exit
+   preservation. Check creation-time assignment, private job ownership, ABI/prerequisite checks,
+   nested jobs, launch failure and handle lifetimes. Inspect the actual inherited-handle allowlist
+   and pipe duplication: no job/control handles may leak. Explicitly retain unsupported spawn-model
+   limits; do not invent a universal process containment guarantee.
+2. UTF-8 incremental byte framing, size/queue/output bounds and backpressure, schema/order/ID/base64
+   validation, EOF and malformed behavior. Ensure errors do not disclose requests/environments.
+   Verify host input polling/drain task failures and native exception paths enter bounded cleanup.
+3. Enclosing monotonic deadlines, cached disposal/shared cleanup, cancelled and joined pollers,
+   remaining-time clipping and admission stopping. Reconcile actual code with budgets.md, including
+   delayed launch/read/write/control-send paths; short successful cases alone do not prove deadlines.
+   Confirm real primary errors and separate cleanup uncertainty survive host/fault failures.
+4. Leader/intermediate exit with live descendants, normal and cancelled job absence, independent
+   owner behavior on runner timeout and host death. Distinguish inner uncertainty from outer absence;
+   outer success cannot rewrite inner failure. All roots retained is valid evidence preservation but
+   not itself proof that a future helper integration would delete safely. Review test-driver cleanup
+   and host/pipe/handle close paths as carefully as the launcher itself.
+
+Independent validation is bounded: execute explicit launcher strict typing and the finite unit/native
+vector checks; inspect the nine saved source-bound runtime cases and the 108-member seal with hashes
+and byte lengths. Confirm reached fault injection, ancestry/parent-exit evidence and actual absence/
+output receipts, preserving original failed campaign attribution. Do not automatically rerun the whole
+campaign or full OS/package suite. Select a small number of independent process probes only for
+specific unresolved boundaries. In particular, address the outcome's unverified normal-user transport
+and inherited-handle runtime audit with concrete evidence or a clearly justified remaining gate; do
+not silently treat them as passed. Preserve first probe failures and stop on unsafe/unknown cleanup.
+No arbitrary timeout extension or repeated tuning; no formal performance work.
+
+Report accepted/corrections-required for standalone Stage B, mandatory findings with concrete paths,
+executed versus saved evidence, remaining limits and whether it is ready for a separately assigned
+optional-helper integration/Unix P1 correction. This review cannot accept P1 as integrated or authorize
+PR readiness. New hypothetical hardening or broad framework redesign is not a review requirement.
+
+Append a concise review to the round-1 outcome (or a linked dedicated review if needed), update active
+routing, format write/check and diff check, documentation-only checkpoint/normal push. Verify actual
+remote/clean/unchanged parent M2 `4f09265` and F2 `4ea24d5`, remain on child. Restore temporary probe
+source changes and retain evidence safely. No implementation repairs, PR, merge, freeze, helper
+integration, formal runs or release acceptance updates. Warn before real-process checks about time.
+
+## Historical assignment: Stage B diagnosed correction round 1 (2026-10-14)
 
 Execution status: completed once; see the [correction return](opentelemetry-m2-stage-b-correction-round1.md).
 All nine runtime entries passed once in dependency order, no unreached entries or runtime retry.

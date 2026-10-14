@@ -5,7 +5,10 @@ test boundary. Correction round 1 implements the confirmed encoding, orphan setu
 findings from the [diagnosis](../handoff/opentelemetry-m2-stage-b-first-failure-diagnosis.md), under
 its [assignment](../handoff/opentelemetry-m2-fixture-ci-correction.md). Its one source-bound campaign
 passed all nine entries; see the [correction return](../handoff/opentelemetry-m2-stage-b-correction-round1.md).
-Independent focused review is pending. P1, integration and PR readiness remain unaccepted;
+[Independent review](../handoff/opentelemetry-m2-stage-b-independent-review.md) returned corrections
+required for error paths, enforced deadlines and settlement. Normal-user/handle runtime gates remain
+open. The mechanism descriptions below do not establish delayed-path correctness.
+P1, integration and PR readiness remain unaccepted;
 existing fixture helpers, product/no-owner/formal helpers and the Unix repair are outside this slice.
 
 `launcher.ts` owns invocation-local control, bounded writes, ordered launch receipts, strict output

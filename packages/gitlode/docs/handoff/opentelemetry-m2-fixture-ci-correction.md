@@ -1,15 +1,30 @@
 # Fixture CI correction before PR
 
-Latest return: [Stage B diagnosed correction round 1](opentelemetry-m2-stage-b-correction-round1.md).
+Latest return: [independent standalone Stage B review](opentelemetry-m2-stage-b-independent-review.md),
+**corrections required**. Prior correction outcome:
+[Stage B diagnosed correction round 1](opentelemetry-m2-stage-b-correction-round1.md).
 The confirmed encoding, detached orphan setup and deadline/settlement corrections were checkpointed
 at `f45062df73561ea563b5b0ad078bd92694bc910f` from `baee244abcad8ff2ac00115f596bc6be296f3d1d`.
 Finite static/in-memory checks and one dependency-ordered nine-entry runtime campaign passed;
-return for independent focused review, not self-acceptance. Stage B/P1/PR readiness remain
+independent review verified that evidence but found delayed/error-path blockers. Stage B/P1/PR readiness remain
 unaccepted; existing helpers are not integrated. Original diagnosis/first-failure evidence remains
 preserved in the [diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: independent standalone Stage B review (2026-10-14)
+## Active routing: standalone Stage B corrections required (2026-10-14)
+
+Independent review of fixed `f45062d` from checkpoint `8ca31cb` returned
+**corrections required** in the [complete-launcher review](opentelemetry-m2-stage-b-independent-review.md).
+Saved nine-case evidence and its 108-member seal were independently verified. Mandatory findings cover
+read-stream errors, native cleanup reservation, stalled disposal/settlement, enclosing file I/O bounds
+and cleanup exception preservation. Normal-user transport/handle runtime audits remain open.
+Return to trunk for bounded correction disposition; no correction or new campaign is assigned here.
+P2 remains accepted; standalone Stage B/P1/PR readiness remain unaccepted. No helper integration,
+Unix repair, PR, merge, freeze, formal measurement or acceptance update is authorized by this review.
+
+## Historical assignment: independent standalone Stage B review (2026-10-14)
+
+Execution status: completed; see the [independent review](opentelemetry-m2-stage-b-independent-review.md).
 
 Correction outcome `ef6d17131c7f907a168781f3352f1a5409814e66` reports all finite checks passed.
 Review fixed implementation `f45062df73561ea563b5b0ad078bd92694bc910f`, including the COMPLETE

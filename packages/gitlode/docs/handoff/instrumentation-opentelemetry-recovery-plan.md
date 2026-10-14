@@ -54,6 +54,11 @@ nine source-bound process entries passed once (35.82 seconds). Assign independen
 review with bounded probes for concrete gaps, particularly normal-user transport/handle inheritance.
 No standalone acceptance, helper integration, Unix P1 completion or PR readiness is inferred.
 
+The [independent complete-launcher review](opentelemetry-m2-stage-b-independent-review.md) of
+`f45062d` returned corrections required. Saved nine-case/seal evidence is verified; delayed-path
+deadlines, error handling and settlement need bounded correction disposition. Normal-user transport
+and inherited-handle runtime audits remain gates. The review assigns no implementation or campaign.
+
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.
 Trunk verified local/remote M2 and old-F ancestry. Child and experiment histories are preserved

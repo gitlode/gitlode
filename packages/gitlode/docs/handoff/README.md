@@ -27,8 +27,10 @@ Diagnosis `ee1dc83` confirms encoding/accounting defects and establishes the det
 The active packet now assigns their minimal correction with clipped enclosing deadlines and ordered,
 stop-on-first-unexplained-failure validation. Standalone acceptance and helper integration remain pending.
 Correction `f45062d`, outcome `ef6d171`, reports finite checks and all nine process entries passed.
-Current assignment is independent review of the complete standalone launcher, not only the correction;
-normal-user transport and inherited-handle audit evidence must be explicitly assessed.
+The [independent complete-launcher review](opentelemetry-m2-stage-b-independent-review.md) returned
+corrections required for error/deadline/settlement paths; normal-user transport and inherited-handle
+runtime gates remain open. Return to trunk for bounded correction disposition; no new campaign or
+helper integration is assigned by the review.
 Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.

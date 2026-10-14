@@ -1,5 +1,12 @@
 # Stage B diagnosed correction round 1 (2026-10-14)
 
+Independent review returned **corrections required**; see the
+[complete-launcher review](opentelemetry-m2-stage-b-independent-review.md).
+Saved nine-case success remains valid for its reached oracles. Read-stream errors, delayed-path
+deadlines, active disposal/settlement, file I/O bounds and cleanup exception preservation remain
+mandatory corrections. Normal-user transport and inherited-handle runtime audits remain open.
+This historical correction outcome grants no standalone acceptance or helper integration.
+
 Returned from `feature/otel-redesign_M2_fixture`, starting clean at
 `baee244abcad8ff2ac00115f596bc6be296f3d1d`, under the packet's
 [Active assignment](opentelemetry-m2-fixture-ci-correction.md#active-assignment-stage-b-diagnosed-correction-round-1-2026-10-14).

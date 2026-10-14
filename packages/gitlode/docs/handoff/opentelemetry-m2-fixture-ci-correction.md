@@ -1,5 +1,9 @@
 # Fixture CI correction before PR
 
+Latest execution: [P2 delivery and P1 scope return](#p2-delivery-and-p1-scope-return-2026-10-14).
+P1 remains unimplemented under the active assignment's explicit pre-implementation stop condition;
+P2 is delivered for independent focused review. The combined ownership correction is not complete.
+
 ## Active assignment: ownership P1/P2 correction (2026-10-14)
 
 Trunk confirms review `4ecc79f6b01a63f9ae684b62dbd4431196ca8468`: ownership corrections required,
@@ -941,3 +945,116 @@ parent remains `4f09265791c82452a5800cc6d9855938bf88a46e` and both F2 preservati
 `4ea24d53afc57778addf3f47752e0fe73a7011ea`. Delivery is this document only, format write/check and
 diff check, normal commit/push, followed by actual remote/clean/ref verification. No implementation
 repair, PR, merge, freeze, formal measurement, qualification or acceptance update was performed.
+
+## P2 delivery and P1 scope return (2026-10-14)
+
+Started clean at assigned `9e1e12d7a9bbe832a61e1a8e5024b6642cd8b975` on
+`feature/otel-redesign_M2_fixture`. P2 documentation checkpoint is
+`05134d052a8e53cfa3491654d43140401a554736`. This delivery is **P2 pending independent focused review,
+P1 returned before implementation for scope disposition**, not completion or self-acceptance of the
+combined assignment. Windows PR-readiness remains blocked. Product, no-owner/formal supervisor,
+fixture recipe, Windows worker policy, deadlines, skips and acceptance records are unchanged.
+
+### P1: concrete existing-mechanism limitation and bounded alternatives
+
+`fixture-git.ts:115` uses ordinary `execFile` for Windows. `TestFixtureOwner.child` records only the
+leader's PID/close promise, not its creation identity, a containment handle or descendant identities
+at launch. Windows tree evidence is first collected in `stop`, only while the leader is still alive.
+The closed-state shortcut at line 116 and close-only disposal barrier at lines 187-198 remain exactly
+as reviewed. Removing the shortcut alone cannot supply the missing evidence on normal completion.
+
+A post-exit CIM snapshot can contain a surviving grandchild whose `ParentProcessId` names an already
+exited intermediate process. Neither that intermediate row nor the owned leader's creation identity
+is retained by this owner. Walking the snapshot from the closed leader therefore cannot establish
+its complete tree. Polling while the leader runs can miss an intermediate process born and exited
+between observations. Recording just the leader identity, trusting a missing PID or killing by a
+reused PID would not close this gap. With the existing seam, conservative retention for every closed
+Windows leader is the only general fallback; the active assignment explicitly excludes that as a
+substitute for a working ordinary child-only path.
+
+This is the packet's stop condition: “If the existing ownership mechanism cannot support normal
+completion safely without a broader platform redesign, return the concrete limitation and bounded
+alternatives before implementing it.” No P1 code patch, Unix-only partial fix, new framework or
+weaker leader-only guarantee was applied. Existing owner/helper code remains byte-for-byte unchanged
+in Git relative to the starting checkpoint.
+
+Recommended bounded next packet: evaluate a test-only Windows Job Object launcher that assigns the
+owned leader before it can spawn descendants, prevents escape, retains an invocation-local job
+handle and proves the job's active-process count is zero before root disposal. Limit the evaluation
+to launch/registration/close races, child-only normal completion, orphaned intermediate descendants,
+termination, unavailable observations and primary-error preservation; leave no-owner execution and
+the formal supervisor untouched. This requires a native launch/containment seam beyond the current
+`ChildProcess` callback and needs explicit scope disposition, rather than silently adding it here.
+A smaller deliverable alternative is a separately authorized Unix-only correction with Windows P1
+still blocked; it cannot satisfy Windows PR readiness. Neither alternative is implemented or accepted.
+
+New Windows deterministic boundary execution uses a simulated closed child with no PID and no
+registered root. Both normal disposal and abort-after-close return `quiescent: true`, `removed: true`
+and no termination observations. This verifies the existing decision path safely; it is **not** a
+real descendant/root-deletion reproduction or a passing corrected regression.
+
+The real Windows probe used the actual `fixtureExec` and owner, with finite Node leader/intermediate/
+descendant code and independent evidence files. It did not establish the required absent-ancestor/
+live-descendant snapshot in either invocation and failed explicitly; neither missing observations
+nor failed setup are counted as success. The first probe also mishandled PowerShell singleton JSON;
+its first script/log were retained before normalizing the JSON for the second invocation. The exact
+cause of the remaining failed fixture establishment is unproven. Evidence roots were deliberately
+not registered for removal, no broad process termination or evidence deletion was attempted, and all
+created evidence is retained. The independently reviewed Linux counterexample above remains reported
+prior-session evidence, not a new Linux reproduction in this session.
+
+### P2: delivered guidance and executed procedure
+
+The durable [build/test guide](../contributing/build-test-release.md#windows-with-volta-invocation-local-executable-setup)
+now resolves the installed `npm.exe`, verifies its local copy by SHA-256, records installed Node/npm
+identity, prepends a unique repository-local directory for the invocation and restores PATH in
+`finally`. It explains direct `execFile` versus `npm.cmd`, retains receipts and distinguishes corrected
+setup from an unmodified Volta environment. No agent cache path, replacement toolchain or repository
+npm-resolution implementation is introduced.
+
+Executed the exact documented PowerShell procedure, extracted from the formatted guide at clean
+fixed `05134d0`; its bytes also match the initial preflight script. The npm lifecycle runs an actual
+Vitest worker, which checks direct npm execution and starts a tsx child that checks it again.
+**One file/one test passed**, exit 0, 953 ms. Both paths observe Node 22.23.1/npm 11.11.0 and the
+installed Node executable. The source and local `npm.exe` copy share SHA-256
+`7b648c48ba1473baa724d1cecf9df16e36ca12c768977d72745032349368953f`.
+The outer binding explicitly confirms PATH restoration and clean Git status before/after.
+The initial identical procedure also passed once (968 ms); neither is a full source-test campaign.
+
+Format write/check and diff check passed for P2. Final handoff formatting and diff checks are required
+again before its documentation commit. Relevant validation is documentation formatting and the
+executable-resolution preflight; no source implementation changed. Build, fixture strict typing,
+four-suite Windows/Linux regression, plain Windows root `npm test`, fixed-SHA Linux/release/package
+CI and P1 fail-before/pass-after are **not executed** here: the P1 pre-implementation stop condition
+was reached, so the combined implementation/focused-success campaign gate was not reached. They
+remain required for an authorized complete P1 correction. No retry-until-green campaign was started.
+Historical ENOENT, unrestricted Windows latency/EBUSY, Unix ESRCH, first-driver cleanup and separate
+fake-duration failures remain historical/unresolved as previously attributed.
+
+### Evidence and delivery binding
+
+Local evidence: `.cache/ownership-p1-p2/`. Sealed archive:
+`.cache/ownership-p1-p2-evidence-sealed.zip`, SHA-256
+`94598b396a2cdbf20768c64899952953a360503af928adfcd7cd5c46bbc11af5`.
+Its manifest SHA-256 is `8d5c5f7c8e4445e6e081bd1d4c67881bf47bdbcc55095e94d6d09e2eeaff2581`;
+all **30** listed members were rehashed from the archive with zero mismatches. It preserves scripts,
+first/final probe logs, simulated-boundary receipts, both P2 preflight logs, fixed-source/environment
+binding, executable copies and worker/child resolution receipts. An earlier preliminary archive
+had incomplete receipt copies due to a packaging command error and is retained separately; only the
+named sealed archive is the delivery archive. Windows zip path separators were normalized during
+verification. No existing sealed archive was modified.
+
+Principal receipts: `documented-setup.log` SHA-256
+`63353842848affcc94fcc4689baee7ebf852da4effd2e225c8d0ae1b0f5437ce`;
+`documented-setup-binding.json` SHA-256
+`cc18c9f0c6be249307e5638ea5ab9167a88e5d46640a57857ea238b0bfce37bc`.
+The binding's receipt directory was filled from the retained command log after execution because a
+script-local variable was unavailable to its caller; this metadata repair did not rerun validation.
+
+Pre-push live remote: child `9e1e12d7a9bbe832a61e1a8e5024b6642cd8b975`, parent
+`4f09265791c82452a5800cc6d9855938bf88a46e`, both F2 archive refs
+`4ea24d53afc57778addf3f47752e0fe73a7011ea`. Delivery uses the P2 checkpoint and this documentation
+checkpoint, normal push, then actual remote/clean/unchanged parent/F2 verification. Remain on the
+child. Return P2 for independent focused re-review and P1 for explicit scope disposition; do not
+represent this as complete ownership correction. No PR, merge, freeze, formal measurement,
+qualification or acceptance update is performed.

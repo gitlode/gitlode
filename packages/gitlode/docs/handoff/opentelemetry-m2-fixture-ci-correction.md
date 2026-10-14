@@ -4,7 +4,77 @@ Latest execution: [Windows containment feasibility and independent P2 review](#w
 P1 remains unimplemented; the prototype returns feasibility for trunk's implementation decision.
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: bounded Windows containment feasibility (2026-10-14)
+## Active assignment: standalone test launcher and suitability gate (2026-10-14)
+
+Trunk accepts independent P2 review at `56f19834ddcf40588dc1e7216e03baec06d60a29`, for fixed
+guidance `05134d0`. P1 remains open. The Job Object prototype supports bounded feasibility only;
+1,283.21 ms is aggregate host overhead outside four case operation timings, NOT a per-launch cost.
+Real Git launches, general argument/environment transport and captured pipes remain unverified.
+
+Authorize a standalone test-only Windows launcher slice on the same child from this packet's
+checkpoint. No wiring into existing fixtureExec/owner/sidecar, no product/no-owner changes and no
+new npm/native dependencies or installed toolchain. Keep parent/F2 immutable and P2 accepted.
+Use one hidden PowerShell host and one Add-Type compilation per owner invocation, with separate
+owned jobs as needed; no per-command compilation, cross-test daemon or global process registry.
+Source may be checkpointed under test/support with narrowly scoped strict checks and finite tests.
+
+### Stage A: suitability before full transport work
+
+Use the preserved prototype as evidence, not production-ready source. Establish minimal real Node
+and Git execution under the job, including a spaced working path. First inspect actual command/I/O
+counts in the three affected test paths. Choose their most demanding relevant five-second path,
+not a trivial empty child. Exercise a small isolated equivalent command sequence through one host,
+with ordinary test setup counted. Keep the repository's existing helpers/tests/config unchanged.
+Use at most two recorded suitability executions (cold and subsequent), under the supported Windows
+two-worker context with a representative second workload; record observed load and its limitations.
+This is a finite fit check, not a performance benchmark or acceptance of all five-second tests.
+
+Report elapsed totals and setup/compilation/launch/I/O breakdown. If either valid execution misses
+the existing deadline, or the evidence shows no practical margin, stop before Stage B and return
+the numbers and one bounded alternative. Do not raise deadlines, reduce worker policy, prewarm
+outside the measured setup invisibly, tune repeatedly or build a native executable as a workaround.
+If a representative fit check cannot be built without the full transport, explain that limitation
+and return rather than implement the whole transport first. Preserve first setup failures.
+
+### Stage B: standalone transport, only after Stage A supports proceeding
+
+Implement the smallest invocation-local protocol sufficient for the existing helper commands:
+explicit readiness, launch ID, absolute executable, argument array, cwd/environment, started/exit,
+bounded output, cancel, observed job absence and host shutdown. Use creation-time job assignment,
+private non-inherited job handles and explicit pipe-handle ownership. No suspended/unassigned fallback.
+Serialize only what the actual caller needs; keep workload stdout/stderr distinct from control traffic.
+Seal launch admission before final zero observation. Preserve exit/error identity and await output
+settlement separately from leader exit and job absence. Unknown membership, query failure, malformed
+protocol, host EOF/death or bounded timeout cannot authorize fixture deletion.
+
+Finite tests must cover spaces/quotes/trailing backslashes/empty arguments, environment/cwd, bounded
+stdout/stderr and nonzero exit; child-only completion and real multi-generation orphan normal/cancel;
+registration/abort races and launch failure; unavailable observation and actual host death. Confirm
+no job/control handle leaks to workloads. Distinguish tested Node/Git CreateProcess descendants from
+unsupported WMI/broker/adversarial escapes. Preserve root/evidence on uncertainty; the test driver
+must itself confirm owned termination before cleanup and preserve primary errors.
+
+Record platform requirements (Windows 10+ and validated x64 ABI), normal-user/nested-job behavior,
+failure behavior when prerequisites are absent, source responsibilities and maintenance cost in
+the contributor tooling guide, explicitly labeling this standalone/non-integrated status. Test
+selection/config must keep non-Windows runtime cases appropriately isolated while TypeScript checks
+still cover the adapter; do not alter existing skip/deadline policy or existing assertions.
+
+### Review boundary and delivery
+
+Run only new finite launcher checks, strict typing, relevant lint, format write/check and diff check.
+Use build if required by the checks; no full OS/package or formal measurement campaign. Ordinary
+push CI may run, but no rerun-until-green. Store exact source/commands/results and sealed prototype/
+test receipts, separating Stage A suitability from Stage B correctness. Warn before executions that
+startup and child-process work takes time. Return costs/limits plus a proposed integration seam and
+Unix correction scope; do not implement that integration or claim P1/PR readiness.
+
+Checkpoint source and outcome, normal push and actual remote/clean/parent/F2 verification; remain
+on child. Independent focused review must accept the standalone boundary before trunk authorizes
+integration. A blocker returns bounded diagnosis, not an automatic second framework implementation.
+No PR, merge, freeze, eligibility, formal runs or acceptance updates.
+
+## Historical assignment: bounded Windows containment feasibility (2026-10-14)
 
 Trunk accepts the scope stop at `9731f6cb6adea5dea8bd4fab8d10c05dc1584a4b`, not P1 completion.
 P2 `05134d052a8e53cfa3491654d43140401a554736` remains pending independent review. PID snapshots

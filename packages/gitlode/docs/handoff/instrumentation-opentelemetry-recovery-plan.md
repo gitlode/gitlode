@@ -28,6 +28,10 @@ P2 guidance `05134d0` is delivered, not independently accepted. Scope return `97
 the current Windows snapshot mechanism's missing ancestry evidence after intermediate exit. Trunk
 assigns finite test-only Job Object feasibility and P2 review before deciding implementation scope;
 no native dependency or shared-helper integration is yet authorized. P1 and PR readiness remain open.
+Outcome `56f1983` supports bounded Windows containment feasibility and independently accepts P2.
+Trunk assigns standalone test launcher work gated first by representative five-second suitability;
+full transport follows only if that gate supports it. Helper integration and the remaining Unix P1
+correction require subsequent review/disposition. No formal workload or acceptance is authorized.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

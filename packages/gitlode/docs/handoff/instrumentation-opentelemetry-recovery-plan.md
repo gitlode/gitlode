@@ -44,6 +44,11 @@ failures. UTF-8 control transport and driver/cleanup accounting need correction;
 cause remains unproven and dependent fault cases were not reached. Trunk assigns fresh bounded
 diagnosis before correction, not acceptance review. Preserve first evidence and existing deadlines;
 no full matrix rerun, helper integration or formal campaign at this step.
+Diagnosis `ee1dc83` supplies minimal corrections and a proven detached orphan setup. Trunk authorizes
+Stage B correction round 1, explicitly accepting clipped phase ceilings within enclosing deadlines,
+a shared four-second cleanup budget and enforced driver admission/limits. Process validation proceeds
+once per entry in dependency order, stopping unexplained failure; no automatic retry or deadline
+extension. Successful standalone completion still requires independent review before integration.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

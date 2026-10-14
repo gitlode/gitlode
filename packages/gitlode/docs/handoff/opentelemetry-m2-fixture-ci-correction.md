@@ -8,7 +8,72 @@ Standalone source is checkpointed, but Stage B correctness remains failed. P1 re
 existing helpers are not integrated.
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: Stage B bounded diagnosis before correction (2026-10-14)
+## Active assignment: Stage B diagnosed correction round 1 (2026-10-14)
+
+Trunk adopts [the bounded diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md) delivered
+at `ee1dc83bcda7a8d4c9cd1ba1d551c435075e51a5`. Authorize its minimal encoding, orphan setup and
+deadline/settlement corrections, not a new architecture. P2 remains accepted; Stage B/P1/PR readiness
+remain unaccepted. Stay on `feature/otel-redesign_M2_fixture` from this packet checkpoint; keep parent
+M2 `4f09265`, F2 `4ea24d5`, product and no-owner/formal helpers fixed.
+
+### Implementation scope and budget disposition
+
+- Explicit BOM-free UTF-8 at both control endpoints before reader/writer creation, strict incremental
+  byte framing within existing limits, bounded/redacted errors and writes. Preserve native Unicode
+  arguments/environment and separate bounded workload output. Reuse the diagnosis's finite framing
+  vectors rather than adding an open-ended protocol feature set. Do not log inherited environments.
+- Restore detached:true at both orphan generation spawns, ignored stdio/unref and bounded spawn/error/
+  exit identity receipts. Preserve the real parent-exit/live-descendant oracle. The one diagnostic
+  supports this setup correction; it does not count as any cancellation/fault case acceptance.
+- Use monotonic enclosing deadlines and one cached disposal promise with a shared 4,000 ms cleanup
+  budget. Clip every phase wait to remaining enclosing time and reserve cleanup before launching more
+  work. Shutdown failure still permits bounded close/settlement attempts. Cancel and join receipt
+  pollers/in-flight work; handle failed pipe tasks and control-send failures without losing the primary
+  error. Job-handle disposal/termination requests are not absence observations.
+- Trunk explicitly accepts clipped phase budgets. Ready 6,000, native work 15,000, outer operation
+  16,000, local phase ceilings, case watchdog 30,000 and runtime driver 260,000 remain maxima, not
+  independent additive allowances. Abandonment setup consumes the outer work budget, not an extra
+  interval preceding it. Reserve inner/outer cleanup coherently; document the actual cutoff arithmetic.
+  If the structure cannot satisfy these ceilings, return that specific incompatibility before runs;
+  do not extend them or hide setup outside clocks. Slow clipped cases fail/retain rather than pass.
+- Enforce runtime-driver and case work cutoffs, stop admission on first unexplained failure, and allow
+  only bounded cleanup of already-started work. An independent still-live owner may establish absence;
+  runner death alone cannot. Raise/capture a real identifiable primary Error in fault cases and retain
+  separate secondary cleanup outcomes. No reused-PID cleanup or broad deletion of historical roots.
+
+### Finite validation and stop rules
+
+First run strict typing, relevant lint, format/diff and the finite in-memory framing/deadline tests.
+The 260,000 ms runtime campaign ceiling applies to process-case driver bootstrap, workload, receipts
+and reserved cleanup; compilation/lint of repository source is a separate finite command, not hidden
+process-case setup. This clarifies the diagnosis's ambiguous inclusion of static checks.
+
+Preserve the original failing receipts. Where practical show fail-before for the new deterministic
+unit regressions at old bytes, then restore corrected source. Expected fail-before or deliberately
+injected faults do not trigger the unexplained-failure stop rule. Do not repeatedly run real workloads
+while tuning. Checkpoint the implementation before the source-bound process validation.
+
+Run the diagnosis table in dependency order: smallest non-ASCII round trip; original transport and
+launch-races; orphan-normal; orphan-cancel; observation-loss, host-death and malformed; driver-cleanup.
+At most one corrected runtime execution per entry, with controlled fault outcomes explicitly asserted.
+Use the proved orphan setup, and require each fault injection receipt before claiming its coverage.
+Stop later admission at the first unexplained setup/deadline/absence/output/identity failure or
+unsupported prerequisite; preserve source, first logs and roots. No whole-matrix retry, automatic
+deadline extension or additional attempt to obtain green. Passing earlier cases remain useful evidence.
+
+All phase timings, budget decisions, reached/unreached assertions, retained roots and primary/secondary
+errors go into sanitized receipts. Update standalone contributor guidance/budget document to actual
+implemented behavior; do not describe planned outer enforcement as executed. No existing helper
+integration, Unix P1 repair, full OS/package campaign, formal run or acceptance update in this slice.
+
+Append outcome and archive identities here, linking the diagnosis rather than copying its history.
+Correct any actual UTF-8 corruption in new prose/examples using verified UTF-8 reads; never replace
+executed evidence bytes. Checkpoint source and docs, normal push, actual remote/clean/parent/F2 checks,
+remain on child. Warn before process validation about real execution time. If all required checks
+pass, return for independent focused review; otherwise return incomplete with the earliest failing
+boundary for trunk disposition. No PR, merge, freeze or self-acceptance.
+
+## Historical assignment: Stage B bounded diagnosis before correction (2026-10-14)
 
 Execution status: completed once; see the [diagnosis return](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
 The one optional isolated workload allowance is consumed. Do not repeat it or automatically resume

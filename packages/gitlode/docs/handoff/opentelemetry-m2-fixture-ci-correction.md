@@ -1,6 +1,73 @@
 # Fixture CI correction before PR
 
-## Active assignment: independent Windows ownership review (2026-10-13)
+## Active assignment: ownership P1/P2 correction (2026-10-14)
+
+Trunk confirms review `4ecc79f6b01a63f9ae684b62dbd4431196ca8468`: ownership corrections required,
+Windows PR-readiness blocked. Windows resource policy and GC acceptance are maintained. Implement
+only P1/P2 below on `feature/otel-redesign_M2_fixture`, from this packet's checkpoint. Parent M2
+`4f09265`, F2 refs `4ea24d5`, product and no-owner formal measurement behavior remain unchanged.
+
+### P1: require descendant quiescence beyond leader close
+
+The `state.closed` shortcut in stop and the close-only disposal barrier allow surviving descendants
+to access removed roots. Fix the complete decision path, including ordinary completion without abort,
+leader close before abort and close racing termination. Keep per-invocation ownership and bounded
+waits; leader close, a successful kill request or an empty termination list cannot prove quiescence.
+
+On Unix, inspect the owned private group even after leader exit, with safe handling of absent groups
+and observation failures. On Windows, an exited leader cannot be assumed descendant-free; use
+sufficient owned identity/tree evidence or conservatively retain roots. Never target reused/unowned
+identities. Do not make every normally completed Windows invocation retain roots as a substitute
+for a working normal path, and do not silently reduce the documented guarantee to leader-only.
+If the existing ownership mechanism cannot support normal completion safely without a broader
+platform redesign, return the concrete limitation and bounded alternatives before implementing it.
+
+Keep termination/finalization idempotent, consume asynchronous failures and include all relevant
+observations in the disposal barrier. Preserve the primary failure and evidence on uncertainty.
+No unrelated process framework, global process scanning cleanup or changes to formal supervisor.
+
+Finite regression requirements:
+
+- Reproduce the Linux review counterexample with the actual fixtureExec/owner: a closed leader,
+  ignored-stdio same-group descendant, then abort. Also test normal disposal without abort.
+- Assert the descendant cannot observe a deleted root while alive; either confirm group/tree
+  quiescence before removal or retain the root with explicit uncertainty. Test ordinary child-only
+  completion still cleans safely, plus missing-observation and close/termination race boundaries.
+- Cover Windows exited-leader uncertainty in a deterministic boundary test and exercise a real
+  child/tree path where feasible. If a real descendant fixture cannot be established, report that
+  evidence limit rather than count a missing observation file as success.
+- Keep probe cleanup itself safe: terminate/wait only owned processes before deleting test evidence.
+  Preserve fail-before/pass-after, existing sidecar/both-root retention, primary-error and timeout
+  regressions. No deadline increases, new skips or assertion weakening.
+
+### P2: durable supported executable setup
+
+Add reproducible invocation-local Windows/Volta instructions to contributor build/test guidance,
+based on the existing verified receipts: resolve the installed executable, verify its identity,
+prepare the local PATH correction without global changes, preserve versions and restore environment
+after use. Include a resolution check through the npm lifecycle worker/child path that previously
+failed, not merely interactive Get-Command. Explain why npm.cmd alone is insufficient for that
+direct child launch and distinguish supported corrected setup from an unmodified Volta environment.
+Do not hardcode an agent cache path or download/replace the toolchain. Verify the documented procedure
+as written; repository npm-resolution implementation changes require separate scope disposition.
+
+### Validation and delivery
+
+Run build, explicit fixture strict typing, four affected suites on Windows/Linux, relevant lint,
+format write/check and diff check. After focused success, checkpoint implementation and run one
+plain Windows root npm test at fixed source with the documented environment and no worker override.
+Use ordinary fixed-SHA CI for full Linux/release/package execution; do not repeat package campaigns.
+Keep complete first logs and source/environment bindings; no retry-until-green. If the supported
+campaign fails, retain evidence and stop, subject only to the existing deterministic setup exception.
+These commands involve test/build execution time; warn the human before the campaign.
+
+Append outcome/evidence here, separating P1/P2, executed/reported results and unresolved historical
+failures. Commit implementation and documentation checkpoints, normal push and verify remote/clean/
+unchanged parent/F2. Remain on child and return for independent focused re-review. Do not self-accept,
+create PR, merge, freeze, qualify, formally measure or change release acceptance. If the same boundary
+remains unresolved at re-review, return for bounded diagnosis rather than automatic further corrections.
+
+## Historical assignment: independent Windows ownership review (2026-10-13)
 
 Implementation is delivered, not yet accepted. Review the COMPLETE change from
 `4d985d5ddded8312f687dc4588f8b1470a218075` to fixed implementation

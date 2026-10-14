@@ -13,7 +13,8 @@ independently accepted. Trunk assigned a Windows two-worker default and separate
 correction, followed by plain Windows npm test and independent review.
 The shared sidecar's optional invocation-local ownership seam is authorized after scope review;
 implementation `b98bbe5` reports successful supported-policy Windows tests and fixed-SHA CI.
-Independent review of the full ownership/policy change and Volta setup qualification is pending.
+Independent review `4ecc79f` requires P1 descendant-quiescence correction and P2 durable Volta
+setup instructions. Resource policy is accepted; ownership and Windows PR-readiness remain blocked.
 Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.

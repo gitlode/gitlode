@@ -21,6 +21,9 @@ documented Volta PATH setup correction, Linux focused 47 passed and complete fix
 Assign independent review of the complete change, ownership/cleanup barriers, no-owner compatibility
 and environment qualification. PR readiness remains pending that review; historical failures remain
 distinct from successful supported-policy execution.
+Review `4ecc79f` accepts the Windows resource policy but reproduces deletion after leader close while
+a descendant remains alive (P1), and requires durable Volta setup guidance (P2). The active packet
+assigns bounded corrections and independent re-review; PR readiness remains blocked.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

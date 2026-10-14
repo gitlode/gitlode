@@ -1,8 +1,8 @@
 # Fixture CI correction before PR
 
-Latest execution: [P2 delivery and P1 scope return](#p2-delivery-and-p1-scope-return-2026-10-14).
-P1 remains unimplemented under the active assignment's explicit pre-implementation stop condition;
-P2 is delivered for independent focused review. The combined ownership correction is not complete.
+Latest execution: [Windows containment feasibility and independent P2 review](#windows-containment-feasibility-and-independent-p2-review-2026-10-14).
+P1 remains unimplemented; the prototype returns feasibility for trunk's implementation decision.
+P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
 ## Active assignment: bounded Windows containment feasibility (2026-10-14)
 
@@ -1043,9 +1043,9 @@ reused PID would not close this gap. With the existing seam, conservative retent
 Windows leader is the only general fallback; the active assignment explicitly excludes that as a
 substitute for a working ordinary child-only path.
 
-This is the packet's stop condition: “If the existing ownership mechanism cannot support normal
+This is the packet's stop condition: "If the existing ownership mechanism cannot support normal
 completion safely without a broader platform redesign, return the concrete limitation and bounded
-alternatives before implementing it.” No P1 code patch, Unix-only partial fix, new framework or
+alternatives before implementing it." No P1 code patch, Unix-only partial fix, new framework or
 weaker leader-only guarantee was applied. Existing owner/helper code remains byte-for-byte unchanged
 in Git relative to the starting checkpoint.
 
@@ -1129,3 +1129,168 @@ checkpoint, normal push, then actual remote/clean/unchanged parent/F2 verificati
 child. Return P2 for independent focused re-review and P1 for explicit scope disposition; do not
 represent this as complete ownership correction. No PR, merge, freeze, formal measurement,
 qualification or acceptance update is performed.
+
+## Windows containment feasibility and independent P2 review (2026-10-14)
+
+Started clean at assigned `670985a7649738a4e2bc058b367f0678f6f53d78`, on
+`feature/otel-redesign_M2_fixture`. **P1 design verdict: feasible for the bounded Windows
+CreateProcess spawn model; helper integration and five-second test suitability remain unproven.
+P2 review verdict: accepted for contributor executable setup at fixed `05134d0`.** These are
+separate findings. P1 remains unimplemented and Windows PR-readiness remains blocked. No project
+acceptance record changed. Replaced the previous scope-return quotation delimiters with ASCII
+quotes to avoid the observed legacy-decoding corruption, without changing its meaning. Existing
+helpers/tests/configuration/lockfiles are unchanged.
+
+### Boundary, guarantees and prerequisites
+
+The isolated prototype is a Node caller launching one hidden invocation-local Windows PowerShell
+5.1 host. Existing `Add-Type` compiles one small C# P/Invoke source into that host; nothing was
+installed/downloaded or added to package dependencies. Each workload gets a private unnamed job,
+owned solely by the host, with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and neither breakaway flag.
+Job creation uses null security attributes; workload creation uses `bInheritHandles=false`.
+Job/process/thread handles and attribute-list allocations are closed/freed. No general daemon,
+global environment modification or service was created.
+
+`CreateProcessW` with `STARTUPINFOEX`, `EXTENDED_STARTUPINFO_PRESENT` and
+`PROC_THREAD_ATTRIBUTE_JOB_LIST` assigns the leader before its initial thread runs. Membership is
+checked with `IsProcessInJob`. Assignment failure is launch failure, never disposal authorization.
+No suspended-but-unassigned process is created. A suspended-create/assign/resume alternative needs
+termination and handle-wait on assignment failure but still has an orphan window if the launcher
+dies before assignment; it is not the proposed fallback. Creation-time assignment requires Windows
+10 or later. See Microsoft's [creation-time assignment explanation](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812).
+
+Supported scope: ordinary CreateProcess-based Node/Git launches and their ordinary descendants,
+including the executed detached/ignored-stdio Node orphan path. Job containment is not universal:
+WMI `Win32_Process.Create`, services/brokers, remote execution, explicit alternate-parent creation
+and adversarial access to launcher/job are excluded. Actual Node multi-generation spawning was
+executed; Git compatibility is inferred from its ordinary launch model, not separately exercised.
+Unix groups also permit escape through new sessions/groups or brokers. This evaluation neither
+reduces P1's required tested boundary nor implements the known Unix correction. Broader workload
+requirements or any boundary reduction must return to trunk. Microsoft's [Job Objects documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+defines inheritance, WMI exceptions, nested jobs and kill-on-close behavior.
+
+Executed on x64 Windows `10.0.26200`, installed Node `22.23.1`, Windows PowerShell
+`5.1.26100.9711` and its existing .NET/Add-Type facility. Primary Node-to-host execution used
+`WAKA-PC\CodexSandboxOffline`, whose host was already in an outer job: nested creation-time
+assignment and detached descendants worked. A separate single normal-child prerequisite check
+used actual contributor user `WAKA-PC\t-wakabayashi`, with `elevatedAdmin: false` and
+`hostInJob: false`; membership, leader exit and zero count were verified. This confirms normal-user
+privileges here, not every CI/IDE job policy or the actual Vitest-worker launcher path. Unsupported
+API, x86 layout, denied query/assignment or incompatible outer jobs must fail closed with retained
+roots. No breakaway retry or global policy change was made.
+
+### Finite execution and first failures
+
+First run exited 1: ordinary child-only completion verified zero count and safely removed its
+root; orphan-normal failed to establish an intermediate/descendant and reached the unchanged
+3,000 ms observation bound. Its root and complete first source/log/result remain preserved. This
+is a setup failure, not an orphan success. A finite diagnostic confirmed child creation in the
+job, exit 0 and empty stderr. One explained setup correction added `detached: true` to both
+descendant launches, retaining `unref()` and ignored stdio. On Windows, the [Node detached option](https://nodejs.org/docs/latest-v22.x/api/child_process.html#optionsdetached)
+supports independent child lifetime. Native containment, bounds and repository deadlines did not
+change. The corrected fixture established the orphan; no further tuning was performed.
+
+Corrected execution exited 0. These durations are finite feasibility receipts, not formal
+measurement or five-second deadline acceptance:
+
+| Case                    | Launch ms | Operation ms | Observed result                                                                                                                                                                  |
+| ----------------------- | --------: | -----------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Child-only normal       |     28.70 |       197.74 | Leader exited, active count 0, receipts copied, root removed                                                                                                                     |
+| Orphan normal           |     17.44 |     2,026.54 | Leader 10936/intermediate 19416/descendant 30196 ancestry; exited leader and one active process with live descendant heartbeats; root retained until natural exit and observed 0 |
+| Orphan cancellation     |     16.83 |       238.40 | Leader 37480/intermediate 6792/descendant 34104; orphan established at 230.41 ms, cancellation at 231.78 ms, then observed 0 before deletion                                     |
+| Unavailable observation |     17.16 |       261.45 | Orphan established at 244.23 ms; job handle deliberately closed, query unavailable, primary failure preserved, root retained                                                     |
+
+Parent-PID receipts, ignored stdio, live descendant heartbeats, one active process and an exited
+leader establish the surviving-descendant/absent-intermediate state without reconstructing exited
+ancestors from snapshots. Natural-completion receipts include descendant settlement and repeated
+`rootExists: true`. Unavailable observation models loss of observation capability, not an actual
+injected launcher crash. Kill-on-close was requested, but no post-close absence barrier is claimed.
+That root, first failed roots and diagnostic/prerequisite roots remain as evidence.
+
+Disposal requires separate facts: leader-handle exit, successful active-count query returning zero
+after launch admission is sealed, output pipe/capture settlement, and caller body/filesystem
+settlement. Prototype stdio is ignored and workload file calls are synchronous; parent receipt
+copying settles before deletion. General asynchronous I/O was not tested. `TerminateJobObject`
+success or last-handle close requests termination but does not observe absence. Query failure,
+timeout, missing completion, host loss or failed setup retains roots and preserves the original
+body/timeout exception with secondary cleanup uncertainty. Zero is meaningful only while no new
+launch into the private job is possible. PID snapshots or completion-port messages alone cannot
+replace the observation barrier.
+
+### Cost and smallest next implementation slice
+
+The corrected Node caller took 4,007.35 ms for four cases in one host. `Add-Type` took 406.22 ms;
+approximately 1,283.21 ms lay outside case operation timings, including PowerShell startup/shutdown,
+compilation and other host overhead. This is not a pure startup measurement. First compilation was
+456.54 ms. Normal-user compilation was 450.44 ms, with 699.22 ms inside that host through child
+settlement. Warm in-host creation took 16.83-28.70 ms. Per-command PowerShell/Add-Type adds material
+repeated cost to unchanged five-second tests; these receipts do not establish suitability.
+
+Smallest plausible boundary: compile once per fixture-owner invocation, handle only that
+invocation's jobs/commands and shut down. A cross-invocation daemon is not proposed. A shipped
+binary/native package requires separate adoption authorization; none was adopted. Proposed
+test-only files are a launcher `.ps1`, small interop `.cs`, Node protocol adapter and finite tests
+under `packages/gitlode/test/support/`, with no npm/native dependencies for the evaluated route.
+Maintenance includes Win32 ABI layouts, OS checks, handle ownership, command-line quoting,
+environment blocks and pipe lifecycle. The prototype only quotes fixed known paths/arguments,
+inherits environment/cwd and has no workload pipes; it is not an arbitrary-command implementation.
+
+Before integration, implement a versioned invocation-local protocol: `ready`, launch ID with
+absolute executable/argument array/cwd/environment, `started` after assignment, leader exit,
+bounded cancellation, observed absence, pipe settlement and final completion. Node owns root and
+body/I/O settlement and gates deletion on all barriers. Host EOF/error/timeout produces uncertainty,
+consumes asynchronous failures and requests bounded termination without permitting deletion.
+Workload pipes need controlled duplication/explicit handle allowlists to prevent job/protocol
+handle leaks. Seal launch admission during the final zero observation.
+
+The next authorized slice should test that standalone transport/lifetime boundary first:
+arguments with spaces/quotes/backslashes, environment/cwd and bounded output, registration/abort
+races, atomic launch failure, normal completion, exited leader/intermediate, termination/query
+races, denied observation, actual host death/EOF and primary-error retention. Then assess only the
+concrete five-second helper path overhead before integration into the optional owner seam. Complete
+P1 still requires its Unix correction and authorized focused regressions. Success here is neither
+integration permission nor P1 acceptance. If overhead is unacceptable, alternatives are a separately
+authorized native launcher or narrowly supported foreground Windows paths with retention for
+unsupported cases. The latter leaves the general descendant obligation/Windows PR-readiness
+blocked and requires trunk's boundary decision. Unix-only correction also leaves Windows blocked.
+
+### Independent P2 review and evidence preservation
+
+Independently read fixed `05134d052a8e53cfa3491654d43140401a554736` and the sealed
+30-member archive/manifest. Rehashed all 30 listed members and byte lengths: zero mismatches;
+31 physical entries include the manifest. Archive SHA-256 remains
+`94598b396a2cdbf20768c64899952953a360503af928adfcd7cd5c46bbc11af5`.
+The documented procedure matches the archived executed script after line-ending normalization.
+Saved binding identifies clean fixed source, exit 0 and PATH restoration; worker/tsx child both
+report installed Node `22.23.1`/npm `11.11.0` and matching executable paths. Independently hashed
+the currently installed npm source: it matches the archived local copy and recorded
+`7b648c48ba1473baa724d1cecf9df16e36ca12c768977d72745032349368953f`.
+Read the complete saved 953 ms one-test log and resolution/config/source receipts. These are
+independently reviewed saved executions, not a fresh preflight or full campaign.
+
+Unique repository-local GUID paths, literal copy/hash operations, invocation-only PATH prepend and
+`finally` restoration are appropriate for this documented installation. Guidance checks an actual
+npm-lifecycle worker and tsx child, explains direct `execFile` versus `npm.cmd` and confines pass
+claims to the corrected environment. Absolute test-path interpolation assumes no apostrophe in
+the repository path; generic escaping remains a portability limitation outside the demonstrated
+path. The disclosed post-execution receiptRoot metadata repair does not supply missing execution.
+No unresolved preflight part warrants rerunning it. P2 closes the contributor-guidance finding
+without repairing historical unmodified-Volta ENOENT or the P1 ownership defect.
+
+New source/evidence: `.cache/windows-job-feasibility-670985a-20261014/`.
+Sealed archive: `.cache/windows-job-feasibility-670985a-20261014-sealed.zip`, SHA-256
+`72ac389d6354882e12a180af202d06fb19c8c62825198d396912f5f3dee1f546`;
+manifest SHA-256 `aca01bbccd72fa217a86f6d2f91e500ceb43fea2f8b436b9aa0f47f3cd93367f`.
+Rehashed all 40 listed files from the archive: zero mismatches; manifest makes 41 entries. Includes
+first/corrected sources/results/logs, caller commands/timings, normal-user prerequisite, diagnostic,
+retained-root receipts, independent P2 verifier/result and sealing source. Corrected result hash:
+`57cc1a694adf1ddcbfc1f9a570bfb248e78a96b37690e6f462b1f6dc1580a7ed`.
+First inline PowerShell/Node quoting failure and archive-prefix reader failure are disclosed in
+`commands-and-failures.md`; neither counts as workload success. Existing archives were unchanged.
+
+Pre-delivery live remote child matched `670985a`; parent matched
+`4f09265791c82452a5800cc6d9855938bf88a46e`; both F2 preservation refs matched
+`4ea24d53afc57778addf3f47752e0fe73a7011ea`. Delivery is this document only, followed by
+format write/check, diff check, normal commit/push and actual remote/clean/parent/F2 verification.
+No production/helper integration, dependency installation, full test/package campaign, PR, merge,
+freeze, formal measurement or acceptance update. Remain on the child for trunk disposition.

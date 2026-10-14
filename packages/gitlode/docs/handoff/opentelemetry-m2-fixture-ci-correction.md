@@ -1,10 +1,16 @@
 # Fixture CI correction before PR
 
-Latest execution: [Standalone Windows launcher Stage A suitability return](#standalone-windows-launcher-stage-a-suitability-return-2026-10-14).
-P1 remains unimplemented; the prototype returns feasibility for trunk's implementation decision.
+Latest execution: [Standalone Windows launcher Stage B bounded failure return](#standalone-windows-launcher-stage-b-bounded-failure-return-2026-10-14).
+Standalone source is checkpointed, but Stage B correctness failed and is stopped for independent
+review/diagnosis. P1 remains incomplete; existing helpers are not integrated.
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
 ## Active assignment: Stage B under approved scoped timeout policy (2026-10-14)
+
+Execution status: attempted once under this assignment; the unexplained orphan setup deadline
+triggered its stop rule. See the latest return below. Do not automatically resume the matrix or
+redesign the launcher. The independent reviewer must distinguish setup/implementation defects,
+budget ordering and missing correctness evidence before a subsequent bounded assignment.
 
 The human approved revising the blanket five-second prohibition. This supersedes the old Stage A
 prerequisite and deadline prohibitions below ONLY for the identified process/OS integration tests.
@@ -1560,3 +1566,142 @@ Pre-delivery live remote child matched `1feb43a`; parent matched
 `4ea24d53afc57778addf3f47752e0fe73a7011ea`. Deliver the source/outcome checkpoint with normal push
 and actual remote/clean/parent/F2 verification, remain on child, and await suitability disposition.
 No PR, merge, freeze, eligibility or self-acceptance.
+
+## Standalone Windows launcher Stage B bounded failure return (2026-10-14)
+
+Started clean at the requested `52683613481a89b92a51a364f5b1c19ded8cd484` on the child.
+Implementation checkpoint: **`9bb37134ded1f2b8df8e5dedd371c14bbea0be17`**.
+**Stage B failed; stopped pending independent standalone review/diagnosis.** This is an unfinished
+implementation checkpoint, not suitability, integration, P1, PR-readiness or acceptance. P2 remains
+accepted. No Stage A rerun, existing helper/test integration, Unix fix or global timeout change.
+
+### Standalone responsibilities and finite execution
+
+New `test/support/windows-launcher/{launcher.ts,host.ps1,Transport.cs,Job.cs}` implements an
+invocation-local adapter, one hidden host/Add-Type per owner and separate creation-time-assigned
+jobs per launch. Control receipts cover ready/version, IDs, started, exit, bounded base64 output,
+cancel, observed job zero and shutdown. Cwd/environment and argument arrays are transported;
+NUL stdin and two workload pipes form the inherited handle allowlist. Jobs/process handles remain
+private. Output drains continuously but retains only 65,536 bytes per stream. Completion requires
+leader exit, zero membership and both drain tasks. Only the new test file and new explicit strict
+TypeScript project are included. Contributor requirements/maintenance/limitations are described in
+[the standalone guide](../contributing/windows-standalone-launcher.md).
+
+Before execution, fixed the [provisional timeout table](../../test/support/windows-launcher/budgets.md):
+ready 6,000 ms per fresh host; native operation 15,000 ms; outer caller operation 16,000 ms;
+normal command/output/Git 4,000 ms; orphan receipt 2,000 ms; normal descendant completion 3,000 ms;
+controlled cancel/fault 2,000 ms; intended shared cleanup 4,000 ms; abandonment setup 10,000 ms;
+each new test 30,000 ms; planned matrix driver 260,000 ms. Startup/setup and scheduling allowances
+are counted and explained there using retained compile/host timings and actual designed operation
+counts. These are provisional hang detection budgets, not formal performance bounds.
+
+Important implementation mismatch: the first shell runner did **not enforce** its planned 260,000 ms
+outer bound. `dispose()` separately allows 4,000 ms for shutdown and another 4,000 ms for host close,
+so its actual cleanup maximum is 8,000 ms; worst-case summed phases can overrun the test deadline.
+Receipt polling loops remain outstanding after Promise.race timeout. These unresolved defects
+invalidate a claim that this implementation satisfies the fully ordered finite-driver policy.
+No deadline was extended after a failure, and no second runtime validation was performed.
+
+Exact runtime command:
+
+```powershell
+$env:STAGE_B_EVIDENCE = (Join-Path (Get-Location) '.cache/windows-launcher-stage-b-5268361-20261014/first-run')
+node node_modules/vitest/vitest.mjs run packages/gitlode/test/telemetry/windows-launcher.test.ts --reporter=verbose
+```
+
+One invocation, exit 1; eight scheduled cases ran serially in one test file under the unchanged
+root Windows maxWorkers=2 policy. One passed, seven failed, zero skipped, Vitest total 42,010 ms.
+There was no second representative worker workload or cold/warm suitability campaign. The shell
+logged through PowerShell redirection; the resulting bytes are preserved as emitted, not claimed
+to be pristine raw UTF-8 child streams. Node-generated JSON receipts bind case costs and failures.
+
+| Case             | Actual complete case ms | Outer Add-Type ms | Correctness result                                              |
+| ---------------- | ----------------------: | ----------------: | --------------------------------------------------------------- |
+| transport        |                2,913.72 |            453.57 | Failed: non-ASCII control JSON corrupted before first workload  |
+| launch-races     |                3,040.39 |            440.82 | Passed: missing executable and three immediate repeated cancels |
+| orphan-normal    |                4,870.16 |            438.29 | Failed: intermediate receipt deadline                           |
+| orphan-cancel    |                5,001.12 |            479.99 | Failed: intermediate receipt deadline                           |
+| observation-loss |                4,825.68 |            436.33 | Failed during orphan setup; fault not reached                   |
+| host-death       |                4,882.08 |            458.29 | Failed during orphan setup; actual death not reached            |
+| malformed        |                4,857.37 |            449.14 | Failed during orphan setup; fault not reached                   |
+| driver-cleanup   |               11,319.16 |            487.07 | Failed: abandonment setup deadline; intended fault not reached  |
+
+Costs include ordinary directories, fresh outer host, Node/tsx scenario, fresh inner host,
+workload/setup failure and disposal/receipt work. Successful launch-races inner ready was
+1,287.24 ms including 494.46 ms compilation; inner complete scenario was 1,569.58 ms. It is one
+execution, not a bound. Other outer compilations above cannot be reused as per-launch costs.
+Transport's real Git, argument/cwd/environment identity, nonzero exit and bounded-output checks
+were not reached. Orphan normal/cancel, fault identity, inherited-handle runtime audit and actual
+host-death cleanup are **unverified**, never passes by missing files. Seven outer command completions
+independently observed job absence and settled captured output; all failed roots were retained.
+Driver-cleanup records no command-completion absence receipt and conservatively retains its root;
+its shutdown completion alone is not substituted for the missing case receipt. Launch-races root
+was removed only after command absence/output and host shutdown/close. No PID snapshot or reused-PID
+kill cleanup was used.
+
+### Bounded diagnosis and independent review packet
+
+Transport error includes corrupted Japanese text in otherwise valid sent JSON. Windows PowerShell
+Console.ReadLine uses its default encoding; host.ps1 never explicitly sets UTF-8 input/output.
+This is a concrete missing transport requirement, not evidence of an insufficient timeout. No
+encoding fix was runtime-tested or silently substituted into the executed source.
+
+Orphan roots contain only leader.json and the failed scenario receipt; intermediate/descendant
+and settled receipts are absent. Earlier feasibility workload used detached:true; this new
+workload does not, and ignores descendant stderr without recording spawn errors. The console/
+detach difference is a diagnostic hypothesis, **not an established cause or containment verdict**.
+No additional native launch, diagnostic workload, timeout extension or automatic redesign was
+executed after the unexplained deadline. All eight cases were already scheduled in the same initial
+Vitest invocation; first failure did not dynamically stop subsequent scheduled cases. A future
+finite driver must also stop admission of later cases at the first unexplained boundary failure.
+
+Independent review should assess the fixed standalone diff and first evidence, particularly:
+explicit UTF-8 and bounded protocol framing; real orphan setup proof and descendant spawn identity;
+shared cleanup deadline, cancellable polling and outer-driver enforcement; preserving the body
+failure when cleanup is uncertain; host-death/observation-loss/handle inheritance correctness.
+The current fault setup labels a deliberate primary body failure but never reaches that boundary,
+so primary-error preservation has no successful fault evidence. CloseHandle cleanup and pipe-task
+failure settlement also need review. Passing launch-races does not waive any of these requirements.
+One bounded next proposal is a diagnosis-only assignment for these exact setup/budget defects,
+retaining this first execution and using the same approved scoped timeout policy; it is not adopted
+or automatically executed here. No existing-case deadline proposal is implemented. Later integration
+would attach the reviewed adapter to optional fixtureExec/owner/sidecar with Node retaining body,
+I/O and root ownership; Unix still needs private-group observation after leader exit. Neither seam
+is authorized by this failed standalone slice.
+
+### Source-bound preservation and checks
+
+Tracked [validation receipt](../../test/support/windows-launcher/validation-receipt.json) contains
+exact first-executed source payloads, byte lengths/SHA-256 and case/log hashes. Payloads were decoded
+and checked with zero mismatches. Raw failure receipts contain complete inherited environment in
+the serializer error and remain in local evidence; the tracked summary only binds their hashes.
+The formatted checkpoint is distinct from executed bytes. Job.cs line endings were normalized to
+LF after staged diff check identified CRLF as whitespace for that extension; no runtime rerun.
+Strict `tsc -p packages/gitlode/tsconfig.windows-launcher.json`, relevant oxlint on the adapter,
+scenario/workload and test, Node syntax checks, npm run format:write/format:check and staged diff
+check passed. No build was needed; no full package/OS or formal campaign. The new strict project
+covers the adapter/test without modifying existing strict projects or runtime skip policies.
+
+Formatting used an invocation-local byte-identical copy of installed Volta npm.exe, hash
+`7b648c48ba1473baa724d1cecf9df16e36ca12c768977d72745032349368953f`, with PATH restored in finally.
+Node was 22.23.1, npm 11.11.0, Vitest 4.1.10, installed x64 Windows PowerShell/.NET; nested jobs
+were reported true. Stage B normal-user transport and successful real Git identity are not established.
+Initial restricted Git calls encountered dubious ownership, .git write and network restrictions;
+per-command safe.directory and approved escalation handled repository-local commits/live refs,
+without global Git configuration changes. No toolchain, dependency, lockfile or product changes.
+
+Sealed local archive: `.cache/windows-launcher-stage-b-5268361-20261014-sealed.zip`, SHA-256
+`4fc01b2773ce343e43e486eceeebbbc54ff9e335d4b602a52928769f08a4482e`;
+manifest SHA-256 `09ea01c2a58e056c15dcb5ea9d3c979c510de89cffa845e97cd9b64933a7be0d`.
+All 56 listed files/byte lengths rehashed from the zip with zero mismatches; 62 physical entries
+include directories and manifest. Contains first sources/failures/retained roots, checkpoint-source
+Git bytes, strict/lint/format logs, npm setup binding and packaging source. Archive verifier initially
+used forward slashes against native backslash zip entries; corrected lookup only, no archive/workload
+mutation. Verification receipt is `.cache/windows-launcher-stage-b-5268361-20261014-archive-check.json`.
+Original Stage A and feasibility archives remain unchanged.
+
+Pre-delivery actual remote child matched starting `5268361`, parent M2 matched
+`4f09265791c82452a5800cc6d9855938bf88a46e` and both F2 preservation refs matched
+`4ea24d53afc57778addf3f47752e0fe73a7011ea`. Outcome is checkpointed separately after source,
+normal push, actual remote/clean/parent/F2 verification, and return on the child for independent
+review. No PR, merge, freeze, eligibility, formal measurement or acceptance update.

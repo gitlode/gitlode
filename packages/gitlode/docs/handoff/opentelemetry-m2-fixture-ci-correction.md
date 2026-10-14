@@ -1,11 +1,19 @@
 # Fixture CI correction before PR
 
-Latest execution: [Standalone Windows launcher Stage B bounded failure return](#standalone-windows-launcher-stage-b-bounded-failure-return-2026-10-14).
-Standalone source is checkpointed, but Stage B correctness failed and is stopped for independent
-review/diagnosis. P1 remains incomplete; existing helpers are not integrated.
+Latest return: [Stage B first-failure bounded diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
+Diagnosis completed from `99b54804dcf3c9fcfe38f7990f0f84aa4827fda6`; one isolated orphan setup
+diagnostic supports the detached-spawn correction. Encoding and deadline corrections remain
+unimplemented. Route to trunk for a bounded correction assignment, not acceptance review.
+Standalone source is checkpointed, but Stage B correctness remains failed. P1 remains incomplete;
+existing helpers are not integrated.
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
 ## Active assignment: Stage B bounded diagnosis before correction (2026-10-14)
+
+Execution status: completed once; see the [diagnosis return](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
+The one optional isolated workload allowance is consumed. Do not repeat it or automatically resume
+the eight-case matrix. The assignment below records the controlling scope of this diagnosis;
+trunk must assign implementation correction and finite subsequent validation separately.
 
 Trunk classifies `6e051475b8f3d638ceca32c78cef74fe4f79f935` as incomplete Stage B, NOT ready for
 acceptance review. Fixed implementation is `9bb3713`; the source-bound first execution is preserved

@@ -1,5 +1,9 @@
 # Build, Test, and Release Validation
 
+The unfinished test-only Windows boundary is documented separately in
+[Standalone Windows launcher](windows-standalone-launcher.md); it is not integrated into fixture
+helpers and its first Stage B runtime validation failed.
+
 ## Purpose and scope
 
 This document is the canonical contributor guide for TypeScript projects, development builds,

@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.release-boundary.json",
+  "include": [
+    "test/support/windows-launcher/launcher.ts",
+    "test/telemetry/windows-launcher.test.ts"
+  ]
+}

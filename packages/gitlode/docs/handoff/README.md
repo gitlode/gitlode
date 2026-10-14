@@ -16,8 +16,10 @@ implementation `b98bbe5` reports successful supported-policy Windows tests and f
 Independent review `4ecc79f` requires P1 descendant-quiescence correction and P2 durable Volta
 setup instructions. Resource policy is accepted; ownership and Windows PR-readiness remain blocked.
 P2 at `05134d0` is independently accepted in `56f1983`. Job Object feasibility is supported within
-the tested boundary; five-second suitability and transport remain unproven. Next is a standalone
-test launcher slice with an early suitability gate, then independent review before helper integration.
+the tested boundary. Stage A `4947470` did not establish five-second suitability. The human approved
+explicit finite per-test budgets for process/OS integration cases, retaining the general default and
+safety assertions. Stage B standalone transport resumes under that policy, then independent review
+before helper integration; Stage A is not retroactively accepted.
 Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.

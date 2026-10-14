@@ -4,7 +4,61 @@ Latest execution: [Standalone Windows launcher Stage A suitability return](#stan
 P1 remains unimplemented; the prototype returns feasibility for trunk's implementation decision.
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: standalone test launcher and suitability gate (2026-10-14)
+## Active assignment: Stage B under approved scoped timeout policy (2026-10-14)
+
+The human approved revising the blanket five-second prohibition. This supersedes the old Stage A
+prerequisite and deadline prohibitions below ONLY for the identified process/OS integration tests.
+Stage A `4947470d8148193c677c38914c0b7eef9eea0997` remains inconclusive: its single valid 4,016.01 ms
+execution is not cold suitability proof and excludes full transport. Preserve both attempts; do not
+rerun Stage A merely to satisfy the obsolete gate. P2 remains accepted, P1/PR readiness remain open.
+
+Resume Stage B on `feature/otel-redesign_M2_fixture` from this packet's checkpoint. Implement the
+standalone transport and finite tests described in the historical Stage B specification immediately
+below, with these controlling conditions:
+
+- General unit-test default remains five seconds, Windows root worker cap remains two, Linux worker
+  policy remains unchanged. No global test/hook timeout increase, skip or assertion weakening.
+- Identify explicit process/OS integration test cases eligible for a larger finite budget. In this
+  standalone slice, set budgets only for new launcher tests; propose existing-case changes for the
+  later integration slice, not edits to existing fixture helpers/tests now.
+- Record each timeout value and rationale: host startup/compilation, real workload, protocol/output
+  settlement, cancellation and cleanup where applicable, plus explicit scheduling allowance. Count
+  setup honestly; do not hide startup outside the measured interval or call one warm result a bound.
+  Test timeouts are hang-detection budgets, not formal performance thresholds or latency guarantees.
+- Before validation, choose finite provisional test/phase/outer-driver bounds using retained timings
+  and the designed operation count. Use initial finite successful executions to report actual costs
+  and justify the proposed stable values for independent review. Never derive acceptance by repeatedly
+  extending a timeout after failure. An unexplained deadline failure stops for diagnosis; documented
+  deterministic setup corrections retain their first evidence.
+- Keep operation, termination/absence observation, cleanup and outer-driver budgets explicit and
+  consistently ordered. The outer timeout must leave the designed bounded cleanup opportunity.
+  Fault tests should trigger cancellation deliberately with short controlled delays; increasing the
+  outer budget must not remove their ability to detect a broken cancellation or disposal barrier.
+- The safety contract is unchanged: leader exit is insufficient; job/group absence, output and
+  outstanding body/I/O settlement are separate barriers. Missing observation, host loss or timeout
+  retains roots and preserves primary failures. No blind deletion or kill-by-reused-PID fallback.
+
+Keep one hidden host/Add-Type per owner invocation, creation-time job assignment and the narrow
+Node/Git spawn model. No cross-test daemon, downloaded/shipped native binary, new dependency or
+toolchain installation. Implement only required argument/environment/cwd and bounded stdout/stderr
+transport, cancellation and completion. New standalone source/tests and strict-check inclusion plus
+contributor documentation are authorized; existing helper integration and the Unix P1 fix are not
+part of this slice. Stop concrete unsupported ABI/host-policy/ownership issues rather than expand
+into a general process framework.
+
+Run the finite Stage B correctness matrix (including real orphan, host death and driver cleanup),
+explicit strict typing, relevant lint, format write/check and diff check; build only if required.
+No extra full OS/package campaign or formal measurement. Automatic push CI is allowed; preserve
+first failures and actual execution/skip/source attribution. Before test execution, explain that
+host startup and process work take time. Report test cost and timeout table alongside correctness.
+
+Checkpoint implementation and outcome separately, retain source-bound receipts/archive hashes,
+normal push and verify actual remote/clean/unchanged parent M2 `4f09265` and F2 `4ea24d5`.
+Remain on child and return for independent standalone review. Passing this slice is neither P1
+completion nor integration authorization. No PR, merge, freeze, eligibility, formal run or acceptance
+update. A failed correctness boundary returns bounded diagnosis, not another automatic redesign.
+
+## Historical assignment: standalone test launcher and suitability gate (2026-10-14)
 
 Trunk accepts independent P2 review at `56f19834ddcf40588dc1e7216e03baec06d60a29`, for fixed
 guidance `05134d0`. P1 remains open. The Job Object prototype supports bounded feasibility only;

@@ -182,6 +182,17 @@ version. A successful campaign with this procedure is evidence for the corrected
 it does not establish that the unmodified Volta environment works. If executable resolution or the
 version assertions fail, preserve the first log and resolve the setup before running the campaign.
 
+### Timeouts for process integration tests
+
+Tests that exercise real Git processes, OS process containment or process shutdown may use an
+explicit per-test finite timeout rather than the general five-second unit-test default. Document
+the affected cases and budget rationale, including startup, workload, output settlement and a
+separate bounded cleanup opportunity. Keep outer driver deadlines consistent with those phases.
+Timeouts detect hangs; they are not performance acceptance thresholds. Preserve cancellation fault
+injection and cleanup assertions. A timeout failure requires diagnosis, not repeated increases until
+the test passes. Do not raise global defaults or weaken process-quiescence and evidence-retention
+requirements to accommodate these tests.
+
 ### Optional coverage
 
 ```bash

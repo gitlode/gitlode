@@ -33,6 +33,13 @@ Trunk assigns standalone test launcher work gated first by representative five-s
 full transport follows only if that gate supports it. Helper integration and the remaining Unix P1
 correction require subsequent review/disposition. No formal workload or acceptance is authorized.
 
+2026-10-14 human decision supersedes the Stage A five-second prerequisite: allow justified finite
+per-test budgets for real-process/OS integration tests, keeping the general five-second default,
+Windows two-worker policy and all quiescence/retention assertions. Stage A `4947470` remains
+inconclusive, with one valid 4,016 ms result and no cold/full-transport proof. Resume standalone
+Stage B without rerunning that gate. Require an explicit timeout/cost table and independent review
+before helper integration. P2 remains accepted; P1, PR readiness and release acceptance remain open.
+
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.
 Trunk verified local/remote M2 and old-F ancestry. Child and experiment histories are preserved

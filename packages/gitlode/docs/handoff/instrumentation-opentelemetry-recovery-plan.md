@@ -39,6 +39,11 @@ Windows two-worker policy and all quiescence/retention assertions. Stage A `4947
 inconclusive, with one valid 4,016 ms result and no cold/full-transport proof. Resume standalone
 Stage B without rerunning that gate. Require an explicit timeout/cost table and independent review
 before helper integration. P2 remains accepted; P1, PR readiness and release acceptance remain open.
+Stage B implementation `9bb3713`, outcome `6e05147`, stopped after one pass/seven first-run
+failures. UTF-8 control transport and driver/cleanup accounting need correction; orphan setup
+cause remains unproven and dependent fault cases were not reached. Trunk assigns fresh bounded
+diagnosis before correction, not acceptance review. Preserve first evidence and existing deadlines;
+no full matrix rerun, helper integration or formal campaign at this step.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

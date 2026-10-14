@@ -5,7 +5,56 @@ Standalone source is checkpointed, but Stage B correctness failed and is stopped
 review/diagnosis. P1 remains incomplete; existing helpers are not integrated.
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: Stage B under approved scoped timeout policy (2026-10-14)
+## Active assignment: Stage B bounded diagnosis before correction (2026-10-14)
+
+Trunk classifies `6e051475b8f3d638ceca32c78cef74fe4f79f935` as incomplete Stage B, NOT ready for
+acceptance review. Fixed implementation is `9bb3713`; the source-bound first execution is preserved
+separately from formatted checkpoint bytes. One pass/seven failures includes shared setup failures
+that prevented later faults from being reached, not seven independently established defects.
+P2 remains accepted. P1, helper integration and PR readiness remain blocked.
+
+Assign a fresh diagnosis-only session on the same child from this packet checkpoint. Inspect source
+and saved receipts first. Keep repository implementation, tests/configuration and approved timeout
+values unchanged. No full eight-case rerun, OS/package campaign, timeout extension or new launcher
+architecture. The objective is a finite correction plan, not another acceptance review of known failures.
+
+1. Map each first failure to the earliest failing boundary and dependent unexecuted assertions.
+   Verify checkpoint/executed-byte differences and essential archive hashes; distinguish actual
+   absence/output observations from shutdown requests. Do not delete uncertain roots.
+2. Diagnose UTF-8 framing through Node writes, PowerShell console input/output and serializer paths.
+   Specify explicit encoding, bounded framing, malformed-input and output behavior, with the smallest
+   non-ASCII round-trip regression. Avoid including whole inherited environments in new logs or
+   tracked evidence: keep only required identity/encoding fields, redact values unrelated to the
+   diagnosis, and leave existing private evidence immutable. Do not echo raw failure environments.
+3. Compare the failed orphan workload with the successful preserved feasibility fixture, including
+   detached/stdio/unref semantics, actual command arguments and spawn error/exit reporting. Establish
+   whether a Windows setup defect explains missing receipts before changing containment code.
+   If saved/static evidence is insufficient, allow ONE isolated finite diagnostic workload with
+   explicit descendant spawn/error/exit receipts and the preserved working launch model. Use a
+   temporary copy, record exact differences, keep the existing bounds, and retain failure evidence.
+   If it cannot establish the orphan, stop that inquiry and return unknown; no second tuning run.
+4. Statically trace all phase timers, Promise.race losers/pollers, disposal calls, pipe tasks and
+   admission control. Propose one shared absolute cleanup deadline, cancellation/settlement of
+   polling, and an actually enforced outer bound that reserves cleanup time. Specify failure
+   handling when the runner itself times out: killing the runner alone must not authorize deletion.
+   Stop admission after the first unexplained boundary failure while allowing bounded cleanup of
+   already-started work. Preserve primary errors when cleanup also fails. Do not silently increase
+   approved durations to repair incorrect accounting; flag an incompatible budget for trunk.
+
+For each finding return source location, evidence, confidence, minimal change and fail-before/pass-
+after oracle. Identify the dependency order: encoding/driver budgets, proven orphan setup, then
+normal/cancel and reached fault cases. Give an explicit finite next validation matrix that never
+counts an unreached fault as tested, plus stop conditions. Review additional source only where
+necessary to explain these failures; defer speculative hardening and broad rewrites.
+
+Temporary diagnostic sources/results must be sealed with identities outside runtime paths. Return
+without production/test fixes or a complete matrix rerun. Record outcome here, correct routing to
+diagnosis rather than acceptance, format write/check and diff check, documentation-only commit and
+normal push. Verify actual remote/clean/unchanged parent M2 `4f09265` and F2 `4ea24d5`; remain on
+child. Trunk assigns the correction once this diagnosis resolves the specific unknowns. No PR,
+merge, freeze, formal measurement or acceptance update.
+
+## Historical assignment: Stage B under approved scoped timeout policy (2026-10-14)
 
 Execution status: attempted once under this assignment; the unexplained orphan setup deadline
 triggered its stop rule. See the latest return below. Do not automatically resume the matrix or

@@ -20,6 +20,9 @@ the tested boundary. Stage A `4947470` did not establish five-second suitability
 explicit finite per-test budgets for process/OS integration cases, retaining the general default and
 safety assertions. Stage B standalone transport resumes under that policy, then independent review
 before helper integration; Stage A is not retroactively accepted.
+Stage B `9bb3713` / outcome `6e05147` has one pass/seven first-run failures. It is incomplete,
+not acceptance-review ready. Next is bounded diagnosis of encoding, orphan setup and enforced
+deadline/cleanup accounting; no complete matrix rerun or deadline extension is assigned.
 Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.

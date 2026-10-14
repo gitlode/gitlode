@@ -3,8 +3,9 @@
 The experimental sources under `test/support/windows-launcher/` are an unfinished standalone
 test boundary. Correction round 1 implements the confirmed encoding, orphan setup and deadline
 findings from the [diagnosis](../handoff/opentelemetry-m2-stage-b-first-failure-diagnosis.md), under
-its [assignment](../handoff/opentelemetry-m2-fixture-ci-correction.md). It awaits source-bound
-validation and independent focused review. P1, integration and PR readiness remain unaccepted;
+its [assignment](../handoff/opentelemetry-m2-fixture-ci-correction.md). Its one source-bound campaign
+passed all nine entries; see the [correction return](../handoff/opentelemetry-m2-stage-b-correction-round1.md).
+Independent focused review is pending. P1, integration and PR readiness remain unaccepted;
 existing fixture helpers, product/no-owner/formal helpers and the Unix repair are outside this slice.
 
 `launcher.ts` owns invocation-local control, bounded writes, ordered launch receipts, strict output

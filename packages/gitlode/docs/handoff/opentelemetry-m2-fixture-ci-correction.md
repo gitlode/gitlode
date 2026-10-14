@@ -1,14 +1,20 @@
 # Fixture CI correction before PR
 
-Latest return: [Stage B first-failure bounded diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
-Diagnosis completed from `99b54804dcf3c9fcfe38f7990f0f84aa4827fda6`; one isolated orphan setup
-diagnostic supports the detached-spawn correction. Encoding and deadline corrections remain
-unimplemented. Route to trunk for a bounded correction assignment, not acceptance review.
-Standalone source is checkpointed, but Stage B correctness remains failed. P1 remains incomplete;
-existing helpers are not integrated.
+Latest return: [Stage B diagnosed correction round 1](opentelemetry-m2-stage-b-correction-round1.md).
+The confirmed encoding, detached orphan setup and deadline/settlement corrections were checkpointed
+at `f45062df73561ea563b5b0ad078bd92694bc910f` from `baee244abcad8ff2ac00115f596bc6be296f3d1d`.
+Finite static/in-memory checks and one dependency-ordered nine-entry runtime campaign passed;
+return for independent focused review, not self-acceptance. Stage B/P1/PR readiness remain
+unaccepted; existing helpers are not integrated. Original diagnosis/first-failure evidence remains
+preserved in the [diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
 ## Active assignment: Stage B diagnosed correction round 1 (2026-10-14)
+
+Execution status: completed once; see the [correction return](opentelemetry-m2-stage-b-correction-round1.md).
+All nine runtime entries passed once in dependency order, no unreached entries or runtime retry.
+All roots retained. Independent focused review is pending; this status grants no acceptance,
+integration, PR or new campaign authorization.
 
 Trunk adopts [the bounded diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md) delivered
 at `ee1dc83bcda7a8d4c9cd1ba1d551c435075e51a5`. Authorize its minimal encoding, orphan setup and

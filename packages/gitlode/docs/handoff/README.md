@@ -15,6 +15,8 @@ The shared sidecar's optional invocation-local ownership seam is authorized afte
 implementation `b98bbe5` reports successful supported-policy Windows tests and fixed-SHA CI.
 Independent review `4ecc79f` requires P1 descendant-quiescence correction and P2 durable Volta
 setup instructions. Resource policy is accepted; ownership and Windows PR-readiness remain blocked.
+P2 is delivered at `05134d0`, pending independent review. P1 scope return `9731f6c` leads to a bounded
+test-only Windows Job Object feasibility evaluation, not native launcher adoption or implementation.
 Current assignment:
 [fixture CI correction](opentelemetry-m2-fixture-ci-correction.md). Prior integration tuples are
 historical until corrected-source full tests, CI and focused review pass.

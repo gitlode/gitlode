@@ -4,7 +4,78 @@ Latest execution: [P2 delivery and P1 scope return](#p2-delivery-and-p1-scope-re
 P1 remains unimplemented under the active assignment's explicit pre-implementation stop condition;
 P2 is delivered for independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: ownership P1/P2 correction (2026-10-14)
+## Active assignment: bounded Windows containment feasibility (2026-10-14)
+
+Trunk accepts the scope stop at `9731f6cb6adea5dea8bd4fab8d10c05dc1584a4b`, not P1 completion.
+P2 `05134d052a8e53cfa3491654d43140401a554736` remains pending independent review. PID snapshots
+cannot reconstruct every already-exited intermediate ancestor. Do not continue snapshot patches
+as though they establish that guarantee. Authorize a test-only Job Object feasibility evaluation,
+NOT integration into fixtureExec/owner/sidecar and NOT adoption of a native dependency.
+
+Start on the same child from this packet checkpoint. Parent/F2 remain fixed. Use an isolated,
+invocation-local prototype/evidence directory; retain its source, commands and hashes in a sealed
+archive and return a design verdict here. No production, existing test/helper/config or lockfile edits.
+No new installed compiler/SDK/package, downloaded binary, global environment modification or platform
+service without a subsequent scope decision. Existing Windows tooling may be used; record prerequisites.
+
+### Questions to resolve, without broadening the product
+
+1. Describe the smallest test-only launcher boundary: Node caller, job-handle owner, command/argument/
+   environment/stdio transport, cancellation and completion messages. Evaluate whether existing
+   PowerShell/.NET facilities can host the native API calls without per-command compilation/startup
+   overhead dominating the unchanged five-second tests. Do not silently create a general daemon.
+2. Establish containment before the workload can spawn descendants. Consider creation-time job
+   assignment; if using suspended creation then assignment/resume, explicitly account for the crash
+   window before assignment and cleanup on assignment failure. A launcher killed at an unsafe phase
+   must not produce a false safe-to-delete result. Prevent handle inheritance/leaks and unwanted
+   breakaway. Assess nested-job compatibility with the actual test host and normal user privileges.
+3. Separate leader exit, contained-process absence, pipe/body/I/O settlement and disposal authorization.
+   Job termination/handle close alone is not an observed absence barrier. Define bounded failure,
+   unavailable-query and launcher-loss outcomes that retain roots and preserve primary errors.
+4. State the exact supported spawn model. Job inheritance is not universal (for example WMI-created
+   processes); Unix process groups also have escape boundaries. Cover actual Node/Git helper launches
+   and explicitly exclude unsupported/adversarial escape mechanisms rather than promise all possible
+   descendants. Any proposed reduction of the currently required tested boundary must return to trunk.
+
+Primary references to verify against the proposed design:
+
+- [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+- [Creation-time assignment and suspended-launch crash window](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812)
+
+### Finite feasibility evidence
+
+Use small finite Node workloads, not repositories or formal runs. Cover child-only normal completion,
+leader AND intermediate exit with a surviving descendant using ignored stdio, cancellation of that
+descendant, and one controlled unavailable-observation/launcher-loss path. Require explicit proof
+the orphan scenario was established; missing files or a failed setup are not successes. Verify roots
+remain while uncertainty exists and only delete after verified termination/settlement. Record launcher
+startup and operation durations for these cases to assess the existing deadline, without a benchmark
+campaign. Preserve the first failures; at most one explained deterministic setup correction per case.
+Stop unresolved lifecycle/integrity failures and return the limitation, rather than tune repeatedly.
+
+If prerequisites are absent, return the blocked feasibility and smallest prerequisite choices; do not
+install them. Do not implement the Unix-only fix during this evaluation. Its known correction remains
+required in the eventual complete P1 implementation.
+
+### P2 review and return
+
+As a new independent session, review P2 contributor instructions and the reported 30-member archive
+against fixed `05134d0`: setup identity, worker/tsx child execution, safe invocation-local paths and
+PATH restoration. Reuse verified logs where sufficient; rerun only a concrete unresolved part of the
+documented preflight, not a full test campaign. Separate this review verdict from P1 feasibility.
+
+Return: feasible/not feasible/inconclusive; exact guarantee and limitations; proposed files and
+dependencies; finite evidence and setup failures; startup/maintenance cost; minimum next implementation
+slice and tests. A successful prototype is not P1 acceptance or permission to wire it into helpers.
+If too costly or infeasible, compare explicit narrower supported-path alternatives with what would
+remain blocked; do not silently waive P1. Trunk makes the implementation/adoption decision once.
+
+Record outcome here and correct the visibly corrupted quotation in the prior scope return without
+altering its meaning. Preserve prototype/evidence source in the archive, format write/check and diff
+check, documentation-only commit/normal push, verify actual remote/clean/parent/F2, remain on child.
+No full test/package campaign, PR, merge, freeze, formal measurement or acceptance update.
+
+## Historical assignment: ownership P1/P2 correction (2026-10-14)
 
 Trunk confirms review `4ecc79f6b01a63f9ae684b62dbd4431196ca8468`: ownership corrections required,
 Windows PR-readiness blocked. Windows resource policy and GC acceptance are maintained. Implement

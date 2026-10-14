@@ -24,6 +24,10 @@ distinct from successful supported-policy execution.
 Review `4ecc79f` accepts the Windows resource policy but reproduces deletion after leader close while
 a descendant remains alive (P1), and requires durable Volta setup guidance (P2). The active packet
 assigns bounded corrections and independent re-review; PR readiness remains blocked.
+P2 guidance `05134d0` is delivered, not independently accepted. Scope return `9731f6c` establishes
+the current Windows snapshot mechanism's missing ancestry evidence after intermediate exit. Trunk
+assigns finite test-only Job Object feasibility and P2 review before deciding implementation scope;
+no native dependency or shared-helper integration is yet authorized. P1 and PR readiness remain open.
 
 PR #116 is human squash-integrated into M2 at `4ea24d53afc57778addf3f47752e0fe73a7011ea`,
 tree `715387bc01edac4792909b9faf5cd63ce53e7da1`, exactly matching reviewed source `14ee38b`.

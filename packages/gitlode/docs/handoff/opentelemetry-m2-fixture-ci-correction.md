@@ -1,6 +1,6 @@
 # Fixture CI correction before PR
 
-Latest execution: [Windows containment feasibility and independent P2 review](#windows-containment-feasibility-and-independent-p2-review-2026-10-14).
+Latest execution: [Standalone Windows launcher Stage A suitability return](#standalone-windows-launcher-stage-a-suitability-return-2026-10-14).
 P1 remains unimplemented; the prototype returns feasibility for trunk's implementation decision.
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
@@ -1364,3 +1364,145 @@ Pre-delivery live remote child matched `670985a`; parent matched
 format write/check, diff check, normal commit/push and actual remote/clean/parent/F2 verification.
 No production/helper integration, dependency installation, full test/package campaign, PR, merge,
 freeze, formal measurement or acceptance update. Remain on the child for trunk disposition.
+
+## Standalone Windows launcher Stage A suitability return (2026-10-14)
+
+Started clean on the assigned child at `1feb43aaab1b18cef7c677de9b2c2cf05abedac4`.
+**Stage A: inconclusive; Stage B withheld, returning for suitability disposition.** One valid
+subsequent lower-bound execution completed in 4,016.01 ms, but the cold execution failed during
+setup. The authorized maximum of two recorded executions is exhausted. No standalone command
+transport, helper integration, Unix correction or P1 acceptance is delivered. P2 remains accepted.
+
+### Selected path and observed load
+
+Inspected behavioral-baseline, repository-sidecar and fixture-lifecycle before execution. The
+five-second baseline regeneration body creates two SHA-1 repositories and compares semantic
+snapshots: 31 Git commands per recipe plus 10 per snapshot, **82 commands and 24 explicit
+filesystem operations** (106 owner-work registrations). Existing five-way query concurrency is
+preserved. Separate frozen extraction tests have an explicit 30-second deadline and are excluded.
+
+Lifecycle identity uses nine Git queries plus recursive file inventories/hashes/statfs. Prepare
+performs three identities and a recursive copy; capture two identities and atomic boundary writes;
+finalize one identity and boundary/lifecycle writes. Two-capture C2 executes 72 queries; the
+queries/copy verification body executes 73. Shared six-commit setup is 33 commands in beforeAll.
+Sidecar setup executes 31 Git commands, ordinary fixture/config writes and one Node sidecar launch;
+worker report/output/provenance work and product-adapter subprocess counts depend on the request.
+Plugin setup adds its directory/package/index/input/config writes. These are inspected static
+helper counts, not newly executed sidecar/C2 results. Full inventory costs and product Git children
+are not equated with helper launch count. The selected baseline has the largest relevant helper
+command count and a documented prior five-second failure; this is not a claim that every other
+body has less elapsed time.
+
+Two new isolated Vitest files run with `maxWorkers: 2` and file parallelism, without changing any
+repository config or existing test selection/deadline/skip/assertion. Main timer begins before
+ordinary spaced-root/gate creation and includes fresh hidden PowerShell host startup, one Add-Type,
+real Node/tsx bootstrap, the actual unchanged recipe/snapshot functions, Git captured pipe
+settlement, job-zero observation and host shutdown. A second worker executes the same real
+82-command/24-filesystem-operation workload with independent roots. Distinct worker PIDs are
+24892 and 3188; the peer finishes 1,156 ms before main. Load overlaps host startup and part of the
+main Git phase, not the whole tail; it is not a full-suite load or CPU/memory utilization sample.
+No invisible prewarming or third execution. OS/tsx caches may be warm.
+
+### First failure, valid result and cost limits
+
+First invocation exits 1 before workload entry: Node rejects a Windows absolute --import path as
+`c:` protocol (`ERR_UNSUPPORTED_ESM_URL_SCHEME`). Peer stderr identifies the cause; the ignored-stdio
+host reports missing workload receipt. Its Node leader was assigned to the job, exited, and active
+count zero was observed; no failed setup is counted as workload success. Total 1,481.28 ms,
+compilation 385.00 ms, launch 34.25 ms. First sources, logs and roots are preserved. One deterministic
+correction uses file URLs in both import arguments; no load/recipe/compiler/deadline changes.
+
+Second invocation exits 0; two finite driver assertions pass. Main observes job membership, leader
+exit and active count zero before disposing private handles. All 82 Git commands have successful
+close receipts with captured output; semantic snapshots match. All roots remain preserved.
+
+| Recorded component                           |          Elapsed ms |
+| -------------------------------------------- | ------------------: |
+| Main complete measured body                  |            4,016.01 |
+| Ordinary root/gate setup                     |                2.03 |
+| Add-Type compilation                         |              388.33 |
+| Native Node launch                           |               36.71 |
+| Node workload including Git/files/body       |            2,483.74 |
+| Git launch-through-pipe-close interval union |            1,962.04 |
+| Workload outside those intervals             |              521.70 |
+| Node bootstrap/host observation remainder    |              155.85 |
+| Other host body work                         |              129.40 |
+| Host startup/shutdown/caller remainder       |              819.95 |
+| Peer body / peer Node workload               | 2,852.64 / 2,603.14 |
+
+The Git union and outside-interval rows partition the workload row; do not add them again.
+Git interval sum is 2,466.21 ms because parallel queries overlap. Launch intervals include Git
+computation and pipe settlement, not pure launch cost. The outside-interval remainder includes
+filesystem work and scheduling, not pure I/O latency. Main captured 8,129 stdout bytes and
+2,610 stderr bytes; pipe/body completion precedes the final workload receipt. No output transport
+between the host and Node caller was implemented.
+
+This executes **one job around the whole Node recipe**, with Git launched by unchanged Node
+execFile inside that job. It establishes actual Node/Git descendants and spaced cwd under nested
+job containment, not 82 host-mediated launches with separate jobs and generic pipes. The remaining
+**983.99 ms** is an untested budget for that transport/lifecycle work. Earlier aggregate overhead
+is not a per-command cost; old native launch timings cannot simply be added (possible double
+counting). Practical margin for the full proposed boundary is not established, and there is no
+valid cold fit. Implementing all transport to resolve that gap would bypass the Stage A gate.
+The 20-second new-driver and 15-second host diagnostic bounds only allow recording settlement
+after a miss; suitability remains 5,000 ms. No repository deadline was raised.
+
+Executed platform: x64 Windows 10.0.26200, PowerShell 5.1.26100.9711, existing .NET/Add-Type,
+Node 22.23.1, tsx 4.23.8, Vitest 4.1.10, **Git 2.45.1.windows.1**. Identity is
+`WAKA-PC\CodexSandboxOffline`; host is in an outer job. This session does not repeat the previously
+recorded normal-user prerequisite. Different installed Git identity is disclosed, not treated as
+the prior Git installation. No download, dependency installation or toolchain replacement.
+Only ordinary Node/Git CreateProcess descendants are exercised; broker/WMI/adversarial escape
+and general output/handle inheritance remain outside this evidence.
+
+### Source, evidence and next boundary
+
+Tracked [source/receipt packet](../../test/support/windows-launcher-stage-a/source-receipts.json)
+contains 25 exact executed-source/receipt members plus one explicitly unexecuted static lint
+correction, with byte lengths and SHA-256. It is archival data, not
+a runnable installed launcher; source paths refer to its original invocation-local replay root.
+Generated .git data is excluded from tracked source. Raw non-UTF-8 PowerShell logs use base64;
+all decoded members were verified with zero mismatches. First packet packaging rejected log
+encoding; the correction changed only archival encoding, never workload results. Final rehashing
+also caught PowerShell text decoding damage after adding the static lint variant; the packet was
+rebuilt directly from preserved bytes through Node and reverified. The damaged packet is retained
+in delivery evidence. The preliminary
+seal remains unchanged and is not the final delivery archive.
+
+Final local archive:
+`.cache/windows-launcher-stage-a-1feb43a-20261014-final-sealed.zip`, SHA-256
+`fd66649728942e41b03b691b1dfc584236b99b39fccc7176ea44adfa663fad3e`;
+manifest SHA-256 `222dfe8793bf1d0c605f80618a378e4bbe557185e06307b64aa6644d8c944930`.
+Rehashed all **56 files**, byte lengths included, zero mismatches; 205 physical zip entries include
+directories and manifest. Includes first/final source, both executions, commands/limitations,
+calculation source, native prototype and retained roots. Original prototype archive remains
+`72ac389d6354882e12a180af202d06fb19c8c62825198d396912f5f3dee1f546` unchanged.
+
+One bounded alternative for trunk disposition: explicitly authorize a command-batch boundary
+that assigns the whole helper recipe to one job and uses file receipts, then separately reviews
+cancellation/failure/absence. This avoids host round trips but does not satisfy arbitrary fixtureExec
+commands or sidecar stdout; those remain blocked. No alternative is implemented/adopted and no
+additional tuning or native executable is proposed in this slice.
+
+The eventual proposed seam remains optional fixtureExec/owner and owned sidecar launch, with Node
+owning roots/body/output settlement and requiring separately observed absence. Unix still needs
+private-group observation after leader exit for normal and cancelled disposal. Neither is wired.
+Future transport maintenance includes x64 ABI, native failure identity, quoting/environment blocks,
+pipe-handle allowlists, admission sealing and output settlement. Stage B contributor platform/
+maintenance documentation is deferred because no reusable adapter has been implemented.
+
+Validation is confined to these two new finite drivers, archived-source syntax/relevant lint,
+packet identity, format write/check and diff check. Strict adapter typing and Stage B correctness
+cases are not executed: no TypeScript adapter/runtime module was introduced. No build was required
+for the actual fixture recipe check. Direct lint selection under hidden .cache found no files;
+byte-identical replay copies exposed one no-promise-executor-return diagnostic in the peer gate's
+setTimeout executor. Its static correction discards the unused return value; relevant lint on the
+three runtime sources then passes. The packet retains original executed bytes and labels the
+corrected peer variant unexecuted. No third workload execution and no clocked-source replacement.
+Calculation/packaging scripts receive syntax checks; they are archival maintenance scripts.
+No full OS/package campaign, formal runs or acceptance update.
+Pre-delivery live remote child matched `1feb43a`; parent matched
+`4f09265791c82452a5800cc6d9855938bf88a46e`; both F2 preservation refs matched
+`4ea24d53afc57778addf3f47752e0fe73a7011ea`. Deliver the source/outcome checkpoint with normal push
+and actual remote/clean/parent/F2 verification, remain on child, and await suitability disposition.
+No PR, merge, freeze, eligibility or self-acceptance.

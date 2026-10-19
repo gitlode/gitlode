@@ -76,7 +76,18 @@ Launcher and lifecycle checked configs also move to tests/performance. Historica
 
 ## Validation
 
-Pending completion; no acceptance inferred from relocation.
+Implementation checkpoint: `5b94157890971f0187098d335f5dd755bc3901d8`. Relocation and scoped checks are complete; independent review and HQ measurement permission are not implied.
+
+- Moved 63 implementation/test/asset paths plus two focused TypeScript configurations. All 63 old paths are absent. The 17 dedicated test files now belong to the performance project; root discovery remains 105 files, with no test added or dropped.
+- Windows: selected 9 files / 106 passed, fixture/aggregation 2 files / 31 passed, worker transport and release gate 2 files / 51 passed (188 total, no skips). No standalone Windows runtime campaign or audit was run.
+- TypeScript: tooling/shared support, Windows launcher closure, lifecycle closure and release-boundary check pass. The pre-move tooling closure also passed; historical readonly diagnostics were not reproduced by these commands.
+- build:dev, lint, format write/check, syncpack and architecture pass. Architecture retains one pre-existing compactness warning, zero errors. Relocation-only declaration/override adjustments corrected initial missing dependency, lint-scope and graph-consumer errors; no algorithm fixes were made.
+- Linux isolated copy: Node 22.23.1, Git 2.53.0, Vitest 4.1.10, TypeScript 7.0.2, tsx 4.23.8, existing dependency copy, no install. Initial 4 passed / 6 failed / 16 deselected due operator setup missing npm on PATH. Original logs and retained roots are preserved. After correcting PATH, identical test source passed 10 / 16 deselected (selection skips, not OS skips). These are small synthetic supervised entrypoint/retention/C3 tests, not qualification or formal measurement. Expected failed nested retention probes appear inside the passing outer tests.
+- Both old gitlode and new private-workspace npm aliases resolve and reject missing artifact values with exit 2 before workload launch. Package default manifest/artifact paths now belong to tests/performance; explicit operator arguments retain caller-cwd behavior.
+- All existing lock resolution entries are unchanged. Only workspace registration/link/declarations are added. Product src, release validator, acceptance record and numeric performance catalog have no diff. Five historical receipt JSONs plus the fixture manifest retain identical Git blobs.
+- Full root tests, Windows native campaign/handle audit, installed-package/release campaign, formal eligibility, formal comparisons and fresh Linux dependency installation were not executed. Thus the copied-dependency Linux check is not a fresh-install CI result. Existing Windows descendant ownership/handle uncertainties and historical flaky failures remain unresolved.
+- Evidence: `C:/Users/t-wakabayashi/source/gitlode/.cache/test-layout`, manifest `edb50d034f127177da1af2ca127a18b9cdbe717c87f03039c972203f06812cc9` (44 members). The Linux working copy is `/tmp/gitlode-layout-Br14Zi/source`; it and failure roots were retained. No frozen F2/legacy runtime/archive/evidence was changed. The source tar is an uncommitted validation snapshot; it is not a candidate freeze.
+- Current canonical routing is in tests/README.md and contributor guides. Historical handoff content/receipt paths are preserved; HQ priority notices suspend the previous audit assignment.
 
 ## Next measurement decision (proposal only)
 

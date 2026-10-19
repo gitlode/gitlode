@@ -1,5 +1,10 @@
 # Fixture CI correction before PR
 
+Latest audit return `1d80f8f` stopped at token preflight, before any audited workload. Follow the
+[active continuation](opentelemetry-m2-stage-b-handle-audit.md#active-continuation-token-preflight-diagnosis-and-conditional-audit):
+bounded error capture/diagnosis, one explained setup correction if needed, then conditional first
+baseline/sensitivity invocation. Accepted fixes remain; runtime audit and Stage B acceptance are pending.
+
 ## Current assignment: runtime handle audit (2026-10-19)
 
 Review `7574619` accepts all five round-2 corrections at `a5dae83`. Trunk maintains that acceptance

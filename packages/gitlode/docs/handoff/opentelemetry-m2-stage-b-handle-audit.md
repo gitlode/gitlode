@@ -1,5 +1,44 @@
 # Stage B creation-time handle audit assignment (2026-10-19)
 
+## Active continuation: token preflight diagnosis and conditional audit
+
+Return `1d80f8fe73016ad62eec85388a0c46163591ff8c` is setup-inconclusive, with ZERO audited
+workload launches. The missing Win32 error prevents attributing this to permissions or platform
+support. Accepted correction `a5dae83` remains unchanged. Start on the same child from this packet
+checkpoint. This section overrides the previous blanket no-diagnostic-repair rule for preparation
+only; baseline/sensitivity and their safety/oracle/stop requirements below remain unchanged.
+
+1. Read saved Audit.cs/preflight/receipts first. Inspect P/Invoke signature, information-class/layout,
+   handle lifetime and actual requested query rights. Verify against documented GetTokenInformation
+   behavior. Do not infer an API's underlying failure from a PowerShell wrapper message.
+2. In a NEW retained diagnostic directory, preserve original bytes and add bounded structured error
+   capture immediately after each failed native call, before any other interop/logging operation.
+   Record API/class, buffer/required length, Win32 code, host PID and intended token kind without
+   environment disclosure. Capture the inner exception chain safely. Do not echo complete raw logs.
+3. Allow ONE no-workload diagnostic preflight on the ordinary contributor token. If its evidence
+   identifies a deterministic preparation bug, allow one targeted correction and ONE confirmation
+   preflight. Use proper query rights, ownership and required-length allocation as appropriate to
+   the demonstrated defect; no blind shotgun changes or token privilege elevation. Establish token
+   identity/integrity/elevation in the actual host; shell identity alone is not a substitute.
+   If the first instrumented call succeeds, record that the old cause remains unknown and verify
+   the corrected diagnostic's provenance/identity rather than claiming an established root cause.
+4. Failed/unsupported/ambiguous prerequisite after this allowance returns pending. No more attempts,
+   no dropped attestation, no administrator/SeDebugPrivilege fallback. Preserve all first failures.
+   Static checks/compilation without launching workload are preparation, not runtime audit evidence.
+5. If the explicit prerequisites pass, finish the planned diagnostic harness and run the original
+   single bounded audit invocation (at most two launches: baseline then sensitivity). This is still
+   the first audit invocation, not a retry of the stopped setup. Validate construction/cleanup and
+   ordinary token binding before admission. Stop the first unexpected runtime failure; no runtime
+   repair/retry or extra launch. The previous 52-member seal remains immutable.
+
+Only temporary diagnostic sources may change. Existing launcher/helper/test/configuration and
+accepted production bytes remain fixed; no installed utilities/dependencies or global changes.
+Deliver token diagnosis/confirmation and audit verdicts separately with exact source hashes,
+attempt counts, sanitized receipts and cleanup limits. Append outcome here, format write/check,
+diff check, documentation-only commit/normal push, actual remote/clean/parent/F2 verification.
+Keep all roots and remain on child. No self-acceptance, helper integration, PR, merge, freeze,
+Unix repair, formal measurement or release acceptance update. Warn before real-process work.
+
 ## Trunk disposition and scope
 
 Trunk accepts all five round-2 corrections at fixed implementation

@@ -1,5 +1,10 @@
 # OpenTelemetry M2 continuation plan
 
+Audit return `1d80f8f` is setup-inconclusive: GetTokenInformation failed without preserved native
+error code; baseline/sensitivity never launched. Assign bounded preflight diagnosis and one explained
+correction/confirmation, then conditional first audit in the same session. This does not establish
+permission failure, waive token evidence or reopen accepted fixes. Follow the active handle-audit packet.
+
 2026-10-19 latest: independent review `7574619` accepts all five round-2 corrections at `a5dae83`.
 Trunk adopts the direct-workload creation-time inheritance oracle and assigns
 [a two-launch runtime audit](opentelemetry-m2-stage-b-handle-audit.md) with existing Windows APIs.

@@ -8,6 +8,10 @@ documents.
 
 ## Active OpenTelemetry work
 
+Latest: audit `1d80f8f` is inconclusive at token setup (zero workload launches). The
+[active audit continuation](opentelemetry-m2-stage-b-handle-audit.md) permits bounded preflight
+diagnosis/correction and the original first audit only after prerequisites pass. No acceptance change.
+
 Current: [bounded Stage B runtime handle audit](opentelemetry-m2-stage-b-handle-audit.md).
 Review `7574619` accepts the five round-2 fixes; the separate audit remains pending. Diagnostic
 copies and two finite launches only; no helper integration or external utility installation.

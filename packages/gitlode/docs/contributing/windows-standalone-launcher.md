@@ -6,8 +6,8 @@ findings from the [diagnosis](../handoff/opentelemetry-m2-stage-b-first-failure-
 its [assignment](../handoff/opentelemetry-m2-fixture-ci-correction.md). Its one source-bound campaign
 passed all nine entries; see the [correction return](../handoff/opentelemetry-m2-stage-b-correction-round1.md).
 [Independent review](../handoff/opentelemetry-m2-stage-b-independent-review.md) returned corrections
-required for error paths, enforced deadlines and settlement. Normal-user/handle runtime gates remain
-open. The mechanism descriptions below do not establish delayed-path correctness.
+required for error paths, enforced deadlines and settlement. The mechanism descriptions below do
+not independently establish delayed-path correctness.
 Round 2 repairs these paths under the [correction packet](../handoff/opentelemetry-m2-stage-b-correction-round2.md).
 Its exit-path table, fault vectors and delivery outcome are the continuation record; this is not
 self-acceptance or permission to integrate helpers.
@@ -15,6 +15,10 @@ Round 2 passed its injected checks, nine-entry regression and one normal-contrib
 case, but returned incomplete because an existing runtime handle enumerator was unavailable.
 Runtime handle types/ownership and job/control-handle exclusion remain unverified; see the
 [return](../handoff/opentelemetry-m2-stage-b-correction-round2.md#round-2-return-incomplete-at-runtime-handle-audit-prerequisite).
+The [round-2 independent review](../handoff/opentelemetry-m2-stage-b-round2-review.md#independent-return-2026-10-19)
+accepts all five fixes as a correction slice and reverifies the saved campaign/ordinary-token
+evidence. Runtime handle audit remains separately pending with a concrete Windows API diagnostic
+plan; no new audit run or helper integration is authorized by that return.
 P1, integration and PR readiness remain unaccepted;
 existing fixture helpers, product/no-owner/formal helpers and the Unix repair are outside this slice.
 
@@ -42,7 +46,8 @@ Requirements: Windows 10+, x64 ABI, existing Windows PowerShell 5.1/.NET Add-Typ
 System.Web.Extensions, installed Node/Git and repository dependencies. Stop unsupported host,
 compiler or containment prerequisites; install nothing to bypass them. Supported workloads are
 direct Node/Git descendants inheriting containment; brokers, WMI and adversarial breakaway are
-unsupported. Normal-user execution and inherited-handle audits remain independently unverified.
+unsupported. Saved normal-user transport evidence is reverified; runtime inherited-handle exclusion
+remains unverified.
 
 The [budget document](../../test/support/windows-launcher/budgets.md) owns cutoff arithmetic.
 `deadlines.ts` uses a shared monotonic origin across Node processes. Poll expiry aborts/joins the

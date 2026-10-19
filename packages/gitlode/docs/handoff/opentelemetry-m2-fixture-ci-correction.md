@@ -1,14 +1,15 @@
 # Fixture CI correction before PR
 
-## Current assignment (2026-10-19): round-2 review and handle-audit disposition
+## Latest return (2026-10-19): round-2 review and handle-audit disposition
 
-Outcome `2709805` reports correction `a5dae83` passed injected checks, nine process entries and
-normal-contributor transport, with runtime handle audit unverified due to tool absence. Follow
-[the independent review packet](opentelemetry-m2-stage-b-round2-review.md). Review the implemented
-five fixes separately from the audit, and return a concrete minimal audit method where pending.
-No acceptance/helper integration is implied; earlier implementation assignments below are historical.
+The [independent round-2 review](opentelemetry-m2-stage-b-round2-review.md#independent-return-2026-10-19)
+accepts the five fixes in `a5dae83` as a correction slice, with independent finite checks and
+reverified saved evidence. Runtime handle audit is separately pending with an invocation-local
+Windows API plan; no audit workload was run. Stage B/P1/PR readiness and helper integration remain
+open. Further diagnostic work needs separate disposition; earlier implementation assignments below
+are historical.
 
-Latest return: [independent standalone Stage B review](opentelemetry-m2-stage-b-independent-review.md),
+Historical round-1 return: [independent standalone Stage B review](opentelemetry-m2-stage-b-independent-review.md),
 **corrections required**. Prior correction outcome:
 [Stage B diagnosed correction round 1](opentelemetry-m2-stage-b-correction-round1.md).
 The confirmed encoding, detached orphan setup and deadline/settlement corrections were checkpointed
@@ -19,7 +20,7 @@ unaccepted; existing helpers are not integrated. Original diagnosis/first-failur
 preserved in the [diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active assignment: Stage B cleanup correction round 2 (2026-10-19)
+## Historical assignment: Stage B cleanup correction round 2 (2026-10-19)
 
 Trunk adopts the five mandatory findings and assigns
 [the coherent round-2 correction](opentelemetry-m2-stage-b-correction-round2.md).

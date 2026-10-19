@@ -2,6 +2,12 @@
 
 ## HQ priority override (2026-10-19)
 
+Latest HQ delegation: [F2 first-target Linux judgment](opentelemetry-m2-f2-first-target.md).
+PR #117 is integrated. Trunk may complete preparation, fixed-quantity eligibility, capture and
+disabled comparison using saved F2/legacy and isolated b002584. Historical per-stage approval/stop
+rules are superseded for this unit; Windows runtime/audit remains paused. The user accepted local
+dual-copy risk for this unit. No profile/full-matrix/product-improvement/release work is delegated.
+
 The HQ-authorized test layout work supersedes the previous executable assignment. Handle-audit continuation, eligibility campaigns and formal performance runs are on hold pending HQ review. Historical outcomes and paths below remain evidence for their original revisions. Current placement and validation are tracked in [test layout](opentelemetry-m2-test-layout.md).
 
 This directory contains continuation notes for unfinished work, future implementation sessions, and

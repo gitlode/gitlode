@@ -8,6 +8,10 @@ documents.
 
 ## Active OpenTelemetry work
 
+Current: [bounded Stage B runtime handle audit](opentelemetry-m2-stage-b-handle-audit.md).
+Review `7574619` accepts the five round-2 fixes; the separate audit remains pending. Diagnostic
+copies and two finite launches only; no helper integration or external utility installation.
+
 Latest return: [round-2 independent review and remaining handle audit](opentelemetry-m2-stage-b-round2-review.md#independent-return-2026-10-19).
 All five fixes in `a5dae83` are independently accepted as a correction slice. Strict typing,
 21 Node tests and finite native vectors pass; the 127-member seal and saved runtime evidence were

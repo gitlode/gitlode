@@ -1,5 +1,11 @@
 # OpenTelemetry M2 continuation plan
 
+2026-10-19 latest: independent review `7574619` accepts all five round-2 corrections at `a5dae83`.
+Trunk adopts the direct-workload creation-time inheritance oracle and assigns
+[a two-launch runtime audit](opentelemetry-m2-stage-b-handle-audit.md) with existing Windows APIs.
+Only diagnostic copies may add suspension/injected sensitivity handles. Stage B/P1/helper integration/
+PR readiness remain pending; no acceptance-record change or external tool installation is authorized.
+
 Latest 2026-10-19 return: the
 [independent correction review](opentelemetry-m2-stage-b-round2-review.md#independent-return-2026-10-19)
 accepts all five fixes in `a5dae83` as a correction slice. Independently executed finite checks pass;

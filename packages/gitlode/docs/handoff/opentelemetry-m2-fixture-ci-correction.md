@@ -1,5 +1,12 @@
 # Fixture CI correction before PR
 
+## Current assignment: runtime handle audit (2026-10-19)
+
+Review `7574619` accepts all five round-2 corrections at `a5dae83`. Trunk maintains that acceptance
+and assigns [the bounded creation-time runtime handle audit](opentelemetry-m2-stage-b-handle-audit.md)
+using existing APIs and diagnostic copies only. Stage B/P1/helper integration/PR readiness remain
+pending. This supersedes earlier current-assignment routing below.
+
 ## Latest return (2026-10-19): round-2 review and handle-audit disposition
 
 The [independent round-2 review](opentelemetry-m2-stage-b-round2-review.md#independent-return-2026-10-19)

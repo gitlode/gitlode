@@ -30,6 +30,8 @@ export class WindowsLauncher {
   private disposal?: Promise<void>;
   private queuedBytes = 0;
   private writes = new Set<Promise<void>>();
+  private stopErrors: Error[] = [];
+  private stopped = false;
   private readyResolve!: () => void;
   private readyReject!: (error: Error) => void;
   private shutdownResolve!: () => void;
@@ -63,6 +65,12 @@ export class WindowsLauncher {
     void this.shutdown.catch(() => {});
     this.host.on("error", () => this.fail(new Error("host spawn failure; retain root")));
     this.host.stdin.on("error", () => this.fail(new Error("control write failure; retain root")));
+    this.host.stdout.on("error", () =>
+      this.fail(new Error("control stdout read failure; retain root")),
+    );
+    this.host.stderr.on("error", () =>
+      this.fail(new Error("control stderr read failure; retain root")),
+    );
     // Drain diagnostic output without retaining exception text or inherited request values.
     this.host.stderr.resume();
     this.host.stdout.on("data", (data: Buffer) => {
@@ -89,7 +97,28 @@ export class WindowsLauncher {
     for (const item of this.pending.values()) item.reject(this.failure);
     this.pending.clear();
     // Closing control requests host cleanup; it never establishes observed absence.
-    this.host.stdin.end();
+    try {
+      this.host.stdin.end();
+    } catch {
+      this.stopErrors.push(new Error("control end failure; retain root"));
+    }
+  }
+  private stop() {
+    this.sealed = true;
+    this.stopped = true;
+    // Each action is independent: a throwing stream must not skip host termination.
+    for (const action of [
+      () => this.host.stdin.destroy(),
+      () => this.host.kill(),
+      () => this.host.stdout.destroy(),
+      () => this.host.stderr.destroy(),
+    ]) {
+      try {
+        action();
+      } catch {
+        this.stopErrors.push(new Error("host stop/close failure; retain root"));
+      }
+    }
   }
   private message(message: Record<string, unknown>) {
     if (this.failure) return;
@@ -269,17 +298,35 @@ export class WindowsLauncher {
         sendError = error;
       }
     }
-    await settleCleanup(end, [
-      {
-        name: "control writes",
-        run: async () => {
-          await Promise.all([...this.writes]);
-          if (sendError) throw sendError;
+    // Request fallback before the shared deadline, leaving time for actual close callbacks.
+    const stopTimer = setTimeout(() => this.stop(), Math.max(0, (end - now()) / 2));
+    try {
+      await settleCleanup(end, [
+        {
+          name: "control writes",
+          run: async () => {
+            await Promise.all([...this.writes]);
+            if (sendError) throw sendError;
+          },
         },
-      },
-      { name: "shutdown observation", run: () => this.shutdown },
-      { name: "host/output settlement", run: () => this.closed },
-    ]);
+        { name: "shutdown observation", run: () => this.shutdown },
+        { name: "host/output settlement", run: () => this.closed },
+        {
+          name: "stop result",
+          run: async () => {
+            if (this.stopped) throw new Error("host forced stop; absence unknown; retain root");
+            if (this.stopErrors.length)
+              throw new AggregateError(this.stopErrors, "stop failures; retain root");
+          },
+        },
+      ]);
+    } catch (error) {
+      // A cached rejected disposal still performs this fallback, without another wait budget.
+      if (!this.stopped) this.stop();
+      throw new AggregateError([error, ...this.stopErrors], "cleanup uncertainty; retain root");
+    } finally {
+      clearTimeout(stopTimer);
+    }
   }
 }
 export async function finite<T>(body: Promise<T>, ms: number, phase: string): Promise<T> {

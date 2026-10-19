@@ -61,3 +61,40 @@ Return for independent focused re-review only if correction gates pass; otherwis
 with the earliest failure. A recurring same-boundary finding returns to trunk diagnosis, not automatic
 further repairs. No helper integration, Unix P1 repair, full OS/package campaign, PR, merge, freeze,
 formal measurement or acceptance update. Do not self-accept Stage B/P1/PR readiness.
+
+## Round-2 exit-path table (recorded before implementation)
+
+All rows retain roots. Deadlines are absolute; no row creates a second cleanup allowance.
+The native host is enclosed by the Node launcher, the scenario by the outer job, and the
+case/runner by the driver. Driver filesystem calls have no further independent owner.
+
+| Trigger                                                        | Admission cutoff                                                                               | Cleanup remainder / actions                                                                    | Possible observations                                         | Failures / terminal result                                                                                                                               |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| stdout or stderr emitted error                                 | Seal immediately                                                                               | End control; dispose under existing owner cutoff; stop/close fallback                          | Host close and settled writes, never inferred job absence     | Original body error stays primary; redacted stream failure and cleanup failures are secondary; absence unknown without complete                          |
+| Existing entry expiry, delayed send, construction or launch    | Check before input/admission and after native return; native work ends at entry start + 11,000 | Entry start + 15,000 maximum; cancel, observe, close                                           | Job zero, leader exit, drain results if native call returns   | Late return cannot send started; non-preemptible call remains enclosed by Node/outer owner, settlement unknown if lost                                   |
+| Shutdown/write stall or disposal expiry                        | Seal at disposal                                                                               | Active stop/close request within same 4,000 remainder, including cached-disposal fallback      | Actual host close/output close and write callbacks only       | Preserve original error and distinct stop/close errors; timeout is uncertainty, never settled                                                            |
+| Setup read/mkdir or final receipt write delay                  | Arm before first filesystem call; no launch after work cutoff                                  | Abort supported I/O, bound waiting, retain outstanding operation identity through final cutoff | Fulfilled/rejected I/O, supported abort settlement            | Pending kernel I/O remains unknown even after runner kill; receipt failure cannot replace body failure                                                   |
+| input.Dispose or transient thread/pipe/NUL CloseHandle failure | Seal on failure                                                                                | Guard each phase; attempt subsequent cancel/observe/close with same remainder                  | Individual close results, drain outcomes and job observations | Preserve primary plus all distinct secondary failures; quarantine failed handle identities without retry; never claim closed/absent from attempted close |
+
+Pre-runtime gate: strict typing, focused lint, 21 Node fault/protocol tests, four finite native
+transport paths (construction, launch, send, input.Dispose), three ambiguous close identities
+with four later releases/no unsafe retries, and native framing (two valid/five rejected) pass.
+Three deterministic old-source regressions fail as expected (both read errors and stalled
+shutdown/write); the exact corrected launcher bytes were restored in finally before pass-after.
+The native transport vectors compile the production bodies with replaced OS boundaries and scaled
+test-only intervals; they exercise actions and failures, not real workloads or kernel preemption.
+
+| Review finding | Implementation / injected evidence                                                                                                                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1              | Both read error handlers call redacted fail; emitted-error tests assert sealing, control end, stop, cached uncertainty                                                                                                      |
+| 2              | Native pre-input/admission/post-launch checks, construction-start work/total accounting, send clipping; delayed construction/launch cannot send started, delayed send requests cancel before reserve exhaustion             |
+| 3              | Disposal fallback timer acts halfway through the same remainder; guarded stream/host stop, actual delayed-close/write-stall test, cached result retains uncertainty                                                         |
+| 4              | Case watchdog and driver timers precede mkdir; CaseIO gates/aborts/tracks pending I/O; actual case read/setup and actual driver setup/final-write fault tests retain unknown settlement                                     |
+| 5              | Native guarded cleanup collects original plus secondary exceptions; close identities quarantined without retry; actual case cancellation/disposal/receipt faults retain the original body and all secondary classifications |
+
+Test-harness-only first failures were an omitted driver argv fixture and a case fake dispose
+returning undefined/expecting one invocation after adding the independent watchdog. Corrected mocks
+now return the disposal Promise and assert both watchdog and join invocations. No native workload
+was admitted during these failures. The final gate contains no unhandled errors.
+
+Status: injected gates passed; real-process validation awaits the source checkpoint below.

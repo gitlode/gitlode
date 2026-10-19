@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.IO;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 public sealed class JobProbe : IDisposable {
@@ -17,7 +18,7 @@ public sealed class JobProbe : IDisposable {
   [DllImport("kernel32", SetLastError=true)] static extern bool IsProcessInJob(IntPtr process,IntPtr job,out bool result);
   [DllImport("kernel32")] static extern IntPtr GetCurrentProcess();
   [DllImport("kernel32")] static extern uint WaitForSingleObject(IntPtr handle,uint timeout);
-  [DllImport("kernel32")] static extern bool CloseHandle(IntPtr handle);
+  [DllImport("kernel32", SetLastError=true)] static extern bool CloseHandle(IntPtr handle);
   [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] struct SI {
     public int cb; public string reserved,desktop,title;
     public uint x,y,xsize,ysize,xchars,ychars,fill,flags;
@@ -31,6 +32,16 @@ public sealed class JobProbe : IDisposable {
   [DllImport("kernel32", SetLastError=true)] static extern bool GetExitCodeProcess(IntPtr process,out uint code);
   [DllImport("kernel32", SetLastError=true, CharSet=CharSet.Unicode)] static extern IntPtr CreateFileW(string name,uint access,uint share,ref SA security,uint creation,uint flags,IntPtr template);
   IntPtr job, leader;
+  // A failed close has ambiguous ownership. Keep its identity, but never retry a possibly reused value.
+  public readonly List<IntPtr> FailedCloses=new List<IntPtr>();
+  static readonly List<IntPtr> quarantinedCloses=new List<IntPtr>();
+  readonly List<Exception> closeFailures=new List<Exception>();
+  void CloseOwned(IntPtr handle) {
+    if(handle==IntPtr.Zero || handle==new IntPtr(-1)) return;
+    try { Check(CloseHandle(handle)); }
+    catch(Exception error) { FailedCloses.Add(handle); quarantinedCloses.Add(handle); error.Data["handle"]=handle; closeFailures.Add(error); }
+  }
+  void CheckCloses() { if(closeFailures.Count!=0) throw new AggregateException("native close uncertainty; retain root",closeFailures); }
   public Task<byte[]> Stdout, Stderr;
   public bool DenyObservation;
   public static string Quote(string value) {
@@ -65,9 +76,10 @@ public sealed class JobProbe : IDisposable {
     job=CreateJobObjectW(IntPtr.Zero,null); if(job==IntPtr.Zero) Check(false);
     IntPtr limits=Marshal.AllocHGlobal(144);
     try { for(int i=0;i<144;i++) Marshal.WriteByte(limits,i,0); Marshal.WriteInt32(limits,16,0x2000); Check(SetInformationJobObject(job,9,limits,144)); }
-    catch { Dispose(); throw; } finally { Marshal.FreeHGlobal(limits); }
+    catch(Exception error) { try { Dispose(); } catch(Exception cleanup) { throw new AggregateException(error,cleanup); } throw; } finally { Marshal.FreeHGlobal(limits); }
   }
-  public void Launch(string exe,string[] args,string cwd,string environment) {
+  public void Launch(string exe,string[] args,string cwd,string environment,Action deadline) {
+    deadline();
     IntPtr size=IntPtr.Zero;
     InitializeProcThreadAttributeList(IntPtr.Zero,2,0,ref size);
     if(size==IntPtr.Zero) Check(false);
@@ -75,6 +87,7 @@ public sealed class JobProbe : IDisposable {
     IntPtr handles=Marshal.AllocHGlobal(IntPtr.Size*3), env=IntPtr.Zero;
     IntPtr outRead=IntPtr.Zero,outWrite=IntPtr.Zero,errRead=IntPtr.Zero,errWrite=IntPtr.Zero,input=IntPtr.Zero;
     SA security=new SA(); security.size=Marshal.SizeOf(typeof(SA)); security.inherit=1;
+    Exception primary=null;
     try {
       Check(InitializeProcThreadAttributeList(attrs,2,0,ref size)); initialized=true;
       Marshal.WriteIntPtr(value,job);
@@ -89,15 +102,26 @@ public sealed class JobProbe : IDisposable {
       sx.si.input=input; sx.si.output=outWrite; sx.si.error=errWrite; PI pi;
       StringBuilder command=new StringBuilder(Quote(exe)); foreach(string arg in args) command.Append(" ").Append(Quote(arg));
       env=Marshal.StringToHGlobalUni(environment);
+      deadline();
       Check(CreateProcessW(exe,command,IntPtr.Zero,IntPtr.Zero,true,0x08080400,env,cwd,ref sx,out pi));
-      leader=pi.process; Pid=pi.pid; CloseHandle(pi.thread);
+      leader=pi.process; Pid=pi.pid; CloseOwned(pi.thread);
+      deadline();
       bool inJob; Check(IsProcessInJob(leader,job,out inJob)); InJob=inJob;
       if(!inJob) throw new InvalidOperationException("creation-time containment absent");
       Stdout=Drain(outRead); outRead=IntPtr.Zero; Stderr=Drain(errRead); errRead=IntPtr.Zero;
-    } finally { if(initialized) DeleteProcThreadAttributeList(attrs); Marshal.FreeHGlobal(attrs); Marshal.FreeHGlobal(value); Marshal.FreeHGlobal(handles);
-      if(env!=IntPtr.Zero) Marshal.FreeHGlobal(env);
-      foreach(IntPtr h in new IntPtr[]{outRead,outWrite,errRead,errWrite,input}) if(h!=IntPtr.Zero && h!=new IntPtr(-1)) CloseHandle(h);
+    } catch(Exception error) { primary=error; }
+    finally {
+      // Guard all releases so a failure cannot skip later pipe/NUL closes.
+      var releases=new Action[]{
+        ()=> { if(initialized) DeleteProcThreadAttributeList(attrs); },
+        ()=>Marshal.FreeHGlobal(attrs), ()=>Marshal.FreeHGlobal(value), ()=>Marshal.FreeHGlobal(handles),
+        ()=> { if(env!=IntPtr.Zero) Marshal.FreeHGlobal(env); }
+      };
+      foreach(var release in releases) try { release(); } catch(Exception error) { closeFailures.Add(error); }
+      foreach(IntPtr h in new IntPtr[]{outRead,outWrite,errRead,errWrite,input}) CloseOwned(h);
     }
+    if(primary!=null) { if(closeFailures.Count!=0) { var errors=new List<Exception>{primary}; errors.AddRange(closeFailures); throw new AggregateException(errors); } System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw(); }
+    CheckCloses();
   }
   public bool LeaderExited() { return leader!=IntPtr.Zero && WaitForSingleObject(leader,0)==0; }
   public uint Active() {
@@ -112,6 +136,10 @@ public sealed class JobProbe : IDisposable {
     if(Stdout!=null && Stdout.IsFaulted) { var error=Stdout.Exception; }
     if(Stderr!=null && Stderr.IsFaulted) { var error=Stderr.Exception; }
   }
-  public void CloseJob() { if(job!=IntPtr.Zero) { IntPtr h=job; job=IntPtr.Zero; Check(CloseHandle(h)); } }
-  public void Dispose() { try { CloseJob(); } finally { if(leader!=IntPtr.Zero) { IntPtr h=leader; leader=IntPtr.Zero; Check(CloseHandle(h)); } } }
+  public void CloseJob() { if(job!=IntPtr.Zero) { IntPtr h=job; job=IntPtr.Zero; CloseOwned(h); } CheckCloses(); }
+  public void Dispose() {
+    if(job!=IntPtr.Zero) { IntPtr h=job; job=IntPtr.Zero; CloseOwned(h); }
+    if(leader!=IntPtr.Zero) { IntPtr h=leader; leader=IntPtr.Zero; CloseOwned(h); }
+    CheckCloses();
+  }
 }

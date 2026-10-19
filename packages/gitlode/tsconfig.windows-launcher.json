@@ -6,6 +6,9 @@
     "test/support/windows-launcher/deadlines.ts",
     "test/support/windows-launcher/case.ts",
     "test/telemetry/windows-launcher.test.ts",
-    "test/telemetry/windows-launcher-protocol.test.ts"
+    "test/telemetry/windows-launcher-protocol.test.ts",
+    "test/telemetry/windows-launcher-io.test.ts",
+    "test/telemetry/windows-launcher-case-failure.test.ts",
+    "test/telemetry/windows-launcher-driver-failure.test.ts"
   ]
 }

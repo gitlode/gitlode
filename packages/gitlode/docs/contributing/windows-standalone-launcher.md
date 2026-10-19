@@ -8,6 +8,9 @@ passed all nine entries; see the [correction return](../handoff/opentelemetry-m2
 [Independent review](../handoff/opentelemetry-m2-stage-b-independent-review.md) returned corrections
 required for error paths, enforced deadlines and settlement. Normal-user/handle runtime gates remain
 open. The mechanism descriptions below do not establish delayed-path correctness.
+Round 2 repairs these paths under the [correction packet](../handoff/opentelemetry-m2-stage-b-correction-round2.md).
+Its exit-path table, fault vectors and delivery outcome are the continuation record; this is not
+self-acceptance or permission to integrate helpers.
 P1, integration and PR readiness remain unaccepted;
 existing fixture helpers, product/no-owner/formal helpers and the Unix repair are outside this slice.
 
@@ -45,6 +48,17 @@ owner, retains primary/secondary errors and every runtime root for review. Killi
 cannot authorize deletion. `runner.mjs` admits cases sequentially and stops at the first unexplained
 failure; `driver.mjs` enforces the 260,000 ms campaign with a 4,000 ms final reserve.
 
+Both control read streams seal admission on error with redacted classifications. Disposal requests
+active stop/pipe close halfway through its remaining allowance if normal shutdown has not settled;
+forced stop remains uncertainty. Native work cutoffs include construction, input and send, with
+checks before admission and after launch returns. Non-preemptible native calls are enclosed by
+the Node/outer owner; a timeout never proves they returned. Cleanup guards each release and retains
+ambiguous failed handle identities without retrying them. `io.mjs` gates and bounds filesystem
+waiting, requests supported aborts and tracks outstanding operations separately. Case/campaign
+control starts before mkdir and remains through receipts; pending kernel I/O stays unknown even
+after process exit. Final receipt failure preserves the original outcome and emits a fallback
+classification. Every root is retained.
+
 Focused static commands (no build needed):
 
 ```powershell
@@ -52,6 +66,7 @@ node node_modules/typescript/bin/tsc -p packages/gitlode/tsconfig.windows-launch
 node node_modules/oxlint/bin/oxlint packages/gitlode/test/support/windows-launcher packages/gitlode/test/telemetry/windows-launcher.test.ts packages/gitlode/test/telemetry/windows-launcher-protocol.test.ts
 node node_modules/vitest/vitest.mjs run packages/gitlode/test/telemetry/windows-launcher-protocol.test.ts
 powershell.exe -NoProfile -NonInteractive -File packages/gitlode/test/support/windows-launcher/framing-vectors.ps1
+powershell.exe -NoProfile -NonInteractive -File packages/gitlode/test/support/windows-launcher/failure-vectors.ps1
 ```
 
 The finite in-memory checks do not invoke native jobs or workloads. Default five-second unit
@@ -59,7 +74,7 @@ deadlines and root Windows two-worker policy remain unchanged. Runtime validatio
 authorized by the active handoff assignment, preceded by a source checkpoint and a real-time warning:
 
 ```powershell
-node packages/gitlode/test/support/windows-launcher/driver.mjs .cache/stage-b-correction-round1/runtime
+node packages/gitlode/test/support/windows-launcher/driver.mjs .cache/stage-b-correction-round2/runtime
 ```
 
 That command is one campaign, not an automatic retry. Do not repeat it after an unexplained failure.

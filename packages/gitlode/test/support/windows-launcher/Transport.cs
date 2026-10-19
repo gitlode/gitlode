@@ -25,9 +25,10 @@ public static class LauncherTransport {
     readonly LauncherFrames frames=new LauncherFrames();
     readonly byte[] chunk=new byte[4096];
     int offset, count;
-    public bool TryLine(out string line) {
+    public bool TryLine(long end,out string line) {
       line=null;
       while(true) {
+        Deadline(end);
         if(offset==count) {
           uint available;
           if(!PeekNamedPipe(handle,IntPtr.Zero,0,IntPtr.Zero,out available,IntPtr.Zero))
@@ -41,48 +42,63 @@ public static class LauncherTransport {
     }
     public void Dispose() { stream.Dispose(); }
   }
-  sealed class Entry { public string Id; public JobProbe Job; public Stopwatch Clock=Stopwatch.StartNew(); public bool Exited, Cancelled; }
+  sealed class Entry { public string Id; public JobProbe Job; public bool Exited, Cancelled; }
+  static void Deadline(long end) { if(clock.ElapsedMilliseconds>=end) throw new TimeoutException("operation work cutoff; retain root"); }
   static void Send(object value) {
+    Deadline(Math.Min(workEnd,cleanupEnd));
     if(writing!=null && !writing.IsCompleted) throw new IOException("control write unsettled");
     string text=json.Serialize(value);
     if(Encoding.UTF8.GetByteCount(text)>Limit) throw new IOException("control write bound");
+    Deadline(Math.Min(workEnd,cleanupEnd));
     writing=Task.Factory.StartNew(()=> { Console.WriteLine(text); Console.Out.Flush(); });
     int wait=(int)Math.Max(0,Math.Min(4000,Math.Min(workEnd,cleanupEnd)-clock.ElapsedMilliseconds));
     if(!writing.Wait(wait)) throw new TimeoutException("control write deadline");
+    Deadline(Math.Min(workEnd,cleanupEnd));
   }
   public static void Run(double compileMs) {
     if(IntPtr.Size!=8 || Environment.OSVersion.Version.Major<10) throw new NotSupportedException("Windows 10+ x64 required");
     var entries=new Dictionary<string,Entry>(); var ids=new HashSet<string>(); bool sealedAdmission=false;
     var input=new Control();
+    var failures=new List<Exception>();
+    long totalEnd=long.MaxValue;
     string phase="ready";
     try {
       Send(new {kind="ready",version=1,compileMs=compileMs,hostInJob=JobProbe.HostInJob()});
       while(true) {
+        // Existing entries expire before input parsing or another launch is admitted.
+        Deadline(Math.Min(workEnd,cleanupEnd));
         string line;
         phase="control-input";
-        if(input.TryLine(out line)) {
+        if(input.TryLine(Math.Min(workEnd,cleanupEnd),out line)) {
+          Deadline(Math.Min(workEnd,cleanupEnd));
           phase="control-schema";
           var message=json.Deserialize<Dictionary<string,object>>(line);
           if(message==null || !message.ContainsKey("kind")) throw new InvalidOperationException("control schema");
           string kind=(string)message["kind"];
           phase="control-kind";
-          if(kind=="shutdown") { if(message.Count!=1 || sealedAdmission) throw new InvalidOperationException("shutdown schema/order"); sealedAdmission=true; cleanupEnd=Math.Min(workEnd,clock.ElapsedMilliseconds+4000); workEnd=cleanupEnd; foreach(var e in entries.Values) { e.Job.Cancel(); e.Cancelled=true; } }
+          if(kind=="shutdown") { if(message.Count!=1 || sealedAdmission) throw new InvalidOperationException("shutdown schema/order"); sealedAdmission=true; cleanupEnd=Math.Min(totalEnd,clock.ElapsedMilliseconds+4000); workEnd=cleanupEnd; foreach(var e in entries.Values) { e.Job.Cancel(); e.Cancelled=true; } }
           else if(kind=="launch") {
+            Deadline(workEnd);
             if(sealedAdmission || message.Count!=6) throw new InvalidOperationException("admission/schema");
             string id=(string)message["id"]; long number;
             if(!long.TryParse(id,out number) || number<=0 || number.ToString()!=id || !ids.Add(id)) throw new InvalidOperationException("invalid launch ID");
-            var e=new Entry {Id=id,Job=new JobProbe()}; entries.Add(id,e);
-            workEnd=Math.Min(workEnd,clock.ElapsedMilliseconds+15000);
+            long entryStart=clock.ElapsedMilliseconds;
+            workEnd=Math.Min(workEnd,entryStart+11000);
+            totalEnd=Math.Min(totalEnd,entryStart+15000);
+            var e=new Entry {Id=id}; entries.Add(id,e);
+            e.Job=new JobProbe();
             try {
               string exe=(string)message["exe"], cwd=(string)message["cwd"];
               if(!System.IO.Path.IsPathRooted(exe) || !System.IO.Path.IsPathRooted(cwd)) throw new ArgumentException("absolute paths required");
               var raw=(System.Collections.ArrayList)message["args"]; string[] args=new string[raw.Count]; for(int i=0;i<args.Length;i++) args[i]=(string)raw[i];
-              e.Job.Launch(exe,args,cwd,(string)message["environment"]);
+              e.Job.Launch(exe,args,cwd,(string)message["environment"],()=>Deadline(workEnd));
+              Deadline(workEnd);
               Send(new {kind="started",id=id,pid=e.Job.Pid});
             } catch(Exception error) {
               // CreateProcess failure has no leader. Post-create uncertainty is fatal, never a safe launch failure.
-              if(e.Job.Pid!=0) throw;
-              e.Job.Dispose(); entries.Remove(id); Send(new {kind="launchError",id=id,error=error.GetType().Name});
+              if(e.Job.Pid!=0 || clock.ElapsedMilliseconds>=workEnd) throw;
+              try { e.Job.Dispose(); } catch(Exception cleanup) { throw new AggregateException(error,cleanup); }
+              entries.Remove(id); Send(new {kind="launchError",id=id,error=error.GetType().Name});
             }
           } else if(kind=="cancel" || kind=="denyObservation") {
             if(message.Count!=2 || sealedAdmission || !(message["id"] is string) || !ids.Contains((string)message["id"])) throw new InvalidOperationException("control ID/schema/order");
@@ -95,7 +111,7 @@ public static class LauncherTransport {
         var complete=new List<string>();
         phase="native-observation";
         foreach(var e in entries.Values) {
-          if(!sealedAdmission && e.Clock.ElapsedMilliseconds>11000) throw new TimeoutException("operation work cutoff; retain root");
+          Deadline(Math.Min(workEnd,cleanupEnd));
           if(!e.Exited && e.Job.LeaderExited()) { e.Exited=true; Send(new {kind="exit",id=e.Id,code=e.Job.ExitCode()}); }
           // Each entry admits exactly one launch, so zero cannot race a later launch into this job.
           if(e.Exited && e.Job.Active()==0 && e.Job.Stdout.IsCompleted && e.Job.Stderr.IsCompleted) {
@@ -105,36 +121,42 @@ public static class LauncherTransport {
         }
         if(sealedAdmission && clock.ElapsedMilliseconds>=workEnd && entries.Count!=0) throw new TimeoutException("shutdown bound");
         foreach(string id in complete) entries.Remove(id);
-        if(entries.Count==0 && !sealedAdmission) workEnd=long.MaxValue;
-        if(sealedAdmission && entries.Count==0) { Send(new {kind="shutdown"}); return; }
+        if(entries.Count==0 && !sealedAdmission) { workEnd=long.MaxValue; totalEnd=long.MaxValue; }
+        if(sealedAdmission && entries.Count==0) { Send(new {kind="shutdown"}); break; }
         Thread.Sleep(5);
       }
-    } catch(Exception) {
+    } catch(Exception error) {
+      failures.Add(error);
       sealedAdmission=true;
-      cleanupEnd=Math.Min(cleanupEnd,Math.Min(workEnd,clock.ElapsedMilliseconds+4000));
+      cleanupEnd=Math.Min(cleanupEnd,Math.Min(totalEnd,clock.ElapsedMilliseconds+4000));
+      workEnd=cleanupEnd;
+      // Stop is requested before a possibly stalled fatal notification consumes the remainder.
+      foreach(var e in entries.Values) { if(e.Job==null) continue; try { e.Job.Cancel(); } catch(Exception stop) { failures.Add(stop); } }
       // Notification failure never replaces the primary exception or skips native cleanup.
-      try { Send(new {kind="fatal",error="control/native uncertainty",phase=phase}); } catch {}
-      throw;
+      try { Send(new {kind="fatal",error="control/native uncertainty",phase=phase}); } catch(Exception notification) { failures.Add(notification); }
     }
     finally {
-      long end=Math.Min(cleanupEnd,Math.Min(workEnd,clock.ElapsedMilliseconds+4000));
-      input.Dispose();
-      foreach(var e in entries.Values) { try { e.Job.Cancel(); } catch {} }
+      long end=Math.Min(cleanupEnd,Math.Min(totalEnd,clock.ElapsedMilliseconds+4000));
+      try { input.Dispose(); } catch(Exception error) { failures.Add(error); }
+      foreach(var e in entries.Values) { if(e.Job==null) continue; try { e.Job.Cancel(); } catch(Exception error) { failures.Add(error); } }
       foreach(var e in entries.Values) {
+        if(e.Job==null) continue;
         bool absent=false, pipes=false;
         while(clock.ElapsedMilliseconds<end) {
-          try { absent=e.Job.Active()==0; } catch {}
+          try { absent=e.Job.Active()==0; } catch(Exception error) { if(!failures.Exists(x=>x.GetType()==error.GetType() && x.Message==error.Message)) failures.Add(error); }
           pipes=(e.Job.Stdout==null || e.Job.Stdout.IsCompleted) && (e.Job.Stderr==null || e.Job.Stderr.IsCompleted);
           if(absent && pipes) break;
           // Observation denial cannot become an absence receipt; still join the drain tasks.
           if(e.Job.DenyObservation && pipes) break;
           Thread.Sleep(5);
         }
-        if(!absent || !pipes || (e.Job.Stdout!=null && e.Job.Stdout.IsFaulted) || (e.Job.Stderr!=null && e.Job.Stderr.IsFaulted)) Console.Error.WriteLine("native cleanup uncertainty; retain root");
-        e.Job.ObservePipeFailures(); try { e.Job.Dispose(); } catch { Console.Error.WriteLine("native handle close failure; retain root"); }
+        if(!absent || !pipes || (e.Job.Stdout!=null && e.Job.Stdout.IsFaulted) || (e.Job.Stderr!=null && e.Job.Stderr.IsFaulted)) failures.Add(new IOException("native cleanup uncertainty; retain root"));
+        try { e.Job.ObservePipeFailures(); } catch(Exception error) { failures.Add(error); }
+        try { e.Job.Dispose(); } catch(Exception error) { failures.Add(error); }
       }
-      if(writing!=null) { try { writing.Wait((int)Math.Max(0,end-clock.ElapsedMilliseconds)); } catch {} }
+      if(writing!=null) { try { if(!writing.Wait((int)Math.Max(0,end-clock.ElapsedMilliseconds))) failures.Add(new TimeoutException("native write unsettled; retain root")); } catch(Exception error) { failures.Add(error); } }
     }
+    if(failures.Count!=0) throw new AggregateException("native uncertainty; retain root",failures);
   }
 }
 // Used by the real pipe reader and the finite in-memory vectors; no whole ReadLine allocation.

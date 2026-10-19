@@ -47,6 +47,7 @@ function fakeHost() {
     stdin: new PassThrough(),
     stdout: new PassThrough(),
     stderr: new PassThrough(),
+    kill: vi.fn(() => true),
   });
   vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>);
   const launcher = new WindowsLauncher();
@@ -68,6 +69,47 @@ it("strict incremental UTF-8 frames split within Unicode and coalesced beyond on
   frames.push(Buffer.concat([large, large]), (m) => messages.push(m));
   expect(messages.length).toBe(3);
   frames.end();
+});
+
+it.each(["stdout", "stderr"] as const)(
+  "%s emitted errors seal admission and retain redacted cleanup uncertainty",
+  async (stream) => {
+    const { child, launcher, ready } = fakeHost();
+    ready();
+    await launcher.ready;
+    const command = launcher.launch("C:\\node.exe", [], "C:\\root", {});
+    const body = new Error("original body");
+    expect(() => child[stream].emit("error", new Error("secret inherited value"))).not.toThrow();
+    await expect(command.completion).rejects.toThrow(`control ${stream} read failure`);
+    expect(() => launcher.launch("C:\\node.exe", [], "C:\\root", {})).toThrow(/read failure/);
+    expect(child.stdin.writableEnded).toBe(true);
+    const disposal = launcher.dispose(now() + 50);
+    await expect(disposal).rejects.toThrow(/cleanup uncertainty/);
+    expect(child.kill).toHaveBeenCalled();
+    expect(child.stdout.destroyed).toBe(true);
+    expect(child.stderr.destroyed).toBe(true);
+    expect(launcher.dispose()).toBe(disposal);
+    expect(body.message).toBe("original body");
+    child.emit("close");
+  },
+);
+
+it("stalled shutdown/write actively stops, joins delayed close and keeps one cutoff", async () => {
+  const { child, launcher, ready } = fakeHost();
+  ready();
+  await launcher.ready;
+  vi.spyOn(child.stdin, "write").mockImplementation(() => true);
+  child.kill.mockImplementation(() => {
+    setTimeout(() => child.emit("close"), 5);
+    return true;
+  });
+  const start = now();
+  const disposal = launcher.dispose(start + 60);
+  await expect(disposal).rejects.toThrow(/cleanup uncertainty/);
+  expect(child.kill).toHaveBeenCalledOnce();
+  expect(child.stdin.destroyed).toBe(true);
+  expect(now() - start).toBeLessThan(200);
+  expect(launcher.dispose()).toBe(disposal);
 });
 
 it("finite malformed, BOM, blank, oversized, no-newline, truncated and invalid base64 vectors seal framing", () => {

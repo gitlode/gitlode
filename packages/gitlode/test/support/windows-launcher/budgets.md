@@ -4,6 +4,16 @@ These ceilings remain unchanged and are hang detection, not performance threshol
 first failures and diagnosis are immutable; this correction awaits independent review. Existing
 fixture helpers, default five-second unit timeout and Windows two-worker cap are unchanged.
 
+Round 2 enforces work admission/waits separately from observed settlement. Native calls cannot
+be preempted by these clocks: a delayed return enters cleanup without a started receipt, and an
+unreturned call belongs to the enclosing Node/outer owner, with settlement unknown on owner loss.
+The native 15,000 ms interval bounds cooperative waiting, not arbitrary kernel-call completion.
+Filesystem abort is supported where available; pending operations remain explicitly unknown.
+Case control is armed before setup; the independent driver retains its hard timer through its own
+final receipt. Driver exit never proves kernel I/O settled. Active host stop starts halfway through
+the existing disposal remainder; no second timeout is added. All cleanup exceptions are retained
+while later releases are attempted; failed handle identities are quarantined without retry.
+
 | Boundary                                   |                           Maximum ms | Implemented cutoff                                                                                                                                                                             |
 | ------------------------------------------ | -----------------------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Fresh host ready                           |                                6,000 | Clip to enclosing work cutoff; compilation/startup are inside it.                                                                                                                              |

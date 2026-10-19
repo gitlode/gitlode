@@ -1,6 +1,6 @@
 ﻿# Standalone Windows launcher (Stage B, not integrated)
 
-The experimental sources under `test/support/windows-launcher/` are an unfinished standalone
+The experimental sources under `tests/performance/support/windows-launcher/` are an unfinished standalone
 test boundary. Correction round 1 implements the confirmed encoding, orphan setup and deadline
 findings from the [diagnosis](../handoff/opentelemetry-m2-stage-b-first-failure-diagnosis.md), under
 its [assignment](../handoff/opentelemetry-m2-fixture-ci-correction.md). Its one source-bound campaign
@@ -49,7 +49,7 @@ direct Node/Git descendants inheriting containment; brokers, WMI and adversarial
 unsupported. Saved normal-user transport evidence is reverified; runtime inherited-handle exclusion
 remains unverified.
 
-The [budget document](../../test/support/windows-launcher/budgets.md) owns cutoff arithmetic.
+The [budget document](../../../../tests/performance/support/windows-launcher/budgets.md) owns cutoff arithmetic.
 `deadlines.ts` uses a shared monotonic origin across Node processes. Poll expiry aborts/joins the
 active read and delay; all local waits clip to enclosing time. Shutdown failure still attempts
 bounded close under the same 4,000 ms disposal deadline. `case.ts` supplies an independent outer
@@ -71,11 +71,11 @@ classification. Every root is retained.
 Focused static commands (no build needed):
 
 ```powershell
-node node_modules/typescript/bin/tsc -p packages/gitlode/tsconfig.windows-launcher.json
-node node_modules/oxlint/bin/oxlint packages/gitlode/test/support/windows-launcher packages/gitlode/test/telemetry/windows-launcher.test.ts packages/gitlode/test/telemetry/windows-launcher-protocol.test.ts
-node node_modules/vitest/vitest.mjs run packages/gitlode/test/telemetry/windows-launcher-protocol.test.ts
-powershell.exe -NoProfile -NonInteractive -File packages/gitlode/test/support/windows-launcher/framing-vectors.ps1
-powershell.exe -NoProfile -NonInteractive -File packages/gitlode/test/support/windows-launcher/failure-vectors.ps1
+node node_modules/typescript/bin/tsc -p tests/performance/tsconfig.windows-launcher.json
+node node_modules/oxlint/bin/oxlint tests/performance/support/windows-launcher tests/performance/test/windows-launcher.test.ts tests/performance/test/windows-launcher-protocol.test.ts
+node node_modules/vitest/vitest.mjs run tests/performance/test/windows-launcher-protocol.test.ts
+powershell.exe -NoProfile -NonInteractive -File tests/performance/support/windows-launcher/framing-vectors.ps1
+powershell.exe -NoProfile -NonInteractive -File tests/performance/support/windows-launcher/failure-vectors.ps1
 ```
 
 The finite in-memory checks do not invoke native jobs or workloads. Default five-second unit
@@ -83,7 +83,7 @@ deadlines and root Windows two-worker policy remain unchanged. Runtime validatio
 authorized by the active handoff assignment, preceded by a source checkpoint and a real-time warning:
 
 ```powershell
-node packages/gitlode/test/support/windows-launcher/driver.mjs .cache/stage-b-correction-round2/runtime
+node tests/performance/support/windows-launcher/driver.mjs .cache/stage-b-correction-round2/runtime
 ```
 
 That command is one campaign, not an automatic retry. Do not repeat it after an unexplained failure.

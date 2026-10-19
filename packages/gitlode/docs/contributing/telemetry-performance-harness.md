@@ -175,13 +175,16 @@ targets are calibrated and the reference legacy artifacts are reviewed.
 ## Lasting and migration-only ownership
 
 Installed CLI/API/schema regression belongs to private `tests/system`. Recorder, collector, report,
-worker fault and behavioral equivalence checks remain implementation-owned. Reusable fixture,
-statistics, supervision and performance-regression tools stay at existing paths in this slice.
-A later move needs its own support closure and checked project. Planner/statistics units remain
+worker fault and behavioral equivalence checks remain implementation-owned. Reusable statistics, supervision, fixture lifecycle and performance-regression tools live in
+private `tests/performance`, with their own checked project and dedicated tests. Shared repository,
+output-equivalence and ownership helpers live in `tests/support`; they depend only on Node and
+each other, never on performance or product test suites. Planner/statistics units remain
 harness units; internal aggregation seams do not authorize installed-test deep imports.
 
-Legacy/redesigned comparisons, calibration/provenance/ancestry tooling and the migration publish gate
-remain at current package/.release paths through M2 acceptance and initial v0.13.0 publication.
+Legacy/redesigned comparisons and calibration tooling live in `tests/performance`. Build provenance,
+the release obligation inventory and the migration publish validator remain in package scripts;
+the acceptance record remains in `.release`. These responsibilities remain through M2 acceptance
+and initial v0.13.0 publication.
 T13C preserves exact revisions, manifests, runtime/package hashes, external evidence and review
 bindings. Gate retirement requires a separate reviewed post-release change with migration obligations
 closed and replacement lasting ownership/commands documented. Retire wiring, validator/config and

@@ -7,21 +7,24 @@ import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extractio
 import type { AbsoluteDirectoryPath, AbsolutePath } from "@gitlode/internal-foundation/support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { executeWorkerRunRequest } from "../../src/execution/execute-run.js";
-import type { ExecutionGitAdapterName, WorkerRunInput } from "../../src/execution/types.js";
 import {
   createDeterministicRepository,
   repositorySemanticSnapshot,
   type DeterministicRepository,
-} from "../support/deterministic-repository.js";
+} from "../../../../tests/support/deterministic-repository.js";
 import {
   compareBehavioralArtifacts,
   frozenBehavioralBaseline,
   readJsonlArtifacts,
   verifyProfileEquivalence,
   type BehavioralArtifacts,
-} from "../support/profile-equivalence.js";
-import { TestFixtureOwner, disposeTestFixtures } from "../support/test-fixture-owner.js";
+} from "../../../../tests/support/profile-equivalence.js";
+import {
+  TestFixtureOwner,
+  disposeTestFixtures,
+} from "../../../../tests/support/test-fixture-owner.js";
+import { executeWorkerRunRequest } from "../../src/execution/execute-run.js";
+import type { ExecutionGitAdapterName, WorkerRunInput } from "../../src/execution/types.js";
 
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const owners: TestFixtureOwner[] = [];

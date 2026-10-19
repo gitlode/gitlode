@@ -20,6 +20,10 @@ import {
 import { BasicTracerProvider, type ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { describe, expect, test } from "vitest";
 
+import {
+  evaluateRepositoryProfileReport,
+  extractProfileReportMeasurements,
+} from "../../../../tests/performance/support/performance-harness.js";
 import { FirstAcceptedBoundedMap } from "../../src/execution/telemetry/bounded-retention.js";
 import {
   BoundedDiagnosticAccumulator,
@@ -31,10 +35,6 @@ import {
   ProfileReportBuilder,
 } from "../../src/execution/telemetry/index.js";
 import { formatProfileLines } from "../../src/presentation/reporting/formatters.js";
-import {
-  evaluateRepositoryProfileReport,
-  extractProfileReportMeasurements,
-} from "../support/performance-harness.js";
 
 function fakeSpan(
   name: string,

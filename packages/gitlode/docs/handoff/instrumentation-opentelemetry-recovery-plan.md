@@ -1,5 +1,9 @@
 # OpenTelemetry M2 continuation plan
 
+## HQ priority override (2026-10-19)
+
+The HQ-authorized test layout work supersedes the previous executable assignment. Handle-audit continuation, eligibility campaigns and formal performance runs are on hold pending HQ review. Historical outcomes and paths below remain evidence for their original revisions. Current placement and validation are tracked in [test layout](opentelemetry-m2-test-layout.md).
+
 Audit return `1d80f8f` is setup-inconclusive: GetTokenInformation failed without preserved native
 error code; baseline/sensitivity never launched. Assign bounded preflight diagnosis and one explained
 correction/confirmation, then conditional first audit in the same session. This does not establish

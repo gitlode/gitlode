@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "npm run build:dev -w @gitlode/internal-contracts && tsc -p tsconfig.json",
     "typecheck:windows-launcher": "tsc -p tsconfig.windows-launcher.json",
     "test": "vitest run",
     "format:write": "oxfmt",

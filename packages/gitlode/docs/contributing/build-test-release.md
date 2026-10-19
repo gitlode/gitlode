@@ -450,6 +450,11 @@ fixture helpers belong to `tests/support`. See the [layout guide](../../../../te
 Root test discovery includes this project. CI and `validate:release` run `typecheck:performance`
 without running a formal measurement. The installed-package boundary in `tests/system` is unchanged.
 
+The performance workspace's `typecheck` command first runs the existing internal-contracts
+development build. Its TypeScript project reference also builds internal-foundation, whose generated
+package exports are required by the checker. This prerequisite belongs to the workspace command so
+direct invocation, CI and `validate:release` work before a root development build has generated dist.
+
 Unused-export analysis for gitlode and the shared verification consumers runs on the root graph,
 so moving a consumer to another workspace does not make a used export appear dead. The existing
 entrypoint exemptions are retained; other workspace checks and product/installed-package import

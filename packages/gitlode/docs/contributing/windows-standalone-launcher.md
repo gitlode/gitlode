@@ -11,6 +11,10 @@ open. The mechanism descriptions below do not establish delayed-path correctness
 Round 2 repairs these paths under the [correction packet](../handoff/opentelemetry-m2-stage-b-correction-round2.md).
 Its exit-path table, fault vectors and delivery outcome are the continuation record; this is not
 self-acceptance or permission to integrate helpers.
+Round 2 passed its injected checks, nine-entry regression and one normal-contributor transport
+case, but returned incomplete because an existing runtime handle enumerator was unavailable.
+Runtime handle types/ownership and job/control-handle exclusion remain unverified; see the
+[return](../handoff/opentelemetry-m2-stage-b-correction-round2.md#round-2-return-incomplete-at-runtime-handle-audit-prerequisite).
 P1, integration and PR readiness remain unaccepted;
 existing fixture helpers, product/no-owner/formal helpers and the Unix repair are outside this slice.
 

@@ -98,3 +98,57 @@ now return the disposal Promise and assert both watchdog and join invocations. N
 was admitted during these failures. The final gate contains no unhandled errors.
 
 Status: injected gates passed; real-process validation awaits the source checkpoint below.
+
+## Round-2 return: incomplete at runtime handle-audit prerequisite
+
+Implementation checkpoint: `a5dae83e4f55b3631061959bcf1bcd98154130e6`, on the assigned child,
+from `168c0d33dfaf6e966c05c2cad63cf540a09a35d8`. The five mappings above are one correction;
+there was no helper integration, acceptance change or runtime retry.
+
+The single source-bound sequential campaign passed all nine entries in **15,151 ms** wall time
+(driver elapsed **15,070.47 ms**). No entry was unreached. All nine outer owners observed absence,
+successful command output/close settlement and shutdown, with no unexpected driver primary or
+secondary failure. The fault cases retained their exact body errors plus inner cleanup uncertainty;
+independent outer success does not change that uncertainty. Orphan cases reached ancestry,
+parent self-exit and native leader-exit/pending-completion assertions. Observation-loss and
+malformed reached their respective injected/native-fatal receipts; host-death reached kill/close;
+driver-cleanup reached armed timeout and outer cancellation/completion with exit 123. Every root
+remains retained. The aggregated [receipt](../../test/support/windows-launcher/correction-round2-receipt.json)
+contains exact cutoffs, events, outcomes and fixed source byte identities.
+
+One subsequent normal-contributor transport case passed (**1.69 s** test time; eight other tests
+skipped). Actual identity was `WAKA-PC\t-wakabayashi`, SID ending `1002`, Administrators deny-only,
+non-elevated, Medium integrity (`S-1-16-8192`). It reached quoting/Unicode/environment round-trip,
+bounded stdout/stderr, nonzero exit and real Git execution, with outer observed absence and
+shutdown/output settlement. Only synthetic transport values were asserted; inherited environment
+values were neither saved nor disclosed. The preceding nine-case campaign ran as the sandbox
+identity, SID ending `1004`; it is not the ordinary-user evidence.
+
+**Earliest unmet boundary: runtime inherited-handle audit prerequisite.** No existing supported
+enumerator (`handle.exe`, `handle64.exe`, `procexp.exe`, `procexp64.exe`) was available on PATH or
+the checked standard Sysinternals/Windows locations. No tool was installed and no handle-audit
+workload was launched. Runtime handle types, ownership and job/control-handle exclusion therefore
+remain **unverified**. The static HANDLE_LIST and normal-user transport success do not satisfy
+this gate. This return is incomplete, not Stage B/P1/PR self-acceptance or a successful all-gate
+return for independent re-review. No further implementation/retry is inferred from this limitation.
+
+Finite injected paths retained unknown settlement while I/O/native writes were pending and
+observed late completion separately. Saved success receipts conservatively list their own receipt
+write as pending at serialization; reopening and verifying the saved bytes establishes those
+particular writes finished. It is not a kernel-I/O preemption claim. Faulted close identities remain
+quarantined without retry; attempted stop/close never establishes workload absence. Legacy scenario
+`UnknownError` placeholders for undefined values remain as stored, not new thrown failures.
+
+Sanitized local seal: `.cache/stage-b-correction-round2-sealed.zip`, SHA-256
+`5ecab09f39f4df0c2815d705ffa50df956fe122b954256ae01d878a30be38a3e`.
+Manifest SHA-256 `3d8710a12ac61ee2d7fab118160faa62f3b236b8a64f99c43cbdab40bcf5daa8`.
+Reopened and checked all **127** listed members by SHA-256/length: zero mismatches. Sources,
+fault/vector logs and transformations, source manifest, verifier, runtime receipts/retained roots,
+ordinary-token evidence and outcome are sealed separately from round 1. Rehashed the round-1 ZIP
+and manifest plus its four original archives: all unchanged. Original `validation-receipt.json`
+matches the starting checkpoint. No historical root or seal was modified.
+
+Source and outcome are separate commits followed by normal child push. Actual remote, clean tree,
+unchanged parent M2 `4f09265791c82452a5800cc6d9855938bf88a46e` and both F2 preservation refs
+`4ea24d53afc57778addf3f47752e0fe73a7011ea` are checked at delivery. Remain on the child.
+No PR, merge, freeze, formal measurement, acceptance update, helper integration or Unix P1 repair.

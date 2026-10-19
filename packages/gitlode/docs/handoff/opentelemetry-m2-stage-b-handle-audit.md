@@ -1,5 +1,9 @@
 # Stage B creation-time handle audit assignment (2026-10-19)
 
+## HQ priority override (2026-10-19)
+
+The HQ-authorized test layout work supersedes the previous executable assignment. Handle-audit continuation, eligibility campaigns and formal performance runs are on hold pending HQ review. Historical outcomes and paths below remain evidence for their original revisions. Current placement and validation are tracked in [test layout](opentelemetry-m2-test-layout.md).
+
 ## Active continuation: token preflight diagnosis and conditional audit
 
 Return `1d80f8fe73016ad62eec85388a0c46163591ff8c` is setup-inconclusive, with ZERO audited

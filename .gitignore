@@ -7,3 +7,4 @@ out/
 *.tmp
 
 packages/gitlode/.benchmark-artifacts/
+tests/performance/.benchmark-artifacts/

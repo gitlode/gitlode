@@ -9,6 +9,7 @@ export default defineConfig({
       "./packages/git-adapters/vitest.config.ts",
       "./packages/line-diff-adapters/vitest.config.ts",
       "./packages/gitlode/vitest.config.ts",
+      "./tests/performance/vitest.config.ts",
       "./packages/plugin-assay-metrics/vitest.config.ts",
       "./packages/plugin-conventional-commits/vitest.config.ts",
       "./packages/plugin-custom-field/vitest.config.ts",

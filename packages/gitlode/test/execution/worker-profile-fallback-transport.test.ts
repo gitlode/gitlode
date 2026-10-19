@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import { describe, expect, it } from "vitest";
 
+import { createPerformanceRepository } from "../../../../tests/performance/support/performance-fixtures.js";
 import type { WorkerRunRequest, WorkerRunResult } from "../../src/execution/types.js";
 import { dispatchWorkerRunRequest } from "../../src/execution/worker-client.js";
-import { createPerformanceRepository } from "../support/performance-fixtures.js";
 
 const workerEntry = new URL("../../dist/execution/worker-entry.js", import.meta.url);
 

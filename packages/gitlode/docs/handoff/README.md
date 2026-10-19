@@ -1,5 +1,9 @@
 # gitlode Handoff Documents
 
+## HQ priority override (2026-10-19)
+
+The HQ-authorized test layout work supersedes the previous executable assignment. Handle-audit continuation, eligibility campaigns and formal performance runs are on hold pending HQ review. Historical outcomes and paths below remain evidence for their original revisions. Current placement and validation are tracked in [test layout](opentelemetry-m2-test-layout.md).
+
 This directory contains continuation notes for unfinished work, future implementation sessions, and
 investigations that may be resumed by human developers or coding agents.
 

@@ -12,8 +12,8 @@
   "include": [
     "tsdown.config.ts",
     "scripts/tooling/release-telemetry-boundary.ts",
-    "scripts/tooling/aggregation-collector-bundle.ts",
-    "test/telemetry/aggregation-child.test.ts",
+    "../../tests/performance/scripts/tooling/aggregation-collector-bundle.ts",
+    "../../tests/performance/test/aggregation-child.test.ts",
     "test/telemetry/sdk-construction-boundary.test.ts"
   ]
 }

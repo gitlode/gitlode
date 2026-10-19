@@ -399,7 +399,10 @@
             "packages/internal-contracts/dist/progress/index.js",
             "packages/internal-contracts/dist/telemetry/index.js",
             "packages/git-adapters/dist/git-impl/index.js",
-            "packages/line-diff-adapters/dist/line-diff-impl/index.js"
+            "packages/line-diff-adapters/dist/line-diff-impl/index.js",
+            "tests/support/**",
+            "tests/performance/support/performance-fixtures.ts",
+            "tests/performance/support/performance-harness.ts"
           ]
         },
         {
@@ -501,8 +504,81 @@
           "name": "system-tests",
           "pattern": "tests/system/**",
           "allow": ["tests/system/scripts/**"]
+        },
+        {
+          "name": "shared-test-support",
+          "pattern": "tests/support/**",
+          "allow": ["tests/support/**"]
+        },
+        {
+          "name": "performance-verification",
+          "pattern": "tests/performance/**",
+          "allow": [
+            "tests/performance/**",
+            "tests/support/**",
+            "packages/gitlode/src/**",
+            "packages/gitlode/dist/**",
+            "packages/gitlode/scripts/tooling/source-revision.ts",
+            "packages/gitlode/scripts/tooling/telemetry-performance-targets.ts",
+            "packages/internal-contracts/dist/**",
+            "packages/internal-foundation/dist/**"
+          ]
         }
-      ]
+      ],
+      "unusedExportsDetection": {
+        "graphExclude": ["**/dist/**"],
+        "validEntryPoints": [
+          "packages/internal-foundation/src/type-utils/index.ts",
+          "packages/internal-foundation/src/support/index.ts",
+          "packages/internal-foundation/src/otel-support/index.ts",
+          "packages/internal-foundation/src/dag/index.ts",
+          "packages/internal-foundation/test/**",
+          "packages/internal-contracts/src/model/index.ts",
+          "packages/internal-contracts/src/diagnostics/index.ts",
+          "packages/internal-contracts/src/progress/index.ts",
+          "packages/internal-contracts/src/extraction-api/index.ts",
+          "packages/internal-contracts/src/git/index.ts",
+          "packages/internal-contracts/src/line-diff/index.ts",
+          "packages/internal-contracts/src/telemetry/index.ts",
+          "packages/internal-contracts/test/**",
+          "packages/line-diff-adapters/src/line-diff-impl/index.ts",
+          "packages/line-diff-adapters/test/**",
+          "packages/git-adapters/src/git-impl/index.ts",
+          "packages/git-adapters/src/git-impl/commit-traversal/index.ts",
+          "packages/git-adapters/test/**",
+          "packages/gitlode/src/index.ts",
+          "packages/gitlode/src/plugin-api.ts",
+          "packages/gitlode/src/execution/worker-entry.ts",
+          "packages/gitlode/src/execution/telemetry/index.ts",
+          "packages/gitlode/src/extraction/telemetry/extraction-pipeline-metric-recorder.ts",
+          "packages/gitlode/src/extraction/telemetry/file-change-fact-expander-metric-recorder.ts",
+          "packages/gitlode/src/extraction/telemetry/built-in-fact-projector-metric-recorder.ts",
+          "packages/gitlode/src/output/telemetry/jsonl-file-writer-metric-recorder.ts",
+          "packages/gitlode/src/plugin-runtime/telemetry/plugin-projection-metric-recorder.ts",
+          "packages/gitlode/src/extraction/index.ts",
+          "packages/gitlode/src/output/index.ts",
+          "packages/gitlode/src/plugin-runtime/index.ts",
+          "packages/gitlode/test/**",
+          "packages/gitlode/scripts/**",
+          "packages/gitlode/tsdown.config.ts",
+          "packages/plugin-assay-metrics/src/index.ts",
+          "packages/plugin-assay-metrics/test/**",
+          "packages/plugin-conventional-commits/src/index.ts",
+          "packages/plugin-conventional-commits/test/**",
+          "packages/plugin-custom-field/src/index.ts",
+          "packages/plugin-custom-field/test/**",
+          "packages/plugin-file-type/src/index.ts",
+          "packages/plugin-file-type/test/**",
+          "packages/plugin-identity-profile/src/index.ts",
+          "packages/plugin-identity-profile/test/**",
+          "tests/system/scripts/**",
+          "tests/performance/scripts/**",
+          "tests/performance/support/**",
+          "tests/performance/test/**",
+          "tests/support/**",
+          "vitest.config.ts"
+        ]
+      }
     },
     {
       "path": "packages/internal-foundation",
@@ -643,9 +719,6 @@
         "ignoreTypeImports": false
       },
       "orphanFilesDetection": {
-        "graphExclude": ["../../**/dist/**"]
-      },
-      "unusedExportsDetection": {
         "graphExclude": ["../../**/dist/**"]
       },
       "unusedNodeModulesDetection": {
@@ -801,6 +874,17 @@
         "excludeModules": ["@types/*"],
         "pkgJsonFieldsWithBinaries": ["scripts"]
       }
+    },
+    {
+      "path": "tests/performance",
+      "followMonorepoPackages": true,
+      "prodEntryPoints": [],
+      "devEntryPoints": ["scripts/**", "support/**", "test/**", "vitest.config.ts"],
+      "circularImportsDetection": {
+        "ignoreTypeImports": false
+      },
+      "unresolvedImportsDetection": true,
+      "missingNodeModulesDetection": true
     }
   ],
   "processIgnoredFiles": ["packages/*/dist/**"]

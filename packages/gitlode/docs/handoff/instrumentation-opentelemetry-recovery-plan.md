@@ -1,5 +1,12 @@
 # OpenTelemetry M2 continuation plan
 
+Latest 2026-10-19 disposition: round-2 implementation `a5dae83`, outcome `2709805`, reports finite
+fault checks, nine process entries and normal-contributor transport passed; runtime handle audit
+remains unverified because no enumerator was available. Assign
+[independent correction review and minimal audit plan](opentelemetry-m2-stage-b-round2-review.md)
+as separate verdicts. Do not block review of completed fixes on tool availability or waive the audit.
+Stage B/P1/helper integration/PR/release acceptance remain pending.
+
 2026-10-19: review `35aeff4` requires five cleanup/deadline/error-path repairs. The active
 [round-2 packet](opentelemetry-m2-stage-b-correction-round2.md) assigns a coherent exit-path correction,
 deterministic fault tests first, then one gated runtime regression and minimal normal-user/handle audit.

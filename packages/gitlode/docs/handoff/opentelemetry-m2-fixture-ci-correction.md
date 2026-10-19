@@ -1,5 +1,13 @@
 # Fixture CI correction before PR
 
+## Current assignment (2026-10-19): round-2 review and handle-audit disposition
+
+Outcome `2709805` reports correction `a5dae83` passed injected checks, nine process entries and
+normal-contributor transport, with runtime handle audit unverified due to tool absence. Follow
+[the independent review packet](opentelemetry-m2-stage-b-round2-review.md). Review the implemented
+five fixes separately from the audit, and return a concrete minimal audit method where pending.
+No acceptance/helper integration is implied; earlier implementation assignments below are historical.
+
 Latest return: [independent standalone Stage B review](opentelemetry-m2-stage-b-independent-review.md),
 **corrections required**. Prior correction outcome:
 [Stage B diagnosed correction round 1](opentelemetry-m2-stage-b-correction-round1.md).

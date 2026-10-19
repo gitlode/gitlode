@@ -8,6 +8,10 @@ documents.
 
 ## Active OpenTelemetry work
 
+Latest routing: [round-2 independent review and remaining handle audit](opentelemetry-m2-stage-b-round2-review.md).
+Implementation `a5dae83` / outcome `2709805` reports correction checks and normal-user transport
+passed. Review those fixes now; keep runtime handle audit as a separate unverified gate.
+
 2026-10-19 current assignment: [Stage B cleanup correction round 2](opentelemetry-m2-stage-b-correction-round2.md).
 Review `35aeff4` requires five error/deadline/settlement repairs. Injected-failure checks precede
 runtime regression; normal-user/handle audits remain explicit gates. P2 acceptance is maintained.

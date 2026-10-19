@@ -1,5 +1,11 @@
 # OpenTelemetry M2 continuation plan
 
+2026-10-19: review `35aeff4` requires five cleanup/deadline/error-path repairs. The active
+[round-2 packet](opentelemetry-m2-stage-b-correction-round2.md) assigns a coherent exit-path correction,
+deterministic fault tests first, then one gated runtime regression and minimal normal-user/handle audit.
+Existing numeric budgets and P2 acceptance remain. No new framework, helper integration or formal
+campaign is authorized; Stage B/P1/PR readiness and release acceptance remain unfulfilled.
+
 ## Current assignment (2026-10-08)
 
 2026-10-13: human blocked fixture PR creation on local/CI test failures. Run 38335718829 at `74fd692`

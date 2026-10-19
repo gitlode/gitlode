@@ -11,7 +11,14 @@ unaccepted; existing helpers are not integrated. Original diagnosis/first-failur
 preserved in the [diagnosis](opentelemetry-m2-stage-b-first-failure-diagnosis.md).
 P2 contributor setup passes independent focused review. The combined ownership correction is not complete.
 
-## Active routing: standalone Stage B corrections required (2026-10-14)
+## Active assignment: Stage B cleanup correction round 2 (2026-10-19)
+
+Trunk adopts the five mandatory findings and assigns
+[the coherent round-2 correction](opentelemetry-m2-stage-b-correction-round2.md).
+Follow that packet, including its failure-injection gates before any runtime regression.
+P2 remains accepted; Stage B/P1/PR readiness and helper integration remain pending.
+
+## Historical routing: standalone Stage B corrections required (2026-10-14)
 
 Independent review of fixed `f45062d` from checkpoint `8ca31cb` returned
 **corrections required** in the [complete-launcher review](opentelemetry-m2-stage-b-independent-review.md).

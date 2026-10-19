@@ -8,6 +8,10 @@ documents.
 
 ## Active OpenTelemetry work
 
+2026-10-19 current assignment: [Stage B cleanup correction round 2](opentelemetry-m2-stage-b-correction-round2.md).
+Review `35aeff4` requires five error/deadline/settlement repairs. Injected-failure checks precede
+runtime regression; normal-user/handle audits remain explicit gates. P2 acceptance is maintained.
+
 PR preparation remains blocked by Windows default source-test failures. GC-strategy correction is
 independently accepted. Trunk assigned a Windows two-worker default and separate timeout ownership
 correction, followed by plain Windows npm test and independent review.

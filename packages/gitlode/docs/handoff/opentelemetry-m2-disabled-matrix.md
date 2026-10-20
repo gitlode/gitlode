@@ -58,7 +58,7 @@ Terminal supervision confirms process cleanup, no cleanup/finalization errors, a
 retention of 25 diagnostic roots. Those roots remain untouched and were additionally archived in both
 locations: `retained-roots/commit-heavy-git-cli-calibration-01.tar.gz`, 488,014,311 bytes, SHA-256
 `2a5d988f14da92a74a4b9ffe622a7b7673afa52ba72085a86a3ccc829c93ce1e`.
-Full attempt sealing is in progress. Intermediate progress snapshots are diagnostic evidence only.
+Full attempt sealing is complete. Intermediate progress snapshots are diagnostic evidence only.
 
 Independent read-only review by `/root/f2_protocol_review` confirms the inconclusive classification.
 The preceding six observed preparation intervals were approximately 21.4–23.8 minutes. Sequential
@@ -91,3 +91,54 @@ This read-only risk review was supplied by `/root/layout_review` against `9680a4
 [standalone launcher boundary](../contributing/windows-standalone-launcher.md), and
 [release evidence](../contributing/build-test-release.md).
 None authorizes profile/aggregation/Windows campaigns in this work unit or changes release gates.
+
+## User-requested suspension (2026-10-20)
+
+The user requested suspension because elapsed time and Coding Agent cost exceeded acceptable levels.
+No further calibration, capture, comparison, repair or workload is authorized by this continuation.
+The running plugin calibration received SIGINT through its verified supervisor, not a direct worker
+kill. It returned exit 2 / `operator-interrupted`; cleanup was confirmed with no cleanup or finalization
+errors. Nine roots remain preserved. No new disabled comparison was reached in this work unit.
+
+| Target                        | State at suspension                                                                     | Interpretation                                                                                |
+| ----------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| commit-heavy / git-cli        | Calibration inconclusive after 5h17m; preparation of 64,016 commits exceeded 30 minutes | 24 completed pilots are diagnostic only; no selected quantity or performance judgment         |
+| file-heavy / isomorphic-git   | Calibration inconclusive after about 19 seconds                                         | At 18 commits, expected 4 output files but actual 5; no quantity adopted                      |
+| file-heavy / git-cli          | Not started                                                                             | Held because the same file-count/rotation calculation is shared; not an observed failure      |
+| plugin-heavy / isomorphic-git | Calibration interrupted at user request after about 6m31s                               | Eight completed pilots (9 through 1,152 commits), then refinement at 864; no quantity adopted |
+
+The earlier accepted commit-heavy/isomorphic-git result remains unchanged. F's historical RSS fail also
+remains unchanged. None of the new attempts measures F2 disabled overhead; calibration uses legacy.
+
+File-heavy diagnosis: the harness counted 204 Git log names at 18 commits, selected 51 lines/file, but
+legacy emitted 220 records and five files. All seven measured runs agreed. The initial 9-commit pilot
+counted 73 names versus 76 records and happened to retain four rotations. `--no-renames` produces 219,
+so it alone is not a proven fix. First-parent merge-diff semantics is a bounded correction candidate,
+not an implemented remedy. Independent saved-data review is recorded in
+`inputs/file-heavy-calibration-01-review.json`. No threshold, assertion, runtime or harness was changed.
+
+Preservation in both approved local locations:
+
+- Commit-heavy complete attempt archive: `sealed-attempts/commit-heavy-git-cli-calibration-01.tar.gz`,
+  77,360 members including seal, 591,651,037 bytes, SHA-256
+  `63ab47e651b8601caaa2ddb529a15f5431cd8151c4f944e32503268672ab5932`.
+  Seal SHA-256 `af64dfeca1992a0a9ff6432dc5e93140c32c46f6fd4c0537c26791565ba19290`.
+  Slow individual-file copying was replaced only after this complete archive passed both member-hash
+  verifications; partial copies and originals remain. This operator change did not interrupt a workload.
+- File-heavy attempt: 488 members / 11,316,101 bytes; seal SHA-256
+  `540a3d3ab4a2c222f107fdcc03b6fef1355db9e12685813e0621d0f31ac30a18`.
+  Two retained roots are additionally archived, SHA-256
+  `0467949445e142884cfe8cdb555418b4a8068a161d3a2ba3c6f70e94e3ff01fe`.
+- Plugin interruption archive: `sealed-attempts/plugin-calibration-01-interrupted.tar.gz`,
+  21,117 members including seal and retained roots, 44,831,779 bytes, SHA-256
+  `d7c5f582f3d123171315273f2d847c390a2c5231d64b9b6394581edb1f06e6d9`.
+  Both copies' members were verified. Partial calibration history cannot be resumed as a formal attempt.
+
+The dominant execution cost was repeated generation of approximately 64,000-commit repositories during
+minimum-quantity refinement. Six observed preparation intervals alone were about 21.4–23.8 minutes
+apiece. Per-file evidence copying added avoidable operator time before archive-based preservation.
+Frequent agent monitoring also consumed agent time; monetary/token totals were not measured here.
+The trunk should have surfaced the cumulative cost and reconsidered continuation earlier, instead of
+relying only on each stage's individual deadline. Before any restart, agree a cumulative work budget
+and a stop/review boundary, and choose whether/how to address calibration cost and the rotation-count
+mismatch. This is a recommendation, not a new execution assignment. No automatic restart is scheduled.

@@ -20,6 +20,14 @@ gitlode documentation is organized for three audiences:
 Agent-specific instruction files may provide routing and guardrails, but they must not become
 independent sources of truth for design contracts.
 
+## Multi-session development
+
+For complex development tasks requiring multiple Codex sessions, use the
+`multi-session-development` Skill. If unavailable, report the missing installation.
+Follow [collaboration guidance](packages/gitlode/docs/agents/collaborative-work.md),
+including its human-owned integration and PR approval requirements.
+Resolve base/work branches and the intended integration chain at Task start.
+
 ## Source of truth
 
 Use these documentation homes when changing behavior:

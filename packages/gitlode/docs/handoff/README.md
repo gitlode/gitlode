@@ -2,6 +2,12 @@
 
 ## HQ priority override (2026-10-19)
 
+2026-10-20 active delegation: [remaining Linux disabled comparisons](opentelemetry-m2-disabled-matrix.md).
+Four targets need fresh calibration, capture and disabled comparison under fixed F2/legacy/b002584.
+The first-target unit below remains complete; its stopping point is superseded only for the newly
+delegated four targets. Routine transitions/reviews/reasoned retries are trunk-owned. Windows audit,
+profile/aggregation campaigns, product optimization and release remain outside this assignment.
+
 Latest HQ delegation: [F2 first-target Linux judgment](opentelemetry-m2-f2-first-target.md).
 The delegated unit is complete: fixed-quantity eligibility and capture passed, and the independently
 reviewed F2 disabled comparison is a valid pass. Saved F2/legacy and isolated b002584 were unchanged.

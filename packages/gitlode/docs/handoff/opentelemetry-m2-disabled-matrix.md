@@ -46,4 +46,37 @@ not used as an extra prerequisite for these comparisons.
 
 ## Current state
 
-Preparation complete; independent calibration input review pending. No new workload launched yet.
+Independent calibration input review accepted packet
+`ce95d79ca63c72a870fd803d9046a7bd6ede17c8f57de6cdf07da832f6d2664e`.
+The commit-heavy/git-cli calibration-01 is running. Continuation found this existing process and
+did not start a duplicate or terminate it. Twenty-two completed pilots bracketed the 10-second boundary
+between 64,000 and 64,128 commits; the next pilot is 64,064. This is progress, not a selected quantity
+or accepted calibration. Large fresh fixture generation dominates elapsed time. The 64,256 and
+64,128 medians were 10,679.277558000758 and 10,713.90767400153 ms, with MAD ratios 0.6323% and
+0.8712%. A 399,126,874-byte partial progress snapshot was copied to both archives at
+`logs/intermediate-progress-20261020T051803Z.json`, SHA-256
+`b0055ee35a0d48b1f8044b9e43da2899d2db3758c2f2e1f240da5f14377bef7e`.
+It is diagnostic evidence, not a selected quantity or permission to resume an interrupted attempt.
+
+The user reconfirmed the current work unit's same-PC dual-copy approval on 2026-10-20;
+`inputs/backup-reconfirmation.json` preserves that direct answer separately from prior attribution.
+
+## Remaining release risks (proposal, not prerequisites for this comparison)
+
+| Area                                  | Purpose and existing evidence                                                                                                   | Unfinished part / reason to address before release                                                                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enabled performance and report output | F2 enabled package smoke and report/session/evaluator regressions exist.                                                        | Review enabled-versus-disabled measurements and complete signals, diagnostics, size and prohibited spans. Disabled results cannot establish SDK cost or useful diagnostic output.                                      |
+| Aggregation growth                    | Built aggregation child and bounded-growth evaluator tests exist.                                                               | N/4N observations and RSS evidence address raw observation retention as input grows, distinct from a short repository peak measurement.                                                                                |
+| Presentation                          | Windows Terminal/plain output has human acceptance; excerpts and rendering tests exist.                                         | Focused GNOME light/dark confirmation remains to catch unreadable important values/failure states. Do not repeat accepted Windows trials or add a new sample-tooling gate.                                             |
+| Final shipping candidate              | Saved F2 has immutable runtime/package identity and first-target evidence.                                                      | Review actual final source/version/dependency/bundle differences and justify selective evidence reuse. Different scripts/workspaces alone do not require all measurements to be repeated.                              |
+| Package validation                    | F2 Linux CLI/API/plugin/schema/typing and lazy-asset boundary evidence exists; later clean layout-CI release validation passed. | Validate the final combined package to detect omitted lazy assets, exports/types or dependency drift. Keep Windows and Linux evidence distinct.                                                                        |
+| Windows test infrastructure           | Adopted fixture helpers and the unintegrated standalone launcher have separate evidence.                                        | Resolve handle/settlement uncertainties before adopting the prototype, or explicitly retain limited operating guarantees. Its completion is not a Linux performance prerequisite or proof of a Windows product defect. |
+
+This read-only risk review was supplied by `/root/layout_review` against `9680a407`. Evidence anchors:
+[profile integration](opentelemetry-m2-profile-integration.md),
+[F2 preservation](opentelemetry-m2-repaired-candidate-freeze.md),
+[layout CI correction](opentelemetry-m2-test-layout-ci-correction.md),
+[performance contract](../design/telemetry-performance.md),
+[standalone launcher boundary](../contributing/windows-standalone-launcher.md), and
+[release evidence](../contributing/build-test-release.md).
+None authorizes profile/aggregation/Windows campaigns in this work unit or changes release gates.

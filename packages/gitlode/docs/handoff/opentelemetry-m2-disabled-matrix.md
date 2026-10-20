@@ -48,15 +48,26 @@ not used as an extra prerequisite for these comparisons.
 
 Independent calibration input review accepted packet
 `ce95d79ca63c72a870fd803d9046a7bd6ede17c8f57de6cdf07da832f6d2664e`.
-The commit-heavy/git-cli calibration-01 is running. Continuation found this existing process and
-did not start a duplicate or terminate it. Twenty-two completed pilots bracketed the 10-second boundary
-between 64,000 and 64,128 commits; the next pilot is 64,064. This is progress, not a selected quantity
-or accepted calibration. Large fresh fixture generation dominates elapsed time. The 64,256 and
-64,128 medians were 10,679.277558000758 and 10,713.90767400153 ms, with MAD ratios 0.6323% and
-0.8712%. A 399,126,874-byte partial progress snapshot was copied to both archives at
-`logs/intermediate-progress-20261020T051803Z.json`, SHA-256
-`b0055ee35a0d48b1f8044b9e43da2899d2db3758c2f2e1f240da5f14377bef7e`.
-It is diagnostic evidence, not a selected quantity or permission to resume an interrupted attempt.
+The commit-heavy/git-cli calibration-01 ended inconclusive after approximately 5 hours 17 minutes.
+Twenty-four complete pilots did not finish quantity selection. Preparation of quantity 64,016 exceeded
+the unchanged 1,800,000 ms deadline; the operator returned exit 2. This is not an F2 performance fail.
+The last completed pilot (64,032) cannot be adopted from an incomplete search. No capture or disabled
+comparison was launched for this target, and its manifest still matches the starting manifest.
+
+Terminal supervision confirms process cleanup, no cleanup/finalization errors, and intentional
+retention of 25 diagnostic roots. Those roots remain untouched and were additionally archived in both
+locations: `retained-roots/commit-heavy-git-cli-calibration-01.tar.gz`, 488,014,311 bytes, SHA-256
+`2a5d988f14da92a74a4b9ffe622a7b7673afa52ba72085a86a3ccc829c93ce1e`.
+Full attempt sealing is in progress. Intermediate progress snapshots are diagnostic evidence only.
+
+Independent read-only review by `/root/f2_protocol_review` confirms the inconclusive classification.
+The preceding six observed preparation intervals were approximately 21.4–23.8 minutes. Sequential
+Git/filesystem operations, foreground maintenance and lifecycle inventory are plausible contributors;
+the exact cause remains unresolved. The saved late observation shows available RAM/disk and low load,
+not proof of a specific bottleneck. Do not retry this target, extend deadlines or resume its history.
+The other three targets may proceed sequentially after preservation and capacity checks: no shared
+runtime malfunction was established. Linux usage was approximately 6.6 GiB after root preservation,
+below the 10 GiB planning boundary. Monitor growth before starting further campaigns.
 
 The user reconfirmed the current work unit's same-PC dual-copy approval on 2026-10-20;
 `inputs/backup-reconfirmation.json` preserves that direct answer separately from prior attribution.

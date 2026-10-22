@@ -28,7 +28,7 @@ test_layers:
       - attribute key, type, values, and reducer
       - valid attribute references
       - unique IDs and names
-      - exactly one profile-view placement for every accepted core observation
+      - one generic profile hierarchy accepts every cataloged and unknown admitted observation
       - diagnostic labels and ProfileReport schema version
       - removed observations are absent from implementation metadata
     production_runtime_reads_yaml: false
@@ -385,15 +385,17 @@ scenarios:
 
 presentation:
   semantic_assertions:
-    - group and row order
-    - known labels
-    - plugin scope subgroup
-    - unknown fallback
-    - partial and unavailable sections
-    - diagnostic fields
+    - Scope and two-level namespace hierarchy
+    - code-unit, kind, and typed-attribute order
+    - short and group-node collisions
+    - plugin and unknown identity without special buckets
+    - token escaping and relative attribute bases
+    - diagnostic target placement and missing-only observations
+    - fixed fallback, lifecycle-only, and reserved-summary notices
     - absent zero is not synthesized
     - nonzero does not render as plain zero
     - histogram percentiles are absent
+    - semantic styling roles preserve plain-text parity
     - quiet suppresses the profile block
     - current success-only profile UX
   incidental_assertions_to_avoid:

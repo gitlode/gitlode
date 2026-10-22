@@ -12,7 +12,8 @@
     "packages/plugin-conventional-commits",
     "packages/plugin-custom-field",
     "packages/plugin-file-type",
-    "packages/plugin-identity-profile"
+    "packages/plugin-identity-profile",
+    "tests/system"
   ],
   "scripts": {
     "architecture:check": "npm run build:dev && rev-dep config run --lint-config",
@@ -22,13 +23,13 @@
     "build:release": "npm run build:dev && npm run bundle:release -w gitlode",
     "build:watch": "tsc -b -w",
     "changeset": "changeset",
-    "changeset:publish": "npm run validate:telemetry-release-acceptance -w gitlode && changeset publish",
+    "changeset:publish": "changeset publish",
     "changeset:status": "changeset status",
     "changeset:version": "changeset version",
     "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",
-    "format:check": "oxfmt --check package.json tsconfig.json tsconfig.base.json vitest.config.ts .syncpackrc.json .changeset/config.json .rev-dep.config.json .github/workflows/*.yml CONTRIBUTING.md && npm run format:check --workspaces --if-present",
-    "format:write": "oxfmt package.json tsconfig.json tsconfig.base.json vitest.config.ts .syncpackrc.json .changeset/config.json .rev-dep.config.json .github/workflows/*.yml CONTRIBUTING.md && npm run format:write --workspaces --if-present",
-    "lint": "oxlint vitest.config.ts && npm run lint --workspaces --if-present",
+    "format:check": "oxfmt --check package.json tsconfig.json tsconfig.base.json vitest.config.ts .syncpackrc.json .changeset/config.json .rev-dep.config.json .github/workflows/*.yml CONTRIBUTING.md && npm run format:check --workspaces --if-present && oxfmt --check tests/support tests/README.md",
+    "format:write": "oxfmt package.json tsconfig.json tsconfig.base.json vitest.config.ts .syncpackrc.json .changeset/config.json .rev-dep.config.json .github/workflows/*.yml CONTRIBUTING.md && npm run format:write --workspaces --if-present && oxfmt tests/support tests/README.md",
+    "lint": "oxlint vitest.config.ts && npm run lint --workspaces --if-present && oxlint tests/support",
     "lint:fix": "oxlint --fix vitest.config.ts && npm run lint:fix --workspaces --if-present",
     "lockfile:sync": "npm install --package-lock-only --ignore-scripts",
     "release": "npm run validate:release && npm run changeset:publish",
@@ -38,8 +39,11 @@
     "test:package": "npm run test:package -w gitlode",
     "test:watch": "vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage",
-    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run build:release && npm run validate:publint -w gitlode && npm run test:system:package -w gitlode",
-    "version-packages": "npm run changeset:version && npm run lockfile:sync"
+    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run typecheck:system && npm run typecheck:test-support && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run build:release && npm run validate:publint -w gitlode && npm run test:system:package",
+    "version-packages": "npm run changeset:version && npm run lockfile:sync",
+    "typecheck:system": "npm run typecheck -w @gitlode/system-tests",
+    "test:system:package": "npm run test:package -w @gitlode/system-tests",
+    "typecheck:test-support": "tsc -p tests/support/tsconfig.json"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",

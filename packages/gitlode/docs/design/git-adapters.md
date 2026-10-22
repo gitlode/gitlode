@@ -182,8 +182,8 @@ Useful scenarios:
 
 - The CLI file-change path currently starts one `diff-tree` process per commit. A planned follow-up
   will investigate reading tree objects through persistent `cat-file --batch` transport and
-  comparing tree structure in TypeScript. Process-management and cancellation guidance is recorded
-  in [`../handoff/git-cli-adapter-plan.md`](../handoff/git-cli-adapter-plan.md).
+  comparing tree structure in TypeScript. Any such implementation must preserve owned-process
+  cleanup, cancellation and the existing adapter result contract.
 - Adapter selection is config-only. A CLI override remains out of scope unless future user workflows
   justify it.
 - gitlode still gates repository object formats through the supported object-format profile; this

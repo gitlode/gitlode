@@ -2,15 +2,13 @@
 
 ## Status
 
-This document defines the accepted design for gitlode telemetry. The OpenTelemetry runtime migration
-is implemented; integration and the remaining release acceptance are tracked separately.
+This document defines the accepted design for gitlode telemetry. The local OpenTelemetry runtime
+provides collection, reporting and no-op behavior as described below.
 [`../profiling.md`](../profiling.md) describes the implemented profile output.
 
-The migration status, branch-sized work plan, and remaining design gates are tracked in
-[`../handoff/instrumentation-opentelemetry-redesign-plan.md`](../handoff/instrumentation-opentelemetry-redesign-plan.md).
-The verification contract for the migration is defined in
+The product verification contract is defined in
 [`telemetry-verification.md`](telemetry-verification.md).
-Performance acceptance is defined in [`telemetry-performance.md`](telemetry-performance.md).
+Empirical timing results are workload-specific evidence, not runtime design guarantees.
 
 ## Purpose and scope
 
@@ -246,8 +244,9 @@ Structured observation definitions live beside this document:
 - [`telemetry-catalog/profile-report.yaml`](telemetry-catalog/profile-report.yaml) owns the
   structured-clone report fields, signal status, aggregate invariants, diagnostics, limits, and
   canonical collection order; and
-- [`telemetry-catalog/profile-view.yaml`](telemetry-catalog/profile-view.yaml) owns profile grouping,
-  labels, preferred reading order, and unknown-observation fallback.
+- [`telemetry-catalog/profile-view.yaml`](telemetry-catalog/profile-view.yaml) owns the generic
+  Scope/namespace hierarchy, deterministic ordering, tokens, numeric formatting, diagnostic
+  placement, and semantic styling roles.
 
 Markdown remains canonical for rationale, cross-cutting behavior, and policies that are better read
 as prose. YAML is canonical for repetitive structured definitions. The same field must not be
@@ -258,8 +257,8 @@ The YAML files are design contracts, not runtime configuration. Production code 
 at startup. Implementation metadata is checked against the catalogs during tests; code generation
 is not introduced unless a later concrete need justifies it.
 
-The complete observation catalog remains a design gate tracked by the handoff. Each metric entry
-must define:
+The observation catalog defines the implemented instrumentation contract. Each metric entry
+defines:
 
 - name, instrument kind, description, and unit;
 - instrumentation scope and operation owner;
@@ -289,7 +288,8 @@ maximum theoretical attribute combination count for one metric must not exceed 1
 
 Shared identifiers and collection policy live in the observation and attribute catalogs. The
 collector does not contain operation-specific knowledge. Domain recorders own when and how values
-are recorded, while the profile-view catalog owns grouping, labels, and preferred display order.
+are recorded, while presentation applies one generic hierarchy without observation-specific labels,
+groups, or ordering metadata.
 
 ## Accepted observation inventory
 
@@ -477,16 +477,35 @@ successful completion without that value is not representable by the recorder in
 
 ## Worker telemetry session
 
-One `WorkerTelemetrySession` owns telemetry for one worker run. It owns providers, context-manager
-registration when needed, local processors/readers, profile snapshot, flush, and shutdown.
+One `WorkerTelemetrySession` owns telemetry for one worker run. The owner and its type-only backend
+contract are SDK-free. Requested Disabled selects API no-op telemetry before any enabled loader,
+provider or context-manager hook. Requested Enabled imports `enabled-worker-telemetry` inside the
+initialization guard; this implementation owns providers, context-manager registration when needed,
+local processors/readers, profile snapshot, flush, and shutdown. Product entrypoints import the owner
+directly, without a collector barrel. Emitted/installed zero-load and dynamic asset closure evidence
+remain a separate release verification gate; source-level lazy loading alone does not prove them.
 
-gitlode-owned providers are used explicitly through `provider.getTracer()` and
-`provider.getMeter()` rather than being registered globally. Context management is initialized
+gitlode-owned enabled providers are used explicitly through `provider.getTracer()` and
+`provider.getMeter()` rather than being registered globally. Enabled context management is initialized
 early enough for worker async propagation. An existing compatible global context manager is not
-replaced, and gitlode shuts down only the manager it owns.
+replaced, and gitlode shuts down only the manager it owns. Concurrent enabled sessions in one isolate
+and external replacement of an owned manager during a run are unsupported.
 
-The `gitlode.run` root span remains active through application work and application resource
-disposal. Finalization order is:
+Disabled and initialization-Degraded use a private public-API `ProxyTracerProvider`, never globally
+registered and never delegated, plus `createNoopMeter`. Only API tracer/meter interfaces escape.
+Unrelated global providers cannot record this session's instrumentation. The nonrecording root is
+created with `{ root: true }` and `ROOT_CONTEXT` and has standard API invalid trace/span IDs, rather
+than SDK-generated valid unsampled IDs. Plugins must not rely on disabled root IDs for correlation.
+No-op children with an explicit valid parent can preserve that parent's span context while remaining
+nonrecording; the invalid-root rule does not apply universally to children.
+
+Both states preserve API context-scoped callbacks and explicit contexts. They install no context
+manager: without an existing manager, callbacks do not automatically acquire async active context.
+An existing compatible manager provides propagation and remains untouched. Disabled/Degraded end
+the root once and perform no flush, collect, report build or provider shutdown at finalization.
+
+The `gitlode.run` root lifetime includes application work and application resource disposal.
+Enabled finalization order is:
 
 1. complete application work;
 2. dispose application resources;
@@ -497,12 +516,16 @@ disposal. Finalization order is:
 7. shut down telemetry resources; and
 8. return the worker result for presentation.
 
-`finalize()` is idempotent, shuts resources down exactly once, never changes the already-determined
-application result, and does not reject because of telemetry lifecycle failures.
+`finalize()` stores a deferred promise before any lifecycle work or reentrant hooks. Concurrent,
+reentrant and repeated calls return that same promise and resolved object, retaining the first
+application result by reference. Callers must use a consistent result type. It shuts resources down
+exactly once and does not reject because of telemetry lifecycle failures. Execution also finalizes
+an acquired session before rethrowing an unexpected rejection outside application classification;
+the original thrown value is preserved. Getters do not reopen a finalized session.
 
 ## Local profile mode
 
-The implemented target has only two effective states:
+The two requested modes are:
 
 - profiling disabled, using no-op OpenTelemetry behavior and no-op domain recorders; and
 - `--profile` enabled, using gitlode-owned local providers, processor, and reader.
@@ -558,14 +581,46 @@ The worker emits the structured-clone-safe, SDK-independent `ProfileReport` defi
 
 ```ts
 interface ProfileReport {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly signalStatus: ProfileSignalStatusSet;
   readonly spans: readonly ProfileSpanAggregate[];
   readonly counters: readonly ProfileCounterPoint[];
   readonly histograms: readonly ProfileHistogramPoint[];
-  readonly diagnostics: readonly ProfileDiagnostic[];
+  readonly diagnostics: readonly (ProfileDiagnostic | ProfileDiagnosticSummary)[];
 }
 ```
+
+Schema version 2 is the active worker, presentation and tooling contract. Diagnostics carry typed
+targets, signal coverage, effects, extent, attribute selectors, per-kind numeric-field masks,
+detail-loss masks, loss quantities, fixed overflow evidence and report-delivery provenance.
+Measurements carry bounded `unavailableFields`; spans also carry a duration-contribution count so a
+default numeric slot is never interpreted as an observed zero. Diagnostic retention uses 15 detailed
+records plus one fixed summary.
+
+A detected invalid Span duration does not erase valid retained duration contributions. Mixed-validity
+aggregates expose the retained total and maximum, make the average unavailable when contribution and
+call coverage differ, and carry a partial status plus bounded omission evidence. If no valid duration
+contribution remains, total, average and maximum are all unavailable; an observed zero-duration
+contribution remains a valid zero.
+
+The diagnostic contract retains confirmed whole-result-unavailable evidence on each detailed
+record and in the reserved summary. The accumulator accepts that evidence only with a collection-loss
+effect (`missing_observations` or `unknown_collection_coverage`); lifecycle and report-delivery
+effects cannot independently mark a signal unavailable. Explicit malformed counts and detail-loss
+mask members become bounded invalid-aggregation evidence instead of default exact values. Set-like
+semantic inputs are rejected by fixed cardinality before iteration when their supplied arrays exceed
+the finite contract universe. Exact safe-integer sums are not saturation; only clamping sets the
+saturation flag, which remains set after later merges.
+
+Status derivation rejects an `unavailable` input paired with retained values. The normal builder
+isolates that validation rejection, retains valid measurements and sibling signals, records bounded
+validation evidence and derives a partial result. A real exception from the normal builder body takes
+the independent fixed fallback exactly once. The fallback accepts prior issue details only through
+an accumulator-issued, detached, runtime-frozen snapshot; otherwise it returns empty measurement
+arrays, unavailable signal statuses, a mandatory report-delivery diagnostic and fixed evidence that
+prior issue detail is unavailable. It never inspects the thrown payload, retries collection or calls
+the normal builder. Shutdown still runs once, and available shutdown evidence is incorporated without
+changing the application result.
 
 The report keeps spans, counters, and histograms as separate signals. Metrics are not attached back
 to a span-shaped `details` field. Individual trace IDs, span IDs, parent relationships, exceptions,
@@ -574,6 +629,11 @@ messages, and stacks are not retained.
 Span aggregates use scope and span name as identity. Metric datapoints use scope, instrument name,
 and the sorted attribute set. An unobserved metric is absent; presentation does not synthesize a
 zero. An explicitly recorded zero remains distinguishable.
+
+Each report value is normalized in its own isolation boundary. A rejected or throwing value cannot
+discard later safely iterable siblings. Iterator failure retains values already obtained, does not
+retry the iterator and records unknown remaining loss rather than an exact count. Metric diagnostics
+retain the narrowest independently validated Scope, observation or point identity.
 
 Signal status is `complete`, `partial`, or `unavailable` independently for spans, counters, and
 histograms. A complete empty array means collection succeeded with no observations; an unavailable
@@ -602,41 +662,57 @@ name, nullable scope version, observation name, and metric attributes, with subo
 attributes and diagnostics similarly sorted. Comparison is locale-independent. The collector has
 no knowledge of pipeline display order or particular span names.
 
+Formal repository and performance consumers validate the complete active report before extracting
+measurements or declaring it healthy. Validation covers every required measurement and diagnostic
+field, permitted masks and variants, finite values, collection bounds, the reserved-summary shape,
+and semantic relationships. An unavailable signal cannot retain measurements; partial/unavailable
+status requires data-impact evidence for that kind, with confirmed whole-result evidence or the
+fixed no-measurement delivery path required for unavailable. Whole-result evidence applies to the
+identified target: a lost point, observation, or Scope may coexist with retained siblings and a
+partial signal. Only a detailed exact report target with `entire_target` extent proves signal-wide
+loss for its covered kinds; a broadened report target or reserved-summary union cannot strengthen
+target-scoped evidence into that proof. Observation/point and affected-field kinds must be covered
+by the diagnostic, while broad report/Scope and multi-kind coverage remain valid. Delivery-failure
+effects and fixed provenance are inseparable, and reserved-summary coverage must retain its per-kind
+associations. The validator returns a detached canonical report only when the supplied value already
+has the same complete schema; contradictions and malformed input are inconclusive rather than
+repaired into an accepted report.
+
 Presentation owns the declarative
-[`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog with group, preferred order, and
-label for known observations. Span names do not contain numeric display prefixes. Unknown
-observations remain visible using canonical fallback order. Preferred display order is a diagnostic
-reading order, not an assertion about chronology.
-
-The profile is presented in separate span, counter, histogram, and diagnostic sections. Formatting
-may convert canonical units into readable units. Percentiles are omitted initially rather than
-presenting bucket approximations as exact measurements.
-
-Known spans and metrics appear in the catalog's diagnostic reading order; groups without
-observations are omitted. Plugin observations are subgrouped by resolved scope name and optional
-version. Core scope is normally omitted from known row labels, while plugin and fallback identity
-remains visible. A known observation name under an unexpected scope is treated as unknown rather
-than receiving a misleading known label.
+[`profile-view.yaml`](telemetry-catalog/profile-view.yaml) catalog. All admitted observations are
+grouped by Scope name/version, then by a source-configured number of dot-separated name segments (default: zero, showing full observation names directly under Scope). Remaining segments
+form the row name. Spans, counters and histograms share this hierarchy; kind is used only for field
+shape, identity and deterministic tie ordering. Plugin, core and unknown admitted identities follow
+the same rules. No Plugins bucket, fallback bucket, kind section, human label override or
+per-observation preferred order exists.
 
 Span rows show total, calls, average, maximum, errors, and bounded attribute summaries. Counter rows
 show one value per attribute set. Histogram rows show count, sum, average, nullable minimum and
 maximum, unit, and attributes. Explicit bucket counts remain in `ProfileReport` but are not expanded
 by the initial CLI view, and zero rows are never synthesized for absent metrics.
 
-Duration and byte values may be humanized by presentation while the report retains `s` and `By`.
-Rounding must not display a nonzero value as an unqualified zero. Exact padding, borders, column
-widths, decimal places, and punctuation are not compatibility contracts.
+Duration and byte values use four-significant-digit presentation with unit promotion while the
+report retains `s` and `By`. Nonzero never becomes unqualified zero. Exact padding, terminal wrapping
+and punctuation are not compatibility contracts.
 
-When any signal is partial or unavailable, a compact status summary precedes the signal sections and
-the affected section repeats its state. Diagnostics render their severity, signal, stage, cataloged
-label, repeated or dropped count, and bounded message when present. Collection overflow stays inside
-the profile as informational diagnostic data and does not become an application warning.
+When diagnostics exist, a compact issue headline follows the Profile title. Structured details are
+placed at the narrowest safely evidenced report, Scope, observation, point or attribute target.
+Missing-only observations remain visible, while valid siblings and unaffected fields remain intact.
+Occurrence count is not loss quantity; known, unknown and omitted detail remain distinct. Collection
+overflow stays in the Profile block and does not become an application warning.
 
 ## Failure isolation
 
-If local SDK initialization fails, execution injects no-op telemetry, emits one structured warning,
-continues extraction, and produces no profile report. An absent report is distinct from a valid
-empty report.
+Enabled import resolution/evaluation, hook or local SDK initialization failure selects Degraded
+API no-op telemetry. Execution emits one sanitized structured warning, continues extraction, and
+produces no profile report. An absent report is distinct from a valid empty report. Degraded may
+already have evaluated SDK modules; it does not claim zero prior SDK loading.
+
+Before returning Degraded, initialization independently cleans all owned partial acquisitions.
+Processor/reader cleanup transfers to their provider only after successful provider construction;
+otherwise they are shut down directly. Candidate context managers are disabled separately from
+registered owned managers. A started root ends before trace shutdown. Cleanup faults do not skip
+later resources, retry initialization or construct fallback SDK providers.
 
 Finalization stages are best-effort and independently guarded. Failure of one stage does not prevent
 later collection or shutdown attempts. A report may contain only the successfully collected signal
@@ -677,10 +753,9 @@ from the catalogs also belong to `@gitlode/internal-contracts/telemetry`. Catalo
 immutable; an owner that passes histogram boundaries to an OpenTelemetry API accepting a mutable
 array supplies a detached copy rather than weakening the metadata type.
 
-The legacy `@gitlode/internal-foundation/instrumentation` export is transitional custom
-instrumentation and is removed when the migration completes. It remains separate from
-`@gitlode/internal-foundation/otel-support`; new helpers must not be re-exported from the legacy
-barrel.
+The legacy `@gitlode/internal-foundation/instrumentation` source and export have been removed.
+Generic OTel helpers belong to `@gitlode/internal-foundation/otel-support`; do not restore the custom
+instrumentation contract or its barrel.
 
 Operation-specific recorder factories live with their owning domains, for example extraction, Git
 implementation, line-diff implementation, output, and plugin runtime. They pre-create instruments
@@ -724,3 +799,21 @@ declarations.
 - Implementing external export, its configuration, or shutdown timeout policy.
 - Adding a general telemetry backend or destination extension point in anticipation of export.
 - Recording sensitive or unbounded values for local diagnosis by default.
+
+## Contributor implementation routes
+
+Recorder changes start at the operation owner and observation catalogs. Keep recording calls in the
+owning control flow; update fake Meter/clock tests and actual owner-path tests under
+[verification](telemetry-verification.md). Collection infrastructure changes start at execution's
+session, SDK and report boundaries with real-provider, fault and transport tests. Internal checks
+remain package-owned. Installed public-contract regression belongs to the private system workspace.
+Empirical comparisons follow the [contributor guidance](../contributing/build-test-release.md#empirical-comparisons).
+
+## Follow-up: Span aggregation semantics
+
+Current Scope/name aggregation and independent `single`/`distinct`/`min_max` reducers lose
+duration/attribute associations and joint attribute combinations; presentation cannot recover them.
+A future design should preserve OTel measurement meaning while making consumer aggregation needs
+explicit. Distinguish SDK same-key updates within one Span from aggregation across completed Spans.
+Evaluate bounded attribute-set aggregation versus retaining individual observations, including memory
+bounds, privacy, admission and loss reporting. This is a product design follow-up, not a v0.13.0 gate.

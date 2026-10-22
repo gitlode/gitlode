@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "tsdown";
 
+import { verifyReleaseTelemetryBoundary } from "./scripts/tooling/release-telemetry-boundary.ts";
+
 const externalRuntimePackages = [
   "@opentelemetry/api",
   "@opentelemetry/context-async-hooks",
@@ -31,11 +33,13 @@ const privateWorkspacePackageMatcher = (id: string) =>
 
 export default defineConfig({
   name: "gitlode",
-  pkg: {
-    name: "gitlode",
-    dependencies: Object.fromEntries(
-      activePrivateWorkspacePackages.map((name) => [name, "workspace:*"]),
-    ),
+  ...{
+    pkg: {
+      name: "gitlode",
+      dependencies: Object.fromEntries(
+        activePrivateWorkspacePackages.map((name) => [name, "workspace:*"]),
+      ),
+    },
   },
   entry: {
     index: "./src/index.ts",
@@ -74,6 +78,16 @@ export default defineConfig({
     sourcemap: false,
   },
   exports: false,
+  plugins: [
+    {
+      name: "gitlode-telemetry-release-boundary",
+      generateBundle(_options, bundle) {
+        verifyReleaseTelemetryBoundary(
+          Object.values(bundle).filter((item) => item.type === "chunk"),
+        );
+      },
+    },
+  ],
   failOnWarn: true,
   suppressWarnings: [
     "TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.",

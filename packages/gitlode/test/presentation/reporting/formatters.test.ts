@@ -1,10 +1,27 @@
-import type { ProfileReport } from "@gitlode/internal-contracts/telemetry";
+import type {
+  ProfileCounterPoint,
+  ProfileDiagnostic,
+  ProfileHistogramPoint,
+  ProfileReport,
+  ProfileSpanAggregate,
+} from "@gitlode/internal-contracts/telemetry";
 import { describe, expect, it } from "vitest";
 
-import { formatProfileLines } from "../../../src/presentation/reporting/formatters.js";
+import { formatProfileLines as formatDefaultProfileLines } from "../../../src/presentation/reporting/formatters.js";
+import { renderProfile } from "../../../src/presentation/reporting/profile-renderer.js";
+import { createStyling, plainStyling, type Styling } from "../../../src/presentation/styling.js";
 
-const emptyReport = (): ProfileReport => ({
-  schemaVersion: 1,
+// Keep hierarchy regressions explicit even when the production default is flat.
+function formatProfileLines(report: ProfileReport, styling: Styling = plainStyling): string[] {
+  const lines: string[] = [];
+  renderProfile({ writeLine: (line) => lines.push(line) }, report, styling, { namespaceDepth: 2 });
+  return lines;
+}
+
+type MutableProfileReport = { -readonly [Key in keyof ProfileReport]: ProfileReport[Key] };
+
+const emptyReport = (): MutableProfileReport => ({
+  schemaVersion: 2,
   signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
   spans: [],
   counters: [],
@@ -12,711 +29,1208 @@ const emptyReport = (): ProfileReport => ({
   diagnostics: [],
 });
 
-describe("formatProfileLines", () => {
-  it("renders separated signal sections and span reducers", () => {
-    const report = emptyReport();
-    report.spans = [
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "gitlode.run",
-        callCount: 2,
-        errorCount: 1,
-        totalDurationSeconds: 0.002,
-        maxDurationSeconds: 0.0015,
-        attributes: [
-          { key: "mode", reducer: "single", value: "commit", observedCount: 2, conflictCount: 0 },
-        ],
-      },
-    ];
-    report.counters = [
-      {
-        scope: { name: "gitlode.extraction", version: null },
-        name: "accepted",
-        unit: "{commit}",
-        attributes: [],
-        value: 0,
-      },
-    ];
-    report.histograms = [
-      {
-        scope: { name: "gitlode.output", version: null },
-        name: "write",
-        unit: "s",
-        attributes: [],
-        count: 2,
-        sum: 0.003,
-        minimum: 0.001,
-        maximum: 0.002,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-    ];
-    const lines = formatProfileLines(report);
-    expect(lines.join("\n")).toContain("Spans");
-    expect(lines.join("\n")).toContain("Counters");
-    expect(lines.join("\n")).toContain("Histograms");
-    expect(lines.join("\n")).not.toContain("percentile");
-    expect(lines.join("\n")).toContain("errors=1");
-  });
+const span = (scope: string, name: string): ProfileSpanAggregate => ({
+  scope: { name: scope, version: null },
+  name,
+  callCount: 2,
+  errorCount: 0,
+  totalDurationSeconds: 0.002,
+  maxDurationSeconds: 0.0015,
+  durationContributionCount: 2,
+  unavailableFields: [],
+  attributes: [],
+});
 
-  it("renders diagnostic status and omits a complete empty report", () => {
-    expect(formatProfileLines(emptyReport())).toEqual([]);
-    const report = emptyReport();
-    report.signalStatus.spans = "unavailable";
-    report.diagnostics = [
-      {
-        code: "lifecycle_failure",
-        severity: "warning",
-        signal: "spans",
-        stage: "trace_flush",
-        count: 1,
-        message: null,
-      },
-    ];
-    expect(formatProfileLines(report).join("\n")).toContain("unavailable");
-    expect(formatProfileLines(report).join("\n")).toContain("Telemetry lifecycle stage failed");
-  });
+const counter = (
+  scope: string,
+  name: string,
+  value = 1,
+  unit = "{operation}",
+): ProfileCounterPoint => ({
+  scope: { name: scope, version: null },
+  name,
+  value,
+  unit,
+  unavailableFields: [],
+  attributes: [],
+});
 
-  it("renders plugin scopes under one Plugins group and sorts independent of input order", () => {
-    const report = emptyReport();
-    report.spans = [
-      {
-        scope: { name: "@example/z", version: "1" },
-        name: "gitlode.plugin.init",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "@example/a", version: null },
-        name: "custom.a",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-    ];
-    const output = formatProfileLines(report).join("\n");
-    expect(output.indexOf("      @example/a")).toBeLessThan(output.indexOf("      @example/z@1"));
-    expect(output.match(/^    Plugins$/gm)).toHaveLength(1);
-    expect(output).toContain("      @example/a");
-    expect(output).toContain("      @example/z@1");
-    expect(output).toContain("        Initialization:");
-    expect(output).toContain("        custom.a:");
-  });
+const histogram = (scope: string, name: string): ProfileHistogramPoint => ({
+  scope: { name: scope, version: null },
+  name,
+  unit: "s",
+  count: 2,
+  sum: 0.003,
+  minimum: 0.001,
+  maximum: 0.002,
+  explicitBounds: [],
+  bucketCounts: [],
+  unavailableFields: [],
+  attributes: [],
+});
 
-  it("suppresses rows for unavailable signals while retaining headings and diagnostics", () => {
-    const report = emptyReport();
-    report.signalStatus.counters = "unavailable";
-    report.counters = [
-      {
-        scope: { name: "gitlode.extraction", version: null },
-        name: "hidden",
-        unit: "unit",
-        attributes: [],
-        value: 1,
-      },
-    ];
-    const output = formatProfileLines(report).join("\n");
-    expect(output).toContain("Counters (unavailable)");
-    expect(output).not.toContain("hidden");
-    expect(output).toContain("Diagnostics");
-  });
+const diagnostic = (overrides: Partial<ProfileDiagnostic> = {}): ProfileDiagnostic => ({
+  code: "invalid_aggregation",
+  severity: "warning",
+  stage: "report_build",
+  target: { type: "report" },
+  signalCoverage: ["counter"],
+  effects: ["missing_observations"],
+  extent: "unidentified_subset",
+  attributeKey: { type: "not_applicable" },
+  affectedFields: [],
+  detailLoss: {
+    pointAttributes: false,
+    observationIdentity: false,
+    scopeIdentity: false,
+    attributeKey: false,
+    affectedFields: false,
+  },
+  lossQuantity: null,
+  wholeResultUnavailable: false,
+  count: 1,
+  countSaturated: false,
+  message: null,
+  reportDelivery: null,
+  ...overrides,
+});
 
-  it("classifies every non-core scope as a plugin and sorts canonical scope identities", () => {
-    const report = emptyReport();
-    report.spans = [
-      ...[
-        ["a-foo", null],
-        ["a", "2"],
-        ["gitlode.plugin.namespace", "1"],
-        ["example-plugin", null],
-        ["a", null],
-      ].map(([name, version]) => ({
-        scope: { name: name!, version },
-        name: `custom.${name}`,
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      })),
-    ];
-    const output = formatProfileLines(report).join("\n");
-    expect(output.match(/^    Plugins$/gm)).toHaveLength(1);
-    const scopes = [
-      "      a",
-      "      a@2",
-      "      a-foo",
-      "      example-plugin",
-      "      gitlode.plugin.namespace@1",
-    ];
-    for (let index = 1; index < scopes.length; index++) {
-      expect(output.indexOf(scopes[index - 1]!)).toBeLessThan(output.indexOf(scopes[index]!));
+describe("generic profile formatting", () => {
+  it("P3-R1 keeps nullable and delimiter-bearing Scope identities collision-free", () => {
+    const measurementScopes = [
+      { name: "scope", version: null },
+      { name: "scope", version: "" },
+      { name: "scope", version: "x\0y" },
+      { name: "scope\0x", version: "y" },
+    ] as const;
+    for (const scopes of [measurementScopes, [...measurementScopes].reverse()]) {
+      const report = emptyReport();
+      report.counters = scopes.map((scope, index) => ({
+        ...counter("unused", "count", index + 1),
+        scope,
+      }));
+      const headings = formatProfileLines(report).filter((line) => line.startsWith("  Scope:"));
+      expect(headings).toEqual([
+        "  Scope: scope",
+        '  Scope: scope@""',
+        '  Scope: scope@"x\\u0000y"',
+        '  Scope: "scope\\u0000x"@y',
+      ]);
     }
-    expect(output).not.toContain("a / custom.a");
+
+    const diagnosticScopes = [
+      { name: "diagnostic", version: null },
+      { name: "diagnostic", version: "" },
+    ] as const;
+    for (const scopes of [diagnosticScopes, [...diagnosticScopes].reverse()]) {
+      const report = emptyReport();
+      report.diagnostics = scopes.map((scope) =>
+        diagnostic({
+          target: { type: "observation", scope, kind: "counter", name: "missing.count" },
+          extent: "entire_target",
+          wholeResultUnavailable: true,
+        }),
+      );
+      expect(formatProfileLines(report).filter((line) => line.startsWith("  Scope:"))).toEqual([
+        "  Scope: diagnostic",
+        '  Scope: diagnostic@""',
+      ]);
+    }
   });
 
-  it.each([
-    [
-      "span groups",
-      [
-        "Overview",
-        "Setup",
-        "Pipeline",
-        "Git operations",
-        "Git traversal",
-        "Git file access",
-        "DAG",
-        "Plugins",
-      ],
-    ],
-    [
-      "metric groups",
-      [
-        "Pipeline",
-        "Git traversal",
-        "Git object access",
-        "Git file access",
-        "DAG",
-        "File expansion",
-        "Line diff",
-        "Output",
-        "Plugins",
-      ],
-    ],
-  ])("renders %s in catalog order regardless of input order", (kind, expectedGroups) => {
+  it("P3-R2 escapes complete measured and missing-only suffixes without changing row boundaries", () => {
+    const measuredName = 'root.ns.measured\n"slash/\\\u0085\u2028\u202etest:=,()';
+    const missingName = 'root.ns.missing\n"slash/\\\u0085\u2028\u202etest:=,()';
     const report = emptyReport();
-    report.spans = [
-      {
-        scope: { name: "gitlode.dag", version: null },
-        name: "gitlode.dag.traversal",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "gitlode.run",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.git", version: null },
-        name: "gitlode.git.commit.walk",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.extraction", version: null },
-        name: "gitlode.extract",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "gitlode.state.validate",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.git", version: null },
-        name: "gitlode.git.resolve_ref",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.git", version: null },
-        name: "gitlode.git.cli.file_blob_batch",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "example-plugin", version: null },
-        name: "plugin.span",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
+    report.counters = [counter("example", measuredName, 1)];
+    report.diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: missingName,
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
     ];
+    const expected = [
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      "    /root",
+      "      ns",
+      '        "measured\\n\\"slash/\\\\\\u0085\\u2028\\u202etest:=,()" : 1operations',
+      '        "missing\\n\\"slash/\\\\\\u0085\\u2028\\u202etest:=,()" : unavailable',
+      "          ! No valid result retained: invalid aggregation discarded.",
+    ];
+    expect(formatProfileLines(report)).toEqual(expected);
+
+    const tagged = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => `<${role}>${text}</${role}>`,
+      ]),
+    ) as unknown as Styling;
+    expect(
+      formatProfileLines(report, tagged)
+        .join("\n")
+        .replace(/<\/?[^>]+>/gu, ""),
+    ).toBe(expected.join("\n"));
+  });
+
+  it("P3-R2 retains quoted malformed-dot missing-only targets beside measured and ordinary rows", () => {
+    const report = emptyReport();
     report.counters = [
+      counter("example", "measured..bad", 2),
       {
-        scope: { name: "gitlode.dag", version: null },
-        name: "gitlode.dag.node.yielded",
-        unit: "{node}",
-        attributes: [],
-        value: 1,
-      },
-      {
-        scope: { name: "gitlode.extraction", version: null },
-        name: "gitlode.extraction.commit.accepted",
-        unit: "{commit}",
-        attributes: [],
-        value: 0,
-      },
-      ...[
-        ["gitlode.git", "gitlode.git.commit.yielded"],
-        ["gitlode.git", "gitlode.git.object.read"],
-        ["gitlode.git", "gitlode.git.file_change.yielded"],
-        ["gitlode.dag", "gitlode.dag.node.yielded"],
-        ["gitlode.extraction", "gitlode.file_change.expanded"],
-        ["gitlode.line_diff", "gitlode.line_diff.compute.operation"],
-        ["gitlode.extraction", "gitlode.output.write.record"],
-      ].map(([scope, name]) => ({
-        scope: { name: scope!, version: null },
-        name: name!,
-        unit: "{operation}",
-        attributes: [],
-        value: 1,
-      })),
-      {
-        scope: { name: "example-plugin", version: "2" },
-        name: "gitlode.plugin.projection.operation",
-        unit: "{commit}",
-        attributes: [],
-        value: 1,
+        ...counter("example", "alpha.beta.ok", 3),
+        attributes: [{ key: "alpha.beta.mode", value: "ready" }],
       },
     ];
-    report.histograms = [
-      {
-        scope: { name: "gitlode.line_diff", version: null },
-        name: "gitlode.line_diff.compute.duration",
-        unit: "s",
-        attributes: [],
-        count: 1,
-        sum: 0.000000001,
-        minimum: null,
-        maximum: null,
-        explicitBounds: [1],
-        bucketCounts: [1],
-      },
-      {
-        scope: { name: "example-plugin", version: "2" },
-        name: "gitlode.plugin.projection.duration",
-        unit: "{commit}",
-        attributes: [],
-        count: 1,
-        sum: 1,
-        minimum: 1,
-        maximum: 1,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-    ];
-    const lines = formatProfileLines(report);
-    const sectionTitle = kind === "span groups" ? "  Spans" : "  Counters";
-    const start = lines.indexOf(sectionTitle);
-    const end =
-      kind === "span groups" ? lines.indexOf("  Counters") : lines.indexOf("  Histograms");
-    const headings = lines
-      .slice(start + 1, end)
-      .filter((line) => /^    [^ ]/.test(line))
-      .map((line) => line.trim());
-    expect(headings).toEqual(expectedGroups);
+    report.diagnostics = [".leading", "alpha..missing", "trailing."].map((name) =>
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name,
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    );
+    expect(formatProfileLines(report)).toEqual([
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      '    /".leading" : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      '    /"alpha..missing" : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      '    /"measured..bad" : 2operations',
+      '    /"trailing." : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      "    /alpha",
+      "      beta",
+      "        ok : 3operations",
+      "          mode = ready",
+    ]);
   });
 
-  it("routes exact core observations, wrong scopes, and independent fallbacks", () => {
+  it("P3-R2 partitions ordinary same-name diagnostics by complete target identity", () => {
+    const measured = [
+      {
+        ...counter("example", "root.ns", 7),
+        attributes: [{ key: "root.ns.mode", value: "kept" }],
+      },
+      {
+        ...counter("example", "root.ns.long", 8),
+        attributes: [{ key: "root.ns.id", value: 1 }],
+      },
+    ];
+    const diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "span",
+          name: "root.ns",
+        },
+        signalCoverage: ["span"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+      diagnostic({
+        code: "metric_point_overflow",
+        severity: "info",
+        stage: "metric_collection",
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.ns",
+        },
+        extent: "unidentified_subset",
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 1,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.ns",
+          attributes: [{ key: "root.ns.mode", value: "missing" }],
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+      diagnostic({
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.ns.long",
+          attributes: [{ key: "root.ns.id", value: 2 }],
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const expected = [
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      "    /root",
+      "      ns",
+      "        /root.ns : unavailable",
+      "          ! No valid result retained: invalid aggregation discarded.",
+      "        /root.ns : 7operations",
+      "          mode = kept",
+      '          ! Additional attribute combinations omitted: datapoint retention limit reached. Known loss: 1 metric points; unit="{point}".',
+      "        /root.ns : unavailable",
+      "          mode = missing",
+      "          ! No valid result retained: invalid aggregation discarded.",
+      "        long : 8operations",
+      "          id = 1",
+      "        long : unavailable",
+      "          id = 2",
+      "          ! No valid result retained: invalid aggregation discarded.",
+    ];
+    for (const reverse of [false, true]) {
+      const report = emptyReport();
+      report.counters = reverse ? [...measured].reverse() : measured;
+      report.diagnostics = reverse ? [...diagnostics].reverse() : diagnostics;
+      expect(formatProfileLines(report)).toEqual(expected);
+    }
+  });
+
+  it("P3-R2 retains malformed matched and unmatched targets exactly once", () => {
+    const point = {
+      ...counter("example", "bad..name", 4),
+      attributes: [{ key: "bad.mode", value: false }],
+    };
+    const diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "span",
+          name: "bad..name",
+        },
+        signalCoverage: ["span"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+      diagnostic({
+        code: "metric_point_overflow",
+        severity: "info",
+        stage: "metric_collection",
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "bad..name",
+          attributes: [{ key: "bad.mode", value: false }],
+        },
+      }),
+      diagnostic({
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "bad..name",
+          attributes: [{ key: "bad.mode", value: "false" }],
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const expected = [
+      "Profile",
+      "  ! Collection issues detected.",
+      "  Scope: example",
+      '    /"bad..name" : unavailable',
+      "      ! No valid result retained: invalid aggregation discarded.",
+      '    /"bad..name" : 4operations',
+      "      /bad.mode = false",
+      "      ! Additional attribute combinations omitted: datapoint retention limit reached.",
+      '    /"bad..name" : unavailable',
+      '      /bad.mode = "false"',
+      "      ! No valid result retained: invalid aggregation discarded.",
+    ];
+    for (const reverse of [false, true]) {
+      const report = emptyReport();
+      report.counters = [point];
+      report.diagnostics = reverse ? [...diagnostics].reverse() : diagnostics;
+      expect(formatProfileLines(report)).toEqual(expected);
+    }
+  });
+
+  it("P3-R3 renders every loss descriptor independently from occurrences", () => {
+    const cases = [
+      ["span_groups", "groups", 2, false, "Known loss: 2 Span groups; unit=groups."],
+      [
+        "span_duration_contributions",
+        "contributions",
+        3,
+        true,
+        "Duration summary excludes 3+ invalid durations",
+      ],
+      [
+        "span_attribute_values",
+        "values",
+        4,
+        false,
+        "Known loss: 4 Span attribute values; unit=values.",
+      ],
+      ["metric_points", "points", 5, true, "Known loss: 5+ metric points; unit=points."],
+      [
+        "observation_results",
+        "results",
+        6,
+        false,
+        "Known loss: 6 observation results; unit=results.",
+      ],
+    ] as const;
+    for (const [descriptor, unit, value, saturated, expected] of cases) {
+      const report = emptyReport();
+      report.diagnostics = [
+        diagnostic({
+          count: 2,
+          lossQuantity: { descriptor, unit, value, saturated },
+        }),
+      ];
+      const output = formatProfileLines(report).join("\n");
+      expect(output).toContain(expected);
+      expect(output).toContain("Repeated 2 times.");
+    }
+
+    const unknown = emptyReport();
+    unknown.diagnostics = [
+      diagnostic({
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: null,
+          saturated: false,
+        },
+      }),
+    ];
+    expect(formatProfileLines(unknown).join("\n")).toContain("The amount of lost data is unknown.");
+  });
+
+  it("P3-R3 orders complete typed diagnostic identities independently of arrival", () => {
+    const baseTarget = {
+      type: "observation" as const,
+      scope: { name: "example", version: null },
+      name: "same",
+    };
+    const diagnostics = [
+      diagnostic({
+        code: "attribute_reducer_conflict",
+        target: { ...baseTarget, kind: "histogram" },
+        signalCoverage: ["histogram"],
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "a" },
+      }),
+      diagnostic({
+        code: "attribute_reducer_conflict",
+        target: { ...baseTarget, kind: "counter" },
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "z" },
+      }),
+      diagnostic({
+        code: "span_attribute_value_overflow",
+        severity: "info",
+        stage: "span_aggregation",
+        target: { ...baseTarget, kind: "span" },
+        signalCoverage: ["span"],
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "b" },
+        lossQuantity: {
+          descriptor: "span_attribute_values",
+          unit: "{value}",
+          value: 2,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        code: "span_attribute_value_overflow",
+        severity: "info",
+        stage: "span_aggregation",
+        target: { ...baseTarget, kind: "span" },
+        signalCoverage: ["span"],
+        effects: ["missing_attribute_detail"],
+        attributeKey: { type: "exact", key: "a" },
+        lossQuantity: {
+          descriptor: "span_groups",
+          unit: "{operation}",
+          value: 1,
+          saturated: false,
+        },
+      }),
+    ];
+    const render = (ordered: ProfileDiagnostic[]): string => {
+      const report = emptyReport();
+      report.counters = [counter("example", "same", 1)];
+      report.histograms = [histogram("example", "same")];
+      report.spans = [span("example", "same")];
+      report.diagnostics = ordered;
+      return formatProfileLines(report).join("\n");
+    };
+    const forward = render(diagnostics);
+    const reverse = render([...diagnostics].reverse());
+    expect(reverse).toBe(forward);
+    const positions = [
+      "a: additional attribute values omitted",
+      "b: additional attribute values omitted",
+      "z: conflicting Span attribute values",
+      "a: conflicting Span attribute values",
+    ].map((token) => forward.indexOf(token));
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+  });
+
+  it("P3-R3 orders visible quantity and occurrence ties independently of arrival", () => {
+    const variants = [
+      diagnostic({
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 10,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        count: 2,
+        countSaturated: true,
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 2,
+          saturated: true,
+        },
+      }),
+      diagnostic({
+        count: 2,
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 2,
+          saturated: true,
+        },
+      }),
+      diagnostic({
+        count: 2,
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: 2,
+          saturated: false,
+        },
+      }),
+      diagnostic({
+        lossQuantity: {
+          descriptor: "metric_points",
+          unit: "{point}",
+          value: null,
+          saturated: false,
+        },
+      }),
+    ];
+    const expectedNotices = [
+      "  ! Invalid aggregation detail was discarded. The amount of lost data is unknown.",
+      '  ! Invalid aggregation detail was discarded. Known loss: 2 metric points; unit="{point}". Repeated 2 times.',
+      '  ! Invalid aggregation detail was discarded. Known loss: 2+ metric points; unit="{point}". Repeated 2 times.',
+      '  ! Invalid aggregation detail was discarded. Known loss: 2+ metric points; unit="{point}". Repeated 2+ times.',
+      '  ! Invalid aggregation detail was discarded. Known loss: 10 metric points; unit="{point}".',
+    ];
+    for (const diagnostics of [variants, [...variants].reverse()]) {
+      const report = emptyReport();
+      report.diagnostics = diagnostics;
+      expect(formatProfileLines(report).slice(2)).toEqual(expectedNotices);
+    }
+  });
+
+  it("P3-R4 assigns headline, frequency and coverage tokens to semantic roles", () => {
     const report = emptyReport();
     report.spans = [
       {
-        scope: { name: "gitlode.extraction", version: null },
-        name: "gitlode.run",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "other",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-    ];
-    report.counters = [
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "counter",
-        unit: "mystery",
-        attributes: [
-          { key: "z", value: 1 },
-          { key: "a", value: 2 },
-        ],
-        value: 0,
-      },
-    ];
-    report.histograms = [
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "histogram",
-        unit: "s",
-        attributes: [],
-        count: 1,
-        sum: 0,
-        minimum: null,
-        maximum: null,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-    ];
-    const output = formatProfileLines(report).join("\n");
-    expect(output).toContain("Other spans");
-    expect(output).toContain("Other counters");
-    expect(output).toContain("Other histograms");
-    expect(output).toContain("gitlode.extraction / gitlode.run");
-    expect(output).toContain("0 mystery");
-    expect(output).toContain("min=—");
-    expect(output).not.toContain("bucket");
-    expect(output).not.toContain("percentile");
-  });
-
-  it("renders every span reducer evidence contract", () => {
-    const report = emptyReport();
-    report.spans = [
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "gitlode.run",
-        callCount: 3,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
+        ...span("example", "operation"),
         attributes: [
           {
-            key: "single_equal",
-            reducer: "single",
-            value: "ok",
-            observedCount: 3,
-            conflictCount: 0,
+            key: "outcome",
+            reducer: "distinct",
+            values: [{ value: "ok", count: 3 }],
+            overflowCount: 0,
+            observedCount: 1,
           },
+        ],
+      },
+    ];
+    report.diagnostics = [
+      diagnostic({
+        code: "span_group_overflow",
+        severity: "info",
+        stage: "span_aggregation",
+        signalCoverage: ["span"],
+      }),
+    ];
+    const calls: string[] = [];
+    const spy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (calls.push(`${role}:${text}`), `<${role}>${text}</${role}>`),
+      ]),
+    ) as unknown as Styling;
+    const styled = formatProfileLines(report, spy).join("\n");
+    expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
+    expect(calls).not.toContain("warning:!");
+    expect(calls).toContain("attributeName:/outcome");
+    expect(calls).not.toContain("fieldLabel:/outcome");
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        "separator:(",
+        "value:3",
+        "separator:)",
+        "separator: (",
+        "fieldLabel:observed",
+        "value:1",
+      ]),
+    );
+
+    const warningSummary = emptyReport();
+    warningSummary.diagnostics = [
+      {
+        code: "diagnostic_overflow",
+        severity: "warning",
+        stage: "report_build",
+        target: { type: "report" },
+        extent: "unidentified_subset",
+        effects: ["lost_issue_detail"],
+        signalCoverage: [],
+        effectsByKind: [],
+        reportEffects: [],
+        detailLoss: {
+          pointAttributes: false,
+          observationIdentity: false,
+          scopeIdentity: false,
+          attributeKey: false,
+          affectedFields: false,
+        },
+        omittedOccurrences: 1,
+        countSaturated: false,
+        maximumSeverity: "warning",
+        priorIssueDetail: "retained",
+      },
+    ];
+    const warningCalls: string[] = [];
+    const warningSpy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (warningCalls.push(`${role}:${text}`), text),
+      ]),
+    ) as unknown as Styling;
+    formatProfileLines(warningSummary, warningSpy);
+    expect(warningCalls.filter((call) => call === "warning:!")).toHaveLength(2);
+
+    const infoSummary = emptyReport();
+    infoSummary.diagnostics = [
+      {
+        ...warningSummary.diagnostics[0],
+        maximumSeverity: "info",
+      } as (typeof warningSummary.diagnostics)[number],
+    ];
+    const infoSummaryCalls: string[] = [];
+    const infoSummarySpy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (infoSummaryCalls.push(`${role}:${text}`), text),
+      ]),
+    ) as unknown as Styling;
+    formatProfileLines(infoSummary, infoSummarySpy);
+    expect(infoSummaryCalls).not.toContain("warning:!");
+
+    const warningDetail = emptyReport();
+    warningDetail.diagnostics = [diagnostic()];
+    const warningDetailCalls: string[] = [];
+    const warningDetailSpy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (warningDetailCalls.push(`${role}:${text}`), text),
+      ]),
+    ) as unknown as Styling;
+    formatProfileLines(warningDetail, warningDetailSpy);
+    expect(warningDetailCalls.filter((call) => call === "warning:!")).toHaveLength(2);
+  });
+
+  it("organizes every kind in one Scope and two namespace levels", () => {
+    const report = emptyReport();
+    report.spans = [span("gitlode.git", "gitlode.git.commit.walk")];
+    report.counters = [counter("gitlode.git", "gitlode.git.object.read", 0, "{object}")];
+    report.histograms = [histogram("gitlode.git", "gitlode.git.blob.read.duration")];
+
+    expect(formatProfileLines(report)).toEqual([
+      "Profile",
+      "  Scope: gitlode.git",
+      "    /gitlode",
+      "      git",
+      "        blob.read.duration : samples=2, total=3ms, avg=1.5ms, min=1ms, max=2ms",
+      "        commit.walk : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
+      "        object.read : 0objects",
+    ]);
+  });
+
+  it("renders short nodes, group-node collisions and cross-kind ties without invented labels", () => {
+    const report = emptyReport();
+    report.spans = [span("example", "root"), span("example", "root.child")];
+    report.counters = [counter("example", "root", 3), counter("example", "root.child", 4)];
+
+    expect(formatProfileLines(report)).toEqual([
+      "Profile",
+      "  Scope: example",
+      "    /root",
+      "      /root : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
+      "      /root : 3operations",
+      "      child",
+      "        /root.child : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
+      "        /root.child : 4operations",
+    ]);
+  });
+
+  it("uses canonical Scope, kind and typed attribute ordering", () => {
+    const report = emptyReport();
+    const base = counter("a", "x", 1, "u");
+    report.counters = [
+      { ...base, scope: { name: "a", version: "1" }, attributes: [{ key: "k", value: false }] },
+      { ...base, attributes: [{ key: "k", value: "1" }] },
+      { ...base, attributes: [{ key: "k", value: 1 }] },
+      { ...base, attributes: [{ key: "k", value: true }] },
+    ];
+    report.spans = [{ ...span("a", "x"), callCount: 1, durationContributionCount: 1 }];
+
+    const output = formatProfileLines(report).join("\n");
+    const positions = [
+      "calls=1",
+      "/k = true",
+      "/k = 1",
+      '/k = "1"',
+      "Scope: a@1",
+      "/k = false",
+    ].map((text) => output.indexOf(text));
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+  });
+
+  it("applies segment-boundary attribute bases and preserves span summary semantics", () => {
+    const report = emptyReport();
+    report.spans = [
+      {
+        ...span("example", "gitlode.projection"),
+        attributes: [
           {
-            key: "single_partial",
+            key: "gitlode.projection.mode",
             reducer: "single",
-            value: "ok",
+            value: "ready",
             observedCount: 2,
             conflictCount: 0,
           },
           {
-            key: "single_conflict",
+            key: "gitlode.project",
             reducer: "single",
-            value: "ok",
-            observedCount: 3,
-            conflictCount: 2,
+            value: "true",
+            observedCount: 1,
+            conflictCount: 0,
           },
           {
-            key: "distinct",
+            key: "gitlode.projection.outcome",
             reducer: "distinct",
-            values: [
-              { value: "a", count: 2 },
-              { value: "b", count: 1 },
-            ],
-            overflowCount: 4,
+            values: [{ value: "ok", count: 2 }],
+            overflowCount: 0,
+            observedCount: 2,
           },
-          { key: "minmax", reducer: "min_max", minimum: 1, maximum: 9, observedCount: 2 },
+          {
+            key: "gitlode.projection.size",
+            reducer: "min_max",
+            minimum: 1,
+            maximum: 9,
+            observedCount: 2,
+          },
         ],
       },
     ];
-    const output = formatProfileLines(report).join("\n");
-    expect(output).toContain("single_equal=ok");
-    expect(output).not.toContain("single_equal=ok (observedCount=");
-    expect(output).toContain("single_partial=ok (observedCount=2)");
-    expect(output).toContain("single_conflict=ok (conflicts=2)");
-    expect(output).toContain("distinct=a(2),b(1) (overflow=4)");
-    expect(output).toContain("minmax=1…9 (observedCount=2)");
+
+    expect(formatProfileLines(report).join("\n")).toContain(
+      [
+        "      projection : calls=2, total=2ms, avg=1ms, max=1.5ms, errors=0",
+        '        /gitlode.project = "true" (observed 1)',
+        "        mode = ready",
+        "        outcome = ok(2)",
+        "        size = 1…9",
+      ].join("\n"),
+    );
   });
 
-  it("renders every canonical unit and preserves tiny nonzero values", () => {
+  it("quotes malformed names, delimiters, controls and type-ambiguous strings", () => {
     const report = emptyReport();
     report.counters = [
-      ["s", 1e-9],
-      ["s", 1e-6],
-      ["s", 0.001],
-      ["s", 1],
-      ["By", 1],
-      ["By", 1024],
-      ["By", 1024 ** 2],
-      ["By", 1024 ** 3],
-      ["{commit}", 2],
-      ["{operation}", 3],
-      ["custom-unit", 7],
-      ["s", 1e-12],
-    ].map(([unit, value], index) => ({
-      scope: { name: "gitlode.execution", version: null },
-      name: `custom.counter.${index}`,
-      unit: unit as string,
-      attributes: [],
-      value: value as number,
-    }));
-    const output = formatProfileLines(report).join("\n");
-    expect(output).toContain("1.000 ns");
-    expect(output).toContain("1.000 µs");
-    expect(output).toContain("1.000 ms");
-    expect(output).toContain("1 s");
-    expect(output).toContain("1 B");
-    expect(output).toContain("1 KiB");
-    expect(output).toContain("1 MiB");
-    expect(output).toContain("1 GiB");
-    expect(output).toContain("2 commits");
-    expect(output).toContain("3 operations");
-    expect(output).toContain("7 custom-unit");
-    expect(output).toContain("0.001000 ns");
-  });
-
-  it("keeps partial rows, suppresses unavailable rows, and omits absent complete signals", () => {
-    const partial = emptyReport();
-    partial.signalStatus.counters = "partial";
-    partial.counters = [
       {
-        scope: { name: "gitlode.execution", version: null },
-        name: "custom.counter",
-        unit: "{commit}",
-        attributes: [],
-        value: 0,
+        ...counter("scope name", "gitlode..read"),
+        attributes: [
+          { key: "line\nkey", value: "true" },
+          { key: "number", value: "1" },
+          { key: "slash", value: "/value" },
+        ],
       },
     ];
-    const partialOutput = formatProfileLines(partial).join("\n");
-    expect(partialOutput).toContain("Counters (partial)");
-    expect(partialOutput).toContain("0 commits");
-    expect(partialOutput).toContain("Diagnostics");
-    expect(partialOutput).not.toContain("Histograms");
-
-    const unavailable = emptyReport();
-    unavailable.signalStatus.spans = "unavailable";
-    unavailable.spans = [
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "hidden",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-    ];
-    const unavailableOutput = formatProfileLines(unavailable).join("\n");
-    expect(unavailableOutput).toContain("Spans (unavailable)");
-    expect(unavailableOutput).toContain("(no observations)");
-    expect(unavailableOutput).not.toContain("hidden");
-    expect(formatProfileLines(emptyReport())).toEqual([]);
+    expect(formatProfileLines(report)).toEqual([
+      "Profile",
+      '  Scope: "scope name"',
+      '    /"gitlode..read" : 1operations',
+      '      /"line\\nkey" = "true"',
+      '      /number = "1"',
+      '      /slash = "/value"',
+    ]);
   });
 
-  it("sorts fallback spans and metrics by canonical scope, name, then attributes", () => {
+  it("quotes an explicitly present empty Scope version", () => {
+    const report = emptyReport();
+    report.counters = [{ ...counter("example", "count"), scope: { name: "example", version: "" } }];
+    expect(formatProfileLines(report)).toContain('  Scope: example@""');
+  });
+
+  it("uses four significant digits, promotes rounded thresholds and never hides nonzero", () => {
+    const report = emptyReport();
+    report.counters = [
+      counter("example", "a", 0, "s"),
+      counter("example", "b", 0.00099996, "s"),
+      counter("example", "c", 1023.96, "By"),
+      counter("example", "d", 1e-15, "s"),
+    ];
+    expect(formatProfileLines(report).join("\n")).toContain("/a : 0s");
+    expect(formatProfileLines(report).join("\n")).toContain("/b : 1ms");
+    expect(formatProfileLines(report).join("\n")).toContain("/c : 1KiB");
+    expect(formatProfileLines(report).join("\n")).toContain("/d : 1e-6ns");
+  });
+
+  it("preserves masks, duration coverage, exact counts and optional extrema", () => {
     const report = emptyReport();
     report.spans = [
       {
-        scope: { name: "gitlode.execution", version: "2" },
-        name: "z",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "a",
-        callCount: 1,
-        errorCount: 0,
-        totalDurationSeconds: 1,
-        maxDurationSeconds: 1,
-        attributes: [],
+        ...span("example", "partial"),
+        durationContributionCount: 1,
+        unavailableFields: ["errors"],
       },
     ];
+    report.counters = [{ ...counter("example", "zero", 0), unavailableFields: ["value"] }];
+    report.histograms = [
+      { ...histogram("example", "hist"), minimum: null, maximum: null, unavailableFields: [] },
+    ];
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("calls=2, total=2ms, avg=—, max=1.5ms, errors=—");
+    expect(output).toContain("/zero : —");
+    expect(output).toContain("samples=2, total=3ms, avg=1.5ms, min=—, max=—");
+  });
+
+  it("omits a complete empty report", () => {
+    expect(formatProfileLines(emptyReport())).toEqual([]);
+  });
+
+  it("places Scope, observation and point issues at their narrowest evidenced targets", () => {
+    const report = emptyReport();
     report.counters = [
       {
-        scope: { name: "gitlode.extraction", version: "1" },
-        name: "z",
-        unit: "u",
-        attributes: [{ key: "z", value: 1 }],
-        value: 1,
+        ...counter("example", "example.cache.lookup", 1),
+        attributes: [{ key: "mode", value: "a" }],
       },
       {
-        scope: { name: "gitlode.execution", version: null },
-        name: "z",
-        unit: "u",
-        attributes: [{ key: "z", value: 1 }],
-        value: 1,
-      },
-      {
-        scope: { name: "gitlode.execution", version: "1" },
-        name: "z",
-        unit: "u",
-        attributes: [{ key: "z", value: 1 }],
-        value: 1,
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "a",
-        unit: "u",
-        attributes: [{ key: "b", value: 1 }],
-        value: 1,
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "a",
-        unit: "u",
-        attributes: [{ key: "a", value: 1 }],
-        value: 1,
+        ...counter("example", "example.cache.lookup", 2),
+        attributes: [{ key: "mode", value: "b" }],
       },
     ];
-    report.histograms = [
-      {
-        scope: { name: "gitlode.extraction", version: "1" },
-        name: "z",
-        unit: "s",
-        attributes: [{ key: "z", value: 1 }],
-        count: 1,
-        sum: 1,
-        minimum: null,
-        maximum: null,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: "1" },
-        name: "z",
-        unit: "s",
-        attributes: [{ key: "z", value: 1 }],
-        count: 1,
-        sum: 1,
-        minimum: null,
-        maximum: null,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "z",
-        unit: "s",
-        attributes: [{ key: "z", value: 1 }],
-        count: 1,
-        sum: 1,
-        minimum: null,
-        maximum: null,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "a",
-        unit: "s",
-        attributes: [{ key: "b", value: 1 }],
-        count: 1,
-        sum: 1,
-        minimum: null,
-        maximum: null,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-      {
-        scope: { name: "gitlode.execution", version: null },
-        name: "a",
-        unit: "s",
-        attributes: [{ key: "a", value: 1 }],
-        count: 1,
-        sum: 1,
-        minimum: null,
-        maximum: null,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
+    report.diagnostics = [
+      diagnostic({
+        code: "lifecycle_failure",
+        stage: "telemetry_shutdown",
+        target: { type: "scope", scope: { name: "example", version: null } },
+        signalCoverage: [],
+        effects: ["lifecycle_notice"],
+      }),
+      diagnostic({
+        code: "metric_point_overflow",
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "example.cache.lookup",
+        },
+        effects: ["missing_observations"],
+      }),
+      diagnostic({
+        target: {
+          type: "point",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "example.cache.lookup",
+          attributes: [{ key: "mode", value: "b" }],
+        },
+        effects: ["incomplete_measurement_fields"],
+        affectedFields: [{ kind: "counter", fields: ["value"] }],
+      }),
     ];
     const lines = formatProfileLines(report);
-    const rows = (heading: string, nextHeading?: string) => {
-      const start = lines.indexOf(heading);
-      const end = nextHeading === undefined ? lines.length : lines.indexOf(nextHeading);
-      return lines.slice(start, end).filter((line) => line.startsWith("      "));
-    };
-    expect(rows("    Other counters", "  Histograms")).toEqual([
-      "      gitlode.execution / a: 1 u, a=1",
-      "      gitlode.execution / a: 1 u, b=1",
-      "      gitlode.execution / z: 1 u, z=1",
-      "      gitlode.execution@1 / z: 1 u, z=1",
-      "      gitlode.extraction@1 / z: 1 u, z=1",
-    ]);
-    expect(rows("    Other histograms")).toEqual([
-      "      gitlode.execution / a: count=1, total=1 s, avg=1 s, min=—, max=—, a=1",
-      "      gitlode.execution / a: count=1, total=1 s, avg=1 s, min=—, max=—, b=1",
-      "      gitlode.execution / z: count=1, total=1 s, avg=1 s, min=—, max=—, z=1",
-      "      gitlode.execution@1 / z: count=1, total=1 s, avg=1 s, min=—, max=—, z=1",
-      "      gitlode.extraction@1 / z: count=1, total=1 s, avg=1 s, min=—, max=—, z=1",
+    expect(lines).toEqual([
+      "Profile",
+      "  ! Collection and telemetry lifecycle issues detected.",
+      "  Scope: example",
+      "    ! Telemetry shutdown failed.",
+      "    /example",
+      "      cache",
+      "        lookup",
+      "          ! Additional attribute combinations omitted: datapoint retention limit reached.",
+      "        lookup : 1operations",
+      "          /mode = a",
+      "        lookup : 2operations",
+      "          /mode = b",
+      "          ! Invalid aggregation detail was discarded.",
     ]);
   });
 
-  it("renders valid histogram catalog groups independently from counters", () => {
+  it("keeps missing-only observations and valid siblings without synthesizing values", () => {
     const report = emptyReport();
-    report.histograms = [
+    report.counters = [counter("example", "example.output.count", 7)];
+    report.diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "histogram",
+          name: "example.output.duration",
+        },
+        signalCoverage: ["histogram"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("duration : unavailable");
+    expect(output).toContain("! No valid result retained: invalid aggregation discarded.");
+    expect(output).toContain("count : 7operations");
+  });
+
+  it("distinguishes known loss, repetition and unknown omitted diagnostic detail", () => {
+    const report = emptyReport();
+    report.spans = [{ ...span("example", "example.operation"), durationContributionCount: 1 }];
+    report.diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "span",
+          name: "example.operation",
+        },
+        signalCoverage: ["span"],
+        effects: ["incomplete_measurement_fields"],
+        affectedFields: [{ kind: "span", fields: ["avg"] }],
+        lossQuantity: {
+          descriptor: "span_duration_contributions",
+          unit: "{operation}",
+          value: 1,
+          saturated: false,
+        },
+        count: 3,
+      }),
       {
-        scope: { name: "example-plugin", version: null },
-        name: "gitlode.plugin.projection.duration",
-        unit: "s",
-        attributes: [],
-        count: 1,
-        sum: 1,
-        minimum: 1,
-        maximum: 1,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-      {
-        scope: { name: "gitlode.extraction", version: null },
-        name: "gitlode.projection.duration",
-        unit: "s",
-        attributes: [],
-        count: 1,
-        sum: 1,
-        minimum: 1,
-        maximum: 1,
-        explicitBounds: [],
-        bucketCounts: [],
-      },
-      {
-        scope: { name: "gitlode.line_diff", version: null },
-        name: "gitlode.line_diff.compute.duration",
-        unit: "s",
-        attributes: [],
-        count: 1,
-        sum: 1,
-        minimum: 1,
-        maximum: 1,
-        explicitBounds: [],
-        bucketCounts: [],
+        code: "diagnostic_overflow",
+        severity: "warning",
+        stage: "report_build",
+        target: { type: "report" },
+        extent: "unidentified_subset",
+        effects: ["lost_issue_detail"],
+        signalCoverage: ["span"],
+        effectsByKind: [],
+        reportEffects: [],
+        detailLoss: {
+          pointAttributes: false,
+          observationIdentity: true,
+          scopeIdentity: true,
+          attributeKey: false,
+          affectedFields: false,
+        },
+        omittedOccurrences: null,
+        countSaturated: false,
+        maximumSeverity: "warning",
+        priorIssueDetail: "unavailable",
       },
     ];
-    const lines = formatProfileLines(report);
-    const start = lines.indexOf("  Histograms");
-    const headings = lines
-      .slice(start + 1)
-      .filter((line) => /^    [^ ]/.test(line))
-      .map((line) => line.trim());
-    expect(headings).toEqual(["Line diff", "Projection", "Plugins"]);
+    const output = formatProfileLines(report).join("\n");
+    expect(output).toContain("Duration summary excludes 1 invalid duration; average unavailable.");
+    expect(output).toContain("Repeated 3 times.");
+    expect(output).toContain("the number of omitted occurrences is unknown");
+    expect(output).toContain("prior issue detail unavailable");
+  });
+
+  it("renders fixed fallback and lifecycle-only reports through the ordinary path", () => {
+    const fallback = emptyReport();
+    fallback.signalStatus = {
+      spans: "unavailable",
+      counters: "unavailable",
+      histograms: "unavailable",
+    };
+    fallback.diagnostics = [
+      diagnostic({
+        code: "lifecycle_failure",
+        stage: "report_build",
+        signalCoverage: ["span", "counter", "histogram"],
+        effects: ["report_delivery_failure"],
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+        reportDelivery: {
+          path: "fixed_fallback",
+          measurementResults: "none",
+          priorIssueDetail: "unavailable",
+        },
+      }),
+    ];
+    expect(formatProfileLines(fallback)).toEqual([
+      "Profile",
+      "  ! Profile report construction failed; measurement results could not be provided.",
+      "  ! Earlier collection issue details are unavailable.",
+    ]);
+
+    const lifecycle = emptyReport();
+    lifecycle.diagnostics = [
+      diagnostic({
+        code: "lifecycle_failure",
+        stage: "telemetry_shutdown",
+        signalCoverage: [],
+        effects: ["lifecycle_notice"],
+      }),
+    ];
+    expect(formatProfileLines(lifecycle)).toEqual([
+      "Profile",
+      "  ! Telemetry lifecycle issues detected.",
+      "  ! Telemetry shutdown failed; affected scopes and observation names are unknown.",
+    ]);
+  });
+
+  it("keeps heading levels structural and excludes fields and notices from heading decoration", () => {
+    const report = emptyReport();
+    report.spans = [span("example", "root"), span("example", "root.child")];
+    report.diagnostics = [
+      diagnostic({
+        target: {
+          type: "observation",
+          scope: { name: "example", version: null },
+          kind: "counter",
+          name: "root.missing",
+        },
+        extent: "entire_target",
+        wholeResultUnavailable: true,
+      }),
+    ];
+    const styling: Styling = {
+      ...plainStyling,
+      h1: (text) => `<h1>${text}</h1>`,
+      h2: (text) => `<h2>${text}</h2>`,
+      h3: (text) => `<h3>${text}</h3>`,
+      h4: (text) => `<h4>${text}</h4>`,
+    };
+    const lines = formatProfileLines(report, styling);
+    expect(lines[0]).toBe("<h1>Profile</h1>");
+    expect(lines).toContain("  <h2>Scope: example</h2>");
+    expect(lines.some((line) => line.startsWith("    <h3>/root</h3> : calls="))).toBe(true);
+    expect(lines.some((line) => line.startsWith("      <h4>child</h4> : calls="))).toBe(true);
+    expect(lines).toContain("      <h4>missing</h4> : unavailable");
+    expect(lines.filter((line) => line.includes("! ")).every((line) => !line.includes("<h"))).toBe(
+      true,
+    );
+    expect(lines.map((line) => line.replace(/<\/?h[1-4]>/gu, ""))).toEqual(
+      formatProfileLines(report),
+    );
+  });
+
+  it("uses semantic style roles while preserving styled/plain text parity", () => {
+    const report = emptyReport();
+    report.spans = [
+      { ...span("example", "example.operation"), callCount: 1, durationContributionCount: 1 },
+    ];
+    report.counters = [counter("example", "example.count", 1)];
+    report.diagnostics = [diagnostic()];
+    const calls: string[] = [];
+    const spy = Object.fromEntries(
+      Object.keys(plainStyling).map((role) => [
+        role,
+        (text: string) => (calls.push(`${role}:${text}`), `<${role}>${text}</${role}>`),
+      ]),
+    ) as unknown as Styling;
+    const styled = formatProfileLines(report, spy).join("\n");
+    expect(styled.replace(/<\/?[^>]+>/gu, "")).toBe(formatProfileLines(report).join("\n"));
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        "h1:Profile",
+        "h2:Scope: example",
+        "h3:/example",
+        "h4:operation",
+        "fieldLabel:calls",
+        "separator: : ",
+        "value:1",
+        "unit:operations",
+        "warning:!",
+      ]),
+    );
+
+    const ansi = /\u001b\[[0-9;]*m/gu;
+    expect(formatProfileLines(report, createStyling(true)).join("\n").replace(ansi, "")).toBe(
+      formatProfileLines(report, createStyling(false)).join("\n"),
+    );
+  });
+});
+
+describe("streaming Profile rendering", () => {
+  it("writes earlier sections before formatting later sections and preserves completed lines on failure", () => {
+    const report = emptyReport();
+    report.counters = [counter("example", "work.count")];
+    const lines: string[] = [];
+    const failure = new Error("decoration failed");
+    expect(() =>
+      renderProfile({ writeLine: (line) => lines.push(line) }, report, {
+        ...plainStyling,
+        h2: () => {
+          expect(lines).toEqual(["Profile"]);
+          throw failure;
+        },
+      }),
+    ).toThrow(failure);
+    expect(lines).toEqual(["Profile"]);
+  });
+
+  it("propagates a sink failure immediately without rendering or replaying later lines", () => {
+    const report = emptyReport();
+    report.counters = [counter("example", "work.count")];
+    const failure = new Error("sink failed");
+    let writes = 0;
+    let scopeFormatted = false;
+    expect(() =>
+      renderProfile(
+        {
+          writeLine: () => {
+            writes++;
+            throw failure;
+          },
+        },
+        report,
+        {
+          ...plainStyling,
+          h2: (text) => {
+            scopeFormatted = true;
+            return text;
+          },
+        },
+      ),
+    ).toThrow(failure);
+    expect(writes).toBe(1);
+    expect(scopeFormatted).toBe(false);
+  });
+
+  it("does not write an empty report", () => {
+    const lines: string[] = [];
+    renderProfile({ writeLine: (line) => lines.push(line) }, emptyReport());
+    expect(lines).toEqual([]);
+  });
+});
+
+describe("source-configurable namespace depth", () => {
+  it.each([0, 1, 2, 3, 4, 8])(
+    "places measurements and diagnostic-only names at depth %i",
+    (namespaceDepth) => {
+      const report = emptyReport();
+      report.counters = [
+        {
+          ...counter("example", "a.b.c.d.count"),
+          attributes: [{ key: "a.b.c.d.label", value: "ok" }],
+        },
+      ];
+      report.diagnostics = [
+        diagnostic({
+          target: {
+            type: "observation",
+            scope: { name: "example", version: null },
+            kind: "counter",
+            name: "a.b.c.d.missing",
+          },
+          wholeResultUnavailable: true,
+        }),
+      ];
+      const lines: string[] = [];
+      renderProfile(
+        { writeLine: (line) => lines.push(line) },
+        report,
+        {
+          ...plainStyling,
+          h3: (text) => "<h3>" + text + "</h3>",
+          h4: (text) => "<h4>" + text + "</h4>",
+        },
+        { namespaceDepth },
+      );
+      expect(lines.filter((line) => line.includes("<h3>"))).toEqual(
+        namespaceDepth === 0
+          ? [
+              "    <h3>/a.b.c.d.count</h3> : 1operations",
+              "    <h3>/a.b.c.d.missing</h3> : unavailable",
+            ]
+          : ["    <h3>/a</h3>"],
+      );
+      expect(lines.filter((line) => line.includes("<h4>"))).toEqual(
+        namespaceDepth > 1
+          ? ["      <h4>b</h4>"]
+          : namespaceDepth === 1
+            ? [
+                "      <h4>b.c.d.count</h4> : 1operations",
+                "      <h4>b.c.d.missing</h4> : unavailable",
+              ]
+            : [],
+      );
+      const plainLines = lines.map((line) => line.replace(/<\/?h[34]>/gu, ""));
+      if (namespaceDepth >= 3) expect(lines).toContain("        c");
+      if (namespaceDepth >= 4) expect(lines).toContain("          d");
+      const segments = ["a", "b", "c", "d", "count"];
+      const valueDepth = Math.min(namespaceDepth, 4) + 2;
+      const valueName =
+        (namespaceDepth === 0 ? "/" : "") + segments.slice(Math.min(namespaceDepth, 4)).join(".");
+      expect(plainLines).toContain("  ".repeat(valueDepth) + valueName + " : 1operations");
+      const missingName =
+        (namespaceDepth === 0 ? "/" : "") +
+        ["a", "b", "c", "d", "missing"].slice(Math.min(namespaceDepth, 4)).join(".");
+      expect(plainLines.filter((line) => line.endsWith(missingName + " : unavailable"))).toEqual([
+        "  ".repeat(valueDepth) + missingName + " : unavailable",
+      ]);
+      expect(lines.filter((line) => line.includes("!"))).toHaveLength(2);
+      const attributeName =
+        namespaceDepth > 0 && namespaceDepth <= 4
+          ? ["a", "b", "c", "d"].slice(namespaceDepth).concat("label").join(".")
+          : "/a.b.c.d.label";
+      expect(lines).toContain("  ".repeat(valueDepth + 1) + attributeName + " = ok");
+    },
+  );
+});
+
+describe("default Profile layout", () => {
+  it("prints full names directly under Scope and joins values to their units", () => {
+    const report = emptyReport();
+    report.counters = [
+      { ...counter("example", "a.b.count"), attributes: [{ key: "a.b.mode", value: "ok" }] },
+    ];
+    expect(formatDefaultProfileLines(report)).toEqual([
+      "Profile",
+      "  Scope: example",
+      "    /a.b.count : 1operations",
+      "      /a.b.mode = ok",
+    ]);
   });
 });

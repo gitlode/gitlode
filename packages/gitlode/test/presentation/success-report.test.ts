@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { renderSuccessReport } from "../../src/presentation/success-report.js";
 
 const profileReport = {
-  schemaVersion: 1 as const,
+  schemaVersion: 2 as const,
   signalStatus: {
     spans: "complete" as const,
     counters: "complete" as const,

@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noCheck": false,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "sourceMap": false
+  },
+  "include": [
+    "tsdown.config.ts",
+    "scripts/tooling/release-telemetry-boundary.ts",
+    "test/telemetry/sdk-construction-boundary.test.ts"
+  ]
+}

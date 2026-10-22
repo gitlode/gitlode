@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,35 +7,37 @@ import type { ExtractionCheckpoint } from "@gitlode/internal-contracts/extractio
 import type { AbsoluteDirectoryPath, AbsolutePath } from "@gitlode/internal-foundation/support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { executeWorkerRunRequest } from "../../src/execution/execute-run.js";
-import type { ExecutionGitAdapterName, WorkerRunInput } from "../../src/execution/types.js";
 import {
   createDeterministicRepository,
   repositorySemanticSnapshot,
   type DeterministicRepository,
-} from "../support/deterministic-repository.js";
+} from "../../../../tests/support/deterministic-repository.js";
 import {
   compareBehavioralArtifacts,
   frozenBehavioralBaseline,
   readJsonlArtifacts,
   verifyProfileEquivalence,
   type BehavioralArtifacts,
-} from "../support/profile-equivalence.js";
+} from "../../../../tests/support/profile-equivalence.js";
+import {
+  TestFixtureOwner,
+  disposeTestFixtures,
+} from "../../../../tests/support/test-fixture-owner.js";
+import { executeWorkerRunRequest } from "../../src/execution/execute-run.js";
+import type { ExecutionGitAdapterName, WorkerRunInput } from "../../src/execution/types.js";
 
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const directories: string[] = [];
-async function temporary(prefix: string): Promise<string> {
+const owners: TestFixtureOwner[] = [];
+async function temporary(prefix: string, owner: TestFixtureOwner): Promise<string> {
+  owner.check();
   const value = await mkdtemp(join(tmpdir(), prefix));
-  directories.push(value);
+  owner.root(value);
+  owner.check();
   return value;
 }
-afterEach(async () => {
+afterEach(async (context) => {
   vi.useRealTimers();
-  await Promise.all(
-    directories
-      .splice(0)
-      .map(async (directory) => await rm(directory, { recursive: true, force: true })),
-  );
+  await disposeTestFixtures(owners, !!context.task.result?.errors?.length);
 });
 
 function file(content: string, name = "baseline-20240203T040506000Z-000001.jsonl") {
@@ -55,24 +57,34 @@ function artifacts(overrides: Partial<BehavioralArtifacts> = {}): BehavioralArti
 }
 
 describe("deterministic telemetry behavioral baseline support", () => {
-  it("regenerates identical isolated SHA-1 repository semantics and tag objects", async () => {
-    const first = await createDeterministicRepository(await temporary("gitlode-fixture-a-"));
-    const second = await createDeterministicRepository(await temporary("gitlode-fixture-b-"));
-    expect(await repositorySemanticSnapshot(first)).toEqual(
-      await repositorySemanticSnapshot(second),
-    );
-    expect(first.objectFormat).toBe("sha1");
-    expect(first.annotatedTagType).toBe("tag");
-    expect(first.lightweightTagType).toBe("commit");
-    expect(first.annotatedTagOid).toMatch(/^[0-9a-f]{40}$/);
-    expect(first.annotatedTagObject).toContain("type commit\n");
-    expect(first.annotatedTagObject).toContain("tag release-annotated\n");
-    expect(first.refs["root-lightweight"]).toMatch(/^[0-9a-f]{40}$/);
-    expect(first.refs["release-annotated"]).toMatch(/^[0-9a-f]{40}$/);
-    expect(Object.values(first.refs).every((oid) => /^[0-9a-f]{40}$/.test(oid))).toBe(true);
-    expect(first.graph.every((oid) => /^[0-9a-f]{40}$/.test(oid))).toBe(true);
-    expect(first.graph).toHaveLength(5);
-    expect(first.refs.main).toBe(first.refs.overlap);
+  it("regenerates identical isolated SHA-1 repository semantics and tag objects", async (context) => {
+    const owner = new TestFixtureOwner(context.signal);
+    owners.push(owner);
+    return await owner.run(async () => {
+      const first = await createDeterministicRepository(
+        await temporary("gitlode-fixture-a-", owner),
+        owner,
+      );
+      const second = await createDeterministicRepository(
+        await temporary("gitlode-fixture-b-", owner),
+        owner,
+      );
+      expect(await repositorySemanticSnapshot(first, owner)).toEqual(
+        await repositorySemanticSnapshot(second, owner),
+      );
+      expect(first.objectFormat).toBe("sha1");
+      expect(first.annotatedTagType).toBe("tag");
+      expect(first.lightweightTagType).toBe("commit");
+      expect(first.annotatedTagOid).toMatch(/^[0-9a-f]{40}$/);
+      expect(first.annotatedTagObject).toContain("type commit\n");
+      expect(first.annotatedTagObject).toContain("tag release-annotated\n");
+      expect(first.refs["root-lightweight"]).toMatch(/^[0-9a-f]{40}$/);
+      expect(first.refs["release-annotated"]).toMatch(/^[0-9a-f]{40}$/);
+      expect(Object.values(first.refs).every((oid) => /^[0-9a-f]{40}$/.test(oid))).toBe(true);
+      expect(first.graph.every((oid) => /^[0-9a-f]{40}$/.test(oid))).toBe(true);
+      expect(first.graph).toHaveLength(5);
+      expect(first.refs.main).toBe(first.refs.overlap);
+    });
   });
 
   it("excludes only success elapsed/profile fields and detects application diagnostics", async () => {
@@ -283,8 +295,10 @@ async function runLegacyBaseline(
   adapter: ExecutionGitAdapterName,
   profile: boolean,
   scenario: BaselineScenario,
+  owner: TestFixtureOwner,
 ): Promise<BehavioralArtifacts> {
-  const outputDir = await temporary(`gitlode-baseline-${adapter}-`);
+  const outputDir = await temporary(`gitlode-baseline-${adapter}-`, owner);
+  owner.check();
   const input: WorkerRunInput = {
     repositoryPath: repository.directory as AbsolutePath,
     repoName: "fixture-repository",
@@ -308,49 +322,57 @@ async function runLegacyBaseline(
     { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
     { environment: process.env },
   );
+  owner.check();
   return {
     result,
     checkpoint: result.kind === "success" ? result.checkpoint : null,
-    jsonl: await readJsonlArtifacts(outputDir),
+    jsonl: await owner.work(async () => await readJsonlArtifacts(outputDir)),
   };
 }
 
 describe("frozen migration-before legacy behavioral baselines", () => {
-  it.each(["isomorphic-git", "git-cli"] as const)(
+  it.for(["isomorphic-git", "git-cli"] as const)(
     "matches frozen baseline for every scenario with %s",
-    async (adapter) => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(new Date("2024-02-03T04:05:06.000Z"));
-      const repository = await createDeterministicRepository(
-        await temporary(`gitlode-${adapter}-repo-`),
-      );
-      for (const scenario of baselineScenarios) {
-        const modes = await verifyProfileEquivalence(
-          async (profile) => await runLegacyBaseline(repository, adapter, profile, scenario),
-          repository.directory,
+    { timeout: 30_000 },
+    async (adapter, context) => {
+      const owner = new TestFixtureOwner(context.signal);
+      owners.push(owner);
+      return await owner.run(async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2024-02-03T04:05:06.000Z"));
+        const repository = await createDeterministicRepository(
+          await temporary(`gitlode-${adapter}-repo-`, owner),
+          owner,
         );
-        if (scenario.id === "output_rotation") {
-          expect(modes.disabled.jsonl.map((file) => file.name)).toEqual([
-            "baseline-20240203T040506Z-000001.jsonl",
-            "baseline-20240203T040506Z-000002.jsonl",
-            "baseline-20240203T040506Z-000003.jsonl",
-            "baseline-20240203T040506Z-000004.jsonl",
-            "baseline-20240203T040506Z-000005.jsonl",
-          ]);
+        for (const scenario of baselineScenarios) {
+          owner.check();
+          const modes = await verifyProfileEquivalence(
+            async (profile) =>
+              await runLegacyBaseline(repository, adapter, profile, scenario, owner),
+            repository.directory,
+          );
+          if (scenario.id === "output_rotation") {
+            expect(modes.disabled.jsonl.map((file) => file.name)).toEqual([
+              "baseline-20240203T040506Z-000001.jsonl",
+              "baseline-20240203T040506Z-000002.jsonl",
+              "baseline-20240203T040506Z-000003.jsonl",
+              "baseline-20240203T040506Z-000004.jsonl",
+              "baseline-20240203T040506Z-000005.jsonl",
+            ]);
+          }
+          expect(
+            modes.disabled.result,
+            `${adapter} ${scenario.id}: ${JSON.stringify(modes.disabled.result)}`,
+          ).toMatchObject({ kind: "success" });
+          expect(frozenBehavioralBaseline(modes.disabled, repository.directory)).toMatchSnapshot(
+            `${adapter} ${scenario.id} profile disabled`,
+          );
+          expect(frozenBehavioralBaseline(modes.enabled, repository.directory)).toMatchSnapshot(
+            `${adapter} ${scenario.id} profile enabled`,
+          );
         }
-        expect(
-          modes.disabled.result,
-          `${adapter} ${scenario.id}: ${JSON.stringify(modes.disabled.result)}`,
-        ).toMatchObject({ kind: "success" });
-        expect(frozenBehavioralBaseline(modes.disabled, repository.directory)).toMatchSnapshot(
-          `${adapter} ${scenario.id} profile disabled`,
-        );
-        expect(frozenBehavioralBaseline(modes.enabled, repository.directory)).toMatchSnapshot(
-          `${adapter} ${scenario.id} profile enabled`,
-        );
-      }
+      });
     },
-    30_000,
   );
 
   it("rejects identical drift applied to both profile modes against the frozen baseline", () => {

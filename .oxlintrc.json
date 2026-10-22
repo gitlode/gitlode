@@ -208,7 +208,7 @@
     },
     {
       // Tests may use compact fixtures and assertions where non-null assertions are acceptable.
-      "files": ["**/test/**"],
+      "files": ["**/test/**", "tests/support/**"],
       "rules": {
         "typescript/no-non-null-assertion": "off"
       }

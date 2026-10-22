@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  IsomorphicGitAdapter,
   createDagTelemetryBinding,
   NOOP_DAG_TELEMETRY_BINDING,
   NOOP_GIT_METRIC_RECORDER,
@@ -22,7 +23,10 @@ import {
   type ExecuteRunDependencies,
   type TelemetryCompositionSlot,
 } from "../../src/execution/execute-run.js";
-import { createWorkerTelemetrySessionForTest } from "../../src/execution/telemetry/index.js";
+import {
+  WorkerTelemetrySession,
+  createWorkerTelemetrySessionForTest,
+} from "../../src/execution/telemetry/index.js";
 import type { ExecutionRunInput, WorkerRunRequest } from "../../src/execution/types.js";
 import {
   NOOP_BUILT_IN_FACT_PROJECTOR_METRIC_RECORDER,
@@ -327,6 +331,7 @@ describe("executeWorkerRunRequest profiling", () => {
       gitAdapter: "isomorphic-git" | "git-cli",
       degraded: boolean,
       withPlugin: boolean,
+      builderFailure = false,
     ) => {
       const outputDir = await makeTempDir("gitlode-noop-telemetry-output-");
       let telemetryClockReads = 0;
@@ -369,11 +374,13 @@ describe("executeWorkerRunRequest profiling", () => {
           environment: {},
           telemetryClock: () => ++telemetryClockReads,
           observeTelemetryComposition: (slot, component) => composition.push([slot, component]),
-          ...(degraded
+          ...(degraded || builderFailure
             ? {
                 createTelemetrySession: async () =>
                   await createWorkerTelemetrySessionForTest({
-                    failures: { meter_provider_construction: new Error("degrade") },
+                    failures: degraded
+                      ? { meter_provider_construction: new Error("degrade") }
+                      : { report_builder_body: new Error("builder failure") },
                   }),
               }
             : {}),
@@ -399,6 +406,7 @@ describe("executeWorkerRunRequest profiling", () => {
     const degraded = await run(true, "git-cli", true, true);
     const degradedBuiltIn = await run(true, "git-cli", true, false);
     const enabled = await run(true, "isomorphic-git", false, true);
+    const fallback = await run(true, "isomorphic-git", false, false, true);
 
     const commonNoopComposition = [
       ["git", NOOP_GIT_METRIC_RECORDER],
@@ -455,6 +463,21 @@ describe("executeWorkerRunRequest profiling", () => {
     expect(disabled.result.success.profileReport).toBeUndefined();
     expect(degraded.result.success.profileReport).toBeUndefined();
     expect(enabled.result.success.profileReport).toBeDefined();
+    expect(fallback.result.success.profileReport).toMatchObject({
+      schemaVersion: 2,
+      signalStatus: { spans: "unavailable", counters: "unavailable", histograms: "unavailable" },
+      spans: [],
+      counters: [],
+      histograms: [],
+    });
+    expect(fallback.result.success.profileReport?.diagnostics[0]).toMatchObject({
+      effects: ["report_delivery_failure"],
+      reportDelivery: { path: "fixed_fallback" },
+    });
+    expect(structuredClone(fallback.result).success.profileReport).toEqual(
+      fallback.result.success.profileReport,
+    );
+    expect(fallback.result.success.recordsWritten).toBe(enabled.result.success.recordsWritten);
     const compatibilityWarning = {
       severity: "warn",
       message:
@@ -1277,6 +1300,92 @@ describe("executeWorkerRunRequest commit traversal strategy environment", () => 
     expect(
       runEntry?.attributes.find((attribute) => attribute.key === "gitlode.git.adapter")?.value,
     ).toBe("git-cli");
+  });
+
+  it.each(["enabled", "disabled", "degraded"] as const)(
+    "keeps disposal inside root lifetime and result classification in %s",
+    async (state) => {
+      for (const outcome of ["success", "user-error", "runtime-error"] as const) {
+        const request = await createOneCommitRequest();
+        const session = await createWorkerTelemetrySessionForTest(
+          {
+            failures: state === "degraded" ? { enabled_module_import: new Error("import") } : {},
+          },
+          state !== "disabled",
+        );
+        const end = vi.spyOn(session.rootSpan, "end");
+        const finalize = vi.spyOn(session, "finalize");
+        const originalDispose = IsomorphicGitAdapter.prototype[Symbol.asyncDispose];
+        const dispose = vi
+          .spyOn(IsomorphicGitAdapter.prototype, Symbol.asyncDispose)
+          .mockImplementation(async function () {
+            expect(end).not.toHaveBeenCalled();
+            await Promise.resolve();
+            expect(end).not.toHaveBeenCalled();
+            await originalDispose.call(this);
+          });
+        try {
+          const result = await executeWorkerRunRequest(
+            {
+              ...request,
+              input: {
+                ...request.input,
+                profile: state !== "disabled",
+                ...(outcome === "success"
+                  ? {}
+                  : {
+                      range:
+                        outcome === "user-error"
+                          ? { type: "ref", since: "missing-ref" }
+                          : { type: "date", since: "not-a-date" },
+                    }),
+              },
+            },
+            { progressReporter: { emit() {} }, diagnosticReporter: { report() {} } },
+            {
+              environment: {},
+              createTelemetrySession: async () => session,
+            },
+          );
+          expect(result.kind).toBe(outcome);
+          expect(dispose).toHaveBeenCalledTimes(1);
+          expect(end).toHaveBeenCalledTimes(1);
+          expect(finalize).toHaveBeenCalledTimes(1);
+          const originalResult = finalize.mock.calls[0]?.[0];
+          expect((await session.finalize("later")).applicationResult).toBe(originalResult);
+        } finally {
+          dispose.mockRestore();
+          end.mockRestore();
+          finalize.mockRestore();
+        }
+      }
+    },
+  );
+
+  it("finalizes an acquired session and preserves a rejection outside application classification", async () => {
+    const request = await createOneCommitRequest();
+    const session = await WorkerTelemetrySession.create();
+    const end = vi.spyOn(session.rootSpan, "end");
+    const finalize = vi.spyOn(session, "finalize");
+    const original = { unexpected: "composition failure" };
+    await expect(
+      executeWorkerRunRequest(
+        request,
+        {
+          progressReporter: { emit() {} },
+          diagnosticReporter: { report() {} },
+        },
+        {
+          environment: {},
+          createTelemetrySession: async () => session,
+          observeTelemetryComposition() {
+            throw original;
+          },
+        },
+      ),
+    ).rejects.toBe(original);
+    expect(finalize).toHaveBeenCalledTimes(1);
+    expect(end).toHaveBeenCalledTimes(1);
   });
 
   it("records typed setup failures without exception events", async () => {

@@ -4,16 +4,21 @@ import { formatDiagnosticLines, splitMessageLines } from "../../src/presentation
 import type { Styling } from "../../src/presentation/progress/index.js";
 
 const styled: Styling = {
-  spinnerGlyph: (text) => text,
-  doneMarker: (text) => text,
-  stageLabel: (text) => text,
-  summaryHeader: (text) => text,
-  warnBadge: (text) => `<warn>${text}</warn>`,
-  errorBadge: (text) => `<error>${text}</error>`,
-  fieldKey: (text) => text,
-  primaryValue: (text) => text,
-  unitSuffix: (text) => text,
-  refsValue: (text) => text,
+  active: (text) => text,
+  success: (text) => text,
+  label: (text) => text,
+  h1: (text) => text,
+  h2: (text) => text,
+  h3: (text) => text,
+  h4: (text) => text,
+  warning: (text) => `<warn>${text}</warn>`,
+  error: (text) => `<error>${text}</error>`,
+  fieldLabel: (text) => text,
+  attributeName: (text) => text,
+  value: (text) => text,
+  unit: (text) => text,
+  reference: (text) => text,
+  separator: (text) => text,
 };
 
 describe("presentation splitMessageLines", () => {

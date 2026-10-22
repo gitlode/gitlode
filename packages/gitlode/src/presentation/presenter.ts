@@ -11,7 +11,7 @@ import {
   type TerminalSink,
   type UiMode,
 } from "./progress/index.js";
-import { formatProfileLines, formatSummaryLines, type SummaryData } from "./reporting/index.js";
+import { renderProfile, formatSummaryLines, type SummaryData } from "./reporting/index.js";
 
 export interface RunPresenter {
   handleProgressEvent(event: ProgressEvent): void;
@@ -86,15 +86,21 @@ export function createRunPresenter(options: CreateRunPresenterOptions): RunPrese
       }
     },
     renderProfile(report) {
-      const lines = formatProfileLines(report, styling);
-      if (lines.length === 0) {
-        return;
-      }
-      prepareForNonProgressOutput();
-      sink.newline();
-      for (const line of lines) {
-        sink.writeLine(line);
-      }
+      let started = false;
+      renderProfile(
+        {
+          writeLine(line) {
+            if (!started) {
+              prepareForNonProgressOutput();
+              sink.newline();
+              started = true;
+            }
+            sink.writeLine(line);
+          },
+        },
+        report,
+        styling,
+      );
     },
   };
 }

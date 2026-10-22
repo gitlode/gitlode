@@ -43,16 +43,53 @@ size, including zero, for success and no size for failure. Invalid numeric input
 signal so that an invalid value cannot enter an instrument or suppress valid sibling observations.
 
 Every no-op recorder family is exercised directly. These tests prove that disabled telemetry creates
-no instruments, reads no clock, and needs no per-operation timing-token allocation.
+no instruments, reads no clock, and needs no per-operation timing-token allocation. Direct recorder
+tests do not prove correct production composition: actual disabled and initialization-degraded worker
+paths must also verify the selected recorder/DAG objects and connected timing behavior. The evidence
+must detect an active selection even for non-timing output/DAG bindings and both built-in projector
+construction paths. Preserve enabled recording, application results, JSONL, checkpoints, plugin
+behavior and initialization warnings while testing these paths.
 
 Collector and report tests cover bounded span aggregation, metric conversion, reducer behavior,
 canonical sorting, signal status, structured cloning, and invalid aggregation. Completed span
 objects and raw histogram samples must not be retained.
 
-Repository performance workflow tests use the same development-only sidecar orchestration as the
-formal workflow. They require a `target_on` report, classify missing or malformed reports as
-inconclusive, propagate report-size, prohibited-span, diagnostic, and signal-status outcomes to the
-top-level evaluation, and keep timed CLI output/checkpoints separate from sidecar artifacts.
+The active schema-v2 contract and runtime use literal cases for typed target
+canonicalization, independently validated identity components, exact/discarded/not-applicable
+attribute selectors, per-kind fields/effects/coverage, quantity merge uncertainty, safe saturation,
+15+1 issue retention, escaped 4096-code-unit detail broadening, numeric availability, and the fixed
+fallback. Runtime tests inject a real normal builder-body failure after partial work, prove a single
+builder invocation, exercise broken diagnostic snapshots and simultaneous shutdown failures, and
+verify cached finalization, application-result identity, normal worker/application transport and the
+ordinary presentation path. Presentation and repository evaluators separately distinguish observed
+zero from unavailable numeric fields, partial/unavailable status, reserved summaries and fixed
+fallback provenance.
+
+Mixed valid/invalid Span duration tests run both input orders through the real processor, report
+builder and presentation/tooling bridges. They preserve retained total/maximum, suppress the average,
+disclose omitted contributions after diagnostic compaction, reject all-invalid defaults as observed
+zero and retain a genuine zero-duration contribution. Report-builder isolation separately covers
+throwing first/middle values and iterator failure, including honest exact versus unknown loss.
+
+Repository-consumer fixtures include complete normal, partial and fixed-fallback reports plus
+compacted producer output, missing required fields, invalid field masks and malformed reserved
+summaries. Relationship cases reject unavailable signals with values, unexplained partial or
+unavailable status, delivery effect/provenance mismatches, target/coverage/affected-field kind
+contradictions and summary-association bypasses. Legal empty signals, broad or multi-kind targets,
+detail loss, lifecycle-only notices and mixed-duration retained totals remain accepted. Acceptance
+is based on complete shared-contract normalization before measurement extraction. An actual
+worker-thread entry/client test injects an invoked builder-body failure through an internal-only seam
+and verifies fallback serialization, ordinary result routing, application-result equivalence and
+finite cleanup.
+
+Correction coverage also compares lifecycle-only and confirmed whole-signal-loss evidence before and
+after detailed-record compaction, rejects status/value contradictions without discarding retained
+values, distinguishes exact safe-integer boundaries from actual saturation, and routes explicitly
+malformed counts and detail-loss masks to invalid-aggregation evidence. A 100,000-entry duplicate-kind
+probe counts indexed reads before diagnostic identity construction; the normalizer must reject it by
+the fixed kind-universe cardinality without input-proportional traversal. This bounds accumulator
+preprocessing after the caller supplies the array, not the caller's cost to allocate or populate that
+untrusted input.
 
 ## Bounded collection
 
@@ -78,6 +115,22 @@ result classification and output remain unchanged in every case. Real SDK asynch
 callbacks cover normal completion, rejection, and non-settlement (including an unlisted plugin
 metric); the non-settlement case uses a finite outer test deadline and proves bounded collection,
 partial metric signals, continued cleanup, idempotence, and safe late settlement.
+
+Source session tests exercise the production owner/factory: Disabled loader non-invocation, unrelated
+global-provider sentinels, invalid roots and explicit valid parents, propagation with an existing
+manager and its absence without one, import/evaluation rejection, actual owned cleanup and cleanup
+rejection, span snapshot failure, and reentrant/concurrent finalization identity. Finite deadlines
+bound fault tests and globals are restored. Execution tests retain all nine actual no-op composition
+choices and verify disposal before root end, result classification and original unexpected rejection
+preservation. The real development worker builder-failure seam must respect requested profile=false.
+
+Source evidence is not emitted/installed boundary acceptance. Release verification must separately
+check static transitive closures of all three entries (including shared chunks, external SDK closure
+and collector/report ownership), real host and worker ESM/CommonJS load guards, constructor guards,
+packed enabled-chunk positive behavior and disposable negative sensitivity. Installed disabled behavior must succeed under SDK denial; enabled
+must normally produce a valid report, and removing a required chunk must fail that positive assertion.
+These independent checks are required regardless of source-session results; functional boundary
+validation does not establish performance acceptance.
 
 ## Operation-owner integration
 
@@ -116,10 +169,12 @@ shape.
 
 ## Presentation verification
 
-Presentation tests primarily assert a structured view model: grouping, labels, preferred order,
-plugin scopes, fallback, signal state, diagnostics, zero semantics, units, and omission of
-percentiles. Formatter smoke tests assert meaningful content without treating padding, borders, or
-column widths as compatibility contracts.
+Presentation tests assert the generic Scope/source-configured namespace tree (flat by default, with explicit multi-level regressions), code-unit/kind/typed-attribute
+ordering, short/group-node collisions, plugin and unknown identities, escaping, attribute bases,
+fixed per-kind fields, masks, zero semantics, unit thresholds and omission of percentiles. Diagnostic
+tests cover report/Scope/observation/point placement, missing-only targets, valid siblings, fixed
+fallback, lifecycle-only notices and reserved detail summaries. Semantic-role spies and ANSI removal
+prove styled/plain text parity without treating padding, wrapping or column widths as contracts.
 
 The successful-run-only profile UX and `--quiet` suppression remain covered until a separate product
 decision changes them.
@@ -127,7 +182,25 @@ decision changes them.
 ## Execution tiers
 
 Catalog, unit, fault-injection, owner-integration, deterministic repository, worker transport,
-presentation, and normal repository checks run in CI. Representative large-repository timing,
-memory, trace-volume, and profile on/off comparisons run explicitly during the final consolidation
-phase using the method and thresholds in
-[`telemetry-performance.md`](telemetry-performance.md).
+presentation, and normal repository checks run in CI. Empirical performance comparisons are distinct
+from these functional checks; see the [contributor guidance](../contributing/build-test-release.md#empirical-comparisons).
+
+## Contributor routes and test ownership
+
+Recorder work follows operation owners, catalogs, fake Meter/clock tests and actual recording paths.
+Collection work follows execution session/report/SDK boundaries with real-provider, fault-injection
+and transport tests. Collector/internal-access tests remain with implementation owners. The private
+system workspace checks installed CLI/worker/schema/public API through the package contract and grants
+no internal import exception. The [build guide](../contributing/build-test-release.md) owns commands
+and runner typing. Empirical comparisons are scoped separately from product regression coverage.
+
+## Release SDK boundary execution
+
+Release bundling validates all three stable entries using emitted module/edge metadata, including
+shared chunks and conservative external dependency closure. The installed-package command checks
+actual CLI/worker ESM and CommonJS guards, SDK denial, positive Enabled observations, lazy asset
+loading and missing-asset sensitivity. See the [build guide](../contributing/build-test-release.md#lazy-telemetry-release-boundary)
+for commands and evidence ownership. These checks do not infer construction from absent output:
+`sdk-construction-boundary.test.ts` intercepts actual SDK constructor calls through the production
+factory and positively activates the same sentinels in Enabled. Global-provider and
+lifecycle regressions remain independent evidence.

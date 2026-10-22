@@ -1,6 +1,9 @@
 export {
   BoundedDiagnosticAccumulator,
+  isTrustedProfileDiagnosticsSnapshot,
   type ProfileDiagnosticInput,
+  type ProfileDiagnosticsSnapshot,
+  type ProfileLossQuantityInput,
 } from "./diagnostic-accumulator.js";
 export {
   convertLocalMetrics,
@@ -15,6 +18,14 @@ export {
   type ProfileReportBuildInput,
   type ProfileSignalInput,
 } from "./profile-report-builder.js";
+export {
+  createFixedProfileReportFallback,
+  deriveCounterNumericAvailability,
+  deriveHistogramNumericAvailability,
+  deriveProfileSignalStatus,
+  deriveSpanNumericAvailability,
+  type ProfileSignalEvidence,
+} from "./profile-report-primitives.js";
 export {
   createWorkerTelemetrySessionForTest,
   WorkerTelemetrySession,

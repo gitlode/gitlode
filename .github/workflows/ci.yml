@@ -39,6 +39,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Typecheck system tooling
+        run: npm run typecheck:system
+
+      - name: Typecheck shared test support
+        run: npm run typecheck:test-support
+
       - name: Check architecture
         run: npm run architecture:check
 
@@ -58,4 +64,4 @@ jobs:
         run: npm run validate:publint -w gitlode
 
       - name: Run installed-package system test
-        run: npm run test:system:package -w gitlode
+        run: npm run test:system:package

@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 status: accepted_target
 
 report:
@@ -23,7 +23,7 @@ report:
   fields:
     schemaVersion:
       type: literal
-      value: 1
+      value: 2
     signalStatus:
       type: ProfileSignalStatusSet
     spans:
@@ -37,7 +37,9 @@ report:
       items: ProfileHistogramPoint
     diagnostics:
       type: array
-      items: ProfileDiagnostic
+      items:
+        - ProfileDiagnostic
+        - ProfileDiagnosticSummary
       maximum_items: 16
 
 types:
@@ -95,6 +97,11 @@ types:
       maxDurationSeconds:
         type: finite_nonnegative_number
         unit: s
+      durationContributionCount:
+        type: nonnegative_safe_integer
+      unavailableFields:
+        type: bounded_set
+        allowed: [calls, total, avg, max, errors]
       attributes:
         type: array
         items: ProfileSpanAttributeSummary
@@ -195,6 +202,9 @@ types:
         items: ProfileAttribute
       value:
         type: finite_nonnegative_number
+      unavailableFields:
+        type: bounded_set
+        allowed: [value]
     invariants:
       - attributes are sorted by key
     zero_semantics:
@@ -238,6 +248,9 @@ types:
       bucketCounts:
         type: array
         items: nonnegative_safe_integer
+      unavailableFields:
+        type: bounded_set
+        allowed: [samples, total, avg, min, max]
     invariants:
       - attributes are sorted by key
       - explicitBounds are strictly increasing
@@ -272,6 +285,9 @@ types:
       - a complete empty array means that collection succeeded and observed no values
       - a partial array may be empty
       - every partial or unavailable status has an explanatory diagnostic unless diagnostics themselves overflowed
+      - explanatory evidence is associated with the same signal kind through detailed signalCoverage or reserved-summary effectsByKind
+      - unavailable requires confirmed whole-result evidence for the kind or fixed-fallback delivery provenance with no supplied measurements
+      - lifecycle-only and report-only effects do not explain partial or unavailable signal status
 
   ProfileDiagnostic:
     fields:
@@ -295,20 +311,49 @@ types:
           - metric_collection
           - report_build
           - telemetry_shutdown
-      signal:
-        enum:
-          - spans
-          - counters
-          - histograms
-          - report
-          - telemetry
+      target:
+        type: ProfileTarget
+      signalCoverage:
+        type: bounded_set
+        allowed: [span, counter, histogram]
+      effects:
+        type: bounded_set
+        allowed:
+          - missing_observations
+          - incomplete_measurement_fields
+          - missing_attribute_detail
+          - unknown_collection_coverage
+          - lost_issue_detail
+          - report_delivery_failure
+          - lifecycle_notice
+      extent:
+        enum: [entire_target, unidentified_subset]
+      attributeKey:
+        type: ProfileAttributeKeySelector
+      affectedFields:
+        type: ProfileAffectedFields
+      detailLoss:
+        type: ProfileDetailLossMask
+      lossQuantity:
+        type:
+          - ProfileLossQuantity
+          - "null"
+      wholeResultUnavailable:
+        type: boolean
+        meaning: confirmed failure to obtain or safely supply the entire identified target result
       count:
         type: positive_safe_integer
+      countSaturated:
+        type: boolean
       message:
         type:
           - string
           - "null"
         maximum_utf16_code_units: 512
+      reportDelivery:
+        type:
+          - ProfileReportDeliveryProvenance
+          - "null"
     severity_policy:
       info:
         - span_group_overflow
@@ -331,9 +376,85 @@ types:
     deduplication_key:
       - code
       - stage
-      - signal
-      - message
+      - target
+      - signalCoverage
+      - effects
+      - extent
+      - attributeKey
+      - affectedFields
+      - detailLoss
+      - lossQuantity descriptor and unit
+      - wholeResultUnavailable
     deduplication_value: increment count
+    invariants:
+      - an observation or point target kind is included in signalCoverage
+      - every affectedFields kind is included in signalCoverage
+      - wholeResultUnavailable requires missing_observations or unknown_collection_coverage
+      - wholeResultUnavailable is target-scoped and does not by itself prove that every target of a covered kind is unavailable
+      - only an exact detailed report target with entire_target extent and wholeResultUnavailable proves signal-wide loss for its covered kinds
+      - report_delivery_failure is present if and only if fixed reportDelivery provenance is present
+
+  ProfileDiagnosticSummary:
+    fields:
+      code:
+        type: literal
+        value: diagnostic_overflow
+      signalCoverage:
+        type: bounded_set
+        allowed: [span, counter, histogram]
+      effectsByKind:
+        type: fixed_summary
+      reportEffects:
+        type: bounded_set
+      detailLoss:
+        type: ProfileDetailLossMask
+      omittedOccurrences:
+        type: nonnegative_safe_integer_or_null
+      maximumSeverity:
+        type: info_warning_or_null
+      priorIssueDetail:
+        enum: [retained, unavailable]
+    maximum_items: 1
+    invariants:
+      - signalCoverage contains exactly the unique kinds represented by effectsByKind
+      - wholeResultUnavailable in effectsByKind requires missing_observations or unknown_collection_coverage for that kind
+      - summarized wholeResultUnavailable is an existential union after target identity was discarded and cannot prove signal-wide loss
+      - reportEffects is report-wide evidence and does not explain an individual signal status
+      - report_delivery_failure is retained as the mandatory detailed provenance record and is not represented only by this summary
+
+  ProfileTarget:
+    variants: [report, scope, observation, point]
+    point_identity: [scope, kind, name, canonical_attributes]
+
+  ProfileAttributeKeySelector:
+    variants: [not_applicable, exact, discarded]
+
+  ProfileAffectedFields:
+    per_kind:
+      span: [calls, total, avg, max, errors]
+      counter: [value]
+      histogram: [samples, total, avg, min, max]
+
+  ProfileDetailLossMask:
+    fixed_members:
+      [pointAttributes, observationIdentity, scopeIdentity, attributeKey, affectedFields]
+
+  ProfileLossQuantity:
+    descriptors:
+      [
+        span_groups,
+        span_duration_contributions,
+        span_attribute_values,
+        metric_points,
+        observation_results,
+      ]
+    value: nonnegative_safe_integer_or_null
+    saturation: explicit
+
+  ProfileReportDeliveryProvenance:
+    path: fixed_fallback
+    measurementResults: [none, trusted_snapshot]
+    priorIssueDetail: [retained, unavailable]
 
 limits:
   span_groups:
@@ -361,7 +482,8 @@ limits:
       entries: 1
       purpose: diagnostic_overflow
     overflow_effect:
-      - increment the reserved diagnostic_overflow entry
+      - merge omitted evidence into the fixed diagnostic_overflow summary
+    structured_detail_maximum_utf16_code_units: 4096
 
 canonical_order:
   scope:
@@ -382,10 +504,7 @@ canonical_order:
     - value_type
     - canonical_value
   diagnostics:
-    - code
-    - stage
-    - signal
-    - message
+    - complete canonical diagnostic identity
   string_comparison: locale-independent code-unit order
 
 availability:
@@ -394,4 +513,5 @@ availability:
   initialized_empty_profile: report present with complete empty signal arrays
   finalization_partial_failure: report present with signal status and diagnostics
   telemetry_shutdown_failure: preserve already-built signal data and add a bounded diagnostic when possible
+  report_builder_failure: emit the fixed schema-2 fallback with empty measurement arrays, unavailable signals and report-delivery provenance
   application_failure: finalize telemetry but retain the current success-only rendering policy

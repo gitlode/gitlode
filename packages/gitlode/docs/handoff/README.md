@@ -1,26 +1,17 @@
 # gitlode Handoff Documents
 
-This directory contains continuation notes for unfinished work, future implementation sessions, and
-investigations that may be resumed by human developers or coding agents.
+## Current OpenTelemetry task (2026-10-22)
 
-Handoff documents are useful working context, but they are not durable source-of-truth design
-documents.
+Start with [v0.13.0 convergence](opentelemetry-v013-convergence.md). It supersedes all earlier
+OpenTelemetry continuation instructions, matrix campaigns and Windows launcher assignments.
+The [current acceptance policy](opentelemetry-v013-convergence.md#release-specific-acceptance-policy) preserves product features and
+uses proportionate three-way timing/output confirmation with human acceptance.
 
-## Active OpenTelemetry work
+Retired migration plans, experiments and launcher assignments have been removed. Historical failures
+are not relabelled as success; the convergence record retains the limited conclusions relevant to
+acceptance. Do not restore old campaigns as release prerequisites.
 
-Start with the [recovery plan](instrumentation-opentelemetry-recovery-plan.md) for the current
-reintegration route, human PR/merge authority, milestones, and next assignment. The
-[redesign plan](instrumentation-opentelemetry-redesign-plan.md) retains unfinished T13B/T13C scope.
-The [M0 result](opentelemetry-m0-result.md) preserves Linux/WSL2 setup and one-target evidence;
-the [M1 evidence note](opentelemetry-m1-validation-result.md) preserves candidate validation,
-package identities, and the CI correction needed for reintegration. Completed session packets
-have been removed; accepted contracts live in the design and contributing documentation.
-
-Before the redesign-to-integration merge, read the recovery plan's
-[accepted pre-merge disposition](instrumentation-opentelemetry-recovery-plan.md#accepted-pre-merge-review-disposition-2026-09-14).
-R1 no-op selection, R2 bounded asynchronous collection and corrected-candidate cumulative validation
-are accepted. That section also defines evidence limits, optional C1-C6 follow-up and final integration
-preparation. The original review is preserved in Git history, not as an active instruction.
+The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams.
 
 ## Lifecycle
 

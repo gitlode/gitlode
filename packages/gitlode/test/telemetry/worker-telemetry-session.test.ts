@@ -33,7 +33,20 @@ function hooks(failures: WorkerTelemetryTestHooks["failures"] = {}): {
 function lifecycle(
   report: NonNullable<Awaited<ReturnType<WorkerTelemetrySession["finalize"]>>["profileReport"]>,
 ) {
-  return report.diagnostics.filter((diagnostic) => diagnostic.code === "lifecycle_failure");
+  return report.diagnostics
+    .filter((diagnostic) => diagnostic.code === "lifecycle_failure")
+    .map((diagnostic) => ({
+      ...diagnostic,
+      signal: diagnostic.signalCoverage.includes("span")
+        ? "spans"
+        : diagnostic.signalCoverage.includes("counter")
+          ? "counters"
+          : diagnostic.signalCoverage.includes("histogram")
+            ? "histograms"
+            : diagnostic.stage === "telemetry_shutdown"
+              ? "telemetry"
+              : "report",
+    }));
 }
 
 function expectPlainCloneValues(value: unknown): void {
@@ -110,7 +123,7 @@ describe("WorkerTelemetrySession normal lifecycle", () => {
     expect(session.rootSpan.isRecording()).toBe(false);
     expect(finalized.applicationResult).toBe(applicationResult);
     expect(finalized.profileReport).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       signalStatus: { spans: "complete", counters: "complete", histograms: "complete" },
       counters: [],
       histograms: [],
@@ -287,6 +300,80 @@ describe("WorkerTelemetrySession initialization degradation", () => {
 });
 
 describe("WorkerTelemetrySession best-effort finalization", () => {
+  test("uses the fixed fallback exactly once after a real builder-body failure", async () => {
+    let unsafeReads = 0;
+    const thrownPayload = new Proxy(
+      {},
+      {
+        get() {
+          unsafeReads += 1;
+          throw new Error("unsafe payload read");
+        },
+      },
+    );
+    const { hooks: testHooks, attempts } = hooks({ report_builder_body: thrownPayload });
+    const session = await createWorkerTelemetrySessionForTest(testHooks);
+    const applicationResult = { kind: "success", identity: Symbol("result") };
+
+    const finalized = await session.finalize(applicationResult);
+
+    expect(finalized.applicationResult).toBe(applicationResult);
+    expect(finalized.profileReport).toMatchObject({
+      schemaVersion: 2,
+      signalStatus: { spans: "unavailable", counters: "unavailable", histograms: "unavailable" },
+      spans: [],
+      counters: [],
+      histograms: [],
+    });
+    expect(finalized.profileReport?.diagnostics[0]).toMatchObject({
+      stage: "report_build",
+      effects: ["report_delivery_failure"],
+      reportDelivery: { path: "fixed_fallback", measurementResults: "none" },
+    });
+    expect(attempts.filter((attempt) => attempt === "report_builder_body")).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt === "report_build")).toHaveLength(1);
+    expect(unsafeReads).toBe(0);
+    expect(structuredClone(finalized.profileReport)).toEqual(finalized.profileReport);
+  });
+
+  test("survives a broken diagnostic snapshot and retains simultaneous shutdown evidence", async () => {
+    const { hooks: testHooks, attempts } = hooks({
+      report_builder_body: new Error("builder failed"),
+      diagnostic_snapshot: new Error("snapshot failed"),
+      telemetry_shutdown: new Error("shutdown failed"),
+      trace_provider_shutdown: new Error("trace shutdown failed"),
+    });
+    const session = await createWorkerTelemetrySessionForTest(testHooks);
+
+    const finalized = await session.finalize("application-result");
+    const report = finalized.profileReport!;
+
+    expect(finalized.applicationResult).toBe("application-result");
+    expect(report.signalStatus).toEqual({
+      spans: "unavailable",
+      counters: "unavailable",
+      histograms: "unavailable",
+    });
+    expect(report.diagnostics).toContainEqual(
+      expect.objectContaining({
+        stage: "telemetry_shutdown",
+        effects: ["lifecycle_notice"],
+        count: 2,
+      }),
+    );
+    expect(report.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "diagnostic_overflow",
+        priorIssueDetail: "unavailable",
+        omittedOccurrences: null,
+      }),
+    );
+    expect(report.diagnostics[0]).toMatchObject({
+      reportDelivery: { priorIssueDetail: "unavailable" },
+    });
+    expect(attempts.filter((attempt) => attempt === "diagnostic_snapshot")).toHaveLength(2);
+  });
+
   test("collects a normally completing unlisted plugin observable", async () => {
     const { hooks: testHooks, attempts } = hooks();
     const session = await createWorkerTelemetrySessionForTest({

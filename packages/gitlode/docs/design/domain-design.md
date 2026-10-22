@@ -230,7 +230,7 @@ of this design. See [`telemetry.md`](telemetry.md).
 The pre-migration `internal-foundation/instrumentation` source was a transitional custom API, not the
 target domain described here. Production owners now use explicit OpenTelemetry composition and the
 source/export has been removed.
-removed. `otel-support` is distinct from that legacy domain and must not acquire gitlode-specific
+`otel-support` is distinct from that legacy domain and must not acquire gitlode-specific
 observation names.
 
 ### 2.5 `dag`
@@ -413,7 +413,10 @@ protects a concrete consumer from implementation dependencies.
   finalization.
 - Excludes CLI parsing, extraction policy, concrete presentation, adapter internals, and
   configuration-document schema.
-- Acts as the application composition boundary for one run.
+- Acts as the application composition boundary for one run. Its telemetry owner, API no-op backend
+  and type-only contract remain SDK-free; enabled composition is a guarded lazy same-domain module.
+  Collectors/report builders stay behind that module in product execution. This introduces no domain,
+  package or public backend extension. See [telemetry design](telemetry.md#worker-telemetry-session).
 
 ### 2.22 Allowed domain dependencies
 
@@ -796,3 +799,20 @@ compare them in both directions: every accepted dependency must be representable
 configuration must not grant dependencies absent from this document. Reviews must also preserve
 charter constraints that the dependency graph does not express directly, especially that
 `type-utils` has no external dependencies and emits no runtime code.
+
+## Private system workspace
+
+The private `@gitlode/system-tests` workspace at `tests/system` owns installed CLI, worker,
+schema and public API regression tooling outside the production dependency envelope. It has only
+development tooling dependencies, no production exports, and no product build edge. Its checked
+scripts import local helpers and Node built-ins only. They consume the packed installation rather
+than product source, tests, dist modules or private exports.
+
+Filesystem exceptions are reading the product manifest, running npm pack in `packages/gitlode`,
+and inspecting installed schemas, runtime assets, package identities, guard traces, worker result messages
+and public `dist/plugin-api.d.ts`. Preloads observe built-in Node loader/worker boundaries and never
+import private product modules. Generated consumers import
+only installed `gitlode/plugin-api`. Collector/internal-access tests remain package-owned.
+The root Rev-dep system boundary allows only `tests/system/scripts/**`; the workspace rule checks
+circular/unresolved imports and declared tooling binaries without following product packages.
+Filesystem accesses and generated consumer text require review beyond static import enforcement.

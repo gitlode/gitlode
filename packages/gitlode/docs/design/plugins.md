@@ -108,7 +108,11 @@ type PluginInitResult = { type: "ready" } | { type: "fatal"; message: string };
 
 `init(runtime)` is required. The runtime context carries plugin-scoped diagnostics (`warn`,
 `error`) and plugin-scoped OpenTelemetry API `Tracer` and `Meter` values. These values are always
-present; they use no-op behavior when profiling is disabled. If `init(runtime)` returns
+present; Disabled and initialization-Degraded use API no-op behavior isolated from unrelated global
+providers. The session root has invalid trace/span IDs; a no-op child with an explicit valid parent
+can preserve the parent's context without recording. Plugins must not use disabled root identity for
+correlation. No manager is installed in these states, so automatic async propagation requires an
+existing compatible context manager. See [telemetry semantics](telemetry.md#worker-telemetry-session). If `init(runtime)` returns
 `{ type: "fatal" }` or throws, the run aborts with exit code 1 before any extraction begins.
 Multiple plugin failures are all reported before exiting.
 

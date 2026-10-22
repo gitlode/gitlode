@@ -52,16 +52,21 @@ function makeScheduler(): Scheduler & { cancelCount: number } {
 }
 
 const plainStyling: Styling = {
-  spinnerGlyph: (text) => text,
-  doneMarker: (text) => text,
-  stageLabel: (text) => text,
-  summaryHeader: (text) => text,
-  warnBadge: (text) => text,
-  errorBadge: (text) => text,
-  fieldKey: (text) => text,
-  primaryValue: (text) => text,
-  unitSuffix: (text) => text,
-  refsValue: (text) => text,
+  active: (text) => text,
+  success: (text) => text,
+  label: (text) => text,
+  h1: (text) => text,
+  h2: (text) => text,
+  h3: (text) => text,
+  h4: (text) => text,
+  warning: (text) => text,
+  error: (text) => text,
+  fieldLabel: (text) => text,
+  attributeName: (text) => text,
+  value: (text) => text,
+  unit: (text) => text,
+  reference: (text) => text,
+  separator: (text) => text,
 };
 
 describe("presentation normalizeUnknownError", () => {
@@ -169,5 +174,53 @@ describe("presentation createRunPresenter", () => {
 
     expect(sink.records[0]).toEqual({ type: "newline" });
     expect(sink.records[1]).toEqual({ type: "writeLine", text: "Extraction complete" });
+  });
+});
+
+describe("Profile progress boundary", () => {
+  it("leaves active progress untouched for an empty report and closes it before the first Profile line", () => {
+    const sink = makeSink();
+    const presenter = createRunPresenter({
+      sink,
+      clock: makeClock(1000),
+      scheduler: makeScheduler(),
+      uiMode: "tty-interactive",
+      styling: plainStyling,
+    });
+    const report = {
+      schemaVersion: 2 as const,
+      signalStatus: {
+        spans: "complete" as const,
+        counters: "complete" as const,
+        histograms: "complete" as const,
+      },
+      spans: [],
+      counters: [],
+      histograms: [],
+      diagnostics: [],
+    };
+    presenter.handleProgressEvent({ type: "phase-start", phase: "extracting" });
+    const before = [...sink.records];
+    presenter.renderProfile(report);
+    expect(sink.records).toEqual(before);
+    presenter.renderProfile({
+      ...report,
+      counters: [
+        {
+          scope: { name: "example", version: null },
+          name: "work.count",
+          value: 1,
+          unit: "{operation}",
+          unavailableFields: [],
+          attributes: [],
+        },
+      ],
+    });
+    expect(sink.records.slice(before.length, before.length + 3)).toEqual([
+      { type: "newline" },
+      { type: "newline" },
+      { type: "writeLine", text: "Profile" },
+    ]);
+    expect(sink.records.filter((record) => record.type === "rewriteLine")).toHaveLength(1);
   });
 });

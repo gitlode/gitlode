@@ -28,7 +28,9 @@ The [earlier performance protocol](telemetry-performance.md) and its catalog des
 their matrix, calibration, RSS and aggregation requirements are not current v0.13.0 release conditions.
 An independent sibling benchmark repository is a separate task and is not a release prerequisite.
 
-The human owns acceptance and PR approval/merge. This policy does not authorize publication. The
-existing migration publish validator still enforces the old record schema until explicitly changed;
-do not fabricate an accepted schema-1 record to represent this new policy. Its transition is tracked
-in the [convergence task](../handoff/opentelemetry-v013-convergence.md).
+The human owns acceptance and PR approval/merge. On 2026-10-22, the human accepted the bounded
+comparison of candidate `d6dc7e03a99e29a47d0f35b33df489f0eaf87759` and authorized retirement of
+the temporary migration publish gate. Its validator, dedicated tests/typecheck and blocked record
+are removed without replacement. Ordinary release and package checks remain. This acceptance does
+not authorize publication or claim unmeasured workloads are verified. The
+[convergence record](../handoff/opentelemetry-v013-convergence.md) retains results and limitations.

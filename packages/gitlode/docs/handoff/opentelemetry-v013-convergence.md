@@ -37,29 +37,24 @@ installed-package checks, while no longer requiring the legacy infrastructure pr
 assertions and historical evidence remain intact. Product regressions using shared performance
 helpers remain included; this is a policy change, not evidence that retired checks passed.
 
-The supported publish command currently requires the old migration validator and a blocked schema-1
-record. **Human-approved transition:** keep publication blocked during convergence;
-after explicit acceptance of the actual candidate, retire the temporary migration-only validator,
-its dedicated tests/record and command wiring in a reviewed change. Preserve ordinary release checks
-and human publication authority. No replacement migration validator will be built.
+## Current state and next step
 
-## Next bounded steps
+On 2026-10-22, the human explicitly accepted the comparison below and authorized removal of the
+migration-only publish gate. The validator, dedicated tsconfig/tests, blocked record and script
+wiring are removed. No replacement validator is introduced. Ordinary `validate:release`, release
+workflow, package checks and human PR/merge/publication authority are preserved. Shared performance
+target definitions remain because the optional historical harness still consumes them.
 
-1. Normal validation routing is updated. Keep the publish block until human candidate acceptance.
-2. Select one available real repository and equivalent extraction settings. Propose a small fixed run
-   count, elapsed-time boundary and straightforward JSONL comparison before executing. Do not require
-   calibration, prescribed 10–30-second workloads or a multi-OS campaign. Record time as observations,
-   not an invented pass/fail threshold. Avoid frequent agent polling through a long workload.
-3. Build/check the actual candidate once using applicable ordinary tests and installed-package checks;
-   reuse matching evidence rather than mechanically repeating all campaigns. Any unexpected failure
-   receives a bounded assessment of product risk versus further cost.
-4. Present three-way times, output equivalence scope, functional/profile checks and remaining limits
-   for human acceptance. Then apply the chosen gate transition and prepare the human-reviewed PR.
+Next: verify this narrow retirement change and prepare a source/base-specific PR proposal for human
+authorization. No PR, merge or release is authorized by candidate acceptance. Historical evidence and
+local assets remain untouched.
 
-Use this Trunk for the short policy/routing decisions. Delegate a coherent implementation or review
-only when it reduces context or provides useful independent scrutiny; do not create a session per
-minor step. The bounded comparison below is complete. Human candidate acceptance is pending; the
-publish block remains in place. No asset deletion or historical performance campaign was performed.
+Retirement verification: manifest comparison permits only the publish primitive change and removal
+of the two dedicated validator scripts; `release` and `validate:release` are unchanged. Vitest
+discovery changed from 88 to 87 files, with exactly the retired gate suite removed and every other
+file/project identity retained. Format write/check and whitespace checks passed. No publishing
+command was executed. Product code, lockfile and release workflow were not changed; the prior
+candidate CI remains applicable product/package evidence, not a claim of CI on this new commit.
 
 ## Historical references
 
@@ -130,5 +125,5 @@ to human judgment. The absolute increase is about 0.106 seconds disabled and 0.3
 It does not establish large-repository, per-file, plugin, git-cli, cold-cache, cross-platform or memory
 behavior. Existing product/package CI supplements, but does not expand, the empirical scope.
 Historical F RSS failure and F2 first-target result retain their original meanings.
-After human acceptance, retire the migration-only gate; do not launch extra calibration to seek a
+Human acceptance was subsequently given and the migration-only gate is retired; do not launch extra calibration to seek a
 more favorable percentage. PR approval/merge and release remain human-controlled.

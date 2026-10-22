@@ -71,4 +71,4 @@ When changing behavior, update the documentation for every affected audience:
 Product work starts with [architecture](design/architecture.md), [domain ownership](design/domain-design.md)
 and [build/test guidance](contributing/build-test-release.md). Telemetry work starts with
 [recording/collection contracts](design/telemetry.md) and [verification](design/telemetry-verification.md).
-Release-specific empirical acceptance follows [the v0.13.0 policy](design/telemetry-v013-acceptance.md).
+Empirical comparisons follow the [contributor guidance](contributing/build-test-release.md#empirical-comparisons).

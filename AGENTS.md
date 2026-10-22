@@ -98,8 +98,7 @@ Read:
    and equivalence verification
 3. `packages/gitlode/docs/design/architecture.md` and `packages/gitlode/docs/design/domain-design.md`
    when instrumentation boundaries are affected
-4. `packages/gitlode/docs/design/telemetry-v013-acceptance.md` for the release-specific
-   empirical acceptance scope
+4. `packages/gitlode/docs/contributing/build-test-release.md` for empirical comparison guidance
 5. `packages/gitlode/docs/profiling.md` for user-visible profile-report interpretation
 6. `packages/gitlode/docs/contributing/build-test-release.md` when publish policy is affected
 7. Relevant notes in `packages/gitlode/docs/handoff/` only when continuing unfinished work

@@ -289,11 +289,6 @@ not rely on undeclared root development dependencies, while the domain rules doc
 
 ## CI and publish gates
 
-For v0.13.0, use the [2026-10-22 acceptance policy](../design/telemetry-v013-acceptance.md).
-The human accepted the bounded actual-candidate comparison on 2026-10-22 and authorized removal of
-the temporary telemetry migration gate. Historical schema-1 attestations are not current release
-requirements; no replacement migration validator is installed.
-
 CI runs source validation and then exercises the release pipeline as explicit steps: development
 build, generated-artifact checks, source tests, release build, packed metadata validation, and the
 installed-package system test. Coverage is intentionally absent.
@@ -311,20 +306,18 @@ The supported release command remains `npm run release`: it runs `validate:relea
 `changeset:publish` (`changeset publish`). The Changesets Action uses this same callback.
 `changeset:publish` itself is the publishing primitive, not a validation command. Do not invoke either
 publishing command as a verification step. Repository review rules and npm Trusted Publishing remain
-the publication authority boundary. Candidate acceptance and gate removal do not authorize an agent
+the publication authority boundary. Candidate acceptance does not authorize an agent
 to publish, approve or merge a PR.
 
-The former migration validator, its dedicated typecheck/tests and blocked record have been removed.
-Historical evidence remains in Git and existing archives; removal does not convert historical failures
-into passes. Ordinary product, release-boundary and installed-package checks remain required.
+Ordinary product, release-boundary and installed-package checks remain required.
 
 ### Lazy telemetry release boundary
 
 The [telemetry verification contract](../design/telemetry-verification.md#failure-injection) requires
 independent emitted graph, host/worker runtime load and packed dynamic asset checks for the SDK-free
 disabled path. Shared chunks and external transitive dependencies count toward the static closure of
-all three stable entries. Packed enabled execution must positively produce a report, and aggregation
-child bundles must retain dynamic targets. Source-only D1 tests do not discharge these obligations;
+all three stable entries. Packed enabled execution must positively produce a report and load the
+emitted lazy assets. Source tests alone do not verify the installed-package boundary.
 The release build runs `typecheck:release-boundary` and a product-owned tsdown metadata verifier
 (`scripts/tooling/release-telemetry-boundary.ts`). It follows static chunk edges for each stable entry,
 checks module ownership and conservatively follows declared external dependency identities. Lazy
@@ -369,7 +362,7 @@ The consumer installs the actual tarball and `typescript@^7.0.2`; registry acces
 version are execution inputs. Public consumer typing uses skipLibCheck false. The private workspace
 has no build/publish script or production entry points. It is outside product `files: [dist, schemas]`;
 exports, bin, bundler inputs and runtime dependencies remain unchanged. Workspace-wide source tests
-do not invoke packaging. The migration-only publish gate has been retired following human acceptance.
+do not invoke packaging.
 
 ## Shared product test support
 
@@ -380,3 +373,20 @@ The installed-package boundary in `tests/system` and normal product tests remain
 
 Run `npm run typecheck:test-support` for the independent strict, no-emit check of these helpers.
 It is included in CI and `validate:release`, with no dependency on generated product declarations.
+
+## Empirical comparisons
+
+Keep timing and resource conclusions tied to the actual candidate, dependencies, input, extraction
+settings and environment. Report absolute values as well as relative differences, preserve failed
+attempts, and distinguish measurement validity from the release owner's acceptance decision. A
+successful rerun does not explain an earlier failure. Scope the work to a concrete product question;
+reassess its value before expanding verification infrastructure.
+
+Compare JSONL content when feasible. Counts or file sizes alone do not prove content equality.
+Functional/package checks do not establish performance across unmeasured workloads or operating
+systems. Release-specific choices and outcomes belong in task coordination records, not product
+design contracts.
+
+For test repositories, Git maintenance defaults can change across Git versions. Process exit alone
+does not prove all descendants have stopped; retain uncertain roots rather than deleting possibly
+active data. These cautions do not require a particular benchmark or launcher implementation.

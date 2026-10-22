@@ -182,9 +182,8 @@ decision changes them.
 ## Execution tiers
 
 Catalog, unit, fault-injection, owner-integration, deterministic repository, worker transport,
-presentation, and normal repository checks run in CI. Release-specific empirical confirmation
-follows [`telemetry-v013-acceptance.md`](telemetry-v013-acceptance.md); the retired migration
-performance infrastructure is not a product verification requirement.
+presentation, and normal repository checks run in CI. Empirical performance comparisons are distinct
+from these functional checks; see the [contributor guidance](../contributing/build-test-release.md#empirical-comparisons).
 
 ## Contributor routes and test ownership
 
@@ -193,7 +192,7 @@ Collection work follows execution session/report/SDK boundaries with real-provid
 and transport tests. Collector/internal-access tests remain with implementation owners. The private
 system workspace checks installed CLI/worker/schema/public API through the package contract and grants
 no internal import exception. The [build guide](../contributing/build-test-release.md) owns commands
-and runner typing. Performance checks follow [performance policy](telemetry-v013-acceptance.md) separately.
+and runner typing. Empirical comparisons are scoped separately from product regression coverage.
 
 ## Release SDK boundary execution
 
@@ -203,5 +202,5 @@ actual CLI/worker ESM and CommonJS guards, SDK denial, positive Enabled observat
 loading and missing-asset sensitivity. See the [build guide](../contributing/build-test-release.md#lazy-telemetry-release-boundary)
 for commands and evidence ownership. These checks do not infer construction from absent output:
 `sdk-construction-boundary.test.ts` intercepts actual SDK constructor calls through the production
-factory and positively activates the same sentinels in Enabled. Existing D1 global-provider and
+factory and positively activates the same sentinels in Enabled. Global-provider and
 lifecycle regressions remain independent evidence.

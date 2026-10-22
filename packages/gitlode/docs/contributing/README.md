@@ -17,6 +17,6 @@ and coding agents need while changing the codebase.
 For normal telemetry verification, start with
 [`../design/telemetry-verification.md`](../design/telemetry-verification.md) and run the applicable
 repository checks described in [`build-test-release.md`](build-test-release.md). Empirical acceptance
-follows [`../design/telemetry-v013-acceptance.md`](../design/telemetry-v013-acceptance.md). Changes to publish policy
+follows [empirical comparison guidance](build-test-release.md#empirical-comparisons). Changes to publish policy
 start with [`build-test-release.md`](build-test-release.md); migration acceptance and empirical
 evidence are separate from the functional and package validation performed by `validate:release`.

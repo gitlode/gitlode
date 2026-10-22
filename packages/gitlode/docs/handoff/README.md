@@ -4,7 +4,7 @@
 
 Start with [v0.13.0 convergence](opentelemetry-v013-convergence.md). It supersedes all earlier
 OpenTelemetry continuation instructions, matrix campaigns and Windows launcher assignments.
-The [current acceptance policy](../design/telemetry-v013-acceptance.md) preserves product features and
+The [current acceptance policy](opentelemetry-v013-convergence.md#release-specific-acceptance-policy) preserves product features and
 uses proportionate three-way timing/output confirmation with human acceptance.
 
 Retired migration plans, experiments and launcher assignments have been removed. Historical failures

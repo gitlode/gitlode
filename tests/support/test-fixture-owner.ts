@@ -21,7 +21,12 @@ async function windowsProcesses(): Promise<ProcessRow[]> {
   return JSON.parse(stdout) as ProcessRow[];
 }
 
-/** Only these fixture tests opt into this lifetime; no process or root registry is global. */
+/**
+ * Owns temporary roots and pending Git operations for product behavioral regressions.
+ * Retained after removal of the performance harness; not the standalone Windows Job launcher.
+ * Remove only when callers have equivalent cancellation, settlement and uncertain-root retention.
+ * Process-tree observation is best-effort, not proof that every Windows descendant is contained.
+ */
 export class TestFixtureOwner implements FixtureWorkOwner {
   private readonly controller = new AbortController();
   readonly signal = this.controller.signal;

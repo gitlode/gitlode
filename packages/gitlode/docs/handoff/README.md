@@ -7,9 +7,9 @@ OpenTelemetry continuation instructions, matrix campaigns and Windows launcher a
 The [current acceptance policy](../design/telemetry-v013-acceptance.md) preserves product features and
 uses proportionate three-way timing/output confirmation with human acceptance.
 
-The [suspended disabled matrix](opentelemetry-m2-disabled-matrix.md) and earlier notes remain historical
-references. Their failures are not relabelled as success, and their unfinished steps are not automatic
-release prerequisites. No old campaign should be resumed from its handoff alone.
+Retired migration plans, experiments and launcher assignments have been removed. Historical failures
+are not relabelled as success; the convergence record retains the limited conclusions relevant to
+acceptance. Do not restore old campaigns as release prerequisites.
 
 The Git CLI adapter plan and deferred test-code typechecking note are separate workstreams.
 

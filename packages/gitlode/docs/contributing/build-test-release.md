@@ -1,9 +1,5 @@
 # Build, Test, and Release Validation
 
-The unfinished test-only Windows boundary is documented separately in
-[Standalone Windows launcher](windows-standalone-launcher.md); it is not integrated into fixture
-helpers and its first Stage B runtime validation failed.
-
 ## Purpose and scope
 
 This document is the canonical contributor guide for TypeScript projects, development builds,
@@ -90,8 +86,8 @@ the supported resource policy for the ordinary root `npm test`, including its un
 deadlines and assertions. Linux retains Vitest's existing defaults. Explicit CLI `--maxWorkers`
 overrides still take precedence; running a workspace independently uses that workspace's own config.
 The Windows cap does not establish that unrestricted concurrency or historical timeout/EBUSY
-failures were repaired. Test cancellation and disposal ownership are checked separately through
-the [fixture tooling boundary](telemetry-performance-harness.md#optional-test-fixture-ownership).
+failures were repaired. Shared fixture ownership helpers remain for product behavioral regressions; see
+the [test layout guide](../../../../tests/README.md) for their purpose and retirement condition.
 
 ### Windows with Volta: invocation-local executable setup
 
@@ -373,23 +369,14 @@ The consumer installs the actual tarball and `typescript@^7.0.2`; registry acces
 version are execution inputs. Public consumer typing uses skipLibCheck false. The private workspace
 has no build/publish script or production entry points. It is outside product `files: [dist, schemas]`;
 exports, bin, bundler inputs and runtime dependencies remain unchanged. Workspace-wide source tests
-do not invoke packaging. Migration publish enforcement remains unchanged.
+do not invoke packaging. The migration-only publish gate has been retired following human acceptance.
 
-## Performance verification workspace
+## Shared product test support
 
-Performance tooling and its dedicated tests belong to private `tests/performance`; shared Node-only
-fixture helpers belong to `tests/support`. See the [layout guide](../../../../tests/README.md).
-Root test discovery covers product projects only. Legacy performance infrastructure remains available
-through explicit `npm run test:performance` and `npm run typecheck:performance`; CI and
-`validate:release` do not require those checks. Product tests that consume shared verification helpers
-remain included. The installed-package boundary in `tests/system` is unchanged.
+`tests/support` contains Node-only deterministic repository, behavioral comparison and fixture
+ownership helpers used by product regressions. See the [layout guide](../../../../tests/README.md).
+The former performance workspace, its commands and standalone Windows launcher have been retired.
+The installed-package boundary in `tests/system` and normal product tests remain.
 
-The performance workspace's `typecheck` command first runs the existing internal-contracts
-development build. Its TypeScript project reference also builds internal-foundation, whose generated
-package exports are required by the checker. This prerequisite belongs to the workspace command so
-direct invocation works before a root development build has generated dist.
-
-Unused-export analysis for gitlode and the shared verification consumers runs on the root graph,
-so moving a consumer to another workspace does not make a used export appear dead. The existing
-entrypoint exemptions are retained; other workspace checks and product/installed-package import
-boundaries remain enforced.
+Run `npm run typecheck:test-support` for the independent strict, no-emit check of these helpers.
+It is included in CI and `validate:release`, with no dependency on generated product declarations.

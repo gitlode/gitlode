@@ -24,8 +24,8 @@ Existing evidence may be reused where applicable, with its limitations stated. A
 output check does not establish unmeasured memory behavior, all workloads or all operating systems.
 
 Historical first-target passes, RSS failures and incomplete calibrations keep their original meaning.
-The [earlier performance protocol](telemetry-performance.md) and its catalog describe those results;
-their matrix, calibration, RSS and aggregation requirements are not current v0.13.0 release conditions.
+The earlier performance protocol and its catalog were retired with their infrastructure; historical
+matrix, calibration, RSS and aggregation requirements are not current v0.13.0 release conditions.
 An independent sibling benchmark repository is a separate task and is not a release prerequisite.
 
 The human owns acceptance and PR approval/merge. On 2026-10-22, the human accepted the bounded
@@ -34,3 +34,12 @@ the temporary migration publish gate. Its validator, dedicated tests/typecheck a
 are removed without replacement. Ordinary release and package checks remain. This acceptance does
 not authorize publication or claim unmeasured workloads are verified. The
 [convergence record](../handoff/opentelemetry-v013-convergence.md) retains results and limitations.
+
+## Verification lessons retained after retirement
+
+Keep performance conclusions tied to the actual input, candidate, dependencies and environment.
+A successful rerun does not explain an earlier failure. Treat measurement validity separately from
+performance acceptance, and stop when investigation cost exceeds the product decision it supports.
+For repository fixtures, process exit alone does not prove all descendants have stopped; preserve
+uncertain roots instead of deleting potentially active data. Git maintenance defaults can change
+fixture behavior across Git versions. None of these lessons requires restoring the retired harness.

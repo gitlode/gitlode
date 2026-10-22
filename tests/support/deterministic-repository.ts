@@ -1,3 +1,5 @@
+// Five-commit fixture for product traversal/profile-equivalence and worker fallback regressions.
+// Keep until those tests use an equivalent deterministic history; no calibration is performed.
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 

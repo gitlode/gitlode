@@ -91,11 +91,6 @@ the fixed kind-universe cardinality without input-proportional traversal. This b
 preprocessing after the caller supplies the array, not the caller's cost to allocate or populate that
 untrusted input.
 
-Repository performance workflow tests use the same development-only sidecar orchestration as the
-formal workflow. They require a `target_on` report, classify missing or malformed reports as
-inconclusive, propagate report-size, prohibited-span, diagnostic, and signal-status outcomes to the
-top-level evaluation, and keep timed CLI output/checkpoints separate from sidecar artifacts.
-
 ## Bounded collection
 
 Every collection limit is tested immediately below, at, and above its boundary. Bounded streaming
@@ -132,8 +127,7 @@ preservation. The real development worker builder-failure seam must respect requ
 Source evidence is not emitted/installed boundary acceptance. Release verification must separately
 check static transitive closures of all three entries (including shared chunks, external SDK closure
 and collector/report ownership), real host and worker ESM/CommonJS load guards, constructor guards,
-packed enabled-chunk positive behavior and disposable negative sensitivity. Aggregation-child assets
-must include every dynamic target. Installed disabled behavior must succeed under SDK denial; enabled
+packed enabled-chunk positive behavior and disposable negative sensitivity. Installed disabled behavior must succeed under SDK denial; enabled
 must normally produce a valid report, and removing a required chunk must fail that positive assertion.
 These independent checks are required regardless of source-session results; functional boundary
 validation does not establish performance acceptance.
@@ -188,10 +182,9 @@ decision changes them.
 ## Execution tiers
 
 Catalog, unit, fault-injection, owner-integration, deterministic repository, worker transport,
-presentation, and normal repository checks run in CI. Representative large-repository timing,
-memory, trace-volume, and profile on/off comparisons run explicitly during the final consolidation
-phase using the method and thresholds in
-[`telemetry-performance.md`](telemetry-performance.md).
+presentation, and normal repository checks run in CI. Release-specific empirical confirmation
+follows [`telemetry-v013-acceptance.md`](telemetry-v013-acceptance.md); the retired migration
+performance infrastructure is not a product verification requirement.
 
 ## Contributor routes and test ownership
 
@@ -200,7 +193,7 @@ Collection work follows execution session/report/SDK boundaries with real-provid
 and transport tests. Collector/internal-access tests remain with implementation owners. The private
 system workspace checks installed CLI/worker/schema/public API through the package contract and grants
 no internal import exception. The [build guide](../contributing/build-test-release.md) owns commands
-and runner typing. Performance checks follow [performance policy](telemetry-performance.md) separately.
+and runner typing. Performance checks follow [performance policy](telemetry-v013-acceptance.md) separately.
 
 ## Release SDK boundary execution
 
@@ -212,8 +205,3 @@ for commands and evidence ownership. These checks do not infer construction from
 `sdk-construction-boundary.test.ts` intercepts actual SDK constructor calls through the production
 factory and positively activates the same sentinels in Enabled. Existing D1 global-provider and
 lifecycle regressions remain independent evidence.
-
-`aggregation-child.test.ts` uses the existing builder, reconstructs its sorted filename/byte identity
-inventory, resolves the emitted static/lazy graph with the existing bundler, and invokes a small
-Enabled/Disabled child. Every resolved local module must belong to that inventory. This functional
-asset check is separate from N/4N and starts no performance campaign.

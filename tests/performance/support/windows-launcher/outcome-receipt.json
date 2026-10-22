@@ -1,7 +1,0 @@
-﻿{
-  "entries": 62,
-  "archiveHash": "4fc01b2773ce343e43e486eceeebbbc54ff9e335d4b602a52928769f08a4482e",
-  "files": 56,
-  "mismatches": [],
-  "initialVerifierFailure": "Forward slash zip prefix rejected; corrected native backslash entry lookup only"
-}

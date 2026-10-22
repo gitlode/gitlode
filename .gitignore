@@ -5,6 +5,3 @@ dist/
 out/
 *.jsonl
 *.tmp
-
-packages/gitlode/.benchmark-artifacts/
-tests/performance/.benchmark-artifacts/

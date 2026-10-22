@@ -28,43 +28,78 @@ continuations. Do not resume the suspended matrix or build the sibling benchmark
 
 Keep product functionality, SDK-free disabled behavior, schema-v2 reports, presentation and existing
 product regressions. Keep installed-package validation. No product rollback is currently justified.
-Leave old verification code, branches and local evidence in place initially; do not turn cleanup into
-a prerequisite or silently delete assets. Do not export them to a new benchmark project.
-
-Legacy `tests/performance` verification is now explicit opt-in through `npm run test:performance`
-and `npm run typecheck:performance`. Root Vitest, CI and `validate:release` retain product tests and
-installed-package checks, while no longer requiring the legacy infrastructure project. Its source,
-assertions and historical evidence remain intact. Product regressions using shared performance
-helpers remain included; this is a policy change, not evidence that retired checks passed.
+The human approved retirement of obsolete verification code, local originals and old archive/work
+branches. Keep only shared support required by product regressions, with its purpose and removal
+condition documented. Do not migrate old assets into a successor benchmark project.
 
 ## Current state and next step
 
 On 2026-10-22, the human explicitly accepted the comparison below and authorized removal of the
 migration-only publish gate. The validator, dedicated tsconfig/tests, blocked record and script
 wiring are removed. No replacement validator is introduced. Ordinary `validate:release`, release
-workflow, package checks and human PR/merge/publication authority are preserved. Shared performance
-target definitions remain because the optional historical harness still consumes them.
+workflow, package checks and human PR/merge/publication authority are preserved. The obsolete performance workspace and its dedicated targets/tooling are being retired.
 
-Next: verify this narrow retirement change and prepare a source/base-specific PR proposal for human
-authorization. No PR, merge or release is authorized by candidate acceptance. Historical evidence and
-local assets remain untouched.
+Next: finish verification of the cleanup below and prepare a source/base-specific PR proposal.
+No PR, merge or release is authorized by acceptance.
 
-Retirement verification: manifest comparison permits only the publish primitive change and removal
+## Obsolete-asset cleanup — 2026-10-22
+
+The human authorized discarding old originals and archive/work branches without successor backups.
+Removed the performance workspace (65 tracked files), its scripts/configuration/dependency entries,
+dedicated source-revision tooling, historical performance catalog/guides, launcher code/receipts and
+obsolete handoffs/diagnosis assets. No `packages/*/src` changed. Product SDK closure checks and
+installed-package validation remain. Release checkout no longer needs full history for the removed
+migration validator. Product dependencies retain their resolved versions.
+
+The worker fallback regression now directly uses the identical five-commit deterministic fixture.
+Collector regressions retain values/status/diagnostic/rendering assertions and use product schema
+normalization instead of the retired formal performance evaluator. Four shared helpers remain for
+product regressions with purpose/removal-condition comments. Their independent strict check is
+`npm run typecheck:test-support`, included in CI and `validate:release`.
+
+Local retirement completed: 38 entries under `D:/gitlode_test`, the approximately 27 GiB Linux
+`/home/t-wakabayashi/gitlode-performance` tree, six old Linux temporary roots, 197 obsolete repository
+cache entries and 108 Windows temporary roots. Sealed Linux directories initially rejected deletion;
+owner write permission was restored only within the approved tree, then removal succeeded. No
+measurement process was stopped. Current accepted three-way outputs and development build cache remain.
+
+Removed 13 old `archive/otel*` branches and the disabled-matrix, f2-first-target and test-layout work
+branches from local and remote, using exact remote OID leases. Retain convergence, fixture and M2 until
+their human-owned integration is complete. Main/integration and release tags were not changed. Git
+history was not rewritten or garbage-collected; deleted branch details are not promised recoverable.
+
+Two Windows TEMP directories have uncertain task provenance and remain pending human disposition:
+`gitlode-phase4-50d899b48ddd41d9af8e11b9abbf3f57` and
+`gitlode-rev-dep-eval-8e4be88d61234a6bae24e43d4068dff4`.
+Existing `gitlode-session-*` roots belong to the retained product Git CLI session tests, not the
+retired performance harness; ordinary node_modules/coverage/build output are also outside this purge.
+
+Independent code/config review found no blocker. Before workspace removal, the affected three product
+suites passed 60 tests; strict shared-support typing passed. Lint and release-boundary typing passed.
+Architecture initially saw stale release chunks in development dist; regenerating development output
+resolved this without source changes. It passed with the existing config warning (zero errors).
+
+Final Windows `validate:release` passed: 86 product test files / 1,157 tests, no skips; release build,
+publint and installed CLI/worker/both adapters/line diff/dynamic plugin/schema/TypeScript consumer all
+passed. Format write/check and diff checks passed. No performance measurement or Windows launcher
+campaign was restarted. The removal was reviewed independently of its code/config implementation.
+
+Historical gate-removal verification (before infrastructure retirement): manifest comparison permits only the publish primitive change and removal
 of the two dedicated validator scripts; `release` and `validate:release` are unchanged. Vitest
 discovery changed from 88 to 87 files, with exactly the retired gate suite removed and every other
 file/project identity retained. Format write/check and whitespace checks passed. No publishing
 command was executed. Product code, lockfile and release workflow were not changed; the prior
 candidate CI remains applicable product/package evidence, not a claim of CI on this new commit.
 
-## Historical references
+## Historical conclusions
 
-[Suspension and saved results](opentelemetry-m2-disabled-matrix.md),
-[profile integration](opentelemetry-m2-profile-integration.md),
-[disabled SDK integration](opentelemetry-m2-disabled-sdk-integration.md), and
-[test-layout CI correction](opentelemetry-m2-test-layout-ci-correction.md) supply facts, not renewed
-assignments. Old F's RSS fail and the limited first-target valid pass remain unchanged.
+Old F failed its then-current disabled RSS criterion. Saved F2 achieved a valid disabled pass only
+for Linux/WSL2/ext4, commit-heavy isomorphic-git, 4,430 commits and the warm-cache protocol. The
+remaining matrix was suspended without further valid F2 judgments. These results do not establish
+causation or coverage of other workloads, and retirement does not convert failures into success.
+Old handoffs and diagnostic assets are removed rather than retained as executable instructions.
 
-## Routing verification
+## Historical routing verification (before infrastructure retirement)
 
 Windows, 2026-10-22: Vitest file discovery before/after matches by complete file path: 105 before,
 88 product files unchanged, 17 optional infrastructure files unchanged, no overlap. Explicit optional

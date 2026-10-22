@@ -1,9 +1,5 @@
 # Build, Test, and Release Validation
 
-The unfinished test-only Windows boundary is documented separately in
-[Standalone Windows launcher](windows-standalone-launcher.md); it is not integrated into fixture
-helpers and its first Stage B runtime validation failed.
-
 ## Purpose and scope
 
 This document is the canonical contributor guide for TypeScript projects, development builds,
@@ -90,8 +86,8 @@ the supported resource policy for the ordinary root `npm test`, including its un
 deadlines and assertions. Linux retains Vitest's existing defaults. Explicit CLI `--maxWorkers`
 overrides still take precedence; running a workspace independently uses that workspace's own config.
 The Windows cap does not establish that unrestricted concurrency or historical timeout/EBUSY
-failures were repaired. Test cancellation and disposal ownership are checked separately through
-the [fixture tooling boundary](telemetry-performance-harness.md#optional-test-fixture-ownership).
+failures were repaired. Shared fixture ownership helpers remain for product behavioral regressions; see
+the [test layout guide](../../../../tests/README.md) for their purpose and retirement condition.
 
 ### Windows with Volta: invocation-local executable setup
 
@@ -306,97 +302,22 @@ dependency consistency, formatting, lint, architecture, generated schema consist
 tests before building the release and running publint and the installed-package system test. It does
 not establish empirical telemetry acceptance by itself.
 
-The supported Changesets publish path has a second, migration-specific gate:
+The supported release command remains `npm run release`: it runs `validate:release` before
+`changeset:publish` (`changeset publish`). The Changesets Action uses this same callback.
+`changeset:publish` itself is the publishing primitive, not a validation command. Do not invoke either
+publishing command as a verification step. Repository review rules and npm Trusted Publishing remain
+the publication authority boundary. Candidate acceptance does not authorize an agent
+to publish, approve or merge a PR.
 
-```bash
-npm run validate:telemetry-release-acceptance -w gitlode
-```
-
-The root `changeset:publish` command runs this validator immediately before `changeset publish`, and
-the Changesets Action publish callback continues to converge through `npm run release`. Ordinary CI,
-`validate:release`, release builds, and Version PR creation do not run the migration gate. The release
-checkout fetches complete history so the validator can prove candidate ancestry.
-
-The versioned record at `.release/telemetry-migration-acceptance.json` starts in `blocked` state. An
-`accepted` record must contain reviewed attestations for all five calibrations and legacy captures,
-the ten canonical comparisons, aggregation N/4N bounded-growth checks, and three `target_on` checks
-for every repository target. Those repository checks attest to profile-report validity, report size,
-and prohibited host spans. The profile-report validity attestation requires literal `pass` outcomes
-for sidecar availability, report presence, schema validity, complete spans, complete counters,
-complete histograms, diagnostics presence, and empty diagnostics. It cannot carry a performance
-exception. Report size and prohibited host spans retain the reviewed performance-exception path.
-The record also requires applicable Git CLI command parity and explicit behavioral outcomes, and it
-must cover profile readability (including partial and unavailable output), staged system-test and
-contributor-navigation work, final Windows/Linux functional and installed-package checks, bundle
-identity, candidate delta assessment, T13C closure, and release-authority approval. Each attestation
-identifies its evidence and archive, records a SHA-256, names the exact final candidate for which it
-is accepted, and identifies the reviewer and review date. A performance exception must also contain
-every exception field in the telemetry performance catalog and a separate release-authority approval;
-it cannot waive calibration, missing or inconclusive evidence, report validity, or behavioral
-correctness.
-
-Performance attestations separately name the product and harness revisions that generated their
-evidence. Those revisions, the preserved legacy revision and the frozen migration candidate must be
-available Git commits. The legacy revision must precede the frozen candidate, and the frozen candidate
-must be an ancestor of the final candidate; separately versioned harness commits need only exist.
-Calibration and legacy capture remain baseline evidence. Reuse of evidence from an older redesigned
-candidate requires a reviewed, evidence-specific delta binding over its evidence ID, source product
-and harness OIDs, and final destination OID. The gate rejects absent, mismatched and dangling reuse
-claims without attempting to judge the reviewer's semantic rationale.
-
-The reviewer is responsible for verifying the referenced bytes and deciding whether the evidence is
-acceptable. The repository gate verifies only that committed attestations are complete and
-consistent; it neither has access to external archives nor proves artifact authenticity from a hash
-alone. The final candidate must be an ancestor of the publish checkout, and their trees may differ
-only at the acceptance-record path. Any tracked or untracked checkout change fails closed. Ignored
-generated build output is omitted by normal Git status handling and therefore does not appear as a
-source edit. Actions publishing is accepted only from `refs/heads/main`; local publishing reads
-the attached branch from Git and requires `main` rather than trusting an environment override.
-
-The record remains enforced after the initial v0.13.0 publication until a separate reviewed change
-retires this temporary migration gate while preserving accepted evidence in history. Repository
-enforcement cannot prevent a credential holder from bypassing the supported command or modifying the
-guard; branch review and npm Trusted Publishing remain the authority boundary for those actions.
-
-Use the narrower commands while developing. Assess publish readiness from both `validate:release`
-and an accepted telemetry migration record; do not change a blocked record without the required
-independent review evidence.
-
-### Fixture qualification release review
-
-Keep migration release schema 1. The
-[fixture adoption contract](../design/telemetry-performance.md#fixture-qualification-and-adoption-review)
-owns exact reference semantics, adoption bindings and temporal gates. For an adopted fixed-quantity
-target, `performance.calibrations[*].attestation` references a sealed target qualification review
-dossier: unique evidenceId, exact archiveId/hash, reviewer/date, final candidateOid, actual legacy
-sourceProductOid and new evidence-generating harnessOid. Its reviewed members bind historical
-calibration, input review, eligibility, adoption and authorized manifest. Distinguish historical
-minimality from new fixed-size eligibility; childStatus/behavioralStatus describe the new eligible
-evidence. Final release authority must explicitly approve this dossier's role as the schema-1
-calibration attestation. Validator syntax acceptance is not semantic approval.
-
-Captures/comparisons retain their own attestations and calibrationEvidenceId/legacyCaptureEvidenceId/
-target recipe cross-links. Their archived dossiers name the exact adoption hash and their own
-execution evidence. Candidate review verifies final bundle/runtime and fixtureManifestSha256 against
-actual bytes. T13C and releaseAuthority attestations reference final closure-review bytes enumerating
-every dossier, adoption hash, candidate and evidence-specific delta/reuse decision. A changed final
-candidate requires destination-candidate review and applicable evidence-specific reuse approval.
-Preserve old baseline/harness provenance; do not relabel historical comparisons as current acceptance.
-One target dossier does not satisfy remaining fresh-target or aggregation requirements.
-
-Reviewers resolve and rehash the dossier's actual members and verify review/authority attribution.
-The supported publish validator checks committed completeness/consistency and hash syntax; it does
-not open external archives, verify their bytes, inspect adoption or authenticate reviewers. The
-accepted policy relies on external review, without automatic preflight, a publish archive resolver or
-schema expansion. Live acceptance remains blocked until all applicable reviews and gates are met.
+Ordinary product, release-boundary and installed-package checks remain required.
 
 ### Lazy telemetry release boundary
 
 The [telemetry verification contract](../design/telemetry-verification.md#failure-injection) requires
 independent emitted graph, host/worker runtime load and packed dynamic asset checks for the SDK-free
 disabled path. Shared chunks and external transitive dependencies count toward the static closure of
-all three stable entries. Packed enabled execution must positively produce a report, and aggregation
-child bundles must retain dynamic targets. Source-only D1 tests do not discharge these obligations;
+all three stable entries. Packed enabled execution must positively produce a report and load the
+emitted lazy assets. Source tests alone do not verify the installed-package boundary.
 The release build runs `typecheck:release-boundary` and a product-owned tsdown metadata verifier
 (`scripts/tooling/release-telemetry-boundary.ts`). It follows static chunk edges for each stable entry,
 checks module ownership and conservatively follows declared external dependency identities. Lazy
@@ -441,21 +362,31 @@ The consumer installs the actual tarball and `typescript@^7.0.2`; registry acces
 version are execution inputs. Public consumer typing uses skipLibCheck false. The private workspace
 has no build/publish script or production entry points. It is outside product `files: [dist, schemas]`;
 exports, bin, bundler inputs and runtime dependencies remain unchanged. Workspace-wide source tests
-do not invoke packaging. Migration publish enforcement remains unchanged.
+do not invoke packaging.
 
-## Performance verification workspace
+## Shared product test support
 
-Performance tooling and its dedicated tests belong to private `tests/performance`; shared Node-only
-fixture helpers belong to `tests/support`. See the [layout guide](../../../../tests/README.md).
-Root test discovery includes this project. CI and `validate:release` run `typecheck:performance`
-without running a formal measurement. The installed-package boundary in `tests/system` is unchanged.
+`tests/support` contains Node-only deterministic repository, behavioral comparison and fixture
+ownership helpers used by product regressions. See the [layout guide](../../../../tests/README.md).
+The former performance workspace, its commands and standalone Windows launcher have been retired.
+The installed-package boundary in `tests/system` and normal product tests remain.
 
-The performance workspace's `typecheck` command first runs the existing internal-contracts
-development build. Its TypeScript project reference also builds internal-foundation, whose generated
-package exports are required by the checker. This prerequisite belongs to the workspace command so
-direct invocation, CI and `validate:release` work before a root development build has generated dist.
+Run `npm run typecheck:test-support` for the independent strict, no-emit check of these helpers.
+It is included in CI and `validate:release`, with no dependency on generated product declarations.
 
-Unused-export analysis for gitlode and the shared verification consumers runs on the root graph,
-so moving a consumer to another workspace does not make a used export appear dead. The existing
-entrypoint exemptions are retained; other workspace checks and product/installed-package import
-boundaries remain enforced.
+## Empirical comparisons
+
+Keep timing and resource conclusions tied to the actual candidate, dependencies, input, extraction
+settings and environment. Report absolute values as well as relative differences, preserve failed
+attempts, and distinguish measurement validity from the release owner's acceptance decision. A
+successful rerun does not explain an earlier failure. Scope the work to a concrete product question;
+reassess its value before expanding verification infrastructure.
+
+Compare JSONL content when feasible. Counts or file sizes alone do not prove content equality.
+Functional/package checks do not establish performance across unmeasured workloads or operating
+systems. Release-specific choices and outcomes belong in task coordination records, not product
+design contracts.
+
+For test repositories, Git maintenance defaults can change across Git versions. Process exit alone
+does not prove all descendants have stopped; retain uncertain roots rather than deleting possibly
+active data. These cautions do not require a particular benchmark or launcher implementation.

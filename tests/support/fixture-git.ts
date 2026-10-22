@@ -1,3 +1,5 @@
+// Runs isolated Git fixture commands for product regressions, with optional ownership tracking.
+// Keep until all fixture callers have equivalent environment isolation and awaited cleanup.
 import {
   execFile,
   spawn,

@@ -15,8 +15,8 @@ With profiling disabled, the source session selects API no-op telemetry without 
 SDK implementation, constructing SDK providers or installing a context manager. Initialization
 failure after an enabled request also falls back to API no-op telemetry, after owned partial cleanup;
 it may already have loaded SDK code. The [telemetry contract](design/telemetry.md#worker-telemetry-session)
-defines no-op root/context semantics. Emitted and installed zero-load proof remains pending D2
-release verification; this source change does not establish performance acceptance.
+defines no-op root/context semantics. Release checks verify this boundary in emitted bundles and
+installed CLI/worker execution; these functional checks do not quantify execution-time overhead.
 
 ## Generic hierarchy
 

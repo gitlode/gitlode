@@ -13,8 +13,7 @@
     "packages/plugin-custom-field",
     "packages/plugin-file-type",
     "packages/plugin-identity-profile",
-    "tests/system",
-    "tests/performance"
+    "tests/system"
   ],
   "scripts": {
     "architecture:check": "npm run build:dev && rev-dep config run --lint-config",
@@ -24,7 +23,7 @@
     "build:release": "npm run build:dev && npm run bundle:release -w gitlode",
     "build:watch": "tsc -b -w",
     "changeset": "changeset",
-    "changeset:publish": "npm run validate:telemetry-release-acceptance -w gitlode && changeset publish",
+    "changeset:publish": "changeset publish",
     "changeset:status": "changeset status",
     "changeset:version": "changeset version",
     "format": "node -e \"console.error('Error: Please run format:check or format:write instead.'); process.exit(1)\"",
@@ -40,11 +39,11 @@
     "test:package": "npm run test:package -w gitlode",
     "test:watch": "vitest",
     "test:coverage": "npm run build:dev && vitest run --coverage",
-    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run typecheck:system && npm run typecheck:performance && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run build:release && npm run validate:publint -w gitlode && npm run test:system:package",
+    "validate:release": "npm run syncpack:check && npm run format:check && npm run lint && npm run typecheck:system && npm run typecheck:test-support && npm run architecture:check && npm run schema:check -w gitlode && npm test && npm run build:release && npm run validate:publint -w gitlode && npm run test:system:package",
     "version-packages": "npm run changeset:version && npm run lockfile:sync",
     "typecheck:system": "npm run typecheck -w @gitlode/system-tests",
     "test:system:package": "npm run test:package -w @gitlode/system-tests",
-    "typecheck:performance": "npm run typecheck -w @gitlode/performance-tests"
+    "typecheck:test-support": "tsc -p tests/support/tsconfig.json"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",

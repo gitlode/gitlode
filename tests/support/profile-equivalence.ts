@@ -1,3 +1,5 @@
+// Compares product results with profile on/off while ignoring only run-specific metadata.
+// Keep while behavioral-baseline.test.ts exercises profile transparency.
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 

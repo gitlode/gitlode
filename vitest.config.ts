@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    ...(process.platform === "win32" ? { maxWorkers: 2 } : {}),
     projects: [
       "./packages/internal-foundation/vitest.config.ts",
       "./packages/internal-contracts/vitest.config.ts",

@@ -2,15 +2,13 @@
 
 ## Status
 
-This document defines the accepted design for gitlode telemetry. The OpenTelemetry runtime migration
-is implemented and integrated; remaining release acceptance is tracked separately.
+This document defines the accepted design for gitlode telemetry. The local OpenTelemetry runtime
+provides collection, reporting and no-op behavior as described below.
 [`../profiling.md`](../profiling.md) describes the implemented profile output.
 
-The migration status, branch-sized work plan, and remaining design gates are tracked in
-[`../handoff/instrumentation-opentelemetry-redesign-plan.md`](../handoff/instrumentation-opentelemetry-redesign-plan.md).
-The verification contract for the migration is defined in
+The product verification contract is defined in
 [`telemetry-verification.md`](telemetry-verification.md).
-Performance acceptance is defined in [`telemetry-performance.md`](telemetry-performance.md).
+Empirical timing results are workload-specific evidence, not runtime design guarantees.
 
 ## Purpose and scope
 
@@ -259,8 +257,8 @@ The YAML files are design contracts, not runtime configuration. Production code 
 at startup. Implementation metadata is checked against the catalogs during tests; code generation
 is not introduced unless a later concrete need justifies it.
 
-The complete observation catalog remains a design gate tracked by the handoff. Each metric entry
-must define:
+The observation catalog defines the implemented instrumentation contract. Each metric entry
+defines:
 
 - name, instrument kind, description, and unit;
 - instrumentation scope and operation owner;
@@ -809,4 +807,13 @@ owning control flow; update fake Meter/clock tests and actual owner-path tests u
 [verification](telemetry-verification.md). Collection infrastructure changes start at execution's
 session, SDK and report boundaries with real-provider, fault and transport tests. Internal checks
 remain package-owned. Installed public-contract regression belongs to the private system workspace.
-Empirical acceptance follows [performance policy](telemetry-performance.md) separately.
+Empirical comparisons follow the [contributor guidance](../contributing/build-test-release.md#empirical-comparisons).
+
+## Follow-up: Span aggregation semantics
+
+Current Scope/name aggregation and independent `single`/`distinct`/`min_max` reducers lose
+duration/attribute associations and joint attribute combinations; presentation cannot recover them.
+A future design should preserve OTel measurement meaning while making consumer aggregation needs
+explicit. Distinguish SDK same-key updates within one Span from aggregation across completed Spans.
+Evaluate bounded attribute-set aggregation versus retaining individual observations, including memory
+bounds, privacy, admission and loss reporting. This is a product design follow-up, not a v0.13.0 gate.

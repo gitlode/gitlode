@@ -71,5 +71,4 @@ When changing behavior, update the documentation for every affected audience:
 Product work starts with [architecture](design/architecture.md), [domain ownership](design/domain-design.md)
 and [build/test guidance](contributing/build-test-release.md). Telemetry work starts with
 [recording/collection contracts](design/telemetry.md) and [verification](design/telemetry-verification.md).
-Empirical work separately follows [performance policy](design/telemetry-performance.md) and the
-[harness guide](contributing/telemetry-performance-harness.md).
+Empirical comparisons follow the [contributor guidance](contributing/build-test-release.md#empirical-comparisons).

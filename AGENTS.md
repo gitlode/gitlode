@@ -20,6 +20,14 @@ gitlode documentation is organized for three audiences:
 Agent-specific instruction files may provide routing and guardrails, but they must not become
 independent sources of truth for design contracts.
 
+## Multi-session development
+
+For complex development tasks requiring multiple Codex sessions, use the
+`multi-session-development` Skill. If unavailable, report the missing installation.
+Follow [collaboration guidance](packages/gitlode/docs/agents/collaborative-work.md),
+including its human-owned integration and PR approval requirements.
+Resolve base/work branches and the intended integration chain at Task start.
+
 ## Source of truth
 
 Use these documentation homes when changing behavior:
@@ -90,9 +98,7 @@ Read:
    and equivalence verification
 3. `packages/gitlode/docs/design/architecture.md` and `packages/gitlode/docs/design/domain-design.md`
    when instrumentation boundaries are affected
-4. `packages/gitlode/docs/design/telemetry-performance.md` and
-   `packages/gitlode/docs/contributing/telemetry-performance-harness.md` only for empirical
-   performance work
+4. `packages/gitlode/docs/contributing/build-test-release.md` for empirical comparison guidance
 5. `packages/gitlode/docs/profiling.md` for user-visible profile-report interpretation
 6. `packages/gitlode/docs/contributing/build-test-release.md` when publish policy is affected
 7. Relevant notes in `packages/gitlode/docs/handoff/` only when continuing unfinished work

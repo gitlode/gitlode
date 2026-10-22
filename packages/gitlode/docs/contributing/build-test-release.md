@@ -81,6 +81,118 @@ Normal test commands perform an incremental development build first. The root wa
 not rebuild cross-workspace output continuously; run `npm run build:watch` alongside it when the
 code under test spans workspace boundaries.
 
+On Windows, the root Vitest configuration sets `maxWorkers: 2` for the workspace projects. This is
+the supported resource policy for the ordinary root `npm test`, including its unchanged test
+deadlines and assertions. Linux retains Vitest's existing defaults. Explicit CLI `--maxWorkers`
+overrides still take precedence; running a workspace independently uses that workspace's own config.
+The Windows cap does not establish that unrestricted concurrency or historical timeout/EBUSY
+failures were repaired. Shared fixture ownership helpers remain for product behavioral regressions; see
+the [test layout guide](../../../../tests/README.md) for their purpose and retirement condition.
+
+### Windows with Volta: invocation-local executable setup
+
+Some Volta installations remove their standard shim directories from the PATH passed into an npm
+lifecycle. The interactive shell can resolve npm while a Vitest worker or its tsx child sees only
+`npm.cmd` and fails with `spawn npm ENOENT`. The tooling launches `npm` directly through Node's
+`execFile`, without a command shell; `npm.cmd` alone does not satisfy that executable launch.
+
+For this supported setup, use the installed `npm.exe`, verify a byte-identical local copy, and prepend
+its new directory only for the current invocation. No global PATH, toolchain installation or
+repository npm-resolution code change is needed. Run the following PowerShell procedure from the
+repository root after dependencies are installed. It records installed executable identity and
+versions, checks direct npm execution in both an actual npm lifecycle Vitest worker and its tsx
+child, and restores PATH even if validation fails. It uses installed dependencies in offline mode.
+The preflight is a resolution check, not the repository test campaign.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$originalPath = $env:PATH
+$npmExecutable = (Get-Command npm.exe -CommandType Application -ErrorAction Stop).Source
+$nodeVersion = (& node --version).Trim()
+$npmVersion = (& $npmExecutable --version).Trim()
+$nodeExecutable = (& volta which node).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the installed Volta Node' }
+$setupRoot = Join-Path (Get-Location) ('.cache/windows-npm-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $setupRoot | Out-Null
+$localNpm = Join-Path $setupRoot 'npm.exe'
+Copy-Item -LiteralPath $npmExecutable -Destination $localNpm
+$sourceHash = (Get-FileHash -LiteralPath $npmExecutable -Algorithm SHA256).Hash
+if ((Get-FileHash -LiteralPath $localNpm -Algorithm SHA256).Hash -ne $sourceHash) {
+    throw 'Installed npm executable copy differs'
+}
+@{ npmSource = $npmExecutable; npmCopy = $localNpm; sha256 = $sourceHash
+   nodeExecutable = $nodeExecutable; node = $nodeVersion; npm = $npmVersion } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $setupRoot 'binding.json') -Encoding utf8
+@'
+import { execFileSync } from 'node:child_process';
+console.log(JSON.stringify({
+  node: process.version,
+  execPath: process.execPath,
+  npm: execFileSync('npm', ['--version'], { encoding: 'utf8', timeout: 3000 }).trim(),
+  path: process.env.PATH,
+}));
+'@ | Set-Content -LiteralPath (Join-Path $setupRoot 'child.mjs') -Encoding utf8
+@'
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { expect, it } from 'vitest';
+it('resolves installed npm through the lifecycle worker and tsx child', () => {
+  const binding = JSON.parse(readFileSync(join(import.meta.dirname, 'binding.json'), 'utf8').replace(/^\uFEFF/, ''));
+  const worker = {
+    node: process.version, execPath: process.execPath, path: process.env.PATH,
+    npm: execFileSync('npm', ['--version'], { encoding: 'utf8', timeout: 3000 }).trim(),
+  };
+  const child = JSON.parse(execFileSync(process.execPath, [
+    resolve('node_modules/tsx/dist/cli.mjs'), join(import.meta.dirname, 'child.mjs'),
+  ], { encoding: 'utf8', timeout: 10000 }));
+  writeFileSync(join(import.meta.dirname, 'resolution.json'), JSON.stringify({ binding, worker, child }, null, 2));
+  for (const result of [worker, child]) {
+    expect(result.node).toBe(binding.node);
+    expect(result.npm).toBe(binding.npm);
+    expect(result.execPath.toLowerCase()).toBe(binding.nodeExecutable.toLowerCase());
+  }
+});
+'@ | Set-Content -LiteralPath (Join-Path $setupRoot 'resolution.test.mjs') -Encoding utf8
+$testPath = (Join-Path $setupRoot 'resolution.test.mjs').Replace('\', '/')
+"export default { test: { include: ['$testPath'], maxWorkers: 2 } };" |
+    Set-Content -LiteralPath (Join-Path $setupRoot 'vitest.config.mjs') -Encoding utf8
+try {
+    $env:PATH = $setupRoot + ';' + $originalPath
+    if ((& node --version).Trim() -ne $nodeVersion -or
+        (& $localNpm --version).Trim() -ne $npmVersion) { throw 'Toolchain version changed' }
+    & $npmExecutable exec --offline -- vitest run --config (Join-Path $setupRoot 'vitest.config.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'npm lifecycle worker/child resolution failed' }
+    # Run the required repository commands here, before PATH is restored.
+} finally {
+    $env:PATH = $originalPath
+    Write-Output "Setup receipts retained at $setupRoot; original PATH restored"
+}
+```
+
+At the marked location inside `try`, run `npm test` or the required build/test commands; those commands
+inherit the corrected environment. Running them after `finally` uses the restored environment.
+Retain `binding.json`, `resolution.json` and the complete command logs with the source commit when
+reporting results. The unique `.cache/windows-npm-*` directory keeps receipts and the executable copy
+without deleting other invocations' evidence. Do not download a replacement executable or use an
+agent-specific cache location as the installed source.
+
+The verified correction preserves the installed versions rather than prescribing a replacement
+version. A successful campaign with this procedure is evidence for the corrected invocation only;
+it does not establish that the unmodified Volta environment works. If executable resolution or the
+version assertions fail, preserve the first log and resolve the setup before running the campaign.
+
+### Timeouts for process integration tests
+
+Tests that exercise real Git processes, OS process containment or process shutdown may use an
+explicit per-test finite timeout rather than the general five-second unit-test default. Document
+the affected cases and budget rationale, including startup, workload, output settlement and a
+separate bounded cleanup opportunity. Keep outer driver deadlines consistent with those phases.
+Timeouts detect hangs; they are not performance acceptance thresholds. Preserve cancellation fault
+injection and cleanup assertions. A timeout failure requires diagnosis, not repeated increases until
+the test passes. Do not raise global defaults or weaken process-quiescence and evidence-retention
+requirements to accommodate these tests.
+
 ### Optional coverage
 
 ```bash
@@ -190,69 +302,22 @@ dependency consistency, formatting, lint, architecture, generated schema consist
 tests before building the release and running publint and the installed-package system test. It does
 not establish empirical telemetry acceptance by itself.
 
-The supported Changesets publish path has a second, migration-specific gate:
+The supported release command remains `npm run release`: it runs `validate:release` before
+`changeset:publish` (`changeset publish`). The Changesets Action uses this same callback.
+`changeset:publish` itself is the publishing primitive, not a validation command. Do not invoke either
+publishing command as a verification step. Repository review rules and npm Trusted Publishing remain
+the publication authority boundary. Candidate acceptance does not authorize an agent
+to publish, approve or merge a PR.
 
-```bash
-npm run validate:telemetry-release-acceptance -w gitlode
-```
-
-The root `changeset:publish` command runs this validator immediately before `changeset publish`, and
-the Changesets Action publish callback continues to converge through `npm run release`. Ordinary CI,
-`validate:release`, release builds, and Version PR creation do not run the migration gate. The release
-checkout fetches complete history so the validator can prove candidate ancestry.
-
-The versioned record at `.release/telemetry-migration-acceptance.json` starts in `blocked` state. An
-`accepted` record must contain reviewed attestations for all five calibrations and legacy captures,
-the ten canonical comparisons, aggregation N/4N bounded-growth checks, and three `target_on` checks
-for every repository target. Those repository checks attest to profile-report validity, report size,
-and prohibited host spans. The profile-report validity attestation requires literal `pass` outcomes
-for sidecar availability, report presence, schema validity, complete spans, complete counters,
-complete histograms, diagnostics presence, and empty diagnostics. It cannot carry a performance
-exception. Report size and prohibited host spans retain the reviewed performance-exception path.
-The record also requires applicable Git CLI command parity and explicit behavioral outcomes, and it
-must cover profile readability (including partial and unavailable output), staged system-test and
-contributor-navigation work, final Windows/Linux functional and installed-package checks, bundle
-identity, candidate delta assessment, T13C closure, and release-authority approval. Each attestation
-identifies its evidence and archive, records a SHA-256, names the exact final candidate for which it
-is accepted, and identifies the reviewer and review date. A performance exception must also contain
-every exception field in the telemetry performance catalog and a separate release-authority approval;
-it cannot waive calibration, missing or inconclusive evidence, report validity, or behavioral
-correctness.
-
-Performance attestations separately name the product and harness revisions that generated their
-evidence. Those revisions, the preserved legacy revision and the frozen migration candidate must be
-available Git commits. The legacy revision must precede the frozen candidate, and the frozen candidate
-must be an ancestor of the final candidate; separately versioned harness commits need only exist.
-Calibration and legacy capture remain baseline evidence. Reuse of evidence from an older redesigned
-candidate requires a reviewed, evidence-specific delta binding over its evidence ID, source product
-and harness OIDs, and final destination OID. The gate rejects absent, mismatched and dangling reuse
-claims without attempting to judge the reviewer's semantic rationale.
-
-The reviewer is responsible for verifying the referenced bytes and deciding whether the evidence is
-acceptable. The repository gate verifies only that committed attestations are complete and
-consistent; it neither has access to external archives nor proves artifact authenticity from a hash
-alone. The final candidate must be an ancestor of the publish checkout, and their trees may differ
-only at the acceptance-record path. Any tracked or untracked checkout change fails closed. Ignored
-generated build output is omitted by normal Git status handling and therefore does not appear as a
-source edit. Actions publishing is accepted only from `refs/heads/main`; local publishing reads
-the attached branch from Git and requires `main` rather than trusting an environment override.
-
-The record remains enforced after the initial v0.13.0 publication until a separate reviewed change
-retires this temporary migration gate while preserving accepted evidence in history. Repository
-enforcement cannot prevent a credential holder from bypassing the supported command or modifying the
-guard; branch review and npm Trusted Publishing remain the authority boundary for those actions.
-
-Use the narrower commands while developing. Assess publish readiness from both `validate:release`
-and an accepted telemetry migration record; do not change a blocked record without the required
-independent review evidence.
+Ordinary product, release-boundary and installed-package checks remain required.
 
 ### Lazy telemetry release boundary
 
 The [telemetry verification contract](../design/telemetry-verification.md#failure-injection) requires
 independent emitted graph, host/worker runtime load and packed dynamic asset checks for the SDK-free
 disabled path. Shared chunks and external transitive dependencies count toward the static closure of
-all three stable entries. Packed enabled execution must positively produce a report, and aggregation
-child bundles must retain dynamic targets. Source-only D1 tests do not discharge these obligations;
+all three stable entries. Packed enabled execution must positively produce a report and load the
+emitted lazy assets. Source tests alone do not verify the installed-package boundary.
 The release build runs `typecheck:release-boundary` and a product-owned tsdown metadata verifier
 (`scripts/tooling/release-telemetry-boundary.ts`). It follows static chunk edges for each stable entry,
 checks module ownership and conservatively follows declared external dependency identities. Lazy
@@ -297,4 +362,31 @@ The consumer installs the actual tarball and `typescript@^7.0.2`; registry acces
 version are execution inputs. Public consumer typing uses skipLibCheck false. The private workspace
 has no build/publish script or production entry points. It is outside product `files: [dist, schemas]`;
 exports, bin, bundler inputs and runtime dependencies remain unchanged. Workspace-wide source tests
-do not invoke packaging. Migration publish enforcement remains unchanged.
+do not invoke packaging.
+
+## Shared product test support
+
+`tests/support` contains Node-only deterministic repository, behavioral comparison and fixture
+ownership helpers used by product regressions. See the [layout guide](../../../../tests/README.md).
+The former performance workspace, its commands and standalone Windows launcher have been retired.
+The installed-package boundary in `tests/system` and normal product tests remain.
+
+Run `npm run typecheck:test-support` for the independent strict, no-emit check of these helpers.
+It is included in CI and `validate:release`, with no dependency on generated product declarations.
+
+## Empirical comparisons
+
+Keep timing and resource conclusions tied to the actual candidate, dependencies, input, extraction
+settings and environment. Report absolute values as well as relative differences, preserve failed
+attempts, and distinguish measurement validity from the release owner's acceptance decision. A
+successful rerun does not explain an earlier failure. Scope the work to a concrete product question;
+reassess its value before expanding verification infrastructure.
+
+Compare JSONL content when feasible. Counts or file sizes alone do not prove content equality.
+Functional/package checks do not establish performance across unmeasured workloads or operating
+systems. Release-specific choices and outcomes belong in task coordination records, not product
+design contracts.
+
+For test repositories, Git maintenance defaults can change across Git versions. Process exit alone
+does not prove all descendants have stopped; retain uncertain roots rather than deleting possibly
+active data. These cautions do not require a particular benchmark or launcher implementation.

@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 import type { AbsolutePath } from "@gitlode/internal-foundation/support";
 import { describe, expect, it } from "vitest";
 
+import { createDeterministicRepository } from "../../../../tests/support/deterministic-repository.js";
 import type { WorkerRunRequest, WorkerRunResult } from "../../src/execution/types.js";
 import { dispatchWorkerRunRequest } from "../../src/execution/worker-client.js";
-import { createPerformanceRepository } from "../support/performance-fixtures.js";
 
 const workerEntry = new URL("../../dist/execution/worker-entry.js", import.meta.url);
 
@@ -32,13 +32,7 @@ describe("profile fallback worker transport", () => {
       const repository = join(root, "repository");
       const normalOutput = join(root, "normal-output");
       const fallbackOutput = join(root, "fallback-output");
-      await createPerformanceRepository(repository, "commit_heavy_repository", {
-        commits: 5,
-        files: 1,
-        plugins: 0,
-        rotations: 1,
-        scale: 0,
-      });
+      await createDeterministicRepository(repository);
       await Promise.all([mkdir(normalOutput), mkdir(fallbackOutput)]);
       const request = (outputDir: string): WorkerRunRequest => ({
         input: {

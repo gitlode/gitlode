@@ -68,7 +68,8 @@ branches from local and remote, using exact remote OID leases. Retain convergenc
 their human-owned integration is complete. Main/integration and release tags were not changed. Git
 history was not rewritten or garbage-collected; deleted branch details are not promised recoverable.
 
-Two Windows TEMP directories have uncertain task provenance and remain pending human disposition:
+The human additionally authorized deletion of two Windows TEMP directories with uncertain task provenance;
+both were removed after checking their paths and process command-line references:
 `gitlode-phase4-50d899b48ddd41d9af8e11b9abbf3f57` and
 `gitlode-rev-dep-eval-8e4be88d61234a6bae24e43d4068dff4`.
 Existing `gitlode-session-*` roots belong to the retained product Git CLI session tests, not the

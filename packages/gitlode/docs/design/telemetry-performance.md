@@ -1,5 +1,10 @@
 # Telemetry Performance Verification
 
+> For v0.13.0, the [2026-10-22 acceptance policy](telemetry-v013-acceptance.md) supersedes this
+> protocol's release requirements. The protocol below remains the interpretation of historical
+> measurements and retained tooling; it does not authorize new campaigns or impose old thresholds
+> on current acceptance.
+
 This document defines the performance acceptance policy for the telemetry redesign. Exact
 thresholds, fixture requirements, measurement fields, and environment metadata are canonical in
 [`telemetry-catalog/performance.yaml`](telemetry-catalog/performance.yaml). Functional verification

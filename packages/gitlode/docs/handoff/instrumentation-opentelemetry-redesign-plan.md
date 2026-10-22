@@ -1,5 +1,9 @@
 # OpenTelemetry Instrumentation Redesign Handoff
 
+> Historical plan. The [2026-10-22 convergence task](opentelemetry-v013-convergence.md) supersedes
+> the acceptance requirements and execution assignments below. Preserve historical results; do not
+> resume old work from this document.
+
 ## Status and authority
 
 Runtime migration T00A through T12 and performance readiness T13A are complete. The implemented

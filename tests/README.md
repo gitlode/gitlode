@@ -8,7 +8,7 @@ Product unit/regression tests remain in `packages/*/test`. In particular recorde
 
 See [performance commands and safety](../packages/gitlode/docs/contributing/telemetry-performance-harness.md), [Windows prototype limits](../packages/gitlode/docs/contributing/windows-standalone-launcher.md) and [build/release](../packages/gitlode/docs/contributing/build-test-release.md).
 
-Root `npm test` discovers the performance project as well as product tests. `npm run typecheck:performance` checks tooling/shared support; `npm run typecheck:windows-launcher -w @gitlode/performance-tests` checks the experimental launcher and its test closure. `tsconfig.fixture-lifecycle.json` preserves the existing wider focused check, without treating historical diagnostics as new relocation failures.
+Root `npm test`, watch and coverage discover product projects only. Legacy performance infrastructure is retained for explicit use through `npm run test:performance`; it is not a v0.13.0 acceptance prerequisite. `npm run typecheck:performance` checks tooling/shared support; `npm run typecheck:windows-launcher -w @gitlode/performance-tests` checks the experimental launcher and its test closure. `tsconfig.fixture-lifecycle.json` preserves the existing wider focused check, without treating historical diagnostics as new relocation failures.
 
 `npm run performance:* -w gitlode` remains a compatibility command; the implementation now lives in `tests/performance/scripts`. The private workspace also exposes these commands. Relative operator arguments still resolve from the caller's cwd; use absolute snapshot/artifact paths. Default manifest and artifact directory now belong to the performance workspace. Never run a measurement or native Windows campaign just to check discovery.
 

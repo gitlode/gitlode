@@ -293,6 +293,12 @@ not rely on undeclared root development dependencies, while the domain rules doc
 
 ## CI and publish gates
 
+For v0.13.0, use the [2026-10-22 acceptance policy](../design/telemetry-v013-acceptance.md).
+The human approved retaining the current publication block until candidate acceptance, then retiring
+the temporary migration gate in a reviewed change. No replacement validator is planned. The schema-1
+requirements below describe the still-installed gate, not current acceptance work to execute.
+Do not fabricate a complete record or resume historical campaigns to satisfy that schema.
+
 CI runs source validation and then exercises the release pipeline as explicit steps: development
 build, generated-artifact checks, source tests, release build, packed metadata validation, and the
 installed-package system test. Coverage is intentionally absent.
@@ -447,13 +453,15 @@ do not invoke packaging. Migration publish enforcement remains unchanged.
 
 Performance tooling and its dedicated tests belong to private `tests/performance`; shared Node-only
 fixture helpers belong to `tests/support`. See the [layout guide](../../../../tests/README.md).
-Root test discovery includes this project. CI and `validate:release` run `typecheck:performance`
-without running a formal measurement. The installed-package boundary in `tests/system` is unchanged.
+Root test discovery covers product projects only. Legacy performance infrastructure remains available
+through explicit `npm run test:performance` and `npm run typecheck:performance`; CI and
+`validate:release` do not require those checks. Product tests that consume shared verification helpers
+remain included. The installed-package boundary in `tests/system` is unchanged.
 
 The performance workspace's `typecheck` command first runs the existing internal-contracts
 development build. Its TypeScript project reference also builds internal-foundation, whose generated
 package exports are required by the checker. This prerequisite belongs to the workspace command so
-direct invocation, CI and `validate:release` work before a root development build has generated dist.
+direct invocation works before a root development build has generated dist.
 
 Unused-export analysis for gitlode and the shared verification consumers runs on the root graph,
 so moving a consumer to another workspace does not make a used export appear dead. The existing

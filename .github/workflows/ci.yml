@@ -42,9 +42,6 @@ jobs:
       - name: Typecheck system tooling
         run: npm run typecheck:system
 
-      - name: Typecheck performance tooling
-        run: npm run typecheck:performance
-
       - name: Check architecture
         run: npm run architecture:check
 

@@ -31,23 +31,21 @@ product regressions. Keep installed-package validation. No product rollback is c
 Leave old verification code, branches and local evidence in place initially; do not turn cleanup into
 a prerequisite or silently delete assets. Do not export them to a new benchmark project.
 
-`tests/performance` is currently included in root Vitest, CI typechecking and `validate:release`.
-Separate legacy benchmark-infrastructure verification from the normal product path in a bounded
-follow-up, retaining an explicit optional command if the code remains. Inspect classification before
-excluding anything that directly verifies product behavior. Do not describe retired checks as passed.
+Legacy `tests/performance` verification is now explicit opt-in through `npm run test:performance`
+and `npm run typecheck:performance`. Root Vitest, CI and `validate:release` retain product tests and
+installed-package checks, while no longer requiring the legacy infrastructure project. Its source,
+assertions and historical evidence remain intact. Product regressions using shared performance
+helpers remain included; this is a policy change, not evidence that retired checks passed.
 
 The supported publish command currently requires the old migration validator and a blocked schema-1
-record. **Proposed transition, pending human choice:** keep publication blocked during convergence;
+record. **Human-approved transition:** keep publication blocked during convergence;
 after explicit acceptance of the actual candidate, retire the temporary migration-only validator,
 its dedicated tests/record and command wiring in a reviewed change. Preserve ordinary release checks
-and human publication authority. Do not build a replacement evidence-validation framework. An
-alternative is a small candidate-bound human-acceptance record, if the human wants a lasting
-machine-enforced migration gate.
+and human publication authority. No replacement migration validator will be built.
 
 ## Next bounded steps
 
-1. Confirm the publish-gate transition choice. Update normal validation routing and durable guidance
-   consistently, without changing product semantics or fixing historical benchmark infrastructure.
+1. Normal validation routing is updated. Keep the publish block until human candidate acceptance.
 2. Select one available real repository and equivalent extraction settings. Propose a small fixed run
    count, elapsed-time boundary and straightforward JSONL comparison before executing. Do not require
    calibration, prescribed 10–30-second workloads or a multi-OS campaign. Record time as observations,
@@ -70,3 +68,13 @@ been started in this convergence step.
 [disabled SDK integration](opentelemetry-m2-disabled-sdk-integration.md), and
 [test-layout CI correction](opentelemetry-m2-test-layout-ci-correction.md) supply facts, not renewed
 assignments. Old F's RSS fail and the limited first-target valid pass remain unchanged.
+
+## Routing verification
+
+Windows, 2026-10-22: Vitest file discovery before/after matches by complete file path: 105 before,
+88 product files unchanged, 17 optional infrastructure files unchanged, no overlap. Explicit optional
+workspace execution passed atomic-json 12/12; normal root project execution passed profile formatter
+34/34. These were short unit checks, not calibration or native launcher campaigns. No Linux execution,
+full suite or installed-package campaign was repeated for this routing-only change. Those remain
+candidate/CI checks, not claimed results here. Product source, thresholds, publish wiring, blocked
+record and dependency versions/lockfile are unchanged. Existing format/lint coverage is retained.

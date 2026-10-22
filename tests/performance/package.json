@@ -6,7 +6,7 @@
   "scripts": {
     "typecheck": "npm run build:dev -w @gitlode/internal-contracts && tsc -p tsconfig.json",
     "typecheck:windows-launcher": "tsc -p tsconfig.windows-launcher.json",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
     "format:write": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint",
